@@ -641,11 +641,10 @@ public:
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't add a tile to a const tree");
-        if (NodeType::LEVEL < level) return;
-        if (this->isHashed(xyz)) {
+        if (NodeType::LEVEL >= level && this->isHashed(xyz)) {
             assert(mNode);
-            return const_cast<NodeType*>(mNode)->addTileAndCache(
-                level, xyz, value, state, *mParent);
+            const_cast<NodeType*>(mNode)->addTileAndCache(level, xyz, value, state, *mParent);
+            return;
         }
         mNext.addTile(level, xyz, value, state);
     }
@@ -683,31 +682,41 @@ public:
     NodeT* probeNode(const Coord& xyz)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (this->isHashed(xyz)) {
-            if ((std::is_same<NodeT, NodeType>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeType>::value)) {
+            if (this->isHashed(xyz)) {
                 assert(mNode);
                 return reinterpret_cast<NodeT*>(const_cast<NodeType*>(mNode));
             }
+        }
+
+        if (NodeT::LEVEL < NodeType::LEVEL && mNode) {
+            // don't need to ascend the chain, descend the tree
             return const_cast<NodeType*>(mNode)->template probeNodeAndCache<NodeT>(xyz, *mParent);
         }
-        return mNext.template probeNode<NodeT>(xyz);
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        else {
+            // ascend
+            return mNext.template probeNode<NodeT>(xyz);
+        }
     }
 
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz)
     {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (this->isHashed(xyz)) {
-            if ((std::is_same<NodeT, NodeType>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeType>::value)) {
+            if (this->isHashed(xyz)) {
                 assert(mNode);
                 return reinterpret_cast<const NodeT*>(mNode);
             }
+        }
+
+        if (NodeT::LEVEL < NodeType::LEVEL && mNode) {
+            // don't need to ascend the chain, descend the tree
             return mNode->template probeConstNodeAndCache<NodeT>(xyz, *mParent);
         }
-        return mNext.template probeConstNode<NodeT>(xyz);
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        else {
+            // ascend
+            return mNext.template probeConstNode<NodeT>(xyz);
+        }
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -870,9 +879,7 @@ public:
         , mHash(CoordLimits::max())
         , mNode(nullptr)
         , mNext(parent)
-        , mBuffer(nullptr)
-    {
-    }
+        , mBuffer(nullptr) {}
 
     //@{
     /// Copy another CacheItem's node pointers and hash keys, but not its parent pointer.
@@ -881,9 +888,7 @@ public:
         , mHash(other.mHash)
         , mNode(other.mNode)
         , mNext(parent, other.mNext)
-        , mBuffer(other.mBuffer)
-    {
-    }
+        , mBuffer(other.mBuffer) {}
 
     CacheItem& copy(TreeCacheT& parent, const CacheItem& other)
     {
@@ -953,11 +958,10 @@ public:
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't add a tile to a const tree");
-        if (NodeType::LEVEL < level) return;
-        if (this->isHashed(xyz)) {
+        if (NodeType::LEVEL >= level && this->isHashed(xyz)) {
             assert(mNode);
-            return const_cast<NodeType*>(mNode)->addTileAndCache(
-                level, xyz, value, state, *mParent);
+            const_cast<NodeType*>(mNode)->addTileAndCache(level, xyz, value, state, *mParent);
+            return;
         }
         mNext.addTile(level, xyz, value, state);
     }
@@ -995,27 +999,41 @@ public:
     NodeT* probeNode(const Coord& xyz)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
-        if (this->isHashed(xyz)) {
-            if ((std::is_same<NodeT, NodeType>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeType>::value)) {
+            if (this->isHashed(xyz)) {
                 assert(mNode);
                 return reinterpret_cast<NodeT*>(const_cast<NodeType*>(mNode));
             }
+        }
+
+        if (NodeT::LEVEL < NodeType::LEVEL && mNode) {
+            // don't need to ascend the chain, descend the tree
             return const_cast<NodeType*>(mNode)->template probeNodeAndCache<NodeT>(xyz, *mParent);
         }
-        return mNext.template probeNode<NodeT>(xyz);
+        else {
+            // ascend
+            return mNext.template probeNode<NodeT>(xyz);
+        }
     }
 
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz)
     {
-        if (this->isHashed(xyz)) {
-            if ((std::is_same<NodeT, NodeType>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeType>::value)) {
+            if (this->isHashed(xyz)) {
                 assert(mNode);
                 return reinterpret_cast<const NodeT*>(mNode);
             }
+        }
+
+        if (NodeT::LEVEL < NodeType::LEVEL && mNode) {
+            // don't need to ascend the chain, descend the tree
             return mNode->template probeConstNodeAndCache<NodeT>(xyz, *mParent);
         }
-        return mNext.template probeConstNode<NodeT>(xyz);
+        else {
+            // ascend
+            return mNext.template probeConstNode<NodeT>(xyz);
+        }
     }
 
     /// Return the active state of the voxel at the given coordinates.
@@ -1895,15 +1913,21 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if constexpr (NodeT::LEVEL < NodeT0::LEVEL) {
+            // Might still be worth caching this path if a NodeT0
+            // is accessed in the future
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
     LeafNodeT* probeLeaf(const Coord& xyz)
     {
@@ -1916,15 +1940,21 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<const NodeT*>(mNode0);
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if constexpr (NodeT::LEVEL < NodeT0::LEVEL) {
+            // Might still be worth caching this path if a NodeT0
+            // is accessed in the future
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
     }
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
@@ -2403,7 +2433,7 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
@@ -2412,15 +2442,21 @@ public:
                 return const_cast<NodeT1*>(mNode1)->template probeNodeAndCache<NodeT>(xyz, *this);
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
-        } else if ((std::is_same<NodeT, NodeT1>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT1>::value)) {
             if (this->isHashed1(xyz)) {
                 assert(mNode1);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT1*>(mNode1));
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if constexpr (NodeT::LEVEL < NodeT1::LEVEL) {
+            // Might still be worth caching this path if a NodeT0 or NodeT1
+            // are accessed in the future
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
 
     /// @brief @return a const pointer to the node of the specified type that contains
@@ -2429,7 +2465,7 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<const NodeT*>(mNode0);
@@ -2438,15 +2474,21 @@ public:
                 return mNode1->template probeConstNodeAndCache<NodeT>(xyz, this->self());
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
-        } else if ((std::is_same<NodeT, NodeT1>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT1>::value)) {
             if (this->isHashed1(xyz)) {
                 assert(mNode1);
                 return reinterpret_cast<const NodeT*>(mNode1);
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if constexpr (NodeT::LEVEL < NodeT1::LEVEL) {
+            // Might still be worth caching this path if a NodeT0 or NodeT1
+            // are accessed in the future
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
     }
 
     /// @brief @return a pointer to the leaf node that contains
@@ -2997,7 +3039,7 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT0*>(mNode0));
@@ -3009,7 +3051,7 @@ public:
                 return const_cast<NodeT2*>(mNode2)->template probeNodeAndCache<NodeT>(xyz, *this);
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
-        } else if ((std::is_same<NodeT, NodeT1>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT1>::value)) {
             if (this->isHashed1(xyz)) {
                 assert(mNode1);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT1*>(mNode1));
@@ -3018,15 +3060,21 @@ public:
                 return const_cast<NodeT2*>(mNode2)->template probeNodeAndCache<NodeT>(xyz, *this);
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
-        } else if ((std::is_same<NodeT, NodeT2>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT2>::value)) {
             if (this->isHashed2(xyz)) {
                 assert(mNode2);
                 return reinterpret_cast<NodeT*>(const_cast<NodeT2*>(mNode2));
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else if constexpr (NodeT::LEVEL < NodeT2::LEVEL) {
+            // Might still be worth caching this path if a NodeT0 or NodeT1
+            // are accessed in the future
+            return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
     /// @brief @return a pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
@@ -3038,7 +3086,7 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        if ((std::is_same<NodeT, NodeT0>::value)) {
+        if constexpr ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
                 return reinterpret_cast<const NodeT*>(mNode0);
@@ -3050,7 +3098,7 @@ public:
                 return mNode2->template probeConstNodeAndCache<NodeT>(xyz, this->self());
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
-        } else if ((std::is_same<NodeT, NodeT1>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT1>::value)) {
             if (this->isHashed1(xyz)) {
                 assert(mNode1);
                 return reinterpret_cast<const NodeT*>(mNode1);
@@ -3059,15 +3107,21 @@ public:
                 return mNode2->template probeConstNodeAndCache<NodeT>(xyz, this->self());
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
-        } else if ((std::is_same<NodeT, NodeT2>::value)) {
+        } else if constexpr ((std::is_same<NodeT, NodeT2>::value)) {
             if (this->isHashed2(xyz)) {
                 assert(mNode2);
                 return reinterpret_cast<const NodeT*>(mNode2);
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else if constexpr (NodeT::LEVEL < NodeT2::LEVEL) {
+            // Might still be worth caching this path if a NodeT0 or NodeT1
+            // are accessed in the future
+            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
+        } else {
+            // If we're accessing a node above our top most cache level then
+            // there's no point trying to cache it
+            return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
         }
-        // No point trying to cache as this NodeT isn't part of this accessors chain
-        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
     }
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.

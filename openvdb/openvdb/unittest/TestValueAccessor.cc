@@ -9,29 +9,64 @@
 
 #include <type_traits>
 
-#define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
-
-using ValueType = float;
 using Tree2Type = openvdb::tree::Tree<
     openvdb::tree::RootNode<
-    openvdb::tree::LeafNode<ValueType, 3> > >;
+    openvdb::tree::LeafNode<float, 3> > >;
 using Tree3Type = openvdb::tree::Tree<
     openvdb::tree::RootNode<
     openvdb::tree::InternalNode<
-    openvdb::tree::LeafNode<ValueType, 3>, 4> > >;
-using Tree4Type = openvdb::tree::Tree4<ValueType, 5, 4, 3>::Type;
+    openvdb::tree::LeafNode<float, 3>, 4> > >;
+using Tree4Type = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
 using Tree5Type = openvdb::tree::Tree<
     openvdb::tree::RootNode<
     openvdb::tree::InternalNode<
     openvdb::tree::InternalNode<
     openvdb::tree::InternalNode<
-    openvdb::tree::LeafNode<ValueType, 3>, 4>, 5>, 5> > >;
+    openvdb::tree::LeafNode<float, 3>, 4>, 5>, 5> > >;
 using TreeType = Tree4Type;
 
 
+// Recursive tree with equal Dim at every level
+// Depth includes the root node, so Depth=2 will create a
+// RootNode<LeafNode> tree type.
+template<size_t Depth, typename NodeT, int Log2Dim>
+struct RecursiveTreeBuilder;
+
+template<typename NodeT, int Log2Dim>
+struct RecursiveTreeBuilder<1, NodeT, Log2Dim>
+{
+    using Type = openvdb::tree::Tree<openvdb::tree::RootNode<NodeT>>;
+};
+
+template<size_t Depth, typename NodeT, int Log2Dim>
+struct RecursiveTreeBuilder
+{
+    using Type = typename RecursiveTreeBuilder<
+        Depth-1,
+        openvdb::tree::InternalNode<NodeT, Log2Dim>,
+        Log2Dim
+    >::Type;
+};
+
+template<size_t Depth, typename ValueT, int Log2Dim = 1>
+struct RecursiveGrid
+{
+    using GridType = typename openvdb::Grid<typename RecursiveTreeBuilder<
+        Depth-1,
+        openvdb::tree::LeafNode<ValueT, Log2Dim>,
+        Log2Dim
+    >::Type>;
+
+    using TreeType     = typename GridType::TreeType;
+    using AccessorType = typename GridType::Accessor;
+
+    static_assert(TreeType::DEPTH == Depth);
+};
+
+
 using namespace openvdb::tree;
+
 
 class TestValueAccessor: public ::testing::Test
 {
@@ -51,12 +86,13 @@ protected:
 
 namespace {
 
+template <typename T>
 struct Plus
 {
-    float addend;
-    Plus(float f): addend(f) {}
-    inline void operator()(float& f) const { f += addend; }
-    inline void operator()(float& f, bool& b) const { f += addend; b = false; }
+    T addend;
+    Plus(T f) : addend(f) {}
+    inline void operator()(T& f) const { f += addend; }
+    inline void operator()(T& f, bool& b) const { f += addend; b = false; }
 };
 
 }
@@ -68,30 +104,37 @@ TestValueAccessor::accessorTest()
 {
     using TreeType = typename AccessorT::TreeType;
     using LeafNodeType = typename TreeType::LeafNodeType;
+    using ValueType = typename AccessorT::ValueType;
+    using RootNodeType = typename TreeType::RootNodeType;
+
+    // Largest dim of a supported node by these tree
+    static const size_t LDIM = RootNodeType::ChildNodeType::DIM;
 
     const int leafDepth = int(TreeType::DEPTH) - 1;
     // subtract one because getValueDepth() returns 0 for values at the root
 
-    const ValueType background = 5.0f, value = -9.345f;
-    const openvdb::Coord c0(5, 10, 20), c1(500000, 200000, 300000);
+    const ValueType background = static_cast<ValueType>(5.0f);
+    const ValueType value = static_cast<ValueType>(-9.345f);
+    const openvdb::Coord c0(0), c1(LDIM*5, LDIM*2, LDIM*3);
 
     {
         TreeType tree(background);
         EXPECT_TRUE(!tree.isValueOn(c0));
         EXPECT_TRUE(!tree.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
+        EXPECT_EQ(background, tree.getValue(c0));
+        EXPECT_EQ(background, tree.getValue(c1));
         tree.setValue(c0, value);
         EXPECT_TRUE(tree.isValueOn(c0));
         EXPECT_TRUE(!tree.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(background, tree.getValue(c1));
     }
     {
         TreeType tree(background);
         AccessorT acc(tree);
         ValueType v;
 
+        // test addLeaf
         acc.addLeaf(new LeafNodeType(c0));
         EXPECT_EQ(1ul, tree.leafCount());
         EXPECT_TRUE(acc.probeLeaf(c0));
@@ -103,16 +146,41 @@ TestValueAccessor::accessorTest()
         acc.clear();
         EXPECT_TRUE(!acc.isCached(c0));
 
+        // test probeNode methods
+        // @todo improve based on what levels we're caching
+        EXPECT_TRUE(!acc.template probeNode<LeafNodeType>(c0));
+        EXPECT_TRUE(!acc.template probeConstNode<LeafNodeType>(c0));
+        EXPECT_TRUE(!acc.isCached(c0));
+
+        EXPECT_TRUE(acc.touchLeaf(c0));
+        EXPECT_TRUE(acc.template probeConstNode<LeafNodeType>(c0));
+        EXPECT_TRUE(acc.template probeNode<LeafNodeType>(c0));
+        // test we can access other nodes which have to have been created
+        // (may simply do the above for 3 level trees where ChildNodeType == LeafNodeType)
+        EXPECT_TRUE(acc.template probeNode<typename TreeType::RootNodeType::ChildNodeType>(c0));
+        EXPECT_TRUE(acc.template probeConstNode<typename TreeType::RootNodeType::ChildNodeType>(c0));
+        tree.clear();
+        acc.clear();
+
+        // test addTile
+        // @todo improve based on what levels we're caching
+        acc.addTile(/*level=*/1, c0, value, /*state=*/true);
+        EXPECT_EQ(1ul, tree.activeTileCount());
+        EXPECT_TRUE(acc.isValueOn(c0));
+        tree.clear();
+        acc.clear();
+
+        //
         EXPECT_TRUE(!tree.isValueOn(c0));
         EXPECT_TRUE(!tree.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
+        EXPECT_EQ(background, tree.getValue(c0));
+        EXPECT_EQ(background, tree.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
         EXPECT_TRUE(!acc.isCached(c1));
         EXPECT_TRUE(!acc.probeValue(c0,v));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+        EXPECT_EQ(background, v);
         EXPECT_TRUE(!acc.probeValue(c1,v));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+        EXPECT_EQ(background, v);
         EXPECT_EQ(-1, acc.getValueDepth(c0));
         EXPECT_EQ(-1, acc.getValueDepth(c1));
         EXPECT_TRUE(!acc.isVoxel(c0));
@@ -122,26 +190,30 @@ TestValueAccessor::accessorTest()
 
         EXPECT_TRUE(tree.isValueOn(c0));
         EXPECT_TRUE(!tree.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(background, tree.getValue(c1));
         EXPECT_TRUE(acc.probeValue(c0,v));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, v);
+        EXPECT_EQ(value, v);
         EXPECT_TRUE(!acc.probeValue(c1,v));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+        EXPECT_EQ(background, v);
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0)); // leaf-level voxel value
         EXPECT_EQ(-1, acc.getValueDepth(c1)); // background value
-        EXPECT_EQ(leafDepth, acc.getValueDepth(openvdb::Coord(7, 10, 20)));
+
+        auto leaf = acc.probeLeaf(c0);
+        ASSERT_TRUE(leaf);
+        EXPECT_EQ(leafDepth, acc.getValueDepth(leaf->origin() + openvdb::Coord(leaf->dim()-1))); // resides in same node
         const int depth = leafDepth == 1 ? -1 : leafDepth - 1;
-        EXPECT_EQ(depth, acc.getValueDepth(openvdb::Coord(8, 10, 20)));
+        EXPECT_EQ(depth, acc.getValueDepth(leaf->origin() + openvdb::Coord(leaf->dim()))); // outside of any child node
         EXPECT_TRUE( acc.isVoxel(c0)); // leaf-level voxel value
         EXPECT_TRUE(!acc.isVoxel(c1));
-        EXPECT_TRUE( acc.isVoxel(openvdb::Coord(7, 10, 20)));
-        EXPECT_TRUE(!acc.isVoxel(openvdb::Coord(8, 10, 20)));
+        EXPECT_TRUE( acc.isVoxel(leaf->origin() + openvdb::Coord(leaf->dim()-1)));
+        EXPECT_TRUE(!acc.isVoxel(leaf->origin() + openvdb::Coord(leaf->dim())));
+        leaf = nullptr;
 
-        ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
+        EXPECT_EQ(background, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c1)); // uncached background value
         EXPECT_TRUE(!acc.isValueOn(c1)); // inactive background value
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
+        EXPECT_EQ(value, acc.getValue(c0));
         EXPECT_TRUE(
             (acc.numCacheLevels()>0) == acc.isCached(c0)); // active, leaf-level voxel value
         EXPECT_TRUE(acc.isValueOn(c0));
@@ -149,12 +221,12 @@ TestValueAccessor::accessorTest()
         acc.setValue(c1, value);
 
         EXPECT_TRUE(acc.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(value, tree.getValue(c1));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c1));
+        EXPECT_EQ(value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
+        EXPECT_EQ(value, acc.getValue(c0));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
@@ -163,8 +235,8 @@ TestValueAccessor::accessorTest()
 
         tree.setValueOff(c1);
 
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(value, tree.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
         EXPECT_TRUE( acc.isValueOn(c0));
@@ -177,18 +249,18 @@ TestValueAccessor::accessorTest()
         EXPECT_TRUE( acc.isValueOn(c0));
         EXPECT_TRUE( acc.isValueOn(c1));
 
-        acc.modifyValueAndActiveState(c1, Plus(-value)); // subtract value & mark inactive
+        acc.modifyValueAndActiveState(c1, Plus<ValueType>(-value)); // subtract value & mark inactive
         EXPECT_TRUE(!acc.isValueOn(c1));
 
-        acc.modifyValue(c1, Plus(-value)); // subtract value again & mark active
+        acc.modifyValue(c1, Plus<ValueType>(-value)); // subtract value again & mark active
 
         EXPECT_TRUE(acc.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(-value, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(-value, tree.getValue(c1));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(-value, acc.getValue(c1));
+        EXPECT_EQ(-value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
+        EXPECT_EQ(value, acc.getValue(c0));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
@@ -198,12 +270,12 @@ TestValueAccessor::accessorTest()
         acc.setValueOnly(c1, 3*value);
 
         EXPECT_TRUE(acc.isValueOn(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(3*value, tree.getValue(c1));
+        EXPECT_EQ(value, tree.getValue(c0));
+        EXPECT_EQ(3*value, tree.getValue(c1));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(3*value, acc.getValue(c1));
+        EXPECT_EQ(3*value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
+        EXPECT_EQ(value, acc.getValue(c0));
         EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
@@ -222,6 +294,8 @@ void
 TestValueAccessor::constAccessorTest()
 {
     using TreeType = typename std::remove_const<typename AccessorT::TreeType>::type;
+    using ValueType = typename TreeType::ValueType;
+
     const int leafDepth = int(TreeType::DEPTH) - 1;
         // subtract one because getValueDepth() returns 0 for values at the root
 
@@ -234,14 +308,14 @@ TestValueAccessor::constAccessorTest()
 
     EXPECT_TRUE(!tree.isValueOn(c0));
     EXPECT_TRUE(!tree.isValueOn(c1));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
+    EXPECT_EQ(background, tree.getValue(c0));
+    EXPECT_EQ(background, tree.getValue(c1));
     EXPECT_TRUE(!acc.isCached(c0));
     EXPECT_TRUE(!acc.isCached(c1));
     EXPECT_TRUE(!acc.probeValue(c0,v));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+    EXPECT_EQ(background, v);
     EXPECT_TRUE(!acc.probeValue(c1,v));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+    EXPECT_EQ(background, v);
     EXPECT_EQ(-1, acc.getValueDepth(c0));
     EXPECT_EQ(-1, acc.getValueDepth(c1));
     EXPECT_TRUE(!acc.isVoxel(c0));
@@ -251,23 +325,23 @@ TestValueAccessor::constAccessorTest()
 
     EXPECT_TRUE(tree.isValueOn(c0));
     EXPECT_TRUE(!tree.isValueOn(c1));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
+    EXPECT_EQ(background, acc.getValue(c1));
     EXPECT_TRUE(!acc.isCached(c1));
     EXPECT_TRUE(!acc.isCached(c0));
     EXPECT_TRUE(acc.isValueOn(c0));
     EXPECT_TRUE(!acc.isValueOn(c1));
     EXPECT_TRUE(acc.probeValue(c0,v));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(value, v);
+    EXPECT_EQ(value, v);
     EXPECT_TRUE(!acc.probeValue(c1,v));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
+    EXPECT_EQ(background, v);
     EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
     EXPECT_EQ(-1, acc.getValueDepth(c1));
     EXPECT_TRUE( acc.isVoxel(c0));
     EXPECT_TRUE(!acc.isVoxel(c1));
 
-    ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
+    EXPECT_EQ(value, acc.getValue(c0));
     EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
-    ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
+    EXPECT_EQ(background, acc.getValue(c1));
     EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
     EXPECT_TRUE(!acc.isCached(c1));
     EXPECT_TRUE(acc.isValueOn(c0));
@@ -275,7 +349,7 @@ TestValueAccessor::constAccessorTest()
 
     tree.setValue(c1, value);
 
-    ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c1));
+    EXPECT_EQ(value, acc.getValue(c1));
     EXPECT_TRUE(!acc.isCached(c0));
     EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
     EXPECT_TRUE(acc.isValueOn(c0));
@@ -310,7 +384,7 @@ TestValueAccessor::multithreadedAccessorTest()
         void execute()
         {
             for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
-                ASSERT_DOUBLES_EXACTLY_EQUAL(double(i), acc.getValue(openvdb::Coord(i)));
+                EXPECT_EQ(double(i), acc.getValue(openvdb::Coord(i)));
             }
         }
     };
@@ -322,9 +396,9 @@ TestValueAccessor::multithreadedAccessorTest()
         {
             for (int i = -MAX_COORD; i < MAX_COORD; ++i) {
                 float f = acc.getValue(openvdb::Coord(i));
-                ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), f);
+                EXPECT_EQ(float(i), f);
                 acc.setValue(openvdb::Coord(i), float(i));
-                ASSERT_DOUBLES_EXACTLY_EQUAL(float(i), acc.getValue(openvdb::Coord(i)));
+                EXPECT_EQ(float(i), acc.getValue(openvdb::Coord(i)));
             }
         }
     };
@@ -382,6 +456,13 @@ TEST_F(TestValueAccessor, testTree5AccessorRW)      { accessorTest<ValueAccessor
 TEST_F(TestValueAccessor, testTree5ConstAccessor)   { constAccessorTest<ValueAccessor<const Tree5Type> >(); }
 TEST_F(TestValueAccessor, testTree5ConstAccessorRW) { constAccessorTest<ValueAccessorRW<const Tree5Type> >(); }
 
+// Test different tree configurations with their default accessors
+TEST_F(TestValueAccessor, testTreeRecursive2)       { accessorTest<RecursiveGrid<2, float>::AccessorType>(); }
+TEST_F(TestValueAccessor, testTreeRecursive4)       { accessorTest<RecursiveGrid<4, int32_t>::AccessorType>(); }
+TEST_F(TestValueAccessor, testTreeRecursive5)       { accessorTest<RecursiveGrid<5, double>::AccessorType>(); }
+TEST_F(TestValueAccessor, testTreeRecursive6)       { accessorTest<RecursiveGrid<6, int64_t>::AccessorType>(); }
+TEST_F(TestValueAccessor, testTreeRecursive7)       { accessorTest<RecursiveGrid<7, float>::AccessorType>(); }
+TEST_F(TestValueAccessor, testTreeRecursive8)       { accessorTest<RecursiveGrid<8, int32_t>::AccessorType>(); }
 
 // Test odd combinations of trees and ValueAccessors
 // cache node level 0 and 1
@@ -457,8 +538,8 @@ TEST_F(TestValueAccessor, testTree4Accessor12)
 //cache node level 1 and 3
 TEST_F(TestValueAccessor, testTree5Accessor213)
 {
-    accessorTest<ValueAccessor2<Tree5Type, true, 1,3> >();
-    accessorTest<ValueAccessor2<Tree5Type, false, 1,3> >();
+    accessorTest<ValueAccessor2<Tree5Type, true,  1, 3> >();
+    accessorTest<ValueAccessor2<Tree5Type, false, 1, 3> >();
 }
 
 TEST_F(TestValueAccessor, testMultiThreadedRWAccessors)
@@ -524,7 +605,7 @@ TEST_F(TestValueAccessor, testGetNode)
 {
     using LeafT = Tree4Type::LeafNodeType;
 
-    const ValueType background = 5.0f, value = -9.345f;
+    const LeafT::ValueType background = 5.0f, value = -9.345f;
     const openvdb::Coord c0(5, 10, 20);
 
     Tree4Type tree(background);

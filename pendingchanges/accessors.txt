@@ -1,12 +1,15 @@
 Improvements:
     - Significantly improved the performance of all ValueAccessor methods which
     access LeafNode value buffer data. This improvement applies to any type which
-    is delay load compatible (all default types except for bool and mask grids).
+    is delay load compatible (all default types except for bool and mask grids)
+    and improves the performance of many OpenVDB tools.
 
 Bug Fixes:
-    - Fixed a bug with ValueAccessor::addLeaf which wouldn't add the provided
-    leaf nodes to the underlying tree. This bug did NOT affect the specialized
-    accessors which are used by the default tree configuration.
+    - Fixed a bug with ValueAccessor::addLeaf and ValueAccessor::addTile which
+    wouldn't add the provided leaf nodes to the underlying tree. This bug did
+    NOT affect the specialized accessors which are used by the default tree
+    configuration.
+    [Contributed by Andrey Zakirov]
     - Fixed a bug where ValueAccessor::probeNode<NodeT> and ValueAccessor:probeConstNode<NodeT>
     would return a nullptr if the NodeT type was not explicitly being cached
     by the accessor but the node existed in the tree.
