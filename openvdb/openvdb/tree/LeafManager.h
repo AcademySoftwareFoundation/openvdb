@@ -535,42 +535,6 @@ public:
         transform.run(this->leafRange(grainSize), threaded);
     }
 
-    template<typename ArrayT>
-    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array)
-    {
-        using T = typename ArrayT::value_type;
-        static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
-        using LeafT = typename std::conditional<std::is_const<
-            typename std::remove_pointer<T>::type>::value, const LeafType, LeafType>::type;
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (std::is_same<T, LeafT*>::value) {
-            array.resize(mLeafCount);
-            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
-        } else {
-            mTree->getNodes(array);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
-
-    template<typename ArrayT>
-    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array) const
-    {
-        using T = typename ArrayT::value_type;
-        static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
-        static_assert(std::is_const<typename std::remove_pointer<T>::type>::value,
-            "argument to getNodes() must be an array of const node pointers");
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (std::is_same<T, const LeafType*>::value) {
-            array.resize(mLeafCount);
-            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
-        } else {
-            mTree->getNodes(array);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
-
     /// @brief Generate a linear array of prefix sums of offsets into the
     /// active voxels in the leafs. So @a offsets[n]+m is the offset to the
     /// mth active voxel in the nth leaf node (useful for

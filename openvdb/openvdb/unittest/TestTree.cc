@@ -2393,41 +2393,6 @@ struct BBoxOp
     }
 };
 
-TEST_F(TestTree, testProcessBBox)
-{
-    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-
-    using openvdb::Coord;
-    using openvdb::CoordBBox;
-    //check two leaf nodes and two tiles at each level 1, 2 and 3
-    const int size[4]={1<<3, 1<<3, 1<<(3+4), 1<<(3+4+5)};
-    for (int level=0; level<=3; ++level) {
-        openvdb::FloatTree tree;
-        const int n = size[level];
-        const CoordBBox bbox[]={CoordBBox::createCube(Coord(-n,-n,-n), n),
-                                CoordBBox::createCube(Coord( 0, 0, 0), n)};
-        if (level==0) {
-            tree.setValue(Coord(-1,-2,-3), 1.0f);
-            tree.setValue(Coord( 1, 2, 3), 1.0f);
-        } else {
-            tree.fill(bbox[0], 1.0f, true);
-            tree.fill(bbox[1], 1.0f, true);
-        }
-        BBoxOp op;
-        tree.visitActiveBBox(op);
-        EXPECT_EQ(2, int(op.bbox.size()));
-
-        for (int i=0; i<2; ++i) {
-            //std::cerr <<"\nLevel="<<level<<" op.bbox["<<i<<"]="<<op.bbox[i]
-            //          <<" op.level["<<i<<"]= "<<op.level[i]<<std::endl;
-            EXPECT_EQ(level,int(op.level[i]));
-            EXPECT_TRUE(op.bbox[i] == bbox[i]);
-        }
-    }
-
-    OPENVDB_NO_DEPRECATION_WARNING_END
-}
-
 TEST_F(TestTree, testGetNodes)
 {
     //openvdb::util::CpuTimer timer;
