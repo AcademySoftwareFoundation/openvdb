@@ -1259,11 +1259,11 @@ iOpenVDBDocumentation["Web"] := SystemOpen[$vdbWebDocURL]
 iOpenVDBDocumentation["Notebook"] := notebookDocumentation[]
 
 
-iOpenVDBDocumentation["Update"] := 
-	(
-		Quiet[DeleteFile[$vdbDoc]];
-		notebookDocumentation[]
-	)
+iOpenVDBDocumentation["Update"] :=
+    (
+        Quiet[DeleteFile[$vdbDoc]];
+        notebookDocumentation[]
+    )
 
 
 iOpenVDBDocumentation[___] = $Failed;
@@ -1286,23 +1286,23 @@ addCodeCompletion[OpenVDBDocumentation][{"Web", "Notebook", "Update"}];
 notebookDocumentation[] /; FileExistsQ[$vdbDoc] := NotebookOpen[$vdbDoc]
 
 
-notebookDocumentation[] := 
-	Block[{zip},
-		If[!FileExistsQ[$vdbDocDir],
-			CreateDirectory[$vdbDocDir];
-		];
-		
-		zip = URLDownload[$vdbDocURL, $vdbDocDir];
-		(
-			Quiet[
-				ExtractArchive[zip, $vdbDocDir, FileNameTake[$vdbDoc]];
-				DeleteFile[zip];
-			];
-			
-			NotebookOpen[$vdbDoc] /; FileExistsQ[$vdbDoc]
-			
-		) /; FileExistsQ[zip]
-	]
+notebookDocumentation[] :=
+    Block[{zip},
+        If[!FileExistsQ[$vdbDocDir],
+            CreateDirectory[$vdbDocDir];
+        ];
+
+        zip = URLDownload[$vdbDocURL, $vdbDocDir];
+        (
+            Quiet[
+                ExtractArchive[zip, $vdbDocDir, FileNameTake[$vdbDoc]];
+                DeleteFile[zip];
+            ];
+
+            NotebookOpen[$vdbDoc] /; FileExistsQ[$vdbDoc]
+
+        ) /; FileExistsQ[zip]
+    ]
 
 
 notebookDocumentation[___] = $Failed;
