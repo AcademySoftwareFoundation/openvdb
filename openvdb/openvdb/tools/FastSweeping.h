@@ -34,6 +34,7 @@
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NodeManager.h> // for PruneMinMaxFltKernel
 
 #include "LevelSetUtil.h"
 #include "Morphology.h"
@@ -688,6 +689,7 @@ private:
     struct InitSdf;
     struct DilateKernel;// initialization to dilate a SDF
     struct MinMaxKernel;
+    struct PruneMinMaxFltKernel;// prune sdf if it has min float or max float
     struct SweepingKernel;// performs the actual concurrent sparse fast sweeping
 
     // Define the topology (i.e. stencil) of the neighboring grid points
@@ -889,6 +891,11 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
       MinMaxKernel kernel;
       auto e = kernel.run(*mSdfGrid);//multi-threaded
       //auto e = extrema(mGrid->beginValueOn());// 100x slower!!!!
+      if (kernel.mFltMinExists || kernel.mFltMaxExists) {
+          tree::NodeManager<SdfTreeT> nodeManager(mSdfGrid->tree());
+          PruneMinMaxFltKernel op(e.min(), e.max());
+          nodeManager.foreachTopDown(op, true /* = threaded*/, 1 /* = grainSize*/);
+      }
 #ifdef BENCHMARK_FAST_SWEEPING
       std::cerr << "Min = " << e.min() << " Max = " << e.max() << std::endl;
       timer.restart("Changing asymmetric background value");
@@ -904,13 +911,15 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
 /// Private class of FastSweeping to quickly compute the extrema
 /// values of the active voxels in the leaf nodes. Several orders
 /// of magnitude faster than tools::extrema!
+/// Also determines whether there is float max or float min stored
+/// in a voxel.
 template <typename SdfGridT, typename ExtValueT>
 struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
 {
     using LeafMgr = tree::LeafManager<const SdfTreeT>;
     using LeafRange = typename LeafMgr::LeafRange;
-    MinMaxKernel() : mMin(std::numeric_limits<SdfValueT>::max()), mMax(-mMin) {}
-    MinMaxKernel(MinMaxKernel& other, tbb::split) : mMin(other.mMin), mMax(other.mMax) {}
+    MinMaxKernel() : mMin(std::numeric_limits<SdfValueT>::max()), mMax(-mMin), mFltMinExists(false), mFltMaxExists(true) {}
+    MinMaxKernel(MinMaxKernel& other, tbb::split) : mMin(other.mMin), mMax(other.mMax), mFltMinExists(other.mFltMinExists), mFltMaxExists(other.mFltMaxExists) {}
 
     math::MinMax<SdfValueT> run(const SdfGridT &grid)
     {
@@ -924,8 +933,12 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
         for (auto leafIter = r.begin(); leafIter; ++leafIter) {
             for (auto voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                 const SdfValueT v = *voxelIter;
-                if (v < mMin) mMin = v;
-                if (v > mMax) mMax = v;
+                const bool vEqFltMin = v == -std::numeric_limits<SdfValueT>::max();
+                const bool vEqFltMax = v == std::numeric_limits<SdfValueT>::max();
+                if (v < mMin && !vEqFltMin) mMin = v;
+                if (v > mMax && !vEqFltMax) mMax = v;
+                if (vEqFltMin) mFltMinExists = true;
+                if (vEqFltMax) mFltMaxExists = true;
             }
         }
     }
@@ -934,10 +947,60 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
     {
         if (other.mMin < mMin) mMin = other.mMin;
         if (other.mMax > mMax) mMax = other.mMax;
+        mFltMinExists = other.mFltMinExists || mFltMinExists;
+        mFltMaxExists = other.mFltMaxExists || mFltMaxExists;
     }
 
     SdfValueT mMin, mMax;
+    bool mFltMinExists, mFltMaxExists;
 };// FastSweeping::MinMaxKernel
+
+/// Private class of FastSweeping to prune sdf value that is equal to float max or
+/// float min.
+template <typename SdfGridT, typename ExtValueT>
+struct FastSweeping<SdfGridT, ExtValueT>::PruneMinMaxFltKernel {
+    PruneMinMaxFltKernel(SdfValueT min, SdfValueT max) : mMin(min), mMax(max) {}
+
+    // Root node
+    void operator()(typename SdfTreeT::RootNodeType& node, size_t = 1) const {
+        for (auto iter = node.beginValueAll(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
+    }
+
+    // Internal nodes
+    template<typename NodeT>
+    void operator()(NodeT& node, size_t = 1) const
+    {
+        for (auto iter = node.beginValueAll(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
+    }
+
+    // Leaf nodes
+    void operator()(typename SdfTreeT::LeafNodeType& leaf, size_t = 1) const
+    {
+        for (auto iter = leaf.beginValueOn(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
+    }
+  SdfValueT mMin, mMax;
+};// FastSweeping::PruneMinMaxFltKernel
 
 ////////////////////////////////////////////////////////////////////////////////
 
