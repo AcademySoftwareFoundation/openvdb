@@ -16,7 +16,7 @@
 #ifndef NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 
-#include "HostBuffer.h"// for BufferTraits
+#include "HostBuffer.h" // for BufferTraits
 
 #include <cuda_runtime_api.h> // for cudaMalloc/cudaMallocManaged/cudaFree
 
@@ -46,18 +46,23 @@ class CudaDeviceBuffer
     uint64_t mSize; // total number of bytes for the NanoVDB grid.
     uint8_t *mCpuData, *mGpuData; // raw buffer for the NanoVDB grid.
 
+#if defined(DEBUG) || defined(_DEBUG)
     static inline bool gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
     {
-#if defined(DEBUG) || defined(_DEBUG)
         if (code != cudaSuccess) {
             fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(code), file, line);
             if (abort)
                 exit(code);
             return false;
         }
-#endif
         return true;
     }
+#else
+    static inline bool gpuAssert(cudaError_t, const char*, int, bool = true)
+    {
+        return true;
+    }
+#endif
 
 #if defined(DEBUG) || defined(_DEBUG)
     static inline void ptrAssert(void* ptr, const char* msg, const char* file, int line, bool abort = true)
