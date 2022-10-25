@@ -45,14 +45,14 @@ if(OPENVDB_TOOL_USE_ALL)
 endif()
 
 if(OPENVDB_TOOL_USE_NANO)
-  add_compile_definitions("VDB_TOOL_USE_NANO")
+  target_compile_definitions(vdb_tool_common PUBLIC "VDB_TOOL_USE_NANO")
   if(OPENVDB_TOOL_NANO_USE_ZIP)
-    add_compile_definitions("NANOVDB_USE_ZIP")
+    target_compile_definitions(vdb_tool_common PUBLIC "NANOVDB_USE_ZIP")
     find_package(ZLIB REQUIRED)
     target_link_libraries(vdb_tool_common INTERFACE ZLIB::ZLIB)
   endif()
   if(OPENVDB_TOOL_NANO_USE_BLOSC)
-    add_compile_definitions("NANOVDB_USE_BLOSC")
+    target_compile_definitions(vdb_tool_common PUBLIC "NANOVDB_USE_BLOSC")
     find_package(Blosc REQUIRED)
     target_link_libraries(vdb_tool_common INTERFACE blosc)
   endif()
@@ -60,7 +60,7 @@ if(OPENVDB_TOOL_USE_NANO)
 endif()
 
 if(OPENVDB_TOOL_USE_PNG)
-  add_compile_definitions("VDB_TOOL_USE_PNG")
+  target_compile_definitions(vdb_tool_common PUBLIC "VDB_TOOL_USE_PNG")
   if(WIN32)
     find_package(libpng CONFIG REQUIRED)
   else()
@@ -70,20 +70,20 @@ if(OPENVDB_TOOL_USE_PNG)
 endif()
 
 if(OPENVDB_TOOL_USE_JPG)
-  add_compile_definitions("VDB_TOOL_USE_JPG")
+  target_compile_definitions(vdb_tool_common PUBLIC "VDB_TOOL_USE_JPG")
   find_package(JPEG REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE ${JPEG_LIBRARIES})
   target_include_directories(vdb_tool_common INTERFACE ${JPEG_INCLUDE_DIR})
 endif()
 
 if(OPENVDB_TOOL_USE_EXR)
-  add_compile_definitions("VDB_TOOL_USE_EXR")
+  target_compile_definitions(vdb_tool_common PUBLIC "VDB_TOOL_USE_EXR")
   find_package(OpenEXR REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf)
 endif()
 
 if(OPENVDB_TOOL_USE_ABC)
-  add_compile_definitions("VDB_TOOL_USE_ABC")
+  target_compile_definitions(vdb_tool_common PUBLIC "VDB_TOOL_USE_ABC")
   find_package(Alembic CONFIG REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE Alembic::Alembic)
 endif()
@@ -107,15 +107,15 @@ endif()
 # Increase the number of sections that an object file can contain
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
-add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>")
+target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>")
 # Disable non-secure CRT library function warnings
 # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
 #     compiler-warning-level-3-c4996?view=vs-2019#unsafe-crt-library-functions
-add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
+target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
 # Disable POSIX function name warnings
 # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
 #     compiler-warning-level-3-c4996?view=vs-2019#posix-function-names
-add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_NONSTDC_NO_WARNINGS>")
+target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:_CRT_NONSTDC_NO_WARNINGS>")
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   add_compile_options("$<$<CONFIG:RELEASE>:/Oi>")
