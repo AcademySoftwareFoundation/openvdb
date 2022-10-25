@@ -98,14 +98,14 @@ endif()
 
 # GCC flags
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  add_compile_options(-Wno-invalid-offsetof -pthread -lpthread)
-  add_compile_options("$<$<CONFIG:DEBUG>:-O1>")
+  target_compile_options(vdb_tool_common INTERFACE -Wno-invalid-offsetof -pthread -lpthread)
+  target_compile_options(vdb_tool_common INTERFACE "$<$<CONFIG:DEBUG>:-O1>")
 endif()
 
 
 # MSVC flags
 # Increase the number of sections that an object file can contain
-add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
+target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
 target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>")
 # Disable non-secure CRT library function warnings
@@ -118,21 +118,21 @@ target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:
 target_compile_definitions(vdb_tool_common INTERFACE "$<$<CXX_COMPILER_ID:MSVC>:_CRT_NONSTDC_NO_WARNINGS>")
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  add_compile_options("$<$<CONFIG:RELEASE>:/Oi>")
+  target_compile_options(vdb_tool_common INTERFACE "$<$<CONFIG:RELEASE>:/Oi>")
 
   message(STATUS "Suppressing some noisy MSVC CXX warnings.")
 endif()
 # Conversion from int64_t to long
-add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4244>")
+target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4244>")
 # It's not possible to use STL types in DLL interfaces in a portable and
 # reliable way so disable this warning
-add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4251>")
+target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4251>")
 # Conversion from size_t to uLong
-add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4267>")
+target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4267>")
 # Non dll-interface class used as base for dll-interface class
-#add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4275>")
+#target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4275>")
 # Truncation from 'int' to 'bool'
-#add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4305>")
+#target_compile_options(vdb_tool_common INTERFACE "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4305>")
 
 if(OPENVDB_BUILD_CORE)
     target_link_libraries(vdb_tool_common INTERFACE ${OPENVDB_BINARIES_DEPENDENT_LIBS})
