@@ -35,8 +35,14 @@ PackageExport["$OpenVDBLibrary"]
 PackageExport["$OpenVDBInstallationDirectory"]
 
 
+PackageExport["OpenVDBDocumentation"]
+
+
 $OpenVDBLibrary::usage = "$OpenVDBLibrary is the full path to the OpenVDB Library loaded by OpenVDBLink.";
 $OpenVDBInstallationDirectory::usage = "$OpenVDBInstallationDirectory gives the top-level directory in which your OpenVDB installation resides.";
+
+
+OpenVDBDocumentation::usage = "OpenVDBDocumentation[] opens the OpenVDBLink documentation.\nOpenVDBDocumentation[\"Web\"] opens the OpenVDBLink in a web browser.";
 
 
 OpenVDBLink`Developer`Recompile::usage = "OpenVDBLink`Developer`Recompile[] recompiles the OpenVDB library and reloads the functions.";
@@ -1214,3 +1220,125 @@ pixelGridQ[vdb_] := pixelTypeQ[vdb[[2]]]
 
 
 carefulPixelGridQ[vdb_] := OpenVDBGridQ[vdb] && pixelGridQ[vdb]
+
+
+(* ::Section:: *)
+(*Documentation*)
+
+
+(* ::Subsection::Closed:: *)
+(*OpenVDBDocumentation*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*OpenVDBDocumentation*)
+
+
+OpenVDBDocumentation[args___] /; !CheckArgs[OpenVDBDocumentation[args], {0, 1}] = $Failed;
+
+
+OpenVDBDocumentation[args___] :=
+    With[{res = iOpenVDBDocumentation[args]},
+        res /; res =!= $Failed
+    ]
+
+
+OpenVDBDocumentation[args___] := mOpenVDBDocumentation[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBDocumentation*)
+
+
+iOpenVDBDocumentation[] := iOpenVDBDocumentation["Notebook"]
+
+
+iOpenVDBDocumentation["Web"] := SystemOpen[$vdbWebDocURL]
+
+
+iOpenVDBDocumentation["Notebook"] := notebookDocumentation[]
+
+
+iOpenVDBDocumentation["Update"] := 
+	(
+		Quiet[DeleteFile[$vdbDoc]];
+		notebookDocumentation[]
+	)
+
+
+iOpenVDBDocumentation[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+SyntaxInformation[OpenVDBDocumentation] = {"ArgumentsPattern" -> {_.}};
+
+
+addCodeCompletion[OpenVDBDocumentation][{"Web", "Notebook", "Update"}];
+
+
+(* ::Subsubsection::Closed:: *)
+(*notebookDocumentation*)
+
+
+notebookDocumentation[] /; FileExistsQ[$vdbDoc] := NotebookOpen[$vdbDoc]
+
+
+notebookDocumentation[] := 
+	Block[{zip},
+		If[!FileExistsQ[$vdbDocDir],
+			CreateDirectory[$vdbDocDir];
+		];
+		
+		zip = URLDownload[$vdbDocURL, $vdbDocDir];
+		(
+			Quiet[
+				ExtractArchive[zip, $vdbDocDir, FileNameTake[$vdbDoc]];
+				DeleteFile[zip];
+			];
+			
+			NotebookOpen[$vdbDoc] /; FileExistsQ[$vdbDoc]
+			
+		) /; FileExistsQ[zip]
+	]
+
+
+notebookDocumentation[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Documentation paths and URLs*)
+
+
+$vdbDocDir = FileNameJoin[{$UserBaseDirectory, "ApplicationData", "OpenVDBLink"}];
+
+
+$vdbDoc = FileNameJoin[{$vdbDocDir, "OpenVDBLink.nb"}];
+
+
+$vdbDocURL = "https://www.openvdb.org/download/files/OpenVDBLink.nb.zip";
+
+
+$vdbWebDocURL = "https://www.openvdb.org/documentation/wolfram";
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBDocumentation[type_] :=
+    (
+        If[type =!= "Web" && type =!= "Notebook",
+            Message[OpenVDBDocumentation::type, type, 1];
+        ];
+
+        $Failed
+    )
+
+
+mOpenVDBDocumentation[___] = $Failed;
+
+
+OpenVDBDocumentation::type = "`1` at position `2` is not one of \"Web\", \"Notebook\", or \"Update\".";

@@ -1,4 +1,4 @@
-logo?
+![OpenVDBLink](https://www.openvdb.org/images/openvdblink_logo.png)
 
 # OpenVDBLink
 OpenVDBLink provides a Mathematica interface to [OpenVDB](https://www.openvdb.org), an efficient sparse voxel data structure ubiquitous in the VFX industry. This link ports over access to various grid containers including level sets, fog volumes, vector grids, integer grids, Boolean grids, and mask grids. Construction, modification, combinations, visualisations, queries, import, export, etc. can be achieved over grids too. Any Mathematica 3D region that's ConstantRegionQ and BoundedRegionQ can be represented as a level set grid, providing a more seamless integration with OpenVDB.
@@ -13,7 +13,9 @@ OpenVDB is an Academy Award-winning open-source C++ library comprising a novel h
 
 ### Documentation
 
-* [URL to docs?](.....)
+* [Web version](https://www.openvdb.org/documentation/wolfram)
+* [Notebook version](https://www.openvdb.org/download/files/OpenVDBLink.nb.zip)
+* Access documentation in a Wolfram notebook with `OpenVDBDocumentation[]`.
 
 ### Loading
 
