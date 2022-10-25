@@ -50,8 +50,8 @@ $depthList = {"Depth"};
 
 $renderColorThemes = <|
                  (*     front face             back face           closed face              background *)
-    "Default"    -> {RGBColor["#4D94FF"], RGBColor["#FFA24E"], RGBColor["#4D94FF"], White},
-    "Monochrome" -> {White,               White,               White,               Black},
+    "Default"    -> {RGBColor["#4D94FF"], RGBColor["#FFA24E"], RGBColor["#4D94FF"], RGBColor[1, 1, 1]},
+    "Monochrome" -> {RGBColor[1, 1, 1],   RGBColor[1, 1, 1],   RGBColor[1, 1, 1],   RGBColor[0, 0, 0]},
     "Bold"       -> {ColorData[106, 2],   ColorData[106, 1],   ColorData[106, 2],   Lighter[ColorData[106, 4], 0.5]},
     "Cool"       -> {ColorData[107, 1],   ColorData[107, 4],   ColorData[107, 1],   RGBColor["#E6EBFF"]},
     "Neon"       -> {ColorData[109, 8],   ColorData[109, 2],   ColorData[109, 8],   ColorData[109, 3]},
