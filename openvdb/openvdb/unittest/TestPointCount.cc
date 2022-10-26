@@ -288,8 +288,7 @@ TEST_F(TestPointCount, testGroup)
 
         // write out grid to a temp file
         {
-            io::TempFile file;
-            filename = file.filename();
+            filename = "testPointCount1.vdb";
             io::File fileOut(filename);
             GridCPtrVec grids{grid};
             fileOut.write(grids);
@@ -524,8 +523,7 @@ TEST_F(TestPointCount, testOffsets)
 
     // write out grid to a temp file
     {
-        io::TempFile file;
-        filename = file.filename();
+        const std::string filename = "testPointCount1.vdb";
         io::File fileOut(filename);
         GridCPtrVec grids{grid};
         fileOut.write(grids);
