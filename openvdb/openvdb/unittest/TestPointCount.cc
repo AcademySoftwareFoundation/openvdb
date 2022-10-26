@@ -523,7 +523,7 @@ TEST_F(TestPointCount, testOffsets)
 
     // write out grid to a temp file
     {
-        const std::string filename = "testPointCount1.vdb";
+        filename = "testPointCount1.vdb";
         io::File fileOut(filename);
         GridCPtrVec grids{grid};
         fileOut.write(grids);
