@@ -58,7 +58,15 @@ if(OPENVDB_TOOL_USE_NANO)
   endif()
   #target_include_directories(vdb_tool_common INTERFACE ${PROJECT_SOURCE_DIR}/../nanovdb/)
   if(NOT OPENVDB_BUILD_NANOVDB)
-    message(FATAL_ERROR "Please pass -DUSE_NANOVDB=ON as a cmake argument.")
+    find_package(OpenVDB COMPONENTS nanovdb)
+    if(NOT OpenVDB_nanovdb_FOUND OR NOT OpenVDB_FOUND)
+        message(FATAL_ERROR
+        " Couldn't find NanoVDB\n"
+        " Either set OPENVDB_CMAKE_PATH to <OpenVDB install path>/lib/cmake/OpenVDB"
+        " or please pass -DUSE_NANOVDB=ON as a cmake argument.")
+    endif()
+    set(NANOVDB_LIB OpenVDB::nanovdb)
+    target_include_directories(vdb_tool_common INTERFACE ${OPENVDB_nanovdb_INCLUDE_DIR})
   else()
     set(NANOVDB_LIB nanovdb)
   endif()
