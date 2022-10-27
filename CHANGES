@@ -3,7 +3,7 @@ OpenVDB Version History
 
 Version 10.0.0 - October 27, 2022
 
-    New features:
+    New Features:
     - Introducing OpenVDBLink, which provides a Mathematica interface to
       OpenVDB. This link ports over access to various grid containers including
       level sets, fog volumes, vector grids, integer grids, Boolean grids,
