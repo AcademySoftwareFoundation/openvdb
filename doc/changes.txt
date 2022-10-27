@@ -13,9 +13,10 @@ preserve ABI compatibility it might be necessary to define the macro
 <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>.
 </BLOCKQUOTE>
 
+@par
 <BLOCKQUOTE>
 Introducing OpenVDBLink, which provides a
-<A HREF="https://www.wolfram.com/mathematica/">Mathematica</A> interface to OpenVDB.
+<A HREF="https://www.wolfram.com/mathematica/">Mathematica</A> interface to <A HREF="https://openvdb.org">OpenVDB</A>.
 </BLOCKQUOTE>
 
 @par
