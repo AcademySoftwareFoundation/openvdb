@@ -1,2 +1,0 @@
-New features:
-    - ABI change to openvdb::RootNode, which now has a new member that defines the origin of the node. For now this origin is set to a default value of (0,0,0), but in the near future we will allow for offsets to improve access performance and reduce the memory footprints.
