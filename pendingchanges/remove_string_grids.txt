@@ -1,2 +1,0 @@
-API Changes:
-	- StringGrid and StringTrees have been removed.

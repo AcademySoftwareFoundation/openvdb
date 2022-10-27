@@ -394,6 +394,9 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   elseif(${COMPONENT} STREQUAL "openvdb_je")
     # alias to the result of openvdb which should be handled first
     set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
+  elseif(${COMPONENT} STREQUAL "nanovdb")
+    # alias to the result of openvdb which should be handled first
+    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
   else()
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}

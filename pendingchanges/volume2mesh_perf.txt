@@ -1,2 +1,0 @@
-Improvements:
-    - Improved the performance of volumeToMesh by 10-15%

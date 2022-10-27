@@ -255,9 +255,7 @@ TEST_F(TestPointConversion, testPointConversion)
 
     // read/write grid to a temp file
 
-    io::TempFile file;
-    const std::string filename = file.filename();
-
+    const std::string filename = "testPointConversion.vdb";
     io::File fileOut(filename);
 
     GridCPtrVec grids;
@@ -409,7 +407,6 @@ TEST_F(TestPointConversion, testPointConversion)
         EXPECT_NEAR(position.buffer()[i*2].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
     }
 
-    file.close();
     std::remove(filename.c_str());
 }
 

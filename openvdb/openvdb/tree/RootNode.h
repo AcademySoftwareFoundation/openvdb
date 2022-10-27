@@ -882,21 +882,6 @@ public:
     void combine2(const RootNode& other0, const OtherRootNode& other1,
                   CombineOp& op, bool prune = false);
 
-    /// @brief Call the templated functor BBoxOp with bounding box
-    /// information for all active tiles and leaf nodes in the tree.
-    /// An additional level argument is provided for each callback.
-    ///
-    /// @note The bounding boxes are guaranteed to be non-overlapping.
-    template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
-
-    template<typename VisitorOp> void visit(VisitorOp&);
-    template<typename VisitorOp> void visit(VisitorOp&) const;
-
-    template<typename OtherRootNodeType, typename VisitorOp>
-    void visit2(OtherRootNodeType& other, VisitorOp&);
-    template<typename OtherRootNodeType, typename VisitorOp>
-    void visit2(OtherRootNodeType& other, VisitorOp&) const;
-
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
@@ -976,14 +961,6 @@ private:
 
     template<typename CombineOp, typename OtherRootNode /*= RootNode*/>
     void doCombine2(const RootNode&, const OtherRootNode&, CombineOp&, bool prune);
-
-    template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
-    static inline void doVisit(RootNodeT&, VisitorOp&);
-
-    template<typename RootNodeT, typename OtherRootNodeT, typename VisitorOp,
-        typename ChildAllIterT, typename OtherChildAllIterT>
-    static inline void doVisit2(RootNodeT&, OtherRootNodeT&, VisitorOp&);
-
 
     MapType mTable;
     ValueType mBackground;
@@ -3434,145 +3411,6 @@ RootNode<ChildT>::doCombine2(const RootNode& other0, const OtherRootNode& other1
     mBackground = args.result();
 }
 
-
-////////////////////////////////////////
-
-
-template<typename ChildT>
-template<typename BBoxOp>
-inline void
-RootNode<ChildT>::visitActiveBBox(BBoxOp& op) const
-{
-    const bool descent = op.template descent<LEVEL>();
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (this->isTileOff(i)) continue;
-        if (this->isChild(i) && descent) {
-            this->getChild(i).visitActiveBBox(op);
-        } else {
-            op.template operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-        }
-    }
-}
-
-
-template<typename ChildT>
-template<typename VisitorOp>
-inline void
-RootNode<ChildT>::visit(VisitorOp& op)
-{
-    doVisit<RootNode, VisitorOp, ChildAllIter>(*this, op);
-}
-
-
-template<typename ChildT>
-template<typename VisitorOp>
-inline void
-RootNode<ChildT>::visit(VisitorOp& op) const
-{
-    doVisit<const RootNode, VisitorOp, ChildAllCIter>(*this, op);
-}
-
-
-template<typename ChildT>
-template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
-inline void
-RootNode<ChildT>::doVisit(RootNodeT& self, VisitorOp& op)
-{
-    typename RootNodeT::ValueType val;
-    for (ChildAllIterT iter = self.beginChildAll(); iter; ++iter) {
-        if (op(iter)) continue;
-        if (typename ChildAllIterT::ChildNodeType* child = iter.probeChild(val)) {
-            child->visit(op);
-        }
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename ChildT>
-template<typename OtherRootNodeType, typename VisitorOp>
-inline void
-RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op)
-{
-    doVisit2<RootNode, OtherRootNodeType, VisitorOp, ChildAllIter,
-        typename OtherRootNodeType::ChildAllIter>(*this, other, op);
-}
-
-
-template<typename ChildT>
-template<typename OtherRootNodeType, typename VisitorOp>
-inline void
-RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op) const
-{
-    doVisit2<const RootNode, OtherRootNodeType, VisitorOp, ChildAllCIter,
-        typename OtherRootNodeType::ChildAllCIter>(*this, other, op);
-}
-
-
-template<typename ChildT>
-template<
-    typename RootNodeT,
-    typename OtherRootNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
-inline void
-RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op)
-{
-    enforceSameConfiguration(other);
-
-    typename RootNodeT::ValueType val;
-    typename OtherRootNodeT::ValueType otherVal;
-
-    // The two nodes are required to have corresponding table entries,
-    // but since that might require background tiles to be added to one or both,
-    // and the nodes might be const, we operate on shallow copies of the nodes instead.
-    RootNodeT copyOfSelf(self.mBackground);
-    copyOfSelf.mTable = self.mTable;
-    OtherRootNodeT copyOfOther(other.mBackground);
-    copyOfOther.mTable = other.mTable;
-
-    // Add background tiles to both nodes as needed.
-    CoordSet keys;
-    self.insertKeys(keys);
-    other.insertKeys(keys);
-    for (CoordSetCIter i = keys.begin(), e = keys.end(); i != e; ++i) {
-        copyOfSelf.findOrAddCoord(*i);
-        copyOfOther.findOrAddCoord(*i);
-    }
-
-    ChildAllIterT iter = copyOfSelf.beginChildAll();
-    OtherChildAllIterT otherIter = copyOfOther.beginChildAll();
-
-    for ( ; iter && otherIter; ++iter, ++otherIter)
-    {
-        const size_t skipBranch = static_cast<size_t>(op(iter, otherIter));
-
-        typename ChildAllIterT::ChildNodeType* child =
-            (skipBranch & 1U) ? nullptr : iter.probeChild(val);
-        typename OtherChildAllIterT::ChildNodeType* otherChild =
-            (skipBranch & 2U) ? nullptr : otherIter.probeChild(otherVal);
-
-        if (child != nullptr && otherChild != nullptr) {
-            child->visit2Node(*otherChild, op);
-        } else if (child != nullptr) {
-            child->visit2(otherIter, op);
-        } else if (otherChild != nullptr) {
-            otherChild->visit2(iter, op, /*otherIsLHS=*/true);
-        }
-    }
-    // Remove any background tiles that were added above,
-    // as well as any that were created by the visitors.
-    copyOfSelf.eraseBackgroundTiles();
-    copyOfOther.eraseBackgroundTiles();
-
-    // If either input node is non-const, replace its table with
-    // the (possibly modified) copy.
-    self.resetTable(copyOfSelf.mTable);
-    other.resetTable(copyOfOther.mTable);
-}
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

@@ -1,3 +1,0 @@
-Bug Fixes:
-    - Fixed a bug on Windows where math::Abs could truncate 64bit integer values [Contributed by Edward Lam]
-    - Fixed an occurance of undefined behaviour with math::floatToInt32 and math::doubleToInt64 [Reported by Vojtěch Bubník]

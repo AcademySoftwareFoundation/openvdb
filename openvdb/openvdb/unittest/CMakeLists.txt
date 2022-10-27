@@ -171,7 +171,6 @@ else()
     TestTreeCombine.cc
     TestTreeGetSetValues.cc
     TestTreeIterators.cc
-    TestTreeVisitor.cc
     TestTypes.cc
     TestUtil.cc
     TestValueAccessor.cc

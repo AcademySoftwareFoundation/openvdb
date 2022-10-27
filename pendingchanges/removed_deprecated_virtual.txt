@@ -1,2 +1,0 @@
-    ABI changes:
-    - Removed deprecated virtual methods from AttributeArray.

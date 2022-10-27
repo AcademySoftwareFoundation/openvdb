@@ -184,12 +184,6 @@ public:
      /// Non-const std-compliant iterator
     class Iterator;
 
-    /// @brief This method is deprecated and will be removed shortly!
-    OPENVDB_DEPRECATED size_t push_back(const ValueType& value)
-    {
-        return this->push_back_unsafe(value);
-    }
-
     /// @param value value to be added to this PagedArray
     ///
     /// @note For best performance consider using the ValueBuffer!

@@ -302,8 +302,8 @@ void Tool::run()
 void Tool::warning(const std::string &msg, std::ostream& os) const
 {
     if (mParser.verbose>0) {
-        os << "\n" << std::setw(msg.size()) << std::setfill('*') << "\n" << msg
-           << "\n" << std::setw(msg.size()) << std::setfill('*') << "\n";
+        os << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n" << msg
+           << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n";
     }
 }// Tool::warning
 
@@ -311,21 +311,21 @@ void Tool::warning(const std::string &msg, std::ostream& os) const
 
 /// @brief Private struct for the header of config files
 struct Tool::Header {
-    Header() : magic("vdb_tool"), major(sMajor), minor(sMinor), patch(sPatch) {}
-    Header(const std::string &line) : magic("vdb_tool") {
+    Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
+    Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
-      if (header.size()!=4 || header[0]!=magic ||
-         !isInt(header[1], major) ||
-         !isInt(header[2], minor) ||
-         !isInt(header[3], patch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
+      if (header.size()!=4 || header[0]!=mMagic ||
+         !isInt(header[1], mMajor) ||
+         !isInt(header[2], mMinor) ||
+         !isInt(header[3], mPatch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
     }
     std::string str() const {
-      return magic+" "+std::to_string(major)+"."+std::to_string(minor)+"."+std::to_string(patch);
+      return mMagic+" "+std::to_string(mMajor)+"."+std::to_string(mMinor)+"."+std::to_string(mPatch);
     }
-    bool isCompatible() const {return major == sMajor;}
+    bool isCompatible() const {return mMajor == sMajor;}
 
-    std::string magic;
-    int major, minor, patch;
+    std::string mMagic;
+    int mMajor, mMinor, mPatch;
 };// Header struct
 
 // ==============================================================================================================
@@ -1029,9 +1029,9 @@ void Tool::readVDB(const std::string &fileName)
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_NANO
 void Tool::readNVDB(const std::string &fileName)
 {
-#ifdef VDB_TOOL_USE_NANO
   assert(mParser.getAction().name == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readNVDB: no grids names specified");
@@ -1058,10 +1058,13 @@ void Tool::readNVDB(const std::string &fileName)
     if (mGrid.size() == count) std::cerr << "readNVDB: no NanoVDB grids were loaded\n";
     if (mParser.verbose>1) for (auto it = std::next(mGrid.cbegin(), count); it != mGrid.cend(); ++it) (*it)->print();
   }
-#else
-    throw std::runtime_error("NanoVDB support was disabled during compilation!");
-#endif
 }// Tool::readNVDB
+#else
+void Tool::readNVDB(const std::string&)
+{
+    throw std::runtime_error("NanoVDB support was disabled during compilation!");
+}// Tool::readNVDB
+#endif
 
 // ==============================================================================================================
 
@@ -1094,7 +1097,7 @@ void Tool::config()
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
-            std::vector<char*> args({&header.magic[0]});//parser is expecting first argument to the name of the executable
+            std::vector<char*> args({&header.mMagic[0]});//parser is expecting first argument to the name of the executable
             while (getline(file, line)) {
                 if (line.empty() || contains("#/%!", line[0])) continue;// skip empty lines and comments
                 VecS tmp = vdb_tool::tokenize(line, " ");
@@ -1106,7 +1109,7 @@ void Tool::config()
                 });
             }
             file.close();
-            mParser.parse(args.size(), args.data());
+            mParser.parse(static_cast<int>(args.size()), args.data());
             if (mParser.verbose) mTimer.stop();
         }
     }
@@ -1182,7 +1185,7 @@ void Tool::writeVDB(const std::string &fileName)
         throw std::invalid_argument("writeVDB: unsupported codec \""+codec+"\"");
       }
     };
-    for (int i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(true);
+    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(true);
     if (fileName=="stdout.vdb") {
       if (isatty(fileno(stdout)))  throw std::invalid_argument("writeVDB: stdout is not connected to the terminal");
       if (mParser.verbose) mTimer.start("Streaming VDB grid(s) to output stream");
@@ -1196,7 +1199,7 @@ void Tool::writeVDB(const std::string &fileName)
       file.write(grids);
       file.close();
     }
-    for (int i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(false);
+    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(false);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
@@ -1205,9 +1208,9 @@ void Tool::writeVDB(const std::string &fileName)
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_NANO
 void Tool::writeNVDB(const std::string &fileName)
 {
-#ifdef VDB_TOOL_USE_NANO
   const std::string &name = mParser.getAction().name;
   assert(name == "write");
   try {
@@ -1331,10 +1334,13 @@ void Tool::writeNVDB(const std::string &fileName)
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }
-#else
-    throw std::runtime_error("NanoVDB support was disabled during compilation!");
-#endif
 }// Tool::writeNVDB
+#else
+void Tool::writeNVDB(const std::string&)
+{
+    throw std::runtime_error("NanoVDB support was disabled during compilation!");
+}// Tool::writeNVDB
+#endif
 
 // ==============================================================================================================
 
@@ -1589,7 +1595,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
     throw std::invalid_argument("estimateVoxelSize: invalid maxDim");
   }
   const auto d = bbox.extents()[bbox.maxExtent()];// longest extent of bbox along any coordinate axis
-  return float(d/(maxDim - int(2*halfWidth)));
+  return static_cast<float>(static_cast<float>(d)/static_cast<float>(maxDim - static_cast<int>(2.f * halfWidth)));
 }// Tool::estimateVoxelSize
 
 // ==============================================================================================================
@@ -1724,7 +1730,7 @@ void Tool::offsetLevelSet()
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("offsetLevelSet: no level set with age "+std::to_string(age));
     auto filter = this->createFilter(*grid, space, time);
-    radius *= (*it)->voxelSize()[0];// voxel to world units
+    radius *= static_cast<float>((*it)->voxelSize()[0]);// voxel to world units
     if (name == "dilate") {
       if (mParser.verbose) mTimer.start("Dilate  SDF");
       filter->offset(-radius);
@@ -1964,11 +1970,11 @@ void Tool::csg()
     if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(ij[1]));
     if (gridA->transform() != gridB->transform()) {
       if (gridA->voxelSize()[0]<gridB->voxelSize()[0]) {// use the smallest voxel size
-        const float halfWidth = gridA->background()/gridA->voxelSize()[0];
+        const float halfWidth = static_cast<float>(gridA->background()/gridA->voxelSize()[0]);
         if (mParser.verbose) mTimer.start("Rebuilding "+std::to_string(ij[1]));
         gridB = tools::levelSetRebuild(*gridB, 0.0f, halfWidth, &(gridA->transform()));
       } else {
-        const float halfWidth = gridB->background()/gridB->voxelSize()[0];
+        const float halfWidth = static_cast<float>(gridB->background()/gridB->voxelSize()[0]);
         if (mParser.verbose) mTimer.start("Rebuilding "+std::to_string(ij[0]));
         gridA = tools::levelSetRebuild(*gridA, 0.0f, halfWidth, &(gridB->transform()));
       }
@@ -2111,7 +2117,7 @@ void Tool::levelSetSphere()
     const Vec3f center = mParser.getVec3<float>("center");
     const float width = mParser.get<float>("width");
     const std::string grid_name = mParser.get<std::string>("name");
-    if (voxel == 0.0f) voxel = 2.0f*radius/(dim - 2.0f*width);
+    if (voxel == 0.0f) voxel = 2.0f*radius/(static_cast<float>(dim) - 2.0f*width);
     if (mParser.verbose) mTimer.start("Create sphere");
     GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxel, width);
     if (mParser.verbose) mTimer.stop();
@@ -2137,7 +2143,7 @@ void Tool::levelSetPlatonic()
     const Vec3f center = mParser.getVec3<float>("center");
     const float width = mParser.get<float>("width");
     const std::string grid_name = mParser.get<std::string>("name");
-    if (voxel == 0.0f) voxel = 2.0f*scale/(dim - 2*width);
+    if (voxel == 0.0f) voxel = 2.0f*scale/(static_cast<float>(dim) - 2*width);
     std::string shape;
     switch (faces) {// TETRAHEDRON=4, CUBE=6, OCTAHEDRON=8, DODECAHEDRON=12, ICOSAHEDRON=20
       case  4: shape = "Tetrahedron"; break;
@@ -2178,11 +2184,11 @@ void Tool::multires()
     if (mParser.verbose) mTimer.start("MultiResGrid");
     if (keep) {
       tools::MultiResGrid<GridT::TreeType> mrg(levels+1, *grid);
-      for (int level=1; level<mrg.numLevels(); ++level) mGrid.push_back(mrg.grid(level));
+      for (size_t level=1; level<mrg.numLevels(); ++level) mGrid.push_back(mrg.grid(level));
     } else {
       tools::MultiResGrid<GridT::TreeType> mrg(levels+1, grid);
       mGrid.erase(std::next(it).base());
-      for (int level=1; level<mrg.numLevels(); ++level) mGrid.push_back(mrg.grid(level));
+      for (size_t level=1; level<mrg.numLevels(); ++level) mGrid.push_back(mrg.grid(level));
     }
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
@@ -2338,7 +2344,7 @@ void Tool::scatter()
       tools::UniformPointScatter<PointWrapper, RandGenT> tmp(points, density, mtRand);
       tmp(*grid);
     }   else if (pointsPerVoxel>0) {// dense uniform scattering
-      tools::DenseUniformPointScatter<PointWrapper, RandGenT> tmp(points, pointsPerVoxel, mtRand);
+      tools::DenseUniformPointScatter<PointWrapper, RandGenT> tmp(points, static_cast<float>(pointsPerVoxel), mtRand);
       tmp(*grid);
     } else {
       throw std::invalid_argument("scatter: internal error");
@@ -2482,9 +2488,9 @@ void Tool::clip()
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_PNG
 void savePNG(const std::string& fname, const tools::Film& film)
 {
-#ifdef VDB_TOOL_USE_PNG
   png_structp png = png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   if (!png) OPENVDB_THROW(RuntimeError, "png_create_write_struct failed");
   png_infop info = info = png_create_info_struct(png);
@@ -2532,16 +2538,19 @@ void savePNG(const std::string& fname, const tools::Film& film)
 
   std::fclose(fp);
   png_destroy_write_struct(&png, &info);
-#else
-  OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .png support.");
-#endif
 }// savePNG
+#else
+void savePNG(const std::string&, const tools::Film&)
+{
+  OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .png support.");
+}// savePNG
+#endif
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_JPG
 void saveJPG(const std::string& fname, const tools::Film& film)
 {
-#ifdef VDB_TOOL_USE_JPG
   jpeg_error_mgr jerr;
   jpeg_compress_struct cinfo;
   jpeg_create_compress(&cinfo);
@@ -2565,16 +2574,19 @@ void saveJPG(const std::string& fname, const tools::Film& film)
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
   std::fclose(fp);
-#else
-  OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .jpg support.");
-#endif
 }// saveJPG
+#else
+void saveJPG(const std::string&, const tools::Film&)
+{
+  OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .jpg support.");
+}// saveJPG
+#endif
 
 // ==============================================================================================================
 
+#ifdef VDB_TOOL_USE_EXR
 void saveEXR(const std::string& filename, const tools::Film& film, const std::string &compression = "zip")
 {
-#ifdef VDB_TOOL_USE_EXR
     Imf::setGlobalThreadCount(8);
     Imf::Header header(int(film.width()), int(film.height()));
     if (compression == "none") {
@@ -2607,10 +2619,13 @@ void saveEXR(const std::string& filename, const tools::Film& film, const std::st
     Imf::OutputFile imgFile(filename.c_str(), header);
     imgFile.setFrameBuffer(framebuffer);
     imgFile.writePixels(int(film.height()));
-#else
-    OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .exr support.");
-#endif
 }// saveEXR
+#else
+void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
+{
+    OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .exr support.");
+}// saveEXR
+#endif
 
 // ==============================================================================================================
 
@@ -2644,7 +2659,7 @@ void Tool::render()
   const int colorgrid = mParser.get<int>("colorgrid");
 
   if (light.size()==3) {
-    for (int i=0; i<3; ++i) light.push_back(0.7);
+    for (size_t i=0; i<3; ++i) light.push_back(0.7f);
   } else if (light.size()!=6) {
     throw std::invalid_argument("render: \"light\" option expected 3 or 6 values, got "+std::to_string(light.size()));
   }
