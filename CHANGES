@@ -4,6 +4,14 @@ OpenVDB Version History
 Version 10.0.0 - October 27, 2022
 
     New features:
+    - Introducing OpenVDBLink, which provides a Mathematica interface to
+      OpenVDB. This link ports over access to various grid containers including
+      level sets, fog volumes, vector grids, integer grids, Boolean grids,
+      and mask grids. Construction, modification, combinations, visualisations,
+      queries, import, export, etc. can be achieved over grids too. Any
+      Mathematica 3D region that's ConstantRegionQ and BoundedRegionQ can
+      be represented as a level set grid, providing a more seamless integration
+      with OpenVDB.
     - Introducing a new command-line tool, dubbed vdb_tool, that can combine any
       number of the of high-level tools available in openvdb/tools. For
       instance, it can convert a sequence of polygon meshes and particles to
