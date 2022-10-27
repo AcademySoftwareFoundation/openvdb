@@ -20,6 +20,14 @@ Introducing OpenVDBLink, which provides a
 </BLOCKQUOTE>
 
 @par
+<BLOCKQUOTE>
+Introducing a new command line tool,
+dubbed <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb_cmd/vdb_tool">vdb_tool</A>,
+that can combine any number of the high-level tools available
+in <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb/openvdb/tools">openvdb/tools</A>.
+</BLOCKQUOTE>
+
+@par
 New Features:
 - Introducing OpenVDBLink, which provides a Mathematica interface to
   OpenVDB. This link ports over access to various grid containers
@@ -30,9 +38,11 @@ New Features:
   that's ConstantRegionQ and BoundedRegionQ can be represented
   as a level set grid, providing a more seamless integration with
   OpenVDB.
-- Introducing a new command-line tool, dubbed vdb_tool, that can combine
-  any number of the of high-level tools available in openvdb/tools. For
-  instance, it can convert a sequence of polygon meshes and particles to
+- Introducing a new command-line tool,
+  dubbed <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb_cmd/vdb_tool">vdb_tool</A>,
+  that can combine any number of the of high-level tools available
+  in <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb/openvdb/tools">openvdb/tools</A>.
+  For instance, it can convert a sequence of polygon meshes and particles to
   level sets, perform a large number of operations on these level set
   surfaces and export them as adaptive polyon meshes.
 - Added nanovdb::IndexGrid that allows for arbitrary voxel values and
