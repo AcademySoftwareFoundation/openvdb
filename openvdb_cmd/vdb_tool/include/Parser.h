@@ -510,7 +510,7 @@ public:
         for (auto &s : vec) {
             auto it = mInstructions.find(s);
             if (it != mInstructions.end()) {
-                os << std::left << std::setw(w) << it->first << it->second.doc << "\n\n";
+                os << std::left << std::setw(static_cast<int>(w)) << it->first << it->second.doc << "\n\n";
             } else {
                 throw std::invalid_argument("Processor::help:: unknown operation \"" + s + "\"");
             }
@@ -738,7 +738,7 @@ std::vector<T> Parser::getVec(const std::string &name, const char* delimiters) c
 {
     VecS v = this->getVec<std::string>(name, delimiters);
     std::vector<T> vec(v.size());
-    for (int i=0; i<v.size(); ++i) vec[i] = strTo<T>(v[i]);
+    for (size_t i=0; i<v.size(); ++i) vec[i] = strTo<T>(v[i]);
     return vec;
 }// Parser::getVec
 
@@ -795,8 +795,8 @@ Parser::Parser(std::vector<Option> &&def)
   , iter()// iterator pointing to the current actions being processed
   , hashMap()
   , loops()// list of all for- and each-loops
-  , verbose(1)// verbose level is set to 1 my default
   , defaults(def)// by default keep is set to false
+  , verbose(1)// verbose level is set to 1 my default
   , counter(1)// 1-based global loop counter associated with 'G'
 {
     this->addAction(
@@ -836,11 +836,11 @@ Parser::Parser(std::vector<Option> &&def)
 
     this->addAction(
         "default", "", "define default values to be used by subsequent actions",
-        std::move(std::vector<Option>(defaults)),// move a deep copy
+        std::vector<Option>(defaults), // using std::move produces error: moving a temporary object prevents copy elision
         [&](){assert(iter->name == "default");
               std::vector<Option> &src = iter->options, &dst = defaults;
               assert(src.size() == dst.size());
-              for (int i=0; i<src.size(); ++i) if (!src[i].value.empty()) dst[i].value = src[i].value;},
+              for (size_t i=0; i<src.size(); ++i) if (!src[i].value.empty()) dst[i].value = src[i].value;},
         [](){}
     );
 
@@ -994,7 +994,7 @@ std::string Parser::usage(const Action &action, bool brief) const
     const static int w = 17;
     auto op = [&](std::string line, size_t width, bool isSentence) {
         if (isSentence) {
-            line[0] = std::toupper(line[0]);// capitalizestd::string name, value, example, documentation;');// punctuate
+            line[0] = static_cast<char>(std::toupper(line[0]));// capitalizestd::string name, value, example, documentation;');// punctuate
         }
         width += w;
         const VecS words = tokenize(line, " ");
@@ -1002,7 +1002,7 @@ std::string Parser::usage(const Action &action, bool brief) const
             ss << words[i] << " ";
             n += words[i].size() + 1;
             if (i<words.size()-1 && n > 80) {// exclude last word
-                ss << std::endl << std::left << std::setw(width) << "";
+                ss << std::endl << std::left << std::setw(static_cast<int>(width)) << "";
                 n = width;
             }
         }
@@ -1023,14 +1023,14 @@ std::string Parser::usage(const Action &action, bool brief) const
         for (const auto &opt : action.options) width = std::max(width, opt.name.size());
         width += 4;
         for (const auto &opt : action.options) {
-            ss << std::endl << std::setw(w) << "" << std::setw(width);
+            ss << std::endl << std::setw(w) << "" << std::setw(static_cast<int>(width));
             if (opt.name.empty()) {
                 size_t p = opt.example.find('=');
                 ss << opt.example.substr(0, p) << opt.example.substr(p+1);
             } else {
                 ss << opt.name << opt.example;
             }
-            ss << std::endl << std::left << std::setw(w+width) << "";
+            ss << std::endl << std::left << std::setw(w+static_cast<int>(width)) << "";
             op(opt.documentation, width, true);
         }
     }

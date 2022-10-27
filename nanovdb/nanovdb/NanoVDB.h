@@ -1139,9 +1139,9 @@ public:
 
     /// @brief Return the octant of this Coord
     //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
-    __hostdev__ uint8_t octant() const { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
+    __hostdev__ uint8_t octant() const { return uint8_t((uint8_t(bool(mVec[0] & (1u << 31)))) |
                                                 (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
-                                                (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
+                                                (uint8_t(bool(mVec[2] & (1u << 31))) << 2)); }
 
     /// @brief Return a single precision floating-point vector of this coordinate
     __hostdev__ inline Vec3<float> asVec3s() const;

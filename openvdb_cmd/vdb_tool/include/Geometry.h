@@ -337,7 +337,7 @@ void Geometry::writeSTL(std::ostream &os) const
     if (!mQuad.empty()) throw std::invalid_argument("STL file only supports triangles");
     uint8_t buffer[80] = {0};// fixed-sized buffer initiated with zeros!
     os.write((const char*)buffer, 80);// write header as zeros
-    const uint32_t nTri = mTri.size();
+    const uint32_t nTri = static_cast<uint32_t>(mTri.size());
     os.write((const char*)&nTri, 4);
     float *p = 3 + reinterpret_cast<float*>(buffer);// the normal will remain zero
     for (const Vec3I &tri : mTri) {
@@ -466,7 +466,7 @@ void Geometry::readPLY(std::istream &is)
     };
     auto tokens = tokenize_line();
     auto test = [&tokens](int i, std::vector<std::string> str) {
-        if (i >= tokens.size()) return false;
+        if (i >= static_cast<int>(tokens.size())) return false;
         for (auto &s : str) {
             if (tokens[i] == s) return true;
         }
@@ -520,20 +520,20 @@ void Geometry::readPLY(std::istream &is)
                             } else {// e.g. nx, ny, nz, intensity, s, t etc
                                 if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
                                 vtx_skip[m].count += 1;
-                                vtx_skip[m].bytes += sizeof(float);
+                                vtx_skip[m].bytes += static_cast<int>(sizeof(float));
                             }
                         } else if ( test(1, {"int16", "uint16"}) ) {// e.g. material_index etc
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int16 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(int16_t);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(int16_t));
                         } else if ( test(1, {"int", "int32"}) ) {// e.g. material_index etc
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int32 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(int32_t);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(int32_t));
                         } else if ( test(1, {"uchar", "int8"}) ) {// eg red, green, blue, alpha
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int8 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(unsigned char);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(unsigned char));
                         } else {
                             error("vdb_tool::readPLY: invalid vertex property");
                         }
@@ -620,7 +620,7 @@ void Geometry::readPLY(std::istream &is)
     } else {// ascii
         for (auto &v : mVtx) {
             tokens = tokenize_line();
-            if (tokens.size() != vtx_skip[0].count + 3 + vtx_skip[1].count) {
+            if (static_cast<int>(tokens.size()) != vtx_skip[0].count + 3 + vtx_skip[1].count) {
                 error("vdb_tool::readPLY: error reading ascii vertex coordinates");
             }
             for (int i = 0; i<3; ++i) {
@@ -675,7 +675,7 @@ void Geometry::readPLY(std::istream &is)
                 throw std::invalid_argument("Geometry::readPLY: ascii " + std::to_string(n)+"-gons are not supported");
             }
             for (int i = 0; i<n; ++i) {
-                vtx[i] = std::stoll(tokens[i + 1 + ply_skip[0].count]);
+                vtx[i] = static_cast<uint32_t>(std::stoll(tokens[i + 1 + ply_skip[0].count]));
             }
             if (n==3) {
                 mTri.emplace_back(vtx);
@@ -706,14 +706,12 @@ void Geometry::readVDB(const std::string &fileName)
     io::File file(fileName);
     file.open();// enables delayed loading by default
     GridPtrVecPtr meta = file.readAllGridMetadata();
-    size_t count = 0;
     for (auto m : *meta) {
         if (m->isType<points::PointDataGrid>()) {
             auto grid = gridPtrCast<points::PointDataGrid>(file.readGrid(m->getName()));
             assert(grid);
             size_t n = mVtx.size();
             const auto m = points::pointCount(grid->tree());
-            count += m;
             mVtx.resize(n + m);
             for (auto leafIter = grid->tree().cbeginLeaf(); leafIter; ++leafIter) {
                 const points::AttributeArray& array = leafIter->constAttributeArray("P");
@@ -753,7 +751,6 @@ void Geometry::readPTS(const std::string &fileName)
     std::ifstream infile(fileName, std::ios::in);
     if (!infile.is_open()) throw std::runtime_error("Error opening particle file \""+fileName+"\"");
     std::string line;
-    size_t count = 0;
     std::istringstream iss;
     while(std::getline(infile, line)) {
         const size_t n = mVtx.size(), m = std::stoi(line);
@@ -801,7 +798,7 @@ void Geometry::readSTL(const std::string &fileName)
                         throw std::invalid_argument("Geometry::readSTL ASCII: error parsing line: \""+line+"\"");
                     }
                 }// endloop
-                const int vtx = mVtx.size() - 1;
+                const int vtx = static_cast<int>(mVtx.size()) - 1;
                 switch (nGone){
                 case 3:
                     mTri.emplace_back(vtx - 2, vtx - 1, vtx);
@@ -822,7 +819,7 @@ void Geometry::readSTL(const std::string &fileName)
         infile.seekg (0, infile.end);
         if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size");
         infile.seekg(80 + 4, infile.beg);
-        uint32_t vtxBegin = mVtx.size(), triBegin = mTri.size();
+        uint32_t vtxBegin = static_cast<uint32_t>(mVtx.size()), triBegin = static_cast<uint32_t>(mTri.size());
         mVtx.resize(vtxBegin + 3*numTri);
         mTri.resize(triBegin +   numTri);
         Vec3f *pV = mVtx.data() + vtxBegin;
@@ -841,9 +838,9 @@ void Geometry::readSTL(const std::string &fileName)
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readSTL
 
+#ifdef VDB_TOOL_USE_NANO
 void Geometry::readNVDB(const std::string &fileName)
 {
-#ifdef VDB_TOOL_USE_NANO
     auto handle = nanovdb::io::readGrid(fileName);
     auto grid = handle.grid<uint32_t>();
     if (grid == nullptr || !grid->isPointData()) return;
@@ -855,10 +852,13 @@ void Geometry::readNVDB(const std::string &fileName)
     mVtx.resize(n + count);
     for (size_t i=n; i<mVtx.size(); ++i) mVtx[i] = *p++;// loop over points
     mBBox = BBoxT();//invalidate BBox
-#else
-    throw std::runtime_error("NanoVDB support was disabled during compilation!");
-#endif
 }// Geometry::readNVDB
+#else
+void Geometry::readNVDB(const std::string&)
+{
+    throw std::runtime_error("NanoVDB support was disabled during compilation!");
+}// Geometry::readNVDB
+#endif
 
 void Geometry::print(size_t n, std::ostream& os) const
 {
@@ -1115,9 +1115,9 @@ void Geometry::transform(const math::Transform &xform)
 {
     using RangeT = tbb::blocked_range<size_t>;
     tbb::parallel_for(RangeT(0, mVtx.size()), [&](RangeT r){
-        for (int i=r.begin(); i<r.end(); ++i){
+        for (size_t i=r.begin(); i<r.end(); ++i){
             Vec3d xyz(mVtx[i]);
-            mVtx[i] = xform.baseMap()->applyMap(xyz);
+            mVtx[i] = static_cast<Vec3s>(xform.baseMap()->applyMap(xyz));
         }
     });
     mBBox = BBoxT();//invalidate BBox

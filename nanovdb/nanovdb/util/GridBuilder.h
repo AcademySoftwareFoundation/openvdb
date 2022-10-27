@@ -42,6 +42,7 @@ public:
     /// @note The default value of -1 means it's un-initialized!
     AbsDiff(float tolerance = -1.0f) : mTolerance(tolerance) {}
     AbsDiff(const AbsDiff&) = default;
+    ~AbsDiff() = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
     /// @brief Return true if the approximate value is within the accepted
@@ -68,6 +69,7 @@ public:
     /// @note The default value of -1 means it's un-initialized!
     RelDiff(float tolerance = -1.0f) : mTolerance(tolerance) {}
     RelDiff(const RelDiff&) = default;
+    ~RelDiff() = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
     /// @brief Return true if the approximate value is within the accepted

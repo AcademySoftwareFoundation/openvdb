@@ -129,7 +129,7 @@ inline int findMatch(const std::string &word, const std::vector<std::string> &ve
         do {
             ++p;
             const size_t q = vec[i].find(',', p);
-            if (vec[i].compare(p, q - p, word) == 0) return i + 1; // 1-based return value
+            if (vec[i].compare(p, q - p, word) == 0) return static_cast<int>(i + 1); // 1-based return value
             p = q;
         } while (p != std::string::npos);
     }
@@ -193,7 +193,7 @@ inline bool isInt(const std::string &s, int &i)
 inline int strToInt(const std::string &str)
 {
     size_t pos = 0;
-    int i;
+    int i = 0;
     try{
         i = stoi(str, &pos); // might throw
     } catch (const std::invalid_argument &) {
@@ -207,7 +207,7 @@ inline int strToInt(const std::string &str)
 inline float strToFloat(const std::string &str)
 {
     size_t pos = 0;
-    float v;
+    float v = 0.f;
     try {
         v = stof(str, &pos); // might throw
     } catch (const std::invalid_argument &){
@@ -221,7 +221,7 @@ inline float strToFloat(const std::string &str)
 inline double strToDouble(const std::string &str)
 {
     size_t pos = 0;
-    double v;
+    double v = 0.0;
     try {
         v = stod(str, &pos); // might throw
     } catch (const std::invalid_argument &) {
@@ -237,7 +237,7 @@ inline bool strToBool(const std::string &str)
     if (str == "1" || toLowerCase(str) == "true") return true;
     if (str == "0" || toLowerCase(str) == "false") return false;
     throw std::invalid_argument("strToBool: invalid bool \"" + str + "\"");
-    return "strToBool: internal error"; // should never happen
+    return false; // "strToBool: internal error" should never happen
 }
 
 template <typename T>
@@ -357,7 +357,7 @@ inline std::vector<int> findIntN(const std::vector<std::string> &args, const std
 {
     const auto t = tokenize(findArg(args, option), " ,");
     std::vector<int> v(t.size());
-    for (int i = 0; i < t.size(); ++i) v[i] = strToInt(t[i]);
+    for (size_t i = 0; i < t.size(); ++i) v[i] = strToInt(t[i]);
     return v; // move semantics
 }
 
@@ -366,14 +366,14 @@ std::vector<float> findFltN(const std::vector<std::string> &args, const std::str
 {
     const auto t = tokenize(findArg(args, option), " ,");
     std::vector<float> v(t.size());
-    for (int i = 0; i < t.size(); ++i) v[i] = strToFloat(t[i]);
+    for (size_t i = 0; i < t.size(); ++i) v[i] = strToFloat(t[i]);
     return v; // move semantics
 }
 
 /// @brief return true if the device on which it is executed uses little-endian bit ordering
 inline bool isLittleEndian()
 {
-    const unsigned int tmp = 1;
+    unsigned int tmp = 1;
     return (*(char *)&tmp == 1);
 }
 
