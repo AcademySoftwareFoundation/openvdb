@@ -1,6 +1,0 @@
-API changes:
-    - Removed PagedArray::push_back().
-    - Removed Tree visitor methods from Tree, RootNode, InternalNode and LeafNode classes - visit(), visit2(), visitActiveBBox().
-    - Removed LeafManager::getNodes().
-    - Removed tools::dilateVoxels() and tools::erodeVoxels() in favor of tools::dilateActiveValues() and tools::erodeActiveValues().
-    - Removed tools::FindActiveValues::any() and tools::FindActiveValues::none().
