@@ -1,6 +1,8 @@
 OpenVDB Version History
 =======================
 
+Version 10.0.1 - In development
+
 Version 10.0.0 - October 27, 2022
 
     New Features:
@@ -13,10 +15,10 @@ Version 10.0.0 - October 27, 2022
       be represented as a level set grid, providing a more seamless integration
       with OpenVDB.
     - Introducing a new command-line tool, dubbed vdb_tool, that can combine any
-      number of the of high-level tools available in openvdb/tools. For
+      number of the high-level tools available in openvdb/tools. For
       instance, it can convert a sequence of polygon meshes and particles to
       level sets, perform a large number of operations on these level set
-      surfaces and export them as adaptive polyon meshes.
+      surfaces and export them as adaptive polygon meshes.
     - Added nanovdb::IndexGrid that allows for arbitrary voxel values and even
       multiple channels to be associated with NanoVDB grids. They are more
       flexible and memory efficient than regular grids at a small cost of
@@ -44,13 +46,13 @@ Version 10.0.0 - October 27, 2022
     - Improved the performance of volumeToMesh by 10-15%.
     - Added a new much improved nanovdb::NodeManager, that is both faster and
       more memory efficient, and that works on both the CPU and GPU. Note, it
-      uses an handle for allocation (just like nanovdb::Grid) and replaces the
+      uses a handle for allocation (just like nanovdb::Grid) and replaces the
       old nanovdb::LeafManager which is now deprecated.
     - NanoToOpenVDB is extended to work with grids templated on Fp4, Fp8, Fp16,
       FpN, bool and ValueMask.
-    - Rename RootNode::findTile to RootNode::probeTile and made it public.
-    - Made Mask::getWord return both an const and non-const reference.
-    - Improved unit-tests to use explicit 32B alignment (see aligment bug-fix
+    - Renamed RootNode::findTile to RootNode::probeTile and made it public.
+    - Made Mask::getWord return both a const and non-const reference.
+    - Improved unit-tests to use explicit 32B alignment (see alignment bug-fix
       below).
     - PNanoVDB.h (a C99 port of NanoVDB.h) has been updated.
 
@@ -69,7 +71,7 @@ Version 10.0.0 - October 27, 2022
       in the tree.
     - Fixed a bug on Windows where math::Abs could truncate 64bit integer values.
       [Contributed by Edward Lam]
-    - Fixed an occurance of undefined behaviour with math::floatToInt32 and
+    - Fixed an occurrence of undefined behaviour with math::floatToInt32 and
       math::doubleToInt64.
       [Reported by Vojtěch Bubník]
     - Fixed bugs in the sum merge that produced incorrect merged grids when
