@@ -872,7 +872,8 @@ public:
     using LeafNodeType = typename NodeType::LeafNodeType;
     using CoordLimits = std::numeric_limits<Int32>;
 
-    static_assert(std::is_same<NodeType, LeafNodeType>::value);
+    static_assert(std::is_same<NodeType, LeafNodeType>::value,
+        "cache item node type is not leaf node type");
 
     CacheItem(TreeCacheT& parent)
         : mParent(&parent)
