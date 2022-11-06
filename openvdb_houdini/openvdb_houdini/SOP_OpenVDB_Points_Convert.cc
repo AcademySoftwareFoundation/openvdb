@@ -806,7 +806,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 
         // Unpack any packed primitives
 
-        std::unique_ptr<GA_PrimitiveGroup> packgroup(ptGeo->newDetachedPrimitiveGroup());
+        GA_PrimitiveGroupUPtr packgroup = ptGeo->createDetachedPrimitiveGroup();
 
         for (GA_Iterator it(ptGeo->getPrimitiveRange()); !it.atEnd(); ++it) {
             GA_Offset offset = *it;
