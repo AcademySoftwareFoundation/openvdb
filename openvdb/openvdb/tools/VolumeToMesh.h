@@ -1614,10 +1614,11 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
             if (inclusiveCell) getCellVertexValues(*inputNode, offset, values);
             else               getCellVertexValues(inputAcc, ijk, values);
 
-            size_t count;
+            size_t count, weightcount;
 
             if (refSigns == 0) {
                 count = computeCellPoints(points, values, signs, iso);
+                weightcount = 0;
             } else {
                 if (inclusiveCell && refInputNode) {
                     getCellVertexValues(*refInputNode, offset, refValues);
@@ -1626,6 +1627,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
                 }
                 count = computeCellPoints(points, weightedPointMask, values, refValues, signs, refSigns,
                     iso, refPointIndexNode->getValue(offset), mQuantizedSeamLinePoints);
+                weightcount = count;
             }
 
             xyz = ijk.asVec3d();
@@ -1653,7 +1655,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
                 pos[1] = float(point[1]);
                 pos[2] = float(point[2]);
 
-                if (mSeamLinePointsFlags && weightedPointMask[i]) {
+                if (mSeamLinePointsFlags && weightcount && weightedPointMask[i]) {
                     mSeamLinePointsFlags[pointOffset] = uint8_t(1);
                 }
 
