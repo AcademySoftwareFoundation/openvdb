@@ -8,6 +8,9 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/tools/VolumeToMesh.h>
+#include <openvdb/tools/MeshToVolume.h>
+#include <openvdb/tools/Interpolation.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/openvdb.h>
@@ -250,13 +253,26 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
 
     QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, primitives);
 
+    auto backToOldGrid = [&xform, &grid](const Coord& coord) -> openvdb::math::Vec3d {
+        return grid.transform().worldToIndex(xform->indexToWorld(coord));
+    };
+
+    auto interiorTest = [acc = grid.getConstAccessor(), &backToOldGrid, &xform](const Coord& coord) -> bool {
+        if (xform == nullptr) {
+            return acc.getValue(coord) <= 0 ? true : false;
+        } else {
+            float value = openvdb::tools::BoxSampler::sample(acc, backToOldGrid(coord));
+            return value <= 0 ? true : false;
+        }
+    };
+
     if (interrupter) {
         return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
-            DISABLE_RENORMALIZATION, nullptr);
+            DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
     }
 
     return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
-        DISABLE_RENORMALIZATION, nullptr);
+        DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
 }
 
 
