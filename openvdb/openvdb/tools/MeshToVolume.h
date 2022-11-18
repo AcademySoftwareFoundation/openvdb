@@ -3198,7 +3198,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
                         int dimIdx = (off >> dim * Log2Dim) % DIM;
                         auto neighOff = off + (1 << dim * Log2Dim) * i;
                         if ((0 < dimIdx) &&
-                            (dimIdx < DIM - 1) &&
+                            (dimIdx < (int)DIM - 1) &&
                             (voxelState[neighOff] == NOT_VISITED)) {
 
                             if (abs(leafNode.getValue(neighOff)) <= 0.75) {
@@ -3628,8 +3628,8 @@ meshToVolume(
   float interiorBandWidth,
   int flags,
   typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid,
-  InteriorTest interiorTest,
-  InteriorTestStrategy interiorTestStrat)
+  InteriorTest /*interiorTest*/,
+  InteriorTestStrategy /*interiorTestStrat*/)
 {
     util::NullInterrupter nullInterrupter;
     return meshToVolume<GridType>(nullInterrupter, mesh, transform,
