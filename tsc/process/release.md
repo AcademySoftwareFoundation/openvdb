@@ -13,7 +13,7 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
     * 2e. Click the "Save draft" button. DO NOT publish the release at this stage.
 3. Check out the `v6.1.0_rc` branch.
 4. Ensure the root `CMakeLists.txt` has the correct version number at the top.
-5. Update `CHANGES` and `doc/changes.txt` with release notes. Include any outstanding changes from the /pendingchanges directory.
+5. Update `CHANGES` and `doc/changes.txt` with release notes. Include any outstanding changes from the /pendingchanges directory. Run the files through a spell-check tool.
 6. Update the "Version 6.1.0 - In development" section in `CHANGES` and `doc/changes.txt` to replace "In development" with the planned release date.
 7. Merge these changes to `v6.1.0_rc` in a new pull request and verify that the build CI runs successfully.
 8. Manually dispatch the weekly CI workflow from the `v6.1.0_rc` branch and verify that the additional checks run successfully.
