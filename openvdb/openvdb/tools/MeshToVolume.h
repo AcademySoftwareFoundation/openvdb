@@ -3427,6 +3427,7 @@ meshToVolume(
         /// If interior test is not provided
         if constexpr (std::is_same_v<InteriorTest, std::nullptr_t>) {
             // Determines the inside/outside state for the narrow band of voxels.
+            interiorTest;       // Trigger usage.
             traceExteriorBoundaries(distTree);
         } else {
             evaluateInteriorTest(distTree, interiorTest, interiorTestStrat);
