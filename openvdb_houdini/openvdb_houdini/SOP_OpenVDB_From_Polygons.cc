@@ -19,6 +19,7 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/util/Util.h>
 
+#include <UT/UT_Version.h>
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
