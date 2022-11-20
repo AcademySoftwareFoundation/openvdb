@@ -169,6 +169,7 @@ public:
 
     /// @brief main constructor
     /// @param settings             the shared settings for rasterizing, see class for more details
+    /// @param mask                 a spatial mask to use to define the areas of rasterization
     /// @param interrupt            a pointer adhering to the util::NullInterrupter interface
     explicit FrustumRasterizer(
         const FrustumRasterizerSettings& settings,
