@@ -36,23 +36,9 @@ public:
     using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     /// @note destructor, copy constructor, assignment operator and
     ///   move constructor are left to be defined by the compiler (default)
     Mat4() = default;
-#else
-    Mat4() {}
-
-    /// Copy constructor
-    Mat4(const Mat<4, T> &m)
-    {
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                MyBase::mm[i*4 + j] = m[i][j];
-            }
-        }
-    }
-#endif
 
     /// Constructor given array of elements, the ordering is in row major form:
     /** @verbatim
@@ -1368,10 +1354,8 @@ using Mat4s = Mat4<float>;
 using Mat4d = Mat4<double>;
 using Mat4f = Mat4d;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
 OPENVDB_IS_POD(Mat4s)
 OPENVDB_IS_POD(Mat4d)
-#endif
 
 } // namespace math
 

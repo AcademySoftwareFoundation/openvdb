@@ -16,9 +16,33 @@
 #ifndef NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 
-#include "HostBuffer.h"// for BufferTraits
+#include "HostBuffer.h" // for BufferTraits
 
 #include <cuda_runtime_api.h> // for cudaMalloc/cudaMallocManaged/cudaFree
+
+#if defined(DEBUG) || defined(_DEBUG)
+    static inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
+    {
+        if (code != cudaSuccess) {
+            fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(code), file, line);
+            if (abort) exit(code);
+        }
+    }
+    static inline void ptrAssert(void* ptr, const char* msg, const char* file, int line, bool abort = true)
+    {
+        if (ptr == nullptr) {
+            fprintf(stderr, "NULL pointer error: %s %s %d\n", msg, file, line);
+            if (abort) exit(1);
+        }
+        if (uint64_t(ptr) % NANOVDB_DATA_ALIGNMENT) {
+            fprintf(stderr, "Pointer misalignment error: %s %s %d\n", msg, file, line);
+            if (abort) exit(1);
+        }
+    }
+#else
+    static inline void gpuAssert(cudaError_t, const char*, int, bool = true){}
+    static inline void ptrAssert(void*, const char*, const char*, int, bool = true){}
+#endif
 
 // Convenience function for checking CUDA runtime API results
 // can be wrapped around any runtime API call. No-op in release builds.
@@ -45,34 +69,6 @@ class CudaDeviceBuffer
 {
     uint64_t mSize; // total number of bytes for the NanoVDB grid.
     uint8_t *mCpuData, *mGpuData; // raw buffer for the NanoVDB grid.
-
-    static inline bool gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
-    {
-#if defined(DEBUG) || defined(_DEBUG)
-        if (code != cudaSuccess) {
-            fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(code), file, line);
-            if (abort)
-                exit(code);
-            return false;
-        }
-#endif
-        return true;
-    }
-
-#if defined(DEBUG) || defined(_DEBUG)
-    static inline void ptrAssert(void* ptr, const char* msg, const char* file, int line, bool abort = true)
-    {
-        if (ptr == nullptr) {
-            fprintf(stderr, "NULL pointer error: %s %s %d\n", msg, file, line);
-            if (abort)
-                exit(1);
-        }
-    }
-#else
-    static inline void ptrAssert(void*, const char*, const char*, int, bool = true)
-    {
-    }
-#endif
 
 public:
     CudaDeviceBuffer(uint64_t size = 0)
@@ -162,7 +158,7 @@ inline void CudaDeviceBuffer::init(uint64_t size)
     if (size == 0)
         return;
     mSize = size;
-    cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!)
+    cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
     checkPtr(mCpuData, "failed to allocate host data");
 } // CudaDeviceBuffer::init
 
@@ -170,7 +166,7 @@ inline void CudaDeviceBuffer::deviceUpload(void* stream, bool sync) const
 {
     checkPtr(mCpuData, "uninitialized cpu data");
     if (mGpuData == nullptr)
-        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device
+        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device, always 32B aligned!
     checkPtr(mGpuData, "uninitialized gpu data");
     cudaCheck(cudaMemcpyAsync(mGpuData, mCpuData, mSize, cudaMemcpyHostToDevice, reinterpret_cast<cudaStream_t>(stream)));
     if (sync)

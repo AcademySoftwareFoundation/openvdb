@@ -17,6 +17,7 @@
 #include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbGridCast()
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
@@ -467,7 +468,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 
         const openvdb::Vec3R
             translate = evalVec3R("t", time),
-            rotate = (M_PI / 180.0) * evalVec3R("r", time),
+            rotate = (openvdb::math::pi<double>() / 180.0) * evalVec3R("r", time),
             scale = evalVec3R("s", time),
             pivot = evalVec3R("p", time);
         const float

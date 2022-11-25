@@ -32,5 +32,5 @@ cmake \
     "${CMAKE_EXTRA[@]}" \
     ..
 
-make -j4
+make -j8
 make install

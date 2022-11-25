@@ -1,0 +1,22 @@
+#ifndef LTEMPLATE_COMPILER_SETUP_H
+#define LTEMPLATE_COMPILER_SETUP_H
+
+#if __cplusplus >= 201103L || _MSC_VER >= 1900
+#define LTEMPLATE_USE_CXX11
+#endif
+
+#if LTEMPLATE_MMA_VERSION >= 1040 && defined (LTEMPLATE_USE_CXX11)
+#define LTEMPLATE_RAWARRAY
+#endif
+
+#if LTEMPLATE_MMA_VERSION >= 1200 && defined (LTEMPLATE_USE_CXX11)
+#define LTEMPLATE_NUMERICARRAY
+#endif
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#endif
+
+#endif // LTEMPLATE_COMPILER_SETUP_H

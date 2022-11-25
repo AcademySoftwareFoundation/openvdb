@@ -16,7 +16,7 @@
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <openvdb/tree/RootNode.h> // for NodeChain
+#include "RootNode.h" // for NodeChain
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -533,42 +533,6 @@ public:
     {
         LeafReducer<LeafOp> transform(op);
         transform.run(this->leafRange(grainSize), threaded);
-    }
-
-    template<typename ArrayT>
-    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array)
-    {
-        using T = typename ArrayT::value_type;
-        static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
-        using LeafT = typename std::conditional<std::is_const<
-            typename std::remove_pointer<T>::type>::value, const LeafType, LeafType>::type;
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (std::is_same<T, LeafT*>::value) {
-            array.resize(mLeafCount);
-            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
-        } else {
-            mTree->getNodes(array);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
-
-    template<typename ArrayT>
-    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array) const
-    {
-        using T = typename ArrayT::value_type;
-        static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
-        static_assert(std::is_const<typename std::remove_pointer<T>::type>::value,
-            "argument to getNodes() must be an array of const node pointers");
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (std::is_same<T, const LeafType*>::value) {
-            array.resize(mLeafCount);
-            for (size_t i=0; i<mLeafCount; ++i) array[i] = reinterpret_cast<T>(mLeafs[i]);
-        } else {
-            mTree->getNodes(array);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
     /// @brief Generate a linear array of prefix sums of offsets into the

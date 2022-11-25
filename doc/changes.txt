@@ -2,9 +2,172 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v9_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v10_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 9.0.1</B> - <I>In Development</I>
+<B>Version 10.0.1</B> - <I>In development</I>
+
+@htmlonly <a name="v10_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 10.0.0</B> - <I>October 27, 2022</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
+Introducing OpenVDBLink, which provides a
+<A HREF="https://www.wolfram.com/mathematica/">Mathematica</A> interface to <A HREF="https://openvdb.org">OpenVDB</A>.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
+Introducing a new command line tool,
+dubbed <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb_cmd/vdb_tool">vdb_tool</A>,
+that can combine any number of the high-level tools available
+in <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb/openvdb/tools">openvdb/tools</A>.
+</BLOCKQUOTE>
+
+@par
+New Features:
+- Introducing OpenVDBLink, which provides a Mathematica interface to
+  OpenVDB. This link ports over access to various grid containers
+  including level sets, fog volumes, vector grids, integer grids,
+  Boolean grids, and mask grids. Construction, modification,
+  combinations, visualisations, queries, import, export, etc.
+  can be achieved over grids too. Any Mathematica 3D region
+  that's ConstantRegionQ and BoundedRegionQ can be represented
+  as a level set grid, providing a more seamless integration with
+  OpenVDB.
+- Introducing a new command-line tool,
+  dubbed <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb_cmd/vdb_tool">vdb_tool</A>,
+  that can combine any number of the high-level tools available
+  in <A HREF="https://github.com/AcademySoftwareFoundation/openvdb/tree/master/openvdb/openvdb/tools">openvdb/tools</A>.
+  For instance, it can convert a sequence of polygon meshes and particles to
+  level sets, perform a large number of operations on these level set
+  surfaces and export them as adaptive polygon meshes.
+- Added nanovdb::IndexGrid that allows for arbitrary voxel values and
+  even multiple channels to be associated with NanoVDB grids. They are
+  more flexible and memory efficient than regular grids at a small cost
+  of random-access performance. IndexGrids are constructed with the new
+  nanovdb::IndexGridBuilder and accessed with the new
+  nanovdb::ChannelAccessor.
+- Added iterators to all tree node classes for visiting inactive,
+  active, or all values and child nodes.
+- NanoVDB.h now includes standalone implementations of reading and
+  writing uncompressed nanovdb grids buffers.
+- Added Stats::getExtrema, which computes the min/max values of all
+  voxels in a NanoVDB grid that intersects with a user-defined bounding-box.
+- Added nanovdb::Mask::countOn(int) which is essential to the new
+  nanovdb::IndexGrid.
+- Added RootNode::probeChild and InternalNode::probeChild.
+
+@par
+Improvements:
+- Significantly improved the performance of all ValueAccessor methods which
+  access LeafNode value buffer data. This improvement applies to any type which
+  is delay load compatible (all default types except for bool and mask grids)
+  and improves the performance of many OpenVDB tools.
+- Major updates to the command line interface of the vdb_ax binary, exposing
+  more controls such as tile streaming, value iterator types and attribute
+  bindings.
+- Improved the performance of volumeToMesh by 10-15%.
+- Added a new much improved nanovdb::NodeManager, that is both faster and
+  more memory efficient, and that works on both the CPU and GPU. Note, it uses
+  a handle for allocation (just like nanovdb::Grid) and replaces the old
+  nanovdb::LeafManager which is now deprecated.
+- NanoToOpenVDB is extended to work with grids templated on Fp4, Fp8, Fp16,
+  FpN, bool and ValueMask.
+- Renamed RootNode::findTile to RootNode::probeTile and made it public.
+- Made Mask::getWord return both a const and non-const reference.
+- Improved unit-tests to use explicit 32B alignment (see alignment bug-fix below).
+- PNanoVDB.h (a C99 port of NanoVDB.h) has been updated.
+
+@par
+Bug Fixes:
+- Fixed an issue with tools::topologyToLevelSet which would previously
+  ignore active tiles in the input topology. [Reported by Tobias Rittig]
+- Fixed a bug with ValueAccessor::addLeaf and ValueAccessor::addTile which
+  wouldn't add the provided leaf nodes to the underlying tree. This bug did
+  NOT affect the specialized accessors which are used by the default tree
+  configuration. [Contributed by Andrey Zakirov]
+- Fixed a bug where ValueAccessor::probeNode<NodeT> and
+  ValueAccessor:probeConstNode<NodeT> would return a nullptr if the NodeT type
+  was not explicitly being cached by the accessor but the node existed in the
+  tree.
+- Fixed a bug on Windows where math::Abs could truncate 64bit integer values.
+  [Contributed by Edward Lam]
+- Fixed an occurrence of undefined behaviour with math::floatToInt32 and
+  math::doubleToInt64. [Reported by Vojtěch Bubník]
+- Fixed bugs in the sum merge that produced incorrect merged grids when
+  deep-copying the input nodes or when non-zero background grids were being used.
+- Fixed a bug in FastSweeping where voxels/tiles are left with min/max float
+  values.
+- Fixed a bug in math/Tuple.h that prevented compilation with VS2017.
+- Fixed a bug in nanovdb::HostBuffer that could produce crashes due
+  to misaligned CPU memory allocations.
+- Fixed bug related to uninitialized memory in nanovdb::Grid which could
+  confuse CRC32 checksum validation.
+- Fixed bugs related to the use of intrinsic functions for fast bit-counting
+  in nanovdb.
+- Fixed a potential security vulnerability in NanoVDB.h related to buffer
+  overflow exploits.
+
+@par
+ABI changes:
+- ABI change to openvdb::RootNode, which now has a new member that defines
+  the origin of the node. For now this origin is set to a default value of
+  (0,0,0), but in the near future we will allow for offsets to improve access
+  performance and reduce the memory footprints.
+- Removed deprecated virtual methods from AttributeArray.
+
+@par
+API changes:
+- Removed PagedArray::push_back().
+- Removed Tree visitor methods from Tree, RootNode, InternalNode and LeafNode
+  classes - visit(), visit2(), visitActiveBBox().
+- Removed LeafManager::getNodes().
+- Removed tools::dilateVoxels() and tools::erodeVoxels() in favor of
+  tools::dilateActiveValues() and tools::erodeActiveValues().
+- Removed tools::FindActiveValues::any() and tools::FindActiveValues::none().
+- StringGrid and StringTrees have been removed.
+
+@par
+Houdini:
+- Add convex hull activation for VDB Activate SOP (requires 19.5).
+- Improved SDF activation to use dynamic node manager.
+- Fixed a bug in VDB Visualize SOP where color values that exceed the range wrap
+  around instead of being clamped.
+
+@par
+Build:
+- Added OPENVDB_USE_DELAYED_LOAD flag that enables delayed loading and defaults
+  to on.
+- Add a placeholder to inject the specific revision and URL used to build
+  OpenVDB, useful for 3rd party build scripts to publish their exact versions.
+- Fixed an issue where OPENVDB_AX_DLL was not being defined on shared
+  library builds of AX, resulting in symbols not being exported.
+  [Reported by Ray Molenkamp]
+- Fixed an issue where setting Tbb_INCLUDE_DIR could cause CMake failures.
+- Updated FindTBB.cmake to support newer library ABI suffixing in TBB 2021.5.
+- Updated FindBlosc.cmake to better handle cases where blosc is built with
+  external sources.
+- Resolved LLVM deprecation warnings in AX and added support for LLVM 14.
+- On Windows (MSVC), OpenVDB is now built with extra compiler options to
+  ensure stricter C++ conformance: /permissive- /Zc:throwingNew /Zc:inline.
+- On Windows (MSVC), the _USE_MATH_DEFINES macro is no longer defined when
+  including <openvdb/Platform.h> (or any dependent headers). If you were
+  relying on this in your own project for M_PI, M_PI_2, etc. you can add
+  -D_USE_MATH_DEFINES to your own project compiler options. See
+  <A HREF="https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants">this page</A>
+  for more info.
+
+@htmlonly <a name="v9_1_0_changes"></a>@endhtmlonly
+@par
+<B>Version 9.1.0</B> - <I>June 9, 2022</I>
 
 @par
 Bug Fixes:
@@ -28,6 +191,7 @@ New features:
 - Added points::rasterizeSpheres() and points::rasterizeSmoothSpheres() variants, new kernels and improved performance for OpenVDB points to surface rasterization.
 - Added points::rasterizeTrilinear() for OpenVDB points, fast staggered or colocated trilinear rasterization for scalar and vector attributes.
 - Exposed TypeList declarations in openvdb.h which denote the default set of types supported by OpenVDB.
+- Added points::FrustumRasterizer for efficient rasterization of OpenVDB points to frustum volumes with optional motion blur.
 
 @par
 Improvements:
@@ -41,6 +205,7 @@ Improvements:
 - Added a new foreach method to TypeList for iterating over types without constructing them.
 - Added TypeList::Transform declaration for transforming TypeLists into new types.
 - Moved Grid::apply implementation to TypeList::apply to allow for other polymorphic types to invoke it.
+- Minor updates to NanoVDB to remove compiler warnings.
 
 @par
 Build:
@@ -49,12 +214,16 @@ Build:
 - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.  [Reported by Sam James]
 - Changed the way boost_python and boost_numpy are located. Both components must match the major/minor version of python in use. This can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.
 - Relocated OpenVDB binaries to a new openvdb_cmd root directory.
+- FindTBB.cmake now prioritises newer TBB installations.
+- Added option to compress PDB data in MSVC debug builds.
 
 @par
 Houdini:
 - Added Attribute Bindings to AX SOP to allow differently named AX attributes (@) and target point attributes/volumes.
 - Fix race condition in OpenVDB Merge SOP that could cause crashes
   or merged VDBs to not be deleted.
+- VDB Activate SOP no longer stops at the first non-VDB primitive, but instead just skips such primitives.
+- Added VDB Rasterize Frustum SOP for efficient rasterization of OpenVDB points into frustum volumes with optional motion blur.
 
 @htmlonly <a name="v9_0_0_changes"></a>@endhtmlonly
 @par
@@ -996,8 +1165,7 @@ API changes:
 - @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
   @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
   now return a std::unique_ptr instead of a boost::scoped_array.
-- @vdblink::points::AttributeArray::copyUncompressed() AttributeArray::copyUncompressed@endlink
-  is now deprecated.
+- AttributeArray::copyUncompressed is now deprecated.
 
 @par
 Python:
@@ -1328,9 +1496,8 @@ Improvements:
   @vdblink::points::AttributeArray AttributeArray@endlink now errors.
 - Updated point deletion to use faster batch copying for ABI=6+.
 - Methods relating to in-memory Blosc compression for
-  @vdblink::points::AttributeArray::compress() AttributeArray@endlink
-  now do nothing and have been marked deprecated resulting in memory savings
-  for ABI=6+.
+  AttributeArray::compress() now do nothing and have been marked deprecated
+  resulting in memory savings for ABI=6+.
 
 @par
 Bug fixes:
@@ -1351,8 +1518,8 @@ API changes:
 - Removed a number of methods that were deprecated in version&nbsp;5.0.0 or
   earlier.
 - Removed the experimental @b ValueAccessor::newSetValue method.
-- Deprecated @vdblink::points::AttributeArray::compress()
-  AttributeArray@endlink methods relating to in-memory Blosc compression.
+- Deprecated AttributeArray::compress() methods relating to in-memory Blosc
+  compression.
 
 @par
 Houdini:
@@ -2467,7 +2634,7 @@ Houdini:
   modified or deleted, so for safety,
   @vdblink::io::File::open() File::open@endlink automatically makes
   private copies of source files that are smaller than a user-specified limit
-  (see @vdblink::io::File::setCopyMaxBytes() File::setCopyMaxBytes@endlink).
+  (see io::File::setCopyMaxBytes()).
   The limit can be set to zero to disable copying, but if it cannot be
   guaranteed that a file will not be modified, then it is best not to enable
   delayed loading for that file.

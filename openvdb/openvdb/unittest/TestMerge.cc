@@ -2658,7 +2658,7 @@ TEST_F(TestMerge, testSum)
     }
 
     { // merge two different root tiles from one tree into a tree with one root tile
-        FloatTree tree, tree2;
+        FloatTree tree(100.0f), tree2(200.0f);
         tree.root().addTile(Coord(-8192, 0, 0), -3.3f, true);
         tree2.root().addTile(Coord(0, 0, 0), 1.1f, false);
         tree2.root().addTile(Coord(8192, 0, 0), 2.2f, true);
@@ -2675,18 +2675,18 @@ TEST_F(TestMerge, testSum)
         EXPECT_EQ(Index(2), getActiveTileCount(root));
         EXPECT_EQ(Index(1), getInactiveTileCount(root));
         auto iter = root.cbeginValueAll();
-        EXPECT_EQ(-3.3f, *iter);
+        EXPECT_EQ(200.0f-3.3f, *iter);
         EXPECT_TRUE(iter.isValueOn());
         ++iter;
-        EXPECT_EQ(1.1f, *iter);
+        EXPECT_EQ(100.0f+1.1f, *iter);
         EXPECT_TRUE(iter.isValueOff());
         ++iter;
-        EXPECT_EQ(2.2f, *iter);
+        EXPECT_EQ(100.0f+2.2f, *iter);
         EXPECT_TRUE(iter.isValueOn());
     }
 
     { // merge root tiles with the same active state
-        FloatTree tree, tree2;
+        FloatTree tree(100.0f), tree2(200.0f);
         tree.root().addTile(Coord(0, 0, 0), 1.1f, false);
         tree2.root().addTile(Coord(0, 0, 0), 2.2f, false);
         tree.root().addTile(Coord(8192, 0, 0), 1.1f, true);
@@ -2700,6 +2700,7 @@ TEST_F(TestMerge, testSum)
         nodeManager.foreachTopDown(mergeOp);
 
         const auto& root = tree.root();
+        EXPECT_EQ(root.background(), 300.0f);
         EXPECT_EQ(Index(1), getActiveTileCount(root));
         auto iter = root.cbeginValueAll();
         EXPECT_EQ(1.1f+2.2f, *iter);
@@ -2710,7 +2711,7 @@ TEST_F(TestMerge, testSum)
     }
 
     { // merge root tiles with different active state
-        FloatTree tree, tree2;
+        FloatTree tree(100.0f), tree2(200.0f);
         tree.root().addTile(Coord(0, 0, 0), 1.1f, false);
         tree2.root().addTile(Coord(0, 0, 0), 2.2f, true);
         tree.root().addTile(Coord(8192, 0, 0), 1.1f, true);
@@ -2734,7 +2735,7 @@ TEST_F(TestMerge, testSum)
     }
 
     { // merge root tiles from three trees
-        FloatTree tree, tree2, tree3;
+        FloatTree tree(100.0f), tree2(200.0f), tree3(300.0f);
         tree.root().addTile(Coord(0, 0, 0), 1.1f, false);
         tree2.root().addTile(Coord(0, 0, 0), 2.2f, false);
         tree3.root().addTile(Coord(0, 0, 0), 3.3f, false);
@@ -2753,13 +2754,13 @@ TEST_F(TestMerge, testSum)
 
         const auto& root = tree.root();
         auto iter = root.cbeginValueAll();
-        EXPECT_EQ(-9.9f, *iter);
+        EXPECT_EQ(100.0f+200.0f-9.9f, *iter);
         EXPECT_TRUE(iter.isValueOff());
         ++iter;
         EXPECT_EQ(1.1f+2.2f+3.3f, *iter);
         EXPECT_TRUE(iter.isValueOff());
         ++iter;
-        EXPECT_EQ(2.2f+3.3f, *iter);
+        EXPECT_EQ(100.0f+2.2f+3.3f, *iter);
         EXPECT_TRUE(iter.isValueOn());
     }
 
@@ -2912,6 +2913,77 @@ TEST_F(TestMerge, testSum)
             EXPECT_TRUE(iter->isValueOn(11));
         }
 
+        { // merge a leaf node into a tree with a tile (deep-copy)
+            FloatTree tree(100.0f), tree2(200.0f);
+            tree.root().addTile(Coord(0, 0, 0), 10.0f, false);
+            auto* leaf = tree2.touchLeaf(Coord(0, 0, 0));
+            leaf->setValueOnly(10, -2.3f);
+            leaf->setValueOn(11, 1.5f);
+
+            tools::SumMergeOp<FloatTree> mergeOp(tree2, DeepCopy());
+            tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
+            nodeManager.foreachTopDown(mergeOp);
+
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index(0), getTileCount(tree.root()));
+            auto iter = tree.cbeginLeaf();
+            EXPECT_EQ(iter->getValue(0), 210.0f);
+            EXPECT_FALSE(iter->isValueOn(0));
+            EXPECT_EQ(iter->getValue(10), 10.0f-2.3f);
+            EXPECT_FALSE(iter->isValueOn(10));
+            EXPECT_EQ(iter->getValue(11), 10.0f+1.5f);
+            EXPECT_TRUE(iter->isValueOn(11));
+            // test tile value
+            EXPECT_EQ(tree.getValue(Coord(0, 0, 8)), 210.0f);
+        }
+
+        { // merge a leaf node into a tree with a tile and non-zero background values (deep-copy)
+            FloatTree tree(100.0f), tree2(200.0f);
+            tree.root().addTile(Coord(0, 0, 0), 10.0f, false);
+            // add internal node 1 tile
+            auto* leaf = tree2.touchLeaf(Coord(0, 0, 0));
+            leaf->setValueOnly(10, -2.3f);
+            leaf->setValueOn(11, 1.5f);
+
+            tools::SumMergeOp<FloatTree> mergeOp(tree2, DeepCopy());
+            tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
+            nodeManager.foreachTopDown(mergeOp);
+
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index(0), getTileCount(tree.root()));
+            auto iter = tree.cbeginLeaf();
+            EXPECT_EQ(iter->getValue(0), 210.0f);
+            EXPECT_FALSE(iter->isValueOn(0));
+            EXPECT_EQ(iter->getValue(10), 10.0f-2.3f);
+            EXPECT_FALSE(iter->isValueOn(10));
+            EXPECT_EQ(iter->getValue(11), 10.0f+1.5f);
+            EXPECT_TRUE(iter->isValueOn(11));
+        }
+
+        { // merge a leaf node and a tile into a tree with a tile (deep-copy)
+            FloatTree tree, tree2, tree3;
+            tree.root().addTile(Coord(0, 0, 0), 10.0f, false);
+            auto* leaf = tree2.touchLeaf(Coord(0, 0, 0));
+            leaf->setValueOnly(10, -2.3f);
+            leaf->setValueOn(11, 1.5f);
+            tree3.root().addTile(Coord(0, 0, 0), 5.0f, false);
+
+            std::vector<FloatTree*> trees{&tree2, &tree3};
+            tools::SumMergeOp<FloatTree> mergeOp(trees, DeepCopy());
+            tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
+            nodeManager.foreachTopDown(mergeOp);
+
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index(0), getTileCount(tree.root()));
+            auto iter = tree.cbeginLeaf();
+            EXPECT_EQ(iter->getValue(0), 15.0f);
+            EXPECT_FALSE(iter->isValueOn(0));
+            EXPECT_EQ(iter->getValue(10), 15.0f-2.3f);
+            EXPECT_FALSE(iter->isValueOn(10));
+            EXPECT_EQ(iter->getValue(11), 15.0f+1.5f);
+            EXPECT_TRUE(iter->isValueOn(11));
+        }
+
         { // merge a tile into a tree with a leaf node
             FloatTree tree, tree2;
             auto* leaf = tree.touchLeaf(Coord(0, 0, 0));
@@ -3018,6 +3090,48 @@ TEST_F(TestMerge, testSum)
 
             std::vector<DoubleTree*> trees{&tree2, &tree3};
             tools::SumMergeOp<DoubleTree> mergeOp(trees, Steal());
+            tree::DynamicNodeManager<DoubleTree, 3> nodeManager(tree);
+            nodeManager.foreachTopDown(mergeOp);
+
+            // non-associativity of floating-point addition
+            EXPECT_NE(0.7 + 0.2 + 0.1, 0.7 + 0.1 + 0.2);
+
+            // order of additions must be preserved
+
+            const auto* testLeaf = tree.probeConstLeaf(Coord(0, 0, 0));
+            EXPECT_EQ(0.7 + 0.2 + 0.1, testLeaf->getValue(5));
+            EXPECT_TRUE(testLeaf->isValueOn(5));
+            EXPECT_EQ(0.2 + 0.1 + 0.7, testLeaf->getValue(7));
+            EXPECT_TRUE(testLeaf->isValueOn(7));
+            EXPECT_EQ(0.7 + 0.1 + 0.2, testLeaf->getValue(9));
+            EXPECT_FALSE(testLeaf->isValueOn(9));
+        }
+
+        { // merge three leaf nodes from different grids
+            DoubleTree tree, tree2, tree3;
+
+            auto* leaf = tree.touchLeaf(Coord(0, 0, 0));
+            auto* leaf2 = tree2.touchLeaf(Coord(0, 0, 0));
+            auto* leaf3 = tree3.touchLeaf(Coord(0, 0, 0));
+
+            // active state from the voxel with the minimum value preserved
+
+            leaf->setValueOnly(5, 0.7);
+            leaf2->setValueOnly(5, 0.2);
+            leaf2->setValueOn(5);
+            leaf3->setValueOnly(5, 0.1);
+
+            leaf->setValueOnly(7, 0.2);
+            leaf->setValueOn(7);
+            leaf2->setValueOnly(7, 0.1);
+            leaf3->setValueOnly(7, 0.7);
+
+            leaf->setValueOnly(9, 0.7);
+            leaf2->setValueOnly(9, 0.1);
+            leaf3->setValueOnly(9, 0.2);
+
+            std::vector<DoubleTree*> trees{&tree2, &tree3};
+            tools::SumMergeOp<DoubleTree> mergeOp(trees, DeepCopy());
             tree::DynamicNodeManager<DoubleTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 

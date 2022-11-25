@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,7 +52,7 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 9)
+set(OpenVDB_MAJOR_VERSION 10)
 set(OpenVDB_MINOR_VERSION 0)
 set(OpenVDB_PATCH_VERSION 1)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
@@ -79,6 +79,7 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
+option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 
@@ -247,6 +248,7 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
+  OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
   OPENVDB_USE_DEPRECATED_ABI_7
@@ -342,8 +344,7 @@ endif()
 if(USE_CCACHE)
   find_program(CCACHE_PATH ccache)
   if(CCACHE_PATH)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
-    set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+    set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ${CCACHE_PATH})
     message(STATUS "Using ccache: ${CCACHE_PATH}")
   endif()
 endif()
@@ -541,6 +542,7 @@ if(OPENVDB_BUILD_UNITTESTS)
   add_subdirectory(openvdb/openvdb/unittest)
 endif()
 
+# Tests the vdb_ax binary so needs to come after openvdb_cmd
 if(OPENVDB_BUILD_AX_UNITTESTS)
   add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()

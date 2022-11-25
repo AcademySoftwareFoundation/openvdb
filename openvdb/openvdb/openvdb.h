@@ -221,17 +221,6 @@ using MetaTypes = TypeList<
     io::DelayedLoadMetadata>;
 
 
-// Deprecated types
-/// @note  Customizing the type of a VDB tree to an arbitrary class is still
-///  supported however std::string Trees will, in the future, no longer be
-///  provided as a native type by OpenVDB.
-using StringTree OPENVDB_DEPRECATED_MESSAGE("Support for std::string Trees "
-    "as a native type will be dropped in future versions. Please feedback with any concerns.")
-    = tree::Tree4<std::string, 5, 4, 3>::Type;
-using StringGrid OPENVDB_DEPRECATED_MESSAGE("Support for std::string Grids "
-    "as a native type will be dropped in future versions. Please feedback with any concerns.")
-    = Grid<tree::Tree4<std::string, 5, 4, 3>::Type>;
-
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 

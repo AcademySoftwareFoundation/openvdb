@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -117,7 +117,10 @@ if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+if(OPENVDB_USE_DELAYED_LOADING)
+  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+endif()
+
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
   # The X.Y.Z boost version value isn't available until CMake 3.14
   set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
@@ -250,7 +253,9 @@ endif()
 # if it's in a shared place (like /usr/local) it doesn't accidently pull in
 # other headers.
 
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
+if(OPENVDB_USE_DELAYED_LOADING)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
+endif()
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -449,6 +454,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeFrustum.h
   points/PointRasterizeSDF.h
   points/PointRasterizeTrilinear.h
   points/PointSample.h
@@ -459,6 +465,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointRasterizeFrustumImpl.h
   points/impl/PointRasterizeSDFImpl.h
   points/impl/PointRasterizeTrilinearImpl.h
 )
@@ -636,6 +643,9 @@ endif()
 
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
+endif()
+if(OPENVDB_USE_DELAYED_LOADING)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_DELAYED_LOADING)
 endif()
 
 ##########################################################################

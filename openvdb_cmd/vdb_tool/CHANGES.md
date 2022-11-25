@@ -1,0 +1,107 @@
+
+# Changes and to-dos:
+
+- [X] vdb_tool::readGeo
+- [X] vdb_tool::readVDB
+- [X] vdb_tool::particlesToLevelSet
+- [X] vdb_tool::processLevelSet
+- [X] vdb_tool::offsetLevelSet
+- [X] vdb_tool::filterLevelSet
+- [X] vdb_tool::levelSetToMesh
+- [X] vdb_tool::writeGeo
+- [X] vdb_tool::writeVDB
+- [X] read ASCI obj particle files
+- [X] read ASCI ply particle files
+- [X] read binary ply particle files
+- [X] write binary ply mesh files
+- [X] write ascii obj mesh files
+- [X] Geometry::readVdb
+- [X] Geometry::readPts
+- [X] define time and space order
+- [X] Mesh::readPly
+- [X] vdb_tool::readMesh
+- [X] vdb_tool::meshToLevelSet
+- [X] Geometry::readObj
+- [X] Geometry::readPly
+- [X] Geometry::readNvdb
+- [X] vdb_tool::writeVDB
+- [X] allow actions to have multiple "-"
+- [X] add "-sphere"
+- [X] add volume/geometry ages to all actions
+- [X] add CSG operations
+- [X] "-read" supports multiple files
+- [X] "-write" supports multiple files
+- [X] added "-print"
+- [X] works with tcsh, sh, ksh, and zsh shells
+- [X] added "-default"
+- [X] cache a list of base grids instead of FloatGrids
+- [X] -points2vdb : points -> PointDataGrid
+- [X] -vdb2points : PointDataGrid -> points
+- [X] -write geo=1 vdb=1,3 file.ply file.vdb
+- [X] -iso2ls, convert scalar field to level set
+- [X] -ls2fog, convert level set to fog volume
+- [X] -scatter, scatter points
+- [X] -prune, prune level set
+- [X] -flood, signed flood fill of level set
+- [X] -multires, generate multi-resolution grids
+- [X] -expand, expand narrow band of level set
+- [X] -cpt, generate closest-point transfer
+- [X] -grad, generate gradient field
+- [X] -div, generate divergence from vector field
+- [X] -curl, generate curl from vector field
+- [X] -curvature, generate mean curvature from scalar field
+- [X] -length, generate length of vector field
+- [X] -render, render level set and fog volumes
+- [X] -enright, performs advection test on level set
+- [X] -for i=0,10,1 -end
+- [X] -each s=str1,str2 -end
+- [X] -read grids=sphere file_%4i.vdb
+- [X] Geometry::readSTL
+- [X] Geometry::writeSTL
+- [X] -clip against either a mask grid, bbox or frustum
+- [X] Added local counter "%I" to for-loops
+- [X] Added global counter "%G"
+- [X] add Tool::savePNG
+- [X] add Tool::saveEXR
+- [X] -platonic faces=4
+- [X] -segment vdb=0 keep=0
+- [X] -resample vdb=0[,1] scale=0 translate=0,0,0 order=1[0|2] keep=0
+- [X] add Geometry::readABC
+- [X] add support for unix pipelining
+- [X] add Tool::saveJPG
+- [X] add Geometry::read/write to support streaming
+- [X] -read stdin.[ply,obj,stl,geo,vdb]
+- [X] -write stdout.[ply,obj,stl,geo,vdb]
+- [X] actions can now have an optional alias, e.g. -read, -i
+- [X] -write file.nvdb stdout.nvdb
+- [X] -write bits=32|16|8|N codec=blosc|zip|active
+- [X] -help read,write,ls2mesh brief=true
+- [X] use openvdb namespace
+- [X] Major revision with Parser.h
+- [X] -read delayed=false file.vdb
+- [X] -clear vdb=1,2,3 geo=*
+- [X] -config update=false execute=true configure.txt
+- [X] -each f=*.vdb
+- [X] add stack-based translator and storage
+- [X] -eval '{1:@G}'
+- [X] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {\$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
+- [X] add switch-statement: {\$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
+- [X] Added numerous methods to scripting language
+- [X] -mesh2ls vdb=0  (use another vdb to defined the transform)
+- [X] -iso2ls vdb=0,1 (use another vdb to defined the transform)
+- [X] loops will now skip, instead of throw, if its initial condition is invalid
+- [X] -for i=1,9  (third argument defaults to 1, i.e. i=1,9,1)
+- [X] -if 0|1|false|true  ... -end (if statement)
+- [X] -eval help="*" or -eval help=if,switch
+- [X] {date}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
+- [X] composite: -min, -max, -sum
+- [X] -transform vdb=0,3 geo=5 (scale -> rotate -> translate of VDB grids and geometry)
+- [X] -print mem=1 prints variables saved to memory, e.g. loop variables
+- [X] use cmake (thanks to Greg Klar!)
+- [X] read NanoVDB voxel volumes (thanks to Greg Klar)
+- [X] -ls2mesh iso=0.1 mask=1 invert=true
+- [X] -write binary abc mesh files (thanks to Alexandre Sirois-Vigneux)
+- [x] -write keep=false (by default grids and geometries written are also removed)
+- [ ] -merge
+- [ ] -points2mask
+- [ ] -erodeTopology

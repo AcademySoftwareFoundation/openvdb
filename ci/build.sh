@@ -2,6 +2,8 @@
 
 set -e
 
+CI_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
 # print versions
 bash --version
 if [ ! -z "$CXX" ]; then $CXX -v; fi
@@ -27,9 +29,9 @@ declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
 PARMS[--build-dir]=build
-# github actions runners have 2 threads
+# github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-PARMS[-j]=2
+PARMS[-j]=8
 
 # Available options for --components
 declare -A COMPONENTS
@@ -132,7 +134,27 @@ done
 
 ################################################
 
-# github actions runners have 2 threads
+###### TEMPORARY CHANGE: check if we need to install blosc 1.17.0 as it's not available on the linux docker images yet
+if [ $(uname) == "Linux" ]; then
+    function get_ver_as_int { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+    BLOSC_VERSION="0.0.0"
+    if [ -f "/usr/local/include/blosc.h" ]; then
+        BLOSC_VERSION=$(cat /usr/local/include/blosc.h | grep BLOSC_VERSION_STRING | cut -d'"' -f 2)
+    fi
+
+    if [ $(get_ver_as_int $BLOSC_VERSION) -lt $(get_ver_as_int "1.17.0") ]; then
+        # Install
+        $CI_DIR/install_blosc.sh 1.17.0
+    elif [ $(get_ver_as_int $BLOSC_VERSION) -eq $(get_ver_as_int "1.17.0") ]; then
+        # Remind us to remove this code
+        echo "WARNING: Blosc has been updated to 1.17.0 - this logic in build.sh should be removed!!"
+    fi
+fi
+###### TEMPORARY CHANGE: always install blosc 1.17.0 as it's not available on the docker images yet
+
+################################################
+
+# github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=${PARMS[-j]}
 echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
@@ -160,11 +182,16 @@ set -x
 
 # Note:
 # - print and lod binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
+# - always enabled the python tests with OPENVDB_BUILD_PYTHON_UNITTESTS if the python module is in use,
+#   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_8=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_9=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
+    -DOPENVDB_BUILD_VDB_TOOL=ON \
+    -DOPENVDB_TOOL_USE_NANO=OFF \
+    -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
     "${CMAKE_EXTRA[@]}" \
     ..

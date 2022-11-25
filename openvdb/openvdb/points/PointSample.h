@@ -10,9 +10,9 @@
 #ifndef OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
-#include "openvdb/util/NullInterrupter.h"
-#include "openvdb/thread/Threading.h"
-#include "openvdb/tools/Interpolation.h"
+#include <openvdb/util/NullInterrupter.h>
+#include <openvdb/thread/Threading.h>
+#include <openvdb/tools/Interpolation.h>
 
 #include "PointDataGrid.h"
 #include "PointAttribute.h"

@@ -11,7 +11,7 @@ mkdir .build
 cd .build
 
 # @note  currently only test static builds with MT
-cmake -B . -S ../llvm -A x64 -G "Visual Studio 16 2019" -Thost=x64 \
+cmake -B . -S ../llvm -A x64 -G "Visual Studio 17 2022" -Thost=x64 \
     -DCMAKE_INSTALL_PREFIX="${HOME}/llvm_install" \
     -DLLVM_TARGETS_TO_BUILD="host" \
     -DLLVM_BUILD_TOOLS=OFF \

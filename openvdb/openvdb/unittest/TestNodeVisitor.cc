@@ -5,7 +5,7 @@
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/NodeVisitor.h>
 #include <openvdb/tools/Prune.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 class TestNodeVisitor: public ::testing::Test
 {

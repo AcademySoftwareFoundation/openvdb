@@ -85,7 +85,7 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "camera",   "Camera",
-            "geometry", "Geometry",
+            "geometry", "Geometry Bounding Box",
             "mask",     "Mask VDB"
         })
         .setDefault("geometry")

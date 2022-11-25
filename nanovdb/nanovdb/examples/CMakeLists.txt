@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(NanoVDBExamples LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -98,6 +98,8 @@ nanovdb_example(NAME "ex_openvdb_to_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_read_nanovdb_sphere")
 nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor")
 nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor_cuda")
+nanovdb_example(NAME "ex_index_grid_cuda")
+nanovdb_example(NAME "ex_nodemanager_cuda")
 nanovdb_example(NAME "ex_modify_nanovdb_thrust")
 nanovdb_example(NAME "ex_map_pool_buffer")
 nanovdb_example(NAME "ex_bump_pool_buffer")

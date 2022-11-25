@@ -11,7 +11,7 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/RayIntersector.h>
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include <cassert>
 #include <deque>

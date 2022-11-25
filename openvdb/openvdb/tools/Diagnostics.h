@@ -11,13 +11,13 @@
 #ifndef OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 
-#include "openvdb/Grid.h"
-#include "openvdb/math/Math.h"
-#include "openvdb/math/Vec3.h"
-#include "openvdb/math/Stencils.h"
-#include "openvdb/math/Operators.h"
-#include "openvdb/tree/LeafManager.h"
-#include "openvdb/thread/Threading.h"
+#include <openvdb/Grid.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Vec3.h>
+#include <openvdb/math/Stencils.h>
+#include <openvdb/math/Operators.h>
+#include <openvdb/tree/LeafManager.h>
+#include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>

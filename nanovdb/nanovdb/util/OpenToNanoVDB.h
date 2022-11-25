@@ -110,6 +110,18 @@ struct OpenToNanoType<openvdb::ValueMask>
     using Type = nanovdb::ValueMask;
 };
 
+template<>
+struct OpenToNanoType<openvdb::PointIndex32>
+{
+    using Type = uint32_t;
+};
+
+template<>
+struct OpenToNanoType<openvdb::PointDataIndex32>
+{
+    using Type = uint32_t;
+};
+
 //================================================================================================
 
 /// @brief Grid trait that defines OpenVDB grids with the exact same configuration as NanoVDB grids
@@ -379,6 +391,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
     operator()(const OpenGridT& openGrid,
                const BufferT&   allocator)
 {
+    //mVerbose = 2;
     std::unique_ptr<openvdb::util::CpuTimer> timer(mVerbose > 1 ? new openvdb::util::CpuTimer() : nullptr);
 
     if (timer) timer->start("Allocating memory for the NanoVDB buffer");
@@ -430,7 +443,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
     static_assert(is_same<FpN,   NanoBuildT>::value, "compression: expected NanoBuildT == FpN");
     if (is_same<AbsDiff, OracleT>::value && mOracle.getTolerance() < 0.0f) {// default tolerance for level set and fog volumes
         if (openGrid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-            mOracle.setTolerance(0.1f * openGrid.voxelSize()[0]);// range of ls: [-3dx; 3dx]
+            mOracle.setTolerance(0.1f * float(openGrid.voxelSize()[0]));// range of ls: [-3dx; 3dx]
         } else if (openGrid.getGridClass() == openvdb::GRID_FOG_VOLUME) {
             mOracle.setTolerance(0.01f);// range of FOG volumes: [0;1]
         } else {
@@ -443,7 +456,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
 
     DitherLUT lut(mDitherOn);
     auto kernel = [&](const auto &r) {
-        const OracleT oracle = mOracle;
+        const OracleT oracle = mOracle;// local copy since it's very lightweight
         for (auto i=r.begin(); i!=r.end(); ++i) {
             const float *data = mArray0[i].node->buffer().data();
             float min = std::numeric_limits<float>::max(), max = -min;
@@ -465,7 +478,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
                     const float exact  = data[j];// exact value
                     const uint32_t code = uint32_t(encode*(exact - min) + lut(j));
                     const float approx = code * decode + min;// approximate value
-                    j += mOracle(exact, approx) ? 1 : 513;
+                    j += oracle(exact, approx) ? 1 : 513;
                 } while(j < 512);
                 if (j == 512) break;
                 ++logBitWidth;
@@ -536,7 +549,7 @@ GridHandle<BufferT> OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
 
     this->preProcessMetadata(openGrid);
 
-    mBufferOffsets[0] = 0;// grid is always plated at the beginning of the buffer!
+    mBufferOffsets[0] = 0;// grid is always placed at the beginning of the buffer!
     mBufferOffsets[1] = NanoGridT::memUsage(); // grid ends and tree begins
     mBufferOffsets[2] = NanoTreeT::memUsage(); // tree ends and root begins
     mBufferOffsets[3] = NanoRootT::memUsage(openTree.root().getTableSize()); // root ends and upper internal nodes begins
@@ -552,8 +565,35 @@ GridHandle<BufferT> OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
         mBufferOffsets[i] += mBufferOffsets[i - 1];
     }
 
+#if 0
+    std::cerr << "grid starts at " << mBufferOffsets[0] <<" byte" << std::endl;
+    std::cerr << "tree starts at " << mBufferOffsets[1] <<" byte" << std::endl;
+    std::cerr << "root starts at " << mBufferOffsets[2] <<" byte" << std::endl;
+    std::cerr << "node starts at " << mBufferOffsets[3] <<" byte" << " #" << mArray2.size() << std::endl;
+    std::cerr << "node starts at " << mBufferOffsets[4] <<" byte" << " #" << mArray1.size() << std::endl;
+    std::cerr << "leaf starts at " << mBufferOffsets[5] <<" byte" << " #" << mArray0.size() << std::endl;
+    std::cerr << "meta starts at " << mBufferOffsets[6] <<" byte" << std::endl;
+    std::cerr << "data starts at " << mBufferOffsets[7] <<" byte" << std::endl;
+    std::cerr << "buffer ends at " << mBufferOffsets[8] <<" byte" << std::endl;
+    std::cerr << "creating buffer of size " <<  (mBufferOffsets[8]>>20) << "MB" << std::endl;
+#endif
+
     GridHandle<BufferT> handle(BufferT::create(mBufferOffsets[8], &buffer));
     mBufferPtr = handle.data();
+
+    //openvdb::util::CpuTimer timer("zero buffer");
+#if 1
+    //std::memset(mBufferPtr, '8', mBufferOffsets[8]);
+#else
+    forEach(0,mBufferOffsets[8],1024*1024,[&](const Range1D &r){
+        //for (uint64_t *p = reinterpret_cast<uint64_t*>(mBufferPtr)+r.begin(), *q=p+r.size(); p!=q; ++p) *p=0;
+        std::memset(mBufferPtr+r.begin(), '8', r.size());
+    });
+    //uint8_t *begin = (mBufferPtr >> 3) << 3;
+    //std::memset((mBufferPtr >> 3) << 3, 0, mBufferPtr - p);
+    //forEach(0,mBufferOffsets[8],10*1024*1024,[&](const Range1D &r){std::memset(mBufferPtr+r.begin(), 0, r.size());});
+#endif
+    //timer.stop();
 
     if (mVerbose) {
         openvdb::util::printBytes(std::cout, mBufferOffsets[8], "Allocated", " for the NanoVDB grid\n");
@@ -572,21 +612,22 @@ NanoGrid<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
         OPENVDB_THROW(openvdb::ValueError, "processGrid: OpenToNanoVDB only supports grids with affine transforms");
     }
     auto  affineMap = openGrid.transform().baseMap()->getAffineMap();
+    const std::string gridName = openGrid.getName();
     auto *data = nanoGrid->data();
-    data->mMagic = NANOVDB_MAGIC_NUMBER;
-    data->mChecksum = 0u;
-    data->mVersion = Version();
-    data->mFlags = static_cast<uint32_t>(GridFlags::IsBreadthFirst);
-    data->mGridIndex = 0;
-    data->mGridCount = 1;
-    data->mGridSize = mBufferOffsets[8];
+
+    data->mMagic = NANOVDB_MAGIC_NUMBER;//8B
+    data->mChecksum = 0u;// 8B
+    data->mVersion = Version();//4B
+    data->mFlags = static_cast<uint32_t>(GridFlags::IsBreadthFirst);//4B
+    data->mGridIndex = 0;//4B
+    data->mGridCount = 1;//4B
+    data->mGridSize = mBufferOffsets[8];//8B
+    std::memset(data->mGridName, '\0', GridData::MaxNameSize);// 256B overwrite mGridName
+    strncpy(data->mGridName, gridName.c_str(), GridData::MaxNameSize-1);
     data->mWorldBBox = BBox<Vec3R>();
     data->mBlindMetadataOffset = 0;
     data->mBlindMetadataCount = 0;
 
-    const std::string gridName = openGrid.getName();
-    strncpy(data->mGridName, gridName.c_str(), GridData::MaxNameSize-1);
-    data->mGridName[GridData::MaxNameSize-1] ='\0';// null terminate
     if (gridName.length() >= GridData::MaxNameSize) {
         data->setLongGridNameOn();// grid name is long so store it as blind data
     }
@@ -609,7 +650,7 @@ NanoGrid<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
     }
 
     // mapping from the OpenVDB build type to the NanoVDB build type and GridType enum
-    if (std::is_same<NanoBuildT, float>::value) { // resolved at compiletime
+    if (std::is_same<NanoBuildT, float>::value) { // resolved at compile time
         data->mGridType = GridType::Float;
     } else if (std::is_same<NanoBuildT, double>::value) {
         data->mGridType = GridType::Double;
@@ -621,12 +662,12 @@ NanoGrid<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
         data->mGridType = GridType::Int64;
     } else if (std::is_same<NanoBuildT, Vec3f>::value) {
         data->mGridType = GridType::Vec3f;
-    } else if (std::is_same<NanoBuildT, openvdb::Index32>::value) {
+    } else if (std::is_same<OpenBuildT, openvdb::Index32>::value) {
         data->mGridType = GridType::UInt32;
-    } else if (std::is_same<NanoBuildT, openvdb::PointIndex32>::value) {
+    } else if (std::is_same<OpenBuildT, openvdb::PointIndex32>::value) {
         data->mGridType = GridType::UInt32;
         data->mGridClass = GridClass::PointIndex;
-    } else if (std::is_same<NanoBuildT, openvdb::PointDataIndex32>::value) {
+    } else if (std::is_same<OpenBuildT, openvdb::PointDataIndex32>::value) {
         data->mGridType = GridType::UInt32;
         data->mGridClass = GridClass::PointData;
     } else if (std::is_same<NanoBuildT, ValueMask>::value) {
@@ -659,6 +700,9 @@ NanoGrid<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
         // Only support non-tapered at the moment:
         data->mMap.set(mat, mat.inverse(), 1.0);
     }
+    data->mData0 = 0u;
+    data->mData1 = 0u;
+    data->mData2 = 0u;
 
     this->processTree(openGrid.tree());// calls processRoot
 
@@ -669,6 +713,7 @@ NanoGrid<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
         auto *blindData = reinterpret_cast<char*>(mBufferPtr + mBufferOffsets[7]);
         metaData->setBlindData(blindData);
     }
+
     return nanoGrid;
 }// OpenToNanoVDB::processGrid
 
@@ -692,23 +737,23 @@ NanoTree<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
     NanoLeafT  *nanoLeaf  = mArray0.empty() ? nullptr : reinterpret_cast<NanoLeafT*>(mBufferPtr + mBufferOffsets[5]);
     data->setFirstNode(nanoLeaf);
 
-    data->mNodeCount[0] = mArray0.size();
-    data->mNodeCount[1] = mArray1.size();
-    data->mNodeCount[2] = mArray2.size();
+    data->mNodeCount[0] = static_cast<uint32_t>(mArray0.size());
+    data->mNodeCount[1] = static_cast<uint32_t>(mArray1.size());
+    data->mNodeCount[2] = static_cast<uint32_t>(mArray2.size());
 
 #if 1// count active tiles and voxels
 
-    // Count number of active leaf level tiles
+    // Count number of active tiles in the lower internal nodes
     data->mTileCount[0] = reduce(mArray1, uint32_t(0), [&](auto &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray1[i].node->getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
-    // Count number of active lower internal node tiles
+    // Count number of active tiles in the upper internal nodes
     data->mTileCount[1] = reduce(mArray2, uint32_t(0), [&](auto &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray2[i].node->getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
-    // Count number of active upper internal node tiles
+    // Count number of active tile in the root node
     uint32_t sum = 0;
     for (auto it = openTree.root().cbeginValueOn(); it; ++it) ++sum;
     data->mTileCount[2] = sum;
@@ -741,8 +786,13 @@ NanoRoot<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
 {
     auto *nanoRoot = reinterpret_cast<NanoRootT*>(mBufferPtr + mBufferOffsets[2]);
     auto* data = nanoRoot->data();
+    if (data->padding()>0) {
+        //std::cout << "Root has padding\n";
+        std::memset(data, 0, NanoRootT::memUsage(openRoot.getTableSize()));
+    } else {
+        data->mTableSize = 0;// incremented below
+    }
     data->mBackground = openRoot.background();
-    data->mTableSize = 0;// incremented below
     data->mMinimum = data->mMaximum = data->mBackground;
     data->mBBox.min() = openvdb::Coord::max(); // set to an empty bounding box
     data->mBBox.max() = openvdb::Coord::min();
@@ -767,6 +817,7 @@ void OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
     processNodes(std::vector<NodePair<OpenNodeT>>& openNodes)
 {
     using NanoNodeT = typename NanoNode<NanoBuildT, OpenNodeT::LEVEL>::Type;
+    //if (NanoNodeT::DataType::padding()>0u) std::cerr << "OpenToNanoVDB: internal node has padding\n";
     static_assert(NanoNodeT::LEVEL == 1 || NanoNodeT::LEVEL == 2, "Expected internal node");
     auto  kernel = [&](const Range1D& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5 - NanoNodeT::LEVEL];// 3 or 4
@@ -775,7 +826,8 @@ void OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
             auto *openNode = openNodes[i].node;
             auto *nanoNode = PtrAdd<NanoNodeT>(ptr, openNodes[i].offset);
             auto*    data  = nanoNode->data();
-            this->encode(openNode, nanoNode);
+            if (NanoNodeT::DataType::padding()>0u) std::memset(data, 0, NanoNodeT::DataType::memUsage());
+            this->encode(openNode, nanoNode);// sets data->mBBoxMin
             data->mValueMask = openNode->getValueMask(); // copy value mask
             data->mChildMask = openNode->getChildMask(); // copy child mask
             for (auto iter = openNode->cbeginChildAll(); iter; ++iter) {
@@ -802,14 +854,21 @@ inline typename std::enable_if<!std::is_same<typename OpenGridType<openvdb::Valu
                                !std::is_same<FpN, typename T::NanoNodeT::BuildType>::value>::type
 OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vector<T>& openLeafs)
 {
+    //if (NanoLeafT::DataType::padding()>0u) std::cerr << "OpenToNanoVDB: leaf has padding\n";
     auto kernel = [&](const auto& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5];
         for (auto i = r.begin(); i != r.end(); ++i) {
             auto *openLeaf = openLeafs[i].node;
             auto *nanoLeaf = PtrAdd<NanoLeafT>(ptr, openLeafs[i].offset);
             auto* data = nanoLeaf->data();
-            this->encode(openLeaf, nanoLeaf);
-            data->mFlags = 0u;
+            if (NanoLeafT::DataType::padding()>0u) {// resolved at compile time
+                std::memset(data, 0, NanoLeafT::DataType::memUsage());
+            } else {
+                data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
+                data->mMaximum = data->mMinimum = typename NanoLeafT::DataType::ValueType(0);
+                data->mStdDevi = data->mAverage = typename NanoLeafT::DataType::FloatType(0);
+            }
+            this->encode(openLeaf, nanoLeaf);// sets data->mBBoxMin
             data->mValueMask = openLeaf->valueMask(); // copy value mask
             auto *src = reinterpret_cast<const NanoValueT*>(openLeaf->buffer().data());
             for (NanoValueT *dst = data->mValues, *end = dst + OpenLeafT::size(); dst != end; dst += 4, src += 4) {
@@ -832,6 +891,7 @@ inline typename std::enable_if<std::is_same<Fp4,  typename T::NanoNodeT::BuildTy
                                std::is_same<Fp16, typename T::NanoNodeT::BuildType>::value>::type
 OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vector<T>& openLeafs)
 {
+    static_assert(NanoLeafT::DataType::padding()==0u, "Expected no padding in LeafNode<Fp{4,8,16}>");
     using ArrayT = typename NanoLeafT::DataType::ArrayType;
     using FloatT = typename std::conditional<NanoLeafT::DataType::bitWidth()>=16, double, float>::type;// 16 compression and higher requires double
     DitherLUT lut(mDitherOn);
@@ -842,8 +902,9 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vec
             auto *openLeaf = openLeafs[i].node;
             auto *nanoLeaf = PtrAdd<NanoLeafT>(ptr, openLeafs[i].offset);
             auto* data = nanoLeaf->data();
-            this->encode(openLeaf, nanoLeaf);
-            data->mFlags = 0u;
+            data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
+            data->mDev = data->mAvg = data->mMax = data->mMin = 0u;
+            this->encode(openLeaf, nanoLeaf);// sets data->mBBoxMin
             data->mValueMask = openLeaf->valueMask(); // copy value mask
             auto *src = reinterpret_cast<const float*>(openLeaf->buffer().data());
             // compute extrema values
@@ -853,8 +914,8 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vec
                 if (v < min) min = v;
                 if (v > max) max = v;
             }
-            data->init(min, max, NanoLeafT::DataType::bitWidth());
-            // perform quantization relative to the values in the curret leaf node
+            data->init(min, max, NanoLeafT::DataType::bitWidth());// sets mMinimum and mQuantum
+            // perform quantization relative to the values in the current leaf node
             const FloatT encode = FloatT((1 << NanoLeafT::DataType::bitWidth()) - 1)/(max-min);
             auto *code = reinterpret_cast<ArrayT*>(data->mCode);
             int offset = 0;
@@ -886,22 +947,24 @@ inline typename std::enable_if<std::is_same<FpN, typename T::NanoNodeT::BuildTyp
 OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vector<T>& openLeafs)
 {
     static_assert(is_same<float, OpenBuildT>::value, "Expected OpenBuildT == float");
-
+    static_assert(NanoLeafT::DataType::padding()==0u, "Expected no padding in LeafNode<FpN>");
     DitherLUT lut(mDitherOn);
     auto kernel = [&](const auto& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5];
         for (auto i = r.begin(); i != r.end(); ++i) {
+            const uint8_t logBitWidth = uint8_t(mCodec[i].log2);
             auto *openLeaf = openLeafs[i].node;
             auto *nanoLeaf = PtrAdd<NanoLeafT>(ptr, openLeafs[i].offset);
             auto* data = nanoLeaf->data();
-            this->encode(openLeaf, nanoLeaf);
-            const uint8_t logBitWidth = uint8_t(mCodec[i].log2);
+            data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
+            data->mDev = data->mAvg = data->mMax = data->mMin = 0u;
+            this->encode(openLeaf, nanoLeaf);// sets data->mBBoxMin
             data->mFlags = logBitWidth << 5;// pack logBitWidth into 3 MSB of mFlag
             data->mValueMask = openLeaf->valueMask(); // copy value mask
             auto *src = reinterpret_cast<const float*>(openLeaf->buffer().data());
             const float min = mCodec[i].min, max = mCodec[i].max;
-            data->init(min, max, uint8_t(1) << logBitWidth);
-            // perform quantization relative to the values in the curret leaf node
+            data->init(min, max, uint8_t(1) << logBitWidth);// sets mMinimum and mQuantum
+            // perform quantization relative to the values in the current leaf node
             int offset = 0;
             switch (logBitWidth) {
                 case 0u: {// 1 bit
@@ -972,16 +1035,18 @@ template<typename T>
 inline typename std::enable_if<std::is_same<T, typename OpenGridType<bool>::LeafT>::value>::type
 OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vector<NodePair<T>>& openLeafs)
 {
+    static_assert(NanoLeafT::DataType::padding()==0u, "Expected no padding in LeafNode<bool>");
     auto kernel = [&](const auto& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5];
         for (auto i = r.begin(); i != r.end(); ++i) {
             auto *openLeaf = openLeafs[i].node;
             auto *nanoLeaf = PtrAdd<NanoLeafT>(ptr, openLeafs[i].offset);
+            this->encode(openLeaf, nanoLeaf);// sets data->mBBoxMin
             auto* data = nanoLeaf->data();
-            this->encode(openLeaf, nanoLeaf);
-            data->mFlags = 0u;
+            data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
             data->mValueMask = openLeaf->valueMask(); // copy value mask
             data->mValues = *reinterpret_cast<const nanovdb::Mask<3>*>(openLeaf->buffer().data()); // copy values
+            data->mPadding[1] = data->mPadding[0] = 0u;
         }
     };
     forEach(openLeafs, 8, kernel);
@@ -994,15 +1059,17 @@ template<typename T>
 inline typename std::enable_if<std::is_same<T, typename OpenGridType<openvdb::ValueMask>::LeafT>::value>::type
 OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processLeafs(std::vector<NodePair<T>>& openLeafs)
 {
+    static_assert(NanoLeafT::DataType::padding()==0u, "Expected no padding in LeafNode<ValueMask>");
     auto kernel = [&](const auto& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5];
         for (auto i = r.begin(); i != r.end(); ++i) {
             auto *openLeaf = openLeafs[i].node;
             auto *nanoLeaf = PtrAdd<NanoLeafT>(ptr, openLeafs[i].offset);
-            auto* data = nanoLeaf->data();
             this->encode(openLeaf, nanoLeaf);
-            data->mFlags = 0u;
+            auto* data = nanoLeaf->data();
+            data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
             data->mValueMask = openLeaf->valueMask(); // copy value mask
+            data->mPadding[1] = data->mPadding[0] = 0u;
         }
     };
     forEach(openLeafs, 8, kernel);
@@ -1216,6 +1283,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processMetadata(const
         ss << "Point attribute name \"" << it->name << "\" is more than " << (GridBlindMetaData::MaxNameSize-1) << " characters";
         OPENVDB_THROW(openvdb::ValueError, ss.str());
     }
+    std::memset(metaData[0].mName, '\0', GridBlindMetaData::MaxNameSize);//overwrite mName
     memcpy(metaData[0].mName, it->name.c_str(), it->name.size() + 1);
 
     // write point offsets as blind data
@@ -1293,6 +1361,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::processMetadata(const
                 OPENVDB_THROW(openvdb::ValueError, ss.str());
             }
 
+            std::memset(metaData[i].mName, '\0', GridBlindMetaData::MaxNameSize);//overwrite mName
             memcpy(metaData[i].mName, it->name.c_str(), it->name.size() + 1);
             if (it->typeName == "vec3s") {
                 metaData[i].mDataType = GridType::Vec3f;

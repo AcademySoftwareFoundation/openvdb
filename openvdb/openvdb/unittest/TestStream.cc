@@ -8,7 +8,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <cstdio> // for remove()
 #include <fstream>
 

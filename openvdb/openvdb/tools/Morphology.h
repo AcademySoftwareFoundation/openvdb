@@ -19,10 +19,11 @@
 #include "Activate.h" // backwards compatibility
 #include "Prune.h"
 #include "ValueTransformer.h"
-#include "openvdb/Types.h"
-#include "openvdb/Grid.h"
-#include "openvdb/tree/ValueAccessor.h"
-#include "openvdb/tree/LeafManager.h"
+
+#include <openvdb/Types.h>
+#include <openvdb/Grid.h>
+#include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
 
@@ -655,7 +656,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
             // For each node, dilate the mask into itself and neighboring leaf nodes.
             // If the node was originally dense (all active), steal/replace it so
             // subsequent iterations are faster
-            manager.foreach([&](LeafT& leaf, const size_t idx) {
+            manager.foreach([&](auto& leaf, const size_t idx) {
                 // original bit-mask of current leaf node
                 const MaskType& oldMask = nodeMasks[idx];
                 const bool dense = oldMask.isOn();
@@ -1179,97 +1180,6 @@ void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
     morph.setThreaded(threaded);
     morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
 }
-
-
-/////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////
-
-
-/// @brief Topologically dilate all leaf-level active voxels in a tree
-/// using one of three nearest neighbor connectivity patterns.
-/// @warning This method is NOT multi-threaded and ignores active tiles!
-///
-/// @param tree          tree to be dilated
-/// @param iterations    number of iterations to apply the dilation
-/// @param nn            connectivity pattern of the dilation: either
-///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
-///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
-///     nearest neighbors).
-///
-/// @note The values of any voxels are unchanged.
-template<typename TreeType>
-OPENVDB_DEPRECATED_MESSAGE("Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
-inline void dilateVoxels(TreeType& tree,
-                         int iterations = 1,
-                         NearestNeighbors nn = NN_FACE)
-{
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(tree);
-    morph.setThreaded(false); // backwards compatible
-    // This will also sync the leaf manager
-    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-}
-
-/// @brief Topologically dilate all leaf-level active voxels in a tree
-/// using one of three nearest neighbor connectivity patterns.
-/// @warning This method is NOT multi-threaded and ignores active tiles!
-///
-/// @param manager       LeafManager containing the tree to be dilated.
-///                      On exit it is updated to include all the leaf
-///                      nodes of the dilated tree.
-/// @param iterations    number of iterations to apply the dilation
-/// @param nn           connectivity pattern of the dilation: either
-///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
-///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
-///     nearest neighbors).
-///
-/// @note The values of any voxels are unchanged.
-template<typename TreeType>
-OPENVDB_DEPRECATED_MESSAGE("Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
-inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
-                         int iterations = 1,
-                         NearestNeighbors nn = NN_FACE)
-{
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(manager);
-    morph.setThreaded(false);
-    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-}
-
-//@{
-/// @brief Topologically erode all leaf-level active voxels in the given tree.
-/// @details That is, shrink the set of active voxels by @a iterations voxels
-/// in the +x, -x, +y, -y, +z and -z directions, but don't change the values
-/// of any voxels, only their active states.
-/// @todo Currently operates only on leaf voxels; need to extend to tiles.
-template<typename TreeType>
-OPENVDB_DEPRECATED_MESSAGE("Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
-inline void erodeVoxels(TreeType& tree,
-                        int iterations=1,
-                        NearestNeighbors nn = NN_FACE)
-{
-    if (iterations > 0) {
-        morphology::Morphology<TreeType> morph(tree);
-        morph.setThreaded(true);
-        morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-    }
-
-    tools::pruneLevelSet(tree); // matches old behaviour
-}
-
-template<typename TreeType>
-OPENVDB_DEPRECATED_MESSAGE("Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
-inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
-                        int iterations = 1,
-                        NearestNeighbors nn = NN_FACE)
-{
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(manager);
-    morph.setThreaded(true);
-    morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-    tools::pruneLevelSet(manager.tree()); // matches old behaviour
-}
-//@}
 
 
 ////////////////////////////////////////

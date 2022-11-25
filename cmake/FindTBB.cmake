@@ -93,7 +93,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 
@@ -169,6 +169,8 @@ if(NOT Tbb_INCLUDE_DIR)
     PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
     PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
   )
+else()
+  set(Tbb_LEGACY_INCLUDE_DIR ${Tbb_INCLUDE_DIR})
 endif()
 
 # Look for a new tbb header installation
@@ -202,24 +204,21 @@ endif()
 
 
 if(EXISTS ${_tbb_version_file})
-  file(STRINGS ${_tbb_version_file}
-    _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR "
-  )
-  string(REGEX REPLACE "#define TBB_VERSION_MAJOR" ""
-    _tbb_version_major_string "${_tbb_version_major_string}"
-  )
+  file(STRINGS ${_tbb_version_file} _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR " )
+  string(REGEX REPLACE "#define TBB_VERSION_MAJOR" "" _tbb_version_major_string "${_tbb_version_major_string}")
   string(STRIP "${_tbb_version_major_string}" Tbb_VERSION_MAJOR)
 
-  file(STRINGS ${_tbb_version_file}
-     _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR "
-  )
-  string(REGEX REPLACE "#define TBB_VERSION_MINOR" ""
-    _tbb_version_minor_string "${_tbb_version_minor_string}"
-  )
+  file(STRINGS ${_tbb_version_file} _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR ")
+  string(REGEX REPLACE "#define TBB_VERSION_MINOR" "" _tbb_version_minor_string "${_tbb_version_minor_string}")
   string(STRIP "${_tbb_version_minor_string}" Tbb_VERSION_MINOR)
+
+  file(STRINGS ${_tbb_version_file} _tbb_binary_version_string REGEX "#define __TBB_BINARY_VERSION ")
+  string(REGEX REPLACE "#define __TBB_BINARY_VERSION" "" _tbb_binary_version_string "${_tbb_binary_version_string}")
+  string(STRIP "${_tbb_binary_version_string}" Tbb_BINARY_VERSION)
 
   unset(_tbb_version_major_string)
   unset(_tbb_version_minor_string)
+  unset(_tbb_binary_version_string)
 
   set(Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR})
 endif()
@@ -275,8 +274,22 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${_TBB_LIB_NAME}
       ${_FIND_TBB_ADDITIONAL_OPTIONS}
       PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
-    )
+      PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+
+    # If we didn't find the library, prepend Tbb_BINARY_VERSION to each possible
+    # component name and try again. As of TBB 2021, TBB decides to version some
+    # of its libraries on some of its platforms...
+    if(NOT Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} AND Tbb_BINARY_VERSION)
+      set(_TBB_LIB_NAME "${COMPONENT}${Tbb_BINARY_VERSION}")
+      if(BUILD_TYPE STREQUAL DEBUG)
+        set(_TBB_LIB_NAME "${_TBB_LIB_NAME}${TBB_DEBUG_SUFFIX}")
+      endif()
+
+      find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${_TBB_LIB_NAME}
+        ${_FIND_TBB_ADDITIONAL_OPTIONS}
+        PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
+        PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+    endif()
 
     # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
     # and correct the library name if so

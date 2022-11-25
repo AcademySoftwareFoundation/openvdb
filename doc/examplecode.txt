@@ -921,7 +921,7 @@ openvdb::Vec3SGrid::Ptr grid = ...;
 
 // Construct the rotation matrix.
 openvdb::math::Mat3s rot45 =
-    openvdb::math::rotation<openvdb::math::Mat3s>(openvdb::math::Y_AXIS, M_PI_4);
+    openvdb::math::rotation<openvdb::math::Mat3s>(openvdb::math::Y_AXIS, openvdb::math::pi<double>()/4.0);
 
 // Apply the functor to all active values.
 openvdb::tools::foreach(grid->beginValueOn(), MatMul(rot45));
@@ -1199,7 +1199,6 @@ void processTypedGrid(openvdb::GridBase::Ptr grid, OpType& op)
     else if (grid->isType<openvdb::Vec3IGrid>())  CALL_OP(openvdb::Vec3IGrid);
     else if (grid->isType<openvdb::Vec3SGrid>())  CALL_OP(openvdb::Vec3SGrid);
     else if (grid->isType<openvdb::Vec3DGrid>())  CALL_OP(openvdb::Vec3DGrid);
-    else if (grid->isType<openvdb::StringGrid>()) CALL_OP(openvdb::StringGrid);
 
 #undef CALL_OP
 }
@@ -1220,11 +1219,6 @@ struct PruneOp {
     void operator()(typename GridType::Ptr grid) const
     {
         grid->tree().prune(typename GridType::ValueType(tolerance));
-    }
-    // Overload to handle string-valued grids
-    void operator()(openvdb::StringGrid::Ptr grid) const
-    {
-        grid->tree().prune();
     }
 };
 

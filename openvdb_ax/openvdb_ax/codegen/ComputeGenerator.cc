@@ -201,7 +201,7 @@ bool ComputeGenerator::visit(const ast::ConditionalStatement* cond)
         llvm::Value* condition = mValues.top(); mValues.pop();
 
         if (condition->getType()->isPointerTy()) {
-            condition = mBuilder.CreateLoad(condition);
+            condition = ir_load(mBuilder, condition);
         }
         llvm::Type* conditionType = condition->getType();
         // check the type of the condition branch is bool-convertable
@@ -258,7 +258,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         // check the type of the condition branch is bool-convertable
         if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
             boolCondition = truePtr ?
-                boolComparison(mBuilder.CreateLoad(trueValue), mBuilder) : boolComparison(trueValue, mBuilder);
+                boolComparison(ir_load(mBuilder, trueValue), mBuilder) : boolComparison(trueValue, mBuilder);
             mBuilder.CreateCondBr(boolCondition, trueBlock, falseBlock);
         }
         else {
@@ -311,11 +311,11 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
             assert(!(truePtr && falsePtr));
             if (truePtr) {
                 mBuilder.SetInsertPoint(trueBranch);
-                trueValue = mBuilder.CreateLoad(trueValue);
+                trueValue = ir_load(mBuilder, trueValue);
             }
             else {
                 mBuilder.SetInsertPoint(falseBranch);
-                falseValue = mBuilder.CreateLoad(falseValue);
+                falseValue = ir_load(mBuilder, falseValue);
             }
         }
         else { // needs casting
@@ -331,10 +331,10 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                 returnType = typePrecedence(trueType, falseType);
                 // always load scalars here, even if they are the correct type
                 mBuilder.SetInsertPoint(trueBranch);
-                if (truePtr) trueValue = mBuilder.CreateLoad(trueValue);
+                if (truePtr) trueValue = ir_load(mBuilder, trueValue);
                 trueValue = arithmeticConversion(trueValue, returnType, mBuilder);
                 mBuilder.SetInsertPoint(falseBranch);
-                if (falsePtr) falseValue = mBuilder.CreateLoad(falseValue);
+                if (falsePtr) falseValue = ir_load(mBuilder, falseValue);
                 falseValue = arithmeticConversion(falseValue, returnType, mBuilder);
             }
             else if (trueType->isArrayTy() && falseType->isArrayTy()
@@ -357,7 +357,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                 // SCALAR_ARRAY
                 returnType = typePrecedence(trueType, falseType->getArrayElementType());
                 mBuilder.SetInsertPoint(trueBranch);
-                if (truePtr) trueValue = mBuilder.CreateLoad(trueValue);
+                if (truePtr) trueValue = ir_load(mBuilder, trueValue);
                 trueValue = arithmeticConversion(trueValue, returnType, mBuilder);
                 const size_t arraySize = falseType->getArrayNumElements();
                 if (arraySize == 9 || arraySize == 16) {
@@ -380,7 +380,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                     trueValue = arrayCast(trueValue, returnType, mBuilder);
                 }
                 mBuilder.SetInsertPoint(falseBranch);
-                if (falsePtr) falseValue = mBuilder.CreateLoad(falseValue);
+                if (falsePtr) falseValue = ir_load(mBuilder, falseValue);
                 falseValue = arithmeticConversion(falseValue, returnType, mBuilder);
                 const size_t arraySize = trueType->getArrayNumElements();
                 if (arraySize == 9 || arraySize == 16) {
@@ -477,7 +477,7 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     if (this->traverse(loop->condition())) {
         llvm::Value* condition = mValues.top(); mValues.pop();
         if (condition->getType()->isPointerTy()) {
-            condition = mBuilder.CreateLoad(condition);
+            condition = ir_load(mBuilder, condition);
         }
         llvm::Type* conditionType = condition->getType();
         // check the type of the condition branch is bool-convertable
@@ -573,7 +573,7 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
             lhs = mValues.top(); mValues.pop();
             llvm::Type* lhsType = lhs->getType();
             if (lhsType->isPointerTy()) {
-                lhs = mBuilder.CreateLoad(lhs);
+                lhs = ir_load(mBuilder, lhs);
                 lhsType = lhsType->getPointerElementType();
             }
 
@@ -601,7 +601,7 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
             llvm::Value* rhs = mValues.top(); mValues.pop();
             llvm::Type* rhsType = rhs->getType();
             if (rhsType->isPointerTy()) {
-                rhs = mBuilder.CreateLoad(rhs);
+                rhs = ir_load(mBuilder, rhs);
                 rhsType = rhsType->getPointerElementType();
             }
 
@@ -667,7 +667,7 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
     if (type->isPointerTy()) {
         type = type->getPointerElementType();
         if (type->isIntegerTy() || type->isFloatingPointTy()) {
-            value = mBuilder.CreateLoad(value);
+            value = ir_load(mBuilder, value);
         }
     }
 
@@ -769,7 +769,7 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
     if (rhsType->isPointerTy()) {
         rhsType = rhsType->getPointerElementType();
         if (rhsType->isIntegerTy() || rhsType->isFloatingPointTy()) {
-            rhs = mBuilder.CreateLoad(rhs);
+            rhs = ir_load(mBuilder, rhs);
         }
     }
 
@@ -784,7 +784,7 @@ bool ComputeGenerator::visit(const ast::Crement* node)
         mLog.error("unable to assign to an rvalue", node);
         return false;
     }
-    llvm::Value* rvalue = mBuilder.CreateLoad(value);
+    llvm::Value* rvalue = ir_load(mBuilder, value);
     llvm::Type* type = rvalue->getType();
 
     if (type->isIntegerTy(1) || (!type->isIntegerTy() && !type->isFloatingPointTy())) {
@@ -838,7 +838,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
                 type = type->getPointerElementType();
                 if (type->isIntegerTy() || type->isFloatingPointTy()) {
                     // pass by value
-                    arg = mBuilder.CreateLoad(arg);
+                    arg = ir_load(mBuilder, arg);
                 }
             }
             else {
@@ -923,7 +923,7 @@ bool ComputeGenerator::visit(const ast::Cast* node)
 
 
         if (value->getType()->isPointerTy()) {
-            value = mBuilder.CreateLoad(value);
+            value = ir_load(mBuilder, value);
         }
 
         if (targetType->isIntegerTy(1)) {
@@ -996,7 +996,7 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
             if (initType->isPointerTy()) {
                 initType = initType->getPointerElementType();
                 if (initType->isIntegerTy() || initType->isFloatingPointTy()) {
-                    init = mBuilder.CreateLoad(init);
+                    init = ir_load(mBuilder, init);
                 }
             }
             if (!this->assignExpression(value, init, node)) return false;
@@ -1075,10 +1075,10 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     }
 
     if (component0->getType()->isPointerTy()) {
-        component0 = mBuilder.CreateLoad(component0);
+        component0 = ir_load(mBuilder, component0);
     }
     if (component1 && component1->getType()->isPointerTy()) {
-        component1 = mBuilder.CreateLoad(component1);
+        component1 = ir_load(mBuilder, component1);
     }
 
     if (!component0->getType()->isIntegerTy() ||
@@ -1100,7 +1100,7 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
 
     llvm::Value* zero = LLVMType<int32_t>::get(mContext, 0);
     if (!component1) {
-        value = mBuilder.CreateGEP(value, {zero, component0});
+        value = ir_gep(mBuilder, value, {zero, component0});
     }
     else {
         // component0 = row, component1 = column. Index into the matrix array
@@ -1111,7 +1111,7 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
             LLVMType<int32_t>::get(mContext, static_cast<int32_t>(dim));
         component0 = binaryOperator(component0, offset, ast::tokens::MULTIPLY, mBuilder);
         component0 = binaryOperator(component0, component1, ast::tokens::PLUS, mBuilder);
-        value = mBuilder.CreateGEP(value, {zero, component0});
+        value = ir_gep(mBuilder, value, {zero, component0});
     }
 
     mValues.push(value);
@@ -1133,7 +1133,7 @@ bool ComputeGenerator::visit(const ast::ArrayPack* node)
     for (size_t i = 0; i < num; ++i) {
         llvm::Value* value = mValues.top(); mValues.pop();
         if (value->getType()->isPointerTy()) {
-            value = mBuilder.CreateLoad(value);
+            value = ir_load(mBuilder, value);
         }
         if (value->getType()->isArrayTy()) {
             mLog.error("cannot build nested arrays", node->child(num-(i+1)));
@@ -1247,10 +1247,10 @@ bool ComputeGenerator::visit(const ast::ExternalVariable* node)
     }
 
     llvm::Type* type = llvmTypeFromToken(node->type(), mContext);
-    llvm::Value* address = mBuilder.CreateLoad(ptrToAddress);
+    llvm::Value* address = ir_load(mBuilder, ptrToAddress);
     llvm::Value* value = mBuilder.CreateIntToPtr(address, type->getPointerTo(0));
     if (type->isIntegerTy() || type->isFloatingPointTy()) {
-        value = mBuilder.CreateLoad(value);
+        value = ir_load(mBuilder, value);
     }
     mValues.push(value);
     return true;
@@ -1298,7 +1298,7 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
     if (lsize == 9 || lsize == 16) {
         if (rtype->isIntegerTy() || rtype->isFloatingPointTy()) {
             if (rhs->getType()->isPointerTy()) {
-                rhs = mBuilder.CreateLoad(rhs);
+                rhs = ir_load(mBuilder, rhs);
             }
             rhs = arithmeticConversion(rhs, ltype->getArrayElementType(), mBuilder);
             rhs = scalarToMatrix(rhs, mBuilder, lsize == 9 ? 3 : 4);
@@ -1361,8 +1361,8 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
         }
 
         for (size_t i = 0; i < resultsize; ++i) {
-            llvm::Value* lelement = lsize == 1 ? lhs : mBuilder.CreateConstGEP2_64(lhs, 0, i);
-            llvm::Value* relement = rsize == 1 ? rhs : mBuilder.CreateLoad(mBuilder.CreateConstGEP2_64(rhs, 0, i));
+            llvm::Value* lelement = lsize == 1 ? lhs : ir_constgep2_64(mBuilder, lhs, 0, i);
+            llvm::Value* relement = rsize == 1 ? rhs : ir_load(mBuilder, ir_constgep2_64(mBuilder, rhs, 0, i));
             relement = arithmeticConversion(relement, opprec, mBuilder);
             mBuilder.CreateStore(relement, lelement);
         }
@@ -1450,7 +1450,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
     if (lsize == 9 || lsize == 16) {
         if (rtype->isIntegerTy() || rtype->isFloatingPointTy()) {
             if (rhs->getType()->isPointerTy()) {
-                rhs = mBuilder.CreateLoad(rhs);
+                rhs = ir_load(mBuilder, rhs);
             }
             rhs = arithmeticConversion(rhs, ltype->getArrayElementType(), mBuilder);
             rhs = scalarToMatrix(rhs, mBuilder, lsize == 9 ? 3 : 4);
@@ -1471,7 +1471,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
     if (rsize == 9 || rsize == 16) {
         if (ltype->isIntegerTy() || ltype->isFloatingPointTy()) {
             if (lhs->getType()->isPointerTy()) {
-                lhs = mBuilder.CreateLoad(lhs);
+                lhs = ir_load(mBuilder, lhs);
             }
             lhs = arithmeticConversion(lhs, rtype->getArrayElementType(), mBuilder);
             lhs = scalarToMatrix(lhs, mBuilder, rsize == 9 ? 3 : 4);
@@ -1619,12 +1619,12 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
 
         if (!ltype->isArrayTy()) {
             if (lhs->getType()->isPointerTy()) {
-                lhs = mBuilder.CreateLoad(lhs);
+                lhs = ir_load(mBuilder, lhs);
             }
         }
         if (!rtype->isArrayTy()) {
             if (rhs->getType()->isPointerTy()) {
-                rhs = mBuilder.CreateLoad(rhs);
+                rhs = ir_load(mBuilder, rhs);
             }
         }
 
@@ -1648,8 +1648,8 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
 
         // perform op
         for (size_t i = 0; i < resultsize; ++i) {
-            llvm::Value* lelement = lsize == 1 ? lhs : mBuilder.CreateLoad(mBuilder.CreateConstGEP2_64(lhs, 0, i));
-            llvm::Value* relement = rsize == 1 ? rhs : mBuilder.CreateLoad(mBuilder.CreateConstGEP2_64(rhs, 0, i));
+            llvm::Value* lelement = lsize == 1 ? lhs : ir_load(mBuilder, ir_constgep2_64(mBuilder, lhs, 0, i));
+            llvm::Value* relement = rsize == 1 ? rhs : ir_load(mBuilder, ir_constgep2_64(mBuilder, rhs, 0, i));
             lelement = arithmeticConversion(lelement, opprec, mBuilder);
             relement = arithmeticConversion(relement, opprec, mBuilder);
             elements.emplace_back(runop(lelement, relement));
@@ -1671,7 +1671,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 result = insertStaticAlloca(mBuilder,
                     llvm::ArrayType::get(opprec, resultsize));
                 for (size_t i = 0; i < resultsize; ++i) {
-                    mBuilder.CreateStore(elements[i], mBuilder.CreateConstGEP2_64(result, 0, i));
+                    mBuilder.CreateStore(elements[i], ir_constgep2_64(mBuilder, result, 0, i));
                 }
             }
         }
