@@ -198,8 +198,8 @@ struct LLVMType<void>
     }
 };
 
-/// @note void* implemented as signed int_t* to match clang IR generation
-template <> struct LLVMType<void*> : public LLVMType<int_t<sizeof(void*)>::type*> {};
+/// @note void* implemented as signed int8_t* to match clang IR generation
+template <> struct LLVMType<void*> : public LLVMType<int8_t*> {};
 template <> struct LLVMType<openvdb::math::half>
 {
     // @note LLVM has a special representation of half types. Don't alias to
