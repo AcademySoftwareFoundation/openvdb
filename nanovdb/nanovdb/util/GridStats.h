@@ -74,7 +74,6 @@ public:
         , mMax(b)
     {
     }
-    Extrema& operator=(const Extrema&) = default;
     Extrema& min(const ValueT& v)
     {
         if (v < mMin) {
