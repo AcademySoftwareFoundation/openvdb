@@ -1,53 +1,22 @@
-///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2002, Industrial Light & Magic, a division of Lucas
-// Digital Ltd. LLC
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright Contributors to the OpenEXR Project.
 //
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-// *       Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-// *       Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-// *       Neither the name of Industrial Light & Magic nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-///////////////////////////////////////////////////////////////////////////
 
-// Primary authors:
+//
+// Primary original authors:
 //     Florian Kainz <kainz@ilm.com>
 //     Rod Bogart <rgb@ilm.com>
-
+//
 
 //---------------------------------------------------------------------------
 //
-//      class half --
-//      implementation of non-inline members
+//  class half --
+//  implementation of non-inline members
 //
 //---------------------------------------------------------------------------
 
-#include <assert.h>
 #include "Half.h"
-
-using namespace std;
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -55,184 +24,31 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 namespace internal {
 
+#if defined(_WIN32) && defined(OPENVDB_DLL)
+#define EXPORT_CONST __declspec(dllexport)
+#else
+#define EXPORT_CONST
+#endif
+
 // Handled via OPENVDB_API, but disabled here to minimize change
 // with reference implementation
-#define HALF_EXPORT
+#define IMATH_EXPORT
 
-
-//-----------------------------------------------
-// Overflow handler for float-to-half conversion;
-// generates a hardware floating-point overflow,
-// which may be trapped by the operating system.
-//-----------------------------------------------
-
-HALF_EXPORT float
-half::overflow ()
-{
-    volatile float f = 1e10;
-
-    for (int i = 0; i < 10; i++)
-        f *= f;                         // this will overflow before
-                                        // the for­loop terminates
-    return f;
-}
-
-
-//-----------------------------------------------------
-// Float-to-half conversion -- general case, including
-// zeroes, denormalized numbers and exponent overflows.
-//-----------------------------------------------------
-
-HALF_EXPORT short
-half::convert (int i)
-{
-    //
-    // Our floating point number, f, is represented by the bit
-    // pattern in integer i.  Disassemble that bit pattern into
-    // the sign, s, the exponent, e, and the significand, m.
-    // Shift s into the position where it will go in in the
-    // resulting half number.
-    // Adjust e, accounting for the different exponent bias
-    // of float and half (127 versus 15).
-    //
-
-    int s =  (i >> 16) & 0x00008000;
-    int e = ((i >> 23) & 0x000000ff) - (127 - 15);
-    int m =   i        & 0x007fffff;
-
-    //
-    // Now reassemble s, e and m into a half:
-    //
-
-    if (e <= 0)
-    {
-        if (e < -10)
-        {
-            //
-            // E is less than -10.  The absolute value of f is
-            // less than HALF_MIN (f may be a small normalized
-            // float, a denormalized float or a zero).
-            //
-            // We convert f to a half zero with the same sign as f.
-            //
-
-            return (short) s;
-        }
-
-        //
-        // E is between -10 and 0.  F is a normalized float
-        // whose magnitude is less than HALF_NRM_MIN.
-        //
-        // We convert f to a denormalized half.
-        //
-
-        //
-        // Add an explicit leading 1 to the significand.
-        //
-
-        m = m | 0x00800000;
-
-        //
-        // Round to m to the nearest (10+e)-bit value (with e between
-        // -10 and 0); in case of a tie, round to the nearest even value.
-        //
-        // Rounding may cause the significand to overflow and make
-        // our number normalized.  Because of the way a half's bits
-        // are laid out, we don't have to treat this case separately;
-        // the code below will handle it correctly.
-        //
-
-        int t = 14 - e;
-        int a = (1 << (t - 1)) - 1;
-        int b = (m >> t) & 1;
-
-        m = (m + a + b) >> t;
-
-        //
-        // Assemble the half from s, e (zero) and m.
-        //
-
-        return (short) (s | m);
-    }
-    else if (e == 0xff - (127 - 15))
-    {
-        if (m == 0)
-        {
-            //
-            // F is an infinity; convert f to a half
-            // infinity with the same sign as f.
-            //
-
-            return (short) (s | 0x7c00);
-        }
-        else
-        {
-            //
-            // F is a NAN; we produce a half NAN that preserves
-            // the sign bit and the 10 leftmost bits of the
-            // significand of f, with one exception: If the 10
-            // leftmost bits are all zero, the NAN would turn
-            // into an infinity, so we have to set at least one
-            // bit in the significand.
-            //
-
-            m >>= 13;
-            return (short)(s | 0x7c00 | m | (m == 0));
-        }
-    }
-    else
-    {
-        //
-        // E is greater than zero.  F is a normalized float.
-        // We try to convert f to a normalized half.
-        //
-
-        //
-        // Round to m to the nearest 10-bit value.  In case of
-        // a tie, round to the nearest even value.
-        //
-
-        m = m + 0x00000fff + ((m >> 13) & 1);
-
-        if (m & 0x00800000)
-        {
-            m =  0;             // overflow in significand,
-            e += 1;             // adjust exponent
-        }
-
-        //
-        // Handle exponent overflow
-        //
-
-        if (e > 30)
-        {
-            overflow ();        // Cause a hardware floating point overflow;
-            return (short)(s | 0x7c00);  // if this returns, the half becomes an
-        }                       // infinity with the same sign as f.
-
-        //
-        // Assemble the half from s, e and m.
-        //
-
-        return (short)(s | (e << 10) | (m >> 13));
-    }
-}
-
+// clang-format on
 
 //---------------------
 // Stream I/O operators
 //---------------------
 
-HALF_EXPORT ostream &
-operator << (ostream &os, half h)
+IMATH_EXPORT std::ostream&
+operator<< (std::ostream& os, half h)
 {
     os << float (h);
     return os;
 }
 
-
-HALF_EXPORT istream &
-operator >> (istream &is, half &h)
+IMATH_EXPORT std::istream&
+operator>> (std::istream& is, half& h)
 {
     float f;
     is >> f;
@@ -240,51 +56,48 @@ operator >> (istream &is, half &h)
     return is;
 }
 
-
 //---------------------------------------
 // Functions to print the bit-layout of
 // floats and halfs, mostly for debugging
 //---------------------------------------
 
-HALF_EXPORT void
-printBits (ostream &os, half h)
+IMATH_EXPORT void
+printBits (std::ostream& os, half h)
 {
     unsigned short b = h.bits();
 
     for (int i = 15; i >= 0; i--)
     {
-        os << (((b >> i) & 1)? '1': '0');
+        os << (((b >> i) & 1) ? '1' : '0');
 
         if (i == 15 || i == 10)
             os << ' ';
     }
 }
 
-
-HALF_EXPORT void
-printBits (ostream &os, float f)
+IMATH_EXPORT void
+printBits (std::ostream& os, float f)
 {
     half::uif x;
     x.f = f;
 
     for (int i = 31; i >= 0; i--)
     {
-        os << (((x.i >> i) & 1)? '1': '0');
+        os << (((x.i >> i) & 1) ? '1' : '0');
 
         if (i == 31 || i == 23)
             os << ' ';
     }
 }
 
-
-HALF_EXPORT void
+IMATH_EXPORT void
 printBits (char c[19], half h)
 {
     unsigned short b = h.bits();
 
     for (int i = 15, j = 0; i >= 0; i--, j++)
     {
-        c[j] = (((b >> i) & 1)? '1': '0');
+        c[j] = (((b >> i) & 1) ? '1' : '0');
 
         if (i == 15 || i == 10)
             c[++j] = ' ';
@@ -293,8 +106,7 @@ printBits (char c[19], half h)
     c[18] = 0;
 }
 
-
-HALF_EXPORT void
+IMATH_EXPORT void
 printBits (char c[35], float f)
 {
     half::uif x;
@@ -302,7 +114,7 @@ printBits (char c[35], float f)
 
     for (int i = 31, j = 0; i >= 0; i--, j++)
     {
-        c[j] = (((x.i >> i) & 1)? '1': '0');
+        c[j] = (((x.i >> i) & 1) ? '1' : '0');
 
         if (i == 31 || i == 23)
             c[++j] = ' ';
@@ -315,7 +127,13 @@ printBits (char c[35], float f)
 // Lookup tables for half-to-float and float-to-half conversion
 //-------------------------------------------------------------
 
-const half::uif half::_toFloat[1 << 16] =
+// clang-format off
+
+#if !defined(IMATH_HALF_NO_LOOKUP_TABLE)
+// Omit the table entirely if IMATH_HALF_NO_LOOKUP_TABLE is
+// defined. Half-to-float conversion must be accomplished either by
+// F16C instructions or the bit-shift algorithm.
+const imath_half_uif_t imath_half_to_float_table_data[1 << 16] =
 {
     {0x00000000}, {0x33800000}, {0x34000000}, {0x34400000},
     {0x34800000}, {0x34a00000}, {0x34c00000}, {0x34e00000},
@@ -16703,73 +16521,11 @@ const half::uif half::_toFloat[1 << 16] =
     {0xffff8000}, {0xffffa000}, {0xffffc000}, {0xffffe000},
 };
 
-const unsigned short    half::_eLut[1 << 9] =
-{
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,  1024,  2048,  3072,  4096,  5120,  6144,  7168,
-     8192,  9216, 10240, 11264, 12288, 13312, 14336, 15360,
-    16384, 17408, 18432, 19456, 20480, 21504, 22528, 23552,
-    24576, 25600, 26624, 27648, 28672, 29696,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0, 33792, 34816, 35840, 36864, 37888, 38912, 39936,
-    40960, 41984, 43008, 44032, 45056, 46080, 47104, 48128,
-    49152, 50176, 51200, 52224, 53248, 54272, 55296, 56320,
-    57344, 58368, 59392, 60416, 61440, 62464,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-        0,     0,     0,     0,     0,     0,     0,     0,
-};
+extern "C" {
+EXPORT_CONST const imath_half_uif_t *imath_half_to_float_table = imath_half_to_float_table_data;
+} // extern "C"
+
+#endif
 
 } // namespace internal
 } // namespace math
