@@ -1723,7 +1723,7 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
       EXPECT_EQ(end-start, 28);// padding is 28 bytes
 
       // use padding for an offset and check that it doesn't interfere with other data
-      size_t &offset = *reinterpret_cast<size_t*>(&(data->mStdDevi)+1);
+      uint64_t &offset = *reinterpret_cast<uint64_t*>(&(data->mStdDevi)+1);
       data->mStdDevi = true;
       data->mTable[0].child = 123434214;
       offset = 45634923663;
@@ -1751,7 +1751,7 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
       EXPECT_EQ(end-start, 28);// padding is 28 bytes
 
       // use padding for an offset and check that it doesn't interfere with other data
-      size_t &offset = *reinterpret_cast<size_t*>(&(data->mStdDevi)+1);
+      uint64_t &offset = *reinterpret_cast<uint64_t*>(&(data->mStdDevi)+1);
       data->mStdDevi = true;
       data->mTable[0].child = 123434214;
       offset = 45634923663;
@@ -2283,7 +2283,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     EXPECT_EQ(sizeof(TreeT), nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(4*8 + 3*4 + 3*4 + 8));
     EXPECT_EQ(sizeof(TreeT), size_t(4*8 + 3*4 + 3*4 + 8));// should already be 32 byte aligned
 
-    size_t bytes[6] = {GridT::memUsage(), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::DataType::memUsage()};
+    uint64_t bytes[6] = {GridT::memUsage(), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::DataType::memUsage()};
     for (int i = 1; i < 6; ++i)
         bytes[i] += bytes[i - 1]; // Byte offsets to: tree, root, internal nodes, leafs, total
     std::unique_ptr<uint8_t[]> pool(new uint8_t[bytes[5] + NANOVDB_DATA_ALIGNMENT]);
