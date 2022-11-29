@@ -116,7 +116,7 @@ replicate(const PointDataGridT& source,
     private:
         Index mIt, mEnd, mSource;
         const Index mSourceEnd;
-        const GetIncrementCB& mCallback;
+        const GetIncrementCB mCallback;
     }; // struct CopyIter
 
 
