@@ -1,2 +1,0 @@
-Build:
- - Fixed CXX standard requirement for VDB components in FindOpenVDB.cmake

@@ -4,7 +4,16 @@
 
 @htmlonly <a name="v10_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 10.0.1</B> - <I>In development</I>
+<B>Version 10.0.1</B> - <I>November 30, 2022</I>
+
+@par
+Bug Fixes:
+- Fixed uninitialized point flags in tools::VolumeToMesh which could result in
+  non-deterministic results (bug introduced in 10.0.0).
+
+@par
+Build:
+- Fixed CXX standard requirement for VDB components in FindOpenVDB.cmake
 
 @htmlonly <a name="v10_0_0_changes"></a>@endhtmlonly
 @par
