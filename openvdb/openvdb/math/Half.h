@@ -618,10 +618,10 @@ class OPENVDB_API half
     /// @name Access to the internal representation
 
     /// Return the bit pattern
-    OPENVDB_API constexpr uint16_t bits() const noexcept;
+    constexpr uint16_t bits() const noexcept;
 
     /// Set the bit pattern
-    OPENVDB_API constexpr void setBits (uint16_t bits) noexcept;
+    constexpr void setBits (uint16_t bits) noexcept;
 
     /// @}
 
