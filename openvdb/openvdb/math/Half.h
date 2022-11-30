@@ -177,6 +177,8 @@
 #include <openvdb/version.h>
 #include <iostream>
 
+OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+
 #if defined(_WIN32)
 #include <intrin.h>
 #elif defined(__x86_64__)
@@ -979,5 +981,7 @@ public:
 };
 
 } // namespace std
+
+OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
 #endif // OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED
