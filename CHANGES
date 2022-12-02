@@ -1,7 +1,14 @@
 OpenVDB Version History
 =======================
 
-Version 10.0.1 - In development
+Version 10.0.1 - November 30, 2022
+
+    Bug Fixes:
+    - Fix uninitialized point flags in tools::VolumeToMesh which could result in
+      non-deterministic results (bug introduced in 10.0.0).
+
+    Build:
+    - Fixed CXX standard requirement for VDB components in FindOpenVDB.cmake
 
 Version 10.0.0 - October 27, 2022
 
