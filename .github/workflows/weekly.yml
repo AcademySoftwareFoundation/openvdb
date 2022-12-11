@@ -178,22 +178,21 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
           # Standalone
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '8', components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '8', components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '8', components: 'core' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '8', components: 'core' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: build
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
           --components=${{ matrix.config.components }}
           --cargs=\"
@@ -208,7 +207,6 @@ jobs:
         if: matrix.config.components == 'core'
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
           --components="bin,axcore,axbin,axtest,python"
           --cargs=\"
