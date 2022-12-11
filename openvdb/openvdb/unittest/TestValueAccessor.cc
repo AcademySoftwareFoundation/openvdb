@@ -215,7 +215,7 @@ TestValueAccessor::accessorTest()
         EXPECT_TRUE(!acc.isValueOn(c1)); // inactive background value
         EXPECT_EQ(value, acc.getValue(c0));
         EXPECT_TRUE(
-            (acc.numCacheLevels()>0) == acc.isCached(c0)); // active, leaf-level voxel value
+            (acc.NumCacheLevels>0) == acc.isCached(c0)); // active, leaf-level voxel value
         EXPECT_TRUE(acc.isValueOn(c0));
 
         acc.setValue(c1, value);
@@ -223,11 +223,11 @@ TestValueAccessor::accessorTest()
         EXPECT_TRUE(acc.isValueOn(c1));
         EXPECT_EQ(value, tree.getValue(c0));
         EXPECT_EQ(value, tree.getValue(c1));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
         EXPECT_EQ(value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
         EXPECT_EQ(value, acc.getValue(c0));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
         EXPECT_TRUE(acc.isVoxel(c0));
@@ -238,14 +238,14 @@ TestValueAccessor::accessorTest()
         EXPECT_EQ(value, tree.getValue(c0));
         EXPECT_EQ(value, tree.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
         EXPECT_TRUE( acc.isValueOn(c0));
         EXPECT_TRUE(!acc.isValueOn(c1));
 
         acc.setValueOn(c1);
 
         EXPECT_TRUE(!acc.isCached(c0));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
         EXPECT_TRUE( acc.isValueOn(c0));
         EXPECT_TRUE( acc.isValueOn(c1));
 
@@ -257,11 +257,11 @@ TestValueAccessor::accessorTest()
         EXPECT_TRUE(acc.isValueOn(c1));
         EXPECT_EQ(value, tree.getValue(c0));
         EXPECT_EQ(-value, tree.getValue(c1));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
         EXPECT_EQ(-value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
         EXPECT_EQ(value, acc.getValue(c0));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
         EXPECT_TRUE(acc.isVoxel(c0));
@@ -272,11 +272,11 @@ TestValueAccessor::accessorTest()
         EXPECT_TRUE(acc.isValueOn(c1));
         EXPECT_EQ(value, tree.getValue(c0));
         EXPECT_EQ(3*value, tree.getValue(c1));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
         EXPECT_EQ(3*value, acc.getValue(c1));
         EXPECT_TRUE(!acc.isCached(c0));
         EXPECT_EQ(value, acc.getValue(c0));
-        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
         EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
         EXPECT_TRUE(acc.isVoxel(c0));
@@ -340,9 +340,9 @@ TestValueAccessor::constAccessorTest()
     EXPECT_TRUE(!acc.isVoxel(c1));
 
     EXPECT_EQ(value, acc.getValue(c0));
-    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+    EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c0));
     EXPECT_EQ(background, acc.getValue(c1));
-    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+    EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c0));
     EXPECT_TRUE(!acc.isCached(c1));
     EXPECT_TRUE(acc.isValueOn(c0));
     EXPECT_TRUE(!acc.isValueOn(c1));
@@ -351,7 +351,7 @@ TestValueAccessor::constAccessorTest()
 
     EXPECT_EQ(value, acc.getValue(c1));
     EXPECT_TRUE(!acc.isCached(c0));
-    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+    EXPECT_TRUE((acc.NumCacheLevels>0) == acc.isCached(c1));
     EXPECT_TRUE(acc.isValueOn(c0));
     EXPECT_TRUE(acc.isValueOn(c1));
     EXPECT_EQ(leafDepth, acc.getValueDepth(c0));

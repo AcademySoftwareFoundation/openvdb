@@ -416,8 +416,8 @@ inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
                 // with the same active state.
                 // @warning This code assume that getValueDepth() is always called to force
                 // a node cache.
-                using NodeT1 = typename AccessorType::NodeT1;
-                using NodeT2 = typename AccessorType::NodeT2;
+                using NodeT1 = typename AccessorType::template NodeTypeAtLevel<1>;
+                using NodeT2 = typename AccessorType::template NodeTypeAtLevel<2>;
                 if (NodeT1* node = accessorPtr->template getNode<NodeT1>()) {
                     const openvdb::Index index = node->coordToOffset(*ijk);
                     assert(node->isChildMaskOff(index));
