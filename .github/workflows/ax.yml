@@ -49,7 +49,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -158,7 +158,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2022-clang11
     steps:

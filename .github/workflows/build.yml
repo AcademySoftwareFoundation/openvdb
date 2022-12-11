@@ -56,7 +56,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-vfx:${{ matrix.config.image }}-
       abi:${{ matrix.config.abi }}-
@@ -118,7 +118,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'win'
-    runs-on: windows-2022-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
