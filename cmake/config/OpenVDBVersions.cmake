@@ -18,9 +18,13 @@ set(MINIMUM_CXX_STANDARD 17)
 
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
-set(MINIMUM_OPENVDB_ABI_VERSION 8)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 10)
-set(FUTURE_OPENVDB_ABI_VERSION 11)
+math(EXPR MINIMUM_OPENVDB_ABI_VERSION "${OpenVDB_MAJOR_VERSION}-2")
+math(EXPR FUTURE_OPENVDB_ABI_VERSION "${OpenVDB_MAJOR_VERSION}+1")
+
+# List of deprecated but supported OpenVDB ABIs for this version of OpenVDB
+math(EXPR _PREV_ABI "${OpenVDB_MAJOR_VERSION}-1")
+set(OPENVDB_DEPRECATED_ABI_LIST ${MINIMUM_OPENVDB_ABI_VERSION} ${_PREV_ABI})
+unset(_PREV_ABI)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2021 of the VFX platform where available

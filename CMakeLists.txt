@@ -135,9 +135,7 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_7 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_8 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
+
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -251,9 +249,6 @@ mark_as_advanced(
   OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
-  OPENVDB_USE_DEPRECATED_ABI_7
-  OPENVDB_USE_DEPRECATED_ABI_8
-  OPENVDB_USE_FUTURE_ABI_10
   SYSTEM_LIBRARY_PATHS
   USE_CCACHE
   USE_COLORED_OUTPUT
@@ -269,6 +264,13 @@ mark_as_advanced(
 # Configure MINIMUM and FUTURE_MINIMUM version variables
 
 include(cmake/config/OpenVDBVersions.cmake)
+
+foreach(DEPRECATED_ABI ${OPENVDB_DEPRECATED_ABI_LIST})
+  option(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI} "Bypass minimum ABI requirement checks" OFF)
+  mark_as_advanced(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI})
+endforeach()
+option(OPENVDB_USE_FUTURE_ABI_${FUTURE_OPENVDB_ABI_VERSION} "Bypass future ABI check" OFF)
+mark_as_advanced(OPENVDB_USE_FUTURE_ABI_${FUTURE_OPENVDB_ABI_VERSION})
 
 #########################################################################
 
@@ -486,14 +488,14 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
     "no longer supported.")
 endif()
 
-if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
+if(OpenVDB_ABI IN_LIST OPENVDB_DEPRECATED_ABI_LIST)
   if(NOT OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${OpenVDB_MAJOR_VERSION} "
       "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI} to ON to "
       "suppress this error.")
   endif()
 
-  message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+  message(DEPRECATION "OpenVDB ABI versions earlier than ${OpenVDB_MAJOR_VERSION} "
     "are deprecated and will soon be removed.")
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
