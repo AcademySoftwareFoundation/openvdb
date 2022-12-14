@@ -49,7 +49,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -93,7 +93,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'win'
-    runs-on: windows-2022-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 17 2022"
@@ -175,7 +175,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest

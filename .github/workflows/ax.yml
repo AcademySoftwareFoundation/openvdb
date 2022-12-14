@@ -49,7 +49,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -61,11 +61,11 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '8', components: 'core,python,bin,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '8', components: 'core,python,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '8', components: 'core,python,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '8', components: 'core,python,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '8', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core,python,bin,axcore,axbin,axtest' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -85,7 +85,6 @@ jobs:
       - name: build
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
           --components=${{ matrix.config.components }}
           --cargs=\"
@@ -100,7 +99,6 @@ jobs:
         if: matrix.config.components == 'core'
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
           --components="bin,axcore,axbin,axtest"
           --cargs=\"
@@ -158,7 +156,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2022-clang11
     steps:

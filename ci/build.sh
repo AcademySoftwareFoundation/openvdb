@@ -29,9 +29,15 @@ declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
 PARMS[--build-dir]=build
-# github actions runners have 8 threads
-# https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-PARMS[-j]=8
+
+if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
+    # ASWF github actions runners have 8 threads
+    PARMS[-j]=8
+else
+    # Github actions runners have 2 threads
+    # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
+    PARMS[-j]=2
+fi
 
 # Available options for --components
 declare -A COMPONENTS

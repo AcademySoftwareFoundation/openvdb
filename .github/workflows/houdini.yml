@@ -41,7 +41,7 @@ jobs:
     # Check that valid github secrets have been set. This isn't needed to retrieve
     # the cache, but ensures that the job doens't start with an empty cache
     name: Verify Houdini Secrets
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ubuntu-latest
     outputs:
       HOUDINI_SECRETS: ${{ steps.check.outputs.HOUDINI_SECRETS }}
     steps:
@@ -59,7 +59,7 @@ jobs:
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
-    runs-on: ubuntu-20.04-8c-32g-300h
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
