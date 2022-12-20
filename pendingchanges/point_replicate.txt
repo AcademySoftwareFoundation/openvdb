@@ -1,0 +1,3 @@
+New features:
+    - Added points::replicate() for the replication of PointDataGrid points
+    and attributes.

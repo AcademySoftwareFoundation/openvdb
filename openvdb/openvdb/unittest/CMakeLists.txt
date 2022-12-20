@@ -149,6 +149,7 @@ else()
     TestPointRasterizeFrustum.cc
     TestPointRasterizeSDF.cc
     TestPointRasterizeTrilinear.cc
+    TestPointReplicate.cc
     TestPointSample.cc
     TestPointScatter.cc
     TestPointStatistics.cc
