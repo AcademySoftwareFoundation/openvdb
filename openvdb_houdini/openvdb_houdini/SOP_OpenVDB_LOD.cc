@@ -322,7 +322,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
+                hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -358,7 +358,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
+                hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
@@ -383,7 +383,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                     continue;
                 }
 
-                hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op);
+                hvdb::GEOvdbApply<hvdb::NumericGridTypes>(**it, op);
 
                 if (boss.wasInterrupted()) return error();
 
