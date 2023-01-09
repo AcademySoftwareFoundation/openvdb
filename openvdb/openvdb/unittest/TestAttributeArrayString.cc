@@ -591,7 +591,7 @@ TEST_F(TestAttributeArrayString, testProfile)
     volatile bool result = false;
     (void)result;
     for (size_t i = 0; i < elements/2; ++i) {
-        result |= handle.contains("test_string_" + std::to_string(i*4));
+        result = result | handle.contains("test_string_" + std::to_string(i*4));
     }
 
     timer.stop();
