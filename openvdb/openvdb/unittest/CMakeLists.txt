@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -146,6 +146,10 @@ else()
     TestPointMask.cc
     TestPointMove.cc
     TestPointPartitioner.cc
+    TestPointRasterizeFrustum.cc
+    TestPointRasterizeSDF.cc
+    TestPointRasterizeTrilinear.cc
+    TestPointReplicate.cc
     TestPointSample.cc
     TestPointScatter.cc
     TestPointStatistics.cc
@@ -168,7 +172,6 @@ else()
     TestTreeCombine.cc
     TestTreeGetSetValues.cc
     TestTreeIterators.cc
-    TestTreeVisitor.cc
     TestTypes.cc
     TestUtil.cc
     TestValueAccessor.cc
@@ -194,7 +197,7 @@ endif()
 if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
+    if(MSVC)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
     else()
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -208,8 +211,18 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
 
-target_link_libraries(vdb_test
-  ${OPENVDB_TEST_DEPENDENT_LIBS}
-)
+target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
+add_test(NAME vdb_unit_test COMMAND $<TARGET_FILE:vdb_test> -v)
 
-add_test(vdb_unit_test vdb_test -v)
+# For the undefined behaviour sanitizer, add the suppression file and
+# additional options
+
+get_filename_component(PATH_TO_PROJECT_ROOT ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
+get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
+get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
+set(UBSAN_SUPRESSION_FILE ${PATH_TO_PROJECT_ROOT}/cmake/scripts/ubsan.supp)
+
+set_tests_properties(vdb_unit_test PROPERTIES
+    ENVIRONMENT
+      "$<$<CONFIG:UBSAN>:UBSAN_OPTIONS=halt_on_error=1 report_error_type=1 suppressions=${UBSAN_SUPRESSION_FILE}>")
+

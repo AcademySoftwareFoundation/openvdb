@@ -4,6 +4,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
+#include <openvdb/math/Math.h>
 
 #include <gtest/gtest.h>
 
@@ -105,8 +106,8 @@ std::vector<openvdb::Vec3R> genPoints(const int numPoints)
     // init
     openvdb::math::Random01 randNumber(0);
     const int n = int(std::sqrt(double(numPoints)));
-    const double xScale = (2.0 * M_PI) / double(n);
-    const double yScale = M_PI / double(n);
+    const double xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double yScale = openvdb::math::pi<double>() / double(n);
 
     double x, y, theta, phi;
 
@@ -1165,6 +1166,7 @@ TEST_F(TestPointDataLeaf, testIO)
             EXPECT_TRUE(leaf == *leafFromDisk);
         }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
         { // read grids from file and pre-fetch
             PointDataGrid::Ptr gridFromDisk;
 
@@ -1267,6 +1269,7 @@ TEST_F(TestPointDataLeaf, testIO)
         }
 
         remove("leaf.vdb");
+#endif // OPENVDB_USE_DELAYED_LOADING
     }
 
     { // test multi-buffer IO with varying attribute storage per-leaf

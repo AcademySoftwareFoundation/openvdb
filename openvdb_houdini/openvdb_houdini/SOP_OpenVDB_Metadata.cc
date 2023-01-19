@@ -156,10 +156,10 @@ Other:\n\
 @overview\n\
 \n\
 This node allows one to create and edit\n\
-[metadata|https://academysoftwarefoundation.github.io/openvdb/codeExamples.html#sHandlingMetadata]\n\
+[metadata|https://www.openvdb.org/documentation/doxygen/codeExamples.html#sHandlingMetadata]\n\
 attached to a VDB volume.\n\
 Some standard VDB metadata, such as the\n\
-[grid class|https://academysoftwarefoundation.github.io/openvdb/overview.html#secGrid],\n\
+[grid class|https://www.openvdb.org/documentation/doxygen/overview.html#secGrid],\n\
 is exposed via intrinsic attributes on the primitive and can be viewed\n\
 and in some cases edited either from the [geometry spreadsheet|/ref/panes/geosheet]\n\
 or with the [Node:sop/attribcreate] node, but changes to attribute values\n\

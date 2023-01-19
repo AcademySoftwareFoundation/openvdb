@@ -54,6 +54,7 @@ public:
     /// @details The file does not necessarily exist on disk yet.
     const std::string& filename() const;
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     /// @brief Open the file, read the file header and the file-level metadata,
     /// and populate the grid descriptors, but do not load any grids into memory.
     /// @details If @a delayLoad is true, map the file into memory and enable delayed loading
@@ -64,6 +65,9 @@ public:
     /// @return @c true if the file's UUID has changed since it was last read.
     /// @see setCopyMaxBytes
     bool open(bool delayLoad = true, const MappedFile::Notifier& = MappedFile::Notifier());
+#else
+    bool open(bool /*delayLoad*/ = false);
+#endif
 
     /// Return @c true if the file has been opened for reading.
     bool isOpen() const;
@@ -75,6 +79,7 @@ public:
     /// @throw IoError if the file size cannot be determined.
     Index64 getSize() const;
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     /// @brief Return the size in bytes above which this file will not be
     /// automatically copied during delayed loading.
     Index64 copyMaxBytes() const;
@@ -90,6 +95,7 @@ public:
     /// by setting the environment variable @c OPENVDB_DELAYED_LOAD_COPY_MAX_BYTES
     /// to the desired number of bytes.
     void setCopyMaxBytes(Index64 bytes);
+#endif
 
     /// Return @c true if a grid of the given name exists in this file.
     bool hasGrid(const Name&) const;
@@ -130,7 +136,7 @@ public:
 
     /// A const iterator that iterates over all names in the file. This is only
     /// valid once the file has been opened.
-    class NameIterator
+    class OPENVDB_API NameIterator
     {
     public:
         NameIterator(const NameMapCIter& iter): mIter(iter) {}

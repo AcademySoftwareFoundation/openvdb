@@ -17,27 +17,6 @@
 
 #include <iomanip>// for std::setfill and std::setw
 
-
-// Convenience function for checking CUDA runtime API results
-// can be wrapped around any runtime API call. No-op in release builds.
-#define cudaCheck(ans) \
-    { \
-        gpuAssert((ans), __FILE__, __LINE__); \
-    }
-
-static inline bool gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
-{
-#if defined(DEBUG) || defined(_DEBUG)
-    if (code != cudaSuccess) {
-        fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort)
-            exit(code);
-        return false;
-    }
-#endif
-    return true;
-}
-
 extern "C" float launch_kernels(const nanovdb::DenseGridHandle<nanovdb::CudaDeviceBuffer>&,
                                nanovdb::ImageHandle<nanovdb::CudaDeviceBuffer>&,
                                const nanovdb::Camera<float>*,

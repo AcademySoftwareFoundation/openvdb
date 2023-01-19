@@ -34,8 +34,8 @@
 
 #include <openvdb/openvdb.h>
 
-#include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointMask.h>
+#include "PointDataGrid.h"
+#include "PointMask.h"
 
 #include <tbb/concurrent_vector.h>
 

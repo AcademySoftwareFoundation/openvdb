@@ -34,23 +34,9 @@ public:
     using MyBase = Mat<3, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     /// @note destructor, copy constructor, assignment operator and
     ///   move constructor are left to be defined by the compiler (default)
     Mat3() = default;
-#else
-    Mat3() {}
-
-    /// Copy constructor
-    Mat3(const Mat<3, T> &m)
-    {
-        for (int i=0; i<3; ++i) {
-            for (int j=0; j<3; ++j) {
-                MyBase::mm[i*3 + j] = m[i][j];
-            }
-        }
-    }
-#endif
 
     /// Constructor given the quaternion rotation, e.g.    Mat3f m(q);
     /// The quaternion is normalized and used to construct the matrix
@@ -848,10 +834,8 @@ using Mat3s = Mat3<float>;
 using Mat3d = Mat3<double>;
 using Mat3f = Mat3d;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
 OPENVDB_IS_POD(Mat3s)
 OPENVDB_IS_POD(Mat3d)
-#endif
 
 } // namespace math
 

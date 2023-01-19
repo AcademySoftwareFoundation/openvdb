@@ -78,7 +78,7 @@ namespace tools {
 /// {
 ///     VectorGrid grid = ...;
 ///     tools::foreach(grid.beginValueOn(),
-///         MatMul(math::rotation<math::Mat3s>(math::Y, M_PI_4)));
+///         MatMul(math::rotation<math::Mat3s>(math::Y, openvdb::math::pi<double>()/4.0)));
 /// }
 /// @endcode
 ///
@@ -139,12 +139,10 @@ inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
 
-#ifndef _MSC_VER
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     const XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
-#endif
 
 
 /// Iterate over a grid and at each step call @c op(iter).  If threading is enabled,
@@ -602,7 +600,6 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
     }
 }
 
-#ifndef _MSC_VER
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void
 transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
@@ -615,7 +612,6 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
     Processor proc(inIter, Adapter::tree(outGrid), op, merge);
     proc.process(threaded);
 }
-#endif
 
 
 ////////////////////////////////////////

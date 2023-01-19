@@ -45,9 +45,6 @@ TEST_F(TestInit, test)
     EXPECT_TRUE(DoubleGrid::isRegistered());
     EXPECT_TRUE(Int32Grid::isRegistered());
     EXPECT_TRUE(Int64Grid::isRegistered());
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    EXPECT_TRUE(StringGrid::isRegistered());
-OPENVDB_NO_DEPRECATION_WARNING_END
     EXPECT_TRUE(Vec3IGrid::isRegistered());
     EXPECT_TRUE(Vec3SGrid::isRegistered());
     EXPECT_TRUE(Vec3DGrid::isRegistered());
@@ -78,9 +75,6 @@ OPENVDB_NO_DEPRECATION_WARNING_END
     EXPECT_TRUE(!DoubleGrid::isRegistered());
     EXPECT_TRUE(!Int32Grid::isRegistered());
     EXPECT_TRUE(!Int64Grid::isRegistered());
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    EXPECT_TRUE(!StringGrid::isRegistered());
-OPENVDB_NO_DEPRECATION_WARNING_END
     EXPECT_TRUE(!Vec3IGrid::isRegistered());
     EXPECT_TRUE(!Vec3SGrid::isRegistered());
     EXPECT_TRUE(!Vec3DGrid::isRegistered());

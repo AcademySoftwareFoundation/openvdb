@@ -1,0 +1,18 @@
+Attribute: b, type: float
+  Index        : 0
+  Reads From   : true
+  Writes To    : false
+  Dependencies : 0
+  Usage : 1
+    Attribute: a type: float
+
+Attribute: a, type: float
+  Index        : 1
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 2
+    Attribute: a type: float
+    Attribute: b type: float
+  Usage : 1
+    Attribute: a type: float
+

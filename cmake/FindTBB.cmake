@@ -93,7 +93,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 
@@ -162,51 +162,70 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Look for a standard tbb header file.
-find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
+if(NOT Tbb_INCLUDE_DIR)
+  # Look for a legacy tbb header file.
+  find_path(Tbb_LEGACY_INCLUDE_DIR tbb/tbb_stddef.h
+    ${_FIND_TBB_ADDITIONAL_OPTIONS}
+    PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
+    PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
+  )
+else()
+  set(Tbb_LEGACY_INCLUDE_DIR ${Tbb_INCLUDE_DIR})
+endif()
+
+# Look for a new tbb header installation
+# From TBB 2021, tbb_stddef is removed and the directory include/tbb is
+# simply an alias for include/oneapi/tbb. Try and find the version header
+# in oneapi/tbb
+find_path(Tbb_INCLUDE_DIR oneapi/tbb/version.h
   ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
-set(_tbb_version_file "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h")
+set(_tbb_legacy_version_file "${Tbb_LEGACY_INCLUDE_DIR}/tbb/tbb_stddef.h")
+set(_tbb_version_file "${Tbb_INCLUDE_DIR}/oneapi/tbb/version.h")
 
-if(NOT EXISTS ${_tbb_version_file})
-  # From TBB 2021, tbb_stddef is removed and the directory include/tbb is
-  # simply an alias for include/oneapi/tbb. Try and find the version header
-  # in oneapi/tbb
-  find_path(Tbb_INCLUDE_DIR oneapi/tbb/version.h
-    ${_FIND_TBB_ADDITIONAL_OPTIONS}
-    PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
-    PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
-  )
-  set(_tbb_version_file "${Tbb_INCLUDE_DIR}/oneapi/tbb/version.h")
+if(EXISTS ${_tbb_legacy_version_file})
+  if(EXISTS ${_tbb_version_file})
+    message(WARNING "
+      FindTBB located both an old and new tbb installation.
+          old: ${_tbb_legacy_version_file}
+          new: ${_tbb_version_file}
+      The NEWER versioned installation will be used. You can set TBB_INCLUDEDIR
+      to control FindTBB.cmake search, or explicitly set Tbb_INCLUDE_DIR to the
+      desired location.
+      ")
+  else()
+    set(_tbb_version_file "${_tbb_legacy_version_file}")
+    set(Tbb_INCLUDE_DIR ${Tbb_LEGACY_INCLUDE_DIR} CACHE STRING "" FORCE)
+  endif()
 endif()
 
+
 if(EXISTS ${_tbb_version_file})
-  file(STRINGS ${_tbb_version_file}
-    _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR "
-  )
-  string(REGEX REPLACE "#define TBB_VERSION_MAJOR" ""
-    _tbb_version_major_string "${_tbb_version_major_string}"
-  )
+  file(STRINGS ${_tbb_version_file} _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR " )
+  string(REGEX REPLACE "#define TBB_VERSION_MAJOR" "" _tbb_version_major_string "${_tbb_version_major_string}")
   string(STRIP "${_tbb_version_major_string}" Tbb_VERSION_MAJOR)
 
-  file(STRINGS ${_tbb_version_file}
-     _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR "
-  )
-  string(REGEX REPLACE "#define TBB_VERSION_MINOR" ""
-    _tbb_version_minor_string "${_tbb_version_minor_string}"
-  )
+  file(STRINGS ${_tbb_version_file} _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR ")
+  string(REGEX REPLACE "#define TBB_VERSION_MINOR" "" _tbb_version_minor_string "${_tbb_version_minor_string}")
   string(STRIP "${_tbb_version_minor_string}" Tbb_VERSION_MINOR)
+
+  file(STRINGS ${_tbb_version_file} _tbb_binary_version_string REGEX "#define __TBB_BINARY_VERSION ")
+  string(REGEX REPLACE "#define __TBB_BINARY_VERSION" "" _tbb_binary_version_string "${_tbb_binary_version_string}")
+  string(STRIP "${_tbb_binary_version_string}" Tbb_BINARY_VERSION)
 
   unset(_tbb_version_major_string)
   unset(_tbb_version_minor_string)
+  unset(_tbb_binary_version_string)
 
   set(Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR})
 endif()
 
 unset(_tbb_version_file)
+unset(_tbb_legacy_version_file)
+unset(Tbb_LEGACY_INCLUDE_DIR)
 
 # ------------------------------------------------------------------------
 #  Search for TBB lib DIR
@@ -231,7 +250,7 @@ if(NOT DEFINED TBB_DEBUG_SUFFIX)
 endif()
 set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-if(WIN32)
+if(MSVC)
   if(TBB_USE_STATIC_LIBS)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
   endif()
@@ -255,8 +274,22 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${_TBB_LIB_NAME}
       ${_FIND_TBB_ADDITIONAL_OPTIONS}
       PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
-      PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
-    )
+      PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+
+    # If we didn't find the library, prepend Tbb_BINARY_VERSION to each possible
+    # component name and try again. As of TBB 2021, TBB decides to version some
+    # of its libraries on some of its platforms...
+    if(NOT Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} AND Tbb_BINARY_VERSION)
+      set(_TBB_LIB_NAME "${COMPONENT}${Tbb_BINARY_VERSION}")
+      if(BUILD_TYPE STREQUAL DEBUG)
+        set(_TBB_LIB_NAME "${_TBB_LIB_NAME}${TBB_DEBUG_SUFFIX}")
+      endif()
+
+      find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${_TBB_LIB_NAME}
+        ${_FIND_TBB_ADDITIONAL_OPTIONS}
+        PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
+        PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+    endif()
 
     # On Unix, TBB sometimes uses linker scripts instead of symlinks, so parse the linker script
     # and correct the library name if so
@@ -412,7 +445,8 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     set_target_properties(TBB::${COMPONENT} PROPERTIES
       INTERFACE_COMPILE_OPTIONS "${PC_Tbb_CFLAGS_OTHER}"
       INTERFACE_COMPILE_DEFINITIONS "${Tbb_${COMPONENT}_DEFINITIONS}"
-      INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}")
+      INTERFACE_INCLUDE_DIRECTORIES "${Tbb_INCLUDE_DIR}"
+      INTERFACE_LINK_DIRECTORIES "${Tbb_LIBRARY_DIRS}")
 
     # Standard location
     set_target_properties(TBB::${COMPONENT} PROPERTIES

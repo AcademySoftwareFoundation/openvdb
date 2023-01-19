@@ -783,6 +783,12 @@ GEO_PrimVDB::reverse()
 {
 }
 
+UT_Vector3D
+GEO_PrimVDB::computeNormalD() const
+{
+    return UT_Vector3D(0, 0, 0);
+}
+
 UT_Vector3
 GEO_PrimVDB::computeNormal() const
 {
@@ -3284,7 +3290,7 @@ GEO_PrimVDB::calcPositiveDensity() const
     return density;
 }
 
-int
+bool
 GEO_PrimVDB::getBBox(UT_BoundingBox *bbox) const
 {
     if (hasGrid())
@@ -3736,6 +3742,25 @@ namespace // anonymous
     }
 
 } // namespace anonymous
+
+
+fpreal
+GEO_PrimVDB::backgroundF() const
+{
+    fpreal64            cval = 0;
+    intrinsicBackground(this, &cval, 1);
+    return cval;
+}
+
+UT_Vector3D
+GEO_PrimVDB::backgroundV3() const
+{
+    UT_Vector3D            cval;
+    cval = 0;
+    intrinsicBackground(this, cval.data(), 3);
+    return cval;
+}
+
 
 #define VDB_INTRINSIC_META_STR(CLASS, ID) { \
         struct callbacks { \

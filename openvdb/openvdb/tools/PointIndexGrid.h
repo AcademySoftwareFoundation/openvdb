@@ -16,9 +16,9 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
+#include <openvdb/thread/Threading.h>
 #include <openvdb/version.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Grid.h>
@@ -1427,7 +1427,7 @@ public:
     bool operator!=(const PointIndexLeafNode& other) const { return !(other == *this); }
 
     template<MergePolicy Policy> void merge(const PointIndexLeafNode& rhs) {
-        BaseLeaf::merge<Policy>(rhs);
+        BaseLeaf::template merge<Policy>(rhs);
     }
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive) {
          BaseLeaf::template merge<Policy>(tileValue, tileActive);
@@ -1490,6 +1490,7 @@ public:
 
 
     Index64 memUsage() const;
+    Index64 memUsageIfLoaded() const;
 
 
     ////////////////////////////////////////
@@ -1785,6 +1786,13 @@ inline Index64
 PointIndexLeafNode<T, Log2Dim>::memUsage() const
 {
     return BaseLeaf::memUsage() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointIndexLeafNode<T, Log2Dim>::memUsageIfLoaded() const
+{
+    return BaseLeaf::memUsageIfLoaded() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
 }
 
 } // namespace tools

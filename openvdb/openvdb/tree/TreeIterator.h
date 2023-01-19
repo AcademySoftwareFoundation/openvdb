@@ -661,7 +661,7 @@ public:
 
     /// @brief Return in @a node a pointer to the node over which this iterator is
     /// currently iterating or one of that node's parents, as determined by @a NodeType.
-    /// @return a null pointer if @a NodeType specifies a node at a lower level
+    /// Sets @a node to null pointer if @a NodeType specifies a node at a lower level
     /// of the tree than that given by getLevel().
     template<typename NodeType>
     void getNode(NodeType*& node) const { mValueIterList.getNode(mLevel, node); }

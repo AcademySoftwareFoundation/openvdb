@@ -107,10 +107,10 @@ inline uint64_t reverseEndianness(uint64_t val)
 //        one or more grids.
 // Magic number of NanoVDB files   (uint64_t) |
 // Version numbers of this file    (uint32_t) | one header for each segment
-// Compression mode                (uint16_t) |
 // Number of grids in this segment (uint16_t) |
+// Compression mode                (uint16_t) |
 struct Header
-{
+{// 16 bytes
     uint64_t magic; // 8 bytes
     Version  version;// 4 bytes version numbers
     uint16_t gridCount; // 2 bytes
@@ -142,7 +142,7 @@ struct Header
 // Padding due to 8B alignment     (uint16_t)   |
 // Version number                  (uint32_t)   |
 struct MetaData
-{
+{// 176 bytes
     uint64_t    gridSize, fileSize, nameKey, voxelCount; // 4 * 8 = 32B.
     GridType    gridType;  // 4B.
     GridClass   gridClass; // 4B.
@@ -445,6 +445,8 @@ inline void Segment::add(const GridHandle<BufferT>& h)
         meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<ValueMask>()) {
         meta.emplace_back(h.size(), header.codec, *grid);
+    } else if (auto* grid = h.template grid<ValueIndex>()) {
+        meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<bool>()) {
         meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<Rgba8>()) {
@@ -636,7 +638,7 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
     while (s.read(is)) {
         std::streamoff seek = 0;
         for (auto& m : s.meta) {
-            if (m.nameKey == key && m.gridName == gridName) { // check for hask key collision
+            if (m.nameKey == key && m.gridName == gridName) { // check for hash key collision
                 GridHandle<BufferT> handle(BufferT::create(m.gridSize, &buffer));
                 is.seekg(seek, std::ios_base::cur); // rewind
                 Internal::read(is, handle, s.header.codec);

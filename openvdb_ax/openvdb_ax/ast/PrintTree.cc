@@ -399,7 +399,7 @@ bool PrintVisitor::visit(const ast::AssignExpression* node)
 
 bool PrintVisitor::visit(const ast::Loop* node)
 {
-    mOs << tokens::loopNameFromToken(node->loopType()) <<" "<< node->nodename() << ": " << '\n';
+    mOs << tokens::loopNameFromToken(node->loopType()) <<" "<< node->nodename() << ":" << '\n';
     return true;
 }
 
@@ -414,8 +414,8 @@ bool PrintVisitor::visit(const ast::Crement* node)
     mOs << node->nodename() << ':';
     if (node->post()) mOs << " post-";
     else              mOs << " pre-";
-    if (node->increment()) mOs << "increment ";
-    else                   mOs << "decrement ";
+    if (node->increment()) mOs << "increment";
+    else                   mOs << "decrement";
     mOs << '\n';
     return true;
 }

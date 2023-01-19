@@ -221,7 +221,7 @@ struct MaskInteriorVoxels {
             }
         }
 
-        if (maskNodePt) delete maskNodePt;
+        delete maskNodePt;
     }
 
     LeafNodeType        const * const * const mNodes;
@@ -346,7 +346,7 @@ struct LabelBoundaryVoxels {
             }
         }
 
-        if (maskNodePt) delete maskNodePt;
+        delete maskNodePt;
     }
 
     LeafNodeType        const * const * const mNodes;
@@ -1254,7 +1254,7 @@ struct MaskIsovalueCrossingVoxels
             }
         }
 
-        if (maskNodePt) delete maskNodePt;
+        delete maskNodePt;
     }
 
     void join(MaskIsovalueCrossingVoxels& rhs) {

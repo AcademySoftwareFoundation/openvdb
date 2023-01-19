@@ -1,0 +1,5 @@
+scoped block: 1 statement(s)
+    [0] assignment expression: +=
+        attribute: @(float - inferred) a
+        attribute: @(float - inferred) b
+

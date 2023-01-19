@@ -1,0 +1,98 @@
+{
+        {
+        vec3f v = 0f;
+        for (int32 i = 0; (i < 3); ++i)
+        {
+            v[i] = (i + 1);
+        }
+        vec3f@loop_test1 = v;
+    }
+;
+        {
+        vec3f v = 0f;
+        int32 i = 0;
+        for (; (i < 3); ++i)
+        {
+            v[i] = (i + 1);
+        }
+        vec3f@loop_test2 = v;
+    }
+;
+        {
+        vec3f v = 0f;
+        int32 i = 1;
+        for (int32 i = 0; (i < 3); )
+        {
+            v[i] = (i + 1);
+            i++;
+        }
+        vec3f@loop_test3 = v;
+    }
+;
+        {
+        vec3f v = 0f;
+        for (int32 i = 0; (i < 0); ++i)
+        {
+            v[i] = (i + 1);
+        }
+        vec3f@loop_test15 = v;
+    }
+;
+        {
+        mat3f mat = 0f;
+        for (int32 i = 0; (i < 3); ++i)
+        {
+            for (int32 j = 0; (j < 3); ++j)
+            {
+                mat[i, j] = (((i * 3) + j) + 1);
+            }
+        }
+        mat3f@loop_test18 = mat;
+    }
+;
+        {
+        int32 j = 0;
+        for (int32 i = 0; (i < 3); (++i, ++j))
+        {
+        }
+        int32@loop_test22 = j;
+    }
+;
+        {
+        int32 j = 0;
+        for (int32 i = 5; int32 k = floor((i - 1)); --i)
+        {
+            j++;
+        }
+        int32@loop_test23 = j;
+    }
+;
+        {
+        int32 j = 0;
+        int32 k = 0;
+        int32 l = 1;
+        for (int32 i = 5; ((k != 0), l--); --i)
+        {
+            j++;
+        }
+        int32@loop_test25 = j;
+    }
+;
+        {
+        int32 i = 0;
+        int32 j = 0;
+        for ((i -= 10, j += 4); (i < 10); i += j)
+        {
+            j *= 2;
+            int32@loop_test27 = (i + j);
+        }
+    }
+;
+        {
+        for (int32 i = 0, j = 10; (i < 10); ++i)
+        {
+            int32@loop_test30 = (i + j);
+        }
+    }
+;
+}

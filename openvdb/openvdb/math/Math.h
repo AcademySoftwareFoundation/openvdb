@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cmath>     // for std::ceil(), std::fabs(), std::pow(), std::sqrt(), etc.
 #include <cstdlib>   // for abs(int)
+#include <cstring>   // for memcpy
 #include <random>
 #include <string>
 #include <type_traits> // for std::is_arithmetic
@@ -304,14 +305,12 @@ SmoothUnitStep(Type x, Type min, Type max)
 
 //@{
 /// Return the absolute value of the given quantity.
-inline int32_t Abs(int32_t i) { return abs(i); }
+inline int32_t Abs(int32_t i) { return std::abs(i); }
 inline int64_t Abs(int64_t i)
 {
-#ifdef _MSC_VER
-    return (i < int64_t(0) ? -i : i);
-#else
-    return labs(i);
-#endif
+    static_assert(sizeof(decltype(std::abs(i))) == sizeof(int64_t),
+                  "std::abs(int64) broken");
+    return std::abs(i);
 }
 inline float Abs(float x) { return std::fabs(x); }
 inline double Abs(double x) { return std::fabs(x); }
@@ -476,27 +475,25 @@ isRelOrApproxEqual(const bool& a, const bool& b, const bool&, const bool&)
     return (a == b);
 }
 
-
-// Avoid strict aliasing issues by using type punning
-// http://cellperformance.beyond3d.com/articles/2006/06/understanding-strict-aliasing.html
-// Using "casting through a union(2)"
 inline int32_t
-floatToInt32(const float aFloatValue)
+floatToInt32(const float f)
 {
-    union FloatOrInt32 { float floatValue; int32_t int32Value; };
-    const FloatOrInt32* foi = reinterpret_cast<const FloatOrInt32*>(&aFloatValue);
-    return foi->int32Value;
+    // switch to std:bit_cast in C++20
+    static_assert(sizeof(int32_t) == sizeof f, "`float` has an unexpected size.");
+    int32_t ret;
+    std::memcpy(&ret, &f, sizeof(int32_t));
+    return ret;
 }
-
 
 inline int64_t
-doubleToInt64(const double aDoubleValue)
+doubleToInt64(const double d)
 {
-    union DoubleOrInt64 { double doubleValue; int64_t int64Value; };
-    const DoubleOrInt64* dol = reinterpret_cast<const DoubleOrInt64*>(&aDoubleValue);
-    return dol->int64Value;
+    // switch to std:bit_cast in C++20
+    static_assert(sizeof(int64_t) == sizeof d, "`double` has an unexpected size.");
+    int64_t ret;
+    std::memcpy(&ret, &d, sizeof(int64_t));
+    return ret;
 }
-
 
 // aUnitsInLastPlace is the allowed difference between the least significant digits
 // of the numbers' floating point representation
@@ -517,7 +514,7 @@ isUlpsEqual(const double aLeft, const double aRight, const int64_t aUnitsInLastP
         longRight = INT64_C(0x8000000000000000) - longRight;
     }
 
-    int64_t difference = labs(longLeft - longRight);
+    int64_t difference = Abs(longLeft - longRight);
     return (difference <= aUnitsInLastPlace);
 }
 
@@ -536,7 +533,7 @@ isUlpsEqual(const float aLeft, const float aRight, const int32_t aUnitsInLastPla
         intRight = 0x80000000 - intRight;
     }
 
-    int32_t difference = abs(intLeft - intRight);
+    int32_t difference = Abs(intLeft - intRight);
     return (difference <= aUnitsInLastPlace);
 }
 
@@ -872,7 +869,7 @@ template<typename Type>
 inline Type
 Truncate(Type x, unsigned int digits)
 {
-    Type tenth = Pow(10,digits);
+    Type tenth = static_cast<Type>(Pow(size_t(10), digits));
     return RoundDown(x*tenth+0.5)/tenth;
 }
 
@@ -925,40 +922,36 @@ struct promote {
     using type = typename boost::numeric::conversion_traits<S, T>::supertype;
 };
 
-
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
-/// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and smaller than the
-/// third component, the largest index of the two is always returned.
-/// If all three vector components are equal the largest index, i.e. 2, is
-/// returned. In other words the return value corresponds to the largest index
-/// of the of the smallest vector components.
+/// @note This methods assumes operator[] exists.
+/// @details The return value corresponds to the largest index of the of
+/// the smallest vector components.
 template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
 {
-    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
-    const size_t hashKey =
-        ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
-    return hashTable[hashKey];
+    size_t r = 0;
+    for (size_t i = 1; i < 3; ++i) {
+        // largest index (backwards compatibility)
+        if (v[i] <= v[r]) r = i;
+    }
+    return r;
 }
 
-
 /// @brief Return the index [0,1,2] of the largest value in a 3D vector.
-/// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and larger than the
-/// third component, the largest index of the two is always returned.
-/// If all three vector components are equal the largest index, i.e. 2, is
-/// returned. In other words the return value corresponds to the largest index
-/// of the largest vector components.
+/// @note This methods assumes operator[] exists.
+/// @details The return value corresponds to the largest index of the of
+/// the largest vector components.
 template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)
 {
-    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
-    const size_t hashKey =
-        ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
-    return hashTable[hashKey];
+    size_t r = 0;
+    for (size_t i = 1; i < 3; ++i) {
+        // largest index (backwards compatibility)
+        if (v[i] >= v[r]) r = i;
+    }
+    return r;
 }
 
 } // namespace math

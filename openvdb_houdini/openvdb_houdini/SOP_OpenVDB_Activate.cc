@@ -19,7 +19,10 @@
   #include "SOP_NodeVDB.h"
 #endif
 
+#include <UT/UT_Version.h>
+#include <GEO/GEO_PrimVolume.h>
 #include <GU/GU_PrimVDB.h>
+#include <GU/GU_ConvexHull3D.h>
 #include <OP/OP_Node.h>
 #include <OP/OP_Operator.h>
 #include <OP/OP_OperatorTable.h>
@@ -269,6 +272,36 @@ not aligned.
 If turned off, the bounding box of the chosen primitives are used
 instead and activated as if they were specified as World Positions.)"));
 
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "usehull", "Activate Using Convex Hull")
+                .setDefault(PRMzeroDefaults)
+                .setTooltip("If turned on, activate with convex hull of points.")
+                .setDocumentation(
+R"(If turned on, only convex hull fo points are used for activation.)"));
+    parms.add(hutil::ParmFactory(PRM_STRING, "boundptgroup", "Convex Hull Group")
+              .setChoiceList(&SOP_Node::pointGroupMenu)
+              .setSpareData(SOP_Node::getGroupSelectButton(GA_GROUP_POINT,
+                    nullptr, 1, &SOP_Node::theSecondInput))
+              .setTooltip("Points of the second input contribute to the convex hull computation.")
+              .setDocumentation(
+R"(Which points of the second input contribute to the convex hull
+computation.)"));
+    parms.add(hutil::ParmFactory(PRM_FLT, "voxeloffset", "Voxel Offset")
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, -10.0f, PRM_RANGE_UI, 10.0f)
+              .setTooltip("Expand the convex hull by this number of voxels.")
+              .setDocumentation(
+R"(Expand the convex hull by the specified number of voxels.)"));
+    parms.add(hutil::ParmFactory(PRM_FLT, "worldoffset", "World Offset")
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, -1.0f, PRM_RANGE_UI, 1.0f)
+              .setTooltip("Expand the convex hull by this distance.")
+              .setDocumentation(
+R"(Expand the convex hull by the specified distance.)"));
+#endif
+
+
+
     parms.addFolder("Deactivate");
 /*
     Any voxels that have the background value will be deactivated.  This
@@ -334,8 +367,8 @@ inactive.)"));
         .addOptionalInput("Bounds to Activate")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_VDBActivate::Cache; })
         .setDocumentation(
-R"(#icon: COMMON/openvdb
-#tags: vdb
+R"(#icon: COMMON/openvdb)"
+R"(#tags: vdb
 
 = OpenVDB Activate =
 
@@ -382,6 +415,14 @@ SOP_VDBActivate::updateParmsFlags()
     int changed = 0;
     changed += enableParm("boundgroup", has_bounds);
     changed += enableParm("usevdb", has_bounds);
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+    bool usevdb = evalInt("usevdb", 0, 0.0f);
+    bool usehull = evalInt("usehull", 0, 0.0f);
+    changed += enableParm("usehull", has_bounds && !usevdb);
+    changed += enableParm("boundptgroup", has_bounds && !usevdb && usehull);
+    changed += enableParm("worldoffset", has_bounds && !usevdb && usehull);
+    changed += enableParm("voxeloffset", has_bounds && !usevdb && usehull);
+#endif
 
     changed += enableParm("operation", regionusesvalue);
     // Only union supports writing values.
@@ -467,40 +508,480 @@ sopDeactivate(GridType &grid, double tolerance)
     openvdb::tools::deactivate(grid.tree(), grid.background(), static_cast<ValueT>(value));
 }
 
+template <typename TreeT>
+class sop_FillSDFOp
+{
+public:
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
+
+    sop_FillSDFOp(ValueT bg)
+    : myNegBackground(-bg)
+    {
+    }
+
+    // Process roots
+    bool operator()(RootT&, size_t) const
+    { return true; }
+
+    // Process internal nodes.
+    template <typename NodeT>
+    bool operator()(NodeT &node, size_t idx) const
+    {
+        using ChildT = typename NodeT::ChildNodeType;
+
+        for (auto iter = node.beginChildAll(); iter; ++iter)
+        {
+            typename NodeT::ChildNodeType    *child;
+            ValueT               value;
+            if (iter.getItem(iter.pos(), child, value))
+            {
+                // Dense tile, recurse.
+            }
+            else
+            {
+                UT_ASSERT(!child);
+
+                // Constant tile
+                // If value is outside, we are unchanged.
+                if (value >= 0)
+                    continue;
+
+                // Inside, activate!
+                node.addTile(iter.pos(), myNegBackground, /*active=*/true);
+            }
+        }
+
+        // Proceed to sub tiles...
+        return true;
+    }
+
+    bool operator()(LeafT &node, size_t idx) const
+    {
+        ValueT         dist;
+
+        for (openvdb::Index offset = 0; offset < LeafT::NUM_VALUES; offset++)
+        {
+            if (!node.probeValue(offset, dist))
+            {
+                // Inactive voxel, if inside set to background
+                if (dist < 0)
+                {
+                    node.setValueOn(offset, myNegBackground);
+                }
+            }
+        }
+        return true;
+    }
+
+private:
+    ValueT      myNegBackground;
+};
+
 
 template <typename GridType>
 static void
 sopFillSDF(GridType &grid, int dummy)
 {
-    typename GridType::Accessor         access = grid.getAccessor();
-    typedef typename GridType::ValueType ValueT;
+    using TreeT = typename GridType::TreeType;
 
-    ValueT              value;
-    UT_Interrupt        *boss = UTgetInterrupt();
-    ValueT              background = grid.background();
+    sop_FillSDFOp<TreeT> gridop(grid.background());
+    openvdb::tree::DynamicNodeManager<TreeT> nodes(grid.tree());
+    nodes.foreachTopDown(gridop);
+}
 
-    for (typename GridType::ValueOffCIter
-         iter = grid.cbeginValueOff(); iter; ++iter)
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+template <typename TreeT>
+class sop_ConvexHullOp
+{
+public:
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
+
+    sop_ConvexHullOp(const GU_ConvexHullHalfPlanesF &hull,
+                    GEO_PrimVDB::ActivateOperation op,
+                    ValueT value,
+                    ValueT bg)
+    : myHull(hull)
+    , myOp(op)
+    , myValue(value)
+    , myBackground(bg)
     {
-        if (boss->opInterrupt())
-            break;
+    }
 
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
+    // Process roots
+    bool operator()(RootT&, size_t) const
+    { return true; }
 
-        // Assuming the SDF is at all well-formed, any crossing
-        // of sign must have a crossing of inactive->active.
-        openvdb::Coord coord(bbox.min().x(), bbox.min().y(), bbox.min().z());
+    // Process internal nodes.
+    template <typename NodeT>
+    bool operator()(NodeT &node, size_t idx) const
+    {
+        using ChildT = typename NodeT::ChildNodeType;
 
-        // We do not care about the active state as it is hopefully inactive
-        access.probeValue(coord, value);
-
-        if (value < 0)
+        // Check if entire node is rejected
+        auto coordbbox = node.getNodeBoundingBox();
+        auto bbox = UTvdbConvert(coordbbox);
+        if (myHull.contains(bbox))
         {
-            // Fill the region to negative background.
-            grid.fill(bbox, -background, /*active=*/true);
+            // Fully inside.
+            // Intersection: Do nothing.
+            // Subtract: Deactivate
+            // Union: Activate
+            // Copy: Activate
+            switch (myOp)
+            {
+                case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    break;
+                case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                    node = NodeT(node.origin(), myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_UNION:
+                case GEO_PrimVDB::ACTIVATE_COPY:
+                    node = NodeT(node.origin(), myValue, /*active=*/true);
+                    break;
+            }
+            return false;
+        }
+
+        if (myHull.excludes(bbox))
+        {
+            // Fully outside.
+            // Intersection: Deactivate & outside
+            // Copy: Deactivate & outside
+            // Difference: Do nothing
+            // Union: Do nothing
+            switch (myOp)
+            {
+                case GEO_PrimVDB::ACTIVATE_COPY:
+                case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    node = NodeT(node.origin(), myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                case GEO_PrimVDB::ACTIVATE_UNION:
+                    break;
+            }
+            return false;
+        }
+
+        for (auto iter = node.beginChildAll(); iter; ++iter)
+        {
+            typename NodeT::ChildNodeType    *child;
+            ValueT               value;
+
+            iter.getItem(iter.pos(), child, value);
+
+            if (!child) // Tile
+            {
+                // We may have nothing to do with this tile if our operation
+                // cannot change it.
+                bool    isactive = node.isValueMaskOn(iter.pos());
+                switch (myOp)
+                {
+                    case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                        // Inactive tiles cannot change.
+                        if (!isactive)
+                            continue;
+                        break;
+                    case GEO_PrimVDB::ACTIVATE_UNION:
+                        // Active tiles can still change as we have
+                        // to set the value.
+                        if (isactive && value == myValue)
+                            continue;
+                        break;
+                    case GEO_PrimVDB::ACTIVATE_COPY:
+                        // All tiles may change under copy.
+                        break;
+                }
+            }
+
+            // Check for culling of the entire child, whether it is a tile
+            // or a dense node.
+            const openvdb::Coord xyz(node.offsetToGlobalCoord(iter.pos()));
+            openvdb::CoordBBox vdbtilebbox(xyz, xyz.offsetBy(ChildT::DIM-1));
+            auto tilebbox = UTvdbConvert(vdbtilebbox);
+
+            if (myHull.contains(tilebbox))
+            {
+                // Fully inside.
+                // Intersection: Do nothing.
+                // Subtract: Deactivate
+                // Union: Activate
+                // Copy: Activate
+                switch (myOp)
+                {
+                    case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                        break;
+                    case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                        node.addTile(iter.pos(), myBackground, /*active*/false);
+                        break;
+                    case GEO_PrimVDB::ACTIVATE_UNION:
+                    case GEO_PrimVDB::ACTIVATE_COPY:
+                        node.addTile(iter.pos(), myValue, /*active*/true);
+                        break;
+                }
+                continue;
+            }
+
+            if (myHull.excludes(tilebbox))
+            {
+                // Fully outside.
+                // Intersection: Deactivate & outside
+                // Copy: Deactivate & outside
+                // Difference: Do nothing
+                // Union: Do nothing
+                switch (myOp)
+                {
+                    case GEO_PrimVDB::ACTIVATE_COPY:
+                    case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                        node.addTile(iter.pos(), myBackground, /*active*/false);
+                        break;
+                    case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                    case GEO_PrimVDB::ACTIVATE_UNION:
+                        break;
+                }
+                continue;
+            }
+
+            // We've hit none of the early exit, so we want to process
+            // this tile.  But if it is a constant tile, we have to
+            // densify it first.
+            if (!child)
+            {
+                // We are in the grey-zone so have to densify.
+                auto *newchild = new ChildT(xyz, value, node.isValueMaskOn(iter.pos()));
+                node.addChild(newchild);
+            }
+        }
+
+        // Proceed to sub tiles...
+        return true;
+    }
+
+    template <GEO_PrimVDB::ActivateOperation Op>
+    void doLeaf(const UT_Array<int> &activeplanes, LeafT &node, const openvdb::CoordBBox &coordbbox) const
+    {
+        openvdb::Index offset = 0;
+        for (int x = coordbbox.min().x(); x <= coordbbox.max().x(); x++)
+            for (int y = coordbbox.min().y(); y <= coordbbox.max().y(); y++)
+                for (int z = coordbbox.min().z(); z <= coordbbox.max().z(); z++)
+                {
+                    float dist = myHull.distance(activeplanes, UT_Vector3(x, y, z), 0.001);
+
+                    if (dist < 0)
+                    {
+                        // Inside.
+                        switch (Op)
+                        {
+                            case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                                break;
+                            case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                                node.setValueOff(offset, myBackground);
+                                break;
+                            case GEO_PrimVDB::ACTIVATE_COPY:
+                            case GEO_PrimVDB::ACTIVATE_UNION:
+                                node.setValueOn(offset, myValue);
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        // Outside.
+                        switch (Op)
+                        {
+                            case GEO_PrimVDB::ACTIVATE_UNION:
+                            case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                                break;
+                            case GEO_PrimVDB::ACTIVATE_COPY:
+                            case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                                node.setValueOff(offset, myBackground);
+                                break;
+                        }
+                    }
+                    offset++;
+                }
+    }
+
+
+    bool operator()(LeafT &node, size_t idx) const
+    {
+        auto coordbbox = node.getNodeBoundingBox();
+        auto bbox = UTvdbConvert(coordbbox);
+        if (myHull.contains(bbox))
+        {
+            // Fully inside.
+            // Union: Activate & Inside
+            // Copy: Activate & Inside
+            // Intersection: Do nothing.
+            // Difference: Deactivate & Outside.
+            switch (myOp)
+            {
+                case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    break;
+                case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                    node.fill(myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_UNION:
+                case GEO_PrimVDB::ACTIVATE_COPY:
+                    node.fill(myValue, /*active=*/true);
+                    break;
+            }
+            return false;
+        }
+
+        if (myHull.excludes(bbox))
+        {
+            // Fully outside.
+            // Intersection: Deactivate & outside
+            // Copy: Deactivate & outside
+            // Difference: Do nothing
+            // Union: Do nothing
+            switch (myOp)
+            {
+                case GEO_PrimVDB::ACTIVATE_COPY:
+                case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    node.fill(myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                case GEO_PrimVDB::ACTIVATE_UNION:
+                    break;
+            }
+            return false;
+        }
+
+        UT_SmallArray<int>      activeplanes;
+        bool inside = myHull.findActivePlanes(
+                activeplanes,
+                UT_Vector3( 0.5 * (coordbbox.max().x() + coordbbox.min().x()),
+                            0.5 * (coordbbox.max().y() + coordbbox.min().y()),
+                            0.5 * (coordbbox.max().z() + coordbbox.min().z()) ),
+                sqrt(3) * (LeafT::DIM / 2) * 1.01);
+
+        // Usually if  the active planes aren't set we should have
+        // culled with the first earlier bbox tests, but in case things
+        // fall in the cracks...
+        if (!activeplanes.entries())
+        {
+            switch (myOp)
+            {
+                case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                    if (!inside)
+                        node.fill(myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                    if (inside)
+                        node.fill(myBackground, /*active=*/false);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_UNION:
+                    if (inside)
+                        node.fill(myValue, /*active=*/true);
+                    break;
+                case GEO_PrimVDB::ACTIVATE_COPY:
+                    node.fill(inside ? myValue : myBackground, /*active=*/inside);
+                    break;
+            }
+            return false;
+        }
+
+        switch (myOp)
+        {
+            case GEO_PrimVDB::ACTIVATE_COPY:
+                doLeaf<GEO_PrimVDB::ACTIVATE_COPY>(activeplanes, node, coordbbox);
+                break;
+            case GEO_PrimVDB::ACTIVATE_UNION:
+                doLeaf<GEO_PrimVDB::ACTIVATE_UNION>(activeplanes, node, coordbbox);
+                break;
+            case GEO_PrimVDB::ACTIVATE_INTERSECT:
+                doLeaf<GEO_PrimVDB::ACTIVATE_INTERSECT>(activeplanes, node, coordbbox);
+                break;
+            case GEO_PrimVDB::ACTIVATE_SUBTRACT:
+                doLeaf<GEO_PrimVDB::ACTIVATE_SUBTRACT>(activeplanes, node, coordbbox);
+                break;
+        }
+
+        return true;
+    }
+
+private:
+    GEO_PrimVDB::ActivateOperation myOp;
+    const GU_ConvexHullHalfPlanesF &myHull;
+    ValueT      myValue, myBackground;
+};
+
+template <typename GridType>
+static void
+sopConvexHull(GridType& grid, const GU_ConvexHullHalfPlanesF &hull,
+        GEO_PrimVDB::ActivateOperation op,
+        bool setvalue, fpreal floatvalue,
+        const UT_BoundingBoxF &hullbbox)
+{
+    using ValueT = typename GridType::ValueType;
+    using TreeT = typename GridType::TreeType;
+    using RootT = typename TreeT::RootNodeType;
+
+    if (!setvalue && op == GEO_PrimVDB::ACTIVATE_COPY)
+    {
+        sopConvexHull(grid, hull, GEO_PrimVDB::ACTIVATE_INTERSECT,
+                setvalue, floatvalue, hullbbox);
+        sopConvexHull(grid, hull, GEO_PrimVDB::ACTIVATE_UNION,
+                setvalue, floatvalue, hullbbox);
+        return;
+    }
+
+    if (!setvalue && op == GEO_PrimVDB::ACTIVATE_UNION)
+    {
+        openvdb::MaskGrid       mask(false);
+        sopConvexHull(mask, hull, op, true, 1, hullbbox);
+        grid.topologyUnion(mask);
+        return;
+    }
+
+    // We need to touch all the top-level root nodes that might be hit.
+    if (op == GEO_PrimVDB::ACTIVATE_COPY || op == GEO_PrimVDB::ACTIVATE_UNION)
+    {
+        const int shift = RootT::ChildNodeType::TOTAL;
+
+        for (int x = (int(SYSfloor(hullbbox.xmin())) >> shift);
+                 x <= (int(SYSceil(hullbbox.xmax())) >> shift);
+                 x++)
+        {
+            for (int y = (int(SYSfloor(hullbbox.ymin())) >> shift);
+                     y <= (int(SYSceil(hullbbox.ymax())) >> shift);
+                     y++)
+            {
+                for (int z = (int(SYSfloor(hullbbox.zmin())) >> shift);
+                         z <= (int(SYSceil(hullbbox.zmax())) >> shift);
+                         z++)
+                {
+                    openvdb::Coord      idx(x << shift, y << shift, z << shift);
+                    if (grid.tree().root().getValueDepth(idx) < 0)
+                    {
+                        // This root node is implicit background so
+                        // need to densify.
+                        // We are in the grey-zone so have to densify.
+                        auto *child = new typename RootT::ChildNodeType(idx, grid.background(), false);
+                        grid.tree().root().addChild(child);
+                    }
+
+                }
+            }
         }
     }
+
+
+    // This ugly construction avoids compiler warnings when,
+    // for example, initializing an openvdb::Vec3i with a double.
+    ValueT      value = ValueT(openvdb::zeroVal<ValueT>() + floatvalue);
+
+    sop_ConvexHullOp<TreeT> gridop(hull, op, value, grid.background());
+    openvdb::tree::DynamicNodeManager<TreeT> nodes(grid.tree());
+    nodes.foreachTopDown(gridop);
 }
+#endif
+
 
 template <typename GridType>
 static void
@@ -604,7 +1085,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
         GA_FOR_ALL_GROUP_PRIMITIVES(gdp, group, prim)
         {
             if (!(prim->getPrimitiveId() & GEO_PrimTypeCompat::GEOPRIMVDB))
-                break;
+                continue;
 
             GEO_PrimVDB *vdb = UTverify_cast<GEO_PrimVDB *>(prim);
             vdb->makeGridUnique();
@@ -618,18 +1099,41 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                 {
                     if (bounds_src)
                     {
-                        UT_String       boundgroupname;
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+                        UT_StringHolder      boundgroupname, boundptgroupname;
+#else
+                        UT_String            boundgroupname;
+#endif
 
                         evalString(boundgroupname, "boundgroup", 0, t);
                         const GA_PrimitiveGroup *boundgroup = 0;
 
-                        if (boundgroupname.isstring())
+                        bool                usevdb = evalInt("usevdb", 0, t);
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+                        bool                usehull = evalInt("usehull", 0, t);
+#else
+                        bool                usehull = false;
+#endif
+
+                        if ((usevdb || !usehull) && boundgroupname.isstring())
                         {
                             bool        success;
                             boundgroup = gop.parseOrderedPrimitiveDetached((const char *) boundgroupname, bounds_src, true, success);
                             if (!success)
                                 addWarning(SOP_ERR_BADGROUP, boundgroupname);
                         }
+
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+                        evalString(boundptgroupname, "boundptgroup", 0, t);
+                        const GA_PointGroup *boundptgroup = 0;
+                        if ((!usevdb && usehull) && boundptgroupname.isstring())
+                        {
+                            bool        success;
+                            boundptgroup = gop.parsePointDetached((const char *) boundptgroupname, bounds_src, true, success);
+                            if (!success)
+                                addWarning(SOP_ERR_BADGROUP, boundptgroupname);
+                        }
+#endif
 
                         if (evalInt("usevdb", 0, t))
                         {
@@ -656,6 +1160,39 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                                 addWarning(SOP_MESSAGE, "No VDB primitives found in second input");
                             }
                         }
+#if UT_VERSION_INT >= 0x13050000        // 19.5 or later
+                        else if (evalInt("usehull", 0, t))
+                        {
+                            UT_Vector3DArray    poses;
+                            UT_BoundingBoxF     hullbbox;
+                            float               voxelsize = vdb->getVoxelSize().maxComponent();
+
+                            GEO_PrimVolumeXform index_xform = vdb->getIndexSpaceTransform();
+                            GA_Offset           ptoff;
+                            hullbbox.initBounds();
+                            GA_FOR_ALL_GROUP_PTOFF(bounds_src, boundptgroup, ptoff)
+                            {
+                                UT_Vector3D     pos = bounds_src->getPos3D(ptoff);
+                                pos = index_xform.toVoxelSpace(pos) - 0.5;
+                                poses.append(pos);
+                                hullbbox.enlargeBounds(
+                                    pos.x(),
+                                    pos.y(),
+                                    pos.z());
+                            }
+                            GU_ConvexHullHalfPlanesF    hull(poses);
+                            hull.applyOffset(evalFloat("worldoffset", 0, t) / voxelsize + evalFloat("voxeloffset", 0, t));
+
+                            UTvdbCallAllTopology(vdb->getStorageType(),
+                                             sopConvexHull,
+                                             vdb->getGrid(),
+                                             hull,
+                                             sopXlateOperation(OPERATION(t)),
+                                             evalInt("setvalue", 0, t),
+                                             evalFloat("value", 0, t),
+                                             hullbbox);
+                        }
+#endif
                         else
                         {
                             // Activate by bounding box.

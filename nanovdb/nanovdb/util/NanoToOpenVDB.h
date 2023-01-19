@@ -22,15 +22,36 @@
 #ifndef NANOVDB_NANOTOOPENVDB_H_HAS_BEEN_INCLUDED
 #define NANOVDB_NANOTOOPENVDB_H_HAS_BEEN_INCLUDED
 
-namespace nanovdb {
+template<typename T>
+struct ConvertTrait {using Type = T;};
 
 template<typename T>
-struct ConvertTrait;
+struct ConvertTrait<nanovdb::Vec3<T>> {using Type = openvdb::math::Vec3<T>;};
+
+template<typename T>
+struct ConvertTrait<nanovdb::Vec4<T>> {using Type = openvdb::math::Vec4<T>;};
+
+template<>
+struct ConvertTrait<nanovdb::Fp4> {using Type = float;};
+
+template<>
+struct ConvertTrait<nanovdb::Fp8> {using Type = float;};
+
+template<>
+struct ConvertTrait<nanovdb::Fp16> {using Type = float;};
+
+template<>
+struct ConvertTrait<nanovdb::FpN> {using Type = float;};
+
+template<>
+struct ConvertTrait<nanovdb::ValueMask> {using Type = openvdb::ValueMask;};
+
+namespace nanovdb {
 
 /// @brief Forward declaration of free-standing function that de-serializes a typed NanoVDB grid into an OpenVDB Grid
-template<typename ValueT>
-typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<ValueT>::Type>::Type>::Ptr
-nanoToOpenVDB(const NanoGrid<ValueT>& grid, int verbose = 0);
+template<typename NanoBuildT>
+typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<NanoBuildT>::Type>::Type>::Ptr
+nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid, int verbose = 0);
 
 /// @brief Forward declaration of free-standing function that de-serializes a NanoVDB GridHandle into an OpenVDB GridBase
 template<typename BufferT>
@@ -38,66 +59,83 @@ openvdb::GridBase::Ptr
 nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose = 0);
 
 /// @brief This class will serialize an OpenVDB grid into a NanoVDB grid managed by a GridHandle.
-template<typename ValueType>
+template<typename NanoBuildT>
 class NanoToOpenVDB
 {
-    using ValueT = typename ConvertTrait<ValueType>::Type; // e.g. float -> float but nanovdb::Vec3<float> -> openvdb::Vec3<float>
-    using SrcNode0 = LeafNode<ValueT, openvdb::Coord, openvdb::util::NodeMask>; // note that it's using openvdb types!
-    using SrcNode1 = InternalNode<SrcNode0>;
-    using SrcNode2 = InternalNode<SrcNode1>;
-    using SrcRootT = RootNode<SrcNode2>;
-    using SrcTreeT = Tree<SrcRootT>;
-    using SrcGridT = Grid<SrcTreeT>;
+    using NanoNode0  = LeafNode<NanoBuildT, openvdb::Coord, openvdb::util::NodeMask>; // note that it's using openvdb coord nd mask types!
+    using NanoNode1  = InternalNode<NanoNode0>;
+    using NanoNode2  = InternalNode<NanoNode1>;
+    using NanoRootT  = RootNode<NanoNode2>;
+    using NanoTreeT  = Tree<NanoRootT>;
+    using NanoGridT  = Grid<NanoTreeT>;
+    using NanoValueT = typename NanoGridT::ValueType;
 
-    using DstNode0 = openvdb::tree::LeafNode<ValueT, SrcNode0::LOG2DIM>; // leaf
-    using DstNode1 = openvdb::tree::InternalNode<DstNode0, SrcNode1::LOG2DIM>; // lower
-    using DstNode2 = openvdb::tree::InternalNode<DstNode1, SrcNode2::LOG2DIM>; // upper
-    using DstRootT = openvdb::tree::RootNode<DstNode2>;
-    using DstTreeT = openvdb::tree::Tree<DstRootT>;
-    using DstGridT = openvdb::Grid<DstTreeT>;
+    using OpenBuildT = typename ConvertTrait<NanoBuildT>::Type; // e.g. float -> float but nanovdb::Vec3<float> -> openvdb::Vec3<float>
+    using OpenNode0  = openvdb::tree::LeafNode<OpenBuildT, NanoNode0::LOG2DIM>; // leaf
+    using OpenNode1  = openvdb::tree::InternalNode<OpenNode0, NanoNode1::LOG2DIM>; // lower
+    using OpenNode2  = openvdb::tree::InternalNode<OpenNode1, NanoNode2::LOG2DIM>; // upper
+    using OpenRootT  = openvdb::tree::RootNode<OpenNode2>;
+    using OpenTreeT  = openvdb::tree::Tree<OpenRootT>;
+    using OpenGridT  = openvdb::Grid<OpenTreeT>;
+    using OpenValueT = typename OpenGridT::ValueType;
 
 public:
     /// @brief Construction from an existing const OpenVDB Grid.
     NanoToOpenVDB(){};
 
     /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpenVDB grid
-    typename DstGridT::Ptr operator()(const NanoGrid<ValueType>& grid, int verbose = 0);
+    typename OpenGridT::Ptr operator()(const NanoGrid<NanoBuildT>& grid, int verbose = 0);
 
 private:
 
-    template<typename SrcNodeT, typename DstNodeT>
-    DstNodeT* processNode(const SrcNodeT*);
+    template<typename NanoNodeT, typename OpenNodeT>
+    OpenNodeT* processNode(const NanoNodeT*);
 
-    DstNode2* process(const SrcNode2* node) {return this->template processNode<SrcNode2, DstNode2>(node);}
-    DstNode1* process(const SrcNode1* node) {return this->template processNode<SrcNode1, DstNode1>(node);}
-    DstNode0* process(const SrcNode0* node);
+    OpenNode2* process(const NanoNode2* node) {return this->template processNode<NanoNode2, OpenNode2>(node);}
+    OpenNode1* process(const NanoNode1* node) {return this->template processNode<NanoNode1, OpenNode1>(node);}
+
+    template <typename NanoLeafT>
+    typename std::enable_if<!std::is_same<bool, typename NanoLeafT::BuildType>::value &&
+                            !std::is_same<ValueMask, typename NanoLeafT::BuildType>::value &&
+                            !std::is_same<Fp4, typename NanoLeafT::BuildType>::value &&
+                            !std::is_same<Fp8, typename NanoLeafT::BuildType>::value &&
+                            !std::is_same<Fp16,typename NanoLeafT::BuildType>::value &&
+                            !std::is_same<FpN, typename NanoLeafT::BuildType>::value,
+                            OpenNode0*>::type
+    process(const NanoLeafT* node);
+
+    template <typename NanoLeafT>
+    typename std::enable_if<std::is_same<Fp4, typename NanoLeafT::BuildType>::value ||
+                            std::is_same<Fp8, typename NanoLeafT::BuildType>::value ||
+                            std::is_same<Fp16,typename NanoLeafT::BuildType>::value ||
+                            std::is_same<FpN, typename NanoLeafT::BuildType>::value,
+                            OpenNode0*>::type
+    process(const NanoLeafT* node);
+
+    template <typename NanoLeafT>
+    typename std::enable_if<std::is_same<ValueMask, typename NanoLeafT::BuildType>::value,
+                            OpenNode0*>::type
+    process(const NanoLeafT* node);
+
+    template <typename NanoLeafT>
+    typename std::enable_if<std::is_same<bool, typename NanoLeafT::BuildType>::value,
+                            OpenNode0*>::type
+    process(const NanoLeafT* node);
+
+    /// converts nanovdb value types to openvdb value types, e.g. nanovdb::Vec3f& -> openvdb::Vec3f&
+    static const OpenValueT& Convert(const NanoValueT &v) {return reinterpret_cast<const OpenValueT&>(v);}
+    static const OpenValueT* Convert(const NanoValueT *v) {return reinterpret_cast<const OpenValueT*>(v);}
+
 }; // NanoToOpenVDB class
 
-template<typename T>
-struct ConvertTrait
-{
-    using Type = T;
-};
-
-template<typename T>
-struct ConvertTrait< Vec3<T> >
-{
-    using Type = openvdb::math::Vec3<T>;
-};
-
-template<typename T>
-struct ConvertTrait< Vec4<T> >
-{
-    using Type = openvdb::math::Vec4<T>;
-};
-
-template<typename T>
-typename NanoToOpenVDB<T>::DstGridT::Ptr
-NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
+template<typename NanoBuildT>
+typename NanoToOpenVDB<NanoBuildT>::OpenGridT::Ptr
+NanoToOpenVDB<NanoBuildT>::operator()(const NanoGrid<NanoBuildT>& grid, int /*verbose*/)
 {
     // since the input nanovdb grid might use nanovdb types (Coord, Mask, Vec3) we cast to use openvdb types
-    const SrcGridT *srcGrid = reinterpret_cast<const SrcGridT*>(&grid);
-    auto dstGrid = openvdb::createGrid<DstGridT>(srcGrid->tree().background());
+    const NanoGridT *srcGrid = reinterpret_cast<const NanoGridT*>(&grid);
+
+    auto dstGrid = openvdb::createGrid<OpenGridT>(Convert(srcGrid->tree().background()));
     dstGrid->setName(srcGrid->gridName()); // set grid name
     switch (srcGrid->gridClass()) { // set grid class
     case nanovdb::GridClass::LevelSet:
@@ -113,8 +151,6 @@ NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
         throw std::runtime_error("NanoToOpenVDB does not yet support PointIndexGrids");
     case nanovdb::GridClass::PointData:
         throw std::runtime_error("NanoToOpenVDB does not yet support PointDataGrids");
-    case nanovdb::GridClass::Topology:
-        throw std::runtime_error("NanoToOpenVDB does not yet support Mask (or Topology) Grids");
     default:
         dstGrid->setGridClass(openvdb::GRID_UNKNOWN);
     }
@@ -132,16 +168,9 @@ NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
     for (uint32_t i=0; i<data->mTableSize; ++i) {
         auto *tile = data->tile(i);
         if (tile->isChild()) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
             root.addChild( this->process( data->getChild(tile)) );
-#else// hack since RootNode::addChild is not available in older versions
-            root.addTile(tile->origin(), root.background(), false);//dummy tile
-            auto it = root.beginChildAll();
-            while(it.getCoord() != tile->origin()) ++it;// find tile
-            it.setChild(this->process( data->getChild(tile)) );//replace tile with child
-#endif
         } else {
-            root.addTile(tile->origin(), tile->value, tile->state);
+            root.addTile(tile->origin(), Convert(tile->value), tile->state);
         }
     }
 
@@ -167,7 +196,7 @@ NanoToOpenVDB<T>::processNode(const SrcNodeT *srcNode)
         if (childMask.isOn(n)) {
             childNodes.emplace_back(n, srcData->getChild(n));
         } else {
-            dstTable[n].setValue(srcData->mTable[n].value);
+            dstTable[n].setValue(Convert(srcData->mTable[n].value));
         }
     }
     auto kernel = [&](const auto& r) {
@@ -186,15 +215,23 @@ NanoToOpenVDB<T>::processNode(const SrcNodeT *srcNode)
 } // processNode
 
 template<typename T>
-typename NanoToOpenVDB<T>::DstNode0*
-NanoToOpenVDB<T>::process(const SrcNode0 *srcNode)
+template <typename NanoLeafT>
+inline typename std::enable_if<!std::is_same<bool, typename NanoLeafT::BuildType>::value &&
+                               !std::is_same<ValueMask, typename NanoLeafT::BuildType>::value &&
+                               !std::is_same<Fp4, typename NanoLeafT::BuildType>::value &&
+                               !std::is_same<Fp8, typename NanoLeafT::BuildType>::value &&
+                               !std::is_same<Fp16,typename NanoLeafT::BuildType>::value &&
+                               !std::is_same<FpN, typename NanoLeafT::BuildType>::value,
+                               typename NanoToOpenVDB<T>::OpenNode0*>::type
+NanoToOpenVDB<T>::process(const NanoLeafT *srcNode)
 {
-    DstNode0* dstNode = new DstNode0(); // un-initialized for fast construction
+    static_assert(std::is_same<NanoLeafT, NanoNode0>::value, "NanoToOpenVDB<FpN>::process assert failed");
+    OpenNode0* dstNode = new OpenNode0(); // un-initialized for fast construction
     dstNode->setOrigin(srcNode->origin());
     dstNode->setValueMask(srcNode->valueMask());
 
-    const ValueT* src = srcNode->data()->mValues;// doesn't work for compressed data, bool or ValueMask
-    for (ValueT *dst = dstNode->buffer().data(), *end = dst + DstNode0::SIZE; dst != end; dst += 4, src += 4) {
+    const auto* src = Convert(srcNode->data()->mValues);// doesn't work for compressed data, bool or ValueMask
+    for (auto *dst = dstNode->buffer().data(), *end = dst + OpenNode0::SIZE; dst != end; dst += 4, src += 4) {
         dst[0] = src[0];
         dst[1] = src[1];
         dst[2] = src[2];
@@ -202,13 +239,66 @@ NanoToOpenVDB<T>::process(const SrcNode0 *srcNode)
     }
 
     return dstNode;
-} // process(SrcNode0)
+} // process(NanoNode0)
 
-template<typename ValueT>
-typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<ValueT>::Type>::Type>::Ptr
-nanoToOpenVDB(const NanoGrid<ValueT>& grid, int verbose)
+template<typename T>
+template <typename NanoLeafT>
+inline typename std::enable_if<std::is_same<Fp4, typename NanoLeafT::BuildType>::value ||
+                               std::is_same<Fp8, typename NanoLeafT::BuildType>::value ||
+                               std::is_same<Fp16,typename NanoLeafT::BuildType>::value ||
+                               std::is_same<FpN, typename NanoLeafT::BuildType>::value,
+                               typename NanoToOpenVDB<T>::OpenNode0*>::type
+NanoToOpenVDB<T>::process(const NanoLeafT *srcNode)
 {
-    nanovdb::NanoToOpenVDB<ValueT> tmp;
+    static_assert(std::is_same<NanoLeafT, NanoNode0>::value, "NanoToOpenVDB<T>::process assert failed");
+    OpenNode0* dstNode = new OpenNode0(); // un-initialized for fast construction
+    dstNode->setOrigin(srcNode->origin());
+    dstNode->setValueMask(srcNode->valueMask());
+    float *dst = dstNode->buffer().data();
+    for (int i=0; i!=512; i+=4) {
+        *dst++ = srcNode->getValue(i);
+        *dst++ = srcNode->getValue(i+1);
+        *dst++ = srcNode->getValue(i+2);
+        *dst++ = srcNode->getValue(i+3);
+    }
+
+    return dstNode;
+} // process(NanoNode0)
+
+template<typename T>
+template <typename NanoLeafT>
+inline typename std::enable_if<std::is_same<ValueMask, typename NanoLeafT::BuildType>::value,
+                               typename NanoToOpenVDB<T>::OpenNode0*>::type
+NanoToOpenVDB<T>::process(const NanoLeafT *srcNode)
+{
+    static_assert(std::is_same<NanoLeafT, NanoNode0>::value, "NanoToOpenVDB<ValueMask>::process assert failed");
+    OpenNode0* dstNode = new OpenNode0(); // un-initialized for fast construction
+    dstNode->setOrigin(srcNode->origin());
+    dstNode->setValueMask(srcNode->valueMask());
+
+    return dstNode;
+} // process(NanoNode0)
+
+template<typename T>
+template <typename NanoLeafT>
+inline typename std::enable_if<std::is_same<bool, typename NanoLeafT::BuildType>::value,
+                               typename NanoToOpenVDB<T>::OpenNode0*>::type
+NanoToOpenVDB<T>::process(const NanoLeafT *srcNode)
+{
+    static_assert(std::is_same<NanoLeafT, NanoNode0>::value, "NanoToOpenVDB<ValueMask>::process assert failed");
+    OpenNode0* dstNode = new OpenNode0(); // un-initialized for fast construction
+    dstNode->setOrigin(srcNode->origin());
+    dstNode->setValueMask(srcNode->valueMask());
+    reinterpret_cast<openvdb::util::NodeMask<3>&>(dstNode->buffer()) = srcNode->data()->mValues;
+
+    return dstNode;
+} // process(NanoNode0)
+
+template<typename NanoBuildT>
+inline typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<NanoBuildT>::Type>::Type>::Ptr
+nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid, int verbose)
+{
+    nanovdb::NanoToOpenVDB<NanoBuildT> tmp;
     return tmp(grid, verbose);
 }
 
@@ -224,6 +314,18 @@ nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose)
         return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else if (auto grid = handle.template grid<int64_t>()) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<bool>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::Fp4>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::Fp8>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::Fp16>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::FpN>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::ValueMask>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else if (auto grid = handle.template grid<nanovdb::Vec3f>()) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else if (auto grid = handle.template grid<nanovdb::Vec3d>()) {
@@ -233,7 +335,7 @@ nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose)
     } else if (auto grid = handle.template grid<nanovdb::Vec4d>()) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else {
-        OPENVDB_THROW(openvdb::RuntimeError, "Unsupported NanoVDB grid type");
+        OPENVDB_THROW(openvdb::RuntimeError, "Unsupported NanoVDB grid type!");
     }
 }
 

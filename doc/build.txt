@@ -238,10 +238,8 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 18.0              | 6           |
-Houdini  | 18.5              | 7           |
 Houdini  | 19.0              | 8           |
-Maya     | 2017              | Any         |
+Houdini  | 19.5              | 9           |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
 
@@ -258,8 +256,8 @@ OpenVDB components you wish to build.
 Package        | Description                                                     | OpenVDB Components |
 -------------- | --------------------------------------------------------------- | ------------------ |
 CMake          | Cross-platform family of tools designed to help build software  | All                |
-C++14 Compiler | Matching Houdini compiler and version                           | All                |
-Boost          | Components: system, iostreams, python, thread                   | All                |
+C++17 Compiler | Matching Houdini compiler and version                           | All                |
+Boost          | Components: iostreams, python, thread                           | All                |
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 CppUnit        | A unit testing framework module for C++                         | Unit Tests (AX)    |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
@@ -268,7 +266,7 @@ Log4cplus      | An optional dependency for improved OpenVDB Logging            
 NumPy          | Scientific computing with Python                                | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
-At a minimum, boost, a matching C++14 compiler and CMake will be required. See
+At a minimum, boost, a matching C++17 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
 installing the above software. Note that as Blosc and ZLib are provided as part
 of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
@@ -347,8 +345,8 @@ Supported versions of maya only ship with TBB.
 Package        | Description                                                       | OpenVDB Components               |
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
-C++14 Compiler | Matching Houdini compiler and version                             | All                              |
-Boost          | Components: system, iostreams, python, thread                     | All                              |
+C++17 Compiler | Matching Houdini compiler and version                             | All                              |
+Boost          | Components: iostreams, python, thread                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
@@ -364,7 +362,7 @@ LLVM           | Target-independent code generation                             
 
 * See [blosc support](@ref buildBloscSupport)
 
-At a minimum, boost, a matching C++14 compiler, ZLIB, blosc and CMake will be
+At a minimum, boost, a matching C++17 compiler, ZLIB, blosc and CMake will be
 required. See the full [dependency list](@ref dependencies) for help with
 downloading and installing the above software.
 
@@ -516,7 +514,7 @@ You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
 OpenVDB as a dependency:
 
 @code{.cmake}
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)

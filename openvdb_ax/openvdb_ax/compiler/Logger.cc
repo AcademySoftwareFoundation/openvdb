@@ -148,7 +148,7 @@ std::string format(const std::string& message,
 {
     std::stringstream ss;
     ss << indent;
-    if (numbered) ss << "[" << numMessage + 1 << "] ";
+    if (numbered) ss << "[" << numMessage << "] ";
     for (auto c : message) {
         ss << c;
         if (c == '\n') ss << indent;
@@ -187,8 +187,11 @@ void Logger::setSourceCode(const char* code)
 bool Logger::error(const std::string& message,
                    const Logger::CodeLocation& lineCol)
 {
-    // already exceeded the error limit
-    if (this->atErrorLimit()) return false;
+    // check if we've already exceeded the error limit
+    const bool limit = this->atErrorLimit();
+    // Always increment the error counter
+    ++mNumErrors;
+    if (limit) return false;
     mErrorOutput(format(this->getErrorPrefix() + message,
                         lineCol,
                         this->errors(),
@@ -196,10 +199,7 @@ bool Logger::error(const std::string& message,
                         this->getPrintLines(),
                         this->mSettings->mIndent,
                         this->mCode.get()));
-    ++mNumErrors;
-    // now exceeds the limit
-    if (this->atErrorLimit()) return false;
-    else return true;
+    return !this->atErrorLimit();
 }
 
 bool Logger::error(const std::string& message,
@@ -215,6 +215,7 @@ bool Logger::warning(const std::string& message,
         return this->error(message + " [warning-as-error]", lineCol);
     }
     else {
+        ++mNumWarnings;
         mWarningOutput(format(this->getWarningPrefix() + message,
                               lineCol,
                               this->warnings(),
@@ -222,7 +223,6 @@ bool Logger::warning(const std::string& message,
                               this->getPrintLines(),
                               this->mSettings->mIndent,
                               this->mCode.get()));
-        ++mNumWarnings;
         return true;
     }
 }

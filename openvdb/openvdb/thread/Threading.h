@@ -6,7 +6,13 @@
 #ifndef OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
 #define OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
 
-#include "openvdb/version.h"
+#include <openvdb/version.h>
+
+#ifndef __TBB_show_deprecation_message_task_H
+    #define __TBB_show_deprecation_message_task_H
+    #define OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+#endif
+
 
 /// @note tbb/blocked_range.h is the ONLY include that persists from TBB 2020
 ///   to TBB 2021 that itself includes the TBB specific version header files.
@@ -23,7 +29,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace thread {
 
-inline bool cancelGroupExecution()
+/// @note  This UBSAN suppression may not be needed when we transition to TBB21
+inline OPENVDB_UBSAN_SUPPRESS("vptr") bool cancelGroupExecution()
 {
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
@@ -35,7 +42,8 @@ inline bool cancelGroupExecution()
 #endif
 }
 
-inline bool isGroupExecutionCancelled()
+/// @note  This UBSAN suppression may not be needed when we transition to TBB21
+inline OPENVDB_UBSAN_SUPPRESS("vptr") bool isGroupExecutionCancelled()
 {
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
@@ -50,5 +58,11 @@ inline bool isGroupExecutionCancelled()
 } // namespace thread
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
+
+#ifdef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+    #undef __TBB_show_deprecation_message_task_H
+    #undef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+#endif
+
 
 #endif // OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED

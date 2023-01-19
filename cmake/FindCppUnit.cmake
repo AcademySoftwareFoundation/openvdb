@@ -83,7 +83,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 
@@ -169,7 +169,7 @@ list(APPEND _CPPUNIT_LIBRARYDIR_SEARCH_DIRS
 
 set(_CPPUNIT_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-if(WIN32)
+if(MSVC)
   if(CPPUNIT_USE_STATIC_LIBS)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
   else()

@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-macros"
@@ -19,12 +20,11 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/system/error_code.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/version.hpp> // for BOOST_VERSION
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
 // Ensure that both namespaces exist.
@@ -35,6 +35,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <sys/stat.h> // for stat()
 #include <unistd.h> // for unlink()
 #endif
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 #include <atomic>
 #include <fstream>
@@ -54,6 +55,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #endif
 #endif
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 /// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
 class ProxyMappedFile
 {
@@ -71,7 +73,7 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
-#ifdef _MSC_VER
+#ifdef _WIN32
             using namespace boost::interprocess::detail;
             using namespace boost::interprocess::ipcdetail;
             using openvdb::Index64;
@@ -100,6 +102,7 @@ private:
     }; // class Impl
     std::unique_ptr<Impl> mImpl;
 }; // class ProxyMappedFile
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 using namespace openvdb;
 using namespace openvdb::compression;
@@ -417,17 +420,7 @@ TestStreamCompression::testPagedStreams()
         ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
         ostream.flush();
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-        EXPECT_EQ(ss.tellp(), std::streampos(5400));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-        EXPECT_EQ(ss.tellp(), std::streampos(4422));
-#else
-        EXPECT_EQ(ss.tellp(), std::streampos(4452));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
         EXPECT_EQ(ss.tellp(), std::streampos(PageSize+sizeof(int)));
 #endif
 
@@ -450,17 +443,7 @@ TestStreamCompression::testPagedStreams()
 
         istream.read(handle, values.size(), false);
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-        EXPECT_EQ(ss.tellg(), std::streampos(5400));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-        EXPECT_EQ(ss.tellg(), std::streampos(4422));
-#else
-        EXPECT_EQ(ss.tellg(), std::streampos(4452));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
         EXPECT_EQ(ss.tellg(), std::streampos(PageSize+sizeof(int)));
 #endif
 
@@ -475,7 +458,7 @@ TestStreamCompression::testPagedStreams()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
+#ifdef _WIN32
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
@@ -543,20 +526,12 @@ TestStreamCompression::testPagedStreams()
 
             ostream.flush();
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-            EXPECT_EQ(fileout.tellp(), std::streampos(51480));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-            EXPECT_EQ(fileout.tellp(), std::streampos(42424));
-#else
-            EXPECT_EQ(fileout.tellp(), std::streampos(42724));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
             EXPECT_EQ(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
 #endif
 
+
+#ifdef OPENVDB_USE_DELAYED_LOADING
             // abuse File being a friend of MappedFile to get around the private constructor
             ProxyMappedFile* proxy = new ProxyMappedFile(filename);
             SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
@@ -648,6 +623,8 @@ TestStreamCompression::testPagedStreams()
             // page should have just one use count (itself)
 
             EXPECT_EQ(page.use_count(), long(1));
+
+#endif // OPENVDB_USE_DELAYED_LOADING
         }
         std::remove(filename.c_str());
     }

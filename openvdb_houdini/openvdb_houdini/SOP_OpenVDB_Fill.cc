@@ -84,10 +84,10 @@ newSopOperator(OP_OperatorTable* table)
 "How to specify the bounding box to be filled\n\n"
 "Index Space:\n"
 "    Interpret the given min and max coordinates in"
-" [index-space|https://academysoftwarefoundation.github.io/openvdb/overview.html#subsecVoxSpace] units.\n"
+" [index-space|https://www.openvdb.org/documentation/doxygen/overview.html#subsecVoxSpace] units.\n"
 "World Space:\n"
 "    Interpret the given min and max coordinates in"
-" [world-space|https://academysoftwarefoundation.github.io/openvdb/overview.html#subsecWorSpace] units.\n"
+" [world-space|https://www.openvdb.org/documentation/doxygen/overview.html#subsecWorSpace] units.\n"
 "Reference Geometry:\n"
 "    Use the world-space bounds of the reference input geometry.\n"));
 

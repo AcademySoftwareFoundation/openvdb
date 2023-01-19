@@ -50,6 +50,11 @@ TEST_F(TestPointMask, testMask)
 
         EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
         EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
+
+        // also test tree function signature
+        auto maskTree = convertPointsToMask(points->tree());
+        EXPECT_EQ(maskTree->activeVoxelCount(), Index64(4));
+        EXPECT_TRUE(maskTree->hasSameTopology(mask->tree()));
     }
 
     { // mask grid instead of bool grid

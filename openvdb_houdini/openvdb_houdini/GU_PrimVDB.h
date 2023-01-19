@@ -166,6 +166,7 @@ public:
                             const GEO_PrimVolume &src_vol);
 
     void                normal(NormalComp &output) const override;
+    void                normal(NormalCompD &output) const override;
 
     /// @brief Transfer any metadata associated with this primitive's
     /// VDB grid to primitive attributes.

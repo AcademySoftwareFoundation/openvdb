@@ -218,7 +218,6 @@ struct OPENVDB_AX_API ComputeGenerator : public ast::Visitor<ComputeGenerator>
     ///@}
 
 protected:
-
     const FunctionGroup* getFunction(const std::string& identifier,
             const bool allowInternal = false);
 

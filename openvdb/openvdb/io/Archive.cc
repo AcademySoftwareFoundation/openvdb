@@ -13,6 +13,7 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/openvdb.h>
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 // Boost.Interprocess uses a header-only portion of Boost.DateTime
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -26,12 +27,8 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
-#include <atomic>
-
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
 extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
     void* fh, void* ctime, void* atime, void* mtime);
@@ -43,6 +40,13 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <sys/stat.h> // for stat()
 #include <unistd.h> // for unlink()
 #endif
+#endif // OPENVDB_USE_DELAYED_LOADING
+
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
+#include <atomic>
+
 #include <algorithm> // for std::find_if()
 #include <cerrno> // for errno
 #include <cstdlib> // for getenv()
@@ -437,6 +441,9 @@ operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+
+
 // Memory-mapping a VDB file permits threaded input (and output, potentially,
 // though that might not be practical for compressed files or files containing
 // multiple grids).  In particular, a memory-mapped file can be loaded lazily,
@@ -459,7 +466,7 @@ public:
         mLastWriteTime = this->getLastWriteTime();
 
         if (mAutoDelete) {
-#ifndef _MSC_VER
+#ifndef _WIN32
             // On Unix systems, unlink the file so that it gets deleted once it is closed.
             ::unlink(mMap.get_name());
 #endif
@@ -489,7 +496,7 @@ public:
         Index64 result = 0;
         const char* filename = mMap.get_name();
 
-#ifdef _MSC_VER
+#ifdef _WIN32
         // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
         using namespace boost::interprocess::detail;
         using namespace boost::interprocess::ipcdetail;
@@ -573,6 +580,9 @@ MappedFile::clearNotifier()
 {
     mImpl->mNotifier = nullptr;
 }
+
+
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 
 ////////////////////////////////////////
@@ -894,6 +904,7 @@ setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 }
 
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 MappedFile::Ptr
 getMappedFilePtr(std::ios_base& strm)
 {
@@ -909,6 +920,7 @@ setMappedFilePtr(std::ios_base& strm, io::MappedFile::Ptr& mappedFile)
 {
     strm.pword(sStreamState.mappedFile) = &mappedFile;
 }
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 
 StreamMetadata::Ptr
@@ -1098,7 +1110,11 @@ Archive::connectInstance(const GridDescriptor& gd, const NamedGridMap& grids) co
 bool
 Archive::isDelayedLoadingEnabled()
 {
+#ifdef OPENVDB_USE_DELAYED_LOADING
     return (nullptr == std::getenv("OPENVDB_DISABLE_DELAYED_LOAD"));
+#else
+    return false;
+#endif
 }
 
 

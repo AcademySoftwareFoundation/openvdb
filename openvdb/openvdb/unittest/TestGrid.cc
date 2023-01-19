@@ -9,7 +9,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/CpuTimer.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <iostream>
 #include <memory> // for std::make_unique
 
@@ -84,10 +84,8 @@ public:
 
     openvdb::Index treeDepth() const override { return 0; }
     openvdb::Index leafCount() const override { return 0; }
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     std::vector<openvdb::Index32> nodeCount() const override
         { return std::vector<openvdb::Index32>(DEPTH, 0); }
-#endif
     openvdb::Index nonLeafCount() const override { return 0; }
     openvdb::Index64 activeVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
@@ -185,7 +183,6 @@ TEST_F(TestGrid, testIsTreeUnique)
     GridBase::Ptr grid3 = grid->copyGridWithNewTree();
     EXPECT_TRUE(grid->isTreeUnique());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     // shallow copy using GridBase
     GridBase::Ptr grid4 = grid->copyGrid();
     EXPECT_TRUE(!grid4->isTreeUnique());
@@ -193,7 +190,6 @@ TEST_F(TestGrid, testIsTreeUnique)
     // copy with new tree using GridBase
     GridBase::Ptr grid5 = grid->copyGridWithNewTree();
     EXPECT_TRUE(grid5->isTreeUnique());
-#endif
 }
 
 
@@ -266,7 +262,6 @@ TEST_F(TestGrid, testCopyGrid)
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree1.getValue(changeCoord));
     ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, tree2.getValue(changeCoord));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     // shallow-copy a const grid but supply a new transform and meta map
     EXPECT_EQ(1.0, grid1->transform().voxelSize().x());
     EXPECT_EQ(size_t(0), grid1->metaCount());
@@ -285,7 +280,6 @@ TEST_F(TestGrid, testCopyGrid)
     EXPECT_EQ(size_t(1), grid3->metaCount());
     EXPECT_EQ(Index(2), tree3.leafCount());
     EXPECT_EQ(long(3), constGrid1->constTreePtr().use_count());
-#endif
 }
 
 

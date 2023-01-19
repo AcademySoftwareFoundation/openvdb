@@ -6,7 +6,7 @@
 #include <openvdb/tools/Filter.h>
 #include <openvdb/tools/ValueTransformer.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 // @todo gaussian!
 class TestFilter: public ::testing::Test {};

@@ -47,7 +47,7 @@ The following variables may be provided to tell this module where to look.
 # Find the glfw3 installation and use glfw's CMake to initialize
 # the glfw lib
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 set(_FIND_GLFW3_ADDITIONAL_OPTIONS "")
 if(DISABLE_CMAKE_SEARCH_PATHS)

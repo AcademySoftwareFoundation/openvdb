@@ -11,7 +11,7 @@
 #include <string>
 #include <vector>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
 #endif
 

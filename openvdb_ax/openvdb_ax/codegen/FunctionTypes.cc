@@ -112,6 +112,18 @@ Function::create(llvm::LLVMContext& C, llvm::Module* M) const
             this->symbol(),
             M);
 
+    if (!mNames.empty()) {
+        // If some argument names have been specified, name the llvm values.
+        // This provides a more reliable way for function to index into values
+        // rather than relying on their position in the argument vector
+        // @note  This does not guarantee that all arguments will have valid
+        //   names
+        for (llvm::Argument& arg : function->args()) {
+            const char* name = this->argName(arg.getArgNo());
+            if (name) arg.setName(name);
+        }
+    }
+
     function->setAttributes(this->flattenAttrs(C));
     return function;
 }
@@ -230,7 +242,7 @@ Function::cast(std::vector<llvm::Value*>& args,
                 llvm::Type* strType = LLVMType<codegen::String>::get(C);
                 if (type->getContainedType(0) == strType) {
                     value = B.CreateStructGEP(strType, value, 0); // char**
-                    value = B.CreateLoad(value); // char*
+                    value = ir_load(B, value); // char*
                 }
             }
         }
@@ -253,7 +265,12 @@ Function::flattenAttrs(llvm::LLVMContext& C) const
         return set;
     };
 
+#if LLVM_VERSION_MAJOR <= 13
     llvm::AttrBuilder ab;
+#else
+    llvm::AttrBuilder ab(C);
+#endif
+
     const llvm::AttributeSet fn = buildSetFromKinds(ab, mAttributes->mFnAttrs);
     const llvm::AttributeSet ret = buildSetFromKinds(ab, mAttributes->mRetAttrs);
 

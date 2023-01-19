@@ -1,0 +1,1 @@
+FATAL: position arguments [input.vdb <output.vdb>] are deprecated and cannot be used with -i and -o. See 'vdb_ax --help'

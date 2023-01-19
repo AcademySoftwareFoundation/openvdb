@@ -8,6 +8,7 @@
 #include <openvdb/io/Stream.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/tools/Count.h>
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
 #include <openvdb/util/logging.h>
 #include <openvdb/version.h>
@@ -621,8 +622,10 @@ TEST_F(TestFile, testWriteInstancedGrids)
     EXPECT_TRUE(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
     EXPECT_TRUE(density.get() != nullptr);
+#ifdef OPENVDB_USE_DELAYED_LOADING
     EXPECT_TRUE(density->unallocatedLeafCount() > 0);
     EXPECT_EQ(density->leafCount(), density->unallocatedLeafCount());
+#endif // OPENVDB_USE_DELAYED_LOADING
     grid = findGridByName(*grids, "density_copy");
     EXPECT_TRUE(grid.get() != nullptr);
     EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
@@ -2200,10 +2203,9 @@ TEST_F(TestFile, testCompression)
                     grid->tree().getValue(Coord(23)));
 
                 // Verify that the only active value in this grid is 999.
-                Int32 minVal = -1, maxVal = -1;
-                grid->evalMinMax(minVal, maxVal);
-                EXPECT_EQ(999, minVal);
-                EXPECT_EQ(999, maxVal);
+                const math::MinMax<Int32> extrema = tools::minMax(grid->tree());
+                EXPECT_EQ(999, extrema.min());
+                EXPECT_EQ(999, extrema.max());
             }
             for (int idx = 1; idx <= 2; ++idx) {
                 const FloatGrid::Ptr

@@ -56,7 +56,11 @@ public:
         set(bindings);
     }
 
-public:
+    bool operator==(const AttributeBindings& other) const
+    {
+        return mAXToDataMap == other.mAXToDataMap &&
+            mDataToAXMap == other.mDataToAXMap;
+    }
 
     /// @brief Set up a binding. If a data binding exists for this AX name, it will be replaced.
     ///     If another binding exists for the supplied dataname that will be removed.
@@ -146,6 +150,19 @@ private:
     std::map<std::string, std::string> mDataToAXMap;
 };
 
+
+inline std::ostream& operator<<(std::ostream& os, const AttributeBindings& bindings)
+{
+    os << "ax->data map:\n";
+    for (const auto& m : bindings.axToDataMap()) {
+        os << "  [" << m.first << " -> " << m.second << ']' << '\n';
+    }
+    os << "data->ax map:\n";
+    for (const auto& m : bindings.dataToAXMap()) {
+        os << "  [" << m.first << " -> " << m.second  << ']' << '\n';
+    }
+    return os;
+}
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME

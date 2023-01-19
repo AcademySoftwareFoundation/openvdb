@@ -10,7 +10,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
-#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage()
+#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Platform.h>
@@ -49,6 +49,10 @@ public:
 
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
     virtual Name valueType() const = 0;
+
+    /// Return @c true if this tree is of the same type as the template parameter.
+    template<typename TreeType>
+    bool isType() const { return (this->type() == TreeType::treeType()); }
 
     /// Return a pointer to a deep copy of this tree
     virtual TreeBase::Ptr copy() const = 0;
@@ -109,12 +113,10 @@ public:
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
-#endif
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
     /// Return the number of active voxels stored in leaf nodes.
@@ -336,7 +338,6 @@ public:
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
@@ -346,7 +347,6 @@ public:
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
-#endif
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
@@ -361,6 +361,7 @@ public:
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
+    OPENVDB_DEPRECATED_MESSAGE("Switch to tools::minMax. Use threaded = false for serial execution")
     void evalMinMax(ValueType &min, ValueType &max) const;
 
     Index64 memUsage() const override { return tools::memUsage(*this); }
@@ -766,10 +767,8 @@ public:
     /// @endcode
     template<typename CombineOp>
     void combine(Tree& other, CombineOp& op, bool prune = false);
-#ifndef _MSC_VER
     template<typename CombineOp>
     void combine(Tree& other, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine(), but with
     /// @param other  a tree of the same type as this tree
@@ -811,10 +810,8 @@ public:
     /// @endcode
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, ExtendedCombineOp& op, bool prune = false);
-#ifndef _MSC_VER
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, const ExtendedCombineOp& op, bool prune = false);
-#endif
 
     /// For a given function @c f, use sparse traversal to compute <tt>f(a, b)</tt> over all
     /// corresponding pairs of values (tile or voxel) of trees A and B and store the result
@@ -846,10 +843,8 @@ public:
     /// @endcode
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, CombineOp& op, bool prune = false);
-#ifndef _MSC_VER
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine2(), but with
     /// @param a,b    two trees with the same configuration (levels and node dimensions)
@@ -927,44 +922,9 @@ public:
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, ExtendedCombineOp& op,
         bool prune = false);
-#ifndef _MSC_VER
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, const ExtendedCombineOp&,
         bool prune = false);
-#endif
-
-    template<typename BBoxOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visitActiveBBox(BBoxOp& op) const { mRoot.visitActiveBBox(op); }
-
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(VisitorOp& op);
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(const VisitorOp& op);
-
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(VisitorOp& op) const;
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(const VisitorOp& op) const;
-
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, VisitorOp& op);
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, const VisitorOp& op);
-
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, VisitorOp& op) const;
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, const VisitorOp& op) const;
-
 
     //
     // Iteration
@@ -1759,7 +1719,6 @@ Tree<RootNodeType>::combine(Tree& other, CombineOp& op, bool prune)
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combine(bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
 template<typename RootNodeType>
 template<typename CombineOp>
 inline void
@@ -1768,7 +1727,6 @@ Tree<RootNodeType>::combine(Tree& other, const CombineOp& op, bool prune)
     CombineOpAdapter<ValueType, const CombineOp> extendedOp(op);
     this->combineExtended(other, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1783,7 +1741,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, ExtendedCombineOp& op, bool pru
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combineExtended(bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
 template<typename RootNodeType>
 template<typename ExtendedCombineOp>
 inline void
@@ -1792,7 +1749,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, const ExtendedCombineOp& op, bo
     this->clearAllAccessors();
     mRoot.template combine<const ExtendedCombineOp>(other.mRoot, op, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1807,7 +1763,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, CombineOp& o
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>tree.combine2(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
 template<typename RootNodeType>
 template<typename CombineOp, typename OtherTreeType>
 inline void
@@ -1816,7 +1771,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, const Combin
     CombineOpAdapter<ValueType, const CombineOp, typename OtherTreeType::ValueType> extendedOp(op);
     this->combine2Extended(a, b, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1833,7 +1787,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like the following, where the functor argument is a temporary:
 /// <tt>tree.combine2Extended(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
 template<typename RootNodeType>
 template<typename ExtendedCombineOp, typename OtherTreeType>
 inline void
@@ -1842,101 +1795,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 {
     this->clearAllAccessors();
     mRoot.template combine2<const ExtendedCombineOp>(a.root(), b.root(), op, prune);
-}
-#endif
-
-
-////////////////////////////////////////
-
-
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(VisitorOp& op)
-{
-    this->clearAllAccessors();
-    mRoot.template visit<VisitorOp>(op);
-}
-
-
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(VisitorOp& op) const
-{
-    mRoot.template visit<VisitorOp>(op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>tree.visit(MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(const VisitorOp& op)
-{
-    this->clearAllAccessors();
-    mRoot.template visit<const VisitorOp>(op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>tree.visit(MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(const VisitorOp& op) const
-{
-    mRoot.template visit<const VisitorOp>(op);
-}
-
-
-////////////////////////////////////////
-
-
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op)
-{
-    this->clearAllAccessors();
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
-}
-
-
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op) const
-{
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>aTree.visit2(bTree, MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op)
-{
-    this->clearAllAccessors();
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>aTree.visit2(bTree, MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op) const
-{
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
 }
 
 
@@ -2025,7 +1883,6 @@ template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
 {
-    /// @todo optimize
     minVal = maxVal = zeroVal<ValueType>();
     if (ValueOnCIter iter = this->cbeginValueOn()) {
         minVal = maxVal = *iter;
@@ -2088,17 +1945,13 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     ValueType minVal = zeroVal<ValueType>(), maxVal = zeroVal<ValueType>();
     if (verboseLevel > 3) {
         // This forces loading of all non-resident nodes.
-        this->evalMinMax(minVal, maxVal);
+        const math::MinMax<ValueType> extrema = tools::minMax(*this);
+        minVal = extrema.min();
+        maxVal = extrema.max();
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     const auto nodeCount = this->nodeCount();//fast
     const Index32 leafCount = nodeCount.front();// leaf is the first element
-#else
-    std::vector<Index64> nodeCount(dims.size());
-    for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);//slow
-    const Index64 leafCount = *nodeCount.rbegin();// leaf is the last element
-#endif
     assert(dims.size() == nodeCount.size());
 
     Index64 totalNodeCount = 0;
@@ -2108,11 +1961,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     os << "    Root(1 x " << mRoot.getTableSize() << ")";
     if (dims.size() >= 2) {
         for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
             os << ", Internal(" << util::formattedInt(nodeCount[N - i]);
-#else
-            os << ", Internal(" << util::formattedInt(nodeCount[i]);
-#endif
             os << " x " << (1 << dims[i]) << "^3)";
         }
         os << ", Leaf(" << util::formattedInt(leafCount);

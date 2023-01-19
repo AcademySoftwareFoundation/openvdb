@@ -10,18 +10,17 @@
 #ifndef OPENVDB_TOOLS_POINT_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_ADVECT_HAS_BEEN_INCLUDED
 
-#include "openvdb/openvdb.h"
-#include "openvdb/Types.h"                 // Vec3 types and version number
-#include "openvdb/Grid.h"                  // grid
-#include "openvdb/math/Math.h"             // min
-#include "openvdb/util/NullInterrupter.h"
-#include "openvdb/thread/Threading.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/Types.h>                 // Vec3 types and version number
+#include <openvdb/Grid.h>                  // grid
+#include <openvdb/math/Math.h>             // min
+#include <openvdb/util/NullInterrupter.h>
+#include <openvdb/thread/Threading.h>
 #include "Interpolation.h"                 // sampling
 #include "VelocityFields.h"                // VelocityIntegrator
 
 #include <tbb/blocked_range.h>             // threading
 #include <tbb/parallel_for.h>              // threading
-#include <tbb/task.h>                      // for cancel
 
 #include <vector>
 

@@ -1,0 +1,49 @@
+usage: vdb_ax [command] [--help|-h] [-v] [<args>]
+
+CLI utility for processing OpenVDB data using AX.
+    -h, --help, -help         print help and exit
+    -v, --verbose             verbose (print timing and diagnostics)
+
+[execute] read/process/write VDB file/streams (default command):
+    -i [file.vdb]             append an input vdb file to be read
+    -s [code], -f [file]      input code to execute as a string or from a file
+    -o [file.vdb]             write the result to a given vdb file
+    --opt [NONE|O0|O1|O2|Os|Oz|O3]
+                              compilation optimization level (Default: 03)
+    --threads [n]             number of threads to use, 0 uses all available (Default: 0)
+    --werror                  warnings as errors
+    --max-errors [n]          maximum error messages, 0 allows all error messages (Default: 0)
+    --copy-file-metadata      copy the file level metadata of the first input to the output
+  Volumes:
+    --create-missing [ON|OFF]
+                              whether to implicitly create volumes (Default: ON)
+    --tree-level [l1|l1:l2]   a node level or node range to process (Default: 0:4)
+    --node-iter [ON|OFF|ALL]  the active state type of nodes to process (Default: ON)
+    --tile-stream [ON|OFF|AUTO]
+                              set the active tile streaming behaviour (Default: AUTO)
+    --volume-grain [g1|g1:g2]
+                              threading grain size for processing nodes (Default: 1:32)
+    --bindings ["ax_name:volume_name,..."]
+                              attribute bindings for volumes
+  Points:
+    --create-missing [ON|OFF]
+                              whether to implicitly point attributes (Default: ON)
+    --group [name]            a point group to process
+    --points-grain [n]        the threading grain size for processing nodes (Default: 1)
+    --bindings ["ax_name:point_attr_name,..."]
+                              attribute bindings for points
+
+[analyze] parse code and run analysis:
+    --ast-print               print the generated abstract syntax tree
+    --re-print                re-interpret print of the code post ast traversal
+    --reg-print               print the attribute registry (name, types, access, dependencies)
+    --try-compile <points | volumes>
+                              attempt compilation for points, volumes or both if no option is
+                              provided
+
+[functions] query available function information:
+    --list <filter-name>      list functions, their documentation and their signatures
+    --list-names              list all available functions names only
+
+Email bug reports, questions, discussions to <openvdb-dev@lists.aswf.io>
+and/or open issues at https://github.com/AcademySoftwareFoundation/openvdb.

@@ -11,7 +11,7 @@
 
 [Website](https://www.openvdb.org) |
 [Discussion Forum](https://github.com/AcademySoftwareFoundation/openvdb/discussions) |
-[Documentation](https://academysoftwarefoundation.github.io/openvdb)
+[Documentation](https://www.openvdb.org/documentation/doxygen)
 
 OpenVDB is an open source C++ library comprising a novel hierarchical data structure and a large suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It was developed by DreamWorks Animation for use in volumetric applications typically encountered in feature film production.
 
@@ -33,14 +33,13 @@ OpenVDB welcomes contributions to the OpenVDB project. Please refer to the [cont
 
 ### Developer Quick Start
 
-The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX, NanoVDB and various executables, may require additional dependencies. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
+The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX, NanoVDB and various executables, may require additional dependencies. See the [build documentation](https://www.openvdb.org/documentation/doxygen/build.html) for help with installations.
 
 #### Linux
 ##### Installing Dependencies (Boost, TBB, Blosc)
 
 ```bash
 apt-get install -y libboost-iostreams-dev
-apt-get install -y libboost-system-dev
 apt-get install -y libtbb-dev
 apt-get install -y libblosc-dev
 ```
@@ -84,7 +83,6 @@ vcpkg install zlib:x64-windows
 vcpkg install blosc:x64-windows
 vcpkg install tbb:x64-windows
 vcpkg install boost-iostreams:x64-windows
-vcpkg install boost-system:x64-windows
 vcpkg install boost-any:x64-windows
 vcpkg install boost-algorithm:x64-windows
 vcpkg install boost-uuid:x64-windows
@@ -102,7 +100,7 @@ cmake --build . --parallel 4 --config Release --target install
 
 #### Building OpenVDB AX
 
-OpenVDB AX depends on the core OpenVDB library. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for all available AX component options:
+OpenVDB AX depends on the core OpenVDB library. See the [build documentation](https://www.openvdb.org/documentation/doxygen/build.html) for all available AX component options:
 
 ```bash
 git clone git@github.com:AcademySoftwareFoundation/openvdb.git
@@ -116,7 +114,7 @@ make -j4 && make install
 #### Building NanoVDB
 
 NanoVDB can be built with and without OpenVDB support. To see full build instructions
-see the [NanoVDB build documentation](https://academysoftwarefoundation.github.io/openvdb/NanoVDB_HowToBuild.html)
+see the [NanoVDB build documentation](https://www.openvdb.org/documentation/doxygen/NanoVDB_HowToBuild.html)
 
 #### Building Without OpenVDB Support
 

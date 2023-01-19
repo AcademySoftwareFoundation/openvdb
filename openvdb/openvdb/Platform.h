@@ -54,12 +54,6 @@
 
 /// Windows defines
 #ifdef _WIN32
-    // Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-    // defined on MSVC
-    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif
     ///Disable the non-portable Windows definitions of min() and max() macros
     #ifndef NOMINMAX
         #define NOMINMAX
@@ -76,6 +70,29 @@
     #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
         #define OPENEXR_DLL
     #endif
+#endif
+
+/// Macros to suppress undefined behaviour sanitizer warnings. Should be used
+/// sparingly, primarily to suppress issues in upstream dependencies.
+#if defined(__clang__)
+#define OPENVDB_UBSAN_SUPPRESS(X) __attribute__((no_sanitize(X)))
+#else
+#define OPENVDB_UBSAN_SUPPRESS(X)
+#endif
+
+/// Macros to alias to compiler builtins which hint at critical edge selection
+/// during conditional statements.
+#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#ifdef __cplusplus
+#define OPENVDB_LIKELY(x) (__builtin_expect(static_cast<bool>(x), true))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect(static_cast<bool>(x), false))
+#else
+#define OPENVDB_LIKELY(x) (__builtin_expect((x), 1))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect((x), 0))
+#endif
+#else
+#define OPENVDB_LIKELY(x) (x)
+#define OPENVDB_UNLIKELY(x) (x)
 #endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
@@ -128,7 +145,8 @@
 
 /// @brief Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END,
 /// to inhibit warnings about deprecated code.
-/// @note Use this sparingly.  Remove references to deprecated code if at all possible.
+/// @note Only intended to be used internally whilst parent code is being
+///   deprecated
 /// @details Example:
 /// @code
 /// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
@@ -142,9 +160,7 @@
 #if defined __INTEL_COMPILER
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         _Pragma("warning (push)") \
-        _Pragma("warning (disable:1478)") \
-        PRAGMA(message("NOTE: ignoring deprecation warning at " __FILE__  \
-            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+        _Pragma("warning (disable:1478)")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("warning (pop)")
 #elif defined __clang__
@@ -157,16 +173,13 @@
 #elif defined __GNUC__
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         _Pragma("GCC diagnostic push") \
-        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"") \
-        _Pragma("message(\"NOTE: ignoring deprecation warning\")")
+        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("GCC diagnostic pop")
 #elif defined _MSC_VER
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         __pragma(warning(push)) \
-        __pragma(warning(disable : 4996)) \
-        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__ \
-            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+        __pragma(warning(disable : 4996))
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         __pragma(warning(pop))
 #else
@@ -214,10 +227,6 @@
 #ifdef OPENVDB_IMPORT
 #undef OPENVDB_IMPORT
 #endif
-#ifdef __GNUC__
-    #define OPENVDB_EXPORT __attribute__((visibility("default")))
-    #define OPENVDB_IMPORT __attribute__((visibility("default")))
-#endif
 #ifdef _WIN32
     #ifdef OPENVDB_DLL
         #define OPENVDB_EXPORT __declspec(dllexport)
@@ -226,6 +235,9 @@
         #define OPENVDB_EXPORT
         #define OPENVDB_IMPORT
     #endif
+#elif defined(__GNUC__)
+    #define OPENVDB_EXPORT __attribute__((visibility("default")))
+    #define OPENVDB_IMPORT __attribute__((visibility("default")))
 #endif
 
 /// Helper macros for explicit template instantiation

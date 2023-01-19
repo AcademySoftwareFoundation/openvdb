@@ -229,7 +229,8 @@ public:
     template<int Log2N = 20>
     size_t hash() const
     {
-        return ((1<<Log2N)-1) & (mVec[0]*73856093 ^ mVec[1]*19349663 ^ mVec[2]*83492791);
+        const uint32_t* vec = reinterpret_cast<const uint32_t*>(mVec.data());
+        return ((1<<Log2N)-1) & (vec[0]*73856093 ^ vec[1]*19349663 ^ vec[2]*83492791);
     }
 
 private:

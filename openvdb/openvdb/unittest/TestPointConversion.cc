@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/io/TempFile.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
@@ -119,8 +120,8 @@ genPoints(const int numPoints, const double scale, const bool stride,
     // init
     openvdb::math::Random01 randNumber(0);
     const int n = int(std::sqrt(double(numPoints)));
-    const double xScale = (2.0 * M_PI) / double(n);
-    const double yScale = M_PI / double(n);
+    const double xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double yScale = openvdb::math::pi<double>() / double(n);
 
     double x, y, theta, phi;
     openvdb::Vec3f pos;
@@ -138,7 +139,7 @@ genPoints(const int numPoints, const double scale, const bool stride,
     AttributeWrapper<float>::Handle uniformHandle(uniform);
     AttributeWrapper<openvdb::Name>::Handle stringHandle(string);
 
-    int i = 0;
+    size_t i = 0;
 
     // loop over a [0 to n) x [0 to n) grid.
     for (int a = 0; a < n; ++a) {
@@ -164,14 +165,14 @@ genPoints(const int numPoints, const double scale, const bool stride,
 
             if (stride)
             {
-                xyzHandle.set(i, 0, i);
-                xyzHandle.set(i, 1, i*i);
-                xyzHandle.set(i, 2, i*i*i);
+                xyzHandle.set(i, 0, static_cast<int>(i));
+                xyzHandle.set(i, 1, static_cast<int>(i*i));
+                xyzHandle.set(i, 2, static_cast<int>(i*i*i));
             }
 
             // add points with even id to the group
             if ((i % 2) == 0) {
-                group.setOffsetOn(i);
+                group.setOffsetOn(static_cast<int>(i));
                 stringHandle.set(i, /*stride*/0, "testA");
             }
             else {
@@ -254,9 +255,7 @@ TEST_F(TestPointConversion, testPointConversion)
 
     // read/write grid to a temp file
 
-    io::TempFile file;
-    const std::string filename = file.filename();
-
+    const std::string filename = "testPointConversion.vdb";
     io::File fileOut(filename);
 
     GridCPtrVec grids;
@@ -408,7 +407,6 @@ TEST_F(TestPointConversion, testPointConversion)
         EXPECT_NEAR(position.buffer()[i*2].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
     }
 
-    file.close();
     std::remove(filename.c_str());
 }
 
@@ -1045,9 +1043,9 @@ TEST_F(TestPointConversion, testComputeVoxelSize)
 
         // Rotate by 45 degrees in X, Y, Z
 
-        transform1->postRotate(M_PI / 4.0, math::X_AXIS);
-        transform1->postRotate(M_PI / 4.0, math::Y_AXIS);
-        transform1->postRotate(M_PI / 4.0, math::Z_AXIS);
+        transform1->postRotate(openvdb::math::pi<double>() / 4.0, math::X_AXIS);
+        transform1->postRotate(openvdb::math::pi<double>() / 4.0, math::Y_AXIS);
+        transform1->postRotate(openvdb::math::pi<double>() / 4.0, math::Z_AXIS);
 
         affineMap1 = transform1->constMap<math::AffineMap>();
         EXPECT_TRUE(affineMap1.get());

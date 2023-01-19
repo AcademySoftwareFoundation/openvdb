@@ -1,0 +1,1 @@
+FATAL: CLIError: positional argument 'execute' used after optional argument. See 'vdb_ax --help'

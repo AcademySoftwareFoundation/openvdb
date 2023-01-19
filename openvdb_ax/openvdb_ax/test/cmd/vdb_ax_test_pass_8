@@ -1,0 +1,70 @@
+Attribute: loop_test22, type: int32
+  Index        : 0
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test23, type: int32
+  Index        : 1
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test25, type: int32
+  Index        : 2
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test27, type: int32
+  Index        : 3
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test30, type: int32
+  Index        : 4
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test18, type: mat3f
+  Index        : 5
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test1, type: vec3f
+  Index        : 6
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test15, type: vec3f
+  Index        : 7
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test2, type: vec3f
+  Index        : 8
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+
+Attribute: loop_test3, type: vec3f
+  Index        : 9
+  Reads From   : true
+  Writes To    : true
+  Dependencies : 0
+  Usage : 0
+

@@ -683,22 +683,3 @@ TEST_F(TestMorphology, testPreserveMaskLeafNodes)
         EXPECT_EQ(mask.probeConstLeaf({i,i,i}), nodes[i]);
     }
 }
-
-
-TEST_F(TestMorphology, testDeprecated)
-{
-    // just test these can be instantiated
-
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    openvdb::FloatTree tree;
-    openvdb::tree::LeafManager<openvdb::FloatTree> lm(tree);
-
-    openvdb::tools::dilateVoxels(tree, 1);
-    lm.rebuild();
-    openvdb::tools::dilateVoxels(lm, 1);
-    openvdb::tools::erodeVoxels(tree, 1);
-
-    lm.rebuild();
-    openvdb::tools::erodeVoxels(lm, 1);
-OPENVDB_NO_DEPRECATION_WARNING_END
-}

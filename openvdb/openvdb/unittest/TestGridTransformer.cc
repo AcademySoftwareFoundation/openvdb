@@ -60,7 +60,7 @@ TestGridTransformer::transformGrid()
     for (int i = 0; i < 8; ++i) {
         const openvdb::Vec3R
             scale = i & 1 ? openvdb::Vec3R(10, 4, 7.5) : oneVec,
-            rotate = (i & 2 ? openvdb::Vec3R(30, 230, -190) : zeroVec) * (M_PI / 180),
+            rotate = (i & 2 ? openvdb::Vec3R(30, 230, -190) : zeroVec) * (openvdb::math::pi<openvdb::Real>() / 180),
             translate = i & 4 ? openvdb::Vec3R(-5, 0, 10) : zeroVec,
             pivot = i & 8 ? openvdb::Vec3R(0.5, 4, -3.3) : zeroVec;
         openvdb::tools::GridTransformer transformer(pivot, scale, rotate, translate);
@@ -239,7 +239,7 @@ TEST_F(TestGridTransformer, testDecomposition)
         EXPECT_TRUE(!decompose(m, s, r, t));
     }
 
-    const auto rad = [](double deg) { return deg * M_PI / 180.0; };
+    const auto rad = [](double deg) { return deg * openvdb::math::pi<double>() / 180.0; };
 
     const Vec3d ix(1, 0, 0), iy(0, 1, 0), iz(0, 0, 1);
 

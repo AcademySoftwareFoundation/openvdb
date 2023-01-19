@@ -144,11 +144,13 @@ public:
     /// Return a copy of this attribute.
     virtual AttributeArray::Ptr copy() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// Return a copy of this attribute.
 #ifndef _MSC_VER
     OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
 #endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
+#endif
 
     /// Return the number of elements in this array.
     /// @note This does not count each data element in a strided array
@@ -194,6 +196,14 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the number of bytes of memory used by this attribute array once it
+    /// has been deserialized (this may be different to memUsage() if delay-loading
+    /// is in use). Note that this method does NOT consider the fact that a
+    /// uniform attribute could be expanded and only deals with delay-loading.
+    virtual size_t memUsageIfLoaded() const = 0;
+#endif
+
     /// Create a new attribute array of the given (registered) type, length and stride.
     /// @details If @a lock is non-null, the AttributeArray registry mutex
     /// has already been locked
@@ -217,12 +227,14 @@ public:
     template<typename ValueType>
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
     // Windows does not allow base classes to be easily deprecated.
 #ifndef _MSC_VER
     OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
+#endif
 
     /// @brief Copy values into this array from a source array to a target array
     /// as referenced by an iterator.
@@ -265,6 +277,7 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
     OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
@@ -275,6 +288,7 @@ public:
     OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
 #endif
     virtual bool decompress() = 0;
+#endif
 
     /// @brief   Specify whether this attribute should be hidden (e.g., from UI or iterators).
     /// @details This is useful if the attribute is used for blind data or as scratch space
@@ -366,9 +380,7 @@ private:
         bool rangeChecking = true);
 
 protected:
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&);
-#endif
 
     /// @brief Specify whether this attribute has a constant stride or not.
     void setConstantStride(bool state);
@@ -544,7 +556,7 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
+
     /// Deep copy constructor.
     /// @note This method is thread-safe (as of ABI=7) for concurrently reading from the
     /// source attribute array while being deep-copied. Specifically, this means that the
@@ -552,15 +564,12 @@ public:
     /// while being copied using this copy-constructor in another thread.
     /// It is not thread-safe for write.
     TypedAttributeArray(const TypedAttributeArray&);
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// Deep copy constructor.
     OPENVDB_DEPRECATED_MESSAGE("Use copy-constructor without unused bool parameter")
     TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
-#else
-    /// Deep copy constructor.
-    /// @note This method is not thread-safe for reading or writing, use
-    /// TypedAttributeArray::copy() to ensure thread-safety when reading concurrently.
-    TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
 #endif
+
     /// Deep copy assignment operator.
     /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
@@ -575,10 +584,12 @@ public:
     /// @note This method is thread-safe.
     AttributeArray::Ptr copy() const override;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// Return a copy of this attribute.
     /// @note This method is thread-safe.
     OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
     AttributeArray::Ptr copyUncompressed() const override;
+#endif
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true,
@@ -645,6 +656,14 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the number of bytes of memory used by this attribute array once it
+    /// has been deserialized (this may be different to memUsage() if delay-loading
+    /// is in use). Note that this method does NOT consider the fact that a
+    /// uniform attribute could be expanded and only deals with delay-loading.
+    size_t memUsageIfLoaded() const override;
+#endif
+
     /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
     /// Return the value at index @a n
@@ -671,9 +690,11 @@ public:
     /// (assumes in-core)
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
     OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
+#endif
 
     /// Return @c true if this array is stored as a single uniform value.
     bool isUniform() const override { return mIsUniform; }
@@ -697,12 +718,14 @@ public:
     /// Non-member equivalent to fill() that static_casts array to this TypedAttributeArray
     static void fill(AttributeArray* array, const ValueType& value);
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
     /// Compress the attribute array.
     OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
     bool compress() override;
     /// Uncompress the attribute array.
     OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
     bool decompress() override;
+#endif
 
     /// Read attribute data from a stream.
     void read(std::istream&) override;
@@ -762,17 +785,19 @@ protected:
 private:
     friend class ::TestAttributeArray;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
-#endif
 
     /// Load data from memory-mapped file.
     inline void doLoad() const;
     /// Load data from memory-mapped file (unsafe as this function is not protected by a mutex).
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    inline void doLoadUnsafe() const;
+#else
     /// @param compression parameter no longer used
     inline void doLoadUnsafe(const bool compression = true) const;
     /// Compress in-core data assuming mutex is locked
     inline bool compressUnsafe();
+#endif
 
     /// Toggle out-of-core state
     inline void setOutOfCore(const bool);
@@ -1132,7 +1157,6 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
     : TypedAttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
@@ -1144,11 +1168,6 @@ template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs,
     const tbb::spin_mutex::scoped_lock& lock)
     : AttributeArray(rhs, lock)
-#else
-template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
-    : AttributeArray(rhs)
-#endif
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
 {
@@ -1259,20 +1278,18 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
-#if OPENVDB_ABI_VERSION_NUMBER < 7
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-#endif
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
 template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copyUncompressed() const
 {
     return this->copy();
 }
-
+#endif
 
 template<typename ValueType_, typename Codec_>
 size_t
@@ -1374,6 +1391,15 @@ TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 {
     return sizeof(*this) + (bool(mData) ? this->arrayMemUsage() : 0);
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename ValueType_, typename Codec_>
+size_t
+TypedAttributeArray<ValueType_, Codec_>::memUsageIfLoaded() const
+{
+    return sizeof(*this) + (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
+}
+#endif
 
 
 template<typename ValueType_, typename Codec_>
@@ -1478,6 +1504,7 @@ TypedAttributeArray<ValueType_, Codec_>::setUnsafe(AttributeArray* array, const 
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
 template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sourceArray, const Index sourceIndex)
@@ -1489,6 +1516,7 @@ TypedAttributeArray<ValueType_, Codec_>::set(Index n, const AttributeArray& sour
 
     this->set(n, sourceValue);
 }
+#endif
 
 
 template<typename ValueType_, typename Codec_>
@@ -1584,6 +1612,7 @@ TypedAttributeArray<ValueType_, Codec_>::fill(AttributeArray* array, const Value
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 10
 template<typename ValueType_, typename Codec_>
 inline bool
 TypedAttributeArray<ValueType_, Codec_>::compress()
@@ -1606,6 +1635,7 @@ TypedAttributeArray<ValueType_, Codec_>::decompress()
 {
     return false;
 }
+#endif
 
 
 template<typename ValueType_, typename Codec_>
@@ -1764,10 +1794,12 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
         return;
     }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     // If this array is being read from a memory-mapped file, delay loading of its data
     // until the data is actually accessed.
     io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is.getInputStream());
     const bool delayLoad = (mappedFile.get() != nullptr);
+#endif
 
     if (is.sizeOnly())
     {
@@ -1785,14 +1817,22 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     this->deallocate();
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     this->setOutOfCore(delayLoad);
     is.read(mPageHandle, std::streamsize(mPageHandle->size()), delayLoad);
+#else
+    is.read(mPageHandle, std::streamsize(mPageHandle->size()), false);
+#endif // OPENVDB_USE_DELAYED_LOADING
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     if (!delayLoad) {
+#endif
         std::unique_ptr<char[]> buffer = mPageHandle->read();
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
         mPageHandle.reset();
+#ifdef OPENVDB_USE_DELAYED_LOADING
     }
+#endif
 
     // clear page state
 
@@ -1943,7 +1983,11 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 
 template<typename ValueType_, typename Codec_>
 void
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe() const
+#else
 TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool /*compression*/) const
+#endif
 {
     if (!(this->isOutOfCore())) return;
 

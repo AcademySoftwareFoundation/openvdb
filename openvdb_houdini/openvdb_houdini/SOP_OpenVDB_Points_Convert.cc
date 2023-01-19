@@ -447,7 +447,7 @@ Unit Vector:\n\
 @overview\n\
 \n\
 This node converts an unstructured cloud of points to and from a single\n\
-[VDB Points|https://academysoftwarefoundation.github.io/openvdb/points.html] primitive.\n\
+[VDB Points|https://www.openvdb.org/documentation/doxygen/points.html] primitive.\n\
 The resulting primitive will reorder the points to place spatially\n\
 close points close together.\n\
 It is then able to efficiently unpack regions of interest within that primitive.\n\
@@ -806,7 +806,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 
         // Unpack any packed primitives
 
-        std::unique_ptr<GA_PrimitiveGroup> packgroup(ptGeo->newDetachedPrimitiveGroup());
+        GA_PrimitiveGroupUPtr packgroup = ptGeo->createDetachedPrimitiveGroup();
 
         for (GA_Iterator it(ptGeo->getPrimitiveRange()); !it.atEnd(); ++it) {
             GA_Offset offset = *it;

@@ -1,0 +1,11 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+
+#ifndef OPENVDBLINK_EXPLICITGRIDS_OPENVDBFLOATGRID_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_EXPLICITGRIDS_OPENVDBFLOATGRID_HAS_BEEN_INCLUDED
+
+#include "../OpenVDBGrid.h"
+
+using OpenVDBFloatGrid = openvdbmma::OpenVDBGrid<float>;
+
+#endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBFLOATGRID_HAS_BEEN_INCLUDED

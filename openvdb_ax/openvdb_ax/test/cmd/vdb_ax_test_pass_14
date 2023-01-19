@@ -1,0 +1,7 @@
+abs, acos, acosh, addtogroup, adjoint, argsort, asin, asinh, atan, atan2, atanh, atof, atoi, cbrt, ceil,
+clamp, cofactor, cos, cosh, cross, curlsimplexnoise, degrees, deletepoint, determinant, diag, dot, euclideanmod,
+exp, exp2, external, externalv, fabs, fit, floor, floormod, getcoord, getcoordx, getcoordy, getcoordz,
+getvoxelpws, hash, hsvtorgb, identity3, identity4, ingroup, inverse, isfinite, isinf, isnan, length, lengthsq,
+lerp, log, log10, log2, max, min, normalize, polardecompose, postscale, pow, prescale, pretransform, print,
+radians, rand, rand32, removefromgroup, rgbtohsv, round, sign, signbit, simplexnoise, sin, sinh, sort,
+sqrt, tan, tanh, trace, transform, transpose,truncatemod

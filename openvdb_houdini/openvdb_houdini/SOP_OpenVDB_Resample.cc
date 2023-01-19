@@ -17,6 +17,7 @@
 #include <openvdb_houdini/UT_VDBUtils.h> // for UTvdbGridCast()
 #include <openvdb_houdini/SOP_NodeVDB.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/VectorTransformer.h> // for transformVectors()
@@ -208,7 +209,7 @@ Using Voxel Scale Only:\n\
         .setTooltip(
             "Apply the resampling transform to the voxel values of vector-valued VDBs,"
             " in accordance with those VDBs'"
-            " [Vector Type|https://academysoftwarefoundation.github.io/openvdb/overview.html#secGrid]"
+            " [Vector Type|https://www.openvdb.org/documentation/doxygen/overview.html#secGrid]"
             " attributes."));
 
     // Level set rebuild toggle
@@ -467,7 +468,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
 
         const openvdb::Vec3R
             translate = evalVec3R("t", time),
-            rotate = (M_PI / 180.0) * evalVec3R("r", time),
+            rotate = (openvdb::math::pi<double>() / 180.0) * evalVec3R("r", time),
             scale = evalVec3R("s", time),
             pivot = evalVec3R("p", time);
         const float

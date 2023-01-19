@@ -20,6 +20,7 @@
 
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_Version.h>
+#include <UT/UT_ConcurrentVector.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -297,7 +298,7 @@ struct MergeOp
     StringRemapType opRemap;
     std::deque<GU_PrimVDB*> vdbPrims;
     std::deque<const GU_PrimVDB*> constVdbPrims;
-    std::deque<GU_PrimVDB*> vdbPrimsToRemove;
+    UT_ConcurrentVector<GU_PrimVDB*> vdbPrimsToRemove;
     PrimitiveNumberMap primNumbers;
 
     explicit MergeOp(openvdb::util::NullInterrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }

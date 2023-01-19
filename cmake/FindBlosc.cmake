@@ -88,7 +88,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 mark_as_advanced(
@@ -192,7 +192,7 @@ list(APPEND _BLOSC_LIBRARYDIR_SEARCH_DIRS
 
 set(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-if(WIN32)
+if(MSVC)
   if(BLOSC_USE_STATIC_LIBS)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
   endif()
@@ -376,19 +376,74 @@ if(NOT TARGET Blosc::blosc)
     set_target_properties(Blosc::blosc PROPERTIES
       INTERFACE_LINK_DIRECTORIES
          "\$<\$<CONFIG:Release>:${Blosc_RELEASE_LIBRARY_DIRS}>;\$<\$<CONFIG:Debug>:${Blosc_DEBUG_LIBRARY_DIRS}>")
-    target_link_libraries(Blosc::blosc INTERFACE
-      $<$<CONFIG:Release>:lz4;snappy;zlib>
-      $<$<CONFIG:Debug>:lz4d;snappyd;zlibd>)
 
-    if(BLOSC_USE_STATIC_LIBS)
+    set(BLOSC_EXTERNAL_LIBRARIES lz4 snappy zlib zstd)
+
+    foreach(BLOSC_EXTERNAL_LIB ${BLOSC_EXTERNAL_LIBRARIES})
+
+      foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
+        set(_BLOSC_CMAKE_IGNORE_PATH ${CMAKE_IGNORE_PATH})
+
+        if(VCPKG_TOOLCHAIN)
+          if(BUILD_TYPE STREQUAL RELEASE)
+            list(APPEND CMAKE_IGNORE_PATH ${Blosc_DEBUG_LIBRARY_DIRS})
+          else()
+            list(APPEND CMAKE_IGNORE_PATH ${Blosc_RELEASE_LIBRARY_DIRS})
+          endif()
+        endif()
+
+        find_library(${BLOSC_EXTERNAL_LIB}_LIBRARY_${BUILD_TYPE} ${BLOSC_EXTERNAL_LIB}
+          ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
+          PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
+          PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+
+        if(NOT ${BLOSC_EXTERNAL_LIB}_LIBRARY_${BUILD_TYPE})
+          if(BUILD_TYPE STREQUAL DEBUG)
+            find_library(${BLOSC_EXTERNAL_LIB}_LIBRARY_${BUILD_TYPE} "${BLOSC_EXTERNAL_LIB}d"
+              ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
+              PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
+              PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib)
+          endif()
+        endif()
+
+        set(CMAKE_IGNORE_PATH ${_BLOSC_CMAKE_IGNORE_PATH})
+      endforeach()
+
+      if(${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG AND ${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE)
+        # if the generator is multi-config or if CMAKE_BUILD_TYPE is set for
+        # single-config generators, set optimized and debug libraries
+        get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+        if(_isMultiConfig OR CMAKE_BUILD_TYPE)
+          set(${BLOSC_EXTERNAL_LIB}_LIBRARY optimized ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE} debug ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
+        else()
+          # For single-config generators where CMAKE_BUILD_TYPE has no value,
+          # just use the release libraries
+          set(${BLOSC_EXTERNAL_LIB}_LIBRARY ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE})
+        endif()
+        # FIXME: This probably should be set for both cases
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARIES optimized ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE} debug ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
+      endif()
+
+      # if only the release version was found, set the debug variable also to the release version
+      if(${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE AND NOT ${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG)
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE})
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARY       ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE})
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARIES     ${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE})
+      endif()
+
+      # if only the debug version was found, set the release variable also to the debug version
+      if(${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG AND NOT ${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE)
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARY         ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
+        set(${BLOSC_EXTERNAL_LIB}_LIBRARIES       ${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG})
+      endif()
+
       target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:zstd_static>
-        $<$<CONFIG:Debug>:zstd_staticd>)
-    else()
-      target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:zstd>
-        $<$<CONFIG:Debug>:zstdd>)
-    endif()
+        $<$<CONFIG:Release>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_RELEASE}>
+        $<$<CONFIG:Debug>:${${BLOSC_EXTERNAL_LIB}_LIBRARY_DEBUG}>)
+
+    endforeach()
   endif()
+
 endif()
 
