@@ -136,11 +136,11 @@ divergence(const GridType& grid, const MaskT& mask, bool threaded = true)
 /// @details When a mask grid is specified, the solution is calculated only in
 /// the intersection of the mask active topology and the input active topology
 /// independent of the transforms associated with either grid.
-template<typename GridType, typename InterruptT>
+template<typename GridType, typename InterruptT, math::DScheme DiffScheme = math::DScheme::CD_2ND>
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, bool threaded, InterruptT* interrupt);
 
-template<typename GridType, typename MaskT, typename InterruptT>
+template<typename GridType, typename MaskT, typename InterruptT, math::DScheme DiffScheme = math::DScheme::CD_2ND>
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* interrupt);
 
@@ -157,7 +157,6 @@ gradient(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
     return gradient<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
-
 
 /// @brief Compute the Laplacian of the given scalar grid.
 /// @return a new scalar grid
@@ -631,7 +630,8 @@ protected:
 template<
     typename InGridT,
     typename MaskGridType = typename gridop::ToMaskGrid<InGridT>::Type,
-    typename InterruptT = util::NullInterrupter>
+    typename InterruptT = util::NullInterrupter,
+    math::DScheme DiffScheme = math::DScheme::CD_2ND>
 class Gradient
 {
 public:
@@ -666,7 +666,7 @@ protected:
         template<typename MapT>
         void operator()(const MapT& map)
         {
-            typedef math::Gradient<MapT, math::CD_2ND> OpT;
+            typedef math::Gradient<MapT, DiffScheme> OpT;
             gridop::GridOperator<InGridType, MaskGridType, OutGridType, MapT, OpT, InterruptT>
                 op(mInputGrid, mMask, map, mInterrupt);
             mOutputGrid = op.process(mThreaded); // cache the result
@@ -995,20 +995,20 @@ divergence(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* i
     return op.process(threaded);
 }
 
-template<typename GridType, typename InterruptT>
+template<typename GridType, typename InterruptT, math::DScheme DiffScheme>
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, bool threaded, InterruptT* interrupt)
 {
-    Gradient<GridType, typename gridop::ToMaskGrid<GridType>::Type, InterruptT>
+    Gradient<GridType, typename gridop::ToMaskGrid<GridType>::Type, InterruptT, DiffScheme>
         op(grid, interrupt);
     return op.process(threaded);
 }
 
-template<typename GridType, typename MaskT, typename InterruptT>
+template<typename GridType, typename MaskT, typename InterruptT, math::DScheme DiffScheme>
 typename ScalarToVectorConverter<GridType>::Type::Ptr
 gradient(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* interrupt)
 {
-    Gradient<GridType, MaskT, InterruptT> op(grid, mask, interrupt);
+    Gradient<GridType, MaskT, InterruptT, DiffScheme> op(grid, mask, interrupt);
     return op.process(threaded);
 }
 
