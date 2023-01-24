@@ -27,12 +27,6 @@
 #include <png.h>
 #endif
 
-// tbb/task_scheduler_init.h was removed in TBB 2021. The best construct to swap
-// to is tbb/global_control (for executables). global_control was only officially
-// added in TBB 2019U4 but exists in 2018 as a preview feature. To avoid more
-// compile time branching (as we still support 2018), we use it in 2018 too by
-// enabling the below define.
-#define TBB_PREVIEW_GLOBAL_CONTROL 1
 #include <tbb/global_control.h>
 #include <tbb/tick_count.h>
 
