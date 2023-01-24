@@ -36,7 +36,12 @@ if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
 else
     # Github actions runners have 2 threads
     # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-    PARMS[-j]=2
+    if [[ $CXX == "g++" ]]; then
+        # GCC hits memory limits on runners, build in serial
+        PARMS[-j]=1
+    else
+        PARMS[-j]=2
+    fi
 fi
 
 # Available options for --components
@@ -140,29 +145,9 @@ done
 
 ################################################
 
-###### TEMPORARY CHANGE: check if we need to install blosc 1.17.0 as it's not available on the linux docker images yet
-if [ $(uname) == "Linux" ]; then
-    function get_ver_as_int { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
-    BLOSC_VERSION="0.0.0"
-    if [ -f "/usr/local/include/blosc.h" ]; then
-        BLOSC_VERSION=$(cat /usr/local/include/blosc.h | grep BLOSC_VERSION_STRING | cut -d'"' -f 2)
-    fi
-
-    if [ $(get_ver_as_int $BLOSC_VERSION) -lt $(get_ver_as_int "1.17.0") ]; then
-        # Install
-        $CI_DIR/install_blosc.sh 1.17.0
-    elif [ $(get_ver_as_int $BLOSC_VERSION) -eq $(get_ver_as_int "1.17.0") ]; then
-        # Remind us to remove this code
-        echo "WARNING: Blosc has been updated to 1.17.0 - this logic in build.sh should be removed!!"
-    fi
-fi
-###### TEMPORARY CHANGE: always install blosc 1.17.0 as it's not available on the docker images yet
-
-################################################
-
 ###### TEMPORARY CHANGE: Install pybind11 2.10.0 as it's not available on the linux docker images yet
 if [ $(uname) == "Linux" ]; then
-    if [ ! -f "/usr/local/include/pybind11.h" ]; then
+    if [ ! -f "/usr/local/include/pybind11/pybind11.h" ]; then
         $CI_DIR/install_pybind11.sh 2.10.0
     fi
 fi

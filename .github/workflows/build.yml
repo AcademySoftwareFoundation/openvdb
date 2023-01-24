@@ -70,13 +70,13 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Release' }
-          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Debug'   }
-          - { cxx: g++,     image: '2022-clang11', abi: '10', build: 'Release' }
-          - { cxx: clang++, image: '2022-clang11', abi: '9',  build: 'Release' }
-          - { cxx: g++,     image: '2022-clang11', abi: '9',  build: 'Release' }
-          - { cxx: clang++, image: '2021',         abi: '8',  build: 'Release' }
-          - { cxx: g++,     image: '2021',         abi: '8',  build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Debug'  , cmake: '' }
+          - { cxx: g++,     image: '2022-clang11', abi: '10', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9',  build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2022-clang11', abi: '9',  build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2021',         abi: '8',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2021',         abi: '8',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
@@ -98,7 +98,11 @@ jobs:
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
         --components=\"core,python,bin,view,render,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}\"
+        --cargs=\"
+        ${{ matrix.config.cmake }}
+        -DOPENVDB_CXX_STRICT=ON
+        -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}
+        \"
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2

@@ -101,8 +101,7 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      # Can bump clang when AX is compatible with LLVM14
-      image: aswf/ci-openvdb:2022-clang12
+      image: aswf/ci-openvdb:2022-clang14
     env:
       CXX: clang++
     strategy:
@@ -178,15 +177,15 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
           # Standalone
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core', cmake: '' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core', cmake: '' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -196,6 +195,7 @@ jobs:
           --build-type=${{ matrix.config.build }}
           --components=${{ matrix.config.components }}
           --cargs=\"
+          ${{ matrix.config.cmake }}
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
@@ -210,6 +210,7 @@ jobs:
           --build-type=${{ matrix.config.build }}
           --components="bin,axcore,axbin,axtest,python"
           --cargs=\"
+          ${{ matrix.config.cmake }}
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON

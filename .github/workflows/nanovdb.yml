@@ -84,6 +84,7 @@ jobs:
           -DNANOVDB_USE_CUDA=ON
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
+          -DUSE_BLOSC=OFF
           \'
       - name: test
         run: cd build && sudo ctest -V
