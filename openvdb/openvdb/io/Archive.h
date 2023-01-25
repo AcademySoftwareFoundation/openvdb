@@ -10,7 +10,6 @@
 #include <openvdb/MetaMap.h>
 #include <openvdb/Platform.h>
 #include <openvdb/version.h> // for VersionId
-#include <boost/uuid/uuid.hpp>
 #include <cstdint>
 #include <iosfwd>
 #include <map>
@@ -179,8 +178,8 @@ private:
     uint32_t mFileVersion;
     /// The version of the library that was used to create the file that was read
     VersionId mLibraryVersion;
-    /// 16-byte (128-bit) UUID
-    mutable boost::uuids::uuid mUuid;// needs to be mutable since writeHeader is const!
+    /// Unique tag, a random 16-byte (128-bit) value, stored as a string format.
+    mutable std::string mUuid;// needs to be mutable since writeHeader is const!
     /// Flag indicating whether the input stream contains grid offsets
     /// and therefore supports partial reading
     bool mInputHasGridOffsets;
