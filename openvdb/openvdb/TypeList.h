@@ -837,7 +837,7 @@ struct TypeList
 ///   methods. Importantly can be instatiated from a TypeList and implements a
 ///   similar ::foreach interface
 /// @warning  Some member methods here run on actual instances of types in the
-///   list. As such, it's unlikely that they can alwasy be resolved at compile
+///   list. As such, it's unlikely that they can always be resolved at compile
 ///   time (unlike methods in TypeList). Compilers are notriously bad at
 ///   automatically inlining recursive/nested template instations (without fine
 ///   tuning inline options to the frontend) so the public API of this class is
@@ -855,6 +855,7 @@ struct TupleList
     TupleList() = default;
     TupleList(Ts&&... args) : mTuple(std::forward<Ts>(args)...) {}
 
+    constexpr auto size() { return std::tuple_size_v<TupleT>; }
     constexpr TupleT& tuple() { return mTuple; }
     constexpr TupleT& tuple() const { return mTuple; }
 
@@ -886,7 +887,7 @@ struct TupleList
     ///   calls op(std::get<I>(mTuple)) when pred(I) returns true, then exits,
     ///   where I = [0,Size). Does not support returning a value.
     /// @note  This is mainly useful to avoid the overhead of calling std::get<I>
-    ///   on every element when only a single element needs processing.
+    ///   on every element when only a single unknown element needs processing.
     ///
     /// @param pred  Predicate to run on each index, should return true/false
     /// @param op    Function to run on the first element that satisfies pred
@@ -897,9 +898,9 @@ struct TupleList
     /// }
     /// {
     ///     Types::AsTupleList tuple(Int32(1), float(3.3), std::string("foo"));
-    ///     // prints '3.3'
+    ///     bool runtimeFlags[tuple.size()] = { .... } // some runtime flags
     ///     tuple.foreach(
-    ///         [](auto Idx) { return (Idx == 1); },
+    ///         [&](auto Idx)  { return runtimeFlags[Idx]; },
     ///         [](auto value) { std::cout << value << std::endl; }
     ///      );
     /// }
@@ -958,6 +959,7 @@ struct TupleList<>
 
     TupleList() = default;
 
+    constexpr auto size() { return std::tuple_size_v<TupleT>; }
     inline TupleT& tuple() { return mTuple; }
     inline const TupleT& tuple() const { return mTuple; }
 
