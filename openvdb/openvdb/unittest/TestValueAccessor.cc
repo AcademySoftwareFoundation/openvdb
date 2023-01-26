@@ -431,6 +431,35 @@ TestValueAccessor::multithreadedAccessorTest()
 #undef MAX_COORD
 }
 
+/// Static assert class sizes
+template <typename Type, size_t Expect, size_t Actual = sizeof(Type)>
+struct CheckClassSize { static_assert(Expect == Actual); };
+
+// Build a type list of all accessor types and make sure they are all the
+// expected size.
+template <typename GridT> using GridToAccCheckA =
+    CheckClassSize<typename GridT::Accessor, 96ul>;
+template <typename GridT> using GridToAccCheckB =
+    CheckClassSize<typename GridT::Accessor, 88ul>;
+
+void StaticAsssertVASizes()
+{
+    // Accessors with a leaf buffer cache have an extra pointer
+    using AccessorsWithLeafCache =
+        openvdb::GridTypes
+            ::Remove<openvdb::BoolGrid>
+            ::Remove<openvdb::MaskGrid>
+            ::Transform<GridToAccCheckA>;
+
+    // Accessors without a leaf buffer cache
+    using AccessorsWithoutLeafCache =
+        openvdb::TypeList<openvdb::BoolGrid, openvdb::MaskGrid>
+            ::Transform<GridToAccCheckB>;
+
+    // instantiate these types to force the static check
+    [[maybe_unused]] AccessorsWithLeafCache::AsTupleList test;
+    [[maybe_unused]] AccessorsWithoutLeafCache::AsTupleList test2;
+}
 
 // cache all node levels
 TEST_F(TestValueAccessor, testTree2Accessor)        { accessorTest<ValueAccessor<Tree2Type> >(); }

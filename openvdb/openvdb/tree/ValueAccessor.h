@@ -3,11 +3,23 @@
 
 /// @file tree/ValueAccessor.h
 ///
-/// @brief  When traversing a grid in a spatially coherent pattern (e.g.,
-///   iterating over neighboring voxels), request a @c ValueAccessor from the
-///   grid (with Grid::getAccessor()) and use the accessor's @c getValue() and
-///   @c setValue() methods. These will typically be significantly faster than
-///   accessing voxels directly in the grid's tree.
+/// @brief  ValueAccessors are designed to help accelerate accesses into the
+///   OpenVDB Tree structures by storing caches to Tree branches. When
+///   traversing a grid in a spatially coherent pattern (e.g., iterating over
+///   neighboring voxels), the same branches and nodes of the underlying tree
+///   can be hit. If you do this using the Tree/RootNode methods directly,
+///   traversal will occur at O(log(n)) (or O(n) depending on the hash map
+///   implementation) for every access. However, using a ValueAccessor allows
+///   for the Accessor to cache previously visited Nodes, providing possible
+///   subsequent access speeds of O(1) if the next access is close to a
+///   previously cached Node. Accessors are lightweight and can be configured
+///   to cache any number of arbitrary Tree levels.
+///
+///   The ValueAccessor interfaces matches that of compatible OpenVDB Tree
+///   nodes. You can request an Accessor from a Grid (with Grid::getAccessor())
+///   or construct one directly from a Tree. You can use, for example, the
+///   accessor's @c getValue() and @c setValue() methods in place of those on
+///   OpenVDB Nodes/Trees.
 ///
 /// @par Example:
 /// @code
@@ -200,26 +212,7 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-/// @brief  A small class that contains a Mutex which is derived from by the
-///    internal Value Accessor Implementation. This allows for the empty base
-///    class optimization to be performed in the case where a Mutex/Lock is not
-///    in use. From C++20 we can instead switch to [[no_unique_address]].
-template <typename MutexT>
-struct ValueAccessorLock
-{
-    inline auto lock() const { return std::scoped_lock(m); }
-private:
-    mutable MutexT m;
-};
-
-/// @brief  Specialization for the case where no Mutex is in use. See above.
-template <>
-struct ValueAccessorLock<void>
-{
-    inline constexpr auto lock() const { return 0; }
-};
-
-///////////////////////////////////////////////////////////////////////////////
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace value_accessor_internal
 {
@@ -269,15 +262,107 @@ struct NodeListBuilder<NodeChainT, RootLevel, openvdb::index_sequence<Is...>>
     using ListT = typename NodeListBuilderImpl<NodeChainT, Is..., RootLevel>::ListT;
 };
 
+
+template<typename TreeTypeT, typename NodeT>
+struct EnableLeafBuffer
+{
+    using LeafNodeT = typename TreeTypeT::LeafNodeType;
+    static constexpr bool value =
+        std::is_same<NodeT, LeafNodeT>::value &&
+        std::is_same<typename LeafNodeT::Buffer::StorageType,
+            typename LeafNodeT::ValueType>::value;
+};
+
+template<typename TreeTypeT, size_t... Is>
+struct EnableLeafBuffer<TreeTypeT, openvdb::index_sequence<Is...>>
+{
+    // Empty integer seq, no nodes being caches
+    static constexpr bool value = false;
+};
+
+template<typename TreeTypeT, size_t First, size_t... Is>
+struct EnableLeafBuffer<TreeTypeT, openvdb::index_sequence<First, Is...>>
+{
+private:
+    using NodeChainT = typename TreeTypeT::RootNodeType::NodeChainType;
+    using FirstNodeT = typename NodeChainT::template Get<First>;
+public:
+    static constexpr bool value = EnableLeafBuffer<TreeTypeT, FirstNodeT>::value;
+};
+
 } // namespace value_accessor_internal
+
+/// @endcond
+
+///////////////////////////////////////////////////////////////////////////////
+
+/// The following classes exist to perform empty base class optimizations
+/// with the final ValueAccessor implementation. Depending on the template
+/// types provided to the derived implementation, some member variables may not
+/// be necessary (mutex, leaf buffer cache, etc). These classes allow for these
+/// variables to be compiled out. Note that from C++20 we can switch to
+/// [[no_unique_address]] member annotations instead.
+
+/// @brief  A small class that contains a Mutex which is derived from by the
+///   internal Value Accessor Implementation. This allows for the empty base
+///   class optimization to be performed in the case where a Mutex/Lock is not
+///   in use. From C++20 we can instead switch to [[no_unique_address]].
+template <typename MutexT>
+struct ValueAccessorLock
+{
+    inline auto lock() const { return std::scoped_lock(m); }
+private:
+    mutable MutexT m;
+};
+
+/// @brief  Specialization for the case where no Mutex is in use. See above.
+template <>
+struct ValueAccessorLock<void>
+{
+    inline constexpr auto lock() const { return 0; }
+};
+
+/// @brief  A small class that contains a cached pointer to a LeafNode data
+///   buffer which is derived from by the internal Value Accessor
+///   Implementation. This allows for the empty base class optimization to be
+///   performed in the case where a LeafNode does not store a contiguous
+///   index-able buffer. From C++20 we can instead switch to
+///   [[no_unique_address]].
+template<typename TreeTypeT, typename IntegerSequence, typename Enable = void>
+struct ValueAccessorLeafBuffer
+{
+    template <typename NodeT>
+    static constexpr bool BypassLeafAPI =
+        std::is_same<NodeT, typename TreeTypeT::LeafNodeType>::value;
+    inline const typename TreeTypeT::ValueType* buffer() { assert(mBuffer); return mBuffer; }
+    inline const typename TreeTypeT::ValueType* buffer() const { assert(mBuffer); return mBuffer; }
+    inline void setBuffer(const typename TreeTypeT::ValueType* b) const { mBuffer = b; }
+private:
+    mutable const typename TreeTypeT::ValueType* mBuffer;
+};
+
+/// @brief  Specialization for the case where a Leaf Buffer cannot be cached.
+//    These methods should never be invoked. See above.
+template<typename TreeTypeT, typename IntegerSequence>
+struct ValueAccessorLeafBuffer<TreeTypeT, IntegerSequence,
+    typename std::enable_if<
+        !value_accessor_internal::EnableLeafBuffer<TreeTypeT, IntegerSequence>::value
+    >::type>
+{
+    template <typename> static constexpr bool BypassLeafAPI = false;
+    inline constexpr typename TreeTypeT::ValueType* buffer() { assert(false); return nullptr; }
+    inline constexpr typename TreeTypeT::ValueType* buffer() const { assert(false); return nullptr; }
+    inline constexpr void setBuffer(const typename TreeTypeT::ValueType*) const { assert(false); }
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
 /// @brief  The Value Accessor Implementation and API methods. The majoirty of
-///   the API matches the API of an OpenVDB Tree.
+///   the API matches the API of a compatible OpenVDB Tree Node.
 template<typename _TreeType, bool IsSafe, typename MutexT, typename IntegerSequence>
 class ValueAccessorImpl final :
     public ValueAccessorBase<_TreeType, IsSafe>,
+    public ValueAccessorLeafBuffer<_TreeType, IntegerSequence>,
     public ValueAccessorLock<MutexT>
 {
 public:
@@ -285,6 +370,7 @@ public:
     ///   compatibility.
     using BaseT = ValueAccessorBase<_TreeType, IsSafe>;
     using LockT = ValueAccessorLock<MutexT>;
+    using LeafCacheT = ValueAccessorLeafBuffer<_TreeType, IntegerSequence>;
 
     using TreeType = _TreeType;
     using ValueType = typename TreeType::ValueType;
@@ -322,13 +408,12 @@ public:
     ///   index-able array of values then this returns true.
     template <typename NodeT>
     static constexpr bool IsLeafAndBypassLeafAPI =
-        std::is_same<NodeT, LeafNodeT>::value &&
-        std::is_same<typename LeafNodeT::Buffer::StorageType, ValueType>::value;
+        LeafCacheT::template BypassLeafAPI<NodeT>;
 
     /// @brief Helper alias which is true if the lowest cached node level is
-    ///   a LeafNode type and has a compatible value type for optimized
-    ///   access
-    static constexpr bool BypassLeafAPI = IsLeafAndBypassLeafAPI<NodeTypeAtLevel<0>>;
+    ///   a LeafNode type and has a compatible value type for optimized access.
+    static constexpr bool BypassLeafAPI =
+        IsLeafAndBypassLeafAPI<NodeTypeAtLevel<0>>;
 
     /// @brief The number of node levels that this accessor can cache,
     ///   excluding the RootNode.
@@ -339,10 +424,10 @@ public:
     /// @brief Constructor from a tree
     ValueAccessorImpl(TreeType& tree)
         : BaseT(tree)
+        , LeafCacheT()
         , LockT()
         , mKeys()
-        , mNodes()
-        , mBuffer() {
+        , mNodes() {
             this->clear();
         }
 
@@ -380,8 +465,7 @@ public:
                 if (!this->isHashed<NodeType>(xyz)) return nullptr;
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
-                    return &(mBuffer[LeafNodeT::coordToOffset(xyz)]);
+                    return &(LeafCacheT::buffer()[LeafNodeT::coordToOffset(xyz)]);
                 }
                 else {
                     auto node = mNodes.template get<Idx>();
@@ -413,9 +497,8 @@ public:
                 assert(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
                     const auto offset = LeafNodeT::coordToOffset(xyz);
-                    value = mBuffer[offset];
+                    value = LeafCacheT::buffer()[offset];
                     return node->isValueOn(offset);
                 }
                 else {
@@ -473,9 +556,8 @@ public:
                 assert(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
                     const auto offset = LeafNodeT::coordToOffset(xyz);
-                    const_cast<ValueType&>(mBuffer[offset]) = value;
+                    const_cast<ValueType&>(LeafCacheT::buffer()[offset]) = value;
                     const_cast<NodeType*>(node)->setValueOn(offset);
                 }
                 else {
@@ -504,8 +586,7 @@ public:
                 if (!this->isHashed<NodeType>(xyz)) return false;
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
-                    const_cast<ValueType&>(mBuffer[LeafNodeT::coordToOffset(xyz)]) = value;
+                    const_cast<ValueType&>(LeafCacheT::buffer()[LeafNodeT::coordToOffset(xyz)]) = value;
                 }
                 else {
                     auto node = mNodes.template get<Idx>();
@@ -532,9 +613,8 @@ public:
                 assert(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
                     const auto offset = LeafNodeT::coordToOffset(xyz);
-                    const_cast<ValueType&>(mBuffer[offset]) = value;
+                    const_cast<ValueType&>(LeafCacheT::buffer()[offset]) = value;
                     const_cast<NodeType*>(node)->setValueOff(offset);
                 }
                 else {
@@ -558,9 +638,8 @@ public:
                 assert(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
                     const auto offset = LeafNodeT::coordToOffset(xyz);
-                    op(const_cast<ValueType&>(mBuffer[offset]));
+                    op(const_cast<ValueType&>(LeafCacheT::buffer()[offset]));
                     const_cast<NodeType*>(node)->setActiveState(offset, true);
                 }
                 else {
@@ -583,10 +662,9 @@ public:
                 assert(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
-                    assert(mBuffer);
                     const auto offset = LeafNodeT::coordToOffset(xyz);
                     bool state = node->isValueOn(offset);
-                    op(const_cast<ValueType&>(mBuffer[offset]), state);
+                    op(const_cast<ValueType&>(LeafCacheT::buffer()[offset]), state);
                     const_cast<NodeType*>(node)->setActiveState(offset, state);
                 }
                 else {
@@ -803,7 +881,9 @@ public:
     {
         mKeys.fill(Coord::max());
         mNodes.foreach([](auto& node) { node = nullptr; });
-        mBuffer = nullptr;
+        if constexpr (BypassLeafAPI) {
+            LeafCacheT::setBuffer(nullptr);
+        }
         if (BaseT::mTree) {
             static constexpr int64_t Idx = NodeLevelList::template Index<RootNodeT>;
             mNodes.template get<Idx>() = const_cast<RootNodeT*>(&(BaseT::mTree->root()));
@@ -860,7 +940,7 @@ protected:
             mKeys[Idx] = xyz & ~(NodeT::DIM-1);
             mNodes.template get<Idx>() = const_cast<NodeT*>(node);
             if constexpr(IsLeafAndBypassLeafAPI<NodeT>) {
-                mBuffer = node->buffer().data();
+                LeafCacheT::setBuffer(node->buffer().data());
             }
         }
     }
@@ -938,7 +1018,6 @@ private:
 private:
     mutable std::array<Coord, NumCacheLevels> mKeys;
     mutable typename NodePtrList::AsTupleList mNodes;
-    mutable const ValueType* mBuffer;
 }; // ValueAccessorImpl
 
 } // namespace tree
