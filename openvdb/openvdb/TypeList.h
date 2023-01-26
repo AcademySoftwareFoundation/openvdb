@@ -17,13 +17,29 @@
 #include <tuple>
 #include <type_traits>
 
+/// We should usually not be decorating public API functions with attributes
+/// such as always_inline. However many compilers are notoriously bad at
+/// inlining recursive template loops with default inline settings. The
+/// TypeList and TupleList metaprogram constructs heavily use this C++ feature
+/// and the performance difference can be substantial, even for very small
+/// lists. You can disable this behaviour by setting the define:
+///    OPENVDB_TYPELIST_NO_FORCE_INLINE
+/// This will disable the force inling on public API methods in this file.
+#ifdef OPENVDB_TYPELIST_NO_FORCE_INLINE
+#define OPENVDB_TYPELIST_FORCE_INLINE inline
+#else
+#define OPENVDB_TYPELIST_FORCE_INLINE OPENVDB_FORCE_INLINE
+#endif
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 /// @cond OPENVDB_DOCS_INTERNAL
 
-template<typename... Ts> struct TypeList; // forward declaration
+// forward declarations
+template<typename... Ts> struct TypeList;
+template<typename... Ts> struct TupleList;
 
 namespace typelist_internal {
 
@@ -427,16 +443,6 @@ public:
         Append<NextList>;
 };
 
-
-template<typename OpT> inline void TSForEachImpl(OpT) {}
-template<typename OpT, typename T, typename... Ts>
-inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
-
-template<template <typename> class OpT> inline void TSForEachImpl() {}
-template<template <typename> class OpT, typename T, typename... Ts>
-inline void TSForEachImpl() { OpT<T>()(); TSForEachImpl<OpT, Ts...>(); }
-
-
 /// @brief  Partial apply specialization for an empty @c TypeList
 /// @tparam  OpT    User functor to apply to the first valid type
 /// @tparam  BaseT  Type of the provided obj
@@ -469,10 +475,98 @@ struct TSApplyImpl<OpT, BaseT, TypeList<T, Ts...>>
     }
 };
 
+template<template <typename> class OpT> inline void TSForEachImpl() {}
+template<template <typename> class OpT, typename T, typename... Ts>
+inline void TSForEachImpl() { OpT<T>()(); TSForEachImpl<OpT, Ts...>(); }
+
+template<typename OpT> inline void TSForEachImpl(OpT) {}
+template<typename OpT, typename T, typename... Ts>
+constexpr OPENVDB_FORCE_INLINE void TSForEachImpl(OpT op) {
+    op(T()); TSForEachImpl<OpT, Ts...>(op);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Implementation details of @c TupleList
+
+template<size_t Iter, size_t End, typename OpT, typename TupleT>
+constexpr OPENVDB_FORCE_INLINE void TSForEachImpl(
+    [[maybe_unused]] OpT op,
+    [[maybe_unused]] TupleT& tup)
+{
+    if constexpr(Iter<End) {
+        op(std::get<Iter>(tup));
+        TSForEachImpl<Iter+1, End, OpT, TupleT>(op, tup);
+    }
+}
+
+template<typename OpT, size_t Iter, size_t End>
+constexpr OPENVDB_FORCE_INLINE void TSForEachIndexImpl([[maybe_unused]] OpT op)
+{
+    if constexpr(Iter<End) {
+        op(std::integral_constant<std::size_t, Iter>());
+        TSForEachIndexImpl<OpT, Iter+1, End>(op);
+    }
+}
+
+template<typename OpT, typename RetT, size_t Iter, size_t End>
+constexpr OPENVDB_FORCE_INLINE RetT TSEvalFirstIndex([[maybe_unused]] OpT op, const RetT def)
+{
+    if constexpr(Iter<End) {
+        if (auto ret = op(std::integral_constant<std::size_t, Iter>())) return ret;
+        return TSEvalFirstIndex<OpT, RetT, Iter+1, End>(op, def);
+    }
+    else return def;
+}
+
+template<class Pred, class OpT, typename TupleT, size_t Iter, size_t End>
+constexpr OPENVDB_FORCE_INLINE
+void TSEvalFirstPredImpl(
+    [[maybe_unused]] Pred pred,
+    [[maybe_unused]] OpT op,
+    [[maybe_unused]] TupleT& tup)
+{
+    if constexpr (Iter<End) {
+        constexpr auto Idx = std::integral_constant<std::size_t, Iter>();
+        if (pred(Idx)) op(std::get<Idx>(tup));
+        else TSEvalFirstPredImpl<Pred, OpT, TupleT, Iter+1, End>(pred, op, tup);
+    }
+}
+
+template<class Pred, class OpT, typename TupleT, typename RetT, size_t Iter, size_t End>
+constexpr OPENVDB_FORCE_INLINE
+RetT TSEvalFirstPredImpl(
+    [[maybe_unused]] Pred pred,
+    [[maybe_unused]] OpT op,
+    [[maybe_unused]] TupleT& tup,
+    RetT def)
+{
+    if constexpr (Iter<End) {
+        constexpr auto Idx = std::integral_constant<std::size_t, Iter>();
+        if (pred(Idx)) return op(std::get<Idx>(tup));
+        else return TSEvalFirstPredImpl
+            <Pred, OpT, TupleT, RetT, Iter+1, End>(pred, op, tup, def);
+    }
+    else return def;
+}
+
 } // namespace internal
 
 /// @endcond
 
+
+/// @brief
+template<size_t Start, size_t End, typename OpT>
+OPENVDB_TYPELIST_FORCE_INLINE auto foreachIndex(OpT op)
+{
+    typelist_internal::TSForEachIndexImpl<OpT, Start, End>(op);
+}
+
+template<size_t Start, size_t End, typename OpT, typename RetT>
+OPENVDB_TYPELIST_FORCE_INLINE RetT evalFirstIndex(OpT op, const RetT def = RetT())
+{
+    return typelist_internal::TSEvalFirstIndex<OpT, RetT, Start, End>(op, def);
+}
 
 /// @brief A list of types (not necessarily unique)
 /// @details Example:
@@ -484,6 +578,8 @@ struct TypeList
 {
     /// The type of this list
     using Self = TypeList;
+
+    using AsTupleList = TupleList<Ts...>;
 
     /// @brief The number of types in the type list
     static constexpr size_t Size = sizeof...(Ts);
@@ -657,7 +753,9 @@ struct TypeList
     /// @note OpT must be a templated class. It is created and invoked for each
     ///   type in this list.
     template<template <typename> class OpT>
-    static void foreach() { typelist_internal::TSForEachImpl<OpT, Ts...>(); }
+    static OPENVDB_TYPELIST_FORCE_INLINE void foreach() {
+        typelist_internal::TSForEachImpl<OpT, Ts...>();
+    }
 
     /// @brief Invoke a templated, unary functor on a value of each type in this list.
     /// @details Example:
@@ -680,7 +778,19 @@ struct TypeList
     /// @note The functor object is passed by value.  Wrap it with @c std::ref
     /// to use the same object for each type.
     template<typename OpT>
-    static void foreach(OpT op) { typelist_internal::TSForEachImpl<OpT, Ts...>(op); }
+    static OPENVDB_TYPELIST_FORCE_INLINE void foreach(OpT op) {
+        typelist_internal::TSForEachImpl<OpT, Ts...>(op);
+    }
+
+    template<typename OpT>
+    static OPENVDB_TYPELIST_FORCE_INLINE void foreachIndex(OpT op) {
+        foreachIndex<OpT, 0, Size>(op);
+    }
+
+    template<typename OpT, typename RetT>
+    static OPENVDB_TYPELIST_FORCE_INLINE RetT foreachIndex(OpT op, RetT def) {
+        return foreachIndex<OpT, RetT, 0, Size>(op, def);
+    }
 
     /// @brief Invoke a templated, unary functor on a provide @c obj of type
     ///        @c BaseT only if said object is an applicable (derived) type
@@ -718,11 +828,152 @@ struct TypeList
     /// @note The functor object is passed by value.  Wrap it with @c std::ref
     ///   pass by reference.
     template<typename OpT, typename BaseT>
-    static bool apply(OpT op, BaseT& obj) {
+    static OPENVDB_TYPELIST_FORCE_INLINE bool apply(OpT op, BaseT& obj) {
         return typelist_internal::TSApplyImpl<OpT, BaseT, Self>::apply(obj, op);
     }
 };
 
+/// @brief  A trivial wrapper around a std::tuple but with compatible TypeList
+///   methods. Importantly can be instatiated from a TypeList and implements a
+///   similar ::foreach interface
+/// @warning  Some member methods here run on actual instances of types in the
+///   list. As such, it's unlikely that they can always be resolved at compile
+///   time (unlike methods in TypeList). Compilers are notriously bad at
+///   automatically inlining recursive/nested template instations (without fine
+///   tuning inline options to the frontend) so the public API of this class is
+///   marked as force inlined. You can disable this behaviour by defining:
+///      OPENVDB_TYPELIST_NO_FORCE_INLINE
+///   before including this header. Note however that the ValueAccessor uses
+///   this API and disabling force inlining can cause significant performance
+///   degredation.
+template<typename... Ts>
+struct TupleList
+{
+    using AsTypeList = TypeList<Ts...>;
+    using TupleT = std::tuple<Ts...>;
+
+    TupleList() = default;
+    TupleList(Ts&&... args) : mTuple(std::forward<Ts>(args)...) {}
+
+    constexpr auto size() { return std::tuple_size_v<TupleT>; }
+    constexpr TupleT& tuple() { return mTuple; }
+    constexpr TupleT& tuple() const { return mTuple; }
+
+    template <size_t Idx> constexpr auto& get() { return std::get<Idx>(mTuple); }
+    template <size_t Idx> constexpr auto& get() const { return std::get<Idx>(mTuple); }
+
+    /// @brief  Run a function on each type instance in the underlying
+    ///   std::tuple. Effectively calls op(std::get<I>(mTuple)) where
+    ///   I = [0,Size). Does not support returning a value.
+    ///
+    /// @param op  Function to run on each type
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using Types = openvdb::TypeList<Int32, float, std::string>;
+    /// }
+    /// {
+    ///     Types::AsTupleList tuple(Int32(1), float(3.3), std::string("foo"));
+    ///     tuple.foreach([](auto value) { std::cout << value << ' '; }); // prints '1 3.3 foo'
+    /// }
+    /// @endcode
+    template<typename OpT>
+    OPENVDB_TYPELIST_FORCE_INLINE constexpr void foreach(OpT op) {
+        typelist_internal::TSForEachImpl<0, AsTypeList::Size>(op, mTuple);
+    }
+
+    /// @brief  Run a function on the first element in the underlying
+    ///   std::tuple that satisfies the provided predicate. Effectively
+    ///   calls op(std::get<I>(mTuple)) when pred(I) returns true, then exits,
+    ///   where I = [0,Size). Does not support returning a value.
+    /// @note  This is mainly useful to avoid the overhead of calling std::get<I>
+    ///   on every element when only a single unknown element needs processing.
+    ///
+    /// @param pred  Predicate to run on each index, should return true/false
+    /// @param op    Function to run on the first element that satisfies pred
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using Types = openvdb::TypeList<Int32, float, std::string>;
+    /// }
+    /// {
+    ///     Types::AsTupleList tuple(Int32(1), float(3.3), std::string("foo"));
+    ///     bool runtimeFlags[tuple.size()] = { .... } // some runtime flags
+    ///     tuple.foreach(
+    ///         [&](auto Idx)  { return runtimeFlags[Idx]; },
+    ///         [](auto value) { std::cout << value << std::endl; }
+    ///      );
+    /// }
+    /// @endcode
+    template<class Pred, class OpT>
+    OPENVDB_TYPELIST_FORCE_INLINE void evalFirstPred(Pred pred, OpT op)
+    {
+        typelist_internal::TSEvalFirstPredImpl
+            <Pred, OpT, TupleT, 0, AsTypeList::Size>
+                (pred, op, mTuple);
+    }
+
+    /// @brief  Run a function on the first element in the underlying
+    ///   std::tuple that satisfies the provided predicate. Effectively
+    ///   calls op(std::get<I>(mTuple)) when pred(I) returns true, then exits,
+    ///   where I = [0,Size). Supports returning a value, but a default return
+    ///   value must be provided.
+    ///
+    /// @param pred  Predicate to run on each index, should return true/false
+    /// @param op    Function to run on the first element that satisfies pred
+    /// @param def   Default return value
+    /// @details Example:
+    /// @code
+    /// {
+    ///     using Types = openvdb::TypeList<Int32, float, std::string>;
+    /// }
+    /// {
+    ///     Types::AsTupleList tuple(Int32(1), float(3.3), std::string("foo"));
+    ///     // returns 3
+    ///     auto size = tuple.foreach(
+    ///         [](auto Idx) { return std::is_same<std::string, Types::template Get<Idx>>::value; },
+    ///         [](auto value) { return value.size(); },
+    ///         -1
+    ///      );
+    /// }
+    /// @endcode
+    template<class Pred, class OpT, typename RetT>
+    OPENVDB_TYPELIST_FORCE_INLINE RetT evalFirstPred(Pred pred, OpT op, RetT def)
+    {
+        return typelist_internal::TSEvalFirstPredImpl
+            <Pred, OpT, TupleT, RetT, 0, AsTypeList::Size>
+                (pred, op, mTuple, def);
+    }
+
+private:
+    TupleT mTuple;
+};
+
+/// @brief  Specilization of an empty TupleList. Required due to constructor
+///   selection.
+template<>
+struct TupleList<>
+{
+    using AsTypeList = TypeList<>;
+    using TupleT = std::tuple<>;
+
+    TupleList() = default;
+
+    constexpr auto size() { return std::tuple_size_v<TupleT>; }
+    inline TupleT& tuple() { return mTuple; }
+    inline const TupleT& tuple() const { return mTuple; }
+
+    template <size_t Idx> inline constexpr auto& get() { return std::get<Idx>(mTuple); }
+    template <size_t Idx> inline constexpr auto& get() const { return std::get<Idx>(mTuple); }
+
+    template<typename OpT> constexpr void foreach(OpT) {}
+    template<class Pred, class OpT> constexpr void evalFirstPred(Pred, OpT) {}
+    template<class Pred, class OpT, typename RetT>
+    constexpr RetT evalFirstPred(Pred, OpT, RetT def) { return def; }
+
+private:
+    TupleT mTuple;
+};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

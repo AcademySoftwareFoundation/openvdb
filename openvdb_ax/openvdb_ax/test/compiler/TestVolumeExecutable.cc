@@ -132,9 +132,9 @@ TestVolumeExecutable::testTreeExecutionLevel()
     CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
         executable->getActiveTileStreaming());
 
-    using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
-    using NodeT1 = openvdb::FloatGrid::Accessor::NodeT1;
-    using NodeT2 = openvdb::FloatGrid::Accessor::NodeT2;
+    using NodeT0 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<0>;
+    using NodeT1 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<1>;
+    using NodeT2 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<2>;
 
     openvdb::FloatGrid grid;
     grid.setName("test");
@@ -316,9 +316,9 @@ TestVolumeExecutable::testTreeExecutionLevel()
 void
 TestVolumeExecutable::testActiveTileStreaming()
 {
-    using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
-    using NodeT1 = openvdb::FloatGrid::Accessor::NodeT1;
-    using NodeT2 = openvdb::FloatGrid::Accessor::NodeT2;
+    using NodeT0 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<0>;
+    using NodeT1 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<1>;
+    using NodeT2 = openvdb::FloatGrid::Accessor::template NodeTypeAtLevel<2>;
 
     //
 
