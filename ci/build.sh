@@ -29,15 +29,9 @@ declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
 PARMS[--build-dir]=build
-
-if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
-    # ASWF github actions runners have 8 threads
-    PARMS[-j]=8
-else
-    # Github actions runners have 2 threads
-    # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-    PARMS[-j]=2
-fi
+# github actions runners have 8 threads
+# https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
+PARMS[-j]=8
 
 # Available options for --components
 declare -A COMPONENTS
@@ -157,6 +151,16 @@ if [ $(uname) == "Linux" ]; then
     fi
 fi
 ###### TEMPORARY CHANGE: always install blosc 1.17.0 as it's not available on the docker images yet
+
+################################################
+
+###### TEMPORARY CHANGE: Install pybind11 2.10.0 as it's not available on the linux docker images yet
+if [ $(uname) == "Linux" ]; then
+    if [ ! -f "/usr/local/include/pybind11.h" ]; then
+        $CI_DIR/install_pybind11.sh 2.10.0
+    fi
+fi
+###### TEMPORARY CHANGE: always install pybind11 2.10.0 as it's not available on the docker images yet
 
 ################################################
 
