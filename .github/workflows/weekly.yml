@@ -289,7 +289,7 @@ jobs:
       run: |
         vcpkg update
         vcpkg install zlib tbb cppunit blosc python3 \
-          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm boost-python
+          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm pybind11
     - name: build
       shell: bash
       run: >

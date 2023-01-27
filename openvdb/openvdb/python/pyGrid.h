@@ -385,7 +385,7 @@ inline ArrayDimVec
 arrayDimensions(const py::array& array)
 {
     ArrayDimVec dims;
-    for (int i = 0, N = array.ndim(); i < N; ++i) {
+    for (size_t i = 0, N = array.ndim(); i < N; ++i) {
         dims.push_back(array.shape(i));
     }
     return dims;
@@ -812,7 +812,7 @@ meshToLevelSet(py::array_t<float> pointsObj, py::array_t<Index32> trianglesObj, 
 
 template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
 inline std::tuple<py::array_t<float>, py::array_t<Index32> >
-volumeToQuadMesh(const GridType& grid, double isovalue)
+volumeToQuadMesh(const GridType&, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
@@ -839,7 +839,7 @@ volumeToQuadMesh(const GridType& grid, double isovalue)
 
 template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
 inline std::tuple<py::array_t<float>, py::array_t<Index32>, py::array_t<Index32> >
-volumeToMesh(const GridType& grid, double isovalue, double adaptivity)
+volumeToMesh(const GridType&, double, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
