@@ -160,6 +160,16 @@ fi
 
 ################################################
 
+###### TEMPORARY CHANGE: Install pybind11 2.10.0 as it's not available on the linux docker images yet
+if [ $(uname) == "Linux" ]; then
+    if [ ! -f "/usr/local/include/pybind11.h" ]; then
+        $CI_DIR/install_pybind11.sh 2.10.0
+    fi
+fi
+###### TEMPORARY CHANGE: always install pybind11 2.10.0 as it's not available on the docker images yet
+
+################################################
+
 # github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=${PARMS[-j]}
