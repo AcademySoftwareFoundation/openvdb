@@ -74,7 +74,6 @@ public:
         , mMax(b)
     {
     }
-    Extrema& operator=(const Extrema&) = default;
     Extrema& min(const ValueT& v)
     {
         if (v < mMin) {
@@ -132,7 +131,6 @@ protected:
             , vector(v)
         {
         }
-        Pair& operator=(const Pair&) = default;
         bool  operator<(const Pair& rhs) const { return scalar < rhs.scalar; }
     } mMin, mMax;
     Extrema& add(const Pair& p)
@@ -163,7 +161,6 @@ public:
         , mMax(b)
     {
     }
-    Extrema& operator=(const Extrema&) = default;
     Extrema& min(const VecT& v)
     {
         Pair tmp(v);
