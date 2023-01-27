@@ -49,7 +49,7 @@ namespace
 // that fit into an unsigned int, and then shift those bytes out of the
 // hash. We repeat until we have no bits left in the hash.
 template <typename SeedType>
-inline SeedType hashToSeed(size_t hash) {
+inline SeedType hashToSeed(uint64_t hash) {
     SeedType seed = 0;
     do {
         seed ^= (SeedType) hash;
@@ -955,7 +955,7 @@ inline FunctionGroup::UniquePtr axrand32(const FunctionOptions& op)
             // (e.g. -0 and +0 must return the same hash value, etc). Other than these
             // special cases, this function will usually just copy the binary
             // representation of a float into the resultant `size_t`
-            const size_t hash = std::hash<double>()(seed);
+            const uint64_t hash = std::hash<double>()(seed);
 
             // Now that we have a reliable hash (with special floating-point cases taken
             // care of), we proceed to use this hash to seed a random number generator.
