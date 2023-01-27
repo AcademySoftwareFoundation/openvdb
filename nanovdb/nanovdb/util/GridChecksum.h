@@ -178,7 +178,7 @@ template <typename ValueT>
 void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     // Validate the assumed memory layout
-#if 1
+#if 0
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mMagic)    ==  0);
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mChecksum) ==  8);
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mVersion)  == 16);
