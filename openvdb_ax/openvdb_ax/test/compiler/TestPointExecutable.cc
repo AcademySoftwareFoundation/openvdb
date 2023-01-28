@@ -3,6 +3,7 @@
 
 #include <openvdb_ax/compiler/Compiler.h>
 #include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/util/x86.h>
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
@@ -586,7 +587,20 @@ TestPointExecutable::testAttributeCodecs()
                  "if (v@P.x > 0.5) { v@vnu[0] = 7.135e-7f; v@vnu[1] = 200000.0f; v@vnu[2] = -5e-3f; }"
                  "else             { v@vnu[0] = -1.0f;     v@vnu[1] = 80123.14f; v@vnu[2] = 9019.53123f; }");
 
+#if defined(__i386__) || defined(_M_IX86) || \
+    defined(__x86_64__) || defined(_M_X64)
+    if (openvdb::ax::x86::CheckX86Feature("f16c") ==
+        openvdb::ax::x86::CpuFlagStatus::Unsupported)
+    {
+        CPPUNIT_ASSERT(!executable->usesAcceleratedKernel(points->tree()));
+    }
+    else {
         CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+    }
+#else
+        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+#endif
+
         CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
 
         CPPUNIT_ASSERT_EQUAL(3.245e-7f, handle0.get(0));
@@ -727,7 +741,20 @@ TestPointExecutable::testAttributeCodecs()
                  "v@P.y -= 1.0f;"
                  "v@P.z += 2.0f;");
 
+#if defined(__i386__) || defined(_M_IX86) || \
+    defined(__x86_64__) || defined(_M_X64)
+    if (openvdb::ax::x86::CheckX86Feature("f16c") ==
+        openvdb::ax::x86::CpuFlagStatus::Unsupported)
+    {
+        CPPUNIT_ASSERT(!executable->usesAcceleratedKernel(points->tree()));
+    }
+    else {
         CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+    }
+#else
+        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+#endif
+
         CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();

@@ -5,6 +5,7 @@
 
 #include <openvdb_ax/codegen/Types.h>
 #include <openvdb_ax/codegen/Codecs.h>
+#include <openvdb_ax/util/x86.h>
 
 #include <openvdb/points/AttributeArray.h> // for native codec types
 
@@ -75,8 +76,14 @@ void TestCodecs::testRegisteredCodecs()
         }
     }
 
+    size_t count = 5;
+#if defined(__i386__) || defined(_M_IX86) || \
+    defined(__x86_64__) || defined(_M_X64)
+    if (x86::CheckX86Feature("f16c") == x86::CpuFlagStatus::Unsupported) count = 4;
+#endif
+
     // currently only 5 codecs are registered by default
-    CPPUNIT_ASSERT_EQUAL(codecs.size(), size_t(5));
+    CPPUNIT_ASSERT_EQUAL(codecs.size(), count);
 
     //  for each codec, check:
     //    make sure the codecs flags are unique
@@ -176,6 +183,11 @@ void TestCodecs::testRegisteredCodecs()
 
 void TestCodecs::testTruncateCodec()
 {
+#if defined(__i386__) || defined(_M_IX86) || \
+    defined(__x86_64__) || defined(_M_X64)
+    if (x86::CheckX86Feature("f16c") == x86::CpuFlagStatus::Unsupported) return;
+#endif
+
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
     llvm::Module& M = state.module();

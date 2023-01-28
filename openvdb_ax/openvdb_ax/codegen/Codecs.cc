@@ -9,6 +9,7 @@
 #include "openvdb_ax/codegen/FunctionTypes.h"
 #include "openvdb_ax/codegen/Types.h"
 #include "openvdb_ax/codegen/Utils.h"
+#include "openvdb_ax/util/x86.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -324,24 +325,55 @@ const CodecTypeMap& getCodecTypeMap()
         std::make_unique<Codec>(axprfxpt16encode(), axprfxpt16decode(), 1<<4),
     };
 
-    static CodecTypeMap map {
-        {
-            ast::tokens::FLOAT,
-            {
+    // If on X86, see if the hardware supports f16c. For other platforms we
+    // currently assume hardware support for half/float conversion. This only
+    // applies to the truncate codec.
+    // @todo  Add software support. Will be simpler with AX function support.
+    static bool HasF16C =
+        ax::x86::CheckX86Feature("f16c") != ax::x86::CpuFlagStatus::Unsupported;
+
+    static auto GetFloatCodecs = []() -> CodecNameMap {
+        if (HasF16C) {
+            return {
                 { points::TruncateCodec::name(),                             codecs[0].get() },
                 { points::FixedPointCodec<true, points::UnitRange>::name(),  codecs[1].get() },
                 { points::FixedPointCodec<false, points::UnitRange>::name(), codecs[2].get() }
-            }
-        },
-        {
-            ast::tokens::VEC3F,
-            {
+            };
+        }
+        else {
+            return {
+                { points::FixedPointCodec<true, points::UnitRange>::name(),  codecs[1].get() },
+                { points::FixedPointCodec<false, points::UnitRange>::name(), codecs[2].get() }
+            };
+        }
+    };
+
+    static auto GetVectorCodecs = []() -> CodecNameMap {
+        if (HasF16C) {
+            return {
                 { points::TruncateCodec::name(),                                 codecs[0].get() },
                 { points::FixedPointCodec<true, points::UnitRange>::name(),      codecs[1].get() },
                 { points::FixedPointCodec<false, points::UnitRange>::name(),     codecs[2].get() },
                 { points::FixedPointCodec<true, points::PositionRange>::name(),  codecs[3].get() },
                 { points::FixedPointCodec<false, points::PositionRange>::name(), codecs[4].get() }
-            }
+            };
+        }
+        else {
+            return {
+                { points::FixedPointCodec<true, points::UnitRange>::name(),      codecs[1].get() },
+                { points::FixedPointCodec<false, points::UnitRange>::name(),     codecs[2].get() },
+                { points::FixedPointCodec<true, points::PositionRange>::name(),  codecs[3].get() },
+                { points::FixedPointCodec<false, points::PositionRange>::name(), codecs[4].get() }
+            };
+        }
+    };
+
+    static CodecTypeMap map {
+        {
+            ast::tokens::FLOAT, GetFloatCodecs()
+        },
+        {
+            ast::tokens::VEC3F, GetVectorCodecs()
         },
     };
 

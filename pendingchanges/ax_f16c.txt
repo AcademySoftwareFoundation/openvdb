@@ -1,0 +1,4 @@
+AX:
+- Bug Fix:
+    Fixed a bug in AX on older X86 hardware which could cause a crash when
+    accessing point attributes with half compression (bug introduced in 9.1.0).

@@ -158,6 +158,7 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   compiler/PointExecutable.cc
   compiler/VolumeExecutable.cc
   math/OpenSimplexNoise.cc
+  util/x86.cc
 )
 
 if(OPENVDB_BUILD_AX_GRAMMAR)
@@ -194,6 +195,7 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
   codegen/Utils.h
   codegen/VolumeComputeGenerator.h
   math/OpenSimplexNoise.h
+  util/x86.h
 )
 
 set(OPENVDB_AX_COMPILER_INCLUDE_FILES
