@@ -114,6 +114,7 @@ jobs:
           - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
           - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
           - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'visib', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_CXX_VISIBILITY_PRESET=hidden' }
           - { name: 'asan',  build: 'asan',    components: 'core,test,axcore,axtest',          cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
           - { name: 'ubsan', build: 'ubsan',   components: 'core,test,axcore,axtest',          cmake: '' }
           - { name: 'c++20', build: 'Release', components: 'core,test,axcore,axtest',          cmake: '-DCMAKE_CXX_STANDARD=20' }
