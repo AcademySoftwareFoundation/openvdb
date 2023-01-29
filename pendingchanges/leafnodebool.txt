@@ -1,0 +1,5 @@
+OpenVDB:
+ - Bug Fixes:
+    - Fixed a bug with LeafNodeBool Topology constructor with designated
+    on/off values which wouldn't apply them correctly.
+    [Reported by @hozhaoea]
