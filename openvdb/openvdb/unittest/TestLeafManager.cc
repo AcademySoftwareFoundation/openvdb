@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/Types.h>
+#include <openvdb/TypeList.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
@@ -303,4 +304,37 @@ TEST_F(TestLeafManager, testReduce)
         EXPECT_EQ(  1.0f, tree.getValue(*iter));
     }
     EXPECT_EQ(FloatTree::LeafNodeType::numValues(), n);
+}
+
+TEST_F(TestLeafManager, testTreeConfigurations)
+{
+    using Tree2Type = openvdb::tree::Tree<
+        openvdb::tree::RootNode<
+        openvdb::tree::LeafNode<float, 3> > >;
+    using Tree3Type = openvdb::tree::Tree3<float, 4, 3>::Type;
+    using Tree4Type = openvdb::tree::Tree4<float, 5, 4, 3>::Type;
+    using Tree5Type = openvdb::tree::Tree5<float, 5, 5, 4, 3>::Type;
+
+    using TestConfigurations = openvdb::TypeList<
+        Tree2Type, Tree3Type, Tree4Type, Tree5Type
+    >;
+
+    TestConfigurations::foreach([](auto tree) {
+        using TreeType = typename std::decay<decltype(tree)>::type;
+        using LeafNodeType = typename TreeType::LeafNodeType;
+        using LeafManagerT = openvdb::tree::LeafManager<TreeType>;
+
+        // Add 20 leaf nodes and make sure they are parsed correctly
+        constexpr int64_t Count = 20;
+        std::array<LeafNodeType*, Count> ptrs;
+
+        const int64_t start = -(Count/2)*LeafNodeType::DIM;
+        const int64_t end   =  (Count/2)*LeafNodeType::DIM;
+        for (int64_t idx = start; idx < end; idx+=LeafNodeType::DIM) {
+            ptrs[idx] = tree.touchLeaf(openvdb::math::Coord(idx));
+        }
+        EXPECT_EQ(tree.leafCount(), Count);
+        LeafManagerT manager(tree);
+        EXPECT_EQ(manager.leafCount(), Count);
+    });
 }
