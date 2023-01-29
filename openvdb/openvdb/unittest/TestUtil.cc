@@ -5,6 +5,7 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/PagedArray.h>
 #include <openvdb/util/Formats.h>
+#include <openvdb/util/Name.h>
 
 #include <gtest/gtest.h>
 
@@ -484,4 +485,186 @@ TEST_F(TestUtil, testPagedArray)
             for (int i=0; i<100000; ++i) EXPECT_EQ(i, array[i]);
         }
     }
+}
+
+
+TEST_F(TestUtil, testStringUtils)
+{
+    {
+        std::set<std::string> results;
+
+        // split set
+        results.insert("test");
+        openvdb::string::split(results, "", ' ');
+        EXPECT_TRUE(results.empty());
+
+        openvdb::string::split(results, "test", ' ');
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE(results.count("test"));
+
+        openvdb::string::split(results, "t,est", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE(results.count("t"));
+        EXPECT_TRUE(results.count("est"));
+
+        openvdb::string::split(results, "t,est", '.');
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE(results.count("t,est"));
+
+        openvdb::string::split(results, ",test", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE(results.count(""));
+        EXPECT_TRUE(results.count("test"));
+
+        openvdb::string::split(results, "test,", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE(results.count("test"));
+        EXPECT_TRUE(results.count(""));
+
+        openvdb::string::split(results, "test,test", ',');
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE(results.count("test"));
+
+        // split set multi delim
+        openvdb::string::split(results, "", std::set<char>{',', '.'});
+        EXPECT_TRUE(results.empty());
+
+        openvdb::string::split(results, "test", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE(results.count("test"));
+
+        openvdb::string::split(results, ",test.", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE(results.count(""));
+        EXPECT_TRUE(results.count("test"));
+
+        openvdb::string::split(results, "t,e.st,test", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(4), results.size());
+        EXPECT_TRUE(results.count("t"));
+        EXPECT_TRUE(results.count("e"));
+        EXPECT_TRUE(results.count("st"));
+        EXPECT_TRUE(results.count("test"));
+    }
+
+    {
+        std::vector<std::string> results;
+
+        // split vector
+        results.emplace_back("test");
+        openvdb::string::split(results, "", ' ');
+        EXPECT_TRUE(results.empty());
+
+        openvdb::string::split(results, "test", ' ');
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE("test" == results.front());
+
+        openvdb::string::split(results, "t,est", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE("t" == results.front());
+        EXPECT_TRUE("est" == results.back());
+
+        openvdb::string::split(results, "t,est", '.');
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE("t,est" == results.front());
+
+        openvdb::string::split(results, ",test", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE("" == results.front());
+        EXPECT_TRUE("test" == results.back());
+
+        openvdb::string::split(results, "test,", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE("test" == results.front());
+        EXPECT_TRUE("" == results.back());
+
+        openvdb::string::split(results, "test,test", ',');
+        EXPECT_EQ(size_t(2), results.size());
+        EXPECT_TRUE("test" == results.front());
+        EXPECT_TRUE("test" == results.back());
+
+        // split vector multi delim
+        openvdb::string::split(results, "", std::set<char>{',', '.'});
+        EXPECT_TRUE(results.empty());
+
+        openvdb::string::split(results, "test", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(1), results.size());
+        EXPECT_TRUE("test" == results.front());
+
+        openvdb::string::split(results, ",test.", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(3), results.size());
+        EXPECT_TRUE("" == results[0]);
+        EXPECT_TRUE("test" == results[1]);
+        EXPECT_TRUE("" == results[2]);
+
+        openvdb::string::split(results, "t,e.st,test", std::set<char>{',', '.'});
+        EXPECT_EQ(size_t(4), results.size());
+        EXPECT_TRUE("t" == results[0]);
+        EXPECT_TRUE("e" == results[1]);
+        EXPECT_TRUE("st" == results[2]);
+        EXPECT_TRUE("test" == results[3]);
+    }
+
+    // starts_with
+
+    EXPECT_TRUE(openvdb::string::starts_with("", ""));
+    // matches behaviour of boost::algorithm::starts_with
+    EXPECT_TRUE(openvdb::string::starts_with("a", ""));
+    EXPECT_TRUE(!openvdb::string::starts_with("a", "a "));
+    EXPECT_TRUE(!openvdb::string::starts_with("", "a"));
+    EXPECT_TRUE(openvdb::string::starts_with("a", "a"));
+
+    EXPECT_TRUE(openvdb::string::starts_with("foo bar", "f"));
+    EXPECT_TRUE(openvdb::string::starts_with("foo bar", "foo"));
+    EXPECT_TRUE(openvdb::string::starts_with("foo bar", "foo "));
+    EXPECT_TRUE(openvdb::string::starts_with("foo bar", "foo bar"));
+    EXPECT_TRUE(!openvdb::string::starts_with("foo bar", "bar"));
+
+    // ends_with
+
+    EXPECT_TRUE(openvdb::string::ends_with("", ""));
+    // matches behaviour of boost::algorithm::iends_with
+    EXPECT_TRUE(openvdb::string::ends_with("a", ""));
+    EXPECT_TRUE(!openvdb::string::ends_with("a", "a "));
+    EXPECT_TRUE(!openvdb::string::ends_with("", "a"));
+    EXPECT_TRUE(openvdb::string::ends_with("a", "a"));
+
+    EXPECT_TRUE(openvdb::string::ends_with("foo bar", "r"));
+    EXPECT_TRUE(openvdb::string::ends_with("foo bar", "bar"));
+    EXPECT_TRUE(openvdb::string::ends_with("foo bar", " bar"));
+    EXPECT_TRUE(openvdb::string::ends_with("foo bar", "foo bar"));
+    EXPECT_TRUE(!openvdb::string::ends_with("foo bar", "foo"));
+
+
+    // trim
+
+    auto trim = [](const std::string& s) -> std::string {
+        std::string r = s; openvdb::string::trim(r); return r;
+    };
+
+    EXPECT_TRUE("" == trim(""));
+    EXPECT_TRUE("" == trim(" "));
+    EXPECT_TRUE("" == trim("\t"));
+    EXPECT_TRUE("" == trim("\r"));
+    EXPECT_TRUE("" == trim("\f"));
+    EXPECT_TRUE("" == trim("\n"));
+    EXPECT_TRUE("" == trim("\v"));
+
+    EXPECT_TRUE("foo" == trim(" foo"));
+    EXPECT_TRUE("foo" == trim("foo "));
+    EXPECT_TRUE("foo" == trim(" foo "));
+    EXPECT_TRUE("foo" == trim("  foo  "));
+    EXPECT_TRUE("foo bar" == trim("\vfoo bar\t"));
+    EXPECT_TRUE("foo\nbar" == trim("\nfoo\nbar\n"));
+
+    // to lower
+
+    auto to_lower = [](const std::string& s) -> std::string {
+        std::string r = s; openvdb::string::to_lower(r); return r;
+    };
+
+    EXPECT_TRUE("" == to_lower(""));
+    EXPECT_TRUE("a" == to_lower("a"));
+    EXPECT_TRUE("\t" == to_lower("\t"));
+    EXPECT_TRUE("a" == to_lower("A"));
+    EXPECT_TRUE("foo bar" == to_lower("fOo Bar"));
 }

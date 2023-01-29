@@ -4,8 +4,7 @@
 #include "GridDescriptor.h"
 
 #include <openvdb/Exceptions.h>
-#include <boost/algorithm/string/predicate.hpp> // for boost::ends_with()
-#include <boost/algorithm/string/erase.hpp> // for boost::erase_last()
+#include <openvdb/util/Name.h>
 #include <sstream>
 
 
@@ -79,9 +78,9 @@ GridDescriptor::read(std::istream &is)
 
     // Read in the grid type.
     mGridType = readString(is);
-    if (boost::ends_with(mGridType, HALF_FLOAT_TYPENAME_SUFFIX)) {
+    if (openvdb::string::ends_with(mGridType, HALF_FLOAT_TYPENAME_SUFFIX)) {
         mSaveFloatAsHalf = true;
-        boost::erase_last(mGridType, HALF_FLOAT_TYPENAME_SUFFIX);
+        mGridType.resize(mGridType.size() - std::strlen(HALF_FLOAT_TYPENAME_SUFFIX));
     }
 
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_GRID_INSTANCING) {

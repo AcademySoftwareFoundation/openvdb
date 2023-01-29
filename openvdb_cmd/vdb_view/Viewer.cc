@@ -43,6 +43,8 @@ public:
     void init(const std::string& progName);
 
     std::string getVersionString() const;
+    std::string getOpenGLVersionString() const;
+    std::string getGLFWVersionString() const;
 
     bool isOpen() const;
     bool open(int width = 900, int height = 800);
@@ -273,6 +275,22 @@ Viewer::getVersionString() const
     return version;
 }
 
+std::string
+Viewer::getOpenGLVersionString() const
+{
+    std::string version;
+    if (sViewer) version = sViewer->getOpenGLVersionString();
+    return version;
+}
+
+std::string
+Viewer::getGLFWVersionString() const
+{
+    std::string version;
+    if (sViewer) version = sViewer->getGLFWVersionString();
+    return version;
+}
+
 
 ////////////////////////////////////////
 
@@ -403,12 +421,20 @@ ViewerImpl::getVersionString() const
         openvdb::OPENVDB_LIBRARY_MINOR_VERSION << "." <<
         openvdb::OPENVDB_LIBRARY_PATCH_VERSION;
 
-    int major, minor, rev;
-    glfwGetVersion(&major, &minor, &rev);
-    ostr << ", " << "GLFW: " << major << "." << minor << "." << rev;
+    ostr << ", " << this->getGLFWVersionString();
 
+    // may return empty if not initialized
+    const std::string glv = this->getOpenGLVersionString();
+    if (!glv.empty()) ostr << ", " << glv;
+    return ostr.str();
+}
+
+std::string
+ViewerImpl::getOpenGLVersionString() const
+{
+    std::ostringstream ostr;
     if (mDidInit) {
-        ostr << ", " << "OpenGL: ";
+        ostr << "OpenGL: ";
         std::shared_ptr<GLFWwindow> wPtr;
         GLFWwindow* w = mWindow;
         if (!w) {
@@ -424,6 +450,15 @@ ViewerImpl::getVersionString() const
     return ostr.str();
 }
 
+std::string
+ViewerImpl::getGLFWVersionString() const
+{
+    std::ostringstream ostr;
+    int major, minor, rev;
+    glfwGetVersion(&major, &minor, &rev);
+    ostr << "GLFW: " << major << "." << minor << "." << rev;
+    return ostr.str();
+}
 
 bool
 ViewerImpl::open(int width, int height)

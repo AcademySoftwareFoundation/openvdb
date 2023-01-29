@@ -5,8 +5,7 @@
 #include <openvdb/tools/MultiResGrid.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/logging.h>
-#include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
-#include <boost/algorithm/string/split.hpp>
+#include <openvdb/util/Name.h>
 #include <cstdlib> // for std::atof()
 #include <iomanip> // for std::setprecision()
 #include <iostream>
@@ -80,7 +79,6 @@ struct Options
     bool keep, preserve;
 };
 
-
 /// @brief Parse a string of the form "from-to:step" and populate the given @a opts
 /// with the resulting values.
 /// @throw std::runtime_error if parsing fails for any reason
@@ -89,7 +87,7 @@ parseRangeSpec(const std::string& rangeSpec, Options& opts)
 {
     // Split on the "-" character, of which there should be at most one.
     std::vector<std::string> rangeItems;
-    boost::split(rangeItems, rangeSpec, boost::is_any_of("-"));
+    openvdb::string::split(rangeItems, rangeSpec, '-');
     if (rangeItems.empty() || rangeItems.size() > 2) throw std::runtime_error("");
 
     // Extract the "from" value, and default "to" to "from" and "step" to 1.
@@ -99,7 +97,7 @@ parseRangeSpec(const std::string& rangeSpec, Options& opts)
     if (rangeItems.size() > 1) {
         // Split on the ":" character, of which there should be at most one.
         const std::string item = rangeItems[1];
-        boost::split(rangeItems, item, boost::is_any_of(":"));
+        openvdb::string::split(rangeItems, item, ':');
         if (rangeItems.empty() || rangeItems.size() > 2) throw std::runtime_error("");
 
         // Extract the "to" value.
@@ -280,11 +278,9 @@ main(int argc, char *argv[])
         usage();
     }
 
-    // If -name was specified, generate a accept list of names of grids to be processed.
-    // Otherwise (if the accept list is empty), process all grids of supported types.
     std::set<std::string> acceptlist;
     if (!gridNameStr.empty()) {
-        boost::split(acceptlist, gridNameStr, boost::is_any_of(","));
+        openvdb::string::split(acceptlist, gridNameStr, ',');
     }
 
     // Process the input file.
