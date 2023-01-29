@@ -576,8 +576,8 @@ public:
     /// array.reserve(tree.leafCount());//this is a fast preallocation.
     /// tree.getNodes(array);
     /// @endcode
-    template<typename ArrayT> void getNodes(ArrayT& array) { mRoot.getNodes(array); }
-    template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
+    template<typename ArrayT> void getNodes(ArrayT& array);
+    template<typename ArrayT> void getNodes(ArrayT& array) const;
     //@}
 
     /// @brief Steals all nodes of a certain type from the tree and
@@ -1270,6 +1270,30 @@ inline void
 Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array)
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array) const
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, const RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
 }
 
 

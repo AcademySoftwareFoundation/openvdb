@@ -323,18 +323,21 @@ TEST_F(TestLeafManager, testTreeConfigurations)
         using TreeType = typename std::decay<decltype(tree)>::type;
         using LeafNodeType = typename TreeType::LeafNodeType;
         using LeafManagerT = openvdb::tree::LeafManager<TreeType>;
+        using ConstLeafManagerT = openvdb::tree::LeafManager<const TreeType>;
 
-        // Add 20 leaf nodes and make sure they are parsed correctly
-        constexpr int64_t Count = 20;
-        std::array<LeafNodeType*, Count> ptrs;
+        // Add 20 leaf nodes and make sure they are constructed correctly
+        constexpr openvdb::Int32 Count = 20;
 
-        const int64_t start = -(Count/2)*LeafNodeType::DIM;
-        const int64_t end   =  (Count/2)*LeafNodeType::DIM;
-        for (int64_t idx = start; idx < end; idx+=LeafNodeType::DIM) {
-            ptrs[idx] = tree.touchLeaf(openvdb::math::Coord(idx));
+        const openvdb::Int32 start = -(Count/2)*openvdb::Int32(LeafNodeType::DIM);
+        const openvdb::Int32 end   =  (Count/2)*openvdb::Int32(LeafNodeType::DIM);
+        for (openvdb::Int32 idx = start; idx < end; idx+=openvdb::Int32(LeafNodeType::DIM)) {
+            tree.touchLeaf(openvdb::math::Coord(idx));
         }
+
         EXPECT_EQ(tree.leafCount(), Count);
         LeafManagerT manager(tree);
         EXPECT_EQ(manager.leafCount(), Count);
+        ConstLeafManagerT cmanager(tree);
+        EXPECT_EQ(cmanager.leafCount(), Count);
     });
 }
