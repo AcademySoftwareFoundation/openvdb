@@ -796,9 +796,14 @@ compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
+    using ValueT = typename GridOrTreeT::ValueType;
     struct Local {
         static inline void op(CombineArgs<typename TreeT::ValueType>& args) {
-            args.setResult(args.a() * args.b());
+            if constexpr(std::is_same<ValueT, bool>::value) {
+                args.setResult(args.a() && args.b());
+            } else {
+                args.setResult(args.a() * args.b());
+            }
         }
     };
     Adapter::tree(aTree).combineExtended(Adapter::tree(bTree), Local::op, /*prune=*/false);
