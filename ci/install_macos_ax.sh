@@ -11,6 +11,7 @@ brew install cppunit
 brew install c-blosc
 brew install zlib
 brew install jq # for trivial parsing of brew json
+brew install tbb
 
 # Alias python version installed by pybind11 to path
 py_version=$(brew info pybind11 --json | \
@@ -25,13 +26,7 @@ echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
 
 LLVM_VERSION=$1
 if [ "$LLVM_VERSION" == "latest" ]; then
-    brew install tbb
     brew install llvm
 else
-    brew install tbb@2020
     brew install llvm@$LLVM_VERSION
-
-    # Export TBB paths which are no longer installed to /usr/local (as v2020 is deprecated)
-    echo "TBB_ROOT=/usr/local/opt/tbb@2020" >> $GITHUB_ENV
-    echo "/usr/local/opt/tbb@2020/bin" >> $GITHUB_PATH
 fi

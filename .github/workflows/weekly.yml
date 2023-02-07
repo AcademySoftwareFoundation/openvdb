@@ -128,7 +128,7 @@ jobs:
     - name: test
       run: cd build && ctest -V
 
-  # Test EXR 3 and TBB 2021 on MacOS
+  # Test EXR 3 on MacOS
   macos-latest:
     if: |
       github.event_name != 'workflow_dispatch' ||
