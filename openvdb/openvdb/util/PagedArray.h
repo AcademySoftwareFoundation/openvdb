@@ -584,12 +584,15 @@ private:
 // Const std-compliant iterator
 // Public member-class of PagedArray
 template <typename ValueT, size_t Log2PageSize>
-class PagedArray<ValueT, Log2PageSize>::
-ConstIterator : public std::iterator<std::random_access_iterator_tag, ValueT>
+class PagedArray<ValueT, Log2PageSize>::ConstIterator
 {
 public:
-    using BaseT = std::iterator<std::random_access_iterator_tag, ValueT>;
-    using difference_type = typename BaseT::difference_type;
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = ValueT;
+    using difference_type = std::ptrdiff_t;
+    using pointer = ValueT*;
+    using reference = ValueT&;
+
     // constructors and assignment
     ConstIterator() : mPos(0), mParent(nullptr) {}
     ConstIterator(const PagedArray& parent, size_t pos=0) : mPos(pos), mParent(&parent) {}
@@ -635,12 +638,15 @@ private:
 // Non-const std-compliant iterator
 // Public member-class of PagedArray
 template <typename ValueT, size_t Log2PageSize>
-class PagedArray<ValueT, Log2PageSize>::
-Iterator : public std::iterator<std::random_access_iterator_tag, ValueT>
+class PagedArray<ValueT, Log2PageSize>::Iterator
 {
 public:
-    using BaseT = std::iterator<std::random_access_iterator_tag, ValueT>;
-    using difference_type = typename BaseT::difference_type;
+    using iterator_category = std::random_access_iterator_tag;
+    using value_type = ValueT;
+    using difference_type = std::ptrdiff_t;
+    using pointer = ValueT*;
+    using reference = ValueT&;
+
     // constructors and assignment
     Iterator() : mPos(0), mParent(nullptr) {}
     Iterator(PagedArray& parent, size_t pos=0) : mPos(pos), mParent(&parent) {}
