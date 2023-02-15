@@ -257,12 +257,13 @@ Package        | Description                                                    
 -------------- | --------------------------------------------------------------- | ------------------ |
 CMake          | Cross-platform family of tools designed to help build software  | All                |
 C++17 Compiler | Matching Houdini compiler and version                           | All                |
-Boost          | Components: iostreams, python, thread                           | All                |
+Boost          | Components: iostreams                                           | All                |
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 CppUnit        | A unit testing framework module for C++                         | Unit Tests (AX)    |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
 Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
+PyBind11       | C++/python bindings                                             | Optional (Python)  |
 NumPy          | Scientific computing with Python                                | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
@@ -346,7 +347,7 @@ Package        | Description                                                    
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++17 Compiler | Matching Houdini compiler and version                             | All                              |
-Boost          | Components: iostreams, python, thread                             | All                              |
+Boost          | Components: iostreams                                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
@@ -356,6 +357,7 @@ Doxygen        | Documentation generation from C++                              
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
 IlmBase        | Used half precision floating points and EXR serialization support | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
+PyBind11       | C++/python bindings                                               | Optional (Python)                |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
 

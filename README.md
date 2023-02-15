@@ -39,6 +39,8 @@ The following provides basic installation examples for the core OpenVDB library.
 ##### Installing Dependencies (Boost, TBB, Blosc)
 
 ```bash
+# @note If your distribution does not have required versions, consider using
+#   apt pinning. See the dependency documentation for more details.
 apt-get install -y libboost-iostreams-dev
 apt-get install -y libtbb-dev
 apt-get install -y libblosc-dev

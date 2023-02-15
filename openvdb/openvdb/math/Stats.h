@@ -42,12 +42,8 @@ public:
     }
 
     /// @brief Constructor
-    MinMax(const ValueType &min, const ValueType &max) : mMin(min), mMax(max)
-    {
-    }
-
-    /// @brief Default copy constructor
-    MinMax(const MinMax &other) = default;
+    MinMax(const ValueType &min, const ValueType &max)
+        : mMin(min), mMax(max) {}
 
     /// Add a single sample.
     inline void add(const ValueType &val, const Less &less = Less())

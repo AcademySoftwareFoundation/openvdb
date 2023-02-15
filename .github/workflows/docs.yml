@@ -122,6 +122,17 @@ jobs:
         cd build
         ctest -V
         make gcov_html
+        cd -
+    - name: zip_large_html
+      # The index.function list is > 100mb. Just zip it and provide it as a
+      # download (could instead use LFS to host but not really worth it).
+      run: |
+        cd build/gcov_html
+        tar -czvf index.functions.html.tar.gz index.functions.html
+        sed -i -e 's/index.functions.html/index.functions.html.tar.gz/g' index.html
+        sed -i -e 's/List of functions/Download function index/g' index.html
+        rm index.functions.html
+        cd -
     - name: pre_deploy
       # Overwrite global SSH configuration
       #  https://github.com/peaceiris/actions-gh-pages/issues/719
