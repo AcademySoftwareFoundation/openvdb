@@ -224,7 +224,7 @@ struct ProgOptions
             .addOpt("-h")
             .addOpt("--help")
             .addOpt("-help")
-            .setDoc("print help and exit. [command] -h prints extra information.")
+            .setDoc("print help and exit (use [command] --help for more information).")
             .get();
 
     // Execute options
@@ -287,6 +287,7 @@ struct ProgOptions
                     fatal("invalid option given for --opt level");
                 }
             })
+            .setDefault(openvdb::ax::CompilerOptions::OptLevel::O3)
             .get();
 
     openvdb::ax::cli::Param<size_t> mThreads =
@@ -463,7 +464,8 @@ void shortManPage [[noreturn]] (const ProgOptions& opts, int exitStatus = EXIT_F
     std::cerr <<
     "usage: " << gProgName << " [command] [--help|-h] [-v] [<args>]\n" <<
     '\n' <<
-    "CLI utility for processing OpenVDB data using AX.\n";
+    "CLI utility for processing OpenVDB data using AX.\n" <<
+    "Available [command] modes are: [execute|analyze|functions] (Default: execute).\n";
     openvdb::ax::cli::usage(std::cerr, opts.mHelp.opts(), opts.mHelp.doc(), false);
     openvdb::ax::cli::usage(std::cerr, opts.mVerbose.opts(), opts.mVerbose.doc(), false);
     std::cerr << '\n';
