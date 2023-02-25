@@ -10,42 +10,33 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 
 namespace {
-
-// Declare this at file scope to ensure thread-safe initialization.
-// NOTE: Do *NOT* move this into Maps.h or else we will need to pull in
-//       Windows.h with things like 'rad2' defined!
-std::mutex sInitMapRegistryMutex;
-
+inline std::mutex& GetMapRegistryMutex()
+{
+    static std::mutex sInitMapRegistryMutex;
+    return sInitMapRegistryMutex;
+};
 } // unnamed namespace
 
 
 ////////////////////////////////////////
 
 
-// Caller is responsible for calling this function serially.
 MapRegistry*
-MapRegistry::staticInstance()
+MapRegistry::instance()
 {
     static MapRegistry registry;
     return &registry;
 }
 
 
-MapRegistry*
-MapRegistry::instance()
-{
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
-    return staticInstance();
-}
-
-
 MapBase::Ptr
 MapRegistry::createMap(const Name& name)
 {
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
-    MapDictionary::const_iterator iter = staticInstance()->mMap.find(name);
+    std::lock_guard<std::mutex> lock(GetMapRegistryMutex());
+    auto* reg = MapRegistry::instance();
+    MapDictionary::const_iterator iter = reg->mMap.find(name);
 
-    if (iter == staticInstance()->mMap.end()) {
+    if (iter == reg->mMap.end()) {
         OPENVDB_THROW(LookupError, "Cannot create map of unregistered type " << name);
     }
 
@@ -56,37 +47,39 @@ MapRegistry::createMap(const Name& name)
 bool
 MapRegistry::isRegistered(const Name& name)
 {
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
-    return (staticInstance()->mMap.find(name) != staticInstance()->mMap.end());
+    std::lock_guard<std::mutex> lock(GetMapRegistryMutex());
+    const auto* reg = MapRegistry::instance();
+    return (reg->mMap.find(name) != reg->mMap.end());
 }
 
 
 void
 MapRegistry::registerMap(const Name& name, MapBase::MapFactory factory)
 {
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(GetMapRegistryMutex());
+    auto* reg = MapRegistry::instance();
 
-    if (staticInstance()->mMap.find(name) != staticInstance()->mMap.end()) {
+    if (reg->mMap.find(name) != reg->mMap.end()) {
         OPENVDB_THROW(KeyError, "Map type " << name << " is already registered");
     }
 
-    staticInstance()->mMap[name] = factory;
+    reg->mMap[name] = factory;
 }
 
 
 void
 MapRegistry::unregisterMap(const Name& name)
 {
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
-    staticInstance()->mMap.erase(name);
+    std::lock_guard<std::mutex> lock(GetMapRegistryMutex());
+    MapRegistry::instance()->mMap.erase(name);
 }
 
 
 void
 MapRegistry::clear()
 {
-    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
-    staticInstance()->mMap.clear();
+    std::lock_guard<std::mutex> lock(GetMapRegistryMutex());
+    MapRegistry::instance()->mMap.clear();
 }
 
 

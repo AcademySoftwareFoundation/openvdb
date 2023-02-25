@@ -387,7 +387,6 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   points/StreamCompression.cc
   points/points.cc
   util/Formats.cc
-  util/Util.cc
 )
 
 set(OPENVDB_LIBRARY_INCLUDE_FILES

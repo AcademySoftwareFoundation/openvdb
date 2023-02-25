@@ -178,6 +178,10 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wall>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wextra>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wconversion>")
+  # Only check global constructors for libraries (we should really check for
+  # executables too but gtest relies on these types of constructors for its
+  # framework).
+  add_compile_options("$<$<AND:$<NOT:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-sign-conversion>")
   # GNU
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Werror>")

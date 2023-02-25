@@ -33,8 +33,8 @@ public:
     using Limits = std::numeric_limits<ValueType>;
 
     Coord(): mVec{{0, 0, 0}} {}
-    explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
-    Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
+    constexpr explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
+    constexpr Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
     explicit Coord(const Vec3i& v): mVec{{v[0], v[1], v[2]}} {}
     explicit Coord(const Vec3I& v): mVec{{Int32(v[0]), Int32(v[1]), Int32(v[2])}} {}
     explicit Coord(const Int32* v): mVec{{v[0], v[1], v[2]}} {}

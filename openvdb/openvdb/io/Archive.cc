@@ -99,8 +99,13 @@ struct StreamState
     int halfFloat;
     int mappedFile;
     int metadata;
+};
+
+inline StreamState& GetSteamState()
+{
+    static StreamState sStreamState;
+    return sStreamState;
 }
-sStreamState;
 
 const long StreamState::MAGIC_NUMBER =
     long((uint64_t(OPENVDB_MAGIC) << 32) | (uint64_t(OPENVDB_MAGIC)));
@@ -654,14 +659,14 @@ uint32_t
 getFormatVersion(std::ios_base& is)
 {
     /// @todo get from StreamMetadata
-    return static_cast<uint32_t>(is.iword(sStreamState.fileVersion));
+    return static_cast<uint32_t>(is.iword(GetSteamState().fileVersion));
 }
 
 
 void
 Archive::setFormatVersion(std::istream& is)
 {
-    is.iword(sStreamState.fileVersion) = mFileVersion; ///< @todo remove
+    is.iword(GetSteamState().fileVersion) = mFileVersion; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(is)) {
         meta->setFileVersion(mFileVersion);
     }
@@ -673,8 +678,8 @@ getLibraryVersion(std::ios_base& is)
 {
     /// @todo get from StreamMetadata
     VersionId version;
-    version.first = static_cast<uint32_t>(is.iword(sStreamState.libraryMajorVersion));
-    version.second = static_cast<uint32_t>(is.iword(sStreamState.libraryMinorVersion));
+    version.first = static_cast<uint32_t>(is.iword(GetSteamState().libraryMajorVersion));
+    version.second = static_cast<uint32_t>(is.iword(GetSteamState().libraryMinorVersion));
     return version;
 }
 
@@ -682,8 +687,8 @@ getLibraryVersion(std::ios_base& is)
 void
 Archive::setLibraryVersion(std::istream& is)
 {
-    is.iword(sStreamState.libraryMajorVersion) = mLibraryVersion.first; ///< @todo remove
-    is.iword(sStreamState.libraryMinorVersion) = mLibraryVersion.second; ///< @todo remove
+    is.iword(GetSteamState().libraryMajorVersion) = mLibraryVersion.first; ///< @todo remove
+    is.iword(GetSteamState().libraryMinorVersion) = mLibraryVersion.second; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(is)) {
         meta->setLibraryVersion(mLibraryVersion);
     }
@@ -703,9 +708,9 @@ getVersion(std::ios_base& is)
 void
 setCurrentVersion(std::istream& is)
 {
-    is.iword(sStreamState.fileVersion) = OPENVDB_FILE_VERSION; ///< @todo remove
-    is.iword(sStreamState.libraryMajorVersion) = OPENVDB_LIBRARY_MAJOR_VERSION; ///< @todo remove
-    is.iword(sStreamState.libraryMinorVersion) = OPENVDB_LIBRARY_MINOR_VERSION; ///< @todo remove
+    is.iword(GetSteamState().fileVersion) = OPENVDB_FILE_VERSION; ///< @todo remove
+    is.iword(GetSteamState().libraryMajorVersion) = OPENVDB_LIBRARY_MAJOR_VERSION; ///< @todo remove
+    is.iword(GetSteamState().libraryMinorVersion) = OPENVDB_LIBRARY_MINOR_VERSION; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(is)) {
         meta->setFileVersion(OPENVDB_FILE_VERSION);
         meta->setLibraryVersion(VersionId(
@@ -717,9 +722,9 @@ setCurrentVersion(std::istream& is)
 void
 setVersion(std::ios_base& strm, const VersionId& libraryVersion, uint32_t fileVersion)
 {
-    strm.iword(sStreamState.fileVersion) = fileVersion; ///< @todo remove
-    strm.iword(sStreamState.libraryMajorVersion) = libraryVersion.first; ///< @todo remove
-    strm.iword(sStreamState.libraryMinorVersion) = libraryVersion.second; ///< @todo remove
+    strm.iword(GetSteamState().fileVersion) = fileVersion; ///< @todo remove
+    strm.iword(GetSteamState().libraryMajorVersion) = libraryVersion.first; ///< @todo remove
+    strm.iword(GetSteamState().libraryMinorVersion) = libraryVersion.second; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setFileVersion(fileVersion);
         meta->setLibraryVersion(libraryVersion);
@@ -743,14 +748,14 @@ uint32_t
 getDataCompression(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    return uint32_t(strm.iword(sStreamState.dataCompression));
+    return uint32_t(strm.iword(GetSteamState().dataCompression));
 }
 
 
 void
 setDataCompression(std::ios_base& strm, uint32_t c)
 {
-    strm.iword(sStreamState.dataCompression) = c; ///< @todo remove
+    strm.iword(GetSteamState().dataCompression) = c; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setCompression(c);
     }
@@ -832,14 +837,14 @@ bool
 getWriteGridStatsMetadata(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    return strm.iword(sStreamState.writeGridStatsMetadata) != 0;
+    return strm.iword(GetSteamState().writeGridStatsMetadata) != 0;
 }
 
 
 void
 setWriteGridStatsMetadata(std::ios_base& strm, bool writeGridStats)
 {
-    strm.iword(sStreamState.writeGridStatsMetadata) = writeGridStats; ///< @todo remove
+    strm.iword(GetSteamState().writeGridStatsMetadata) = writeGridStats; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setWriteGridStats(writeGridStats);
     }
@@ -853,7 +858,7 @@ uint32_t
 getGridClass(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    const uint32_t val = static_cast<uint32_t>(strm.iword(sStreamState.gridClass));
+    const uint32_t val = static_cast<uint32_t>(strm.iword(GetSteamState().gridClass));
     if (val >= NUM_GRID_CLASSES) return GRID_UNKNOWN;
     return val;
 }
@@ -862,7 +867,7 @@ getGridClass(std::ios_base& strm)
 void
 setGridClass(std::ios_base& strm, uint32_t cls)
 {
-    strm.iword(sStreamState.gridClass) = long(cls); ///< @todo remove
+    strm.iword(GetSteamState().gridClass) = long(cls); ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setGridClass(cls);
     }
@@ -873,14 +878,14 @@ bool
 getHalfFloat(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    return strm.iword(sStreamState.halfFloat) != 0;
+    return strm.iword(GetSteamState().halfFloat) != 0;
 }
 
 
 void
 setHalfFloat(std::ios_base& strm, bool halfFloat)
 {
-    strm.iword(sStreamState.halfFloat) = halfFloat; ///< @todo remove
+    strm.iword(GetSteamState().halfFloat) = halfFloat; ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setHalfFloat(halfFloat);
     }
@@ -891,14 +896,14 @@ const void*
 getGridBackgroundValuePtr(std::ios_base& strm)
 {
     /// @todo get from StreamMetadata
-    return strm.pword(sStreamState.gridBackground);
+    return strm.pword(GetSteamState().gridBackground);
 }
 
 
 void
 setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 {
-    strm.pword(sStreamState.gridBackground) = const_cast<void*>(background); ///< @todo remove
+    strm.pword(GetSteamState().gridBackground) = const_cast<void*>(background); ///< @todo remove
     if (StreamMetadata::Ptr meta = getStreamMetadataPtr(strm)) {
         meta->setBackgroundPtr(background);
     }
@@ -909,7 +914,7 @@ setGridBackgroundValuePtr(std::ios_base& strm, const void* background)
 MappedFile::Ptr
 getMappedFilePtr(std::ios_base& strm)
 {
-    if (const void* ptr = strm.pword(sStreamState.mappedFile)) {
+    if (const void* ptr = strm.pword(GetSteamState().mappedFile)) {
         return *static_cast<const MappedFile::Ptr*>(ptr);
     }
     return MappedFile::Ptr();
@@ -919,7 +924,7 @@ getMappedFilePtr(std::ios_base& strm)
 void
 setMappedFilePtr(std::ios_base& strm, io::MappedFile::Ptr& mappedFile)
 {
-    strm.pword(sStreamState.mappedFile) = &mappedFile;
+    strm.pword(GetSteamState().mappedFile) = &mappedFile;
 }
 #endif // OPENVDB_USE_DELAYED_LOADING
 
@@ -927,7 +932,7 @@ setMappedFilePtr(std::ios_base& strm, io::MappedFile::Ptr& mappedFile)
 StreamMetadata::Ptr
 getStreamMetadataPtr(std::ios_base& strm)
 {
-    if (const void* ptr = strm.pword(sStreamState.metadata)) {
+    if (const void* ptr = strm.pword(GetSteamState().metadata)) {
         return *static_cast<const StreamMetadata::Ptr*>(ptr);
     }
     return StreamMetadata::Ptr();
@@ -937,7 +942,7 @@ getStreamMetadataPtr(std::ios_base& strm)
 void
 setStreamMetadataPtr(std::ios_base& strm, StreamMetadata::Ptr& meta, bool transfer)
 {
-    strm.pword(sStreamState.metadata) = &meta;
+    strm.pword(GetSteamState().metadata) = &meta;
     if (transfer && meta) meta->transferTo(strm);
 }
 
@@ -946,7 +951,7 @@ StreamMetadata::Ptr
 clearStreamMetadataPtr(std::ios_base& strm)
 {
     StreamMetadata::Ptr result = getStreamMetadataPtr(strm);
-    strm.pword(sStreamState.metadata) = nullptr;
+    strm.pword(GetSteamState().metadata) = nullptr;
     return result;
 }
 
@@ -1201,8 +1206,8 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
 
     // Restore the file-level stream metadata on exit.
     struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(sStreamState.metadata)) {}
-        ~OnExit() { strm->pword(sStreamState.metadata) = ptr; }
+        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
+        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
         std::ios_base* strm;
         void* ptr;
     };
@@ -1426,8 +1431,8 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
 {
     // Restore file-level stream metadata on exit.
     struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(sStreamState.metadata)) {}
-        ~OnExit() { strm->pword(sStreamState.metadata) = ptr; }
+        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
+        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
         std::ios_base* strm;
         void* ptr;
     };

@@ -47,8 +47,12 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 namespace {
-// Declare this at file scope to ensure thread-safe initialization.
-std::mutex sInitMutex;
+inline std::mutex& GetInitMutex()
+{
+    static std::mutex sInitMutex;
+    return sInitMutex;
+};
+
 std::atomic<bool> sIsInitialized{false};
 }
 
@@ -61,7 +65,7 @@ void
 initialize()
 {
     if (sIsInitialized.load(std::memory_order_acquire)) return;
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
     if (sIsInitialized.load(std::memory_order_acquire)) return; // Double-checked lock
 
     logging::initialize();
@@ -110,7 +114,7 @@ __pragma(warning(default:1711))
 void
 uninitialize()
 {
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.
