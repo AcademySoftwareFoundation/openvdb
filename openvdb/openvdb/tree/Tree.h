@@ -1038,12 +1038,7 @@ protected:
     RootNodeType mRoot; // root node of the tree
     mutable AccessorRegistry mAccessorRegistry;
     mutable ConstAccessorRegistry mConstAccessorRegistry;
-
-    static std::unique_ptr<const Name> sTreeTypeName;
 }; // end of Tree class
-
-template<typename _RootNodeType>
-std::unique_ptr<const Name> Tree<_RootNodeType>::sTreeTypeName;
 
 
 /// @brief Tree3<T, N1, N2>::Type is the type of a three-level tree
@@ -1805,9 +1800,9 @@ template<typename RootNodeType>
 inline const Name&
 Tree<RootNodeType>::treeType()
 {
-    static std::once_flag once;
-    std::call_once(once, []()
+    static std::string sTreeTypeName = []()
     {
+        // @todo use RootNode::NodeChain::foreach() instead
         std::vector<Index> dims;
         Tree::getNodeLog2Dims(dims);
         std::ostringstream ostr;
@@ -1815,9 +1810,9 @@ Tree<RootNodeType>::treeType()
         for (size_t i = 1, N = dims.size(); i < N; ++i) { // start from 1 to skip the RootNode
             ostr << "_" << dims[i];
         }
-        sTreeTypeName.reset(new Name(ostr.str()));
-    });
-    return *sTreeTypeName;
+        return ostr.str();
+    }();
+    return sTreeTypeName;
 }
 
 
