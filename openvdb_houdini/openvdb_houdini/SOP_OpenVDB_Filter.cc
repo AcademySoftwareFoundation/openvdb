@@ -406,7 +406,6 @@ struct FilterOp
     void operator()(GridT& grid)
     {
         using ValueT = typename GridT::ValueType;
-        using TreeType = typename GridT::TreeType;
 
         int radius = mParms.radius;
         if (mParms.useWorldRadius) {

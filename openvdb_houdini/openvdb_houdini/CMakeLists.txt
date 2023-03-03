@@ -308,6 +308,12 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   add_library(${DSO_NAME} SHARED ${DSO_NAME}.cc)
   target_link_libraries(${DSO_NAME} PUBLIC openvdb_houdini)
 
+  if(OPENVDB_ENABLE_RPATH)
+    set_target_properties(${DSO_NAME}
+      PROPERTIES INSTALL_RPATH
+        "${CMAKE_INSTALL_RPATH};${OPENVDB_HOUDINI_BIN_INSTALL_PREFIX};${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX}")
+  endif()
+
   # Call houdini_configure_target to setup the sesi tag information. We set
   # INSTDIR to the project build directory and configure the actuall install
   # paths ourselves (otherwise cmake will configure the build to build directly
