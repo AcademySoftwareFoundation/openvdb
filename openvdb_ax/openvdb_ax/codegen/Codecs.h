@@ -35,7 +35,7 @@ OPENVDB_AX_API const Codec* getCodec(const ast::tokens::CoreType type, const std
 /// @param type  The type the codecs encode
 OPENVDB_AX_API const CodecNameMap* getTypeSupportedCodecs(const ast::tokens::CoreType type);
 
-class Codec
+class OPENVDB_AX_API Codec
 {
 public:
     using UniquePtr = std::unique_ptr<Codec>;

@@ -109,6 +109,16 @@ finalizeFunction(llvm::IRBuilder<>& B, llvm::Function* F = nullptr)
     CPPUNIT_ASSERT_MESSAGE("Expected IR to be invalid!", valid); \
 }
 
+inline auto getNumArgFromCallInst(llvm::CallInst* CI)
+{
+#if LLVM_VERSION_MAJOR >= 14
+    return CI->arg_size();
+#else
+    return CI->getNumArgOperands();
+#endif
+}
+
+
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
@@ -682,8 +692,13 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(!list.hasParamAttrs(0));
     CPPUNIT_ASSERT(!list.hasParamAttrs(2));
     CPPUNIT_ASSERT(list.hasParamAttr(1, llvm::Attribute::WriteOnly));
+#if LLVM_VERSION_MAJOR <= 13
     CPPUNIT_ASSERT(list.hasFnAttribute(llvm::Attribute::ReadOnly));
     CPPUNIT_ASSERT(list.hasAttribute(llvm::AttributeList::ReturnIndex, llvm::Attribute::NoAlias));
+#else
+    CPPUNIT_ASSERT(list.hasFnAttr(llvm::Attribute::ReadOnly));
+    CPPUNIT_ASSERT(list.hasRetAttr(llvm::Attribute::NoAlias));
+#endif
     delete function;
 }
 
@@ -712,7 +727,7 @@ TestFunctionTypes::testFunctionCall()
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         CPPUNIT_ASSERT(call);
         CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-        CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+        CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
         CPPUNIT_ASSERT_EQUAL(arg, call->getArgOperand(0));
         // Test the builder is pointing to the correct location
         CPPUNIT_ASSERT_EQUAL(&(BaseFunction->getEntryBlock()), B.GetInsertBlock());
@@ -746,7 +761,7 @@ TestFunctionTypes::testFunctionCall()
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         CPPUNIT_ASSERT(call);
         CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-        CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+        CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
         CPPUNIT_ASSERT_EQUAL(arg, call->getArgOperand(0));
         // Test the builder is pointing to the correct location
         CPPUNIT_ASSERT_EQUAL(&(BaseFunction->getEntryBlock()), B.GetInsertBlock());
@@ -815,7 +830,7 @@ TestFunctionTypes::testFunctionCall()
     llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(args[0], call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(args[1], call->getArgOperand(1));
     CPPUNIT_ASSERT_EQUAL(args[2], call->getArgOperand(2));
@@ -831,7 +846,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(args[0], call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(args[1], call->getArgOperand(1));
     CPPUNIT_ASSERT_EQUAL(args[2], call->getArgOperand(2));
@@ -868,7 +883,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(argsToCast[0] != call->getArgOperand(0));
     CPPUNIT_ASSERT(argsToCast[1] != call->getArgOperand(1));
     CPPUNIT_ASSERT(argsToCast[2] != call->getArgOperand(2));
@@ -898,7 +913,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(argsToCast[0] != call->getArgOperand(0));
     CPPUNIT_ASSERT(argsToCast[1] != call->getArgOperand(1));
     CPPUNIT_ASSERT_EQUAL(args[2], call->getArgOperand(2));
@@ -926,7 +941,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(args[0], call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(args[1], call->getArgOperand(1));
     CPPUNIT_ASSERT_EQUAL(args[2], call->getArgOperand(2));
@@ -950,7 +965,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
     // should be the same as cast is false
     CPPUNIT_ASSERT(vec3f == call->getArgOperand(0));
     VERIFY_MODULE_IR_INVALID(&M);
@@ -967,7 +982,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
     // shouldn't be the same as it should have been cast
     CPPUNIT_ASSERT(vec3f != call->getArgOperand(0));
     CPPUNIT_ASSERT(expected[0] == call->getArgOperand(0)->getType());
@@ -985,7 +1000,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(6u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(6u, getNumArgFromCallInst(call));
     // no casting, args should match operands
     CPPUNIT_ASSERT(argsToCast[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(argsToCast[1] == call->getArgOperand(1));
@@ -1027,7 +1042,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(stringArgs[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(stringArgs[1] == call->getArgOperand(1));
 
@@ -1038,7 +1053,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(stringArgs[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(stringArgs[1] == call->getArgOperand(1));
 
@@ -1052,7 +1067,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(stringArgs[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(stringArgs[1] != call->getArgOperand(1));
     CPPUNIT_ASSERT(chars == call->getArgOperand(1)->getType());
@@ -1069,7 +1084,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     // no valid casting
     CPPUNIT_ASSERT(stringArgs[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(stringArgs[1] == call->getArgOperand(1));
@@ -1102,7 +1117,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(fptr == call->getArgOperand(0));
     CPPUNIT_ASSERT(dptr == call->getArgOperand(1));
 
@@ -1115,7 +1130,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(fptr == call->getArgOperand(0));
     CPPUNIT_ASSERT(dptr == call->getArgOperand(1));
 
@@ -1128,7 +1143,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     // args unaltered as casting is invalid
     CPPUNIT_ASSERT(dptr == call->getArgOperand(0));
     CPPUNIT_ASSERT(fptr == call->getArgOperand(1));
@@ -1153,14 +1168,14 @@ TestFunctionTypes::testFunctionCall()
     VERIFY_FUNCTION_IR(function);
 
     llvm::Value* vptrptr = B.CreateAlloca(LLVMType<void*>::get(C));
-    llvm::Value* vptr = B.CreateLoad(vptrptr);
+    llvm::Value* vptr = openvdb::ax::codegen::ir_load(B, vptrptr);
 
     result = test->call({vptr}, B, /*cast*/false);
     CPPUNIT_ASSERT(result);
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(vptr == call->getArgOperand(0));
 
     VERIFY_MODULE_IR(&M);
@@ -1172,7 +1187,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(vptr == call->getArgOperand(0));
 
     VERIFY_MODULE_IR(&M);
@@ -1184,7 +1199,7 @@ TestFunctionTypes::testFunctionCall()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(1u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(1u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT(fptr == call->getArgOperand(0));
 
     VERIFY_MODULE_IR_INVALID(&M);
@@ -1785,7 +1800,7 @@ TestFunctionTypes::testIRFunctions()
     llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(fp1, call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(fp2, call->getArgOperand(1));
     // Test the builder is pointing to the correct location
@@ -1819,7 +1834,7 @@ TestFunctionTypes::testIRFunctions()
     CPPUNIT_ASSERT(call);
     function = M.getFunction("ax.ir.autoret.test");
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(fp1, call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(fp2, call->getArgOperand(1));
 
@@ -1881,7 +1896,7 @@ TestFunctionTypes::testIRFunctions()
     call = llvm::dyn_cast<llvm::CallInst>(result);
     CPPUNIT_ASSERT(call);
     CPPUNIT_ASSERT_EQUAL(function, call->getCalledFunction());
-    CPPUNIT_ASSERT_EQUAL(2u, call->getNumArgOperands());
+    CPPUNIT_ASSERT_EQUAL(2u, getNumArgFromCallInst(call));
     CPPUNIT_ASSERT_EQUAL(fp1, call->getArgOperand(0));
     CPPUNIT_ASSERT_EQUAL(fp2, call->getArgOperand(1));
 
@@ -1941,7 +1956,7 @@ TestFunctionTypes::testIRFunctions()
         // alloc
         llvm::Value* alloc = _B.CreateAlloca(args[0]->getType());
         _B.CreateStore(args[0], alloc);
-        return _B.CreateLoad(alloc);
+        return openvdb::ax::codegen::ir_load(_B, alloc);
     };
 
     test.reset(new TestIRFunction({
@@ -2146,7 +2161,7 @@ TestFunctionTypes::testSRETFunctions()
         CPPUNIT_ASSERT(args[0]->getType() ==
             llvm::ArrayType::get(llvm::Type::getFloatTy(_B.getContext()), 3)->getPointerTo());
 
-        llvm::Value* e0 = _B.CreateConstGEP2_64(args[0], 0, 0);
+        llvm::Value* e0 = openvdb::ax::codegen::ir_constgep2_64(_B, args[0], 0, 0);
         _B.CreateStore(LLVMType<float>::get(_B.getContext(), 1.0f), e0);
         return nullptr;
     };

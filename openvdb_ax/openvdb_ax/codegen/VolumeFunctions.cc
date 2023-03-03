@@ -67,25 +67,25 @@ inline FunctionGroup::UniquePtr axcoordtooffset(const FunctionOptions& op)
     {
         assert(args.size() == 1);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
-        llvm::Value* x = B.CreateConstGEP2_64(args[0], 0, 0);
-        llvm::Value* y = B.CreateConstGEP2_64(args[0], 0, 1);
-        llvm::Value* z = B.CreateConstGEP2_64(args[0], 0, 2);
+        llvm::Value* x = ir_constgep2_64(B, args[0], 0, 0);
+        llvm::Value* y = ir_constgep2_64(B, args[0], 0, 1);
+        llvm::Value* z = ir_constgep2_64(B, args[0], 0, 2);
         llvm::Value* dimmin1 = LLVMType<int32_t>::get(B.getContext(), int32_t(LeafNodeT::DIM-1u));
         llvm::Value* l2d2 = LLVMType<int32_t>::get(B.getContext(), int32_t(2*LeafNodeT::LOG2DIM));
         llvm::Value* l2d = LLVMType<int32_t>::get(B.getContext(), int32_t(LeafNodeT::LOG2DIM));
 
         // ((xyz[0] & (DIM-1u)) << 2*Log2Dim)
-        x = B.CreateLoad(x);
+        x = ir_load(B, x);
         x = binaryOperator(x, dimmin1, ast::tokens::BITAND, B);
         x = binaryOperator(x, l2d2, ast::tokens::SHIFTLEFT, B);
 
         // ((xyz[1] & (DIM-1u)) << Log2Dim)
-        y = B.CreateLoad(y);
+        y = ir_load(B, y);
         y = binaryOperator(y, dimmin1, ast::tokens::BITAND, B);
         y = binaryOperator(y, l2d, ast::tokens::SHIFTLEFT, B);
 
         // (xyz[2] & (DIM-1u))
-        z = B.CreateLoad(z);
+        z = ir_load(B, z);
         z = binaryOperator(z, dimmin1, ast::tokens::BITAND, B);
 
         return
@@ -143,7 +143,7 @@ inline FunctionGroup::UniquePtr axoffsettocoord(const FunctionOptions& op)
 
         // (offset >> 2*Log2Dim)
         llvm::Value* x = binaryOperator(offset, l2d2, ast::tokens::SHIFTRIGHT, B);
-        B.CreateStore(x, B.CreateConstGEP2_64(ijk, 0, 0));
+        B.CreateStore(x, ir_constgep2_64(B, ijk, 0, 0));
 
         // (offset &= ((1<<2*Log2Dim)-1))
         static constexpr int32_t ymask = ((1<<2*LeafNodeT::LOG2DIM)-1);
@@ -151,12 +151,12 @@ inline FunctionGroup::UniquePtr axoffsettocoord(const FunctionOptions& op)
 
         // (n >> Log2Dim)
         llvm::Value* y = binaryOperator(offset, l2d, ast::tokens::SHIFTRIGHT, B);
-        B.CreateStore(y, B.CreateConstGEP2_64(ijk, 0, 1));
+        B.CreateStore(y, ir_constgep2_64(B, ijk, 0, 1));
 
         // (n & ((1<<Log2Dim)-1))
         static constexpr int32_t zmask = ((1<<LeafNodeT::LOG2DIM)-1);
         llvm::Value* z = binaryOperator(offset, B.getInt32(zmask), ast::tokens::BITAND, B);
-        B.CreateStore(z, B.CreateConstGEP2_64(ijk, 0, 2));
+        B.CreateStore(z, ir_constgep2_64(B, ijk, 0, 2));
         return nullptr;
     };
 
@@ -210,10 +210,10 @@ inline FunctionGroup::UniquePtr axoffsettoglobalcoord(const FunctionOptions& op)
         llvm::Value* local = axoffsettocoord(op)->execute({offset}, B);
 
         for (size_t i = 0; i < 3; ++i){
-            llvm::Value* lx = B.CreateConstGEP2_64(local, 0, i);
-            llvm::Value* ox = B.CreateConstGEP2_64(origin, 0, i);
-            ox = binaryOperator(B.CreateLoad(ox), B.CreateLoad(lx), ast::tokens::PLUS, B);
-            B.CreateStore(ox, B.CreateConstGEP2_64(result, 0, i));
+            llvm::Value* lx = ir_constgep2_64(B, local, 0, i);
+            llvm::Value* ox = ir_constgep2_64(B, origin, 0, i);
+            ox = binaryOperator(ir_load(B, ox), ir_load(B, lx), ast::tokens::PLUS, B);
+            B.CreateStore(ox, ir_constgep2_64(B, result, 0, i));
         }
 
         return nullptr;
@@ -307,7 +307,7 @@ inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
          llvm::IRBuilder<>& B) -> llvm::Value*
     {
         llvm::Value* coord = axgetcoord(op)->execute({}, B);
-        return B.CreateLoad(B.CreateConstGEP2_64(coord, 0, Index));
+        return ir_load(B, ir_constgep2_64(B, coord, 0, Index));
     };
 
     return FunctionBuilder((Index == 0 ? "getcoordx" : Index == 1 ? "getcoordy" : "getcoordz"))
@@ -332,8 +332,8 @@ inline FunctionGroup::UniquePtr axgetvoxelpws(const FunctionOptions& op)
         llvm::Function* compute = B.GetInsertBlock()->getParent();
         llvm::Value* transform = extractArgument(compute, "transforms");
         llvm::Value* wi = extractArgument(compute, "write_index");
-        transform = B.CreateGEP(transform, wi);
-        transform = B.CreateLoad(transform);
+        transform = ir_gep(B, transform, wi);
+        transform = ir_load(B, transform);
         llvm::Value* coord = axgetcoord(op)->execute({}, B);
         return axindextoworld(op)->execute({coord, transform}, B);
     };
@@ -416,8 +416,8 @@ inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
                 // with the same active state.
                 // @warning This code assume that getValueDepth() is always called to force
                 // a node cache.
-                using NodeT1 = typename AccessorType::NodeT1;
-                using NodeT2 = typename AccessorType::NodeT2;
+                using NodeT1 = typename AccessorType::template NodeTypeAtLevel<1>;
+                using NodeT2 = typename AccessorType::template NodeTypeAtLevel<2>;
                 if (NodeT1* node = accessorPtr->template getNode<NodeT1>()) {
                     const openvdb::Index index = node->coordToOffset(*ijk);
                     assert(node->isChildMaskOff(index));

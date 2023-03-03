@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Count.h>
@@ -239,6 +239,7 @@ TEST_F(TestCount, testMemUsage)
     EXPECT_EQ(expectedMaxMem, inCoreMemUsage);
     EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     // Write out the grid and read it in with delay-loading. Check the
     // expected memory usage values.]
 
@@ -279,6 +280,7 @@ TEST_F(TestCount, testMemUsage)
     std::remove(filename.c_str());
 
     openvdb::uninitialize();
+#endif
 }
 
 

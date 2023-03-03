@@ -296,7 +296,9 @@ Page::uncompressedBytes() const
 const char*
 Page::buffer(const int index) const
 {
+#ifdef OPENVDB_USE_DELAYED_LOADING
     if (this->isOutOfCore())   this->load();
+#endif
 
     return mData.get() + index;
 }
@@ -327,10 +329,13 @@ Page::readHeader(std::istream& is)
 void
 Page::readBuffers(std::istream&is, bool delayed)
 {
+    (void) delayed;
+
     assert(mInfo);
 
     bool isCompressed = mInfo->compressedBytes > 0;
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is);
 
     if (delayed && mappedFile) {
@@ -350,6 +355,7 @@ Page::readBuffers(std::istream&is, bool delayed)
         assert(mInfo->mappedFile);
     }
     else {
+#endif
         std::unique_ptr<char[]> buffer(new char[
             (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes)]);
         is.read(buffer.get(), (isCompressed ? mInfo->compressedBytes : -mInfo->compressedBytes));
@@ -360,14 +366,20 @@ Page::readBuffers(std::istream&is, bool delayed)
             this->copy(buffer, -static_cast<int>(mInfo->compressedBytes));
         }
         mInfo.reset();
+#ifdef OPENVDB_USE_DELAYED_LOADING
     }
+#endif
 }
 
 
 bool
 Page::isOutOfCore() const
 {
+#ifdef OPENVDB_USE_DELAYED_LOADING
     return bool(mInfo);
+#else
+    return false;
+#endif
 }
 
 
@@ -396,6 +408,7 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
 void
 Page::doLoad() const
 {
+#ifdef OPENVDB_USE_DELAYED_LOADING
     if (!this->isOutOfCore())  return;
 
     Page* self = const_cast<Page*>(this);
@@ -429,6 +442,7 @@ Page::doLoad() const
     else                self->copy(temp, compressedBytes);
 
     self->mInfo.reset();
+#endif
 }
 
 

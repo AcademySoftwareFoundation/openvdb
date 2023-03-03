@@ -4,6 +4,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/TempFile.h>
+#include <openvdb/math/Math.h>
 
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
@@ -287,8 +288,7 @@ TEST_F(TestPointCount, testGroup)
 
         // write out grid to a temp file
         {
-            io::TempFile file;
-            filename = file.filename();
+            filename = "testPointCount1.vdb";
             io::File fileOut(filename);
             GridCPtrVec grids{grid};
             fileOut.write(grids);
@@ -314,7 +314,9 @@ TEST_F(TestPointCount, testGroup)
 
             GroupFilter groupFilter("test", attributeSet);
 
-            bool inCoreOnly = true;
+            bool inCoreOnly;
+#ifdef OPENVDB_USE_DELAYED_LOADING
+            inCoreOnly = true;
 
             EXPECT_EQ(pointCount(inputTree, NullFilter(), inCoreOnly), Index64(0));
             EXPECT_EQ(pointCount(inputTree, ActiveFilter(), inCoreOnly), Index64(0));
@@ -324,6 +326,7 @@ TEST_F(TestPointCount, testGroup)
                 groupFilter, ActiveFilter()), inCoreOnly), Index64(0));
             EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
                 groupFilter, InactiveFilter()), inCoreOnly), Index64(0));
+#endif
 
             inCoreOnly = false;
 
@@ -520,13 +523,13 @@ TEST_F(TestPointCount, testOffsets)
 
     // write out grid to a temp file
     {
-        io::TempFile file;
-        filename = file.filename();
+        filename = "testPointCount1.vdb";
         io::File fileOut(filename);
         GridCPtrVec grids{grid};
         fileOut.write(grids);
     }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     // test point offsets for a delay-loaded grid
     {
         io::File fileIn(filename);
@@ -569,6 +572,7 @@ TEST_F(TestPointCount, testOffsets)
         EXPECT_EQ(offsets[3], Index64(5));
         EXPECT_EQ(total, Index64(5));
     }
+#endif
 
     std::remove(filename.c_str());
 }
@@ -595,8 +599,8 @@ genPoints(std::vector<Vec3R>& positions, const int numPoints, const double scale
     // init
     math::Random01 randNumber(0);
     const int n = int(std::sqrt(double(numPoints)));
-    const double xScale = (2.0 * M_PI) / double(n);
-    const double yScale = M_PI / double(n);
+    const double xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double yScale = openvdb::math::pi<double>() / double(n);
 
     double x, y, theta, phi;
     Vec3R pos;

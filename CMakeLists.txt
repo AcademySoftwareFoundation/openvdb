@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 9)
-set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_MAJOR_VERSION 10)
+set(OpenVDB_MINOR_VERSION 0)
+set(OpenVDB_PATCH_VERSION 2)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -79,6 +79,7 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
+option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 
@@ -134,9 +135,7 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_7 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_8 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
+
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -247,11 +246,9 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
+  OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
-  OPENVDB_USE_DEPRECATED_ABI_7
-  OPENVDB_USE_DEPRECATED_ABI_8
-  OPENVDB_USE_FUTURE_ABI_10
   SYSTEM_LIBRARY_PATHS
   USE_CCACHE
   USE_COLORED_OUTPUT
@@ -267,6 +264,13 @@ mark_as_advanced(
 # Configure MINIMUM and FUTURE_MINIMUM version variables
 
 include(cmake/config/OpenVDBVersions.cmake)
+
+foreach(DEPRECATED_ABI ${OPENVDB_DEPRECATED_ABI_LIST})
+  option(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI} "Bypass minimum ABI requirement checks" OFF)
+  mark_as_advanced(OPENVDB_USE_DEPRECATED_ABI_${DEPRECATED_ABI})
+endforeach()
+option(OPENVDB_USE_FUTURE_ABI_${FUTURE_OPENVDB_ABI_VERSION} "Bypass future ABI check" OFF)
+mark_as_advanced(OPENVDB_USE_FUTURE_ABI_${FUTURE_OPENVDB_ABI_VERSION})
 
 #########################################################################
 
@@ -484,14 +488,14 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
     "no longer supported.")
 endif()
 
-if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
+if(OpenVDB_ABI IN_LIST OPENVDB_DEPRECATED_ABI_LIST)
   if(NOT OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
-    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+    message(FATAL_ERROR "OpenVDB ABI versions earlier than ${OpenVDB_MAJOR_VERSION} "
       "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI} to ON to "
       "suppress this error.")
   endif()
 
-  message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+  message(DEPRECATION "OpenVDB ABI versions earlier than ${OpenVDB_MAJOR_VERSION} "
     "are deprecated and will soon be removed.")
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
@@ -540,6 +544,7 @@ if(OPENVDB_BUILD_UNITTESTS)
   add_subdirectory(openvdb/openvdb/unittest)
 endif()
 
+# Tests the vdb_ax binary so needs to come after openvdb_cmd
 if(OPENVDB_BUILD_AX_UNITTESTS)
   add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()

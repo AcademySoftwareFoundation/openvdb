@@ -2,6 +2,8 @@
 
 set -e
 
+CI_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
 # print versions
 bash --version
 if [ ! -z "$CXX" ]; then $CXX -v; fi
@@ -27,9 +29,20 @@ declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
 PARMS[--build-dir]=build
-# github actions runners have 2 threads
-# https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-PARMS[-j]=2
+
+if [[ $RUNNER_NAME == *"8c-32g-300h"* ]]; then
+    # ASWF github actions runners have 8 threads
+    PARMS[-j]=8
+else
+    # Github actions runners have 2 threads
+    # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
+    if [[ $CXX == "g++" ]]; then
+        # GCC hits memory limits on runners, build in serial
+        PARMS[-j]=1
+    else
+        PARMS[-j]=2
+    fi
+fi
 
 # Available options for --components
 declare -A COMPONENTS
@@ -132,7 +145,17 @@ done
 
 ################################################
 
-# github actions runners have 2 threads
+###### TEMPORARY CHANGE: Install pybind11 2.10.0 as it's not available on the linux docker images yet
+if [ $(uname) == "Linux" ]; then
+    if [ ! -f "/usr/local/include/pybind11/pybind11.h" ]; then
+        $CI_DIR/install_pybind11.sh 2.10.0
+    fi
+fi
+###### TEMPORARY CHANGE: always install pybind11 2.10.0 as it's not available on the docker images yet
+
+################################################
+
+# github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=${PARMS[-j]}
 echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
@@ -160,11 +183,16 @@ set -x
 
 # Note:
 # - print and lod binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
+# - always enabled the python tests with OPENVDB_BUILD_PYTHON_UNITTESTS if the python module is in use,
+#   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_8=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_9=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
+    -DOPENVDB_BUILD_VDB_TOOL=ON \
+    -DOPENVDB_TOOL_USE_NANO=OFF \
+    -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
     "${CMAKE_EXTRA[@]}" \
     ..

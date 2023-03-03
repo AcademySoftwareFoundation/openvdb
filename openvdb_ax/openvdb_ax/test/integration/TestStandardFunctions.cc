@@ -1166,7 +1166,7 @@ TestStandardFunctions::rand()
 void
 TestStandardFunctions::rand32()
 {
-    auto hashToSeed = [](size_t hash) ->
+    auto hashToSeed = [](uint64_t hash) ->
         std::mt19937::result_type
     {
         unsigned int seed = 0;

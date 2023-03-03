@@ -29,6 +29,8 @@ public: \
     explicit _classname(const std::string& msg) noexcept: Exception( #_classname , &msg) {} \
 }
 
+OPENVDB_AX_EXCEPTION(CLIError);
+
 // @note: Compilation errors due to invalid AX code should be collected using a separate logging system.
 //   These errors are only thrown upon encountering fatal errors within the compiler/executables themselves
 OPENVDB_AX_EXCEPTION(AXTokenError);

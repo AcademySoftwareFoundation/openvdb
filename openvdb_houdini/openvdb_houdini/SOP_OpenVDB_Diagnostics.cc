@@ -1186,7 +1186,7 @@ struct TestCollection
 
             if (mTest.testMinimumBandWidth) {
 
-                if (std::is_floating_point<ValueType>::value) {
+                if constexpr (std::is_floating_point<ValueType>::value) {
                     const ValueType width = ValueType(mTest.minBandWidth) * ValueType(voxelSize);
 
                     AbsLessThan<ValueType> test(width);

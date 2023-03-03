@@ -34,36 +34,10 @@ public:
 
     static const int size = SIZE;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     /// Trivial constructor, the Tuple is NOT initialized
     /// @note destructor, copy constructor, assignment operator and
     ///   move constructor are left to be defined by the compiler (default)
     Tuple() = default;
-#else
-    /// @brief Default ctor.  Does nothing.
-    /// @details This is required because declaring a copy (or other) constructor
-    /// prevents the compiler from synthesizing a default constructor.
-    Tuple() {}
-
-    /// Copy constructor.  Used when the class signature matches exactly.
-    Tuple(Tuple const& src) {
-        for (int i = 0; i < SIZE; ++i) {
-            mm[i] = src.mm[i];
-        }
-    }
-
-    /// @brief Assignment operator
-    /// @details This is required because declaring a copy (or other) constructor
-    /// prevents the compiler from synthesizing a default assignment operator.
-    Tuple& operator=(Tuple const& src) {
-        if (&src != this) {
-            for (int i = 0; i < SIZE; ++i) {
-                mm[i] = src.mm[i];
-            }
-        }
-        return *this;
-    }
-#endif
 
     /// @brief Conversion constructor.
     /// @details Tuples with different value types and different sizes can be
@@ -105,8 +79,8 @@ public:
     // non-integer types that were castable to 'int' (such as floating point type).
     // The above templates allow for any integer type to be used as an offset into
     // the tuple data.
-    T operator[](int i) const { return this->operator[]<int>(i); }
-    T& operator[](int i) { return this->operator[]<int>(i); }
+    T operator[](int i) const { return this->template operator[]<int>(i); }
+    T& operator[](int i) { return this->template operator[]<int>(i); }
 
     /// @name Compatibility
     /// These are mostly for backwards compatibility with functions that take

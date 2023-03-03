@@ -3,34 +3,31 @@
 //
 /// @file pyGrid.h
 /// @author Peter Cucka
-/// @brief Boost.Python wrapper for openvdb::Grid
+/// @brief pybind11 wrapper for openvdb::Grid
 
 #ifndef OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
-#include <boost/python.hpp>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #ifdef PY_OPENVDB_USE_NUMPY
-// boost::python::numeric was replaced with boost::python::numpy in Boost 1.65.
-// (boost::python::numpy requires NumPy 1.7 or later.)
-#include <boost/python/numpy.hpp>
-//#include <arrayobject.h> // for PyArray_Descr (see pyGrid::arrayTypeId())
-#define PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-  #include "openvdb/tools/MeshToVolume.h"
-  #include "openvdb/tools/VolumeToMesh.h" // for tools::volumeToMesh()
+#include <pybind11/numpy.h>
+#include <openvdb/tools/MeshToVolume.h>
+#include <openvdb/tools/VolumeToMesh.h> // for tools::volumeToMesh()
 #endif
-#include "openvdb/openvdb.h"
-#include "openvdb/io/Stream.h"
-#include "openvdb/math/Math.h" // for math::isExactlyEqual()
-#include "openvdb/points/PointDataGrid.h"
-#include "openvdb/tools/LevelSetSphere.h"
-#include "openvdb/tools/Count.h"
-#include "openvdb/tools/Dense.h"
-#include "openvdb/tools/ChangeBackground.h"
-#include "openvdb/tools/Prune.h"
-#include "openvdb/tools/SignedFloodFill.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/io/Stream.h>
+#include <openvdb/math/Math.h> // for math::isExactlyEqual()
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/Count.h>
+#include <openvdb/tools/Dense.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Prune.h>
+#include <openvdb/tools/SignedFloodFill.h>
 #include "pyutil.h"
+#include "pyTypeCasters.h"
 #include "pyAccessor.h" // for pyAccessor::AccessorWrap
-#include "pyopenvdb.h"
 #include <algorithm> // for std::max()
 #include <cstring> // for memcpy()
 #include <iostream>
@@ -38,8 +35,9 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <variant>
 
-namespace py = boost::python;
+namespace py = pybind11;
 
 #ifdef __clang__
 // This is a private header, so it's OK to include a "using namespace" directive.
@@ -54,148 +52,7 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 #endif
 
 
-namespace pyopenvdb {
-
-inline py::object
-getPyObjectFromGrid(const GridBase::Ptr& grid)
-{
-    if (!grid) return py::object();
-
-#define CONVERT_BASE_TO_GRID(GridType, grid) \
-    if (grid->isType<GridType>()) { \
-        return py::object(gridPtrCast<GridType>(grid)); \
-    }
-
-    CONVERT_BASE_TO_GRID(FloatGrid, grid);
-    CONVERT_BASE_TO_GRID(Vec3SGrid, grid);
-    CONVERT_BASE_TO_GRID(BoolGrid, grid);
-#ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    CONVERT_BASE_TO_GRID(DoubleGrid, grid);
-    CONVERT_BASE_TO_GRID(Int32Grid, grid);
-    CONVERT_BASE_TO_GRID(Int64Grid, grid);
-    CONVERT_BASE_TO_GRID(Vec3IGrid, grid);
-    CONVERT_BASE_TO_GRID(Vec3DGrid, grid);
-    CONVERT_BASE_TO_GRID(points::PointDataGrid, grid);
-#endif
-#undef CONVERT_BASE_TO_GRID
-
-    OPENVDB_THROW(TypeError, grid->type() + " is not a supported OpenVDB grid type");
-}
-
-
-inline openvdb::GridBase::Ptr
-getGridFromPyObject(const boost::python::object& gridObj)
-{
-    if (!gridObj) return GridBase::Ptr();
-
-#define CONVERT_GRID_TO_BASE(GridPtrType) \
-    { \
-        py::extract<GridPtrType> x(gridObj); \
-        if (x.check()) return x(); \
-    }
-
-    // Extract a grid pointer of one of the supported types
-    // from the input object, then cast it to a base pointer.
-    CONVERT_GRID_TO_BASE(FloatGrid::Ptr);
-    CONVERT_GRID_TO_BASE(Vec3SGrid::Ptr);
-    CONVERT_GRID_TO_BASE(BoolGrid::Ptr);
-#ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    CONVERT_GRID_TO_BASE(DoubleGrid::Ptr);
-    CONVERT_GRID_TO_BASE(Int32Grid::Ptr);
-    CONVERT_GRID_TO_BASE(Int64Grid::Ptr);
-    CONVERT_GRID_TO_BASE(Vec3IGrid::Ptr);
-    CONVERT_GRID_TO_BASE(Vec3DGrid::Ptr);
-    CONVERT_GRID_TO_BASE(points::PointDataGrid::Ptr);
-#endif
-#undef CONVERT_GRID_TO_BASE
-
-    OPENVDB_THROW(TypeError,
-        pyutil::className(gridObj) + " is not a supported OpenVDB grid type");
-}
-
-
-inline openvdb::GridBase::Ptr
-getGridFromPyObject(PyObject* gridObj)
-{
-    return getGridFromPyObject(pyutil::pyBorrow(gridObj));
-}
-
-} // namespace pyopenvdb
-
-
-////////////////////////////////////////
-
-
 namespace pyGrid {
-
-inline py::object
-getGridFromGridBase(GridBase::Ptr grid)
-{
-    py::object obj;
-    try {
-        obj = pyopenvdb::getPyObjectFromGrid(grid);
-    } catch (openvdb::TypeError& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        py::throw_error_already_set();
-        return py::object();
-    }
-    return obj;
-}
-
-
-/// GridBase is not exposed in Python because it isn't really needed
-/// (and because exposing it would be complicated, requiring wrapping
-/// pure virtual functions like GridBase::baseTree()), but there are
-/// a few cases where, internally, we need to extract a GridBase::Ptr
-/// from a py::object.  Hence this converter.
-inline GridBase::Ptr
-getGridBaseFromGrid(py::object gridObj)
-{
-    GridBase::Ptr grid;
-    try {
-        grid = pyopenvdb::getGridFromPyObject(gridObj);
-    } catch (openvdb::TypeError& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        py::throw_error_already_set();
-        return GridBase::Ptr();
-    }
-    return grid;
-}
-
-
-////////////////////////////////////////
-
-
-/// Variant of pyutil::extractArg() that uses the class name of a given grid type
-template<typename GridType, typename T>
-inline T
-extractValueArg(
-    py::object obj,
-    const char* functionName,
-    int argIdx = 0, // args are numbered starting from 1
-    const char* expectedType = nullptr)
-{
-    return pyutil::extractArg<T>(obj,
-        functionName, pyutil::GridTraits<GridType>::name(), argIdx, expectedType);
-}
-
-
-/// @brief Variant of pyutil::extractArg() that uses the class name
-/// and @c ValueType of a given grid type
-template<typename GridType>
-inline typename GridType::ValueType
-extractValueArg(
-    py::object obj,
-    const char* functionName,
-    int argIdx = 0, // args are numbered starting from 1
-    const char* expectedType = nullptr)
-{
-    return extractValueArg<GridType, typename GridType::ValueType>(
-        obj, functionName, argIdx, expectedType);
-}
-
-
-////////////////////////////////////////
 
 
 template<typename GridType>
@@ -210,9 +67,8 @@ template<typename GridType>
 inline bool
 sharesWith(const GridType& grid, py::object other)
 {
-    py::extract<typename GridType::Ptr> x(other);
-    if (x.check()) {
-        typename GridType::ConstPtr otherGrid = x();
+    if (py::isinstance<GridType>(other)) {
+        typename GridType::ConstPtr otherGrid = other.cast<typename GridType::Ptr>();
         return (&otherGrid->tree() == &grid.tree());
     }
     return false;
@@ -248,14 +104,6 @@ getOneValue()
 
 
 template<typename GridType>
-inline bool
-notEmpty(const GridType& grid)
-{
-    return !grid.empty();
-}
-
-
-template<typename GridType>
 inline typename GridType::ValueType
 getGridBackground(const GridType& grid)
 {
@@ -265,109 +113,10 @@ getGridBackground(const GridType& grid)
 
 template<typename GridType>
 inline void
-setGridBackground(GridType& grid, py::object obj)
+setGridBackground(GridType& grid, const typename GridType::ValueType& background)
 {
-    tools::changeBackground(grid.tree(), extractValueArg<GridType>(obj, "setBackground"));
+    tools::changeBackground(grid.tree(), background);
 }
-
-
-inline void
-setGridName(GridBase::Ptr grid, py::object strObj)
-{
-    if (grid) {
-        if (!strObj) { // if name is None
-            grid->removeMeta(GridBase::META_GRID_NAME);
-        } else {
-            const std::string name = pyutil::extractArg<std::string>(
-                strObj, "setName", /*className=*/nullptr, /*argIdx=*/1, "str");
-            grid->setName(name);
-        }
-    }
-}
-
-
-inline void
-setGridCreator(GridBase::Ptr grid, py::object strObj)
-{
-    if (grid) {
-        if (!strObj) { // if name is None
-            grid->removeMeta(GridBase::META_GRID_CREATOR);
-        } else {
-            const std::string name = pyutil::extractArg<std::string>(
-                strObj, "setCreator", /*className=*/nullptr, /*argIdx=*/1, "str");
-            grid->setCreator(name);
-        }
-    }
-}
-
-
-inline std::string
-getGridClass(GridBase::ConstPtr grid)
-{
-    return GridBase::gridClassToString(grid->getGridClass());
-}
-
-
-inline void
-setGridClass(GridBase::Ptr grid, py::object strObj)
-{
-    if (!strObj) {
-        grid->clearGridClass();
-    } else {
-        const std::string name = pyutil::extractArg<std::string>(
-            strObj, "setGridClass", /*className=*/nullptr, /*argIdx=*/1, "str");
-        grid->setGridClass(GridBase::stringToGridClass(name));
-    }
-}
-
-
-inline std::string
-getVecType(GridBase::ConstPtr grid)
-{
-    return GridBase::vecTypeToString(grid->getVectorType());
-}
-
-
-inline void
-setVecType(GridBase::Ptr grid, py::object strObj)
-{
-    if (!strObj) {
-        grid->clearVectorType();
-    } else {
-        const std::string name = pyutil::extractArg<std::string>(
-            strObj, "setVectorType", /*className=*/nullptr, /*argIdx=*/1, "str");
-        grid->setVectorType(GridBase::stringToVecType(name));
-    }
-}
-
-
-inline std::string
-gridInfo(GridBase::ConstPtr grid, int verbosity)
-{
-    std::ostringstream ostr;
-    grid->print(ostr, std::max<int>(1, verbosity));
-    return ostr.str();
-}
-
-
-////////////////////////////////////////
-
-
-inline void
-setGridTransform(GridBase::Ptr grid, py::object xformObj)
-{
-    if (grid) {
-        if (math::Transform::Ptr xform = pyutil::extractArg<math::Transform::Ptr>(
-            xformObj, "setTransform", /*className=*/nullptr, /*argIdx=*/1, "Transform"))
-        {
-            grid->setTransform(xform);
-        } else {
-            PyErr_SetString(PyExc_ValueError, "null transform");
-            py::throw_error_already_set();
-        }
-    }
-}
-
 
 ////////////////////////////////////////
 
@@ -381,8 +130,7 @@ struct AccessorHelper
     static Wrapper wrap(typename GridType::Ptr grid)
     {
         if (!grid) {
-            PyErr_SetString(PyExc_ValueError, "null grid");
-            py::throw_error_already_set();
+            throw py::value_error("null grid");
         }
         return Wrapper(grid);
     }
@@ -396,8 +144,7 @@ struct AccessorHelper<const GridType>
     static Wrapper wrap(typename GridType::ConstPtr grid)
     {
         if (!grid) {
-            PyErr_SetString(PyExc_ValueError, "null grid");
-            py::throw_error_already_set();
+            throw py::value_error("null grid");
         }
         return Wrapper(grid);
     }
@@ -427,12 +174,12 @@ getConstAccessor(typename GridType::Ptr grid)
 
 
 template<typename GridType>
-inline py::tuple
+std::tuple<Coord, Coord>
 evalLeafBoundingBox(const GridType& grid)
 {
     CoordBBox bbox;
     grid.tree().evalLeafBoundingBox(bbox);
-    return py::make_tuple(bbox.min(), bbox.max());
+    return std::make_tuple(bbox.min(), bbox.max());
 }
 
 
@@ -447,25 +194,12 @@ evalLeafDim(const GridType& grid)
 
 
 template<typename GridType>
-inline py::tuple
-evalActiveVoxelBoundingBox(const GridType& grid)
-{
-    CoordBBox bbox = grid.evalActiveVoxelBoundingBox();
-    return py::make_tuple(bbox.min(), bbox.max());
-}
-
-
-template<typename GridType>
-inline py::tuple
+inline std::vector<Index>
 getNodeLog2Dims(const GridType& grid)
 {
     std::vector<Index> dims;
     grid.tree().getNodeLog2Dims(dims);
-    py::list lst;
-    for (size_t i = 0, N = dims.size(); i < N; ++i) {
-        lst.append(dims[i]);
-    }
-    return py::tuple(lst);
+    return dims;
 }
 
 
@@ -502,204 +236,58 @@ activeLeafVoxelCount(const GridType& grid)
 
 
 template<typename GridType>
-inline py::tuple
+inline std::tuple<typename GridType::ValueType, typename GridType::ValueType>
 evalMinMax(const GridType& grid)
 {
     const math::MinMax<typename GridType::ValueType> extrema = tools::minMax(grid.tree());
-    return py::make_tuple(extrema.min(), extrema.max());
+    return std::make_tuple(extrema.min(), extrema.max());
 }
 
 
 template<typename GridType>
-inline py::tuple
+inline std::tuple<Coord, Coord>
 getIndexRange(const GridType& grid)
 {
     CoordBBox bbox;
     grid.tree().getIndexRange(bbox);
-    return py::make_tuple(bbox.min(), bbox.max());
+    return std::make_tuple(bbox.min(), bbox.max());
 }
 
 
 //template<typename GridType>
 //inline void
-//expandIndexRange(GridType& grid, py::object coordObj)
+//expandIndexRange(GridType& grid, const Coord& xyz)
 //{
-//    Coord xyz = extractValueArg<GridType, Coord>(
-//        coordObj, "expand", 0, "tuple(int, int, int)");
 //    grid.tree().expand(xyz);
 //}
 
 
 ////////////////////////////////////////
 
-
-inline py::dict
-getAllMetadata(GridBase::ConstPtr grid)
-{
-    if (grid) return py::dict(static_cast<const MetaMap&>(*grid));
-    return py::dict();
-}
-
-
-inline void
-replaceAllMetadata(GridBase::Ptr grid, const MetaMap& metadata)
-{
-    if (grid) {
-        grid->clearMetadata();
-        for (MetaMap::ConstMetaIterator it = metadata.beginMeta();
-            it != metadata.endMeta(); ++it)
-        {
-            if (it->second) grid->insertMeta(it->first, *it->second);
-        }
-    }
-}
-
-
-inline void
-updateMetadata(GridBase::Ptr grid, const MetaMap& metadata)
-{
-    if (grid) {
-        for (MetaMap::ConstMetaIterator it = metadata.beginMeta();
-            it != metadata.endMeta(); ++it)
-        {
-            if (it->second) {
-                grid->removeMeta(it->first);
-                grid->insertMeta(it->first, *it->second);
-            }
-        }
-    }
-}
-
-
-inline py::dict
-getStatsMetadata(GridBase::ConstPtr grid)
-{
-    MetaMap::ConstPtr metadata;
-    if (grid) metadata = grid->getStatsMetadata();
-    if (metadata) return py::dict(*metadata);
-    return py::dict();
-}
-
-
-inline py::object
-getMetadataKeys(GridBase::ConstPtr grid)
-{
-    if (grid) {
-#if PY_MAJOR_VERSION >= 3
-        // Return an iterator over the "keys" view of a dict.
-        return py::import("builtins").attr("iter")(
-            py::dict(static_cast<const MetaMap&>(*grid)).keys());
-#else
-        return py::dict(static_cast<const MetaMap&>(*grid)).iterkeys();
-#endif
-    }
-    return py::object();
-}
-
-
-inline py::object
-getMetadata(GridBase::ConstPtr grid, py::object nameObj)
-{
-    if (!grid) return py::object();
-
-    const std::string name = pyutil::extractArg<std::string>(
-        nameObj, "__getitem__", nullptr, /*argIdx=*/1, "str");
-
-    Metadata::ConstPtr metadata = (*grid)[name];
-    if (!metadata) {
-        PyErr_SetString(PyExc_KeyError, name.c_str());
-        py::throw_error_already_set();
-    }
-
-    // Use the MetaMap-to-dict converter (see pyOpenVDBModule.cc) to convert
-    // the Metadata value to a Python object of the appropriate type.
-    /// @todo Would be more efficient to convert the Metadata object
-    /// directly to a Python object.
-    MetaMap metamap;
-    metamap.insertMeta(name, *metadata);
-    return py::dict(metamap)[name];
-}
-
-
-inline void
-setMetadata(GridBase::Ptr grid, py::object nameObj, py::object valueObj)
-{
-    if (!grid) return;
-
-    const std::string name = pyutil::extractArg<std::string>(
-        nameObj, "__setitem__", nullptr, /*argIdx=*/1, "str");
-
-    // Insert the Python object into a Python dict, then use the dict-to-MetaMap
-    // converter (see pyOpenVDBModule.cc) to convert the dict to a MetaMap
-    // containing a Metadata object of the appropriate type.
-    /// @todo Would be more efficient to convert the Python object
-    /// directly to a Metadata object.
-    py::dict dictObj;
-    dictObj[name] = valueObj;
-    MetaMap metamap = py::extract<MetaMap>(dictObj);
-
-    if (Metadata::Ptr metadata = metamap[name]) {
-        grid->removeMeta(name);
-        grid->insertMeta(name, *metadata);
-    }
-}
-
-
-inline void
-removeMetadata(GridBase::Ptr grid, const std::string& name)
-{
-    if (grid) {
-        Metadata::Ptr metadata = (*grid)[name];
-        if (!metadata) {
-            PyErr_SetString(PyExc_KeyError, name.c_str());
-            py::throw_error_already_set();
-        }
-        grid->removeMeta(name);
-    }
-}
-
-
-inline bool
-hasMetadata(GridBase::ConstPtr grid, const std::string& name)
-{
-    if (grid) return ((*grid)[name].get() != nullptr);
-    return false;
-}
-
-
-////////////////////////////////////////
-
-
 template<typename GridType>
 inline void
-prune(GridType& grid, py::object tolerance)
+prune(GridType& grid, typename GridType::ValueType tol)
 {
-    tools::prune(grid.tree(), extractValueArg<GridType>(tolerance, "prune"));
+    tools::prune(grid.tree(), tol);
 }
 
 
 template<typename GridType>
 inline void
-pruneInactive(GridType& grid, py::object valObj)
+pruneInactive(GridType& grid, const std::optional<typename GridType::ValueType>& value)
 {
-    if (valObj.is_none()) {
+    if (value)
+        tools::pruneInactiveWithValue(grid.tree(), *value);
+    else
         tools::pruneInactive(grid.tree());
-    } else {
-        tools::pruneInactiveWithValue(
-            grid.tree(), extractValueArg<GridType>(valObj, "pruneInactive"));
-    }
 }
 
 
 template<typename GridType>
 inline void
-fill(GridType& grid, py::object minObj, py::object maxObj,
-    py::object valObj, bool active)
+fill(GridType& grid, const Coord& bmin, const Coord& bmax, const typename GridType::ValueType& value, bool active)
 {
-    const Coord
-        bmin = extractValueArg<GridType, Coord>(minObj, "fill", 1, "tuple(int, int, int)"),
-        bmax = extractValueArg<GridType, Coord>(maxObj, "fill", 2, "tuple(int, int, int)");
-    grid.fill(CoordBBox(bmin, bmax), extractValueArg<GridType>(valObj, "fill", 3), active);
+    grid.fill(CoordBBox(bmin, bmax), value, active);
 }
 
 
@@ -721,7 +309,7 @@ inline void
 copyFromArray(GridType&, const py::object&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
 }
 
 template<typename GridType>
@@ -729,40 +317,15 @@ inline void
 copyToArray(GridType&, const py::object&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
 }
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
 
-using ArrayDimVec = std::vector<size_t>;
-
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
+using ArrayDimVec = std::vector<ssize_t>;
 
 // ID numbers for supported value types
 enum class DtId { NONE, FLOAT, DOUBLE, BOOL, INT16, INT32, INT64, UINT32, UINT64/*, HALF*/ };
-
-using NumPyArrayType = py::numpy::ndarray;
-
-#else // if !defined PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
-// NumPy type numbers for supported value types
-enum class DtId {
-    NONE =   NPY_NOTYPE,
-    FLOAT =  NPY_FLOAT,
-    DOUBLE = NPY_DOUBLE,
-    BOOL =   NPY_BOOL,
-    INT16 =  NPY_INT16,
-    INT32 =  NPY_INT32,
-    INT64 =  NPY_INT64,
-    UINT32 = NPY_UINT32,
-    UINT64 = NPY_UINT64,
-    //HALF =   NPY_HALF
-};
-
-using NumPyArrayType = py::numeric::array;
-
-#endif // PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
 
 template<DtId TypeId> struct NumPyToCpp {};
 template<> struct NumPyToCpp<DtId::FLOAT>  { using type = float; };
@@ -790,118 +353,44 @@ template<> struct CppToNumPy<Index64>  { static const DtId typeId = DtId::UINT64
 #endif
 
 
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
 // Return the ID number of the given NumPy array's data type.
 /// @todo Revisit this if and when py::numpy::dtype ever provides a type number accessor.
 inline DtId
-arrayTypeId(const py::numpy::ndarray& arrayObj)
+arrayTypeId(const py::array& array)
 {
-    namespace np = py::numpy;
-    const auto dtype = arrayObj.get_dtype();
-#if 0
-    // More efficient than np::equivalent(), but requires NumPy headers.
-    if (const auto* descr = reinterpret_cast<const PyArray_Descr*>(dtype.ptr())) {
-        const auto typeId = static_cast<DtId>(descr->type_num);
-        switch (typeId) {
-            case DtId::NONE: break;
-            case DtId::FLOAT: case DtId::DOUBLE: case DtId::BOOL:
-            case DtId::INT16: case DtId::INT32: case DtId::INT64:
-            case DtId::UINT32: case DtId::UINT64:
-                return typeId;
-        }
-        throw openvdb::TypeError{};
-    }
-#else
-    if (np::equivalent(dtype, np::dtype::get_builtin<float>())) return DtId::FLOAT;
-    if (np::equivalent(dtype, np::dtype::get_builtin<double>())) return DtId::DOUBLE;
-    if (np::equivalent(dtype, np::dtype::get_builtin<bool>())) return DtId::BOOL;
-    if (np::equivalent(dtype, np::dtype::get_builtin<Int16>())) return DtId::INT16;
-    if (np::equivalent(dtype, np::dtype::get_builtin<Int32>())) return DtId::INT32;
-    if (np::equivalent(dtype, np::dtype::get_builtin<Int64>())) return DtId::INT64;
-    if (np::equivalent(dtype, np::dtype::get_builtin<Index32>())) return DtId::UINT32;
-    if (np::equivalent(dtype, np::dtype::get_builtin<Index64>())) return DtId::UINT64;
-    //if (np::equivalent(dtype, np::dtype::get_builtin<math::half>())) return DtId::HALF;
-#endif
+    const auto dtype = array.dtype();
+    if (dtype.is(py::dtype::of<float>())) return DtId::FLOAT;
+    if (dtype.is(py::dtype::of<double>())) return DtId::DOUBLE;
+    if (dtype.is(py::dtype::of<bool>())) return DtId::BOOL;
+    if (dtype.is(py::dtype::of<Int16>())) return DtId::INT16;
+    if (dtype.is(py::dtype::of<Int32>())) return DtId::INT32;
+    if (dtype.is(py::dtype::of<Int64>())) return DtId::INT64;
+    if (dtype.is(py::dtype::of<Index32>())) return DtId::UINT32;
+    if (dtype.is(py::dtype::of<Index64>())) return DtId::UINT64;
+    //if (dtype.is(py::dtype::of<math::half>())) return DtId::HALF;
     throw openvdb::TypeError{};
 }
 
 
 // Return a string description of the given NumPy array's data type.
 inline std::string
-arrayTypeName(const py::numpy::ndarray& arrayObj)
+arrayTypeName(const py::array& array)
 {
-    return pyutil::str(arrayObj.get_dtype());
+    return py::str(array.dtype());
 }
 
 
 // Return the dimensions of the given NumPy array.
 inline ArrayDimVec
-arrayDimensions(const py::numpy::ndarray& arrayObj)
+arrayDimensions(const py::array& array)
 {
     ArrayDimVec dims;
-    for (int i = 0, N = arrayObj.get_nd(); i < N; ++i) {
-        dims.push_back(static_cast<size_t>(arrayObj.shape(i)));
+    for (size_t i = 0, N = array.ndim(); i < N; ++i) {
+        dims.push_back(array.shape(i));
     }
     return dims;
 }
 
-#else // !defined PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
-// Return the ID number of the given NumPy array's data type.
-inline DtId
-arrayTypeId(const py::numeric::array& arrayObj)
-{
-    const PyArray_Descr* dtype = nullptr;
-    if (PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr())) {
-        dtype = PyArray_DESCR(arrayObjPtr);
-    }
-    if (dtype) return static_cast<DtId>(dtype->type_num);
-    throw openvdb::TypeError{};
-}
-
-
-// Return a string description of the given NumPy array's data type.
-inline std::string
-arrayTypeName(const py::numeric::array& arrayObj)
-{
-    std::string name;
-    if (PyObject_HasAttrString(arrayObj.ptr(), "dtype")) {
-        name = pyutil::str(arrayObj.attr("dtype"));
-    } else {
-        name = "'_'";
-        PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr());
-        name[1] = PyArray_DESCR(arrayObjPtr)->kind;
-    }
-    return name;
-}
-
-
-// Return the dimensions of the given NumPy array.
-inline ArrayDimVec
-arrayDimensions(const py::numeric::array& arrayObj)
-{
-    const py::object shape = arrayObj.attr("shape");
-    ArrayDimVec dims;
-    for (long i = 0, N = py::len(shape); i < N; ++i) {
-        dims.push_back(py::extract<size_t>(shape[i]));
-    }
-    return dims;
-}
-
-
-inline py::object
-copyNumPyArray(PyArrayObject* arrayObj, NPY_ORDER order = NPY_CORDER)
-{
-#ifdef __GNUC__
-    // Silence GCC "casting between pointer-to-function and pointer-to-object" warnings.
-    __extension__
-#endif
-    auto obj = pyutil::pyBorrow(PyArray_NewCopy(arrayObj, order));
-    return obj;
-}
-
-#endif // PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
 
 
 // Abstract base class for helper classes that copy data between
@@ -912,37 +401,21 @@ class CopyOpBase
 public:
     using ValueT = typename GridType::ValueType;
 
-    CopyOpBase(bool toGrid, GridType& grid, py::object arrObj,
-        py::object coordObj, py::object tolObj)
+    CopyOpBase(bool toGrid, GridType& grid, py::array array,
+        const Coord& origin, const typename GridType::ValueType& tolerance)
         : mToGrid(toGrid)
         , mGrid(&grid)
     {
-        const char* const opName[2] = { "copyToArray", "copyFromArray" };
+        mArray = array.mutable_data();
+        mArrayTypeName = arrayTypeName(array);
+        mArrayTypeId = arrayTypeId(array);
+        mArrayDims = arrayDimensions(array);
 
-        // Extract the coordinates (i, j, k) of the voxel at which to start populating data.
-        // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-        const Coord origin = extractValueArg<GridType, Coord>(
-            coordObj, opName[toGrid], 1, "tuple(int, int, int)");
-
-        // Extract a reference to (not a copy of) the NumPy array,
-        // or throw an exception if arrObj is not a NumPy array object.
-        const auto arrayObj = pyutil::extractArg<NumPyArrayType>(
-            arrObj, opName[toGrid], pyutil::GridTraits<GridType>::name(),
-            /*argIdx=*/1, "numpy.ndarray");
-
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-        mArray = arrayObj.get_data();
-#else
-        mArray = PyArray_DATA(reinterpret_cast<PyArrayObject*>(arrayObj.ptr()));
-#endif
-
-        mArrayTypeName = arrayTypeName(arrayObj);
-        mArrayTypeId = arrayTypeId(arrayObj);
-        mArrayDims = arrayDimensions(arrayObj);
-
-        mTolerance = extractValueArg<GridType>(tolObj, opName[toGrid], 2);
+        mTolerance = tolerance;
 
         // Compute the bounding box of the region of the grid that is to be copied from or to.
+        // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
+        // Voxel (i, j, k) will correspond to array element (0, 0, 0).
         Coord bboxMax = origin;
         for (size_t n = 0, N = std::min<size_t>(mArrayDims.size(), 3); n < N; ++n) {
             bboxMax[n] += int(mArrayDims[n]) - 1;
@@ -960,9 +433,10 @@ public:
                 copyToArray(); // copy data from the grid to the array
             }
         } catch (openvdb::TypeError&) {
-            PyErr_Format(PyExc_TypeError,
-                "unsupported NumPy data type %s", mArrayTypeName.c_str());
-            boost::python::throw_error_already_set();
+            std::ostringstream os;
+            os << "unsupported NumPy data type ";
+            os << mArrayTypeName.c_str();
+            throw py::type_error(os.str());
         }
     }
 
@@ -1007,9 +481,9 @@ template<typename GridType>
 class CopyOp<GridType, /*VecSize=*/1>: public CopyOpBase<GridType>
 {
 public:
-    CopyOp(bool toGrid, GridType& grid, py::object arrObj, py::object coordObj,
-        py::object tolObj = py::object(zeroVal<typename GridType::ValueType>())):
-        CopyOpBase<GridType>(toGrid, grid, arrObj, coordObj, tolObj)
+    CopyOp(bool toGrid, GridType& grid,  py::array array, const Coord& coord,
+        const typename GridType::ValueType& tolerance = zeroVal<typename GridType::ValueType>()):
+        CopyOpBase<GridType>(toGrid, grid, array, coord, tolerance)
     {
     }
 
@@ -1020,8 +494,7 @@ protected:
             std::ostringstream os;
             os << "expected 3-dimensional array, found "
                 << this->mArrayDims.size() << "-dimensional array";
-            PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            throw py::value_error(os.str());
         }
     }
 
@@ -1072,9 +545,9 @@ template<typename GridType>
 class CopyOp<GridType, /*VecSize=*/3>: public CopyOpBase<GridType>
 {
 public:
-    CopyOp(bool toGrid, GridType& grid, py::object arrObj, py::object coordObj,
-        py::object tolObj = py::object(zeroVal<typename GridType::ValueType>())):
-        CopyOpBase<GridType>(toGrid, grid, arrObj, coordObj, tolObj)
+    CopyOp(bool toGrid, GridType& grid, py::array array, const Coord& coord,
+        const typename GridType::ValueType& tolerance = zeroVal<typename GridType::ValueType>()):
+        CopyOpBase<GridType>(toGrid, grid, array, coord, tolerance)
     {
     }
 
@@ -1085,8 +558,7 @@ protected:
             std::ostringstream os;
             os << "expected 4-dimensional array, found "
                 << this->mArrayDims.size() << "-dimensional array";
-            PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            throw py::value_error(os.str());
         }
         if (this->mArrayDims[3] != 3) {
             std::ostringstream os;
@@ -1094,8 +566,7 @@ protected:
                 << "x" << this->mArrayDims[2] << "x3 array, found " << this->mArrayDims[0]
                 << "x" << this->mArrayDims[1] << "x" << this->mArrayDims[2]
                 << "x" << this->mArrayDims[3] << " array";
-            PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            throw py::value_error(os.str());
         }
     }
 
@@ -1160,44 +631,44 @@ protected:
 
 template<typename GridType>
 inline void
-copyFromArray(GridType& grid, py::object arrayObj, py::object coordObj, py::object toleranceObj)
+copyFromArray(GridType& grid, py::array array, const Coord& coord, const typename GridType::ValueType& tolerance)
 {
     using ValueT = typename GridType::ValueType;
     CopyOp<GridType, VecTraits<ValueT>::Size>
-        op(/*toGrid=*/true, grid, arrayObj, coordObj, toleranceObj);
+        op(/*toGrid=*/true, grid, array, coord, tolerance);
     op();
 }
 
 
 template<typename GridType>
 inline void
-copyToArray(GridType& grid, py::object arrayObj, py::object coordObj)
+copyToArray(GridType& grid, py::array array, const Coord& coord)
 {
     using ValueT = typename GridType::ValueType;
     CopyOp<GridType, VecTraits<ValueT>::Size>
-        op(/*toGrid=*/false, grid, arrayObj, coordObj);
+        op(/*toGrid=*/false, grid, array, coord);
     op();
 }
 
 
 template<>
 inline void
-copyFromArray(points::PointDataGrid& /*grid*/, py::object /*arrayObj*/,
-    py::object /*coordObj*/, py::object /*toleranceObj*/)
+copyFromArray(points::PointDataGrid& /*grid*/, py::array /*array*/,
+    const Coord& /*coord*/, const typename points::PointDataGrid::ValueType& /*tolerance*/)
 {
     PyErr_SetString(PyExc_NotImplementedError,
         "copying NumPy arrays for PointDataGrids is not supported");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
 }
 
 
 template<>
 inline void
-copyToArray(points::PointDataGrid& /*grid*/, py::object /*arrayObj*/, py::object /*coordObj*/)
+copyToArray(points::PointDataGrid& /*grid*/, py::array /*array*/, const Coord& /*coord*/)
 {
     PyErr_SetString(PyExc_NotImplementedError,
         "copying NumPy arrays for PointDataGrids is not supported");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
 }
 
 
@@ -1214,7 +685,7 @@ inline typename GridType::Ptr
 meshToLevelSet(py::object, py::object, py::object, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
     return typename GridType::Ptr();
 }
 
@@ -1223,7 +694,7 @@ inline py::object
 volumeToQuadMesh(const GridType&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
     return py::object();
 }
 
@@ -1232,7 +703,7 @@ inline py::object
 volumeToMesh(const GridType&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    throw py::error_already_set();
     return py::object();
 }
 
@@ -1262,7 +733,7 @@ struct CopyVecOp<T, T> {
 // and sizes from NumPy arrays to STL vectors
 template<typename VecT>
 inline void
-copyVecArray(NumPyArrayType& arrayObj, std::vector<VecT>& vec)
+copyVecArray(py::array& arrayObj, std::vector<VecT>& vec)
 {
     using ValueT = typename VecT::ValueType;
 
@@ -1276,12 +747,7 @@ copyVecArray(NumPyArrayType& arrayObj, std::vector<VecT>& vec)
     vec.resize(M);
 
     // Copy values from the input array to the output vector (with type conversion, if necessary).
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    const void* src = arrayObj.get_data();
-#else
-    PyArrayObject* arrayObjPtr = reinterpret_cast<PyArrayObject*>(arrayObj.ptr());
-    const void* src = PyArray_DATA(arrayObjPtr);
-#endif
+    const void* src = arrayObj.data();
     ValueT* dst = &vec[0][0];
     switch (arrayTypeId(arrayObj)) {
     case DtId::FLOAT:  CopyVecOp<NumPyToCpp<DtId::FLOAT>::type, ValueT>()(src, dst, M*N); break;
@@ -1296,253 +762,117 @@ copyVecArray(NumPyArrayType& arrayObj, std::vector<VecT>& vec)
 }
 
 
-/// @brief Given NumPy arrays of points, triangle indices and quad indices,
+/// @brief Given NumPy arrays of points, triangle indices, and quad indices,
 /// call tools::meshToLevelSet() to generate a level set grid.
 template<typename GridType>
 inline typename GridType::Ptr
-meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsObj,
-    py::object xformObj, py::object halfWidthObj)
+meshToLevelSet(py::array_t<float> pointsObj, py::array_t<Index32> trianglesObj, py::array_t<Index32> quadsObj, math::Transform::Ptr xform, float halfWidth)
 {
-    struct Local {
-        // Return the name of the Python grid method (for use in error messages).
-        static const char* methodName() { return "createLevelSetFromPolygons"; }
-
-        // Raise a Python exception if the given NumPy array does not have dimensions M x N
-        // or does not have an integer or floating-point data type.
-        static void validate2DNumPyArray(NumPyArrayType arrayObj,
-            const size_t N, const char* desiredType)
-        {
-            const auto dims = arrayDimensions(arrayObj);
-
-            bool wrongArrayType = false;
-            // Check array dimensions.
-            if (dims.size() != 2 || dims[1] != N) {
-                wrongArrayType = true;
-            } else {
-                // Check array data type.
-                switch (arrayTypeId(arrayObj)) {
-                    case DtId::FLOAT: case DtId::DOUBLE: //case DtId::HALF:
-                    case DtId::INT16: case DtId::INT32: case DtId::INT64:
-                    case DtId::UINT32: case DtId::UINT64: break;
-                    default: wrongArrayType = true; break;
-                }
+    auto validate2DArray = [](py::array array, ssize_t N) {
+        if (array.ndim() != 2 || array.shape(1) != N) {
+            std::ostringstream os;
+            os << "Expected a 2-dimensional numpy.ndarray with shape(1) = "<< N;
+            os << ", found " << array.ndim() << "-dimensional array with shape = (";
+            for (ssize_t i = 0; i < array.ndim(); ++i) {
+                os << array.shape(i);
+                if (i != array.ndim() - 1)
+                    os << ", ";
             }
-            if (wrongArrayType) {
-                // Generate an error message and raise a Python TypeError.
-                std::ostringstream os;
-                os << "expected N x 3 numpy.ndarray of " << desiredType << ", found ";
-                switch (dims.size()) {
-                    case 0: os << "zero-dimensional"; break;
-                    case 1: os << "one-dimensional"; break;
-                    default:
-                        os << dims[0];
-                        for (size_t i = 1; i < dims.size(); ++i) { os << " x " << dims[i]; }
-                        break;
-                }
-                os << " " << arrayTypeName(arrayObj) << " array as argument 1 to "
-                    << pyutil::GridTraits<GridType>::name() << "." << methodName() << "()";
-                PyErr_SetString(PyExc_TypeError, os.str().c_str());
-                py::throw_error_already_set();
-            }
+            os <<").";
+            throw py::type_error(os.str());
         }
     };
 
-    // Extract the narrow band half width from the arguments to this method.
-    const float halfWidth = extractValueArg<GridType, float>(
-        halfWidthObj, Local::methodName(), /*argIdx=*/5, "float");
-
-    // Extract the transform from the arguments to this method.
-    math::Transform::Ptr xform = math::Transform::createLinearTransform();
-    if (!xformObj.is_none()) {
-        xform = extractValueArg<GridType, math::Transform::Ptr>(
-            xformObj, Local::methodName(), /*argIdx=*/4, "Transform");
-    }
-
     // Extract the list of mesh vertices from the arguments to this method.
     std::vector<Vec3s> points;
-    if (!pointsObj.is_none()) {
-        // Extract a reference to (not a copy of) a NumPy array argument,
-        // or throw an exception if the argument is not a NumPy array object.
-        auto arrayObj = extractValueArg<GridType, NumPyArrayType>(
-            pointsObj, Local::methodName(), /*argIdx=*/1, "numpy.ndarray");
-
-        // Throw an exception if the array has the wrong type or dimensions.
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"float");
-
-        // Copy values from the array to the vector.
-        copyVecArray(arrayObj, points);
-    }
+    // Throw an exception if the array has the wrong type or dimensions.
+    validate2DArray(pointsObj, 3);
+    // Copy values from the array to the vector.
+    copyVecArray(pointsObj, points);
 
     // Extract the list of triangle indices from the arguments to this method.
     std::vector<Vec3I> triangles;
-    if (!trianglesObj.is_none()) {
-        auto arrayObj = extractValueArg<GridType, NumPyArrayType>(
-            trianglesObj, Local::methodName(), /*argIdx=*/2, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/3, /*desiredType=*/"int");
-        copyVecArray(arrayObj, triangles);
-    }
+    validate2DArray(trianglesObj, 3);
+    copyVecArray(trianglesObj, triangles);
 
     // Extract the list of quad indices from the arguments to this method.
     std::vector<Vec4I> quads;
-    if (!quadsObj.is_none()) {
-        auto arrayObj = extractValueArg<GridType, NumPyArrayType>(
-            quadsObj, Local::methodName(), /*argIdx=*/3, "numpy.ndarray");
-        Local::validate2DNumPyArray(arrayObj, /*N=*/4, /*desiredType=*/"int");
-        copyVecArray(arrayObj, quads);
-    }
+    validate2DArray(quadsObj, 4);
+    copyVecArray(quadsObj, quads);
 
     // Generate and return a level set grid.
-    return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
+    if (xform) {
+        return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
+    }
+    else {
+        math::Transform::Ptr identity = math::Transform::createLinearTransform();
+        return tools::meshToLevelSet<GridType>(*identity, points, triangles, quads, halfWidth);
+    }
 }
 
-template<typename GridType,
-    typename std::enable_if<!std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
-inline py::object
-volumeToQuadMesh(const GridType&, py::object)
+template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
+inline std::tuple<py::array_t<float>, py::array_t<Index32> >
+volumeToQuadMesh(const GridType&, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
 
-template<typename GridType,
-    typename std::enable_if<std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
-inline py::object
-volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
+template<typename GridType, typename std::enable_if_t<std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
+inline std::tuple<py::array_t<float>, py::array_t<Index32> >
+volumeToQuadMesh(const GridType& grid, double isovalue)
 {
-    const double isovalue = pyutil::extractArg<double>(
-        isovalueObj, "convertToQuads", /*className=*/nullptr, /*argIdx=*/2, "float");
-
     // Mesh the input grid and populate lists of mesh vertices and face vertex indices.
     std::vector<Vec3s> points;
     std::vector<Vec4I> quads;
     tools::volumeToMesh(grid, points, quads, isovalue);
 
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    const py::object own;
-    auto dtype = py::numpy::dtype::get_builtin<Vec3s::value_type>();
-    auto shape = py::make_tuple(points.size(), 3);
-    auto stride = py::make_tuple(3 * sizeof(Vec3s::value_type), sizeof(Vec3s::value_type));
-    // Create a deep copy of the array (because the point vector will be destroyed
-    // when this function returns).
-    auto pointArrayObj = py::numpy::from_data(points.data(), dtype, shape, stride, own).copy();
+    std::vector<ssize_t> shape = { static_cast<ssize_t>(points.size()), 3 };
+    std::vector<ssize_t> strides = { 3 * static_cast<ssize_t>(sizeof(float)), static_cast<ssize_t>(sizeof(float))};
+    py::array_t<float> pointArrayObj(py::buffer_info(points.data(), sizeof(float), py::format_descriptor<float>::format(), 2, shape, strides));
 
-    dtype = py::numpy::dtype::get_builtin<Vec4I::value_type>();
-    shape = py::make_tuple(quads.size(), 4);
-    stride = py::make_tuple(4 * sizeof(Vec4I::value_type), sizeof(Vec4I::value_type));
-    auto quadArrayObj = py::numpy::from_data(
-        quads.data(), dtype, shape, stride, own).copy(); // deep copy
-#else // !defined PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    // Copy vertices into an N x 3 NumPy array.
-    py::object pointArrayObj = py::numeric::array(py::list(), "float32");
-    if (!points.empty()) {
-        npy_intp dims[2] = { npy_intp(points.size()), 3 };
-        // Construct a NumPy array that wraps the point vector.
-        if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
-            PyArray_SimpleNewFromData(/*nd=*/2, dims, NPY_FLOAT, &points[0])))
-        {
-            // Create a deep copy of the array (because the point vector will be
-            // destroyed when this function returns).
-            pointArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
-        }
-    }
+    shape = { static_cast<ssize_t>(quads.size()), 4 };
+    strides = { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
+    py::array_t<Index32> quadArrayObj(py::buffer_info(quads.data(), sizeof(Index32), py::format_descriptor<Index32>::format(), 2, shape, strides));
 
-    // Copy face indices into an N x 4 NumPy array.
-    py::object quadArrayObj = py::numeric::array(py::list(), "uint32");
-    if (!quads.empty()) {
-        npy_intp dims[2] = { npy_intp(quads.size()), 4 };
-        if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
-            PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &quads[0])))
-        {
-            quadArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
-        }
-    }
-#endif // PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
-    return py::make_tuple(pointArrayObj, quadArrayObj);
+    return std::make_tuple(pointArrayObj, quadArrayObj);
 }
 
-template<typename GridType,
-    typename std::enable_if<!std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
-inline py::object
-volumeToMesh(const GridType&, py::object, py::object)
+template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
+inline std::tuple<py::array_t<float>, py::array_t<Index32>, py::array_t<Index32> >
+volumeToMesh(const GridType&, double, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
 
-template<typename GridType,
-    typename std::enable_if<std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
-inline py::object
-volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivityObj)
+template<typename GridType, typename std::enable_if_t<std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
+inline std::tuple<py::array_t<float>, py::array_t<Index32>, py::array_t<Index32> >
+volumeToMesh(const GridType& grid, double isovalue, double adaptivity)
 {
-    const double isovalue = pyutil::extractArg<double>(
-        isovalueObj, "convertToPolygons", /*className=*/nullptr, /*argIdx=*/2, "float");
-    const double adaptivity = pyutil::extractArg<double>(
-        adaptivityObj, "convertToPolygons", /*className=*/nullptr, /*argIdx=*/3, "float");
-
     // Mesh the input grid and populate lists of mesh vertices and face vertex indices.
     std::vector<Vec3s> points;
     std::vector<Vec3I> triangles;
     std::vector<Vec4I> quads;
     tools::volumeToMesh(grid, points, triangles, quads, isovalue, adaptivity);
 
-#ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    const py::object own;
-    auto dtype = py::numpy::dtype::get_builtin<Vec3s::value_type>();
-    auto shape = py::make_tuple(points.size(), 3);
-    auto stride = py::make_tuple(3 * sizeof(Vec3s::value_type), sizeof(Vec3s::value_type));
     // Create a deep copy of the array (because the point vector will be destroyed
     // when this function returns).
-    auto pointArrayObj = py::numpy::from_data(points.data(), dtype, shape, stride, own).copy();
 
-    dtype = py::numpy::dtype::get_builtin<Vec3I::value_type>();
-    shape = py::make_tuple(triangles.size(), 3);
-    stride = py::make_tuple(3 * sizeof(Vec3I::value_type), sizeof(Vec3I::value_type));
-    auto triangleArrayObj = py::numpy::from_data(
-        triangles.data(), dtype, shape, stride, own).copy(); // deep copy
+    std::vector<ssize_t> shape = { static_cast<ssize_t>(points.size()), 3 };
+    std::vector<ssize_t> strides = { 3 * static_cast<ssize_t>(sizeof(float)), static_cast<ssize_t>(sizeof(float))};
+    py::buffer_info pointInfo(points.data(), sizeof(float), py::format_descriptor<float>::format(), 2, shape, strides);
+    py::array_t<float> pointArray(pointInfo);
 
-    dtype = py::numpy::dtype::get_builtin<Vec4I::value_type>();
-    shape = py::make_tuple(quads.size(), 4);
-    stride = py::make_tuple(4 * sizeof(Vec4I::value_type), sizeof(Vec4I::value_type));
-    auto quadArrayObj = py::numpy::from_data(
-        quads.data(), dtype, shape, stride, own).copy(); // deep copy
-#else // !defined PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    // Copy vertices into an N x 3 NumPy array.
-    py::object pointArrayObj = py::numeric::array(py::list(), "float32");
-    if (!points.empty()) {
-        npy_intp dims[2] = { npy_intp(points.size()), 3 };
-        // Construct a NumPy array that wraps the point vector.
-        if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
-            PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_FLOAT, &points[0])))
-        {
-            // Create a deep copy of the array (because the point vector will be
-            // destroyed when this function returns).
-            pointArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
-        }
-    }
+    shape = { static_cast<ssize_t>(triangles.size()), 3 };
+    strides = { 3 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
+    py::buffer_info triangleInfo(triangles.data(), sizeof(Index32), py::format_descriptor<Index32>::format(), 2, shape, strides);
+    py::array_t<Index32> triangleArray(triangleInfo);
 
-    // Copy triangular face indices into an N x 3 NumPy array.
-    py::object triangleArrayObj = py::numeric::array(py::list(), "uint32");
-    if (!triangles.empty()) {
-        npy_intp dims[2] = { npy_intp(triangles.size()), 3 };
-        if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
-            PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &triangles[0])))
-        {
-            triangleArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
-        }
-    }
+    shape = { static_cast<ssize_t>(quads.size()), 4 };
+    strides = { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
+    py::buffer_info quadInfo(quads.data(), sizeof(Index32), py::format_descriptor<Index32>::format(), 2, shape, strides);
+    py::array_t<Index32> quadArray(quadInfo);
 
-    // Copy quadrilateral face indices into an N x 4 NumPy array.
-    py::object quadArrayObj = py::numeric::array(py::list(), "uint32");
-    if (!quads.empty()) {
-        npy_intp dims[2] = { npy_intp(quads.size()), 4 };
-        if (PyArrayObject* arrayObj = reinterpret_cast<PyArrayObject*>(
-            PyArray_SimpleNewFromData(/*dims=*/2, dims, NPY_UINT32, &quads[0])))
-        {
-            quadArrayObj = copyNumPyArray(arrayObj, NPY_CORDER);
-        }
-    }
-#endif // PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-
-    return py::make_tuple(pointArrayObj, triangleArrayObj, quadArrayObj);
+    return std::make_tuple(pointArray, triangleArray, quadArray);
 }
 
 #endif // defined(PY_OPENVDB_USE_NUMPY)
@@ -1562,18 +892,19 @@ applyMap(const char* methodName, GridType& grid, py::object funcObj)
         py::object result = funcObj(*it);
 
         // Verify that the result is of type GridType::ValueType.
-        py::extract<ValueT> val(result);
-        if (!val.check()) {
-            PyErr_Format(PyExc_TypeError,
-                "expected callable argument to %s.%s() to return %s, found %s",
-                pyutil::GridTraits<GridType>::name(),
-                methodName,
-                openvdb::typeNameAsString<ValueT>(),
-                pyutil::className(result).c_str());
-            py::throw_error_already_set();
+        try {
+            result.cast<ValueT>();
+        } catch (py::cast_error&) {
+            std::ostringstream os;
+            os << "expected callable argument to ";
+            os << pyutil::GridTraits<GridType>::name();
+            os << "." << methodName << "() to return ";
+            os << openvdb::typeNameAsString<ValueT>();
+            os << ", found " << pyutil::className(result);
+            throw py::type_error(os.str());
         }
 
-        it.setValue(val());
+        it.setValue(result.cast<ValueT>());
     }
 }
 
@@ -1611,36 +942,31 @@ struct TreeCombineOp
     using TreeT = typename GridType::TreeType;
     using ValueT = typename GridType::ValueType;
 
-    TreeCombineOp(py::object _op): op(_op) {}
+    TreeCombineOp(py::function _op): op(_op) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& result)
     {
         py::object resultObj = op(a, b);
 
-        py::extract<ValueT> val(resultObj);
-        if (!val.check()) {
-            PyErr_Format(PyExc_TypeError,
-                "expected callable argument to %s.combine() to return %s, found %s",
-                pyutil::GridTraits<GridType>::name(),
-                openvdb::typeNameAsString<ValueT>(),
-                pyutil::className(resultObj).c_str());
-            py::throw_error_already_set();
+        if (!py::isinstance<py::float_>(resultObj)) {
+            std::ostringstream os;
+            os << "expected callable argument to " << pyutil::GridTraits<GridType>::name();
+            os << ".combine() to return " << openvdb::typeNameAsString<ValueT>();
+            os << ", found " <<  pyutil::className(resultObj);
+            throw py::type_error(os.str());
         }
 
-        result = val();
+        result = resultObj.cast<ValueT>();
     }
-    py::object op;
+    py::function op;
 };
 
 
 template<typename GridType>
 inline void
-combine(GridType& grid, py::object otherGridObj, py::object funcObj)
+combine(GridType& grid, GridType& otherGrid, py::function funcObj)
 {
-    using GridPtr = typename GridType::Ptr;
-    GridPtr otherGrid = extractValueArg<GridType, GridPtr>(otherGridObj,
-        "combine", 1, pyutil::GridTraits<GridType>::name());
     TreeCombineOp<GridType> op(funcObj);
-    grid.tree().combine(otherGrid->tree(), op, /*prune=*/true);
+    grid.tree().combine(otherGrid.tree(), op, /*prune=*/true);
 }
 
 
@@ -1781,13 +1107,11 @@ struct IterItemSetter<const GridT, IterT>
     using ValueT = typename GridT::ValueType;
     static void setValue(const IterT&, const ValueT&)
     {
-        PyErr_SetString(PyExc_AttributeError, "can't set attribute 'value'");
-        py::throw_error_already_set();
+        throw py::attribute_error("can't set attribute 'value'");
     }
     static void setActive(const IterT&, bool /*on*/)
     {
-        PyErr_SetString(PyExc_AttributeError, "can't set attribute 'active'");
-        py::throw_error_already_set();
+        throw py::attribute_error("can't set attribute 'active'");
     }
 };
 
@@ -1840,10 +1164,11 @@ public:
     }
 
     /// Return this dictionary's keys as a Python list of Python strings.
-    static py::list getKeys()
+    static std::vector<std::string> getKeys()
     {
-        py::list keyList;
-        for (int i = 0; keys()[i] != nullptr; ++i) keyList.append(keys()[i]);
+        std::vector<std::string> keyList;
+        for (int i = 0; keys()[i] != nullptr; ++i)
+            keyList.push_back(keys()[i]);
         return keyList;
     }
 
@@ -1851,18 +1176,16 @@ public:
     /// @throw KeyError if the key is invalid
     py::object getItem(py::object keyObj) const
     {
-        py::extract<std::string> x(keyObj);
-        if (x.check()) {
-            const std::string key = x();
-            if (key == "value") return py::object(this->getValue());
-            else if (key == "active") return py::object(this->getActive());
-            else if (key == "depth") return py::object(this->getDepth());
-            else if (key == "min") return py::object(this->getBBoxMin());
-            else if (key == "max") return py::object(this->getBBoxMax());
-            else if (key == "count") return py::object(this->getVoxelCount());
+        if (py::isinstance<std::string>(keyObj)) {
+            const std::string key = keyObj.cast<std::string>();
+            if (key == "value") return py::cast(this->getValue());
+            else if (key == "active") return py::cast(this->getActive());
+            else if (key == "depth") return py::cast(this->getDepth());
+            else if (key == "min") return py::cast(this->getBBoxMin());
+            else if (key == "max") return py::cast(this->getBBoxMax());
+            else if (key == "count") return py::cast(this->getVoxelCount());
         }
-        PyErr_SetObject(PyExc_KeyError, ("%s" % keyObj.attr("__repr__")()).ptr());
-        py::throw_error_already_set();
+        throw py::key_error(keyObj.attr("__repr__")().cast<std::string>());
         return py::object();
     }
 
@@ -1871,22 +1194,21 @@ public:
     /// @throw AttributeError if the key refers to a read-only item
     void setItem(py::object keyObj, py::object valObj)
     {
-        py::extract<std::string> x(keyObj);
-        if (x.check()) {
-            const std::string key = x();
+        if (py::isinstance<std::string>(keyObj)) {
+            const std::string key = keyObj.cast<std::string>();
             if (key == "value") {
-                this->setValue(py::extract<ValueT>(valObj)); return;
+                this->setValue(valObj.cast<ValueT>()); return;
             } else if (key == "active") {
-                this->setActive(py::extract<bool>(valObj)); return;
+                this->setActive(valObj.cast<bool>()); return;
             } else if (this->hasKey(key)) {
-                PyErr_SetObject(PyExc_AttributeError,
-                    ("can't set attribute '%s'" % keyObj.attr("__repr__")()).ptr());
-                py::throw_error_already_set();
+                std::ostringstream os;
+                os << "can't set attribute '";
+                os << keyObj.attr("__repr__")().cast<std::string>();
+                os << "'";
+                throw py::attribute_error(os.str());
             }
         }
-        PyErr_SetObject(PyExc_KeyError,
-            ("'%s'" % keyObj.attr("__repr__")()).ptr());
-        py::throw_error_already_set();
+        throw py::key_error(keyObj.attr("__repr__")().cast<std::string>());
     }
 
     bool operator==(const IterValueProxy& other) const
@@ -1909,11 +1231,11 @@ public:
             py::str
                 key(this->keys()[i]),
                 val(this->getItem(key).attr("__repr__")());
-            valuesAsStrings.append("'%s': %s" % py::make_tuple(key, val));
+            valuesAsStrings.append(py::str("'%s': %s").format(py::make_tuple(key, val)));
         }
         // print ", ".join(valuesAsStrings)
         py::object joined = py::str(", ").attr("join")(valuesAsStrings);
-        std::string s = py::extract<std::string>(joined);
+        std::string s = joined.cast<std::string>();
         os << "{" << s << "}";
         return os;
     }
@@ -1955,8 +1277,7 @@ public:
     IterValueProxyT next()
     {
         if (!mIter) {
-            PyErr_SetString(PyExc_StopIteration, "no more values");
-            py::throw_error_already_set();
+            throw py::stop_iteration("no more values");
         }
         IterValueProxyT result(mGrid, mIter);
         ++mIter;
@@ -1967,36 +1288,34 @@ public:
 
     /// @brief Define a Python wrapper class for this C++ class and another for
     /// the IterValueProxy class returned by iterators of this type.
-    static void wrap()
+    static void wrap(py::module_ m)
     {
         const std::string
             gridClassName = pyutil::GridTraits<typename std::remove_const<GridT>::type>::name(),
-            iterClassName = /*gridClassName +*/ Traits::name(),
-            valueClassName = /*gridClassName +*/ "Value";
+            iterClassName = gridClassName + Traits::name(),
+            valueClassName = gridClassName + Traits::name() + "Value";
 
-        py::class_<IterWrap>(
+        py::class_<IterWrap>(m,
             iterClassName.c_str(),
-            /*docstring=*/Traits::descr().c_str(),
-            /*ctor=*/py::no_init) // can only be instantiated from C++, not from Python
+            /*docstring=*/Traits::descr().c_str())
 
-            .add_property("parent", &IterWrap::parent,
+            .def_property_readonly("parent", &IterWrap::parent,
                 ("the " + gridClassName + " over which to iterate").c_str())
 
             .def("next", &IterWrap::next, ("next() -> " + valueClassName).c_str())
             .def("__next__", &IterWrap::next, ("__next__() -> " + valueClassName).c_str())
             .def("__iter__", &returnSelf);
 
-        py::class_<IterValueProxyT>(
+        py::class_<IterValueProxyT>(m,
             valueClassName.c_str(),
-            /*docstring=*/("Proxy for a tile or voxel value in a " + gridClassName).c_str(),
-            /*ctor=*/py::no_init) // can only be instantiated from C++, not from Python
+            /*docstring=*/("Proxy for a tile or voxel value in a " + gridClassName).c_str())
 
             .def("copy", &IterValueProxyT::copy,
                 ("copy() -> " + valueClassName + "\n\n"
                 "Return a shallow copy of this value, i.e., one that shares\n"
                 "its data with the original.").c_str())
 
-            .add_property("parent", &IterValueProxyT::parent,
+            .def_property_readonly("parent", &IterValueProxyT::parent,
                 ("the " + gridClassName + " to which this value belongs").c_str())
 
             .def("__str__", &IterValueProxyT::info)
@@ -2005,27 +1324,25 @@ public:
             .def("__eq__", &IterValueProxyT::operator==)
             .def("__ne__", &IterValueProxyT::operator!=)
 
-            .add_property("value", &IterValueProxyT::getValue, &IterValueProxyT::setValue,
+            .def_property("value", &IterValueProxyT::getValue, &IterValueProxyT::setValue,
                 "value of this tile or voxel")
-            .add_property("active", &IterValueProxyT::getActive, &IterValueProxyT::setActive,
+            .def_property("active", &IterValueProxyT::getActive, &IterValueProxyT::setActive,
                 "active state of this tile or voxel")
-            .add_property("depth", &IterValueProxyT::getDepth,
+            .def_property_readonly("depth", &IterValueProxyT::getDepth,
                 "tree depth at which this value is stored")
-            .add_property("min", &IterValueProxyT::getBBoxMin,
+            .def_property_readonly("min", &IterValueProxyT::getBBoxMin,
                 "lower bound of the axis-aligned bounding box of this tile or voxel")
-            .add_property("max", &IterValueProxyT::getBBoxMax,
+            .def_property_readonly("max", &IterValueProxyT::getBBoxMax,
                 "upper bound of the axis-aligned bounding box of this tile or voxel")
-            .add_property("count", &IterValueProxyT::getVoxelCount,
+            .def_property_readonly("count", &IterValueProxyT::getVoxelCount,
                 "number of voxels spanned by this value")
 
-            .def("keys", &IterValueProxyT::getKeys,
+            .def_static("keys", &IterValueProxyT::getKeys,
                 "keys() -> list\n\n"
                 "Return a list of keys for this tile or voxel.")
-            .staticmethod("keys")
-            .def("__contains__", &IterValueProxyT::hasKey,
+            .def_static("__contains__", &IterValueProxyT::hasKey,
                 "__contains__(key) -> bool\n\n"
                 "Return True if the given key exists.")
-            .staticmethod("__contains__")
             .def("__getitem__", &IterValueProxyT::getItem,
                 "__getitem__(key) -> value\n\n"
                 "Return the value of the item with the given key.")
@@ -2046,106 +1363,60 @@ private:
 
 
 template<typename GridT>
-struct PickleSuite: public py::pickle_suite
+struct PickleSuite
 {
     using GridPtrT = typename GridT::Ptr;
 
-    /// Return @c true, indicating that this pickler preserves a Grid's __dict__.
-    static bool getstate_manages_dict() { return true; }
-
     /// Return a tuple representing the state of the given Grid.
-    static py::tuple getstate(py::object gridObj)
+    static py::tuple getState(const GridPtrT& grid)
     {
-        py::tuple state;
-
-        // Extract a Grid from the Python object.
-        GridPtrT grid;
-        py::extract<GridPtrT> x(gridObj);
-        if (x.check()) grid = x();
-
-        if (grid) {
-            // Serialize the Grid to a string.
-            std::ostringstream ostr(std::ios_base::binary);
-            {
-                openvdb::io::Stream strm(ostr);
-                strm.setGridStatsMetadataEnabled(false);
-                strm.write(openvdb::GridPtrVec(1, grid));
-            }
-            // Construct a state tuple comprising the Python object's __dict__
-            // and the serialized Grid.
-#if PY_MAJOR_VERSION >= 3
-            // Convert the byte string to a "bytes" sequence.
-            const std::string s = ostr.str();
-            py::object bytesObj = pyutil::pyBorrow(PyBytes_FromStringAndSize(s.data(), s.size()));
-#else
-            py::str bytesObj(ostr.str());
-#endif
-            state = py::make_tuple(gridObj.attr("__dict__"), bytesObj);
+        // Serialize the Grid to a string.
+        std::ostringstream ostr(std::ios_base::binary);
+        {
+            openvdb::io::Stream strm(ostr);
+            strm.setGridStatsMetadataEnabled(false);
+            strm.write(openvdb::GridPtrVec(1, grid));
         }
-        return state;
+
+        // Construct a state tuple for the serialized Grid.
+#if PY_MAJOR_VERSION >= 3
+        // Convert the byte string to a "bytes" sequence.
+        const std::string s = ostr.str();
+        py::bytes bytesObj(s);
+#else
+        py::str bytesObj(ostr.str());
+#endif
+        return py::make_tuple(bytesObj);
     }
 
     /// Restore the given Grid to a saved state.
-    static void setstate(py::object gridObj, py::object stateObj)
+    static GridPtrT setState(py::tuple state)
     {
-        GridPtrT grid;
-        {
-            py::extract<GridPtrT> x(gridObj);
-            if (x.check()) grid = x();
-        }
-        if (!grid) return;
-
-        py::tuple state;
-        {
-            py::extract<py::tuple> x(stateObj);
-            if (x.check()) state = x();
-        }
-        bool badState = (py::len(state) != 2);
-
-        if (!badState) {
-            // Restore the object's __dict__.
-            py::extract<py::dict> x(state[0]);
-            if (x.check()) {
-                py::dict d = py::extract<py::dict>(gridObj.attr("__dict__"))();
-                d.update(x());
-            } else {
-                badState = true;
-            }
-        }
+        bool badState = (py::len(state) != 1);
 
         std::string serialized;
         if (!badState) {
             // Extract the sequence containing the serialized Grid.
-            py::object bytesObj = state[1];
 #if PY_MAJOR_VERSION >= 3
-            badState = true;
-            if (PyBytes_Check(bytesObj.ptr())) {
-                // Convert the "bytes" sequence to a byte string.
-                char* buf = nullptr;
-                Py_ssize_t length = 0;
-                if (-1 != PyBytes_AsStringAndSize(bytesObj.ptr(), &buf, &length)) {
-                    if (buf != nullptr && length > 0) {
-                        serialized.assign(buf, buf + length);
-                        badState = false;
-                    }
-                }
-            }
+            if (py::isinstance<py::bytes>(state[0]))
+                serialized = state[0].cast<py::bytes>();
 #else
-            py::extract<std::string> x(bytesObj);
-            if (x.check()) serialized = x();
-            else badState = true;
+            if (py::isinstance<std::string>(state[0]))
+                serialized = state[0].cast<std::string>();
 #endif
+            else
+                badState = true;
         }
 
         if (badState) {
-            PyErr_SetObject(PyExc_ValueError,
+            std::ostringstream os;
 #if PY_MAJOR_VERSION >= 3
-                ("expected (dict, bytes) tuple in call to __setstate__; found %s"
+            os << "expected (dict, bytes) tuple in call to __setstate__; found ";
 #else
-                ("expected (dict, str) tuple in call to __setstate__; found %s"
+            os << "expected (dict, str) tuple in call to __setstate__; found ";
 #endif
-                     % stateObj.attr("__repr__")()).ptr());
-            py::throw_error_already_set();
+            os << state.attr("__repr__")().cast<std::string>();
+            throw py::value_error(os.str());
         }
 
         // Restore the internal state of the C++ object.
@@ -2157,11 +1428,11 @@ struct PickleSuite: public py::pickle_suite
         }
         if (grids && !grids->empty()) {
             if (GridPtrT savedGrid = gridPtrCast<GridT>((*grids)[0])) {
-                grid->MetaMap::operator=(*savedGrid); ///< @todo add a Grid::setMetadata() method?
-                grid->setTransform(savedGrid->transformPtr());
-                grid->setTree(savedGrid->treePtr());
+                return savedGrid;
             }
         }
+
+        return GridPtrT();
     }
 }; // struct PickleSuite
 
@@ -2172,7 +1443,7 @@ struct PickleSuite: public py::pickle_suite
 /// Create a Python wrapper for a particular template instantiation of Grid.
 template<typename GridType>
 inline void
-exportGrid()
+exportGrid(py::module_ m)
 {
     using ValueT = typename GridType::ValueType;
     using GridPtr = typename GridType::Ptr;
@@ -2185,382 +1456,262 @@ exportGrid()
     using ValueOffIterT = typename GridType::ValueOffIter;
     using ValueAllIterT = typename GridType::ValueAllIter;
 
-    math::Transform::Ptr (GridType::*getTransform)() = &GridType::transformPtr;
-
     const std::string pyGridTypeName = Traits::name();
     const std::string defaultCtorDescr = "Initialize with a background value of "
         + pyutil::str(pyGrid::getZeroValue<GridType>()) + ".";
 
     // Define the Grid wrapper class and make it the current scope.
-    {
-        py::class_<GridType, /*HeldType=*/GridPtr> clss(
-            /*classname=*/pyGridTypeName.c_str(),
-            /*docstring=*/(Traits::descr()).c_str(),
-            /*ctor=*/py::init<>(defaultCtorDescr.c_str())
-        );
+    py::class_<GridType, GridPtr, GridBase>(m,
+        /*classname=*/pyGridTypeName.c_str(),
+        /*docstring=*/(Traits::descr()).c_str())
+        .def(py::init<>(), defaultCtorDescr.c_str())
+        .def(py::init<const ValueT&>(), py::arg("background"),
+            "Initialize with the given background value.")
 
-        py::scope gridClassScope = clss;
+        .def("copy", &pyGrid::copyGrid<GridType>,
+            ("copy() -> " + pyGridTypeName + "\n\n"
+            "Return a shallow copy of this grid, i.e., a grid\n"
+            "that shares its voxel data with this grid.").c_str())
+        .def("deepCopy", &GridType::deepCopy,
+            ("deepCopy() -> " + pyGridTypeName + "\n\n"
+            "Return a deep copy of this grid.\n").c_str())
 
-        clss.def(py::init<const ValueT&>(py::args("background"),
-                "Initialize with the given background value."))
+        .def(py::pickle(&PickleSuite<GridType>::getState, &PickleSuite<GridType>::setState))
 
-            .def("copy", &pyGrid::copyGrid<GridType>,
-                ("copy() -> " + pyGridTypeName + "\n\n"
-                "Return a shallow copy of this grid, i.e., a grid\n"
-                "that shares its voxel data with this grid.").c_str())
-            .def("deepCopy", &GridType::deepCopy,
-                ("deepCopy() -> " + pyGridTypeName + "\n\n"
-                "Return a deep copy of this grid.\n").c_str())
+        .def("sharesWith", &pyGrid::sharesWith<GridType>,
+            ("sharesWith(" + pyGridTypeName + ") -> bool\n\n"
+            "Return True if this grid shares its voxel data with the given grid.").c_str())
 
-            .def_pickle(pyGrid::PickleSuite<GridType>())
+        /// @todo Any way to set a docstring for a class property?
+        .def_property_readonly_static("valueTypeName", [](const py::object&) { return pyGrid::getValueType<GridType>(); })
+            /// @todo docstring = "name of this grid's value type"
+        .def_property_readonly_static("zeroValue", [](const py::object&) { return pyGrid::getZeroValue<GridType>(); })
+            /// @todo docstring = "zero, as expressed in this grid's value type"
+        .def_property_readonly_static("oneValue", [](const py::object&) { return pyGrid::getOneValue<GridType>(); })
+            /// @todo docstring = "one, as expressed in this grid's value type"
+        /// @todo Is Grid.typeName ever needed?
+        //.def_property_static("typeName", &GridType::gridType)
+            /// @todo docstring = to "name of this grid's type"
 
-            .def("sharesWith", &pyGrid::sharesWith<GridType>,
-                ("sharesWith(" + pyGridTypeName + ") -> bool\n\n"
-                "Return True if this grid shares its voxel data with the given grid.").c_str())
+        .def_property("background",
+            &pyGrid::getGridBackground<GridType>, &pyGrid::setGridBackground<GridType>,
+            "value of this grid's background voxels")
 
-            /// @todo Any way to set a docstring for a class property?
-            .add_static_property("valueTypeName", &pyGrid::getValueType<GridType>)
-                /// @todo docstring = "name of this grid's value type"
-            .add_static_property("zeroValue", &pyGrid::getZeroValue<GridType>)
-                /// @todo docstring = "zero, as expressed in this grid's value type"
-            .add_static_property("oneValue", &pyGrid::getOneValue<GridType>)
-                /// @todo docstring = "one, as expressed in this grid's value type"
-            /// @todo Is Grid.typeName ever needed?
-            //.add_static_property("typeName", &GridType::gridType)
-                /// @todo docstring = to "name of this grid's type"
+        .def("getAccessor", &pyGrid::getAccessor<GridType>,
+            ("getAccessor() -> " + pyGridTypeName + "Accessor\n\n"
+            "Return an accessor that provides random read and write access\n"
+            "to this grid's voxels.").c_str())
+        .def("getConstAccessor", &pyGrid::getConstAccessor<GridType>,
+            ("getConstAccessor() -> " + pyGridTypeName + "Accessor\n\n"
+            "Return an accessor that provides random read-only access\n"
+            "to this grid's voxels.").c_str())
 
-            .add_property("background",
-                &pyGrid::getGridBackground<GridType>, &pyGrid::setGridBackground<GridType>,
-                "value of this grid's background voxels")
-            .add_property("name", &GridType::getName, &pyGrid::setGridName,
-                "this grid's name")
-            .add_property("creator", &GridType::getCreator, &pyGrid::setGridCreator,
-                "description of this grid's creator")
+        //
+        // Statistics
+        //
+        .def("evalLeafBoundingBox", &pyGrid::evalLeafBoundingBox<GridType>,
+            "evalLeafBoundingBox() -> xyzMin, xyzMax\n\n"
+            "Return the coordinates of opposite corners of the axis-aligned\n"
+            "bounding box of all leaf nodes.")
+        .def("evalLeafDim", &pyGrid::evalLeafDim<GridType>,
+            "evalLeafDim() -> x, y, z\n\n"
+            "Return the dimensions of the axis-aligned bounding box\n"
+            "of all leaf nodes.")
 
-            .add_property("transform", getTransform, &pyGrid::setGridTransform,
-                "transform associated with this grid")
+        .def_property_readonly("treeDepth", &pyGrid::treeDepth<GridType>,
+            "depth of this grid's tree from root node to leaf node")
+        .def("nodeLog2Dims", &pyGrid::getNodeLog2Dims<GridType>,
+            "list of Log2Dims of the nodes of this grid's tree\n"
+            "in order from root to leaf")
 
-            .add_property("gridClass", &pyGrid::getGridClass, &pyGrid::setGridClass,
-                "the class of volumetric data (level set, fog volume, etc.)\nstored in this grid")
+        .def("leafCount", &pyGrid::leafCount<GridType>,
+            "leafCount() -> int\n\n"
+            "Return the number of leaf nodes in this grid's tree.")
+        .def("nonLeafCount", &pyGrid::nonLeafCount<GridType>,
+            "nonLeafCount() -> int\n\n"
+            "Return the number of non-leaf nodes in this grid's tree.")
 
-            .add_property("vectorType", &pyGrid::getVecType, &pyGrid::setVecType,
-                "how transforms are applied to values stored in this grid")
+        .def("activeLeafVoxelCount", &pyGrid::activeLeafVoxelCount<GridType>,
+            "activeLeafVoxelCount() -> int\n\n"
+            "Return the number of active voxels that are stored\n"
+            "in the leaf nodes of this grid's tree.")
 
-            .def("getAccessor", &pyGrid::getAccessor<GridType>,
-                ("getAccessor() -> " + pyGridTypeName + "Accessor\n\n"
-                "Return an accessor that provides random read and write access\n"
-                "to this grid's voxels.").c_str())
-            .def("getConstAccessor", &pyGrid::getConstAccessor<GridType>,
-                ("getConstAccessor() -> " + pyGridTypeName + "Accessor\n\n"
-                "Return an accessor that provides random read-only access\n"
-                "to this grid's voxels.").c_str())
+        .def("evalMinMax", &pyGrid::evalMinMax<GridType>,
+            "evalMinMax() -> min, max\n\n"
+            "Return the minimum and maximum active values in this grid.")
 
-            //
-            // Metadata
-            //
-            .add_property("metadata", &pyGrid::getAllMetadata, &pyGrid::replaceAllMetadata,
-                "dict of this grid's metadata\n\n"
-                "Setting this attribute replaces all of this grid's metadata,\n"
-                "but mutating it in place has no effect on the grid, since\n"
-                "the value of this attribute is a only a copy of the metadata.\n"
-                "Use either indexing or updateMetadata() to mutate metadata in place.")
-            .def("updateMetadata", &pyGrid::updateMetadata,
-                "updateMetadata(dict)\n\n"
-                "Add metadata to this grid, replacing any existing items\n"
-                "having the same names as the new items.")
+        .def("getIndexRange", &pyGrid::getIndexRange<GridType>,
+            "getIndexRange() -> min, max\n\n"
+            "Return the minimum and maximum coordinates that are represented\n"
+            "in this grid.  These might include background voxels.")
+        //.def("expand", &pyGrid::expandIndexRange<GridType>,
+        //    py::arg("xyz"),
+        //    "expand(xyz)\n\n"
+        //    "Expand this grid's index range to include the given coordinates.")
 
-            .def("addStatsMetadata", &GridType::addStatsMetadata,
-                "addStatsMetadata()\n\n"
-                "Add metadata to this grid comprising the current values\n"
-                "of statistics like the active voxel count and bounding box.\n"
-                "(This metadata is not automatically kept up-to-date with\n"
-                "changes to this grid.)")
-            .def("getStatsMetadata", &pyGrid::getStatsMetadata,
-                "getStatsMetadata() -> dict\n\n"
-                "Return a (possibly empty) dict containing just the metadata\n"
-                "that was added to this grid with addStatsMetadata().")
+        //
+        // Tools
+        //
+        .def("fill", &pyGrid::fill<GridType>,
+            py::arg("min"), py::arg("max"), py::arg("value"), py::arg("active")=true,
+            "fill(min, max, value, active=True)\n\n"
+            "Set all voxels within a given axis-aligned box to\n"
+            "a constant value (either active or inactive).")
+        .def("signedFloodFill", &pyGrid::signedFloodFill<GridType>,
+            "signedFloodFill()\n\n"
+            "Propagate the sign from a narrow-band level set into inactive\n"
+            "voxels and tiles.")
 
-            .def("__getitem__", &pyGrid::getMetadata,
-                "__getitem__(name) -> value\n\n"
-                "Return the metadata value associated with the given name.")
-            .def("__setitem__", &pyGrid::setMetadata,
-                "__setitem__(name, value)\n\n"
-                "Add metadata to this grid, replacing any existing item having\n"
-                "the same name as the new item.")
-            .def("__delitem__", &pyGrid::removeMetadata,
-                "__delitem__(name)\n\n"
-                "Remove the metadata with the given name.")
-            .def("__contains__", &pyGrid::hasMetadata,
-                "__contains__(name) -> bool\n\n"
-                "Return True if this grid contains metadata with the given name.")
-            .def("__iter__", &pyGrid::getMetadataKeys,
-                "__iter__() -> iterator\n\n"
-                "Return an iterator over this grid's metadata keys.")
-            .def("iterkeys", &pyGrid::getMetadataKeys,
-                "iterkeys() -> iterator\n\n"
-                "Return an iterator over this grid's metadata keys.")
+        .def("copyFromArray", &pyGrid::copyFromArray<GridType>,
+            py::arg("array"), py::arg("ijk")=Coord(0,0,0),
+                 py::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
+            ("copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
+            "Populate this grid, starting at voxel (i, j, k), with values\nfrom a "
+            + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
+            + "-dimensional array.  Mark voxels as inactive\n"
+            "if and only if their values are equal to this grid's\n"
+            "background value within the given tolerance.").c_str())
+        .def("copyToArray", &pyGrid::copyToArray<GridType>,
+            py::arg("array"), py::arg("ijk")=Coord(0,0,0),
+            ("copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
+            + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
+            + "-dimensional array with values\n"
+            "from this grid, starting at voxel (i, j, k).").c_str())
 
-            .add_property("saveFloatAsHalf",
-                &GridType::saveFloatAsHalf, &GridType::setSaveFloatAsHalf,
-                "if True, write floating-point voxel values as 16-bit half floats")
+        .def("convertToQuads",
+            &pyGrid::volumeToQuadMesh<GridType>,
+            py::arg("isovalue")=0,
+            "convertToQuads(isovalue=0) -> points, quads\n\n"
+            "Uniformly mesh a scalar grid that has a continuous isosurface\n"
+            "at the given isovalue.  Return a NumPy array of world-space\n"
+            "points and a NumPy array of 4-tuples of point indices, which\n"
+            "specify the vertices of the quadrilaterals that form the mesh.")
+        .def("convertToPolygons",
+            &pyGrid::volumeToMesh<GridType>,
+            py::arg("isovalue")=0, py::arg("adaptivity")=0,
+            "convertToPolygons(isovalue=0, adaptivity=0) -> points, triangles, quads\n\n"
+            "Adaptively mesh a scalar grid that has a continuous isosurface\n"
+            "at the given isovalue.  Return a NumPy array of world-space\n"
+            "points and NumPy arrays of 3- and 4-tuples of point indices,\n"
+            "which specify the vertices of the triangles and quadrilaterals\n"
+            "that form the mesh.  Adaptivity can vary from 0 to 1, where 0\n"
+            "produces a high-polygon-count mesh that closely approximates\n"
+            "the isosurface, and 1 produces a lower-polygon-count mesh\n"
+            "with some loss of surface detail.")
+        .def_static("createLevelSetFromPolygons",
+            &pyGrid::meshToLevelSet<GridType>,
+            py::arg("points"),
+#ifdef PY_OPENVDB_USE_NUMPY
+            py::arg("triangles")=py::array_t<Index32>({ 0, 3 }, { 3 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))} ),
+            py::arg("quads")=py::array_t<Index32>({ 0, 4 }, { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))} ),
+#else
+            py::arg("triangles")=std::vector<Index32>(),
+            py::arg("quads")=std::vector<Index32>(),
+#endif
+            py::arg("transform")=py::none(),
+            py::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
+            ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
+             "    transform=None, halfWidth="
+             + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
+             + pyGridTypeName + "\n\n"
+            "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
+            "The mesh must form a closed surface, but the surface need not be\n"
+            "manifold and may have self intersections and degenerate faces.\n"
+            "The mesh is described by a NumPy array of world-space points\n"
+            "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+            "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+            "Either the triangle or the quad array may be empty or None.\n"
+            "The resulting volume will have the given transform (or the identity\n"
+            "transform if no transform is given) and a narrow band width of\n"
+            "2 x halfWidth voxels.").c_str())
 
-            //
-            // Statistics
-            //
-            .def("memUsage", &GridType::memUsage,
-                "memUsage() -> int\n\n"
-                "Return the memory usage of this grid in bytes.")
+        .def("prune", &pyGrid::prune<GridType>,
+            py::arg("tolerance") = 0,
+            "prune(tolerance=0)\n\n"
+            "Remove nodes whose values all have the same active state\n"
+            "and are equal to within a given tolerance.")
+        .def("pruneInactive", &pyGrid::pruneInactive<GridType>,
+            py::arg("value") = py::none(),
+            "pruneInactive()\n\n"
+            "Remove nodes whose values are all inactive and replace them\n"
+            "with background tiles.")
 
-            .def("evalLeafBoundingBox", &pyGrid::evalLeafBoundingBox<GridType>,
-                "evalLeafBoundingBox() -> xyzMin, xyzMax\n\n"
-                "Return the coordinates of opposite corners of the axis-aligned\n"
-                "bounding box of all leaf nodes.")
-            .def("evalLeafDim", &pyGrid::evalLeafDim<GridType>,
-                "evalLeafDim() -> x, y, z\n\n"
-                "Return the dimensions of the axis-aligned bounding box\n"
-                "of all leaf nodes.")
+        .def("merge", &GridType::merge,
+            ("merge(" + pyGridTypeName + ")\n\n"
+            "Move child nodes from the other grid into this grid wherever\n"
+            "those nodes correspond to constant-value tiles in this grid,\n"
+            "and replace leaf-level inactive voxels in this grid with\n"
+            "corresponding voxels in the other grid that are active.\n\n"
+            "Note: this operation always empties the other grid.").c_str())
 
-            .def("evalActiveVoxelBoundingBox", &pyGrid::evalActiveVoxelBoundingBox<GridType>,
-                "evalActiveVoxelBoundingBox() -> xyzMin, xyzMax\n\n"
-                "Return the coordinates of opposite corners of the axis-aligned\n"
-                "bounding box of all active voxels.")
-            .def("evalActiveVoxelDim", &GridType::evalActiveVoxelDim,
-                "evalActiveVoxelDim() -> x, y, z\n\n"
-                "Return the dimensions of the axis-aligned bounding box of all\n"
-                "active voxels.")
+        .def("mapOn", &pyGrid::mapOn<GridType>,
+            py::arg("function"),
+            "mapOn(function)\n\n"
+            "Iterate over all the active (\"on\") values (tile and voxel)\n"
+            "of this grid and replace each value with function(value).\n\n"
+            "Example: grid.mapOn(lambda x: x * 2 if x < 0.5 else x)")
 
-            .add_property("treeDepth", &pyGrid::treeDepth<GridType>,
-                "depth of this grid's tree from root node to leaf node")
-            .def("nodeLog2Dims", &pyGrid::getNodeLog2Dims<GridType>,
-                "list of Log2Dims of the nodes of this grid's tree\n"
-                "in order from root to leaf")
+        .def("mapOff", &pyGrid::mapOff<GridType>,
+            py::arg("function"),
+            "mapOff(function)\n\n"
+            "Iterate over all the inactive (\"off\") values (tile and voxel)\n"
+            "of this grid and replace each value with function(value).\n\n"
+            "Example: grid.mapOff(lambda x: x * 2 if x < 0.5 else x)")
 
-            .def("leafCount", &pyGrid::leafCount<GridType>,
-                "leafCount() -> int\n\n"
-                "Return the number of leaf nodes in this grid's tree.")
-            .def("nonLeafCount", &pyGrid::nonLeafCount<GridType>,
-                "nonLeafCount() -> int\n\n"
-                "Return the number of non-leaf nodes in this grid's tree.")
+        .def("mapAll", &pyGrid::mapAll<GridType>,
+            py::arg("function"),
+            "mapAll(function)\n\n"
+            "Iterate over all values (tile and voxel) of this grid\n"
+            "and replace each value with function(value).\n\n"
+            "Example: grid.mapAll(lambda x: x * 2 if x < 0.5 else x)")
 
-            .def("activeVoxelCount", &GridType::activeVoxelCount,
-                "activeVoxelCount() -> int\n\n"
-                "Return the number of active voxels in this grid.")
-            .def("activeLeafVoxelCount", &pyGrid::activeLeafVoxelCount<GridType>,
-                "activeLeafVoxelCount() -> int\n\n"
-                "Return the number of active voxels that are stored\n"
-                "in the leaf nodes of this grid's tree.")
+        .def("combine", &pyGrid::combine<GridType>,
+            py::arg("grid"), py::arg("function"),
+            "combine(grid, function)\n\n"
+            "Compute function(self, other) over all corresponding pairs\n"
+            "of values (tile or voxel) of this grid and the other grid\n"
+            "and store the result in this grid.\n\n"
+            "Note: this operation always empties the other grid.\n\n"
+            "Example: grid.combine(otherGrid, lambda a, b: min(a, b))")
 
-            .def("evalMinMax", &pyGrid::evalMinMax<GridType>,
-                "evalMinMax() -> min, max\n\n"
-                "Return the minimum and maximum active values in this grid.")
+        //
+        // Iterators
+        //
+        .def("citerOnValues", &pyGrid::IterTraits<GridType, ValueOnCIterT>::begin,
+            "citerOnValues() -> iterator\n\n"
+            "Return a read-only iterator over this grid's active\ntile and voxel values.")
+        .def("citerOffValues", &pyGrid::IterTraits<GridType, ValueOffCIterT>::begin,
+            "iterOffValues() -> iterator\n\n"
+            "Return a read-only iterator over this grid's inactive\ntile and voxel values.")
+        .def("citerAllValues", &pyGrid::IterTraits<GridType, ValueAllCIterT>::begin,
+            "iterAllValues() -> iterator\n\n"
+            "Return a read-only iterator over all of this grid's\ntile and voxel values.")
 
-            .def("getIndexRange", &pyGrid::getIndexRange<GridType>,
-                "getIndexRange() -> min, max\n\n"
-                "Return the minimum and maximum coordinates that are represented\n"
-                "in this grid.  These might include background voxels.")
-            //.def("expand", &pyGrid::expandIndexRange<GridType>,
-            //    py::arg("xyz"),
-            //    "expand(xyz)\n\n"
-            //    "Expand this grid's index range to include the given coordinates.")
+        .def("iterOnValues", &pyGrid::IterTraits<GridType, ValueOnIterT>::begin,
+            "iterOnValues() -> iterator\n\n"
+            "Return a read/write iterator over this grid's active\ntile and voxel values.")
+        .def("iterOffValues", &pyGrid::IterTraits<GridType, ValueOffIterT>::begin,
+            "iterOffValues() -> iterator\n\n"
+            "Return a read/write iterator over this grid's inactive\ntile and voxel values.")
+        .def("iterAllValues", &pyGrid::IterTraits<GridType, ValueAllIterT>::begin,
+            "iterAllValues() -> iterator\n\n"
+            "Return a read/write iterator over all of this grid's\ntile and voxel values.");
 
-            .def("info", &pyGrid::gridInfo,
-                py::arg("verbosity")=1,
-                "info(verbosity=1) -> str\n\n"
-                "Return a string containing information about this grid\n"
-                "with a specified level of verbosity.\n")
+    // Wrap const and non-const value accessors and expose them
+    // as nested classes of the Grid class.
+    pyAccessor::AccessorWrap<const GridType>::wrap(m);
+    pyAccessor::AccessorWrap<GridType>::wrap(m);
 
-            //
-            // Tools
-            //
-            .def("fill", &pyGrid::fill<GridType>,
-                (py::arg("min"), py::arg("max"), py::arg("value"), py::arg("active")=true),
-                "fill(min, max, value, active=True)\n\n"
-                "Set all voxels within a given axis-aligned box to\n"
-                "a constant value (either active or inactive).")
-            .def("signedFloodFill", &pyGrid::signedFloodFill<GridType>,
-                "signedFloodFill()\n\n"
-                "Propagate the sign from a narrow-band level set into inactive\n"
-                "voxels and tiles.")
-
-            .def("copyFromArray", &pyGrid::copyFromArray<GridType>,
-                (py::arg("array"), py::arg("ijk")=Coord(0),
-                     py::arg("tolerance")=pyGrid::getZeroValue<GridType>()),
-                ("copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
-                "Populate this grid, starting at voxel (i, j, k), with values\nfrom a "
-                + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-                + "-dimensional array.  Mark voxels as inactive\n"
-                "if and only if their values are equal to this grid's\n"
-                "background value within the given tolerance.").c_str())
-            .def("copyToArray", &pyGrid::copyToArray<GridType>,
-                (py::arg("array"), py::arg("ijk")=Coord(0)),
-                ("copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
-                + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-                + "-dimensional array with values\n"
-                "from this grid, starting at voxel (i, j, k).").c_str())
-
-            .def("convertToQuads",
-                &pyGrid::volumeToQuadMesh<GridType>,
-                (py::arg("isovalue")=0),
-                "convertToQuads(isovalue=0) -> points, quads\n\n"
-                "Uniformly mesh a scalar grid that has a continuous isosurface\n"
-                "at the given isovalue.  Return a NumPy array of world-space\n"
-                "points and a NumPy array of 4-tuples of point indices, which\n"
-                "specify the vertices of the quadrilaterals that form the mesh.")
-            .def("convertToPolygons",
-                &pyGrid::volumeToMesh<GridType>,
-                (py::arg("isovalue")=0, py::arg("adaptivity")=0),
-                "convertToPolygons(isovalue=0, adaptivity=0) -> points, triangles, quads\n\n"
-                "Adaptively mesh a scalar grid that has a continuous isosurface\n"
-                "at the given isovalue.  Return a NumPy array of world-space\n"
-                "points and NumPy arrays of 3- and 4-tuples of point indices,\n"
-                "which specify the vertices of the triangles and quadrilaterals\n"
-                "that form the mesh.  Adaptivity can vary from 0 to 1, where 0\n"
-                "produces a high-polygon-count mesh that closely approximates\n"
-                "the isosurface, and 1 produces a lower-polygon-count mesh\n"
-                "with some loss of surface detail.")
-            .def("createLevelSetFromPolygons",
-                &pyGrid::meshToLevelSet<GridType>,
-                (py::arg("points"),
-                     py::arg("triangles")=py::object(),
-                     py::arg("quads")=py::object(),
-                     py::arg("transform")=py::object(),
-                     py::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH),
-                ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
-                 "    transform=None, halfWidth="
-                 + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
-                 + pyGridTypeName + "\n\n"
-                "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
-                "The mesh must form a closed surface, but the surface need not be\n"
-                "manifold and may have self intersections and degenerate faces.\n"
-                "The mesh is described by a NumPy array of world-space points\n"
-                "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
-                "the vertices of the triangles and quadrilaterals that form the mesh.\n"
-                "Either the triangle or the quad array may be empty or None.\n"
-                "The resulting volume will have the given transform (or the identity\n"
-                "transform if no transform is given) and a narrow band width of\n"
-                "2 x halfWidth voxels.").c_str())
-            .staticmethod("createLevelSetFromPolygons")
-
-            .def("prune", &pyGrid::prune<GridType>,
-                (py::arg("tolerance")=0),
-                "prune(tolerance=0)\n\n"
-                "Remove nodes whose values all have the same active state\n"
-                "and are equal to within a given tolerance.")
-            .def("pruneInactive", &pyGrid::pruneInactive<GridType>,
-                (py::arg("value")=py::object()),
-                "pruneInactive(value=None)\n\n"
-                "Remove nodes whose values are all inactive and replace them\n"
-                "with either background tiles or tiles of the given value\n"
-                "(if the value is not None).")
-
-            .def("empty", &GridType::empty,
-                "empty() -> bool\n\n"
-                "Return True if this grid contains only background voxels.")
-            .def("__nonzero__", &pyGrid::notEmpty<GridType>)
-
-            .def("clear", &GridType::clear,
-                "clear()\n\n"
-                "Remove all tiles from this grid and all nodes other than the root node.")
-
-            .def("merge", &GridType::merge,
-                ("merge(" + pyGridTypeName + ")\n\n"
-                "Move child nodes from the other grid into this grid wherever\n"
-                "those nodes correspond to constant-value tiles in this grid,\n"
-                "and replace leaf-level inactive voxels in this grid with\n"
-                "corresponding voxels in the other grid that are active.\n\n"
-                "Note: this operation always empties the other grid.").c_str())
-
-            .def("mapOn", &pyGrid::mapOn<GridType>,
-                py::arg("function"),
-                "mapOn(function)\n\n"
-                "Iterate over all the active (\"on\") values (tile and voxel)\n"
-                "of this grid and replace each value with function(value).\n\n"
-                "Example: grid.mapOn(lambda x: x * 2 if x < 0.5 else x)")
-
-            .def("mapOff", &pyGrid::mapOff<GridType>,
-                py::arg("function"),
-                "mapOff(function)\n\n"
-                "Iterate over all the inactive (\"off\") values (tile and voxel)\n"
-                "of this grid and replace each value with function(value).\n\n"
-                "Example: grid.mapOff(lambda x: x * 2 if x < 0.5 else x)")
-
-            .def("mapAll", &pyGrid::mapAll<GridType>,
-                py::arg("function"),
-                "mapAll(function)\n\n"
-                "Iterate over all values (tile and voxel) of this grid\n"
-                "and replace each value with function(value).\n\n"
-                "Example: grid.mapAll(lambda x: x * 2 if x < 0.5 else x)")
-
-            .def("combine", &pyGrid::combine<GridType>,
-                (py::arg("grid"), py::arg("function")),
-                "combine(grid, function)\n\n"
-                "Compute function(self, other) over all corresponding pairs\n"
-                "of values (tile or voxel) of this grid and the other grid\n"
-                "and store the result in this grid.\n\n"
-                "Note: this operation always empties the other grid.\n\n"
-                "Example: grid.combine(otherGrid, lambda a, b: min(a, b))")
-
-            //
-            // Iterators
-            //
-            .def("citerOnValues", &pyGrid::IterTraits<GridType, ValueOnCIterT>::begin,
-                "citerOnValues() -> iterator\n\n"
-                "Return a read-only iterator over this grid's active\ntile and voxel values.")
-            .def("citerOffValues", &pyGrid::IterTraits<GridType, ValueOffCIterT>::begin,
-                "iterOffValues() -> iterator\n\n"
-                "Return a read-only iterator over this grid's inactive\ntile and voxel values.")
-            .def("citerAllValues", &pyGrid::IterTraits<GridType, ValueAllCIterT>::begin,
-                "iterAllValues() -> iterator\n\n"
-                "Return a read-only iterator over all of this grid's\ntile and voxel values.")
-
-            .def("iterOnValues", &pyGrid::IterTraits<GridType, ValueOnIterT>::begin,
-                "iterOnValues() -> iterator\n\n"
-                "Return a read/write iterator over this grid's active\ntile and voxel values.")
-            .def("iterOffValues", &pyGrid::IterTraits<GridType, ValueOffIterT>::begin,
-                "iterOffValues() -> iterator\n\n"
-                "Return a read/write iterator over this grid's inactive\ntile and voxel values.")
-            .def("iterAllValues", &pyGrid::IterTraits<GridType, ValueAllIterT>::begin,
-                "iterAllValues() -> iterator\n\n"
-                "Return a read/write iterator over all of this grid's\ntile and voxel values.")
-
-            ; // py::class_<Grid>
-
-        // Register the GridPtr-to-Python object converter explicitly
-        // if it is not already implicitly registered.
-        try {
-            py::object testObj{GridPtr()};
-        } catch (py::error_already_set&) {
-            PyErr_Clear();
-            py::register_ptr_to_python<GridPtr>();
-        }
-
-        py::implicitly_convertible<GridPtr, GridBase::Ptr>();
-        py::implicitly_convertible<GridPtr, GridBase::ConstPtr>();
-        /// @todo Is there a way to implicitly convert GridType references to GridBase
-        /// references without wrapping the GridBase class?  The following doesn't compile,
-        /// because GridBase has pure virtual functions:
-        /// @code
-        /// py::implicitly_convertible<GridType&, GridBase&>();
-        /// @endcode
-
-        // Wrap const and non-const value accessors and expose them
-        // as nested classes of the Grid class.
-        pyAccessor::AccessorWrap<const GridType>::wrap();
-        pyAccessor::AccessorWrap<GridType>::wrap();
-
-        // Wrap tree value iterators and expose them as nested classes of the Grid class.
-        IterWrap<const GridType, ValueOnCIterT>::wrap();
-        IterWrap<const GridType, ValueOffCIterT>::wrap();
-        IterWrap<const GridType, ValueAllCIterT>::wrap();
-        IterWrap<GridType, ValueOnIterT>::wrap();
-        IterWrap<GridType, ValueOffIterT>::wrap();
-        IterWrap<GridType, ValueAllIterT>::wrap();
-
-    } // gridClassScope
+    // Wrap tree value iterators and expose them as nested classes of the Grid class.
+    IterWrap<const GridType, ValueOnCIterT>::wrap(m);
+    IterWrap<const GridType, ValueOffCIterT>::wrap(m);
+    IterWrap<const GridType, ValueAllCIterT>::wrap(m);
+    IterWrap<GridType, ValueOnIterT>::wrap(m);
+    IterWrap<GridType, ValueOffIterT>::wrap(m);
+    IterWrap<GridType, ValueAllIterT>::wrap(m);
 
     // Add the Python type object for this grid type to the module-level list.
-    py::extract<py::list>(py::scope().attr("GridTypes"))().append(
-        py::scope().attr(pyGridTypeName.c_str()));
+    m.attr("GridTypes").cast<py::list>().append(m.attr(pyGridTypeName.c_str()));
 }
 
 } // namespace pyGrid

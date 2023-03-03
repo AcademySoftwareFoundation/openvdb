@@ -30,32 +30,10 @@ public:
     using ValueType = T;
     enum SIZE_ { size = SIZE };
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     /// Trivial constructor, the matrix is NOT initialized
     /// @note destructor, copy constructor, assignment operator and
     ///   move constructor are left to be defined by the compiler (default)
     Mat() = default;
-#else
-    /// Default ctor.  Does nothing.  Required because declaring a copy (or
-    /// other) constructor means the default constructor gets left out.
-    Mat() { }
-
-    /// Copy constructor.  Used when the class signature matches exactly.
-    Mat(Mat const &src) {
-        for (unsigned i(0); i < numElements(); ++i) {
-            mm[i] = src.mm[i];
-        }
-    }
-
-    Mat& operator=(Mat const& src) {
-        if (&src != this) {
-            for (unsigned i = 0; i < numElements(); ++i) {
-                mm[i] = src.mm[i];
-            }
-        }
-        return *this;
-    }
-#endif
 
     // Number of cols, rows, elements
     static unsigned numRows() { return SIZE; }
@@ -365,11 +343,11 @@ eulerAngles(
     {
     case XYZ_ROTATION:
         if (isApproxEqual(mat[2][0], ValueType(1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[2][0], ValueType(-1.0), eps)) {
-            theta = ValueType(-M_PI_2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = -phi;
         } else {
@@ -382,11 +360,11 @@ eulerAngles(
         return V(phi, theta, psi);
     case ZXY_ROTATION:
         if (isApproxEqual(mat[1][2], ValueType(1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[1][2], ValueType(-1.0), eps)) {
-            theta = ValueType(-M_PI/2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[0][1],mat[2][1]));
             psi = -phi;
         } else {
@@ -400,11 +378,11 @@ eulerAngles(
 
     case YZX_ROTATION:
         if (isApproxEqual(mat[0][1], ValueType(1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[2][0], mat[2][2]));
             psi = phi;
         } else if (isApproxEqual(mat[0][1], ValueType(-1.0), eps)) {
-            theta = ValueType(-M_PI/2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[2][0], mat[1][0]));
             psi = -phi;
         } else {
@@ -423,7 +401,7 @@ eulerAngles(
             phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][0], ValueType(-1.0), eps)) {
-            theta = ValueType(M_PI);
+            theta = ValueType(math::pi<double>());
             psi = ValueType(0.5 * atan2(mat[2][1], -mat[1][1]));
             phi = - psi;
         } else {
@@ -442,7 +420,7 @@ eulerAngles(
             phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][2], ValueType(-1.0), eps)) {
-            theta = ValueType(M_PI);
+            theta = ValueType(math::pi<double>());
             phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = -phi;
         } else {
@@ -457,11 +435,11 @@ eulerAngles(
     case YXZ_ROTATION:
 
         if (isApproxEqual(mat[2][1], ValueType(1.0), eps)) {
-            theta = ValueType(-M_PI_2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(-mat[1][0], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][1], ValueType(-1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[1][0], mat[0][0]));
             psi = -phi;
         } else {
@@ -476,11 +454,11 @@ eulerAngles(
     case ZYX_ROTATION:
 
         if (isApproxEqual(mat[0][2], ValueType(1.0), eps)) {
-            theta = ValueType(-M_PI_2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(-mat[1][0], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][2], ValueType(-1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             phi = ValueType(0.5 * atan2(mat[2][1], mat[2][0]));
             psi = -phi;
         } else {
@@ -495,11 +473,11 @@ eulerAngles(
     case XZY_ROTATION:
 
         if (isApproxEqual(mat[1][0], ValueType(-1.0), eps)) {
-            theta = ValueType(M_PI_2);
+            theta = ValueType(math::pi<double>() / 2.0);
             psi = ValueType(0.5 * atan2(mat[2][1], mat[2][2]));
             phi = -psi;
         } else if (isApproxEqual(mat[1][0], ValueType(1.0), eps)) {
-            theta = ValueType(-M_PI_2);
+            theta = ValueType(-math::pi<double>() / 2.0);
             psi = ValueType(0.5 * atan2(- mat[2][1], mat[2][2]));
             phi = psi;
         } else {

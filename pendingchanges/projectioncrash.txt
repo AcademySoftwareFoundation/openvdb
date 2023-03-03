@@ -1,0 +1,2 @@
+Houdini:
+    - Fix a bug in the projection mode of the Advect Points SOP that was causing a segfault.

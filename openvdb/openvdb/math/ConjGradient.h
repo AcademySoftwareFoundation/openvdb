@@ -588,7 +588,7 @@ inline void
 Vector<T>::resize(SizeType n)
 {
     if (n != mSize) {
-        if (mData) delete[] mData;
+        delete[] mData;
         mData = new T[n];
         mSize = n;
     }

@@ -576,8 +576,8 @@ public:
     /// array.reserve(tree.leafCount());//this is a fast preallocation.
     /// tree.getNodes(array);
     /// @endcode
-    template<typename ArrayT> void getNodes(ArrayT& array) { mRoot.getNodes(array); }
-    template<typename ArrayT> void getNodes(ArrayT& array) const { mRoot.getNodes(array); }
+    template<typename ArrayT> void getNodes(ArrayT& array);
+    template<typename ArrayT> void getNodes(ArrayT& array) const;
     //@}
 
     /// @brief Steals all nodes of a certain type from the tree and
@@ -767,10 +767,8 @@ public:
     /// @endcode
     template<typename CombineOp>
     void combine(Tree& other, CombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename CombineOp>
     void combine(Tree& other, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine(), but with
     /// @param other  a tree of the same type as this tree
@@ -812,10 +810,8 @@ public:
     /// @endcode
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, ExtendedCombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, const ExtendedCombineOp& op, bool prune = false);
-#endif
 
     /// For a given function @c f, use sparse traversal to compute <tt>f(a, b)</tt> over all
     /// corresponding pairs of values (tile or voxel) of trees A and B and store the result
@@ -847,10 +843,8 @@ public:
     /// @endcode
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, CombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine2(), but with
     /// @param a,b    two trees with the same configuration (levels and node dimensions)
@@ -928,44 +922,9 @@ public:
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, ExtendedCombineOp& op,
         bool prune = false);
-#ifndef _WIN32
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, const ExtendedCombineOp&,
         bool prune = false);
-#endif
-
-    template<typename BBoxOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visitActiveBBox(BBoxOp& op) const { mRoot.visitActiveBBox(op); }
-
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(VisitorOp& op);
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(const VisitorOp& op);
-
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(VisitorOp& op) const;
-    template<typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit(const VisitorOp& op) const;
-
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, VisitorOp& op);
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, const VisitorOp& op);
-
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, VisitorOp& op) const;
-    template<typename OtherTreeType, typename VisitorOp>
-    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
-    void visit2(OtherTreeType& other, const VisitorOp& op) const;
-
 
     //
     // Iteration
@@ -1311,6 +1270,30 @@ inline void
 Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array)
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
+}
+
+
+template<typename RootNodeType>
+template<typename ArrayT>
+inline void
+Tree<RootNodeType>::getNodes(ArrayT& array) const
+{
+    using NodeT = typename std::remove_pointer<typename ArrayT::value_type>::type;
+    static_assert(!std::is_same<NodeT, const RootNodeType>::value,
+        "getNodes() does not work for the RootNode. Use Tree::root()");
+    mRoot.getNodes(array);
 }
 
 
@@ -1760,7 +1743,6 @@ Tree<RootNodeType>::combine(Tree& other, CombineOp& op, bool prune)
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combine(bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp>
 inline void
@@ -1769,7 +1751,6 @@ Tree<RootNodeType>::combine(Tree& other, const CombineOp& op, bool prune)
     CombineOpAdapter<ValueType, const CombineOp> extendedOp(op);
     this->combineExtended(other, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1784,7 +1765,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, ExtendedCombineOp& op, bool pru
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combineExtended(bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp>
 inline void
@@ -1793,7 +1773,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, const ExtendedCombineOp& op, bo
     this->clearAllAccessors();
     mRoot.template combine<const ExtendedCombineOp>(other.mRoot, op, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1808,7 +1787,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, CombineOp& o
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>tree.combine2(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp, typename OtherTreeType>
 inline void
@@ -1817,7 +1795,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, const Combin
     CombineOpAdapter<ValueType, const CombineOp, typename OtherTreeType::ValueType> extendedOp(op);
     this->combine2Extended(a, b, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1834,7 +1811,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like the following, where the functor argument is a temporary:
 /// <tt>tree.combine2Extended(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp, typename OtherTreeType>
 inline void
@@ -1843,101 +1819,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 {
     this->clearAllAccessors();
     mRoot.template combine2<const ExtendedCombineOp>(a.root(), b.root(), op, prune);
-}
-#endif
-
-
-////////////////////////////////////////
-
-
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(VisitorOp& op)
-{
-    this->clearAllAccessors();
-    mRoot.template visit<VisitorOp>(op);
-}
-
-
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(VisitorOp& op) const
-{
-    mRoot.template visit<VisitorOp>(op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>tree.visit(MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(const VisitorOp& op)
-{
-    this->clearAllAccessors();
-    mRoot.template visit<const VisitorOp>(op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>tree.visit(MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit(const VisitorOp& op) const
-{
-    mRoot.template visit<const VisitorOp>(op);
-}
-
-
-////////////////////////////////////////
-
-
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op)
-{
-    this->clearAllAccessors();
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
-}
-
-
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op) const
-{
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>aTree.visit2(bTree, MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op)
-{
-    this->clearAllAccessors();
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
-}
-
-
-/// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
-/// code like this: <tt>aTree.visit2(bTree, MyVisitorOp(...))</tt>.
-template<typename RootNodeType>
-template<typename OtherTreeType, typename VisitorOp>
-inline void
-Tree<RootNodeType>::visit2(OtherTreeType& other, const VisitorOp& op) const
-{
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, const VisitorOp>(other.root(), op);
 }
 
 

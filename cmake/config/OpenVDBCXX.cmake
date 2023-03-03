@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 ###############################################################################
 
@@ -129,6 +129,10 @@ endif()
 
 # Increase the number of sections that an object file can contain
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
+# Enable MSVC options that make it behave like other compilers
+add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/permissive->")
+add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/Zc:throwingNew>")
+add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/Zc:inline>")
 # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
 add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>")
 # Disable non-secure CRT library function warnings
@@ -249,7 +253,18 @@ endforeach()
 # clang and GCC. Sanitizers are currently only configured for clang and GCC.
 
 # Coverage
-add_compile_options("$<$<AND:$<CONFIG:COVERAGE>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:--coverage>")
+# --coverage uses -fprofile-arcs -ftest-coverage (compiling) and -lgcov (linking)
+# @note consider -fprofile-abs-path from gcc 10
+# @todo consider using clang with source analysis: -fprofile-instr-generate -fcoverage-mapping.
+#   https://clang.llvm.org/docs/SourceBasedCodeCoverage.html
+#   note that clang also works with gcov (--coverage)
+# @note Ideally we'd use no optimisations (-O0) with --coverage, but a complete
+#   run of all unit tests takes upwards of a day without them. Thread usage also
+#   impacts total runtime. -Og implies -O1 but without optimisations "that would
+#   otherwise interfere with debugging". This still massively effects branch
+#   coverage tracking compared to -O0 so we should look to improve the speed of
+#   some of the unit tests and also experiment with clang.
+add_compile_options("$<$<AND:$<CONFIG:COVERAGE>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:--coverage;-Og>")
 add_link_options("$<$<AND:$<CONFIG:COVERAGE>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:--coverage>")
 
 # ThreadSanitizer
@@ -287,3 +302,40 @@ if(NOT _isMultiConfig)
   message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
 endif()
 
+# Intialize extra build type targets where possible
+
+if(NOT TARGET gcov_html)
+  find_program(GCOVR_PATH gcovr)
+  if(NOT GCOVR_PATH AND CMAKE_BUILD_TYPE STREQUAL "coverage")
+    message(WARNING "Unable to initialize gcovr target. coverage build types will still generate gcno files.")
+  elseif(GCOVR_PATH)
+    # init gcov commands
+    set(GCOVR_HTML_FOLDER_CMD ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/gcov_html)
+    set(GCOVR_HTML_CMD
+      ${GCOVR_PATH} --html --html-details -r ${PROJECT_SOURCE_DIR} --object-directory=${PROJECT_BINARY_DIR}
+      -o gcov_html/index.html
+    )
+
+    # Add a custom target which converts .gcda files to a html report using gcovr.
+    # Note that this target does NOT run ctest or any binaries - that is left to
+    # the implementor of the gcov workflow. Typically, the order of operations
+    # would be:
+    #  - run CMake with unit tests on
+    #  - ctest
+    #  - make gcov_html
+    add_custom_target(gcov_html
+      COMMAND ${GCOVR_HTML_FOLDER_CMD}
+      COMMAND ${GCOVR_HTML_CMD}
+      BYPRODUCTS ${PROJECT_BINARY_DIR}/gcov_html/index.html  # report directory
+      WORKING_DIRECTORY ${PROJECT_BINARY_DIR}
+      VERBATIM
+      COMMENT "Running gcovr to produce HTML code coverage report."
+    )
+
+    # Show info where to find the report
+    add_custom_command(TARGET gcov_html POST_BUILD
+      COMMAND ;
+      COMMENT "Open ./gcov_html/index.html in your browser to view the coverage report."
+    )
+  endif()
+endif()

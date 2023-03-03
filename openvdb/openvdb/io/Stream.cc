@@ -8,7 +8,11 @@
 #include "TempFile.h"
 #include <openvdb/Exceptions.h>
 #include <cstdint>
+
+#ifdef OPENVDB_USE_DELAYED_LOADING
 #include <boost/iostreams/copy.hpp>
+#endif
+
 #include <cstdio> // for remove()
 #include <functional> // for std::bind()
 #include <iostream>
@@ -45,6 +49,8 @@ struct Stream::Impl
 ////////////////////////////////////////
 
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+
 namespace {
 
 /// @todo Use MappedFile auto-deletion instead.
@@ -62,11 +68,16 @@ removeTempFile(const std::string expectedFilename, const std::string& filename)
 
 }
 
+#endif // OPENVDB_USE_DELAYED_LOADING
+
 
 Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
 {
     if (!is) return;
 
+    (void) delayLoad;
+
+#ifdef OPENVDB_USE_DELAYED_LOADING
     if (delayLoad && Archive::isDelayedLoadingEnabled()) {
         // Copy the contents of the stream to a temporary private file
         // and open the file instead.
@@ -89,6 +100,7 @@ Stream::Stream(std::istream& is, bool delayLoad): mImpl(new Impl)
                 std::bind(&removeTempFile, filename, std::placeholders::_1));
         }
     }
+#endif // OPENVDB_USE_DELAYED_LOADING
 
     if (!mImpl->mFile) {
         readHeader(is);

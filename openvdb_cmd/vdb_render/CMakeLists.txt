@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(VDBRender LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -71,7 +71,11 @@ target_link_libraries(vdb_render
 
 if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
+  if (TARGET Imath::Imath)
+    get_target_property(ILMBASE_LIB_TYPE Imath::Imath TYPE)
+  else()
+    get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
+  endif()
   if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
     target_compile_definitions(vdb_render PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
   endif()

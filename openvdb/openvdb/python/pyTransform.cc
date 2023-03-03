@@ -1,11 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <boost/python.hpp>
-#include "openvdb/openvdb.h"
-#include "pyutil.h"
+#include <pybind11/pybind11.h>
+#include <pybind11/operators.h>
+#include <pybind11/cast.h>
+#include <pybind11/stl.h>
+#include <openvdb/openvdb.h>
+#include "pyTypeCasters.h"
 
-namespace py = boost::python;
+namespace py = pybind11;
 using namespace openvdb::OPENVDB_VERSION_NAME;
 
 namespace pyTransform {
@@ -40,40 +43,31 @@ info(math::Transform& t)
 
 
 inline math::Transform::Ptr
-createLinearFromDim(double dim)
+createLinearTransform(double dim)
 {
     return math::Transform::createLinearTransform(dim);
 }
 
 
 inline math::Transform::Ptr
-createLinearFromMat(py::object obj)
+createLinearTransform(const std::vector<std::vector<double> >& sequence)
 {
     Mat4R m;
 
-    // Verify that obj is a four-element sequence.
-    bool is4x4Seq = (PySequence_Check(obj.ptr()) && PySequence_Length(obj.ptr()) == 4);
+    // // Verify that obj is a four-element sequence.
+    bool is4x4Seq = sequence.size() ==4;
+    for (size_t i = 0; i < sequence.size(); ++i)
+        is4x4Seq &= sequence[i].size() == 4;
+
     if (is4x4Seq) {
-        for (int row = 0; is4x4Seq && row < 4; ++row) {
-            // Verify that each element of obj is itself a four-element sequence.
-            py::object rowObj = obj[row];
-            if (PySequence_Check(rowObj.ptr()) && PySequence_Length(rowObj.ptr()) == 4) {
-                // Extract four numeric values from this row of the sequence.
-                for (int col = 0; is4x4Seq && col < 4; ++col) {
-                    if (py::extract<double>(rowObj[col]).check()) {
-                        m[row][col] = py::extract<double>(rowObj[col]);
-                    } else {
-                        is4x4Seq = false;
-                    }
-                }
-            } else {
-                is4x4Seq = false;
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                m[row][col] = sequence[row][col];
             }
         }
     }
     if (!is4x4Seq) {
-        PyErr_Format(PyExc_ValueError, "expected a 4 x 4 sequence of numeric values");
-        py::throw_error_already_set();
+        throw py::value_error("expected a 4 x 4 sequence of numeric values");
     }
 
     return math::Transform::createLinearTransform(m);
@@ -92,72 +86,36 @@ createFrustum(const Coord& xyzMin, const Coord& xyzMax,
 ////////////////////////////////////////
 
 
-struct PickleSuite: public py::pickle_suite
+struct PickleSuite
 {
-    enum { STATE_DICT = 0, STATE_MAJOR, STATE_MINOR, STATE_FORMAT, STATE_XFORM };
-
-    /// Return @c true, indicating that this pickler preserves a Transform's __dict__.
-    static bool getstate_manages_dict() { return true; }
+    enum { STATE_MAJOR = 0, STATE_MINOR, STATE_FORMAT, STATE_XFORM };
 
     /// Return a tuple representing the state of the given Transform.
-    static py::tuple getstate(py::object xformObj)
+    static py::tuple getState(const math::Transform& xform)
     {
-        py::tuple state;
-        py::extract<math::Transform> x(xformObj);
-        if (x.check()) {
-            // Extract a Transform from the Python object.
-            math::Transform xform = x();
-            std::ostringstream ostr(std::ios_base::binary);
-            // Serialize the Transform to a string.
-            xform.write(ostr);
+        std::ostringstream ostr(std::ios_base::binary);
+        // Serialize the Transform to a string.
+        xform.write(ostr);
 
-            // Construct a state tuple comprising the Python object's __dict__,
-            // the version numbers of the serialization format,
-            // and the serialized Transform.
+        // Construct a state tuple comprising the version numbers of
+        // the serialization format and the serialized Transform.
 #if PY_MAJOR_VERSION >= 3
-            // Convert the byte string to a "bytes" sequence.
-            const std::string s = ostr.str();
-            py::object bytesObj = pyutil::pyBorrow(PyBytes_FromStringAndSize(s.data(), s.size()));
+        // Convert the byte string to a "bytes" sequence.
+        py::bytes bytesObj(ostr.str());
 #else
-            py::str bytesObj(ostr.str());
+        py::str bytesObj(ostr.str());
 #endif
-            state = py::make_tuple(
-                xformObj.attr("__dict__"),
-                uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
-                uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
-                uint32_t(OPENVDB_FILE_VERSION),
-                bytesObj);
-        }
-        return state;
+        return py::make_tuple(
+            uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
+            uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
+            uint32_t(OPENVDB_FILE_VERSION),
+            bytesObj);
     }
 
     /// Restore the given Transform to a saved state.
-    static void setstate(py::object xformObj, py::object stateObj)
+    static math::Transform setState(py::tuple state)
     {
-        math::Transform* xform = nullptr;
-        {
-            py::extract<math::Transform*> x(xformObj);
-            if (x.check()) xform = x();
-            else return;
-        }
-
-        py::tuple state;
-        {
-            py::extract<py::tuple> x(stateObj);
-            if (x.check()) state = x();
-        }
-        bool badState = (py::len(state) != 5);
-
-        if (!badState) {
-            // Restore the object's __dict__.
-            py::extract<py::dict> x(state[int(STATE_DICT)]);
-            if (x.check()) {
-                py::dict d = py::extract<py::dict>(xformObj.attr("__dict__"))();
-                d.update(x());
-            } else {
-                badState = true;
-            }
-        }
+        bool badState = (py::len(state) != 4);
 
         openvdb::VersionId libVersion;
         uint32_t formatVersion = 0;
@@ -166,8 +124,8 @@ struct PickleSuite: public py::pickle_suite
             const int idx[3] = { STATE_MAJOR, STATE_MINOR, STATE_FORMAT };
             uint32_t version[3] = { 0, 0, 0 };
             for (int i = 0; i < 3 && !badState; ++i) {
-                py::extract<uint32_t> x(state[idx[i]]);
-                if (x.check()) version[i] = x();
+                if (py::isinstance<py::int_>(state[idx[i]]))
+                    version[i] = state[idx[i]].cast<uint32_t>();
                 else badState = true;
             }
             libVersion.first = version[0];
@@ -180,57 +138,49 @@ struct PickleSuite: public py::pickle_suite
             // Extract the sequence containing the serialized Transform.
             py::object bytesObj = state[int(STATE_XFORM)];
 #if PY_MAJOR_VERSION >= 3
-            badState = true;
-            if (PyBytes_Check(bytesObj.ptr())) {
-                // Convert the "bytes" sequence to a byte string.
-                char* buf = NULL;
-                Py_ssize_t length = 0;
-                if (-1 != PyBytes_AsStringAndSize(bytesObj.ptr(), &buf, &length)) {
-                    if (buf != NULL && length > 0) {
-                        serialized.assign(buf, buf + length);
-                        badState = false;
-                    }
-                }
-            }
+            if (py::isinstance<py::bytes>(bytesObj))
+                serialized = bytesObj.cast<py::bytes>();
 #else
-            py::extract<std::string> x(bytesObj);
-            if (x.check()) serialized = x();
-            else badState = true;
+            if (py::isinstance<std::string>(bytesObj))
+                serialized = bytesObj.cast<std::string>();
 #endif
+            else badState = true;
         }
 
         if (badState) {
-            PyErr_SetObject(PyExc_ValueError,
+            std::ostringstream os;
 #if PY_MAJOR_VERSION >= 3
-                ("expected (dict, int, int, int, bytes) tuple in call to __setstate__; found %s"
+            os << "expected (int, int, int, bytes) tuple in call to __setstate__; found ";
 #else
-                ("expected (dict, int, int, int, str) tuple in call to __setstate__; found %s"
+            os << "expected (int, int, int, str) tuple in call to __setstate__; found ";
 #endif
-                     % stateObj.attr("__repr__")()).ptr());
-            py::throw_error_already_set();
+            os << state.attr("__repr__")().cast<std::string>();
+            throw py::value_error(os.str());
         }
 
         // Restore the internal state of the C++ object.
         std::istringstream istr(serialized, std::ios_base::binary);
         io::setVersion(istr, libVersion, formatVersion);
-        xform->read(istr);
+        math::Transform xform;
+        xform.read(istr);
+        return xform;
     }
 }; // struct PickleSuite
 
 } // namespace pyTransform
 
 
-void exportTransform();
-
 void
-exportTransform()
+exportTransform(py::module_ m)
 {
-    py::enum_<math::Axis>("Axis")
+    py::enum_<math::Axis>(m, "Axis")
         .value("X", math::X_AXIS)
         .value("Y", math::Y_AXIS)
-        .value("Z", math::Z_AXIS);
+        .value("Z", math::Z_AXIS)
+        .export_values();
 
-    py::class_<math::Transform>("Transform", py::init<>())
+    py::class_<math::Transform, math::Transform::Ptr>(m, "Transform")
+        .def(py::init<>())
 
         .def("deepCopy", &math::Transform::copy,
             "deepCopy() -> Transform\n\n"
@@ -241,15 +191,15 @@ exportTransform()
             "info() -> str\n\n"
             "Return a string containing a description of this transform.\n")
 
-        .def_pickle(pyTransform::PickleSuite())
+        .def(py::pickle(&pyTransform::PickleSuite::getState, &pyTransform::PickleSuite::setState))
 
-        .add_property("typeName", &math::Transform::mapType,
+        .def_property_readonly("typeName", &math::Transform::mapType,
             "name of this transform's type")
-        .add_property("isLinear", &math::Transform::isLinear,
+        .def_property_readonly("isLinear", &math::Transform::isLinear,
             "True if this transform is linear")
 
         .def("rotate", &math::Transform::preRotate,
-            (py::arg("radians"), py::arg("axis") = math::X_AXIS),
+            py::arg("radians"), py::arg("axis") = math::X_AXIS,
             "rotate(radians, axis)\n\n"
             "Accumulate a rotation about either Axis.X, Axis.Y or Axis.Z.")
         .def("translate", &math::Transform::postTranslate, py::arg("xyz"),
@@ -262,7 +212,7 @@ exportTransform()
             "scale((sx, sy, sz))\n\n"
             "Accumulate a nonuniform scale.")
         .def("shear", &math::Transform::preShear,
-            (py::arg("s"), py::arg("axis0"), py::arg("axis1")),
+            py::arg("s"), py::arg("axis0"), py::arg("axis1"),
             "shear(s, axis0, axis1)\n\n"
             "Accumulate a shear (axis0 and axis1 are either\n"
             "Axis.X, Axis.Y or Axis.Z).")
@@ -299,28 +249,24 @@ exportTransform()
             "and round the result down to the nearest integer coordinates.")
 
         // Allow Transforms to be compared for equality and inequality.
-        .def(py::self == py::other<math::Transform>())
-        .def(py::self != py::other<math::Transform>())
-        ;
+        .def(py::self == py::self)
+        .def(py::self != py::self);
 
-    py::def("createLinearTransform", &pyTransform::createLinearFromMat, py::arg("matrix"),
+    m.def("createLinearTransform", py::overload_cast<double>(&pyTransform::createLinearTransform),
+        py::arg("voxelSize") = 1.0,
+        "createLinearTransform(voxelSize) -> Transform\n\n"
+        "Create a new linear transform with the given uniform voxel size.");
+
+    m.def("createLinearTransform", py::overload_cast<const std::vector<std::vector<double> >&>(&pyTransform::createLinearTransform), py::arg("matrix"),
         "createLinearTransform(matrix) -> Transform\n\n"
         "Create a new linear transform from a 4 x 4 matrix given as a sequence\n"
         "of the form [[a, b, c, d], [e, f, g, h], [i, j, k, l], [m, n, o, p]],\n"
         "where [m, n, o, p] is the translation component.");
 
-    py::def("createLinearTransform", &pyTransform::createLinearFromDim,
-        (py::arg("voxelSize") = 1.0),
-        "createLinearTransform(voxelSize) -> Transform\n\n"
-        "Create a new linear transform with the given uniform voxel size.");
-
-    py::def("createFrustumTransform", &pyTransform::createFrustum,
-        (py::arg("xyzMin"), py::arg("xyzMax"),
-         py::arg("taper"), py::arg("depth"), py::arg("voxelSize") = 1.0),
+    m.def("createFrustumTransform", &pyTransform::createFrustum,
+        py::arg("xyzMin"), py::arg("xyzMax"),
+         py::arg("taper"), py::arg("depth"), py::arg("voxelSize") = 1.0,
         "createFrustumTransform(xyzMin, xyzMax, taper, depth, voxelSize) -> Transform\n\n"
         "Create a new frustum transform with unit bounding box (xyzMin, xyzMax)\n"
         "and the given taper, depth and uniform voxel size.");
-
-    // allows Transform::Ptr Grid::getTransform() to work
-    py::register_ptr_to_python<math::Transform::Ptr>();
 }

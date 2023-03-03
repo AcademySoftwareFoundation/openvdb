@@ -1,0 +1,19 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how to read a polygon mesh from a ply file,
+# converting it into a narrow-band level set, smooth the level set,
+# converting the level set into an adaptive polygon mesh and writing out
+# the mesh to a binary ply file.
+
+# read level set from openvdb file
+read bunny.vdb
+
+# Gaussian filtering of level set
+# number of iterations is 5
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+# size of the filter kernel is 1.0 voxels
+gauss iter=5 space=5 time=1 size=1
+
+# write level set to file
+write bunny_smooth.vdb

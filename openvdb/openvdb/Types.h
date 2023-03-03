@@ -198,6 +198,45 @@ struct IsSpecializationOf<Template<Args...>, Template>: public std::true_type {}
 ////////////////////////////////////////
 
 
+/// @brief  Re-implementation of C++17's index_sequence and the helper alias
+///   make_index_sequence. This was introduced to fix an issue with clang's
+///   builtin implementation which treats template specializations of builtin
+///   templates differently when a subsequent parameter is dependent. The
+///   result is a resolution failure during partial specialization selection.
+///   For example, the following will fail to specialize:
+///
+/// @code
+///    struct Test { static const int VALUE = 1; };
+///
+///    template <typename T, typename S = std::make_index_sequence<T::VALUE>>
+///    struct Item {};
+///    template <typename T> struct Adapter {};
+///    template <typename T> struct Adapter<Item<T>> {};  // FAIL: will never be selected.
+/// @endcode
+///
+///  This is fixed from Clang16. See also:
+///    https://reviews.llvm.org/D133262
+///    https://github.com/llvm/llvm-project/issues/42102
+///    https://github.com/llvm/llvm-project/issues/51928
+///    https://github.com/llvm/llvm-project/commit/f4ea3bd4b2086e6de10131b197aaf7d066a24df8
+template <std::size_t... Ns>
+struct index_sequence {};
+
+template <std::size_t N, std::size_t... Is>
+auto make_index_sequence_impl() {
+    // only one branch is considered. The other may be ill-formed
+    if constexpr (N == 0) return index_sequence<Is...>(); // end case
+    else return make_index_sequence_impl<N-1, N-1, Is...>(); // recursion
+}
+
+template <std::size_t N>
+using make_index_sequence =
+    std::decay_t<decltype(make_index_sequence_impl<N>())>;
+
+
+////////////////////////////////////////
+
+
 template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
                             IsSpecializationOf<T, math::Vec3>::value ||
                             IsSpecializationOf<T, math::Vec4>::value>

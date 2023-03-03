@@ -1055,6 +1055,7 @@ computeWeightedValue(const ValueT& value, const ValueT& weight)
 
 } // namespace point_rasterize_internal
 
+/// @endcond
 
 ////////////////////////////////////////////////////////////////////////////
 

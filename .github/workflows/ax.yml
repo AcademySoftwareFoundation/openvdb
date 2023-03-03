@@ -38,13 +38,18 @@ on:
         required: true
         default: 'all'
 
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-ax:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -54,16 +59,16 @@ jobs:
       CCACHE_DIR: /tmp/ccache
     strategy:
       matrix:
+        # Only test unified builds (core+ax). weekly CI should test standalone
         config:
-          # Unified
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   cmake: '' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: timestamp
         id: timestamp
         shell: bash
@@ -80,25 +85,10 @@ jobs:
       - name: build
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components=${{ matrix.config.components }}
+          --components='core,python,bin,axcore,axbin,axtest'
           --cargs=\"
-          -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
-          -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DOPENVDB_CXX_STRICT=ON
-          \"
-      - name: clean
-        if: matrix.config.components == 'core'
-        run: rm -rf build
-      - name: build
-        if: matrix.config.components == 'core'
-        run: >
-          ./ci/build.sh -v
-          -j ${{ matrix.config.j }}
-          --build-type=${{ matrix.config.build }}
-          --components="bin,axcore,axbin,axtest"
-          --cargs=\"
+          ${{ matrix.config.cmake }}
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
@@ -126,21 +116,19 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-10.15',  cxx: 'clang++', build: 'Release', llvm: '7'  }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '8'  }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '9'  }
           - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '11' }
           - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install_deps
         run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
       - name: build
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,bin,axcore,axbin,axtest"
+          --components="core,python,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -155,11 +143,11 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2021-clang10
+      image: aswf/ci-openvdb:2022-clang11
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar

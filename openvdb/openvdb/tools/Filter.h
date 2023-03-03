@@ -14,16 +14,16 @@
 #ifndef OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
-#include "openvdb/Types.h"
-#include "openvdb/Grid.h"
-#include "openvdb/math/Math.h"
-#include "openvdb/math/Stencils.h"
-#include "openvdb/math/Transform.h"
-#include "openvdb/tree/NodeManager.h"
-#include "openvdb/tree/LeafManager.h"
-#include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Util.h"
-#include "openvdb/thread/Threading.h"
+#include <openvdb/Types.h>
+#include <openvdb/Grid.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Stencils.h>
+#include <openvdb/math/Transform.h>
+#include <openvdb/tree/NodeManager.h>
+#include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Util.h>
+#include <openvdb/thread/Threading.h>
 #include "Interpolation.h"
 
 #include <tbb/parallel_for.h>
@@ -507,10 +507,14 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
     ValueType sum = zeroVal<ValueType>();
     Int32 &i = xyz[Axis], j = i + width;
     for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-    ValueType value = static_cast<ValueType>(sum * frac);
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-    return value;
+    if constexpr(std::is_same<ValueType, bool>::value) {
+        return sum && frac > 0.0f;
+    } else {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        ValueType value = static_cast<ValueType>(sum * frac);
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        return value;
+    }
 }
 
 

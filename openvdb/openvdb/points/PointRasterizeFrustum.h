@@ -16,8 +16,8 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tools/GridTransformer.h> // for tools::resampleToMatch()
 #include <openvdb/tools/Interpolation.h>
-#include <openvdb/points/PointCount.h>
-#include <openvdb/points/PointDataGrid.h>
+#include "PointCount.h"
+#include "PointDataGrid.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -169,6 +169,7 @@ public:
 
     /// @brief main constructor
     /// @param settings             the shared settings for rasterizing, see class for more details
+    /// @param mask                 a spatial mask to use to define the areas of rasterization
     /// @param interrupt            a pointer adhering to the util::NullInterrupter interface
     explicit FrustumRasterizer(
         const FrustumRasterizerSettings& settings,

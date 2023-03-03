@@ -19,7 +19,7 @@
 #include <openvdb/util/CpuTimer.h>
 #endif
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -2153,7 +2153,9 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
 
     auto leaf = points->tree().cbeginLeaf();
     EXPECT_TRUE(leaf);
+#ifdef OPENVDB_USE_DELAYED_LOADING
     EXPECT_TRUE(leaf->buffer().isOutOfCore());
+#endif
 
     using Rasterizer = FrustumRasterizer<PointDataGrid>;
     using Settings = FrustumRasterizerSettings;
@@ -2324,10 +2326,12 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
     auto points2 = points->deepCopy();
     points2->setTransform(transform);
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     // verify both grids are out-of-core
 
     EXPECT_TRUE(points->tree().cbeginLeaf()->buffer().isOutOfCore());
     EXPECT_TRUE(points2->tree().cbeginLeaf()->buffer().isOutOfCore());
+#endif
 
 #ifndef ONLY_RASTER_FLOAT
     // memory tests

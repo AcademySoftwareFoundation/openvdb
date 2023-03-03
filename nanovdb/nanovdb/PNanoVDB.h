@@ -631,8 +631,8 @@ PNANOVDB_FORCE_INLINE float pnanovdb_read_half(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL// "NanoVDB0" in hex - little endian (uint64_t)
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
-#define PNANOVDB_MINOR_VERSION_NUMBER  3// reflects changes to the API but not ABI
-#define PNANOVDB_PATCH_VERSION_NUMBER  3// reflects bug-fixes with no ABI or API changes
+#define PNANOVDB_MINOR_VERSION_NUMBER  4// reflects changes to the API but not ABI
+#define PNANOVDB_PATCH_VERSION_NUMBER  2// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
 #define PNANOVDB_GRID_TYPE_FLOAT 1
@@ -653,7 +653,8 @@ PNANOVDB_FORCE_INLINE float pnanovdb_read_half(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_GRID_TYPE_FPN 16
 #define PNANOVDB_GRID_TYPE_VEC4F 17
 #define PNANOVDB_GRID_TYPE_VEC4D 18
-#define PNANOVDB_GRID_TYPE_END 19
+#define PNANOVDB_GRID_TYPE_INDEX 19
+#define PNANOVDB_GRID_TYPE_END 20
 
 #define PNANOVDB_GRID_CLASS_UNKNOWN 0
 #define PNANOVDB_GRID_CLASS_LEVEL_SET 1     // narrow band levelset, e.g. SDF
@@ -663,7 +664,8 @@ PNANOVDB_FORCE_INLINE float pnanovdb_read_half(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_GRID_CLASS_POINT_DATA 5    // point data grid
 #define PNANOVDB_GRID_CLASS_TOPOLOGY 6      // grid with active states only (no values)
 #define PNANOVDB_GRID_CLASS_VOXEL_VOLUME 7  // volume of geometric cubes, e.g. minecraft
-#define PNANOVDB_GRID_CLASS_END 8
+#define PNANOVDB_GRID_CLASS_INDEX_GRID 8    // grid whose values are offsets, e.g. into an external array
+#define PNANOVDB_GRID_CLASS_END 9
 
 #define PNANOVDB_GRID_FLAGS_HAS_LONG_GRID_NAME (1 << 0)
 #define PNANOVDB_GRID_FLAGS_HAS_BBOX (1 << 1)
@@ -676,13 +678,14 @@ PNANOVDB_FORCE_INLINE float pnanovdb_read_half(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_LEAF_TYPE_DEFAULT 0
 #define PNANOVDB_LEAF_TYPE_LITE 1
 #define PNANOVDB_LEAF_TYPE_FP 2
+#define PNANOVDB_LEAF_TYPE_INDEX 3
 
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_value_strides_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64, 96,  192,  0, 16, 32,  1, 32,  4,  8, 16,  0, 128, 256 };
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_table_strides_bits[PNANOVDB_GRID_TYPE_END] =  { 64, 64, 64, 64, 64, 64, 128, 192, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 256 };
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_END] = {  0, 32, 64, 16, 32, 64, 96,  192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256 };
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64, 32,   64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64 };
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_END]   = {  0, 32, 64, 32, 32, 64, 32,   64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64 };
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_END]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_value_strides_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64, 96,  192,  0, 16, 32,  1, 32,  4,  8, 16,  0, 128, 256, 0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_table_strides_bits[PNANOVDB_GRID_TYPE_END] =  { 64, 64, 64, 64, 64, 64, 128, 192, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 256, 64 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_END] = {  0, 32, 64, 16, 32, 64, 96,  192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256, 64 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64, 32,   64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_END]   = {  0, 32, 64, 32, 32, 64, 32,   64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_END]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0, 3 };
 
 struct pnanovdb_map_t
 {
@@ -1175,6 +1178,7 @@ PNANOVDB_STATIC_CONST pnanovdb_grid_type_constants_t pnanovdb_grid_type_constant
     {28, 32, 36, 40, 44, 64,  0, 8, 20, 32,  8224, 8228, 8232, 8236, 8256, 270400,  1056, 1060, 1064, 1068, 1088, 33856,  88, 90, 92, 94, 96, 96},
     {28, 44, 60, 76, 80, 96,  128, 16, 20, 64,  8224, 8240, 8256, 8260, 8288, 532576,  1056, 1072, 1088, 1092, 1120, 66656,  80, 96, 112, 116, 128, 8320},
     {32, 64, 96, 128, 136, 160,  256, 32, 24, 64,  8224, 8256, 8288, 8296, 8320, 1056896,  1056, 1088, 1120, 1128, 1152, 132224,  80, 112, 144, 152, 160, 16544},
+    {32, 40, 48, 56, 64, 96,  0, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 80, 80, 80, 88, 96},
 };
 
 // ------------------------------------------------ Basic Lookup -----------------------------------------------------------
@@ -1350,11 +1354,104 @@ PNANOVDB_FORCE_INLINE float pnanovdb_leaf_fpn_read_float(pnanovdb_buf_t buf, pna
     return pnanovdb_leaf_fp_read_float(buf, address, ijk, value_log_bits);
 }
 
+PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_uint32_countbits(pnanovdb_uint32_t value)
+{
+#if defined(PNANOVDB_C)
+#if defined(_MSC_VER) && (_MSC_VER >= 1928) && defined(PNANOVDB_USE_INTRINSICS)
+    return __popcnt(value);
+#elif (defined(__GNUC__) || defined(__clang__)) && defined(PNANOVDB_USE_INTRINSICS)
+    return __builtin_popcount(value);
+#else
+    value = value - ((value >> 1) & 0x55555555);
+    value = (value & 0x33333333) + ((value >> 2) & 0x33333333);
+    value = (value + (value >> 4)) & 0x0F0F0F0F;
+    return (value * 0x01010101) >> 24;
+#endif
+#elif defined(PNANOVDB_HLSL)
+    return countbits(value);
+#elif defined(PNANOVDB_GLSL)
+    return bitCount(value);
+#endif
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_leaf_count_on_range(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t p, pnanovdb_uint32_t max_index)
+{
+    pnanovdb_uint32_t mask_idx_max = max_index >> 5u;
+    pnanovdb_uint32_t sum = 0u;
+    pnanovdb_uint32_t mask_val = 0u;
+    for (pnanovdb_uint32_t mask_idx = 0u; mask_idx < mask_idx_max; mask_idx++)
+    {
+        mask_val = pnanovdb_read_uint32(
+            buf, pnanovdb_address_offset(p.address, PNANOVDB_LEAF_OFF_VALUE_MASK + 4u * mask_idx));
+        sum += pnanovdb_uint32_countbits(mask_val);
+    }
+    mask_val = pnanovdb_read_uint32(
+        buf, pnanovdb_address_offset(p.address, PNANOVDB_LEAF_OFF_VALUE_MASK + 4u * mask_idx_max));
+    sum += pnanovdb_uint32_countbits(mask_val & ((1u << (max_index & 31u)) - 1u));
+    return sum;
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_uint64_offset(pnanovdb_uint64_t a, pnanovdb_uint32_t b)
+{
+#if defined(PNANOVDB_ADDRESS_32)
+    pnanovdb_uint32_t low = pnanovdb_uint64_low(a);
+    pnanovdb_uint32_t high = pnanovdb_uint64_high(a);
+    low += b;
+    if (low < b)
+    {
+        high += 1u;
+    }
+    return pnanovdb_uint32_as_uint64(low, high);
+#else
+    return a + b;
+#endif
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_min_index(pnanovdb_buf_t buf, pnanovdb_address_t min_address)
+{
+    return pnanovdb_read_uint64(buf, min_address);
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_max_index(pnanovdb_buf_t buf, pnanovdb_address_t max_address)
+{
+    return pnanovdb_uint64_offset(pnanovdb_read_uint64(buf, max_address), 1u);
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_ave_index(pnanovdb_buf_t buf, pnanovdb_address_t ave_address)
+{
+    return pnanovdb_uint64_offset(pnanovdb_read_uint64(buf, ave_address), 2u);
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_dev_index(pnanovdb_buf_t buf, pnanovdb_address_t dev_address)
+{
+    return pnanovdb_uint64_offset(pnanovdb_read_uint64(buf, dev_address), 3u);
+}
+
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_value_index(pnanovdb_grid_type_t grid_type, pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, PNANOVDB_IN(pnanovdb_coord_t) ijk)
+{
+    pnanovdb_uint32_t n = pnanovdb_leaf_coord_to_offset(ijk);
+    pnanovdb_uint32_t bbox_dif_and_flags = pnanovdb_leaf_get_bbox_dif_and_flags(buf, leaf);
+    pnanovdb_address_t value_address = pnanovdb_leaf_get_table_address(grid_type, buf, leaf, 0u);
+    if ((bbox_dif_and_flags & 0x10000000) != 0u)
+    {
+        if (pnanovdb_leaf_get_value_mask(buf, leaf, n))
+        {
+            n = pnanovdb_leaf_count_on_range(buf, leaf, n);
+        }
+        else
+        {
+            value_address = pnanovdb_address_null();
+            n = 0;
+        }
+    }
+    return pnanovdb_uint64_offset(pnanovdb_read_uint64(buf, value_address), n);
+}
+
 PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_lower_coord_to_offset(PNANOVDB_IN(pnanovdb_coord_t) ijk)
 {
     return (((PNANOVDB_DEREF(ijk).x & 127) >> 3) << (2 * 4)) +
-        (((PNANOVDB_DEREF(ijk).y & 127) >> 3) << (4)) +
-        ((PNANOVDB_DEREF(ijk).z & 127) >> 3);
+           (((PNANOVDB_DEREF(ijk).y & 127) >> 3) << (4)) +
+            ((PNANOVDB_DEREF(ijk).z & 127) >> 3);
 }
 
 PNANOVDB_FORCE_INLINE pnanovdb_address_t pnanovdb_lower_get_min_address(pnanovdb_grid_type_t grid_type, pnanovdb_buf_t buf, pnanovdb_lower_handle_t node)
@@ -1427,8 +1524,8 @@ PNANOVDB_FORCE_INLINE pnanovdb_address_t pnanovdb_lower_get_value_address(pnanov
 PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_upper_coord_to_offset(PNANOVDB_IN(pnanovdb_coord_t) ijk)
 {
     return (((PNANOVDB_DEREF(ijk).x & 4095) >> 7) << (2 * 5)) +
-        (((PNANOVDB_DEREF(ijk).y & 4095) >> 7) << (5)) +
-        ((PNANOVDB_DEREF(ijk).z & 4095) >> 7);
+           (((PNANOVDB_DEREF(ijk).y & 4095) >> 7) << (5)) +
+            ((PNANOVDB_DEREF(ijk).z & 4095) >> 7);
 }
 
 PNANOVDB_FORCE_INLINE pnanovdb_address_t pnanovdb_upper_get_min_address(pnanovdb_grid_type_t grid_type, pnanovdb_buf_t buf, pnanovdb_upper_handle_t node)

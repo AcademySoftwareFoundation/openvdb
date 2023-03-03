@@ -46,7 +46,7 @@ TEST_F(TestQuat, testAxisAngle)
 
     Vec3s v(1, 2, 3);
     v.normalize();
-    float a = float(M_PI / 4.f);
+    float a = float(openvdb::math::pi<float>() / 4.f);
 
     Quat<float> q(v,a);
     float b = q.angle();
@@ -177,9 +177,9 @@ TEST_F(TestQuat, testEulerAngles)
         double TOL = 1e-7;
 
         Mat4d rx, ry, rz;
-        const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.;
-        const double angle3 = 125. *M_PI / 180.;
+        const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
+        const double angle2 = 64. * openvdb::math::pi<double>() / 180.;
+        const double angle3 = 125. *openvdb::math::pi<double>() / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);
@@ -202,9 +202,9 @@ TEST_F(TestQuat, testEulerAngles)
         double TOL = 1e-7;
 
         Mat4d rx, ry, rz;
-        const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.;
-        const double angle3 = 125. *M_PI / 180.;
+        const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
+        const double angle2 = 64. * openvdb::math::pi<double>() / 180.;
+        const double angle3 = 125. *openvdb::math::pi<double>() / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);
@@ -227,9 +227,9 @@ TEST_F(TestQuat, testEulerAngles)
         double TOL = 1e-7;
 
         Mat4d rx, ry, rz;
-        const double angle1 = 20. * M_PI / 180.;
-        const double angle2 = 64. * M_PI / 180.;
-        const double angle3 = 125. *M_PI / 180.;
+        const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
+        const double angle2 = 64. * openvdb::math::pi<double>() / 180.;
+        const double angle3 = 125. *openvdb::math::pi<double>() / 180.;
         rx.setToRotation(Vec3d(1,0,0), angle1);
         ry.setToRotation(Vec3d(0,1,0), angle2);
         rz.setToRotation(Vec3d(0,0,1), angle3);

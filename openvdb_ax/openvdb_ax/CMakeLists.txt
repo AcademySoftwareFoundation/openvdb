@@ -7,8 +7,12 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
-project(OpenVDBAXCore LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+
+# There is a bug introduced with LLVM 14 config files which causes CMake to
+# complain if the project is not init-ted with LANGUAGES C
+# https://github.com/llvm/llvm-project/issues/53950
+project(OpenVDBAXCore LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -109,6 +113,12 @@ else()
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
+if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+  # https://llvm.org/docs/OpaquePointers.html
+  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to \
+    opaque pointer changes in LLVM. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
+endif()
+
 if(MINIMUM_LLVM_VERSION)
   if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
     message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
@@ -148,6 +158,7 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   compiler/PointExecutable.cc
   compiler/VolumeExecutable.cc
   math/OpenSimplexNoise.cc
+  util/x86.cc
 )
 
 if(OPENVDB_BUILD_AX_GRAMMAR)
@@ -184,6 +195,7 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
   codegen/Utils.h
   codegen/VolumeComputeGenerator.h
   math/OpenSimplexNoise.h
+  util/x86.h
 )
 
 set(OPENVDB_AX_COMPILER_INCLUDE_FILES
@@ -267,6 +279,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
 endif()
 
+if(WIN32)
+  # Silence deprecation warnings coming from MSVC/LLVM about deriving from std::iterator
+  list(APPEND OPENVDB_AX_PUBLIC_DEFINES
+    -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+endif()
+
 list(APPEND OPENVDB_AX_PRIVATE_DEFINES "-DOPENVDB_AX_PRIVATE")
 
 if(USE_NEW_PASS_MANAGER)
@@ -282,6 +300,7 @@ if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_static PUBLIC ../)
+  target_include_directories(openvdb_ax_static PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -305,10 +324,11 @@ endif()
 # Configure shared build
 
 if(OPENVDB_AX_SHARED)
-  target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES} -DOPENVDB_AX_DLL)
   target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_shared PUBLIC ../)
+  target_include_directories(openvdb_ax_shared PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )

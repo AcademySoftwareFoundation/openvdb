@@ -57,7 +57,9 @@ std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
     // First check the Grid
     auto *data = reinterpret_cast<const typename GridT::DataType*>(&grid);
     std::stringstream ss;
-    if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
+    if (!isValid(data)) {
+        errorStr.assign("Grid is not 32B aligned");
+    } else if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
         ss << "Incorrect magic number: Expected " << NANOVDB_MAGIC_NUMBER << ", but read " << data->mMagic;
         errorStr = ss.str();
     } else if (!validateChecksum(grid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
@@ -89,7 +91,9 @@ std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
 template<typename ValueT>
 void GridValidator<ValueT>::checkTree(const GridT &grid, std::string &errorStr, bool detailed)
 {
-    if ( (const uint8_t*)(&grid.tree().root()) < (const uint8_t*)(&grid.tree()+1)) {
+    if (!isValid(&grid.tree())) {
+        errorStr.assign("Tree is not 32B aligned");
+    } else if ( (const uint8_t*)(&grid.tree().root()) < (const uint8_t*)(&grid.tree()+1)) {
        errorStr.assign("Invalid root pointer (should be located after the Grid and Tree)");
     } else if ( (const uint8_t*)(&grid.tree().root()) > (const uint8_t*)(&grid) + grid.gridSize() - sizeof(grid.tree().root()) ) {
        errorStr.assign("Invalid root pointer (appears to be located after the end of the buffer)");
@@ -105,6 +109,9 @@ void GridValidator<ValueT>::checkRoot(const GridT &grid, std::string &errorStr, 
 {
     auto &root = grid.tree().root();
     auto *data = root.data();
+    if (!isValid(data)) {
+        errorStr.assign("Root is not 32B aligned");
+    }
     const uint8_t *minPtr = (const uint8_t*)(&root + 1);
     const uint8_t *maxPtr = (const uint8_t*)(&root) + root.memUsage();
     for (uint32_t i = 0; errorStr.empty() && i<data->mTableSize; ++i) {
@@ -129,7 +136,9 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
     const uint8_t *maxPtr = (const uint8_t*)(&grid) + grid.gridSize();
 
     auto check = [&](const void * ptr, size_t ptrSize) -> bool {
-        if ( (const uint8_t *) ptr < minPtr ) {
+        if (!isValid(ptr)) {
+            errorStr.assign("Invalid node pointer: not 32B aligned");
+        } else if ( (const uint8_t *) ptr < minPtr ) {
             errorStr.assign("Invalid node pointer: below lower bound");
         } else if ( (const uint8_t *) ptr > maxPtr - ptrSize ) {
             errorStr.assign("Invalid node pointer: above higher bound");
@@ -137,23 +146,19 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
         return errorStr.empty();
     };
 
-    auto *data3 = grid.tree().root().data();
-    for (uint32_t i=0, size=data3->mTableSize; i<size; ++i) {
-        auto *tile = data3->tile(i);// note, we already checked the root
-        if (!tile->isChild()) continue;
-        auto *node2 = data3->getChild(tile);
-        if (!check(node2, sizeof(*node2))) return;
-        auto *data2 = node2->data();
-        for (auto it2 = data2->mChildMask.beginOn(); it2; ++it2) {
-            auto *node1 = data2->getChild(*it2);
-            if (!check(node1, sizeof(*node1))) return;
-            auto *data1 = node1->data();
-            for (auto it1 = data1->mChildMask.beginOn(); it1; ++it1) {
-                auto *leaf = data1->getChild(*it1);
-                if (!check(leaf, sizeof(*leaf))) return;
+    for (auto it2 = grid.tree().root().beginChild(); it2; ++it2) {
+        auto &node2 = *it2;
+        if (!check(&node2, sizeof(node2))) return;
+        for (auto it1 = node2.beginChild(); it1; ++it1) {
+            auto &node1 = *it1;
+            if (!check(&node1, sizeof(node1))) return;
+            for (auto it0 = node1.beginChild(); it0; ++it0) {
+                auto &node0 = *it0;
+                if (!check(&node2, sizeof(node2))) return;
             }// loop over child nodes of the lower internal node
         }// loop over child nodes of the upper internal node
     }// loop over child nodes of the root node
+
 } // GridValidator::processNodes
 
 

@@ -74,7 +74,6 @@ public:
         , mMax(b)
     {
     }
-    Extrema& operator=(const Extrema&) = default;
     Extrema& min(const ValueT& v)
     {
         if (v < mMin) {
@@ -132,7 +131,6 @@ protected:
             , vector(v)
         {
         }
-        Pair& operator=(const Pair&) = default;
         bool  operator<(const Pair& rhs) const { return scalar < rhs.scalar; }
     } mMin, mMax;
     Extrema& add(const Pair& p)
@@ -163,7 +161,6 @@ public:
         , mMax(b)
     {
     }
-    Extrema& operator=(const Extrema&) = default;
     Extrema& min(const VecT& v)
     {
         Pair tmp(v);
@@ -316,7 +313,7 @@ class Stats<ValueT, 1> : public Extrema<ValueT, 1>
 {
 protected:
     using BaseT = Extrema<ValueT, 1>;
-    using RealT = double; // for accuracy the internal precission must be 64 bit floats
+    using RealT = double; // for accuracy the internal precision must be 64 bit floats
     size_t mSize;
     double mAvg, mAux;
 
@@ -428,7 +425,7 @@ class GridStats
     static_assert(std::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
     static constexpr bool DO_STATS = StatsT::hasMinMax() ||  StatsT::hasAverage() || StatsT::hasStdDeviation();
 
-    ValueT mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
+    ValueT mDelta; // skip rendering of node if: node.max < -mDelta || node.min > mDelta
 
     void process( GridT& );// process grid and all tree nodes
     void process( TreeT& );// process Tree, root node and child nodes
@@ -447,7 +444,7 @@ class GridStats
 
     template<typename T, typename FlagT>
     typename std::enable_if<!std::is_floating_point<T>::value>::type
-    setFlag(const T&, const T&, FlagT& flag) const { flag &= ~FlagT(1); } // unset first bit
+    setFlag(const T&, const T&, FlagT& flag) const { flag &= ~FlagT(1); } // unset 1st bit to enable rendering
 
     template<typename T, typename FlagT>
     typename std::enable_if<std::is_floating_point<T>::value>::type
@@ -518,10 +515,10 @@ inline typename std::enable_if<std::is_floating_point<T>::value>::type
 GridStats<GridT, StatsT>::
     setFlag(const T& min, const T& max, FlagT& flag) const
 {
-    if (mDelta > 0 && (min > mDelta || max < -mDelta)) {
-        flag |= FlagT(1); //  set 1st bit on to enable rendering
+    if (mDelta > 0 && (min > mDelta || max < -mDelta)) {// LS: min > dx || max < -dx
+        flag |=  FlagT(1u);// set 1st bit to disable rendering
     } else {
-        flag &= ~FlagT(1); // set 1st bit off to disable rendering
+        flag &= ~FlagT(1u);// unset 1st bit to enable rendering
     }
 }
 
@@ -600,7 +597,7 @@ void GridStats<GridT, StatsT>::process(RootT &root)
                 const Coord ijk = tile->origin();
                 total.bbox[0].minComponent(ijk);
                 total.bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-                if (DO_STATS) { // resolved at compiletime
+                if (DO_STATS) { // resolved at compile time
                     total.stats.add(tile->value, ChildT::NUM_VALUES);
                 }
             }
@@ -632,7 +629,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
     if (const auto tileCount = data->mValueMask.countOn()) {
         //total.activeCount = tileCount * ChildT::NUM_VALUES; // active tiles
         for (auto it = data->mValueMask.beginOn(); it; ++it) {
-            if (DO_STATS) { // resolved at compiletime
+            if (DO_STATS) { // resolved at compile time
                 total.stats.add( data->mTable[*it].value, ChildT::NUM_VALUES );
             }
             const Coord ijk = node.offsetToGlobalCoord(*it);
@@ -667,11 +664,11 @@ GridStats<GridT, StatsT>::process(NodeT &node)
 
     data->mBBox = total.bbox;
     if (total.bbox.empty()) {
-        data->mFlags &= ~uint32_t(1); // set 1st bit off since node to disable rendering of node
+        data->mFlags |=  uint32_t(1); // set 1st bit on to disable rendering of node
         data->mFlags &= ~uint32_t(2); // set 2nd bit off since node does not contain active values
     } else {
         data->mFlags |=  uint32_t(2); // set 2nd bit on since node contains active values
-        if (DO_STATS) { // resolved at compiletime
+        if (DO_STATS) { // resolved at compile time
             this->setStats(data, total.stats);
             this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
         }
@@ -689,12 +686,12 @@ GridStats<GridT, StatsT>::process(Node0 &leaf)
     NodeStats local;
     auto *data = leaf.data();
     if (auto activeCount = data->mValueMask.countOn()) {
-        data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
+        //data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
         //local.activeCount += activeCount;
-        leaf.updateBBox(); // optionally update active bounding box
+        leaf.updateBBox(); // optionally update active bounding box (updates data->mFlags)
         local.bbox[0] = local.bbox[1] = data->mBBoxMin;
         local.bbox[1] += Coord(data->mBBoxDif[0], data->mBBoxDif[1], data->mBBoxDif[2]);
-        if (DO_STATS) { // resolved at compiletime
+        if (DO_STATS) { // resolved at compile time
             for (auto it = data->mValueMask.beginOn(); it; ++it) {
                 local.stats.add(data->getValue(*it));
             }
@@ -702,7 +699,7 @@ GridStats<GridT, StatsT>::process(Node0 &leaf)
             this->setFlag(data->getMin(), data->getMax(), data->mFlags);
         }
     } else {
-        data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf does not contain active voxel
+        data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf has no bbox of active active values
     }
     return local;
 } // GridStats::process( LeafNode )
@@ -729,6 +726,117 @@ void gridStats(NanoGrid<BuildT>& grid, StatsMode mode)
         throw std::runtime_error("gridStats: Unsupported statistics mode.");
     }
 }
+
+//================================================================================================
+
+namespace {
+
+// returns a bitmask (of size 32^3 or 16^3) that marks all the entries
+// in a node table that intersects with the specified bounding box.
+template<typename NodeT>
+Mask<NodeT::LOG2DIM> getBBoxMask(const CoordBBox &bbox, const NodeT* node)
+{
+    Mask<NodeT::LOG2DIM> mask;// typically 32^3 or 16^3 bit mask
+    auto b = CoordBBox::createCube(node->origin(), node->dim());
+    assert( bbox.hasOverlap(b) );
+    if ( bbox.isInside(b) ) {
+        mask.setOn();//node is completely inside the bbox so early out
+    } else {
+        b.intersect(bbox);// trim bounding box
+        // transform bounding box from global to local coordinates
+        b.min() &=  NodeT::DIM-1u;
+        b.min() >>= NodeT::ChildNodeType::TOTAL;
+        b.max() &=  NodeT::DIM-1u;
+        b.max() >>= NodeT::ChildNodeType::TOTAL;
+        assert( !b.empty() );
+        auto it = b.begin();// iterates over all the child nodes or tiles that intersects bbox
+        for (const Coord& ijk = *it; it; ++it) {
+            mask.setOn(ijk[2] + (ijk[1] << NodeT::LOG2DIM) + (ijk[0] << 2*NodeT::LOG2DIM));
+        }
+    }
+    return mask;
+}
+}// end of unnamed namespace
+
+/// @brief return the extrema of all the values in a grid that
+///        intersects the specified bounding box.
+template<typename BuildT>
+Extrema<typename NanoGrid<BuildT>::ValueType>
+getExtrema(const NanoGrid<BuildT>& grid, const CoordBBox &bbox)
+{
+    using GridT  = NanoGrid<BuildT>;
+    using ValueT = typename GridT::ValueType;
+    using TreeT = typename GridTree<GridT>::type;
+    using RootT = typename NodeTrait<TreeT, 3>::type;// root node
+    using Node2 = typename NodeTrait<TreeT, 2>::type;// upper internal node
+    using Node1 = typename NodeTrait<TreeT, 1>::type;// lower internal node
+    using Node0 = typename NodeTrait<TreeT, 0>::type;// leaf node
+
+    Extrema<ValueT> extrema;
+    const RootT &root = grid.tree().root();
+    const auto &bbox3 = root.bbox();
+    if (bbox.isInside(bbox3)) {// bbox3 is contained inside bbox
+        extrema.min(root.minimum());
+        extrema.max(root.maximum());
+        extrema.add(root.background());
+    } else if (bbox.hasOverlap(bbox3)) {
+        const auto *data3 = root.data();
+        for (uint32_t i=0; i<data3->mTableSize; ++i) {
+            const auto *tile = data3->tile(i);
+            CoordBBox bbox2 = CoordBBox::createCube(tile->origin(), Node2::dim());
+            if (!bbox.hasOverlap(bbox2)) continue;
+            if (tile->isChild()) {
+                const Node2 *node2 = data3->getChild(tile);
+                if (bbox.isInside(bbox2)) {
+                    extrema.min(node2->minimum());
+                    extrema.max(node2->maximum());
+                } else {// partial intersections at level 2
+                    auto *data2 = node2->data();
+                    const auto bboxMask2 = getBBoxMask(bbox, node2);
+                    for (auto it2 = bboxMask2.beginOn(); it2; ++it2) {
+                        if (data2->mChildMask.isOn(*it2)) {
+                            const Node1* node1 = data2->getChild(*it2);
+                            CoordBBox bbox1 = CoordBBox::createCube(node1->origin(), Node1::dim());
+                            if (bbox.isInside(bbox1)) {
+                                extrema.min(node1->minimum());
+                                extrema.max(node1->maximum());
+                            } else {// partial intersection at level 1
+                                auto *data1 = node1->data();
+                                const auto bboxMask1 = getBBoxMask(bbox, node1);
+                                for (auto it1 = bboxMask1.beginOn(); it1; ++it1) {
+                                    if (data1->mChildMask.isOn(*it1)) {
+                                        const Node0* node0 = data1->getChild(*it1);
+                                        CoordBBox bbox0 = CoordBBox::createCube(node0->origin(), Node0::dim());
+                                        if (bbox.isInside(bbox0)) {
+                                            extrema.min(node0->minimum());
+                                            extrema.max(node0->maximum());
+                                        } else {// partial intersection at level 0
+                                            auto *data0 = node0->data();
+                                            const auto bboxMask0 = getBBoxMask(bbox, node0);
+                                            for (auto it0 = bboxMask0.beginOn(); it0; ++it0) {
+                                                extrema.add(data0->getValue(*it0));
+                                            }
+                                        }// end partial intersection at level 0
+                                    } else {// tile at level 1
+                                        extrema.add(data1->mTable[*it1].value);
+                                    }
+                                }
+                            }// end of partial intersection at level 1
+                        } else {// tile at level 2
+                           extrema.add(data2->mTable[*it2].value);
+                        }
+                    }// loop over tiles and nodes at level 2
+                }// end of partial intersection at level 1
+            } else {// tile at root level
+                extrema.add(tile->value);
+            }
+        }// loop over root table
+    } else {// bbox does not overlap the grid
+        extrema.add(root.background());
+    }
+    return extrema;
+}// getExtrema
+
 
 } // namespace nanovdb
 

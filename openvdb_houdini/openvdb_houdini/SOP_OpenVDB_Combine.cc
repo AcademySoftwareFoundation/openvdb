@@ -399,6 +399,14 @@ Activity Difference:\n\
             " voxel values are considered equal to the background"
             " if they differ by less than this tolerance."));
 
+    // Prune Degenerate Tiles
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prunedegenerate", "Prune Degenerate Tiles")
+        .setDefault(PRMzeroDefaults)
+        .setDocumentation(
+            "When SDF CSG operations result in a degenerancy, such as a VDB\n"
+            "subtracted from itself, clear the tile rather than having ghost\n"
+            "bands.\n"));
+
     // Prune toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
         .setDefault(PRMoneDefaults)
@@ -860,9 +868,13 @@ struct Blend1
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
     {
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        out = ValueT((ONE - aMult * a) * bMult * b);
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        if constexpr(std::is_same<ValueT, bool>::value) {
+            out = a && !b;
+        } else {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            out = ValueT((ONE - aMult * a) * bMult * b);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        }
     }
 };
 
@@ -880,9 +892,14 @@ struct Blend2
         aMult(a), bMult(b), ONE(openvdb::zeroVal<ValueT>() + 1) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& out) const
     {
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        out = ValueT(a*aMult); out = out + ValueT((ONE - out) * bMult*b);
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        if constexpr(std::is_same<ValueT, bool>::value) {
+            out = !a && !b;
+        } else {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            out = ValueT(a*aMult);
+            out = out + ValueT((ONE - out) * bMult*b);
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        }
     }
 };
 
@@ -988,36 +1005,39 @@ struct SOP_OpenVDB_Combine::CombineOp
     typename GridT::Ptr resampleToMatch(const GridT& src, const hvdb::Grid& ref, int order)
     {
         using ValueT = typename GridT::ValueType;
-        const ValueT ZERO = openvdb::zeroVal<ValueT>();
 
         const openvdb::math::Transform& refXform = ref.constTransform();
 
         typename GridT::Ptr dest;
         if (src.getGridClass() == openvdb::GRID_LEVEL_SET) {
-            // For level set grids, use the level set rebuild tool to both resample the
-            // source grid to match the reference grid and to rebuild the resulting level set.
-            const bool refIsLevelSet = ref.getGridClass() == openvdb::GRID_LEVEL_SET;
-            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-            const ValueT halfWidth = refIsLevelSet
-                ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
-                : ValueT(src.background() * (1.0 / src.voxelSize()[0]));
-            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            if constexpr(std::is_floating_point<ValueT>::value) {
+                const ValueT ZERO = openvdb::zeroVal<ValueT>();
 
-            if (!openvdb::math::isFinite(halfWidth)) {
-                std::stringstream msg;
-                msg << "Resample to match: Illegal narrow band width = " << halfWidth
-                    << ", caused by grid '" << src.getName() << "' with background "
-                    << this->getScalarBackgroundValue(ref);
-                throw std::invalid_argument(msg.str());
-            }
+                // For level set grids, use the level set rebuild tool to both resample the
+                // source grid to match the reference grid and to rebuild the resulting level set.
+                const bool refIsLevelSet = ref.getGridClass() == openvdb::GRID_LEVEL_SET;
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                const ValueT halfWidth = refIsLevelSet
+                    ? ValueT(ZERO + this->getScalarBackgroundValue(ref) * (1.0 / ref.voxelSize()[0]))
+                    : ValueT(src.background() * (1.0 / src.voxelSize()[0]));
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
-            try {
-                dest = openvdb::tools::doLevelSetRebuild(src, /*iso=*/ZERO,
-                    /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &refXform, &interrupt.interrupter());
-            } catch (openvdb::TypeError&) {
-                self->addWarning(SOP_MESSAGE, ("skipped rebuild of level set grid "
-                    + src.getName() + " of type " + src.type()).c_str());
-                dest.reset();
+                if (!openvdb::math::isFinite(halfWidth)) {
+                    std::stringstream msg;
+                    msg << "Resample to match: Illegal narrow band width = " << halfWidth
+                        << ", caused by grid '" << src.getName() << "' with background "
+                        << this->getScalarBackgroundValue(ref);
+                    throw std::invalid_argument(msg.str());
+                }
+
+                try {
+                    dest = openvdb::tools::doLevelSetRebuild(src, /*iso=*/ZERO,
+                        /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &refXform, &interrupt.interrupter());
+                } catch (openvdb::TypeError&) {
+                    self->addWarning(SOP_MESSAGE, ("skipped rebuild of level set grid "
+                        + src.getName() + " of type " + src.type()).c_str());
+                    dest.reset();
+                }
             }
         }
         if (!dest && src.constTransform() != refXform) {
@@ -1159,19 +1179,19 @@ struct SOP_OpenVDB_Combine::CombineOp
     }
 
     template <typename GridT>
-    void doUnion(GridT &result, GridT &temp)
+    void doUnion(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgUnion(result, temp);
+        openvdb::tools::csgUnion(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
     template <typename GridT>
-    void doIntersection(GridT &result, GridT &temp)
+    void doIntersection(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgIntersection(result, temp);
+        openvdb::tools::csgIntersection(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
     template <typename GridT>
-    void doDifference(GridT &result, GridT &temp)
+    void doDifference(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgDifference(result, temp);
+        openvdb::tools::csgDifference(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
 
     // Combine two grids of the same type.
@@ -1281,19 +1301,22 @@ struct SOP_OpenVDB_Combine::CombineOp
             case OP_UNION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doUnion(*resultGrid, *tempGrid);
+                doUnion(*resultGrid, *tempGrid,
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_INTERSECTION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doIntersection(*resultGrid, *tempGrid);
+                doIntersection(*resultGrid, *tempGrid,
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_DIFFERENCE:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doDifference(*resultGrid, *tempGrid);
+                doDifference(*resultGrid, *tempGrid,
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_REPLACE:
@@ -1445,15 +1468,15 @@ struct SOP_OpenVDB_Combine::CombineOp
 }; // struct CombineOp
 
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doUnion(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doUnion(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doIntersection(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doIntersection(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doDifference(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doDifference(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 

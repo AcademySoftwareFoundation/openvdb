@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBBinaries LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -18,7 +18,13 @@ option(OPENVDB_BUILD_VDB_PRINT "Build vdb_print" ON)
 option(OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF)
 option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF)
 option(OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF)
-option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
+option(OPENVDB_BUILD_VDB_TOOL "Build vdb_tool" OFF)
+option(OPENVDB_BUILD_VDB_AX "Build the OpenVDB AX command line binary" OFF)
+
+if(OPENVDB_BUILD_AX_BINARIES)
+  message(DEPRECATION "OPENVDB_BUILD_AX_BINARIES is deprecated. Use OPENVDB_BUILD_VDB_AX.")
+  set(OPENVDB_BUILD_VDB_AX ON)
+endif()
 
 #########################################################################
 
@@ -65,10 +71,14 @@ if (OPENVDB_BUILD_VDB_RENDER)
   add_subdirectory(vdb_render)
 endif()
 
+if (OPENVDB_BUILD_VDB_TOOL)
+  add_subdirectory(vdb_tool)
+endif()
+
 if (OPENVDB_BUILD_VDB_VIEW)
   add_subdirectory(vdb_view)
 endif()
 
-if (OPENVDB_BUILD_AX_BINARIES)
+if (OPENVDB_BUILD_VDB_AX)
   add_subdirectory(vdb_ax)
 endif()

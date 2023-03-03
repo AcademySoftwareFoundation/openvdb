@@ -3,6 +3,8 @@
 
 /// @file TempFile.h
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
+
 #ifndef OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 
@@ -48,3 +50,5 @@ private:
 } // namespace openvdb
 
 #endif // OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
+
+#endif // OPENVDB_USE_DELAYED_LOADING

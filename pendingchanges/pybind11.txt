@@ -1,0 +1,3 @@
+Python:
+    - OpenVDB Python bindings are now implemented using pybind11 instead of Boost.Python.
+    [Contributed by Matthew Cong]

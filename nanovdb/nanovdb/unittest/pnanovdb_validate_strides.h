@@ -83,26 +83,39 @@ static void compute_node_strides(
     pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
     pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
     pnanovdb_uint32_t statStride = pnanovdb_grid_type_stat_strides_bits[grid_type] / 8u;
-    if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
+    pnanovdb_uint32_t postStatStride = 0u;
+    if (nodeLevel == 0u)
     {
-        minmaxStride = 0u;
-        minmaxAlign = 0u;
-        statStride = 0u;
-    }
-
-    if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_FP)
-    {
-        minmaxStride = 2u;
-        minmaxAlign = 2u;
-        statStride = 2u;
-        // allocate minimum and quantum
-        allocate(&offset, 4u, 4u);
-        allocate(&offset, 4u, 4u);
+        if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
+        {
+            minmaxStride = 0u;
+            minmaxAlign = 0u;
+            statStride = 0u;
+        }
+        else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_FP)
+        {
+            minmaxStride = 2u;
+            minmaxAlign = 2u;
+            statStride = 2u;
+            // allocate minimum and quantum
+            allocate(&offset, 4u, 4u);
+            allocate(&offset, 4u, 4u);
+        }
+        else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_INDEX)
+        {
+            minmaxStride = 0u;
+            minmaxAlign = 0u;
+            statStride = 0u;
+            postStatStride = 8u;
+            tableAlign = 8u;
+            tableFullStride = 8u;
+        }
     }
     *min_off = allocate(&offset, minmaxStride, minmaxAlign);
     *max_off = allocate(&offset, minmaxStride, minmaxAlign);
     *ave_off = allocate(&offset, statStride, statStride);
     *stddev_off = allocate(&offset, statStride, statStride);
+    allocate(&offset, postStatStride, postStatStride);
     *table_off = allocate(&offset, tableFullStride, tableAlign);
     *total_size = allocate(&offset, 0u, 32u);
 }

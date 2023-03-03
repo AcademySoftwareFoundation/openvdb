@@ -57,7 +57,7 @@ The following functions are provided:
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 
 function(OPENVDB_GET_VERSION_DEFINE HEADER KEY VALUE)

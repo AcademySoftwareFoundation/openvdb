@@ -64,6 +64,8 @@ This will define the following variables:
   True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_IMATH_HALF``
   True if the OpenVDB Library has been built with Imath half support
+``OpenVDB_USES_DELAYED_LOADING``
+  True if the OpenVDB Library has been built with delayed-loading
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -107,7 +109,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 
@@ -392,6 +394,9 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   elseif(${COMPONENT} STREQUAL "openvdb_je")
     # alias to the result of openvdb which should be handled first
     set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
+  elseif(${COMPONENT} STREQUAL "nanovdb")
+    # alias to the result of openvdb which should be handled first
+    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
   else()
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
@@ -555,6 +560,7 @@ set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
+set(OpenVDB_USES_DELAYED_LOADING ${OPENVDB_USE_DELAYED_LOADING})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -587,6 +593,7 @@ if(_OPENVDB_HAS_NEW_VERSION_HEADER)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
+  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_DELAYED_LOADING" OpenVDB_USES_DELAYED_LOADING)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
   # which we can query for optional deps. This basically runs ldd/otoll/objdump
@@ -633,6 +640,11 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_IMATH_HALF ON)
     endif()
+
+    string(FIND ${PREREQUISITE} "boost_iostreams" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_DELAYED_LOADING ON)
+    endif()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
@@ -675,7 +687,12 @@ endif()
 # namespaced headers are correctly prioritized. Otherwise other include paths
 # from shared installs (including houdini) may pull in the wrong headers
 
-set(_OPENVDB_VISIBLE_DEPENDENCIES Boost::iostreams)
+set(_OPENVDB_VISIBLE_DEPENDENCIES "")
+
+if(OpenVDB_USES_DELAYED_LOADING)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Boost::iostreams)
+  list(APPEND OpenVDB_DEFINITIONS OPENVDB_USE_DELAYED_LOADING)
+endif()
 
 if(OpenVDB_USES_IMATH_HALF)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)
@@ -749,7 +766,7 @@ if(NOT TARGET OpenVDB::openvdb)
     INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_INCLUDE_DIR}"
     IMPORTED_LINK_DEPENDENT_LIBRARIES "${_OPENVDB_HIDDEN_DEPENDENCIES}" # non visible deps
     INTERFACE_LINK_LIBRARIES "${_OPENVDB_VISIBLE_DEPENDENCIES}" # visible deps (headers)
-    INTERFACE_COMPILE_FEATURES cxx_std_14
+    INTERFACE_COMPILE_FEATURES cxx_std_17
   )
 endif()
 
@@ -772,7 +789,7 @@ if(OpenVDB_pyopenvdb_LIBRARY)
       IMPORTED_LOCATION "${OpenVDB_pyopenvdb_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_pyopenvdb_INCLUDE_DIR};${PYTHON_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::${BOOST_PYTHON_LIB};${PYTHON_LIBRARIES}"
-      INTERFACE_COMPILE_FEATURES cxx_std_14
+      INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()
 endif()
@@ -786,7 +803,7 @@ if(OpenVDB_openvdb_houdini_LIBRARY)
       IMPORTED_LOCATION "${OpenVDB_openvdb_houdini_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_houdini_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Houdini"
-      INTERFACE_COMPILE_FEATURES cxx_std_14
+      INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()
 endif()
@@ -816,7 +833,7 @@ if(OpenVDB_openvdb_ax_LIBRARY)
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
       INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;${LLVM_LIBS}"
-      INTERFACE_COMPILE_FEATURES cxx_std_14
+      INTERFACE_COMPILE_FEATURES cxx_std_17
     )
   endif()
 endif()
@@ -830,7 +847,7 @@ if(OpenVDB_nanovdb_LIBRARY)
       IMPORTED_LOCATION "${OpenVDB_nanovdb_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_nanovdb_INCLUDE_DIR}"
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;"
-      INTERFACE_COMPILE_FEATURES cxx_std_14
+      INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()
 endif()

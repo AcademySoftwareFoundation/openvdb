@@ -82,6 +82,8 @@ class GridHandle : public GridHandleBase
     static T* no_const(const T* ptr) { return const_cast<T*>(ptr); }
 
 public:
+    using BufferType = BufferT;
+
     /// @brief Move constructor from a buffer
     GridHandle(BufferT&& buffer) { mBuffer = std::move(buffer); }
     /// @brief Empty ctor

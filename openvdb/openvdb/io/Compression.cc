@@ -5,7 +5,6 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
-#include <boost/algorithm/string/join.hpp>
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
 #endif
@@ -24,11 +23,12 @@ compressionToString(uint32_t flags)
 {
     if (flags == COMPRESS_NONE) return "none";
 
-    std::vector<std::string> words;
-    if (flags & COMPRESS_ZIP) words.push_back("zip");
-    if (flags & COMPRESS_BLOSC) words.push_back("blosc");
-    if (flags & COMPRESS_ACTIVE_MASK) words.push_back("active values");
-    return boost::join(words, " + ");
+    std::string descr;
+    if (flags & COMPRESS_ZIP) descr += "zip + ";
+    if (flags & COMPRESS_BLOSC) descr += "blosc + ";
+    if (flags & COMPRESS_ACTIVE_MASK) descr += "active values + ";
+    if (!descr.empty()) descr.resize(descr.size() - 3);
+    return descr;
 }
 
 

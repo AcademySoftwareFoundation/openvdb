@@ -14,10 +14,10 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/VelocityFields.h>
 
-#include <openvdb/points/AttributeGroup.h>
-#include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointGroup.h>
-#include <openvdb/points/PointMove.h>
+#include "AttributeGroup.h"
+#include "PointDataGrid.h"
+#include "PointGroup.h"
+#include "PointMove.h"
 
 #include <memory>
 

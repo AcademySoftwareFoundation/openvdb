@@ -1019,7 +1019,7 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
             case PROPAGATION_TYPE_PROJECTION:
             {
                 Projection projection(parms, boss.interrupter());
-                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, projection);
+                hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mCptPrim, projection);
                 break;
             }
             case PROPAGATION_TYPE_UNKNOWN: break;

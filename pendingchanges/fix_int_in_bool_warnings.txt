@@ -1,0 +1,2 @@
+Improvements:
+- Fix int-in-bool-context GCC9+ warnings by switching to use constexpr if.

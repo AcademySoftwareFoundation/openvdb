@@ -24,6 +24,7 @@
 #include <openvdb/tools/VolumeAdvect.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/util/CpuTimer.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <gtest/gtest.h>
@@ -1605,8 +1606,8 @@ TEST_F(TestTools, testVectorTransformer)
     Mat4d xform = Mat4d::identity();
     xform.preTranslate(Vec3d(0.1, -2.5, 3));
     xform.preScale(Vec3d(0.5, 1.1, 2));
-    xform.preRotate(math::X_AXIS, 30.0 * M_PI / 180.0);
-    xform.preRotate(math::Y_AXIS, 300.0 * M_PI / 180.0);
+    xform.preRotate(math::X_AXIS, 30.0 * openvdb::math::pi<double>() / 180.0);
+    xform.preRotate(math::Y_AXIS, 300.0 * openvdb::math::pi<double>() / 180.0);
 
     Mat4d invXform = xform.inverse();
     invXform = invXform.transpose();

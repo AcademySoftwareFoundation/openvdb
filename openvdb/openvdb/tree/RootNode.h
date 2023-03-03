@@ -882,20 +882,16 @@ public:
     void combine2(const RootNode& other0, const OtherRootNode& other1,
                   CombineOp& op, bool prune = false);
 
-    /// @brief Call the templated functor BBoxOp with bounding box
-    /// information for all active tiles and leaf nodes in the tree.
-    /// An additional level argument is provided for each callback.
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the grid index coordinates of this node's local origin.
+    const Coord& origin() const { return mOrigin; }
+    /// @brief change the origin on this root node
+    /// @param origin the index coordinates of the new alignment
     ///
-    /// @note The bounding boxes are guaranteed to be non-overlapping.
-    template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
-
-    template<typename VisitorOp> void visit(VisitorOp&);
-    template<typename VisitorOp> void visit(VisitorOp&) const;
-
-    template<typename OtherRootNodeType, typename VisitorOp>
-    void visit2(OtherRootNodeType& other, VisitorOp&);
-    template<typename OtherRootNodeType, typename VisitorOp>
-    void visit2(OtherRootNodeType& other, VisitorOp&) const;
+    /// @warning This method will throw if the origin is non-zero, since
+    ///          other tools do not yet support variable offsets.
+    void setOrigin(const Coord &origin);
+#endif
 
 private:
     /// During topology-only construction, access is needed
@@ -913,15 +909,18 @@ private:
     void resetTable(const MapType&) const {}
     //@}
 
-#if OPENVDB_ABI_VERSION_NUMBER < 8
     Index getChildCount() const;
-#endif
     Index getTileCount() const;
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
 
-    /// Return a MapType key for the given coordinates.
-    static Coord coordToKey(const Coord& xyz) { return xyz & ~(ChildType::DIM - 1); }
+#if OPENVDB_ABI_VERSION_NUMBER < 10
+    /// Static method that returns a MapType key for the given coordinates.
+    static Coord coordToKey(const Coord& xyz) {return xyz & ~(ChildType::DIM - 1); }
+#else
+    /// Return a MapType key for the given coordinates, offset by the mOrigin.
+    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
+#endif
 
     /// Insert this node's mTable keys into the given set.
     void insertKeys(CoordSet&) const;
@@ -963,16 +962,11 @@ private:
     template<typename CombineOp, typename OtherRootNode /*= RootNode*/>
     void doCombine2(const RootNode&, const OtherRootNode&, CombineOp&, bool prune);
 
-    template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
-    static inline void doVisit(RootNodeT&, VisitorOp&);
-
-    template<typename RootNodeT, typename OtherRootNodeT, typename VisitorOp,
-        typename ChildAllIterT, typename OtherChildAllIterT>
-    static inline void doVisit2(RootNodeT&, OtherRootNodeT&, VisitorOp&);
-
-
     MapType mTable;
     ValueType mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    Coord mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Transient Data (not serialized)
     Index32 mTransientData = 0;
@@ -1039,7 +1033,11 @@ struct SameRootConfig<ChildT1, RootNode<ChildT2> > {
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
+RootNode<ChildT>::RootNode()
+    : mBackground(zeroVal<ValueType>())
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1047,7 +1045,11 @@ RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(const ValueType& background): mBackground(background)
+RootNode<ChildT>::RootNode(const ValueType& background)
+    : mBackground(background)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1059,11 +1061,20 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, const ValueType& foregd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(other.mOrigin)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
+    }
+#endif
 
     enforceSameConfiguration(other);
 
@@ -1084,11 +1095,20 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(other.mOrigin)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
+    }
+#endif
 
     enforceSameConfiguration(other);
 
@@ -1145,6 +1165,12 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         };
 
         self.mBackground = Local::convertValue(other.mBackground);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if (other.mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNodeCopyHelper::copyWithValueConversion: non-zero offsets are currently not supported");
+        }
+        self.mOrigin = other.mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         self.mTransientData = other.mTransientData;
 #endif
@@ -1174,6 +1200,12 @@ RootNode<ChildT>::operator=(const RootNode& other)
 {
     if (&other != this) {
         mBackground = other.mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mOrigin = other.mOrigin;
+        if (mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNode::operator=: non-zero offsets are currently not supported");
+        }
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
 #endif
@@ -1502,13 +1534,11 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER < 8
 template<typename ChildT>
 inline Index
 RootNode<ChildT>::getChildCount() const {
     return this->childCount();
 }
-#endif
 
 
 template<typename ChildT>
@@ -2633,6 +2663,18 @@ RootNode<ChildT>::addChild(ChildT* child)
     return true;
 }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename ChildT>
+inline void
+RootNode<ChildT>::setOrigin(const Coord &origin)
+{
+    mOrigin = origin;
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are currently not supported");
+    }
+}
+#endif
+
 template<typename ChildT>
 inline void
 RootNode<ChildT>::addTile(const Coord& xyz, const ValueType& value, bool state)
@@ -3369,145 +3411,6 @@ RootNode<ChildT>::doCombine2(const RootNode& other0, const OtherRootNode& other1
     mBackground = args.result();
 }
 
-
-////////////////////////////////////////
-
-
-template<typename ChildT>
-template<typename BBoxOp>
-inline void
-RootNode<ChildT>::visitActiveBBox(BBoxOp& op) const
-{
-    const bool descent = op.template descent<LEVEL>();
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (this->isTileOff(i)) continue;
-        if (this->isChild(i) && descent) {
-            this->getChild(i).visitActiveBBox(op);
-        } else {
-            op.template operator()<LEVEL>(CoordBBox::createCube(i->first, ChildT::DIM));
-        }
-    }
-}
-
-
-template<typename ChildT>
-template<typename VisitorOp>
-inline void
-RootNode<ChildT>::visit(VisitorOp& op)
-{
-    doVisit<RootNode, VisitorOp, ChildAllIter>(*this, op);
-}
-
-
-template<typename ChildT>
-template<typename VisitorOp>
-inline void
-RootNode<ChildT>::visit(VisitorOp& op) const
-{
-    doVisit<const RootNode, VisitorOp, ChildAllCIter>(*this, op);
-}
-
-
-template<typename ChildT>
-template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
-inline void
-RootNode<ChildT>::doVisit(RootNodeT& self, VisitorOp& op)
-{
-    typename RootNodeT::ValueType val;
-    for (ChildAllIterT iter = self.beginChildAll(); iter; ++iter) {
-        if (op(iter)) continue;
-        if (typename ChildAllIterT::ChildNodeType* child = iter.probeChild(val)) {
-            child->visit(op);
-        }
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename ChildT>
-template<typename OtherRootNodeType, typename VisitorOp>
-inline void
-RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op)
-{
-    doVisit2<RootNode, OtherRootNodeType, VisitorOp, ChildAllIter,
-        typename OtherRootNodeType::ChildAllIter>(*this, other, op);
-}
-
-
-template<typename ChildT>
-template<typename OtherRootNodeType, typename VisitorOp>
-inline void
-RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op) const
-{
-    doVisit2<const RootNode, OtherRootNodeType, VisitorOp, ChildAllCIter,
-        typename OtherRootNodeType::ChildAllCIter>(*this, other, op);
-}
-
-
-template<typename ChildT>
-template<
-    typename RootNodeT,
-    typename OtherRootNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
-inline void
-RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op)
-{
-    enforceSameConfiguration(other);
-
-    typename RootNodeT::ValueType val;
-    typename OtherRootNodeT::ValueType otherVal;
-
-    // The two nodes are required to have corresponding table entries,
-    // but since that might require background tiles to be added to one or both,
-    // and the nodes might be const, we operate on shallow copies of the nodes instead.
-    RootNodeT copyOfSelf(self.mBackground);
-    copyOfSelf.mTable = self.mTable;
-    OtherRootNodeT copyOfOther(other.mBackground);
-    copyOfOther.mTable = other.mTable;
-
-    // Add background tiles to both nodes as needed.
-    CoordSet keys;
-    self.insertKeys(keys);
-    other.insertKeys(keys);
-    for (CoordSetCIter i = keys.begin(), e = keys.end(); i != e; ++i) {
-        copyOfSelf.findOrAddCoord(*i);
-        copyOfOther.findOrAddCoord(*i);
-    }
-
-    ChildAllIterT iter = copyOfSelf.beginChildAll();
-    OtherChildAllIterT otherIter = copyOfOther.beginChildAll();
-
-    for ( ; iter && otherIter; ++iter, ++otherIter)
-    {
-        const size_t skipBranch = static_cast<size_t>(op(iter, otherIter));
-
-        typename ChildAllIterT::ChildNodeType* child =
-            (skipBranch & 1U) ? nullptr : iter.probeChild(val);
-        typename OtherChildAllIterT::ChildNodeType* otherChild =
-            (skipBranch & 2U) ? nullptr : otherIter.probeChild(otherVal);
-
-        if (child != nullptr && otherChild != nullptr) {
-            child->visit2Node(*otherChild, op);
-        } else if (child != nullptr) {
-            child->visit2(otherIter, op);
-        } else if (otherChild != nullptr) {
-            otherChild->visit2(iter, op, /*otherIsLHS=*/true);
-        }
-    }
-    // Remove any background tiles that were added above,
-    // as well as any that were created by the visitors.
-    copyOfSelf.eraseBackgroundTiles();
-    copyOfOther.eraseBackgroundTiles();
-
-    // If either input node is non-const, replace its table with
-    // the (possibly modified) copy.
-    self.resetTable(copyOfSelf.mTable);
-    other.resetTable(copyOfOther.mTable);
-}
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

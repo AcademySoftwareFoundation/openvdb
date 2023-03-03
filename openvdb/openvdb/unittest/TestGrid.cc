@@ -9,7 +9,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/CpuTimer.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <iostream>
 #include <memory> // for std::make_unique
 
@@ -183,7 +183,6 @@ TEST_F(TestGrid, testIsTreeUnique)
     GridBase::Ptr grid3 = grid->copyGridWithNewTree();
     EXPECT_TRUE(grid->isTreeUnique());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     // shallow copy using GridBase
     GridBase::Ptr grid4 = grid->copyGrid();
     EXPECT_TRUE(!grid4->isTreeUnique());
@@ -191,7 +190,6 @@ TEST_F(TestGrid, testIsTreeUnique)
     // copy with new tree using GridBase
     GridBase::Ptr grid5 = grid->copyGridWithNewTree();
     EXPECT_TRUE(grid5->isTreeUnique());
-#endif
 }
 
 

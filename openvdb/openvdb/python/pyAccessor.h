@@ -4,13 +4,14 @@
 #ifndef OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 #define OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 
-#include <boost/python.hpp>
-#include "openvdb/openvdb.h"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <openvdb/openvdb.h>
 #include "pyutil.h"
 
 namespace pyAccessor {
 
-namespace py = boost::python;
+namespace py = pybind11;
 using namespace openvdb::OPENVDB_VERSION_NAME;
 
 
@@ -68,40 +69,10 @@ struct AccessorTraits<const _GridT>
 
     static void notWritable()
     {
-        PyErr_SetString(PyExc_TypeError, "accessor is read-only");
-        py::throw_error_already_set();
+        throw py::type_error("accessor is read-only");
     }
 };
 //@}
-
-
-////////////////////////////////////////
-
-
-/// Variant of pyutil::extractArg() that extracts a Coord from a py::object
-/// argument to a given ValueAccessor method
-template<typename GridT>
-inline Coord
-extractCoordArg(py::object obj, const char* functionName, int argIdx = 0)
-{
-    return pyutil::extractArg<Coord>(obj, functionName,
-        AccessorTraits<GridT>::typeName(), argIdx, "tuple(int, int, int)");
-}
-
-
-/// Variant of pyutil::extractArg() that extracts a value of type
-/// ValueAccessor::ValueType from an argument to a ValueAccessor method
-template<typename GridT>
-inline typename GridT::ValueType
-extractValueArg(
-    py::object obj,
-    const char* functionName,
-    int argIdx = 0, // args are numbered starting from 1
-    const char* expectedType = nullptr)
-{
-    return pyutil::extractArg<typename GridT::ValueType>(
-        obj, functionName, AccessorTraits<GridT>::typeName(), argIdx, expectedType);
-}
 
 
 ////////////////////////////////////////
@@ -143,95 +114,78 @@ public:
 
     GridPtrType parent() const { return mGrid; }
 
-    ValueType getValue(py::object coordObj)
+    ValueType getValue(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "getValue");
         return mAccessor.getValue(ijk);
     }
 
-    int getValueDepth(py::object coordObj)
+    int getValueDepth(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "getValueDepth");
         return mAccessor.getValueDepth(ijk);
     }
 
-    int isVoxel(py::object coordObj)
+    int isVoxel(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "isVoxel");
         return mAccessor.isVoxel(ijk);
     }
 
-    py::tuple probeValue(py::object coordObj)
+    std::tuple<ValueType, bool> probeValue(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "probeValue");
         ValueType value;
         bool on = mAccessor.probeValue(ijk, value);
-        return py::make_tuple(value, on);
+        return std::make_tuple(value, on);
     }
 
-    bool isValueOn(py::object coordObj)
+    bool isValueOn(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "isValueOn");
         return mAccessor.isValueOn(ijk);
     }
 
-    void setActiveState(py::object coordObj, bool on)
+    void setActiveState(const Coord& ijk, bool on)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "setActiveState", /*argIdx=*/1);
         Traits::setActiveState(mAccessor, ijk, on);
     }
 
-    void setValueOnly(py::object coordObj, py::object valObj)
+    void setValueOnly(const Coord& ijk, const ValueType& val)
     {
-        Coord ijk = extractCoordArg<GridType>(coordObj, "setValueOnly", 1);
-        ValueType val = extractValueArg<GridType>(valObj, "setValueOnly", 2);
         Traits::setValueOnly(mAccessor, ijk, val);
     }
 
-    void setValueOn(py::object coordObj, py::object valObj)
+    void setValueOn(const Coord& ijk, const std::optional<ValueType>& val)
     {
-        Coord ijk = extractCoordArg<GridType>(coordObj, "setValueOn", 1);
-        if (valObj.is_none()) {
+        if (val)
+            Traits::setValueOn(mAccessor, ijk, *val);
+        else
             Traits::setValueOn(mAccessor, ijk);
-        } else {
-            ValueType val = extractValueArg<GridType>(valObj, "setValueOn", 2);
-            Traits::setValueOn(mAccessor, ijk, val);
-        }
     }
 
-    void setValueOff(py::object coordObj, py::object valObj)
+    void setValueOff(const Coord& ijk, const std::optional<ValueType>& val)
     {
-        Coord ijk = extractCoordArg<GridType>(coordObj, "setValueOff", 1);
-        if (valObj.is_none()) {
+        if (val)
+            Traits::setValueOff(mAccessor, ijk, *val);
+        else
             Traits::setValueOff(mAccessor, ijk);
-        } else {
-            ValueType val = extractValueArg<GridType>(valObj, "setValueOff", 2);
-            Traits::setValueOff(mAccessor, ijk, val);
-        }
     }
 
-    int isCached(py::object coordObj)
+    int isCached(const Coord& ijk)
     {
-        const Coord ijk = extractCoordArg<GridType>(coordObj, "isCached");
         return mAccessor.isCached(ijk);
     }
 
     /// @brief Define a Python wrapper class for this C++ class.
-    static void wrap()
+    static void wrap(py::module_ m)
     {
         const std::string
             pyGridTypeName = pyutil::GridTraits<GridType>::name(),
             pyValueTypeName = openvdb::typeNameAsString<typename GridType::ValueType>(),
             pyAccessorTypeName = Traits::typeName();
 
-        py::class_<AccessorWrap> clss(
-            pyAccessorTypeName.c_str(),
+        py::class_<AccessorWrap>(m,
+            (pyGridTypeName + pyAccessorTypeName).c_str(), //pybind11 requires a unique class name for each template instantiation
             (std::string(Traits::IsConst ? "Read-only" : "Read/write")
                 + " access by (i, j, k) index coordinates to the voxels\nof a "
-                + pyGridTypeName).c_str(),
-            py::no_init);
-
-        clss.def("copy", &AccessorWrap::copy,
+                + pyGridTypeName).c_str())
+            .def("copy", &AccessorWrap::copy,
                 ("copy() -> " + pyAccessorTypeName + "\n\n"
                  "Return a copy of this accessor.").c_str())
 
@@ -239,7 +193,7 @@ public:
                 "clear()\n\n"
                 "Clear this accessor of all cached data.")
 
-            .add_property("parent", &AccessorWrap::parent,
+            .def_property_readonly("parent", &AccessorWrap::parent,
                 ("this accessor's parent " + pyGridTypeName).c_str())
 
             //
@@ -273,26 +227,25 @@ public:
                 "isValueOn(ijk) -> bool\n\n"
                 "Return the active state of the voxel at coordinates (i, j, k).")
             .def("setActiveState", &AccessorWrap::setActiveState,
-                (py::arg("ijk"), py::arg("on")),
+                py::arg("ijk"), py::arg("on"),
                 "setActiveState(ijk, on)\n\n"
                 "Mark voxel (i, j, k) as either active or inactive (True or False),\n"
                 "but don't change its value.")
 
             .def("setValueOnly", &AccessorWrap::setValueOnly,
-                (py::arg("ijk"), py::arg("value")),
+                py::arg("ijk"), py::arg("value"),
                 "setValueOnly(ijk, value)\n\n"
                 "Set the value of voxel (i, j, k), but don't change its active state.")
 
             .def("setValueOn", &AccessorWrap::setValueOn,
-                (py::arg("ijk"), py::arg("value") = py::object()),
-                "setValueOn(ijk, value=None)\n\n"
-                "Mark voxel (i, j, k) as active and, if the given value\n"
-                "is not None, set the voxel's value.\n")
+                py::arg("ijk"), py::arg("value") = py::none(),
+                "setValueOn(ijk, value)\n\n"
+                "Mark voxel (i, j, k) as active and set the voxel's value if specified.\n")
+
             .def("setValueOff", &AccessorWrap::setValueOff,
-                (py::arg("ijk"), py::arg("value") = py::object()),
-                "setValueOff(ijk, value=None)\n\n"
-                "Mark voxel (i, j, k) as inactive and, if the given value\n"
-                "is not None, set the voxel's value.")
+                py::arg("ijk"), py::arg("value") = py::none(),
+                "setValueOff(ijk, value)\n\n"
+                "Mark voxel (i, j, k) as inactive and set the voxel's value if specified.")
 
             .def("isCached", &AccessorWrap::isCached,
                 py::arg("ijk"),

@@ -37,18 +37,21 @@ namespace tools {
 /// @brief Given two level set grids, replace the A grid with the union of A and B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
+/// @note cancelled tiles only pruned if pruning is also enabled.
 template<typename GridOrTreeT>
-void csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune = true, bool pruneCancelledTiles = false);
 /// @brief Given two level set grids, replace the A grid with the intersection of A and B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
+/// @note cancelled tiles only pruned if pruning is also enabled.
 template<typename GridOrTreeT>
-void csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune = true, bool pruneCancelledTiles = false);
 /// @brief Given two level set grids, replace the A grid with the difference A / B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
+/// @note cancelled tiles only pruned if pruning is also enabled.
 template<typename GridOrTreeT>
-void csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune = true, bool pruneCancelledTiles = false);
 
 /// @brief  Threaded CSG union operation that produces a new grid or tree from
 ///         immutable inputs.
@@ -793,9 +796,14 @@ compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
+    using ValueT = typename GridOrTreeT::ValueType;
     struct Local {
         static inline void op(CombineArgs<typename TreeT::ValueType>& args) {
-            args.setResult(args.a() * args.b());
+            if constexpr(std::is_same<ValueT, bool>::value) {
+                args.setResult(args.a() && args.b());
+            } else {
+                args.setResult(args.a() * args.b());
+            }
         }
     };
     Adapter::tree(aTree).combineExtended(Adapter::tree(bTree), Local::op, /*prune=*/false);
@@ -875,7 +883,7 @@ compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
 
 template<typename GridOrTreeT>
 void
-csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
+csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune, bool pruneCancelledTiles)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
@@ -883,6 +891,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
     CsgUnionOp<TreeT> op(bTree, Steal());
+    op.setPruneCancelledTiles(prune && pruneCancelledTiles);
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
@@ -890,7 +899,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 
 template<typename GridOrTreeT>
 void
-csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
+csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune, bool pruneCancelledTiles)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
@@ -898,6 +907,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
     CsgIntersectionOp<TreeT> op(bTree, Steal());
+    op.setPruneCancelledTiles(prune && pruneCancelledTiles);
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
@@ -905,7 +915,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 
 template<typename GridOrTreeT>
 void
-csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
+csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune, bool pruneCancelledTiles)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
@@ -913,6 +923,7 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     composite::validateLevelSet(aTree, "A");
     composite::validateLevelSet(bTree, "B");
     CsgDifferenceOp<TreeT> op(bTree, Steal());
+    op.setPruneCancelledTiles(prune && pruneCancelledTiles);
     tree::DynamicNodeManager<TreeT> nodeManager(aTree);
     nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
@@ -1003,32 +1014,32 @@ compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<
 #endif
 
 #define _FUNCTION(TreeT) \
-    void csgUnion(TreeT&, TreeT&, bool)
+    void csgUnion(TreeT&, TreeT&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void csgUnion(Grid<TreeT>&, Grid<TreeT>&, bool)
+    void csgUnion(Grid<TreeT>&, Grid<TreeT>&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void csgIntersection(TreeT&, TreeT&, bool)
+    void csgIntersection(TreeT&, TreeT&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void csgIntersection(Grid<TreeT>&, Grid<TreeT>&, bool)
+    void csgIntersection(Grid<TreeT>&, Grid<TreeT>&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void csgDifference(TreeT&, TreeT&, bool)
+    void csgDifference(TreeT&, TreeT&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void csgDifference(Grid<TreeT>&, Grid<TreeT>&, bool)
+    void csgDifference(Grid<TreeT>&, Grid<TreeT>&, bool, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

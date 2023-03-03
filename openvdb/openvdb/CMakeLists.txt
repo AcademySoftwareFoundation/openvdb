@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -117,7 +117,12 @@ if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+if(OPENVDB_USE_DELAYED_LOADING)
+  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
+else()
+  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS headers)
+endif()
+
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
   # The X.Y.Z boost version value isn't available until CMake 3.14
   set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
@@ -250,7 +255,11 @@ endif()
 # if it's in a shared place (like /usr/local) it doesn't accidently pull in
 # other headers.
 
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
+if(OPENVDB_USE_DELAYED_LOADING)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
+else()
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::headers)
+endif()
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -412,7 +421,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/DDA.h
   math/FiniteDifference.h
   math/Half.h
-  math/HalfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -638,6 +646,9 @@ endif()
 
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
+endif()
+if(OPENVDB_USE_DELAYED_LOADING)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_DELAYED_LOADING)
 endif()
 
 ##########################################################################

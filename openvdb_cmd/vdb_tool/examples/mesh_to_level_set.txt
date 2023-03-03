@@ -1,0 +1,16 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how to read a polygon mesh from a ply file,
+# converting it into a narrow-band level set, and writing out the level set
+# to an OpenVDB file.
+
+# read OpenVDB file with points
+read bunny.ply
+
+# Mesh to level set conversion
+# dimension is 256 voxel
+# narrow-band level set width is 3 voxel units
+mesh2ls dim=256 width=3
+
+# write level set to an openvdb fie
+write bunny.vdb

@@ -54,12 +54,6 @@
 
 /// Windows defines
 #ifdef _WIN32
-    // Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-    // defined on MSVC
-    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif
     ///Disable the non-portable Windows definitions of min() and max() macros
     #ifndef NOMINMAX
         #define NOMINMAX
@@ -76,6 +70,40 @@
     #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
         #define OPENEXR_DLL
     #endif
+#endif
+
+/// Macros to suppress undefined behaviour sanitizer warnings. Should be used
+/// sparingly, primarily to suppress issues in upstream dependencies.
+#if defined(__clang__)
+#define OPENVDB_UBSAN_SUPPRESS(X) __attribute__((no_sanitize(X)))
+#else
+#define OPENVDB_UBSAN_SUPPRESS(X)
+#endif
+
+/// Macros to alias to compiler builtins which hint at critical edge selection
+/// during conditional statements.
+#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#ifdef __cplusplus
+#define OPENVDB_LIKELY(x) (__builtin_expect(static_cast<bool>(x), true))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect(static_cast<bool>(x), false))
+#else
+#define OPENVDB_LIKELY(x) (__builtin_expect((x), 1))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect((x), 0))
+#endif
+#else
+#define OPENVDB_LIKELY(x) (x)
+#define OPENVDB_UNLIKELY(x) (x)
+#endif
+
+/// Force inline function macros. These macros do not necessary guarantee that
+/// the decorated function will be inlined, but provide the strongest vendor
+/// annotations to that end.
+#if defined(__GNUC__)
+#define OPENVDB_FORCE_INLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+#define OPENVDB_FORCE_INLINE __forceinline
+#else
+#define OPENVDB_FORCE_INLINE inline
 #endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,

@@ -35,18 +35,18 @@ Reference Platform, but for those that do, their specified versions are
 
 @section depComponents OpenVDB Components
 
-Component               | Requirements                                      | Optional
------------------------ | ------------------------------------------------- | --------
-OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::iostream  | Blosc, ZLib, Log4cplus, IlmBase::Half
-OpenVDB Print           | Core Library dependencies                         | -
-OpenVDB LOD             | Core Library dependencies                         | -
-OpenVDB Render          | Core Library dependencies                         | OpenEXR, IlmBase, libpng
-OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW*   | -
-OpenVDB Python          | Core Library dependencies, Python, Boost::python  | Boost::numpy, NumPy
-OpenVDB AX              | Core Library dependencies, LLVM                   | Bison, Flex
-NanoVDB                 | -                                                 | Core Library, CUDA, TBB, Blosc, ZLib
-OpenVDB UnitTests       | Core Library dependencies, GoogleTest             | CppUnit**
-OpenVDB Documentation   | Doxygen                                           | -
+Component               | Requirements                                    | Optional
+----------------------- | ----------------------------------------------- | --------
+OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb, Boost::headers | Blosc, ZLib, Log4cplus, IlmBase::Half, Boost::iostream
+OpenVDB Print           | Core Library dependencies                       | -
+OpenVDB LOD             | Core Library dependencies                       | -
+OpenVDB Render          | Core Library dependencies                       | OpenEXR, IlmBase, libpng
+OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
+OpenVDB Python          | Core Library dependencies, Python, PyBind11     | NumPy
+OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
+NanoVDB                 | -                                               | Core Library, CUDA, TBB, Blosc, ZLib
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest           | CppUnit**
+OpenVDB Documentation   | Doxygen                                         | -
 
  - @b * GLEW is only required for building the vdb_view binary on Windows.
  - @b ** CppUnit is only required for building the AX unit tests.
@@ -57,21 +57,22 @@ OpenVDB Documentation   | Doxygen                                           | -
 
 Package        | Minimum | Recommended | Description                                                       | apt-get | Homebrew | Source
 -------------- | ------- | ----------- | ----------------------------------------------------------------- | ------- | -------- | ------
-CMake          | 3.12    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
-GCC            | 6.3.1   | 6.3.1       | C++ 14 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
-Clang          | 3.8     | Latest      | C++ 14 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
-Intel ICC      | 17      | Latest      | C++ 14 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
-MSVC           | 19.10   | Latest      | C++ 14 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
-IlmBase        | 2.2**   | 2.3         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
-OpenEXR        | 2.2**   | 2.3         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
-TBB            | 2018    | 2018        | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
+CMake          | 3.18    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
+GCC            | 9.3.1   | 9.3.1       | C++ 17 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
+Clang          | 5.0     | Latest      | C++ 17 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
+Intel ICC      | 19      | Latest      | C++ 17 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
+MSVC           | 19.28   | Latest      | C++ 17 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
+IlmBase        | 2.4     | Removed     | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
+OpenEXR        | 2.4     | 3.1         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
+TBB            | 2020.2  | 2020.3      | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.66    | 1.66        | Components: iostreams, python, numpy                              | Y       | Y        | https://www.boost.org
-LLVM           | 6.0.0   | 8.0.0       | Target-independent code generation                                | Y       | Y        | https://llvm.org/
-Bison          | 3.0.0   | 3.0.5       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
-Flex           | 2.6     | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
-Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
-NumPy          | 1.14.0  | 1.14.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
+Boost          | 1.73    | 1.76        | Components: headers, iostreams                                    | Y       | Y        | https://www.boost.org
+LLVM           | 10.0.0  | 10.0.0*     | Target-independent code generation                                | Y       | Y        | https://llvm.org/
+Bison          | 3.0.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
+Flex           | 2.6.0   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
+Python         | 3.7     | 3.7         | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
+PyBind11       | 2.9.1   | Latest      | C++/python bindings                                               | Y       | Y        | https://pybind11.readthedocs.io
+NumPy          | 1.19.0  | 1.20.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
@@ -83,31 +84,24 @@ GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loadi
 CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 
- - @b * See the note in [known issues](@ref depKnownIssues) regarding supported blosc versions.
-
- - @b ** IlmBase/OpenEXR 2.2 is supported as Houdini 18.0 is shipped with
- VFX Reference Platform 2019, except for using older versions of these
- libraries.
+ - @b * See the note in [known issues](@ref depKnownIssues) regarding supported blosc/llvm versions.
 
 @subsection depKnownIssues Known Issues
+
+ - @b LLVM >= 15. LLVM has recently changed their IR pointer data types to be
+ completely opaque. Some support is provided in LLVM 15 but tests with AX show
+ that this is extremely unstable. AX currently only supports LLVM versions up
+ until 14.X.X. See https://llvm.org/docs/OpaquePointers.html for more details.
 
  - @b GLFW: Crash with GLFW 3.2.1 when used with EGL on Linux. OpenVDB View may
  segfault on closure. Fixed in GLFW 3.3
 
- - @b Boost 1.66/1.67 + @b Python3 + @b NumPy: Known issue on UNIX systems
- which can cause the below python runtime error. Consider updating to Boost 1.68
- if you require both Python3 and NumPy support:
-
-@code{.sh}
-RuntimeError: FATAL: module compiled as little endian, but detected different endianness at runtime.
-@endcode
-
  - @b Blosc: OpenVDB has historically used an old version of blosc (1.5.0) to
- serialize .vdb files. OpenVDB is moving to a new blosc version minimum of 1.17.0.
- We have tested a range of blosc versions and found that the following versions
- are NOT compatible with OpenVDB caches written using blosc 1.5.0. Additionally
- these versions of blosc may generally not be compatible with OpenVDB itself.
- Avoid using these versions and upgrade to the new minimum of 1.17.0 where
+ serialize .vdb files. OpenVDB has recently moved to a new blosc version minimum
+ of 1.17.0. We have tested a range of blosc versions and found that the following
+ versions are NOT compatible with OpenVDB caches written using blosc 1.5.0.
+ Additionally these versions of blosc may generally not be compatible with OpenVDB
+ itself. Avoid using these versions and upgrade to the new minimum of 1.17.0 where
  possible.
 
  - All versions from 1.11.0 through to, but excluding, 1.14.0.
@@ -126,6 +120,23 @@ required OpenVDB dependencies.
 
 @subsection depUsingAptGet Using UNIX apt-get
 
+You can use apt to automatically install required packages. Note that different
+Ubuntu distributions will have different versions available. You can use apt
+pinning to request newer versions of specific package from later distributions
+if the required version isn't available by default (see
+[man apt_preferences](https://linux.die.net/man/5/apt_preferences)). For
+example, the below settings will request TBB specifically from Ubuntu 22.04
+(Jammy).
+
+@code{.sh}
+Package: libtbb-dev
+Pin: release n=jammy
+Pin-Priority: 990
+@endcode
+
+Alternatively you can install any missing dependencies manually or through
+other package managers.
+
 @b Note:CppUnit is unavailable using apt-get. See the other package manager
 methods or the [manual installation](@ref depManInstall) options.
 
@@ -138,10 +149,9 @@ apt-get install zlibc                   # zlib
 apt-get install libboost-iostreams-dev  # Boost::iostream
 apt-get install libblosc-dev            # Blosc
 # AX
-apt-get install llvm-8-dev              # LLVM
+apt-get install llvm-10-dev              # LLVM
 # Python
-apt-get install libboost-python-dev     # Boost::python
-apt-get install libboost-numpy-dev      # Boost::numpy
+apt-get install pybind11-dev            # Python
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 # Optional
@@ -174,7 +184,7 @@ brew install c-blosc                   # blosc
 # AX
 brew install llvm                      # LLVM
 # Python
-brew install boost-python              # Boost-python
+brew install pybind11                  # PyBind11
 brew install python                    # Python
 brew install numpy                     # NumPy
 # Unit Tests

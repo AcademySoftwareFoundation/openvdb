@@ -42,6 +42,7 @@ public:
     /// @note The default value of -1 means it's un-initialized!
     AbsDiff(float tolerance = -1.0f) : mTolerance(tolerance) {}
     AbsDiff(const AbsDiff&) = default;
+    ~AbsDiff() = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
     /// @brief Return true if the approximate value is within the accepted
@@ -68,6 +69,7 @@ public:
     /// @note The default value of -1 means it's un-initialized!
     RelDiff(float tolerance = -1.0f) : mTolerance(tolerance) {}
     RelDiff(const RelDiff&) = default;
+    ~RelDiff() = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
     /// @brief Return true if the approximate value is within the accepted
@@ -86,7 +88,7 @@ inline std::ostream& operator<<(std::ostream& os, const RelDiff& diff)
     return os;
 }
 
-/// @brief Allows for the construction of NanoVDB grids without any dependecy
+/// @brief Allows for the construction of NanoVDB grids without any dependency
 template<typename ValueT, typename BuildT = ValueT, typename StatsT = Stats<ValueT>>
 class GridBuilder
 {
@@ -95,7 +97,6 @@ class GridBuilder
     struct BuildNode;
     template<typename ChildT>
     struct BuildRoot;
-    struct ValueAccessor;
 
     struct Codec {float min, max; uint16_t log2, size;};// used for adaptive bit-rate quantization
 
@@ -113,7 +114,7 @@ class GridBuilder
 
     ValueT                   mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
     uint8_t*                 mBufferPtr;// pointer to the beginning of the buffer
-    uint64_t                 mBufferOffsets[9];//grid, tree, root, upper. lower, leafs, meta data, blind data, buffer size
+    uint64_t                 mBufferOffsets[9];//grid, tree, root, upper, lower, leafs, meta data, blind data, buffer size
     int                      mVerbose;
     uint64_t                 mBlindDataSize;
     SrcRootT                 mRoot;// this root supports random write
@@ -173,18 +174,20 @@ class GridBuilder
     setFlag(const T& min, const T& max, FlagT& flag) const;
 
 public:
+    struct ValueAccessor;
+
     GridBuilder(ValueT background = ValueT(),
                 GridClass gClass = GridClass::Unknown,
                 uint64_t blindDataSize = 0);
 
     ValueAccessor getAccessor() { return ValueAccessor(mRoot); }
 
-    /// @brief Performs multi-threaded bottum-up signed-distance flood-filling and changes GridClass to LevelSet
+    /// @brief Performs multi-threaded bottom-up signed-distance flood-filling and changes GridClass to LevelSet
     ///
     /// @warning Only call this method once this GridBuilder contains a valid signed distance field
     void sdfToLevelSet();
 
-    /// @brief Performs multi-threaded bottum-up signed-distance flood-filling followed by level-set -> FOG volume
+    /// @brief Performs multi-threaded bottom-up signed-distance flood-filling followed by level-set -> FOG volume
     ///        conversion. It also changes the GridClass to FogVolume
     ///
     /// @warning Only call this method once this GridBuilder contains a valid signed distance field
@@ -218,7 +221,7 @@ public:
     /// @brief Sets grids values in domain of the @a bbox to those returned by the specified @a func with the
     ///        expected signature [](const Coord&)->ValueT.
     ///
-    /// @note If @a func returns a value equal to the brackground value (specified in the constructor) at a
+    /// @note If @a func returns a value equal to the background value (specified in the constructor) at a
     ///       specific voxel coordinate, then the active state of that coordinate is left off! Else the value
     ///       value is set and the active state is on. This is done to allow for sparse grids to be generated.
     ///
@@ -371,15 +374,15 @@ initHandle(const OracleT &oracle, const BufferT& buffer)
                 offset[1] += DstNode1::memUsage();
                 for (auto it0 = lower->mChildMask.beginOn(); it0; ++it0) {
                     SrcNode0 *leaf = lower->mTable[*it0].child;
-                    leaf->mDstOffset = offset[0];
+                    leaf->mDstOffset = offset[0];// dummy if BuildT = FpN
                     mArray0.emplace_back(leaf);
-                    offset[0] += DstNode0::memUsage();
+                    offset[0] += sizeof(DstNode0);// dummy if BuildT = FpN
                 }// loop over leaf nodes
             }// loop over lower internal nodes
         }// is child node of the root
     }// loop over root table
 
-    this->template compression<BuildT, OracleT>(offset[0], oracle);
+    this->template compression<BuildT, OracleT>(offset[0], oracle);// no-op unless BuildT = FpN
 
     mBufferOffsets[0] = 0;// grid is always stored at the start of the buffer!
     mBufferOffsets[1] = DstGridT::memUsage(); // tree
@@ -509,7 +512,7 @@ void GridBuilder<ValueT, BuildT, StatsT>::
         }// is child node of the root
     }// loop over root table
 
-    // Note that the bottum-up flood filling is essential
+    // Note that the bottom-up flood filling is essential
     const ValueT outside = mRoot.mBackground;
     forEach(mArray0, 8, [&](const Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i)
@@ -541,21 +544,8 @@ GridHandle<BufferT> GridBuilder<ValueT, BuildT, StatsT>::
     if (dx <= 0) {
         throw std::runtime_error("GridBuilder: voxel size is zero or negative");
     }
-    Map          map; // affine map
-    const double Tx = p0[0], Ty = p0[1], Tz = p0[2];
-    const double mat[4][4] = {
-        {dx, 0.0, 0.0, 0.0}, // row 0
-        {0.0, dx, 0.0, 0.0}, // row 1
-        {0.0, 0.0, dx, 0.0}, // row 2
-        {Tx, Ty, Tz, 1.0}, // row 3
-    };
-    const double invMat[4][4] = {
-        {1 / dx, 0.0, 0.0, 0.0}, // row 0
-        {0.0, 1 / dx, 0.0, 0.0}, // row 1
-        {0.0, 0.0, 1 / dx, 0.0}, // row 2
-        {-Tx, -Ty, -Tz, 1.0}, // row 3
-    };
-    map.set(mat, invMat, 1.0);
+    Map map; // affine map
+    map.set(dx, p0, 1.0);
     return this->getHandle(map, name, oracle, buffer);
 } // GridBuilder::getHandle
 
@@ -702,12 +692,18 @@ GridBuilder<ValueT, BuildT, StatsT>::
             auto *srcLeaf = srcLeafs[i];
             auto *dstLeaf = PtrAdd<DstNode0>(ptr, srcLeaf->mDstOffset);
             auto *data = dstLeaf->data();
+            if (DstNode0::DataType::padding()>0u) {
+                std::memset(data, 0, DstNode0::DataType::memUsage());
+            } else {
+                data->mBBoxDif[0] = 0u;
+                data->mBBoxDif[1] = 0u;
+                data->mBBoxDif[2] = 0u;
+                data->mFlags = 0u;// enable rendering, no bbox
+                data->mMinimum = data->mMaximum = ValueT();
+                data->mAverage = data->mStdDevi = 0;
+            }
             srcLeaf->mDstNode = dstLeaf;
             data->mBBoxMin = srcLeaf->mOrigin; // copy origin of node
-            data->mBBoxDif[0] = 0u;
-            data->mBBoxDif[1] = 0u;
-            data->mBBoxDif[2] = 0u;
-            data->mFlags = 0u;
             data->mValueMask = srcLeaf->mValueMask; // copy value mask
             const ValueT* src = srcLeaf->mValues;
             for (ValueT *dst = data->mValues, *end = dst + SrcNode0::SIZE; dst != end; dst += 4, src += 4) {
@@ -744,11 +740,13 @@ GridBuilder<ValueT, BuildT, StatsT>::
             auto *dstLeaf = PtrAdd<DstNode0>(ptr, srcLeaf->mDstOffset);
             srcLeaf->mDstNode = dstLeaf;
             auto *data = dstLeaf->data();
+            if (DstNode0::DataType::padding()>0u) {
+                std::memset(data, 0, DstNode0::DataType::memUsage());
+            } else {
+                data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
+                data->mDev = data->mAvg = data->mMax = data->mMin = 0u;
+            }
             data->mBBoxMin = srcLeaf->mOrigin; // copy origin of node
-            data->mBBoxDif[0] = 0u;
-            data->mBBoxDif[1] = 0u;
-            data->mBBoxDif[2] = 0u;
-            data->mFlags = 0u;
             data->mValueMask = srcLeaf->mValueMask; // copy value mask
             const float* src = srcLeaf->mValues;
             // compute extrema values
@@ -759,7 +757,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
                 if (v > max) max = v;
             }
             data->init(min, max, DstNode0::DataType::bitWidth());
-            // perform quantization relative to the values in the curret leaf node
+            // perform quantization relative to the values in the current leaf node
             const FloatT encode = UNITS/(max-min);
             auto *code = reinterpret_cast<ArrayT*>(data->mCode);
             int offset = 0;
@@ -811,7 +809,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
             const float* src = srcLeaf->mValues;
             const float min = mCodec[i].min, max = mCodec[i].max;
             data->init(min, max, uint8_t(1) << logBitWidth);
-            // perform quantization relative to the values in the curret leaf node
+            // perform quantization relative to the values in the current leaf node
             int offset = 0;
             switch (logBitWidth) {
                 case 0u: {// 1 bit
@@ -890,6 +888,7 @@ void GridBuilder<ValueT, BuildT, StatsT>::
             SrcNodeT *srcNode = srcNodes[i];
             DstNodeT *dstNode = PtrAdd<DstNodeT>(ptr, srcNode->mDstOffset);
             auto     *data = dstNode->data();
+            if (DstNodeT::DataType::padding()>0u) std::memset(data, 0, DstNodeT::memUsage());
             srcNode->mDstNode = dstNode;
             data->mBBox[0]   = srcNode->mOrigin; // copy origin of node
             data->mValueMask = srcNode->mValueMask; // copy value mask
@@ -912,6 +911,7 @@ NanoRoot<BuildT>* GridBuilder<ValueT, BuildT, StatsT>::processRoot()
 {
     auto *dstRoot = reinterpret_cast<DstRootT*>(mBufferPtr + mBufferOffsets[2]);
     auto *data = dstRoot->data();
+    if (data->padding()>0) std::memset(data, 0, DstRootT::memUsage(uint32_t(mRoot.mTable.size())));
     data->mTableSize = uint32_t(mRoot.mTable.size());
     data->mMinimum = data->mMaximum = data->mBackground = mRoot.mBackground;
     data->mBBox = CoordBBox(); // // set to an empty bounding box
@@ -1001,6 +1001,9 @@ processGrid(const Map&         map,
     data->mBlindMetadataCount = 0;
     data->mGridClass = mGridClass;
     data->mGridType = mapToGridType<BuildT>();
+    data->mData0 = 0u;
+    data->mData1 = 0u;
+    data->mData2 = 0u;
 
     if (!isValid(data->mGridType, data->mGridClass)) {
         std::stringstream ss;
@@ -1009,8 +1012,9 @@ processGrid(const Map&         map,
         throw std::runtime_error(ss.str());
     }
 
+    std::memset(data->mGridName, '\0', GridData::MaxNameSize);//overwrite mGridName
     strncpy(data->mGridName, name.c_str(), GridData::MaxNameSize-1);
-    if (name.length() >= GridData::MaxNameSize) {//  currenlty we don't support long grid names
+    if (name.length() >= GridData::MaxNameSize) {//  currently we don't support long grid names
         std::stringstream ss;
         ss << "Grid name \"" << name << "\" is more then " << GridData::MaxNameSize << " characters";
         throw std::runtime_error(ss.str());
@@ -1134,10 +1138,9 @@ struct GridBuilder<ValueT, BuildT, StatsT>::BuildRoot
             child = new ChildT(ijk, iter->second.value, iter->second.state);
             iter->second.child = child;
         }
-        if (child) {
-            acc.insert(ijk, child);
-            child->setValueAndCache(ijk, value, acc);
-        }
+        NANOVDB_ASSERT(child);
+        acc.insert(ijk, child);
+        child->setValueAndCache(ijk, value, acc);
     }
 
     template<typename NodeT>
@@ -1549,8 +1552,9 @@ struct GridBuilder<ValueT, BuildT, StatsT>::
     {
         ValueT*  target = mValues;
         uint32_t n = SIZE;
-        while (n--)
+        while (n--) {
             *target++ = value;
+        }
     }
     BuildLeaf(const BuildLeaf&) = delete; // disallow copy-construction
     BuildLeaf(BuildLeaf&&) = delete; // disallow move construction

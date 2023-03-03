@@ -17,7 +17,6 @@
 #include "Mask.h" // interiorMask
 #include "Morphology.h" // erodeActiveValues
 #include "PoissonSolver.h"
-#include <openvdb/openvdb.h>
 
 
 namespace openvdb {
