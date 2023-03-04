@@ -113,9 +113,9 @@ else()
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
-if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 16.0.0)
   # https://llvm.org/docs/OpaquePointers.html
-  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to \
+  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 16 due to \
     opaque pointer changes in LLVM. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
 endif()
 
@@ -319,6 +319,11 @@ if(OPENVDB_AX_STATIC)
   )
 
   target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
+
+  # @todo fix opaque pointer requirements
+  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+    target_compile_options(openvdb_ax_static PUBLIC "-Wno-error=deprecated-declarations")
+  endif()
 endif()
 
 # Configure shared build
@@ -351,6 +356,10 @@ if(OPENVDB_AX_SHARED)
     )
 
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
+  # @todo fix opaque pointer requirements
+  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+    target_compile_options(openvdb_ax_shared PUBLIC "-Wno-error=deprecated-declarations")
+  endif()
 endif()
 
 install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
