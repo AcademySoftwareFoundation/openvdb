@@ -468,9 +468,20 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointAttributeImpl.h
+  points/impl/PointConversionImpl.h
+  points/impl/PointCountImpl.h
+  points/impl/PointDeleteImpl.h
+  points/impl/PointGroupImpl.h
+  points/impl/PointMaskImpl.h
+  points/impl/PointMoveImpl.h
   points/impl/PointRasterizeFrustumImpl.h
   points/impl/PointRasterizeSDFImpl.h
   points/impl/PointRasterizeTrilinearImpl.h
+  points/impl/PointReplicateImpl.h
+  points/impl/PointSampleImpl.h
+  points/impl/PointScatterImpl.h
+  points/impl/PointStatisticsImpl.h
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
