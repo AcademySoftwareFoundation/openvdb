@@ -38,7 +38,7 @@ using GroupType = uint8_t;
 class OPENVDB_API AttributeSet
 {
 public:
-    enum { INVALID_POS = std::numeric_limits<size_t>::max() };
+    enum AttributePositionLabel : size_t { INVALID_POS = std::numeric_limits<size_t>::max() };
 
     using Ptr                   = std::shared_ptr<AttributeSet>;
     using ConstPtr              = std::shared_ptr<const AttributeSet>;
