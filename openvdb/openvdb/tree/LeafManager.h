@@ -586,7 +586,12 @@ private:
         using LeafParentT = typename CopyConstness<TreeType, NonConstLeafParentT>::Type;
 
         std::deque<LeafParentT*> leafParents;
-        mTree->getNodes(leafParents);
+        if constexpr(std::is_same<NonConstLeafParentT, RootNodeType>::value) {
+            leafParents.emplace_back(&mTree->root());
+        }
+        else {
+            mTree->getNodes(leafParents);
+        }
 
         // Compute the leaf counts for each node
 

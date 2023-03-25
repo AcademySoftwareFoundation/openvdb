@@ -1,0 +1,7 @@
+OpenVDB:
+ - Bug Fixes:
+    - Fixed a bug with LeafManager which wouldn't correctly
+    initialize its LeafNode array for single level Tree configurations
+    i.e. RootNode<LeafNode> (bug introduced in 7.2.0)
+    [Reported by @lanwatch]
+

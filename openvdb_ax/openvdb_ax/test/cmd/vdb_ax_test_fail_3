@@ -2,7 +2,8 @@ FATAL: "--invalid-option" is not a valid option
 usage: vdb_ax [command] [--help|-h] [-v] [<args>]
 
 CLI utility for processing OpenVDB data using AX.
-    -h, --help, -help         print help and exit
+Available [command] modes are: [execute|analyze|functions] (Default: execute).
+    -h, --help, -help         print help and exit (use [command] --help for more information)
     -v, --verbose             verbose (print timing and diagnostics)
 
 [execute] read/process/write VDB file/streams (default command):
