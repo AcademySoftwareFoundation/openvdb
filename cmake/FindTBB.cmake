@@ -34,7 +34,7 @@ This will define the following variables:
 
 ``Tbb_FOUND``
   True if the system has the Tbb library.
-``Tbb_VERSION``
+``TBB_VERSION``
   The version of the Tbb library which was found.
 ``Tbb_INCLUDE_DIRS``
   Include directories needed to use Tbb.
@@ -206,11 +206,11 @@ endif()
 if(EXISTS ${_tbb_version_file})
   file(STRINGS ${_tbb_version_file} _tbb_version_major_string REGEX "#define TBB_VERSION_MAJOR " )
   string(REGEX REPLACE "#define TBB_VERSION_MAJOR" "" _tbb_version_major_string "${_tbb_version_major_string}")
-  string(STRIP "${_tbb_version_major_string}" Tbb_VERSION_MAJOR)
+  string(STRIP "${_tbb_version_major_string}" TBB_VERSION_MAJOR)
 
   file(STRINGS ${_tbb_version_file} _tbb_version_minor_string REGEX "#define TBB_VERSION_MINOR ")
   string(REGEX REPLACE "#define TBB_VERSION_MINOR" "" _tbb_version_minor_string "${_tbb_version_minor_string}")
-  string(STRIP "${_tbb_version_minor_string}" Tbb_VERSION_MINOR)
+  string(STRIP "${_tbb_version_minor_string}" TBB_VERSION_MINOR)
 
   file(STRINGS ${_tbb_version_file} _tbb_binary_version_string REGEX "#define __TBB_BINARY_VERSION ")
   string(REGEX REPLACE "#define __TBB_BINARY_VERSION" "" _tbb_binary_version_string "${_tbb_binary_version_string}")
@@ -220,7 +220,7 @@ if(EXISTS ${_tbb_version_file})
   unset(_tbb_version_minor_string)
   unset(_tbb_binary_version_string)
 
-  set(Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR})
+  set(TBB_VERSION ${TBB_VERSION_MAJOR}.${TBB_VERSION_MINOR})
 endif()
 
 unset(_tbb_version_file)
@@ -370,7 +370,7 @@ find_package_handle_standard_args(TBB
   REQUIRED_VARS
     Tbb_INCLUDE_DIR
     Tbb_LIB_COMPONENTS
-  VERSION_VAR Tbb_VERSION
+  VERSION_VAR TBB_VERSION
   HANDLE_COMPONENTS
 )
 
