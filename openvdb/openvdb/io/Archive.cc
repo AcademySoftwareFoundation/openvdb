@@ -1038,7 +1038,7 @@ Archive::readHeader(std::istream& is)
             uuidStr[i*2] = to_hex(uuidBytes[i] >> 4);
             uuidStr[i*2+1] = to_hex(uuidBytes[i]);
         }
-        uuidStr[33] = 0;
+        uuidStr[32] = 0;
         mUuid = uuidStr;
     }
 
