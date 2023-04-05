@@ -1079,8 +1079,8 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
     auto to_hex = [](unsigned int c) -> char
     {
         c &= 0xf;
-        if (c < 10) return '0' + c;
-        return c - 10 + 'A';
+        if (c < 10) return (char)('0' + c);
+        return (char)(c - 10 + 'A');
     };
 
     try
