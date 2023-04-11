@@ -1030,8 +1030,8 @@ Archive::readHeader(std::istream& is)
         auto to_hex = [](char c) -> char
         {
             c &= 0xf;
-            if (c < 10) return '0' + c;
-            return c - 10 + 'A';
+            if (c < 10) return (char)('0' + c);
+            return (char)(c - 10 + 'A');
         };
         for (int i = 0; i < 16; i++)
         {
