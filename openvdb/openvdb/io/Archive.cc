@@ -1027,7 +1027,7 @@ Archive::readHeader(std::istream& is)
         char uuidBytes[16];
         is.read(uuidBytes, 16);
         char uuidStr[33];
-        auto to_hex = [](char c) -> char
+        auto to_hex = [](unsigned int c) -> char
         {
             c &= 0xf;
             if (c < 10) return (char)('0' + c);
