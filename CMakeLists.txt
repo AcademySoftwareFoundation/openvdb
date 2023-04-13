@@ -537,7 +537,7 @@ if(OPENVDB_BUILD_AX)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)
-  add_subdirectory(openvdb/openvdb/python)
+  add_subdirectory(openvdb_python/openvdb_python)
 endif()
 
 if(OPENVDB_BUILD_BINARIES)
