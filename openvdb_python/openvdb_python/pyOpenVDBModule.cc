@@ -18,6 +18,10 @@
 #include <openvdb_ax/ax.h>
 #endif
 
+#ifdef PY_OPENVDB_USE_NANOVDB
+#include "pyNanoGrid.h"
+#endif
+
 namespace py = pybind11;
 
 // Forward declarations
@@ -533,6 +537,10 @@ PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
         "Specify the program name to be displayed in error messages,\n"
         "and optionally specify whether to print error messages in color.",
         py::arg("name"), py::arg("color") = true);
+
+#ifdef PY_OPENVDB_USE_NANOVDB
+    m.def("openToNanoVDBFooBar", &pyGrid::openToNanoVDBFooBar, "Open to Nano Foo Bar");
+#endif
 
     // Add some useful module-level constants.
     m.attr("LIBRARY_VERSION") = py::make_tuple(

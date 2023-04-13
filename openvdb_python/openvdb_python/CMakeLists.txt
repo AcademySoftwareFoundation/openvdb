@@ -49,6 +49,24 @@ if(USE_AX)
   endif()
 endif()
 
+if(USE_NANOVDB OR OPENVDB_BUILD_NANOVDB)
+  # Link the python module against nanovdb
+  if(NOT OPENVDB_BUILD_NANOVDB)
+    find_package(OpenVDB COMPONENTS nanovdb)
+    if(NOT OpenVDB_nanovdb_FOUND OR NOT OpenVDB_FOUND)
+      message(FATAL_ERROR
+      " Couldn't find NanoVDB\n"
+      " Either set OPENVDB_CMAKE_PATH to <OpenVDB install path>/lib/cmake/OpenVDB"
+      " or please pass -DUSE_NANOVDB=ON as a cmake argument.")
+    endif()
+    set(NANOVDB_LIB OpenVDB::nanovdb)
+    # target_include_directories(vdb_tool_common INTERFACE ${OPENVDB_nanovdb_INCLUDE_DIR})
+  else()
+    set(NANOVDB_LIB nanovdb)
+  endif()
+  # target_link_libraries(vdb_tool_common INTERFACE ${NANOVDB_LIB})
+endif()
+
 # Small function which mimics basic output (bar components) of
 # FindPackageHandleStandardArgs. This is required as we want to ensure
 # the minimum python version is MINIMUM_PYTHON_VERSION - however this cannot
@@ -162,6 +180,10 @@ endif()
 if(USE_AX)
   target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
+endif()
+if(USE_NANOVDB)
+  target_link_libraries(pyopenvdb PUBLIC ${NANOVDB_LIB})
+  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NANOVDB")
 endif()
 
 install(TARGETS
