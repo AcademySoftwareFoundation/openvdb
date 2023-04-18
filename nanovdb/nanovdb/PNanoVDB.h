@@ -2599,7 +2599,7 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_zero_crossing(
     return PNANOVDB_FALSE;
 }
 
-PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_next_hit(
+PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_tree_marcher(
     pnanovdb_grid_type_t grid_type,
     pnanovdb_buf_t buf,
     PNANOVDB_INOUT(pnanovdb_readaccessor_t) acc,
