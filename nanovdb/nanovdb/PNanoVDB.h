@@ -2555,7 +2555,7 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_zero_crossing(
     pnanovdb_vec3_t bbox_maxf = pnanovdb_coord_to_vec3(pnanovdb_coord_add(bbox_max, pnanovdb_coord_uniform(1)));
 
     pnanovdb_bool_t hit = pnanovdb_hdda_ray_clip(PNANOVDB_REF(bbox_minf), PNANOVDB_REF(bbox_maxf), origin, PNANOVDB_REF(tmin), direction, PNANOVDB_REF(tmax));
-    // early out if ray does not hit volume
+    // Early out if ray does not hit volume
     if (!hit || tmax > 1.0e20f)
     {
         return PNANOVDB_FALSE;
@@ -2565,7 +2565,7 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_zero_crossing(
     pnanovdb_coord_t ijk = pnanovdb_hdda_pos_to_ijk(PNANOVDB_REF(pos));
 
     pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(PNANOVDB_GRID_TYPE_FLOAT, buf, acc, PNANOVDB_REF(ijk));
-    // value to determine sign at hdda start
+    // Value to determine sign at hdda start
     float v0 = pnanovdb_read_float(buf, address);
 
     pnanovdb_int32_t dim = pnanovdb_uint32_as_int32(pnanovdb_readaccessor_get_dim(PNANOVDB_GRID_TYPE_FLOAT, buf, acc, PNANOVDB_REF(ijk)));
@@ -2577,18 +2577,18 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_zero_crossing(
         ijk = pnanovdb_hdda_pos_to_ijk(PNANOVDB_REF(pos_start));
         dim = pnanovdb_uint32_as_int32(pnanovdb_readaccessor_get_dim(PNANOVDB_GRID_TYPE_FLOAT, buf, acc, PNANOVDB_REF(ijk)));
         pnanovdb_hdda_update(PNANOVDB_REF(hdda), origin, direction, dim);
-        // skip over tile
+        // Skip over tile
         if (hdda.dim > 1 || !pnanovdb_readaccessor_is_active(grid_type, buf, acc, PNANOVDB_REF(ijk)))
         {
             continue;
         }
-        // only check active values
+        // Only check active values
         while (pnanovdb_hdda_step(PNANOVDB_REF(hdda)) && pnanovdb_readaccessor_is_active(grid_type, buf, acc, PNANOVDB_REF(hdda.voxel)))
         {
             ijk = hdda.voxel;
             pnanovdb_address_t address = pnanovdb_readaccessor_get_value_address(PNANOVDB_GRID_TYPE_FLOAT, buf, acc, PNANOVDB_REF(ijk));
             PNANOVDB_DEREF(valueAtHit) = pnanovdb_read_float(buf, address);
-            // checks if the sign has changed
+            // Checks if the sign has changed
             if (PNANOVDB_DEREF(valueAtHit) * v0 < 0.f)
             {
                 PNANOVDB_DEREF(thit) = hdda.tmin;
@@ -2615,7 +2615,7 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_tree_marcher(
     pnanovdb_vec3_t bbox_maxf = pnanovdb_coord_to_vec3(pnanovdb_coord_add(bbox_max, pnanovdb_coord_uniform(1)));
 
     pnanovdb_bool_t hit = pnanovdb_hdda_ray_clip(PNANOVDB_REF(bbox_minf), PNANOVDB_REF(bbox_maxf), origin, PNANOVDB_REF(tmin), direction, PNANOVDB_REF(tmax));
-    // early out if ray does not hit volume
+    // Early out if ray does not hit volume
     if (!hit || tmax > 1.0e20f)
     {
         return PNANOVDB_FALSE;
@@ -2635,12 +2635,12 @@ PNANOVDB_FORCE_INLINE pnanovdb_bool_t pnanovdb_hdda_tree_marcher(
         ijk = pnanovdb_hdda_pos_to_ijk(PNANOVDB_REF(pos_start));
         dim = pnanovdb_uint32_as_int32(pnanovdb_readaccessor_get_dim(PNANOVDB_GRID_TYPE_FLOAT, buf, acc, PNANOVDB_REF(ijk)));
         pnanovdb_hdda_update(PNANOVDB_REF(hdda), origin, direction, dim);
-        // skip over tile
+        // Skip over tile
         if (hdda.dim > 1 || !pnanovdb_readaccessor_is_active(grid_type, buf, acc, PNANOVDB_REF(ijk)))
         {
             continue;
         }
-        // only check active values
+        // Only check active values
         while (pnanovdb_hdda_step(PNANOVDB_REF(hdda)) && pnanovdb_readaccessor_is_active(grid_type, buf, acc, PNANOVDB_REF(hdda.voxel)))
         {
             ijk = hdda.voxel;
