@@ -80,8 +80,14 @@ struct StreamState
 {
     static const long MAGIC_NUMBER;
 
-    StreamState();
-    ~StreamState();
+    inline StreamState() : magicNumber(-1) {}
+    inline ~StreamState()
+    {
+        uninitialize();
+    }
+
+    void initialize();
+    void uninitialize();
 
     // Important:  The size and order of these member variables must *only* change when
     //             OpenVDB ABI changes to avoid potential segfaults when performing I/O
@@ -109,11 +115,18 @@ const long StreamState::MAGIC_NUMBER =
 ////////////////////////////////////////
 
 
-StreamState::StreamState(): magicNumber(std::ios_base::xalloc())
+void
+StreamState::initialize()
 {
+    // Do nothing if stream state is already registered.
+    if (magicNumber >= 0) {
+        return;
+    }
+
     // Having reserved an entry (the one at index magicNumber) in the extensible array
     // associated with every stream, store a magic number at that location in the
     // array belonging to the cout stream.
+    magicNumber = std::ios_base::xalloc();
     std::cout.iword(magicNumber) = MAGIC_NUMBER;
     std::cout.pword(magicNumber) = this;
 
@@ -171,14 +184,35 @@ StreamState::StreamState(): magicNumber(std::ios_base::xalloc())
 }
 
 
-StreamState::~StreamState()
+void
+StreamState::uninitialize()
 {
+    // Do nothing if stream state is not registered.
+    if (magicNumber < 0) {
+        return;
+    }
+
     // Ensure that this StreamState struct can no longer be accessed.
     std::cout.iword(magicNumber) = 0;
     std::cout.pword(magicNumber) = nullptr;
+    magicNumber = -1;
 }
 
 } // unnamed namespace
+
+
+void
+internal::initialize()
+{
+    sStreamState.initialize();
+}
+
+
+void
+internal::uninitialize()
+{
+    sStreamState.uninitialize();
+}
 
 
 ////////////////////////////////////////

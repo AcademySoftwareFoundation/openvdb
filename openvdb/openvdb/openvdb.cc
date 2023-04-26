@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "openvdb.h"
+#include "io/Archive.h"
 #include "io/DelayedLoadMetadata.h"
 #include "points/PointDataGrid.h"
 #include "tools/PointIndexGrid.h"
@@ -66,6 +67,9 @@ initialize()
 
     logging::initialize();
 
+    // Register stream state.
+    io::internal::initialize();
+
     // Register metadata.
     Metadata::clearRegistry();
     MetaTypes::foreach<RegisterMeta>();
@@ -127,6 +131,7 @@ __pragma(warning(default:1711))
     GridBase::clearRegistry();
     math::MapRegistry::clear();
     points::internal::uninitialize();
+    io::internal::uninitialize();
 
 #ifdef OPENVDB_USE_BLOSC
     // We don't want to destroy Blosc, because it might have been

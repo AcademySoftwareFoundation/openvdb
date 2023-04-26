@@ -192,6 +192,20 @@ private:
     bool mEnableGridStats;
 }; // class Archive
 
+
+namespace internal {
+
+/// @brief Global registration of stream state.
+/// @note This is called from @c openvdb::initialize, so there is
+/// no need to call it directly.
+void initialize();
+
+/// @brief Global deregistration of stream state.
+/// @note This is called from @c openvdb::uninitialize, so there is
+/// no need to call it directly.
+void uninitialize();
+
+} // namespace internal
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
