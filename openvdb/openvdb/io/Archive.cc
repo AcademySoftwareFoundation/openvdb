@@ -42,9 +42,6 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #endif
 #endif // OPENVDB_USE_DELAYED_LOADING
 
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
 #include <atomic>
 
 #include <algorithm> // for std::find_if()
@@ -608,7 +605,7 @@ getErrorString()
 Archive::Archive()
     : mFileVersion(OPENVDB_FILE_VERSION)
     , mLibraryVersion(OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION)
-    , mUuid(boost::uuids::nil_uuid())
+    , mUuid()
     , mInputHasGridOffsets(false)
     , mEnableInstancing(true)
     , mCompression(DEFAULT_COMPRESSION_FLAGS)
@@ -635,13 +632,17 @@ Archive::copy() const
 std::string
 Archive::getUniqueTag() const
 {
-    return boost::uuids::to_string(mUuid);
+    return mUuid;
 }
 
 
 bool
 Archive::isIdentical(const std::string& uuidStr) const
 {
+    // If either uuids are blank, they will always fail to match
+    // as something went wrong generating them.
+    if (uuidStr.empty()) return false;
+    if (getUniqueTag().empty()) return false;
     return uuidStr == getUniqueTag();
 }
 
@@ -1013,16 +1014,37 @@ Archive::readHeader(std::istream& is)
     }
 
     // 6) Read the 16-byte (128-bit) uuid.
-    boost::uuids::uuid oldUuid = mUuid;
+    std::string oldUuid = mUuid;
     if (mFileVersion >= OPENVDB_FILE_VERSION_BOOST_UUID) {
-        // UUID is stored as an ASCII string.
-        is >> mUuid;
+        // UUID is stored as fixed-length ASCII string
+        // The extra 4 bytes are for the hyphens.
+        char uuidValues[16*2+4+1];
+        is.read(uuidValues, 16*2+4);
+        uuidValues[16*2+4] = 0;
+        mUuid = uuidValues;
     } else {
         // Older versions stored the UUID as a byte string.
         char uuidBytes[16];
         is.read(uuidBytes, 16);
-        std::memcpy(&mUuid.data[0], uuidBytes, std::min<size_t>(16, mUuid.size()));
+        char uuidStr[33];
+        auto to_hex = [](unsigned int c) -> char
+        {
+            c &= 0xf;
+            if (c < 10) return (char)('0' + c);
+            return (char)(c - 10 + 'A');
+        };
+        for (int i = 0; i < 16; i++)
+        {
+            uuidStr[i*2] = to_hex(uuidBytes[i] >> 4);
+            uuidStr[i*2+1] = to_hex(uuidBytes[i]);
+        }
+        uuidStr[32] = 0;
+        mUuid = uuidStr;
     }
+
+    // CHeck if new and old uuid differ.  If either are blank, they
+    // differ because an error occurred.
+    if (oldUuid.empty() || mUuid.empty()) return true;
     return oldUuid != mUuid; // true if UUID in input stream differs from old UUID
 }
 
@@ -1051,12 +1073,53 @@ Archive::writeHeader(std::ostream& os, bool seekable) const
     // 5) Write a flag indicating that this stream contains compressed leaf data.
     //    (Omitted as of version 222)
 
-    // 6) Generate a new random 16-byte (128-bit) uuid and write it to the stream.
-    std::mt19937 ran;
-    ran.seed(std::mt19937::result_type(std::random_device()() + std::time(nullptr)));
-    boost::uuids::basic_random_generator<std::mt19937> gen(&ran);
-    mUuid = gen(); // mUuid is mutable
-    os << mUuid;
+    // 6) Generate a new random 16-byte (128-bit) sequence and write it to the stream.
+
+    char uuidStr[16*2+4+1];
+    auto to_hex = [](unsigned int c) -> char
+    {
+        c &= 0xf;
+        if (c < 10) return (char)('0' + c);
+        return (char)(c - 10 + 'A');
+    };
+
+    try
+    {
+        std::random_device  seed;
+        for (int i = 0; i < 4; i++)
+        {
+            unsigned int v = seed();
+            // This writes out in reverse direction of bit order, but
+            // as source is random we don't mind.
+            for (int j = 0; j < 8; j++)
+            {
+                uuidStr[i*8+j] = to_hex(v);
+                v >>= 4;
+            }
+        }
+    }
+    catch (std::exception&)
+    {
+        // We could have failed due to running out of entropy, but hopefully
+        // most platforms use /dev/urandom equivalent...
+        // Create a blank UUID that means it should always fail comparisons.
+        uuidStr[0] = 0;
+    }
+    // Insert our hyphens.
+    for (int i = 0; i < 4; i++)
+        uuidStr[16*2+i] = '-';
+    std::swap(uuidStr[16*2+0], uuidStr[8+0]);
+    std::swap(uuidStr[16*2+1], uuidStr[12+1]);
+    std::swap(uuidStr[16*2+2], uuidStr[16+2]);
+    std::swap(uuidStr[16*2+3], uuidStr[20+3]);
+    uuidStr[16*2+4] = 0;
+    mUuid = uuidStr; // mUuid is mutable
+    // We don't write a string; but instead a fixed length buffer.
+    // To match the old UUID, we need an extra 4 bytes for hyphens.
+    for (int i = 0; i < 16*2+4; i++)
+    {
+        os << uuidStr[i];
+    }
 }
 
 
