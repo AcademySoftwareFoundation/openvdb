@@ -178,6 +178,10 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wall>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wextra>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wconversion>")
+  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wnon-virtual-dtor>")
+  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wover-aligned>")
+  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wimplicit-fallthrough>")
+  add_compile_options("$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,9.3.0>>:-Wimplicit-fallthrough>")
   # Only check global constructors for libraries (we should really check for
   # executables too but gtest relies on these types of constructors for its
   # framework).
@@ -193,6 +197,7 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wconversion>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wdisabled-optimization>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Woverloaded-virtual>")
+  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wnon-virtual-dtor>")
 else()
   # NO OPENVDB_CXX_STRICT, suppress some warnings
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
