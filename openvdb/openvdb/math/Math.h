@@ -67,11 +67,11 @@ namespace OPENVDB_VERSION_NAME {
 /// @note A zeroVal<T>() specialization must be defined for each @c ValueType T
 /// that cannot be constructed using the form @c T(0).  For example, @c std::string(0)
 /// treats 0 as @c nullptr and throws a @c std::logic_error.
-template<typename T> inline T zeroVal() { return T(0); }
+template<typename T> inline constexpr T zeroVal() { return T(0); }
 /// Return the @c std::string value that corresponds to zero.
 template<> inline std::string zeroVal<std::string>() { return ""; }
 /// Return the @c bool value that corresponds to zero.
-template<> inline bool zeroVal<bool>() { return false; }
+template<> inline constexpr bool zeroVal<bool>() { return false; }
 
 namespace math {
 
