@@ -112,7 +112,7 @@ inline std::mutex& GetInitMutex()
 {
     static std::mutex sInitMutex;
     return sInitMutex;
-};
+}
 bool sIsInitialized = false;
 bool sShutdown = false;
 }

@@ -23,7 +23,7 @@ inline std::mutex& GetInitMutex()
 {
     static std::mutex sInitMutex;
     return sInitMutex;
-};
+}
 }
 
 openvdb::ax::Logger* axlog = nullptr;

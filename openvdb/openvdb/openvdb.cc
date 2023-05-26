@@ -51,7 +51,7 @@ inline std::mutex& GetInitMutex()
 {
     static std::mutex sInitMutex;
     return sInitMutex;
-};
+}
 
 std::atomic<bool> sIsInitialized{false};
 }

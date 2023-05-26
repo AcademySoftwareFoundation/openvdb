@@ -14,7 +14,7 @@ inline std::mutex& GetMapRegistryMutex()
 {
     static std::mutex sInitMapRegistryMutex;
     return sInitMapRegistryMutex;
-};
+}
 } // unnamed namespace
 
 
