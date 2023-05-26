@@ -819,7 +819,6 @@ private:
         return TypedAttributeArray::create(n, strideOrTotalSize, constantStride, metadata);
     }
 
-    static std::unique_ptr<const NamePair> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
@@ -1126,10 +1125,6 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 // TypedAttributeArray implementation
 
 template<typename ValueType_, typename Codec_>
-std::unique_ptr<const NamePair> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
-
-
-template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
     Index n, Index strideOrTotalSize, bool constantStride, const ValueType& uniformValue)
     : AttributeArray()
@@ -1209,12 +1204,12 @@ template<typename ValueType_, typename Codec_>
 inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
-    static std::once_flag once;
-    std::call_once(once, []()
+    static NamePair sTypeName = []()
     {
-        sTypeName.reset(new NamePair(typeNameAsString<ValueType>(), Codec::name()));
-    });
-    return *sTypeName;
+        return NamePair(typeNameAsString<ValueType>(), Codec::name());
+    }();
+
+    return sTypeName;
 }
 
 
