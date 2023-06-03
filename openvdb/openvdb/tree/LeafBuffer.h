@@ -164,8 +164,6 @@ private:
     tbb::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
 
-    static const ValueType sZero;
-
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
     template<typename, Index> friend class LeafNode;
@@ -173,10 +171,6 @@ private:
 
 
 ////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
 
 
 template<typename T, Index Log2Dim>
@@ -383,6 +377,7 @@ template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType&
 LeafBuffer<T, Log2Dim>::at(Index i) const
 {
+    static const ValueType sZero = zeroVal<T>();
     assert(i < SIZE);
     this->loadValues();
     // We can't use the ternary operator here, otherwise Visual C++ returns
