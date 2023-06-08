@@ -19,8 +19,11 @@
 #include <memory>
 
 namespace {
-// Declare this at file scope to ensure thread-safe initialization.
-std::mutex sInitMutex;
+inline std::mutex& GetInitMutex()
+{
+    static std::mutex sInitMutex;
+    return sInitMutex;
+}
 }
 
 openvdb::ax::Logger* axlog = nullptr;
@@ -39,7 +42,7 @@ openvdb::ax::ast::Tree::ConstPtr
 openvdb::ax::ast::parse(const char* code,
     openvdb::ax::Logger& logger)
 {
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
     axlog = &logger; // for lexer errs
     logger.setSourceCode(code);
 

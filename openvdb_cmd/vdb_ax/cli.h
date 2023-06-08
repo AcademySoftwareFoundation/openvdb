@@ -181,6 +181,7 @@ inline void usage(std::ostream& os,
 struct ParamBase
 {
     ParamBase() = default;
+    virtual ~ParamBase() = default;
     inline const std::vector<const char*>& opts() const { return mOpts; }
     inline const char* doc() const { return mDoc; }
     virtual void init(const char* arg, const uint32_t idx = 0) = 0;
@@ -198,6 +199,12 @@ struct BasicParam
     using CB = std::function<void(T&, const char*)>;
     BasicParam(T&& v) : mValue(std::move(v)) {}
     BasicParam(const T& v) : mValue(v) {}
+
+    BasicParam(const BasicParam&) = default;
+    BasicParam(BasicParam&&) = default;
+    BasicParam& operator=(const BasicParam&) = default;
+    BasicParam& operator=(BasicParam&&) = default;
+
     inline void set(const T& v) { mValue = v; }
     inline T& get() { return mValue; }
     inline const T& get() const { return mValue; }
@@ -212,6 +219,12 @@ protected:
 template <typename T>
 struct Param : public BasicParam<T>, ParamBase
 {
+    ~Param() override = default;
+    Param(const Param&) = default;
+    Param(Param&&) = default;
+    Param& operator=(const Param&) = default;
+    Param& operator=(Param&&) = default;
+
     // CB1 callback passes the value to store
     // CB2 callback passed the value and the argument provided
     // CB3 callback passed the value, the argument provided and the index to

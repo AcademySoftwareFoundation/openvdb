@@ -283,9 +283,6 @@ public:
 
 private:
     MapRegistry() {}
-
-    static MapRegistry* staticInstance();
-
     MapDictionary mMap;
 };
 

@@ -322,7 +322,6 @@ TEST_F(TestLaplacian, testOldStyleStencils)
     EXPECT_TRUE(grid->empty());
 
     const Coord dim(32, 32, 32);
-    const Coord c(35,30,40);
     const openvdb::Vec3f center(6.0f, 8.0f, 10.0f);//i.e. (12,16,20) in index space
     const float radius=10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);

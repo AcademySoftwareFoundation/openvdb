@@ -1302,6 +1302,9 @@ template<typename IterT>
 class IteratorRange
 {
 public:
+    /// @brief Constructor from iterator and grain size
+    /// @param iter Iterator from which the range is constructed
+    /// @param grainSize Grain size which controls the granularity of range splitting
     IteratorRange(const IterT& iter, size_t grainSize = 8):
         mIter(iter),
         mGrainSize(grainSize),
@@ -1309,6 +1312,10 @@ public:
     {
         mSize = this->size();
     }
+
+    /// @brief Split constructor used by tbb (should rarely be called directly)
+    /// @param other IteratorRange to be split
+    /// @param  tbb::split Dummy class used to create a unique signature for this constructor
     IteratorRange(IteratorRange& other, tbb::split):
         mIter(other.mIter),
         mGrainSize(other.mGrainSize),
@@ -1331,7 +1338,7 @@ public:
     bool is_divisible() const { return mSize > mGrainSize; }
 
     /// Advance the iterator @a n times.
-    void increment(Index n = 1) { for ( ; n > 0 && mSize > 0; --n, --mSize, ++mIter) {} }
+    void increment(size_t n = 1) { for ( ; n > 0 && mSize > 0; --n, --mSize, ++mIter) {} }
     /// Advance the iterator to the next item.
     IteratorRange& operator++() { this->increment(); return *this; }
     /// @brief Advance the iterator to the next item.
@@ -1339,16 +1346,15 @@ public:
     bool next() { this->increment(); return this->test(); }
 
 private:
-    Index size() const { Index n = 0; for (IterT it(mIter); it.test(); ++n, ++it) {} return n; }
+    size_t size() const { size_t n = 0; for (IterT it(mIter); it.test(); ++n, ++it) {} return n; }
 
     IterT mIter;
-    size_t mGrainSize;
+    size_t mGrainSize, mSize;
     /// @note mSize is only an estimate of the number of times mIter can be incremented
     /// before it is exhausted (because the topology of the underlying tree could change
     /// during iteration).  For the purpose of range splitting, though, that should be
     /// sufficient, since the two halves need not be of exactly equal size.
-    Index mSize;
-};
+};// class IteratorRange
 
 
 ////////////////////////////////////////
