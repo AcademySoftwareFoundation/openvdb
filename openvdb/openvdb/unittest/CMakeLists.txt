@@ -28,19 +28,10 @@ message(STATUS "----------------------------------------------------")
 
 # Collect lib dependencies
 
-if(NOT OPENVDB_BUILD_CORE)
-  # @note  Could also use the openvdb_je target here, but we just opt to
-  # handle the value of CONCURRENT_MALLOC outside of this branching for
-  # both cases
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
-endif()
-
 find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
 set(OPENVDB_TEST_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   GTest::GTest
   GTest::Main
 )
@@ -226,4 +217,3 @@ set(UBSAN_SUPRESSION_FILE ${PATH_TO_PROJECT_ROOT}/cmake/scripts/ubsan.supp)
 set_tests_properties(vdb_unit_test PROPERTIES
     ENVIRONMENT
       "$<$<CONFIG:UBSAN>:UBSAN_OPTIONS=halt_on_error=1 report_error_type=1 suppressions=${UBSAN_SUPRESSION_FILE}>")
-

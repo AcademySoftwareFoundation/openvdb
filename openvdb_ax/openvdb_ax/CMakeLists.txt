@@ -38,12 +38,6 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
-endif()
-
 # Configure grammar target
 
 set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
@@ -246,7 +240,7 @@ endif()
 # Configure shared settings
 
 set(OPENVDB_AX_CORE_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   ${LLVM_LIBS}
 )
 

@@ -128,17 +128,11 @@ set(OPENVDB_HOUDINI_PYTHON_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/pyth
 
 # Collect and configure lib dependencies
 
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
-endif()
-
 # @note Linking openvdb_houdini against Houdini brings in all interface compile
 # definitions, including MAKING_DSO
 
 set(OPENVDB_HOUDINI_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   Houdini
 )
 

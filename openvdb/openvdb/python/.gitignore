@@ -7,3 +7,4 @@ cmake_install.cmake
 _skbuild/
 MANIFEST.in
 dist/
+build/

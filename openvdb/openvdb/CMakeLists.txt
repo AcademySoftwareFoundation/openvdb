@@ -618,10 +618,11 @@ endif()
 # such that they are always able to find a valid build of OpenVDB
 
 if(OPENVDB_CORE_SHARED)
-  add_library(openvdb ALIAS openvdb_shared)
+  add_library(OpenVDB::openvdb ALIAS openvdb_shared)
 else()
-  add_library(openvdb ALIAS openvdb_static)
+  add_library(OpenVDB::openvdb ALIAS openvdb_static)
 endif()
+
 
 
 ##########################################################################

@@ -32,11 +32,8 @@ message(STATUS "----------------------------------------------------")
 ##########################################################################
 
 # Collect and configure lib dependencies
-
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
+if(NOT TARGET OpenVDB::openvdb)
+  add_subdirectory(../../.. openvdb_build)
 endif()
 
 if(USE_AX)
@@ -157,7 +154,7 @@ endif()
 pybind11_add_module(_openvdb MODULE ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
 
 target_link_libraries(_openvdb PUBLIC
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   ${OPENVDB_PYTHON_DEPS}
 )
 
