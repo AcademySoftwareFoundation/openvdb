@@ -280,7 +280,8 @@ AttributeSet::isShared(size_t pos) const
 {
     assert(pos != INVALID_POS);
     assert(pos < mAttrs.size());
-    return !mAttrs[pos].unique();
+    // Warning: In multithreaded environment, the value returned by use_count is approximate.
+    return mAttrs[pos].use_count() != 1;
 }
 
 
