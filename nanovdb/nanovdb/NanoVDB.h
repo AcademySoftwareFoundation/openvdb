@@ -1134,8 +1134,10 @@ public:
 
     /// @brief Return a hash key derived from the existing coordinates.
     /// @details For details on this hash function please see the VDB paper.
+    /// The prime numbers are modified based on the ACM Transactions on Graphics paper:
+    /// "Real-time 3D reconstruction at scale using voxel hashing"
     template<int Log2N = 3 + 4 + 5>
-    __hostdev__ uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349663 ^ mVec[2] * 83492791); }
+    __hostdev__ uint32_t hash() const { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
 
     /// @brief Return the octant of this Coord
     //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
