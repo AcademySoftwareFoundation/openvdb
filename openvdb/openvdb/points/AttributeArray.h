@@ -888,9 +888,6 @@ private:
     template <bool IsUnknownCodec>
     typename std::enable_if<!IsUnknownCodec, ValueType>::type get(Index index) const;
 
-    // local copy of AttributeArray (to preserve compression)
-    AttributeArray::Ptr mLocalArray;
-
     Index mStrideOrTotalSize;
     Index mSize;
     bool mCollapseOnDestruction;
