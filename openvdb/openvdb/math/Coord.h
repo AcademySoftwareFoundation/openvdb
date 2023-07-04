@@ -224,13 +224,15 @@ public:
 
     /// @brief Return a hash value for this coordinate
     /// @note Log2N is the binary logarithm of the hash table size.
-    /// @details The hash function is taken from the SIGGRAPH paper:
+    /// @details The hash function is originally taken from the SIGGRAPH paper:
     /// "VDB: High-resolution sparse volumes with dynamic topology"
+    /// and the prime numbers are modified based on the ACM Transactions on Graphics paper:
+    /// "Real-time 3D reconstruction at scale using voxel hashing"
     template<int Log2N = 20>
     size_t hash() const
     {
         const uint32_t* vec = reinterpret_cast<const uint32_t*>(mVec.data());
-        return ((1<<Log2N)-1) & (vec[0]*73856093 ^ vec[1]*19349663 ^ vec[2]*83492791);
+        return ((1<<Log2N)-1) & (vec[0]*73856093 ^ vec[1]*19349669 ^ vec[2]*83492791);
     }
 
 private:
