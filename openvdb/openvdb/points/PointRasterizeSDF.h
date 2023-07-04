@@ -5,37 +5,62 @@
 ///
 /// @file PointRasterizeSDF.h
 ///
-/// @brief Transfer schemes for rasterizing point positional and radius data to
-///  signed distance fields with optional closest point attribute transfers.
-///  All methods support arbitrary target linear transformations, fixed or
-///  varying point radius, filtering of point data and arbitrary types for
-///  attribute transferring.
+/// @brief Various transfer schemes for rasterizing point positions and radius
+///  data to signed distance fields with optional closest point attribute
+///  transfers. All methods support arbitrary target linear transformations,
+///  fixed or varying point radius, filtering of point data and arbitrary types
+///  for attribute transferring.
 ///
-/// @details There are two main transfer implementations; rasterizeSpheres and
-///  rasterizeSmoothSpheres. The prior performs trivial narrow band stamping
-///  of spheres for each point, where as the latter calculates an averaged
-///  position of influence per voxel as described in:
-///    [Animating Sand as a Fluid - Zhu Bridson 05].
+/// @details There are currently three main transfer implementations:
 ///
-///  rasterizeSpheres() is an extremely fast and efficient way to produce both a
-///  valid symmetrical narrow band level set and transfer attributes using
-///  closest point lookups.
+/// - Rasterize Spheres
 ///
-///  rasterizeSmoothSpheres() produces smoother, more blended connections
-///  between points which is ideal for generating a more artistically pleasant
-///  surface directly from point distributions. It aims to avoid typical post
-///  filtering operations used to smooth surface volumes. Note however that
-///  rasterizeSmoothSpheres may not necessarily produce a *symmetrical* narrow
-///  band level set; the exterior band may be smaller than desired depending on
-///  the search radius. The surface can be rebuilt or resized if necessary.
-///  The same closet point algorithm is used to transfer attributes.
+///     Performs trivial narrow band stamping of spheres for each point. This
+///     is an extremely fast and efficient way to produce both a valid
+///     symmetrical narrow band level set and transfer attributes using closest
+///     point lookups.
 ///
-///  In general, it is recommended to consider post rebuilding/renormalizing the
-///  generated surface using either tools::levelSetRebuild() or
+/// - Rasterize Smooth Spheres
+///
+///     Calculates an averaged position of influence per voxel as described in:
+///       [Animating Sand as a Fluid - Zhu Bridson 2005].
+///
+///     This technique produces smoother, more blended connections between
+///     points which is ideal for generating a more artistically pleasant
+///     surface directly from point distributions. It aims to avoid typical
+///     post filtering operations used to smooth surface volumes. Note however
+///     that this method may not necessarily produce a *symmetrical* narrow
+///     band level set; the exterior band may be smaller than desired depending
+///     on the search radius - the surface can be rebuilt or resized if
+///     necessary. The same closet point algorithm is used to transfer
+///     attributes.
+///
+/// - Rasterize Ellipsoids.
+///
+///     Rasterizes anisotropic ellipses for each point by analyzing point
+///     neighborhood distributions, as described in:
+///       [Reconstructing Surfaces of Particle-Based Fluids Using Anisotropic
+///        Kernel - Yu Turk 2010].
+///
+///     This method uses the rotation and affine matrix attributes built from
+///     the points::pca() method which model these elliptical distributions
+///     using principle component analysis. The ellipses create a much tighter,
+///     more fitted surface that better represents the convex hull of the point
+///     set. This technique also allows point to smoothly blend from their
+///     computed ellipse back to a canonical sphere, as well as allowing
+///     isolated points to be rasterized with their own radius scale. Although
+///     the rasterization step of this pipeline is relatively fast, it is still
+///     the slowest of all three methods and depends on the somewhat expensive
+///     points::pca() method. Still, this technique can be far superior at
+///     producing fluid surfaces where thin sheets (waterfalls) or sharp edges
+///     (wave breaks) are desirable.
+///
+///
+///  In general, it is recommended to consider post rebuilding/renormalizing
+///  the generated surface using either tools::levelSetRebuild() or
 ///  tools::LevelSetTracker::normalize() tools::LevelSetTracker::resize().
 ///
 /// @note These methods use the framework provided in PointTransfer.h
-///
 
 #ifndef OPENVDB_POINTS_RASTERIZE_SDF_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_RASTERIZE_SDF_HAS_BEEN_INCLUDED
@@ -50,6 +75,7 @@
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/points/PrincipleComponentAnalysis.h>
 
 #include <unordered_map>
 
@@ -61,305 +87,225 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
-/// @brief Narrow band sphere stamping with a uniform radius.
-/// @details Rasterizes points into a level set using basic sphere stamping with
-///   a uniform radius. The radius parameter is given in world space units and
-///   is applied to every point to generate a fixed surface mask and consequent
-///   distance values.
-/// @param points       the point data grid to rasterize
-/// @param radius       the world space radius of every point
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return The signed distance field.
-template <typename PointDataGridT,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
-typename SdfT::Ptr
-rasterizeSpheres(const PointDataGridT& points,
-             const Real radius,
-             const Real halfband = LEVEL_SET_HALF_WIDTH,
-             math::Transform::Ptr transform = nullptr,
-             const FilterT& filter = NullFilter(),
-             InterrupterT* interrupter = nullptr);
-
-/// @brief Narrow band sphere stamping with a varying radius.
-/// @details Rasterizes points into a level set using basic sphere stamping with
-///   a variable radius. The radius string parameter expects a point attribute
-///   of type RadiusT to exist.
-/// @param points       the point data grid to rasterize
-/// @param radius       the name of the radius attribute
-/// @param scale        an optional scale to apply to each per point radius
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return The signed distance field.
-template <typename PointDataGridT,
-    typename RadiusT = float,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
-typename SdfT::Ptr
-rasterizeSpheres(const PointDataGridT& points,
-             const std::string& radius,
-             const Real scale = 1.0,
-             const Real halfband = LEVEL_SET_HALF_WIDTH,
-             math::Transform::Ptr transform = nullptr,
-             const FilterT& filter = NullFilter(),
-             InterrupterT* interrupter = nullptr);
-
-/// @brief Narrow band sphere stamping with a uniform radius and closest point
-///   attribute transfer.
-/// @details Rasterizes points into a level set using basic sphere stamping with
-///   a uniform radius. The radius parameter is given in world space units and
-///   is applied to every point to generate a fixed surface mask and consequent
-///   distance values. Every voxel's closest point is used to transfer each
-///   attribute in the attributes parameter to a new grid of matching topology.
-///   The destination types of these grids is equal to the ValueConverter result
-///   of the attribute type applied to the PointDataGridT.
-/// @note The AttributeTypes template parameter should be a TypeList of the
-///   required or possible attributes types. i.e. TypeList<int, float, double>.
-///   A runtime error will be thrown if no equivalent type for a given attribute
-////  is found in the AttributeTypes TypeList.
-/// @param points       the point data grid to rasterize
-/// @param radius       the world space radius of every point
-/// @param attributes   list of attributes to transfer
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
+/// @brief  Perform point rasterzation to produce a signed distance field.
+/// @param point     the point data grid to rasterize
+/// @param settings  one of the available transfer setting schemes found below
+///   in this file.
 /// @return A vector of grids. The signed distance field is guaranteed to be
 ///   first and at the type specified by SdfT. Successive grids are the closest
 ///   point attribute grids. These grids are guaranteed to have a topology
 ///   and transform equal to the surface.
+///
+/// @code
+///    points::PointDataGrid g = ...;
+///
+///    // default settings for sphere stamping with a world space radius of 1
+///    SphereSettings<> spheres;
+///    FloatGrid::Ptr sdf = StaticPtrCast<FloatGrid>(points::rasterizeSdf(g, spheres)[0]);
+///
+///    // custom linear transform of target sdf, world space radius of 5
+///    spheres.transform = math::Transform::createLinearTransform(0.3);
+///    spheres.radiusScale = 5;
+///    FloatGrid::Ptr sdf = StaticPtrCast<FloatGrid>(points::rasterizeSdf(g, spheres)[0]);
+///
+///    // smooth sphere rasterization with variable double precision radius
+///    // attribute "pscale" scaled by 2
+///    SmoothSphereSettings<TypeList<>, double> smooth;
+///    smooth.radius = "pscale";
+///    smooth.radiusScale = 2;
+///    smooth.searchRadius = 3;
+///    FloatGrid::Ptr sdf = StaticPtrCast<FloatGrid>(points::rasterizeSdf(g, smooth)[0]);
+///
+///    // anisotropic/ellipsoid rasterization with attribute transferring.
+///    // requires pca attributes to be initialized using points::pca() first
+///    PcaSettings settings;
+///    PcaAttributes attribs;
+///    points::pca(g, settings, attribs);
+///
+///    EllipsoidSettings<TypeList<int32_t, Vec3f>> ellips;
+///    s.pca = attribs;
+///    s.attributes.emplace_back("id");
+///    s.attributes.emplace_back("v");
+///    GridPtrVec grids = points::rasterizeSdf(g, s);
+///    FloatGrid::Ptr sdf = StaticPtrCast<FloatGrid>(grids[0]);
+///    Int32Grid::Ptr id  = StaticPtrCast<Int32Grid>(grids[1]);
+///    Vec3fGrid::Ptr vel = StaticPtrCast<Vec3fGrid>(grids[2]);
+/// @endcode
 template <typename PointDataGridT,
-    typename AttributeTypes,
     typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
+    typename SettingsT>
 GridPtrVec
-rasterizeSpheres(const PointDataGridT& points,
-             const Real radius,
-             const std::vector<std::string>& attributes,
-             const Real halfband = LEVEL_SET_HALF_WIDTH,
-             math::Transform::Ptr transform = nullptr,
-             const FilterT& filter = NullFilter(),
-             InterrupterT* interrupter = nullptr);
+rasterizeSdf(const PointDataGridT& points, const SettingsT& settings);
 
-/// @brief Narrow band sphere stamping with a varying radius and closest point
-///   attribute transfer.
-/// @details Rasterizes points into a level set using basic sphere stamping with
-///   a variable radius. The radius string parameter expects a point attribute
-///   of type RadiusT to exist. Every voxel's closest point is used to transfer
-///   each attribute in the attributes parameter to a new grid of matching
-///   topology. The destination types of these grids is equal to the
-///   ValueConverter result of the attribute type applied to the PointDataGridT.
-/// @note The AttributeTypes template parameter should be a TypeList of the
-///   required or possible attributes types. i.e. TypeList<int, float, double>.
-///   A runtime error will be thrown if no equivalent type for a given attribute
-////  is found in the AttributeTypes TypeList.
-/// @param points       the point data grid to rasterize
-/// @param radius       the name of the radius attribute
-/// @param attributes   list of attributes to transfer
-/// @param scale        scale to apply to each per point radius
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return A vector of grids. The signed distance field is guaranteed to be
-///   first and at the type specified by SdfT. Successive grids are the closest
-///   point attribute grids. These grids are guaranteed to have a topology
-///   and transform equal to the surface.
-template <typename PointDataGridT,
-    typename AttributeTypes,
-    typename RadiusT = float,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+//
+
+/// @brief  Generic settings for narrow band spherical stamping with a uniform
+///   or varying radius and optionally with closest point attribute transfer of
+///   arbitrary attributes. See the struct member documentation for detailed
+///   behavior.
+/// @note  There exists other more complex kernels that derive from this struct,
+///   but on its own it represents the settings needed to perform basic narrow
+///   band sphere stamping. Parameters are interpreted in the same way across
+///   derived classes.
+template <typename AttributeTs = TypeList<>,
+    typename RadiusAttributeT = float,
     typename FilterT = NullFilter,
     typename InterrupterT = util::NullInterrupter>
-GridPtrVec
-rasterizeSpheres(const PointDataGridT& points,
-             const std::string& radius,
-             const std::vector<std::string>& attributes,
-             const Real scale = 1.0,
-             const Real halfband = LEVEL_SET_HALF_WIDTH,
-             math::Transform::Ptr transform = nullptr,
-             const FilterT& filter = NullFilter(),
-             InterrupterT* interrupter = nullptr);
+struct SphereSettings
+{
+    using AttributeTypes = AttributeTs;
+    using RadiusAttributeType = RadiusAttributeT;
+    using FilterType = FilterT;
+    using InterrupterType = InterrupterT;
 
-/// @brief Smoothed point distribution based sphere stamping with a uniform radius.
-/// @details Rasterizes points into a level set using [Zhu Bridson 05] sphere
-///   stamping with a uniform radius. The radius and search radius parameters
-///   are given in world space units and are applied to every point to generate
-///   a fixed surface mask and consequent distance values. The search radius is
-///   each points points maximum contribution to the target level set. The search
-///   radius should always have a value equal to or larger than the point radius.
-/// @warning The width of the exterior half band *may* be smaller than the
-///   specified half band if the search radius is less than the equivalent
-///   world space halfband distance.
-/// @param points       the point data grid to rasterize
-/// @param radius       the world space radius of every point
-/// @param searchRadius the maximum search distance of every point
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return The signed distance field.
-template <typename PointDataGridT,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    /// @param radius  the attribute containing the world space radius
+    /// @details  if the radius parameter is an empty string then the
+    ///   `radiusScale` parameter is used as a uniform world space radius to
+    ///   generate a fixed surface mask. Otherwise, a point attribute
+    ///   representing the world space radius of each point of type
+    ///   `RadiusAttributeT` is expected to exist and radii are scaled by the
+    ///   `radiusScale` parameter.
+    std::string radius = "";
+
+    /// @param radiusScale  the scale applied to every world space radius value
+    /// @note  If no `radius` attribute is provided, this is used as the
+    ///   uniform world space radius for every point. Most surfacing operations
+    ///   will perform faster if they are able to assume a uniform radius (so
+    ///   use this value instead of setting the `radius` parameter if radii are
+    ///   uniform).
+    Real radiusScale = 1.0;
+
+    /// @param halfband  the half band width of the generated surface.
+    Real halfband = LEVEL_SET_HALF_WIDTH;
+
+    /// @param transform  the target transform for the surface. Most surfacing
+    ///   operations impose linear restrictions on the target transform.
+    math::Transform::Ptr transform = nullptr;
+
+    /// @param attributes   list of attributes to transfer
+    /// @details  if the attributes vector is empty, only the surface is built.
+    ///   Otherwise, every voxel's closest point is used to transfer each
+    ///   attribute in the attributes parameter to a new grid of matching
+    ///   topology. The built surface is always the first grid returned from
+    ///   the surfacing operation, followed by attribute grids in the order
+    ///   that they appear in this vector.
+    ///
+    ///   The `AttributeTs` template parameter should be a `TypeList` of the
+    ///   required or possible attributes types. Example:
+    /// @code
+    ///   // compile support for int, double and Vec3f attribute transferring
+    ///   using SupportedTypes = TypeList<int, double, Vec3f>;
+    ///   SphereSettings<SupportedTypes> s;
+    ///
+    ///   // Produce 4 additional grids from the "v", "Cd", "id" and "density"
+    ///   // attributes. Their attribute value types must be available in the
+    ///   // provided TypeList
+    ///   s.attributes = {"v", "Cd", "id", "density"};
+    /// @endcode
+    ///
+    ///   A runtime error will be thrown if no equivalent type for a given
+    ///   attribute is found in the `AttributeTs` TypeList.
+    ///
+    /// @note The destination types of these grids is equal to the
+    ///   `ValueConverter` result of the attribute type applied to the
+    ///   PointDataGridT.
+    std::vector<std::string> attributes;
+
+    /// @param filter  a filter to apply to points. Only points that evaluate
+    ///   to true using this filter are rasterized, regardless of any other
+    ///   filtering derived schemes may use.
+    const FilterT* filter = nullptr;
+
+    /// @param interrupter  optional interrupter
+    InterrupterT* interrupter = nullptr;
+};
+
+/// @brief Smoothed point distribution based sphere stamping with a uniform radius
+///   or varying radius and optionally with closest point attribute transfer of
+///   arbitrary attributes. See the struct member documentation for detailed
+///   behavior.
+/// @note  Protected inheritance prevents accidental struct slicing
+template <typename AttributeTs = TypeList<>,
+    typename RadiusAttributeT = float,
     typename FilterT = NullFilter,
     typename InterrupterT = util::NullInterrupter>
-typename SdfT::Ptr
-rasterizeSmoothSpheres(const PointDataGridT& points,
-             const Real radius,
-             const Real searchRadius,
-             const Real halfband = LEVEL_SET_HALF_WIDTH,
-             math::Transform::Ptr transform = nullptr,
-             const FilterT& filter = NullFilter(),
-             InterrupterT* interrupter = nullptr);
+struct SmoothSphereSettings
+    : protected SphereSettings<AttributeTs, RadiusAttributeT, FilterT, InterrupterT>
+{
+    using BaseT = SphereSettings<AttributeTs, RadiusAttributeT, FilterT, InterrupterT>;
+    using AttributeTypes = typename BaseT::AttributeTypes;
+    using RadiusAttributeType = typename BaseT::RadiusAttributeType;
+    using FilterType = typename BaseT::FilterType;
+    using InterrupterType = typename BaseT::InterrupterType;
 
-/// @brief Smoothed point distribution based sphere stamping with a varying radius.
-/// @details Rasterizes points into a level set using [Zhu Bridson 05] sphere
-///   stamping with a variable radius. The radius string parameter expects a
-///   point attribute of type RadiusT to exist. The radiusScale parameter is
-///   multiplier for radius values held on the radius attribute. The searchRadius
-///   parameter remains a fixed size value which represents each points points
-///   maximum contribution to the target level set. The radius scale and search
-///   radius parameters are given in world space units and are applied to every
-///   point to generate a fixed surface mask and consequent distance values. The
-///   search radius should always have a value equal to or larger than the point
-///   radii.
-/// @warning The width of the exterior half band *may* be smaller than the
-///   specified half band if the search radius is less than the equivalent
-///   world space halfband distance.
-/// @param points       the point data grid to rasterize
-/// @param radius       the attribute containing the world space radius
-/// @param radiusScale  the scale applied to every world space radius value
-/// @param searchRadius the maximum search distance of every point
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return The signed distance field.
-template <typename PointDataGridT,
-    typename RadiusT = float,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
+    using BaseT::radius;
+    /// @note  See also the searchRadius parameter for SmoothSpehere
+    ///   rasterization.
+    using BaseT::radiusScale;
+    /// @warning The width of the exterior half band *may* be smaller than the
+    ///   specified half band if the search radius is less than the equivalent
+    ///   world space halfband distance.
+    using BaseT::halfband;
+    using BaseT::transform;
+    using BaseT::attributes;
+    using BaseT::filter;
+    using BaseT::interrupter;
+
+    /// @param searchRadius  the maximum search distance of every point
+    /// @details  The search radius is each points points maximum contribution
+    ///   to the target level set. It should always have a value equal to or
+    ///   larger than the point radius. Both this and the `radiusScale`
+    ///   parameters are given in world space units and are applied to every
+    ///   point to generate a surface mask.
+    Real searchRadius = 1.0;
+};
+
+/// @brief  Anisotropic point rasterization based on the principle component
+///   analysis of point neighbours. See the struct member documentation for
+///   detailed behavior.
+/// @note  Protected inheritance prevents accidental struct slicing
+template <typename AttributeTs = TypeList<>,
+    typename RadiusAttributeT = float,
     typename FilterT = NullFilter,
     typename InterrupterT = util::NullInterrupter>
-typename SdfT::Ptr
-rasterizeSmoothSpheres(const PointDataGridT& points,
-                 const std::string& radius,
-                 const Real radiusScale,
-                 const Real searchRadius,
-                 const Real halfband = LEVEL_SET_HALF_WIDTH,
-                 math::Transform::Ptr transform = nullptr,
-                 const FilterT& filter = NullFilter(),
-                 InterrupterT* interrupter = nullptr);
+struct EllipsoidSettings
+    : protected SphereSettings<AttributeTs, RadiusAttributeT, FilterT, InterrupterT>
+{
+    using BaseT = SphereSettings<AttributeTs, RadiusAttributeT, FilterT, InterrupterT>;
+    using AttributeTypes = typename BaseT::AttributeTypes;
+    using RadiusAttributeType = typename BaseT::RadiusAttributeType;
+    using FilterType = typename BaseT::FilterType;
+    using InterrupterType = typename BaseT::InterrupterType;
 
-/// @brief Smoothed point distribution based sphere stamping with a uniform
-///   radius and closest point attribute transfer.
-/// @details Rasterizes points into a level set using [Zhu Bridson 05] sphere
-///   stamping with a uniform radius. The radius and search radius parameters
-///   are given in world space units and are applied to every point to generate
-///   a fixed surface mask and consequent distance values. The search radius is
-///   each points points maximum contribution to the target level set. The
-///   search radius should always be larger than the point radius. Every voxel's
-///   closest point is used to transfer each attribute in the attributes
-///   parameter to a new grid of matching topology. The destination types of
-///   these grids is equal to the ValueConverter result of the attribute type
-///   applied to the PointDataGridT.
-/// @note The AttributeTypes template parameter should be a TypeList of the
-///   required or possible attributes types. i.e. TypeList<int, float, double>.
-///   A runtime error will be thrown if no equivalent type for a given attribute
-///  is found in the AttributeTypes TypeList.
-/// @warning The width of the exterior half band *may* be smaller than the
-///   specified half band if the search radius is less than the equivalent
-///   world space halfband distance.
-/// @param points       the point data grid to rasterize
-/// @param radius       the world space radius of every point
-/// @param searchRadius the maximum search distance of every point
-/// @param attributes   list of attributes to transfer
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return A vector of grids. The signed distance field is guaranteed to be
-///   first and at the type specified by SdfT. Successive grids are the closest
-///   point attribute grids. These grids are guaranteed to have a topology
-///   and transform equal to the surface.
-template <typename PointDataGridT,
-    typename AttributeTypes,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
-GridPtrVec
-rasterizeSmoothSpheres(const PointDataGridT& points,
-                 const Real radius,
-                 const Real searchRadius,
-                 const std::vector<std::string>& attributes,
-                 const Real halfband = LEVEL_SET_HALF_WIDTH,
-                 math::Transform::Ptr transform = nullptr,
-                 const FilterT& filter = NullFilter(),
-                 InterrupterT* interrupter = nullptr);
+    using BaseT::radius;
+    using BaseT::radiusScale;
+    using BaseT::halfband;
+    using BaseT::transform;
+    using BaseT::attributes;
+    using BaseT::filter;
+    using BaseT::interrupter;
 
-/// @brief Smoothed point distribution based sphere stamping with a varying
-///   radius and closest point attribute transfer.
-/// @details Rasterizes points into a level set using [Zhu Bridson 05] sphere
-///   stamping with a variable radius. The radius string parameter expects a
-///   point attribute of type RadiusT to exist. The radiusScale parameter is
-///   multiplier for radius values held on the radius attribute. The searchRadius
-///   parameter remains a fixed size value which represents each points points
-///   maximum contribution to the target level set. The radius scale and search
-///   radius parameters are given in world space units and are applied to every
-///   point to generate a fixed surface mask and consequent distance values. The
-///   search radius should always have a value equal to or larger than the point
-///   radii. Every voxel's closest point is used to transfer each attribute in
-///   the attributes parameter to a new grid of matching topology. The
-///   destination types of these grids is equal to the ValueConverter result of
-///   the attribute type applied to the PointDataGridT.
-/// @note The AttributeTypes template parameter should be a TypeList of the
-///   required or possible attributes types. i.e. TypeList<int, float, double>.
-///   A runtime error will be thrown if no equivalent type for a given attribute
-////  is found in the AttributeTypes TypeList.
-/// @warning The width of the exterior half band *may* be smaller than the
-///   specified half band if the search radius is less than the equivalent
-///   world space halfband distance.
-/// @param points       the point data grid to rasterize
-/// @param radius       the attribute containing the world space radius
-/// @param radiusScale  the scale applied to every world space radius value
-/// @param searchRadius the maximum search distance of every point
-/// @param attributes   list of attributes to transfer
-/// @param halfband     the half band width
-/// @param transform    the target transform for the surface
-/// @param filter       a filter to apply to points
-/// @param interrupter  optional interrupter
-/// @return A vector of grids. The signed distance field is guaranteed to be
-///   first and at the type specified by SdfT. Successive grids are the closest
-///   point attribute grids. These grids are guaranteed to have a topology
-///   and transform equal to the surface.
-template <typename PointDataGridT,
-    typename AttributeTypes,
-    typename RadiusT = float,
-    typename SdfT = typename PointDataGridT::template ValueConverter<float>::Type,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
-GridPtrVec
-rasterizeSmoothSpheres(const PointDataGridT& points,
-                 const std::string& radius,
-                 const Real radiusScale,
-                 const Real searchRadius,
-                 const std::vector<std::string>& attributes,
-                 const Real halfband = LEVEL_SET_HALF_WIDTH,
-                 math::Transform::Ptr transform = nullptr,
-                 const FilterT& filter = NullFilter(),
-                 InterrupterT* interrupter = nullptr);
+    /// @brief  The sphere scale. Points which are not in the inclusion group
+    ///   specified by the pca attributes have their world space radius scaled
+    ///   by this amount. Typically you'd want this value to be <= 1.0 to
+    ///   produce smaller spheres for isolated points.
+    Real sphereScale = 1.0;
+
+    /// @brief  The required principle component analysis attributes which are
+    ///   required to exist on the points being rasterized. These attributes
+    ///   define the rotational and affine transformations which can be used to
+    ///   construct ellipsoids for each point. Typically (for our intended
+    ///   surfacing) these transformations are built by analysing each points
+    ///   neighbourhood distributions and constructing tight ellipsoids that
+    ///   orient themselves to follow these point distributions.
+    PcaAttributes pca;
+};
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #include "impl/PointRasterizeSDFImpl.h"
+#include "impl/PointRasterizeEllipsoidsSDFImpl.h"
 
 #endif //OPENVDB_POINTS_RASTERIZE_SDF_HAS_BEEN_INCLUDED
