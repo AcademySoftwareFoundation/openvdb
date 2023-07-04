@@ -128,8 +128,8 @@ else()
     TestMerge.cc
     TestMeshToVolume.cc
     TestMetadata.cc
-    TestMetadataIO.cc
     TestMetaMap.cc
+    TestMetadataIO.cc
     TestMorphology.cc
     TestMultiResGrid.cc
     TestName.cc
@@ -137,6 +137,7 @@ else()
     TestNodeManager.cc
     TestNodeMask.cc
     TestNodeVisitor.cc
+    TestPCA.cc
     TestParticleAtlas.cc
     TestParticlesToLevelSet.cc
     TestPointAdvect.cc
