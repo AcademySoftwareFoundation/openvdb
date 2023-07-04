@@ -680,7 +680,7 @@ pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
 
     double Sjj_minus_Sii = D[j] - D[i];
 
-    if (fabs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > fabs(Sij)) {
+    if (std::abs(Sjj_minus_Sii) * (10*math::Tolerance<T>::value()) > std::abs(Sij)) {
         tan_of_theta = Sij / Sjj_minus_Sii;
     } else {
         /// pivot on Sij
@@ -688,40 +688,40 @@ pivot(int i, int j, Mat3<T>& S, Vec3<T>& D, Mat3<T>& Q)
 
         if (cotan_of_2_theta < 0.) {
             tan_of_theta =
-                -1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
+                -1./(std::sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) - cotan_of_2_theta);
         } else {
             tan_of_theta =
-                1./(sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
+                1./(std::sqrt(1. + cotan_of_2_theta*cotan_of_2_theta) + cotan_of_2_theta);
         }
     }
 
-    cosin_of_theta = 1./sqrt( 1. + tan_of_theta * tan_of_theta);
+    cosin_of_theta = 1./std::sqrt( 1. + tan_of_theta * tan_of_theta);
     sin_of_theta = cosin_of_theta * tan_of_theta;
     z = tan_of_theta * Sij;
     S(i,j) = 0;
-    D[i] -= z;
-    D[j] += z;
+    D[i] -= T(z);
+    D[j] += T(z);
     for (int k = 0; k < i; ++k) {
         temp = S(k,i);
-        S(k,i) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-        S(k,j)= sin_of_theta * temp + cosin_of_theta * S(k,j);
+        S(k,i) = T(cosin_of_theta * temp - sin_of_theta * S(k,j));
+        S(k,j) = T(sin_of_theta * temp + cosin_of_theta * S(k,j));
     }
     for (int k = i+1; k < j; ++k) {
         temp = S(i,k);
-        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(k,j);
-        S(k,j) = sin_of_theta * temp + cosin_of_theta * S(k,j);
+        S(i,k) = T(cosin_of_theta * temp - sin_of_theta * S(k,j));
+        S(k,j) = T(sin_of_theta * temp + cosin_of_theta * S(k,j));
     }
     for (int k = j+1; k < n; ++k) {
         temp = S(i,k);
-        S(i,k) = cosin_of_theta * temp - sin_of_theta * S(j,k);
-        S(j,k) = sin_of_theta * temp + cosin_of_theta * S(j,k);
+        S(i,k) = T(cosin_of_theta * temp - sin_of_theta * S(j,k));
+        S(j,k) = T(sin_of_theta * temp + cosin_of_theta * S(j,k));
     }
     for (int k = 0; k < n; ++k)
-        {
-            temp = Q(k,i);
-            Q(k,i) = cosin_of_theta * temp - sin_of_theta*Q(k,j);
-            Q(k,j) = sin_of_theta * temp + cosin_of_theta*Q(k,j);
-        }
+    {
+        temp = Q(k,i);
+        Q(k,i) = T(cosin_of_theta * temp - sin_of_theta * Q(k,j));
+        Q(k,j) = T(sin_of_theta * temp + cosin_of_theta * Q(k,j));
+    }
 }
 
 } // namespace mat3_internal
@@ -758,7 +758,7 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
         double er = 0;
         for (int i = 0; i < n; ++i) {
             for (int j = i+1; j < n; ++j) {
-                er += fabs(S(i,j));
+                er += std::abs(S(i,j));
             }
         }
         if (std::abs(er) < math::Tolerance<T>::value()) {
@@ -773,12 +773,12 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
         for (int i = 0; i < n; ++i) {
             for (int j = i+1; j < n; ++j){
 
-                if ( fabs(D[i]) * (10*math::Tolerance<T>::value()) > fabs(S(i,j))) {
+                if ( std::abs(D[i]) * (10*math::Tolerance<T>::value()) > std::abs(S(i,j))) {
                     /// value too small to pivot on
                     S(i,j) = 0;
                 }
-                if (fabs(S(i,j)) > max_element) {
-                    max_element = fabs(S(i,j));
+                if (std::abs(S(i,j)) > max_element) {
+                    max_element = std::abs(S(i,j));
                     ip = i;
                     jp = j;
                 }
