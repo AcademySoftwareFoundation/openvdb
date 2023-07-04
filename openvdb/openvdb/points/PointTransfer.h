@@ -114,7 +114,7 @@ namespace points {
 ///         , mHandle(nullptr) {}
 ///
 ///     /// @brief Range in index space of the source points
-///     Int32 range(const Coord&, size_t) const { return Int32(1); }
+///     Vec3i range(const Coord&, size_t) const { return Vec3i(1); }
 ///
 ///     /// @brief Every time we start a new point leaf, init the position array.
 ///     ///   Always return true as we don't skip any leaf nodes.
@@ -417,19 +417,18 @@ struct RasterizePoints
 
     RasterizePoints(const points::PointDataTree& tree,
                     const TransferT& transfer,
+                    const CoordBBox& pointBounds,
                     const PointFilterT& filter = PointFilterT(),
                     InterrupterT* interrupter = nullptr)
         : mPointAccessor(tree)
         , mTransfer(transfer)
+        , mPointBounds(pointBounds)
         , mFilter(filter)
         , mInterrupter(interrupter) {}
 
     void operator()(LeafNodeT& leaf, const size_t idx) const
     {
-        if (util::wasInterrupted(mInterrupter)) {
-            thread::cancelGroupExecution();
-            return;
-        }
+        if (this->interrupted()) return;
 
         const Coord& origin = leaf.origin();
         auto& mask = leaf.getValueMask();
@@ -450,8 +449,12 @@ struct RasterizePoints
 
         mTransfer.initialize(origin, idx, bounds);
 
-        CoordBBox search = bounds.expandBy(mTransfer.range(origin, idx));
+        CoordBBox search = bounds;
+        const Vec3i range(mTransfer.range(origin, idx));
+        search.min() -= Coord(range);
+        search.max() += Coord(range);
         this->transform<>(search);
+        search.intersect(mPointBounds);
 
         // start the iteration from a leaf origin
         const Coord min = (search.min() & ~(DIM-1));
@@ -474,6 +477,8 @@ struct RasterizePoints
                     if (!pointLeaf) continue;
                     if (!mTransfer.startPointLeaf(*pointLeaf)) continue;
                     localFilter.reset(*pointLeaf);
+
+                    if (this->interrupted()) return;
 
                     // loop over point voxels which contribute to this leaf
                     const Coord& pmin(pbox.min());
@@ -537,9 +542,22 @@ private:
     typename std::enable_if<!std::is_base_of<TransformTransfer, EnableT>::value>::type
     transform(CoordBBox&) const {}
 
+    inline constexpr bool interrupted() const
+    {
+        if constexpr (std::is_same<InterrupterT, util::NullInterrupter>::value) return false;
+        else {
+            if (util::wasInterrupted(mInterrupter)) {
+                thread::cancelGroupExecution();
+                return true;
+            }
+            return false;
+        }
+    }
+
 private:
     const PointDataGrid::ConstAccessor mPointAccessor;
     mutable TransferT mTransfer;
+    const CoordBBox& mPointBounds;
     const PointFilterT& mFilter;
     InterrupterT* mInterrupter;
 };
@@ -567,9 +585,14 @@ rasterize(const PointDataTreeOrGridT& points,
 
     auto& topology = transfer.topology();
     using TreeT = typename std::decay<decltype(topology)>::type;
+
+    // Compute max search bounds
+    CoordBBox bounds;
+    tree.evalLeafBoundingBox(bounds);
+
     tree::LeafManager<TreeT> manager(topology);
     transfer_internal::RasterizePoints<TransferT, TreeT, FilterT, InterrupterT>
-        raster(tree, transfer, filter, interrupter);
+        raster(tree, transfer, bounds, filter, interrupter);
     manager.foreach(raster);
 }
 
