@@ -1,0 +1,57 @@
+name: Build Python Bindings
+
+on:
+  pull_request:
+    branches:
+      - 'master'
+
+jobs:
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name:   Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name:   Install build dependencies
+        run: |
+          python -m pip install build
+
+      - name: 📦 Build the sdist
+        working-directory: ./openvdb/openvdb/python
+        run: |
+          python -m build --sdist
+
+      - name:   Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./openvdb/openvdb/python/dist/
+
+  build-wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name:   Checkout the repo
+        uses: actions/checkout@v3
+
+      - name: 🛞 Build wheels
+        uses: pypa/cibuildwheel@v2.13.1
+        with:
+          package-dir: ./openvdb/openvdb/python
+          config-file: ./openvdb/openvdb/python/pyproject.toml
+        env:
+          CIBW_ARCHS_MACOS: auto universal2
+
+      - name:   Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./openvdb/openvdb/python/dist/
