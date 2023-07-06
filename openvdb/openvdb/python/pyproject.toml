@@ -1,14 +1,14 @@
 [build-system]
 requires = [
-    "scikit_build_core==0.2.1",
-    "pybind11==2.10.3",
+    "scikit_build_core==0.4.7",
+    "pybind11==2.10.4",
     "oldest-supported-numpy"
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "openvdb"
-version = "10.0.1"
+version = "10.0.2"
 description= "Python bindings for OpenVDB: sparse volume data structure and tools."
 dependencies = [
     "numpy",
@@ -17,10 +17,9 @@ readme = "README.md"
 authors = [
   { name = "OpenVDB Developer Team", email = "openvdb-dev@lists.aswf.io" },
 ]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 classifiers = [
   "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
-  "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
