@@ -131,6 +131,9 @@ required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
 option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
 option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_VCL [=[
+Use the internally supplied copy of Agner Fog's vectorclass (VCL) SIMD wrapper library to instrument OpenVDB tools.
+This also requires VCL to be installed along with OpenVDB headers. Only applicable which compiling for x86 targets.]=] OFF)
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
@@ -175,7 +178,7 @@ endif()
 set(_OPENVDB_SIMD_OPTIONS None SSE42 AVX)
 if(NOT OPENVDB_SIMD)
   set(OPENVDB_SIMD None CACHE STRING
-    "Choose whether to enable SIMD compiler flags or not, options are: None SSE42 AVX.
+    "Choose whether to enable x86 SIMD compiler flags or not, options are: None SSE42 AVX.
     Although not required, it is strongly recommended to enable SIMD. AVX implies SSE42.
     None is the default." FORCE
   )
@@ -404,20 +407,24 @@ if(CONCURRENT_MALLOC STREQUAL "Auto")
   endif()
 endif()
 
-# Configure SIMD. AVX implies SSE 4.2.
+# Configure SIMD. AVX implies SSE 4.2 (for our builds)
+# @note  You can also provide target specific flags to CXX_FLAGS, however
+#   OpenVDB may not detect this usage correctly in all places. To ensure
+#   the library is instrumented fully with your desired ISA, it's best to
+#   define these macros.
 
 if(OPENVDB_SIMD STREQUAL "AVX")
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx>")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
   endif()
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_AVX>")
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
+  set(OPENVDB_USE_AVX ON)
+  set(OPENVDB_USE_SSE42 ON)
 elseif(OPENVDB_SIMD STREQUAL "SSE42")
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "(x86)|(X86)|(amd64)|(AMD64)")
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
   endif()
-  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
+  set(OPENVDB_USE_SSE42 ON)
 endif()
 
 #########################################################################
