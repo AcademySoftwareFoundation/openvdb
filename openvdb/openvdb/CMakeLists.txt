@@ -280,6 +280,10 @@ endif()
 
 # Configure the version header
 
+if(USE_VCL)
+  set(OPENVDB_USE_VCL 1)
+endif()
+
 if(USE_IMATH_HALF)
   set(OPENVDB_USE_IMATH_HALF 1)
 endif()
@@ -707,6 +711,9 @@ if(OPENVDB_CORE_STATIC)
     target_include_directories(openvdb_static PUBLIC ../../ext/openexr)
   endif()
 
+  if(USE_VCL)
+    target_include_directories(openvdb_static PUBLIC ../../ext/vcl_version2)
+  endif()
 endif()
 
 # Configure shared build
@@ -749,6 +756,9 @@ if(OPENVDB_CORE_SHARED)
     target_include_directories(openvdb_shared PUBLIC ../../ext/openexr)
   endif()
 
+  if(USE_VCL)
+    target_include_directories(openvdb_shared PUBLIC ../../ext/vcl_version2)
+  endif()
 endif()
 
 ##########################################################################
@@ -788,3 +798,6 @@ if(NOT USE_IMATH_HALF)
   install(DIRECTORY ../../ext/openexr/openvdb DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif()
 
+if(USE_VCL)
+  install(DIRECTORY ../../ext/vcl_version2/openvdb DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
