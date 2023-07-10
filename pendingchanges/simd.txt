@@ -1,0 +1,18 @@
+OpenVDB:
+    New Features:
+        - OpenVDB now includes a copy of Agner Fog's VectorClass Library (VCL)
+        for the use of generically wrapped SIMD intrinsics throughout the core
+        library. VCL supports intel ISA up to AVX512. This support is OFF by
+        default but can be enabled with USE_VCL=ON.
+
+        - PointTransfer algorithms have been instrumented with SIMD instructions
+        which result in significantly improved performance of anywhere up from
+        2x to 4x. This includes all PCA and Point Rasterize methods (except for
+        Ellipsoids).
+
+    Improvements:
+        - The PointTransfer framework now allows transfer schemes to set a power
+        of two Batch Size for bucket rasterizing. This results in improved
+        performance for PCA and all PointRasterize methods, even without the use
+        of VCL/SIMD intrinsics.
+
