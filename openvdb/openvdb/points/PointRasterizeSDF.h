@@ -73,9 +73,10 @@
 #include <openvdb/Types.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/points/PrincipleComponentAnalysis.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
-#include <openvdb/points/PrincipleComponentAnalysis.h>
+#include <openvdb/util/Simd.h>
 
 #include <unordered_map>
 

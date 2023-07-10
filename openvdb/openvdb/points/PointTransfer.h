@@ -26,6 +26,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/thread/Threading.h>
+#include <openvdb/util/Simd.h>
 
 #include <type_traits>
 #include <tuple>
@@ -330,6 +331,15 @@ private:
 
 namespace transfer_internal
 {
+
+template<class TransferT, class = void>
+struct GetBatchSize : std::integral_constant<size_t, 1> {};
+
+template<class TransferT>
+struct GetBatchSize<TransferT,
+    std::enable_if_t<std::is_invocable_r<size_t, decltype(TransferT::GetBatchSize)>::value>>
+        : std::integral_constant<size_t, TransferT::GetBatchSize()> {};
+
 template<typename T, typename F, size_t... Is>
 void foreach(T&& t, const F& func, std::integer_sequence<size_t, Is...>)
 {
@@ -401,12 +411,66 @@ inline void VolumeTransfer<TreeTypes...>::foreach(const FunctorT& functor)
 
 namespace transfer_internal
 {
+
+template <size_t BatchSize>
+struct PointCache
+{
+    PointCache()
+        : mPoints()
+        , mCachedPoints(0)
+        , mIjk(Coord::min()) {}
+
+    // Reset the point cache data between threads
+    PointCache(const PointCache&)
+        : mPoints()
+        , mCachedPoints(0)
+        , mIjk(Coord::min()) {}
+
+    const Coord* ijk() const { return &mIjk; }
+    size_t size() const { assert(mCachedPoints <= BatchSize); return mCachedPoints; }
+    const std::array<int64_t, BatchSize>* points() const { return &mPoints; }
+
+    void add(size_t i) const {
+        assert(mCachedPoints < BatchSize);
+        mPoints[mCachedPoints++] = i;
+    }
+    void reset(const Coord& ijk) const
+    {
+        mIjk = ijk;
+        mCachedPoints = 0;
+    }
+    void reset() const { mCachedPoints = 0; }
+    void setRemainingOff() const {
+        for (size_t i = this->size(); i < BatchSize; ++i) {
+            mPoints[i] = -1;
+        }
+    }
+
+private:
+    mutable std::array<int64_t, BatchSize> mPoints;
+    mutable size_t mCachedPoints;
+    mutable Coord mIjk;
+};
+
+template <>
+struct PointCache<1>
+{
+    const Coord* ijk() const { return nullptr; }
+    size_t size() const { return 0; }
+    const std::array<int64_t, 1>* points() const { return nullptr; }
+    void add(size_t) const {}
+    void reset(const Coord&) const {}
+    void reset() const {}
+    void setRemainingOff() const {}
+};
+
 template <typename TransferT,
           typename TopologyT,
           typename PointFilterT = points::NullFilter,
           typename InterrupterT = util::NullInterrupter>
-struct RasterizePoints
+struct RasterizePoints : public PointCache<GetBatchSize<TransferT>::value>
 {
+    static constexpr size_t BatchSize = GetBatchSize<TransferT>::value;
     using LeafManagerT = tree::LeafManager<TopologyT>;
     using LeafNodeT = typename LeafManagerT::LeafNodeType;
 
@@ -419,7 +483,8 @@ struct RasterizePoints
                     const CoordBBox& pointBounds,
                     const PointFilterT& filter = PointFilterT(),
                     InterrupterT* interrupter = nullptr)
-        : mPointAccessor(tree)
+        : PointCache<BatchSize>()
+        , mPointAccessor(tree)
         , mTransfer(transfer)
         , mPointBounds(pointBounds)
         , mFilter(filter)
@@ -494,15 +559,15 @@ struct RasterizePoints
                                 Index id = (index == 0) ? 0 : Index(pointLeaf->getValue(index - 1));
                                 for (; id < end; ++id) {
                                     if (!localFilter.valid(&id)) continue;
-                                    mTransfer.rasterizePoint(ijk, id, bounds);
+                                    this->rasterizePoint(ijk, id, bounds);
                                 } //point idx
                             }
                         }
                     } // outer point voxel
 
-                    if (!mTransfer.endPointLeaf(*pointLeaf)) {
+                    if (!this->endPointLeaf(*pointLeaf, bounds)) {
                         // rescurse if necessary
-                        if (!mTransfer.finalize(origin, idx)) {
+                        if (!this->finalize(origin, idx, bounds)) {
                             this->operator()(leaf, idx);
                         }
                         return;
@@ -512,7 +577,7 @@ struct RasterizePoints
         } // outer leaf node
 
         // rescurse if necessary
-        if (!mTransfer.finalize(origin, idx)) {
+        if (!this->finalize(origin, idx, bounds)) {
             this->operator()(leaf, idx);
         }
     }
@@ -525,6 +590,89 @@ struct RasterizePoints
     }
 
 private:
+
+    void rasterizeN(const Coord& ijk, const CoordBBox& bounds) const
+    {
+        static_assert((BatchSize & (BatchSize - 1)) == 0 &&
+            (BatchSize > 0) && (BatchSize <= 16));
+
+        if constexpr(BatchSize == 1) {
+            return;
+        }
+        else {
+            const PointCache<BatchSize>& cache = *this;
+
+            if (cache.size() == 0) return;
+            if (cache.size() == 1) {
+                mTransfer.rasterizePoint(ijk, Index((*cache.points())[0]), bounds);
+                return;
+            }
+
+            cache.setRemainingOff();
+
+            if constexpr(BatchSize == 16) {
+                if      (cache.size() <= 2)  mTransfer.template rasterizeN2<2>(ijk,  *cache.points(), bounds);
+                else if (cache.size() <= 4)  mTransfer.template rasterizeN2<4>(ijk,  *cache.points(), bounds);
+                else if (cache.size() <= 8)  mTransfer.template rasterizeN2<8>(ijk,  *cache.points(), bounds);
+                else                         mTransfer.template rasterizeN2<16>(ijk, *cache.points(), bounds);
+            }
+            else if constexpr(BatchSize == 8) {
+                if (cache.size() <= 2)       mTransfer.template rasterizeN2<2>(ijk,  *cache.points(), bounds);
+                else if (cache.size() <= 4)  mTransfer.template rasterizeN2<4>(ijk,  *cache.points(), bounds);
+                else                         mTransfer.template rasterizeN2<8>(ijk,  *cache.points(), bounds);
+            }
+            else if constexpr(BatchSize == 4) {
+                if (cache.size() <= 2)       mTransfer.template rasterizeN2<2>(ijk,  *cache.points(), bounds);
+                else                         mTransfer.template rasterizeN2<4>(ijk,  *cache.points(), bounds);
+            }
+            else if constexpr(BatchSize == 2) {
+                mTransfer.template rasterizeN2<2>(ijk,  *cache.points(), bounds);
+            }
+        }
+    }
+
+    void rasterizePoint(const Coord& ijk, const Index id, const CoordBBox& bounds) const
+    {
+        if constexpr(BatchSize == 1) {
+            mTransfer.rasterizePoint(ijk, id, bounds);
+        }
+        else {
+            const PointCache<BatchSize>& cache = *this;
+            if (*cache.ijk() != ijk) {
+                this->rasterizeN(*cache.ijk(), bounds);
+                cache.reset(ijk);
+                assert(cache.size() == 0);
+            }
+
+            cache.add(static_cast<int64_t>(id));
+
+            if (cache.size() == BatchSize) {
+                mTransfer.template rasterizeN2<BatchSize>(ijk, *cache.points(), bounds);
+                cache.reset();
+            }
+        }
+    }
+
+    bool endPointLeaf(const points::PointDataTree::LeafNodeType& leaf,
+        const CoordBBox& bounds) const
+    {
+        if constexpr(BatchSize > 1) {
+            const PointCache<BatchSize>& cache = *this;
+            this->rasterizeN(*cache.ijk(), bounds);
+            cache.reset();
+        }
+        return mTransfer.endPointLeaf(leaf);
+    }
+
+    bool finalize(const Coord& origin, const size_t idx, const CoordBBox& bounds) const
+    {
+        if constexpr(BatchSize > 1) {
+            const PointCache<BatchSize>& cache = *this;
+            this->rasterizeN(*cache.ijk(), bounds);
+            cache.reset();
+        }
+        return mTransfer.finalize(origin, idx);
+    }
 
     template <typename EnableT = TransferT>
     typename std::enable_if<std::is_base_of<TransformTransfer, EnableT>::value>::type

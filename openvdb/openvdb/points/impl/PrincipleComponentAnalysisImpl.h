@@ -4,7 +4,7 @@
 #ifndef OPENVDB_POINTS_POINT_PRINCIPLE_COMPONENT_ANALYSIS_IMPL_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_PRINCIPLE_COMPONENT_ANALYSIS_IMPL_HAS_BEEN_INCLUDED
 
-#ifdef OPENVDB_PROFILE_PCA
+#ifdef OPENVDB_POINTS_PROFILE
 #include <openvdb/util/CpuTimer.h>
 #endif
 
@@ -15,7 +15,7 @@ namespace points {
 
 namespace pca_internal {
 
-#ifdef OPENVDB_PROFILE_PCA
+#ifdef OPENVDB_POINTS_PROFILE
 using PcaTimer = util::CpuTimer;
 #else
 struct PcaTimer {
@@ -24,8 +24,20 @@ inline void stop() {}
 };
 #endif
 
-using WeightSumT = double;
-using WeightedPositionSumT = Vec3d;
+// The precision of the kernel arithmetic
+// @note  for the most part float precision is fine and significantly faster
+//   with the SIMD impl. However, we're currently using the world space
+//   positions of the points for the length calculations. We should probably
+//   instead use the index + voxel space positions and subtract the integer
+//   voxel coordinates separately before adding to the voxel space floating
+//   point offset to increase precision of the length calculations at 32bit
+//   (we can apply this to all the surfacing kernels too and probably end up
+//   demoting the double precision requirement there).
+using RealT = float;
+static_assert(std::is_same<RealT, float>::value ||
+    std::is_same<RealT, double>::value);
+using WeightSumT = RealT;
+using WeightedPositionSumT = math::Vec3<RealT>;
 using GroupIndexT = points::AttributeSet::Descriptor::GroupIndex;
 
 struct AttrIndices
@@ -67,13 +79,13 @@ struct PcaTransfer
     using PositionHandleT = points::AttributeHandle<Vec3d, NullCodec>;
 
     PcaTransfer(const AttrIndices& indices,
-                const float searchRadius,
-                const Real vs,
+                const RealT searchRadius,
+                const RealT vs,
                 tree::LeafManager<PointDataTreeT>& manager)
         : BaseT(manager.tree())
         , mIndices(indices)
         , mSearchRadius(searchRadius)
-        , mDxInv(1.0/vs)
+        , mDxInv(RealT(1.0)/vs)
         , mManager(manager)
         , mTargetPosition()
         , mSourcePosition() {}
@@ -105,6 +117,15 @@ struct PcaTransfer
     }
     */
 
+#ifndef OPENVDB_DISABLE_BATCHED_TRANSFERS
+    static constexpr size_t GetBatchSize()
+    {
+        using namespace openvdb::util;
+        using NativeT = simd::SimdNativeT<RealT>::Type;
+        return simd::SimdTraits<NativeT>::size;
+    }
+#endif
+
     Vec3i range(const Coord&, size_t) const { return this->range(); }
     Vec3i range() const { return Vec3i(math::Round(mSearchRadius * mDxInv)); }
 
@@ -126,8 +147,8 @@ struct PcaTransfer
 
 protected:
     const AttrIndices& mIndices;
-    const float mSearchRadius;
-    const Real mDxInv;
+    const RealT mSearchRadius;
+    const RealT mDxInv;
     const tree::LeafManager<PointDataTreeT>& mManager;
     std::unique_ptr<PositionHandleT> mTargetPosition;
     std::unique_ptr<PositionHandleT> mSourcePosition;
@@ -144,9 +165,9 @@ struct WeightPosSumsTransfer
     static const Index LOG2DIM = PointDataTreeT::LeafNodeType::LOG2DIM;
 
     WeightPosSumsTransfer(const AttrIndices& indices,
-                          const float searchRadius,
+                          const RealT searchRadius,
                           const int32_t neighbourThreshold,
-                          const Real vs,
+                          const RealT vs,
                           tree::LeafManager<PointDataTreeT>& manager)
         : BaseT(indices, searchRadius, vs, manager)
         , mNeighbourThreshold(neighbourThreshold)
@@ -174,30 +195,30 @@ struct WeightPosSumsTransfer
                     const Index pid,
                     const CoordBBox& bounds)
     {
-        const Vec3d Psrc(this->mSourcePosition->get(pid));
-        const Vec3d PsrcIS = Psrc * this->mDxInv;
+        const math::Vec3<RealT> Psrc(this->mSourcePosition->get(pid));
+        const math::Vec3<RealT> PsrcIS(Psrc * this->mDxInv);
 
         const auto* const data = this->template buffer<0>();
         const auto& mask = *(this->template mask<0>());
 
-        const float searchRadiusInv = 1.0f / this->mSearchRadius;
-        const Real searchRadius2 = math::Pow2(this->mSearchRadius);
-        const Real searchRadiusIS2 = math::Pow2(this->mSearchRadius * this->mDxInv);
+        const RealT searchRadiusInv(RealT(1.0) / this->mSearchRadius);
+        const RealT searchRadius2(math::Pow2(this->mSearchRadius));
+        const RealT searchRadiusIS2(math::Pow2(this->mSearchRadius * this->mDxInv));
 
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const Real minx = c.x() - 0.5;
-            const Real maxx = c.x() + 0.5;
-            const Real dminx =
+            const RealT minx = RealT(c.x()) - RealT(0.5);
+            const RealT maxx = RealT(c.x()) + RealT(0.5);
+            const RealT dminx =
                 (PsrcIS[0] < minx ? math::Pow2(PsrcIS[0] - minx) :
                 (PsrcIS[0] > maxx ? math::Pow2(PsrcIS[0] - maxx) : 0));
             if (dminx > searchRadiusIS2) continue;
             const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const Real miny = c.y() - 0.5;
-                const Real maxy = c.y() + 0.5;
-                const Real dminxy = dminx +
+                const RealT miny = RealT(c.y()) - RealT(0.5);
+                const RealT maxy = RealT(c.y()) + RealT(0.5);
+                const RealT dminxy = dminx +
                     (PsrcIS[1] < miny ? math::Pow2(PsrcIS[1] - miny) :
                     (PsrcIS[1] > maxy ? math::Pow2(PsrcIS[1] - maxy) : 0));
                 if (dminxy > searchRadiusIS2) continue;
@@ -206,9 +227,9 @@ struct WeightPosSumsTransfer
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue;
 
-                    const Real minz = c.z() - 0.5;
-                    const Real maxz = c.z() + 0.5;
-                    const Real dminxyz = dminxy +
+                    const RealT minz = RealT(c.z()) - RealT(0.5);
+                    const RealT maxz = RealT(c.z()) + RealT(0.5);
+                    const RealT dminxyz = dminxy +
                         (PsrcIS[2] < minz ? math::Pow2(PsrcIS[2] - minz) :
                         (PsrcIS[2] > maxz ? math::Pow2(PsrcIS[2] - maxz) : 0));
                     // Does this point's radius overlap the voxel c
@@ -217,12 +238,18 @@ struct WeightPosSumsTransfer
                     const Index end = data[offset];
                     Index id = (offset == 0) ? 0 : Index(data[offset - 1]);
                     for (; id < end; ++id) {
-                        const Vec3d Ptgt(this->mTargetPosition->get(id));
-                        const Real d2 = (Psrc - Ptgt).lengthSqr();
+                        // @todo  Length compute should probably always be done
+                        //   at double precision but this needs to match the SimD
+                        //   variant. This is because we are using the world space
+                        //   positions here. If instead we used ijk + P.get(), we
+                        //   could subtract the integer voxel coordinates separately
+                        //   to guarantee better accuracy with 32bit floats
+                        const math::Vec3<RealT> Ptgt(this->mTargetPosition->get(id));
+                        const RealT d2((Psrc - Ptgt).lengthSqr());
                         if (d2 > searchRadius2) continue;
 
-                        const float weight = 1.0f - math::Pow3(float(math::Sqrt(d2)) * searchRadiusInv);
-                        assert(weight >= 0.0f && weight <= 1.0f);
+                        const WeightSumT weight = WeightSumT(1.0) - math::Pow3(math::Sqrt(d2) * searchRadiusInv);
+                        assert(weight >= WeightSumT(0.0) && weight <= WeightSumT(1.0));
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
                         mWeights[id] += weight;
@@ -238,6 +265,71 @@ struct WeightPosSumsTransfer
             }
         } // outer sdf voxel
     } // point idx
+
+    template <size_t Size>
+    inline void rasterizeN2(const Coord&,
+        const std::array<int64_t, BaseT::GetBatchSize()>& points,
+        const CoordBBox& bounds)
+    {
+        using namespace openvdb::util;
+
+        if constexpr (std::is_same<float, RealT>::value && Size == 2) {
+            /// No such SIMD type for 2x32bit floats, treat as four
+            static_assert(BaseT::GetBatchSize() >= 4);
+            assert(points[2] == -1 && points[3] == -1);
+            this->rasterizeN2<4>(Coord(), points, bounds);
+        }
+        else {
+            using SimdT = typename simd::SimdT<RealT, Size>::Type;
+            using SimdIT = typename simd::SimdT<int64_t, Size>::Type;
+            using SimdMT = typename simd::SimdTraits<SimdT>::MaskT;
+
+            // simd containers
+            SimdT px, py, pz, pix, piy, piz;
+            std::array<RealT, 3*Size> cache;
+
+            assert(points[0] != -1);
+            const SimdIT ids = simd::load<Size>(points.data());
+
+            SimdMT validMask;
+            if constexpr (sizeof(RealT) == sizeof(int64_t)) {
+                validMask = simd::neq(ids, SimdIT(-1));
+            }
+            else {
+                using SimdIMT = typename simd::SimdTraits<SimdIT>::MaskT;
+                const SimdIMT v = simd::neq(ids, SimdIT(-1));
+                validMask = SimdMT(simd::compress(SimdIT(v)));
+            }
+
+#if defined(__GNUC__)  && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+            math::Vec3<RealT> tmp;
+            // convert AoS to SoA
+            for (size_t i = 0; i < Size; ++i) {
+                if (points[i] != -1) {
+                    tmp = math::Vec3<RealT>(this->mSourcePosition->get(Index(points[i])));
+                }
+                cache[i+(Size*0)] = tmp[0];
+                cache[i+(Size*1)] = tmp[1];
+                cache[i+(Size*2)] = tmp[2];
+            }
+#if defined(__GNUC__)  && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
+            px = simd::load<Size>(cache.data() + (Size*0));
+            py = simd::load<Size>(cache.data() + (Size*1));
+            pz = simd::load<Size>(cache.data() + (Size*2));
+
+            pix = simd::mul(px, SimdT(this->mDxInv));
+            piy = simd::mul(py, SimdT(this->mDxInv));
+            piz = simd::mul(pz, SimdT(this->mDxInv));
+
+            this->stamp<SimdT>(px, py, pz, pix, piy, piz, validMask, bounds);
+        }
+    }
 
     bool finalize(const Coord&, size_t idx)
     {
@@ -259,8 +351,12 @@ struct WeightPosSumsTransfer
             // every point will have a self contribution (unless this operation
             // has been interrupted or the search radius was 0) so account for
             // that here
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+            assert(mWeights[i] > WeightSumT(0.0));
+#else
+            assert(mWeights->get(i) > WeightSumT(0.0));
+#endif
             assert(mCounts[i] >= 1);
-            assert(mWeights[i] > 0.0f);
             mCounts[i] -= 1;
 
             // turn points OFF if they are ON and don't meet max neighbour requirements
@@ -273,23 +369,134 @@ struct WeightPosSumsTransfer
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
             // Account for self contribution
-            mWeights[i] -= 1.0f;
-            mWeightedPositions[i] -= this->mTargetPosition->get(i);
-            assert(mWeights[i] > 0.0f);
+            mWeights[i] -= WeightSumT(1.0);
+            mWeightedPositions[i] -= WeightedPositionSumT(this->mTargetPosition->get(i));
+            assert(mWeights[i] > WeightSumT(0.0));
             // Now normalize
-            mWeights[i] = 1.0 / mWeights[i];
+            mWeights[i] = WeightSumT(1.0) / mWeights[i];
             mWeightedPositions[i] *= mWeights[i];
 #else
             // Account for self contribution
-            mWeights->set(i, mWeights->get(i) - 1.0f);
-            mWeightedPositions->set(i, mWeightedPositions->get(i) - this->mTargetPosition->get(i));
-            assert(mWeights->get(i) > 0.0f);
+            mWeights->set(i, mWeights->get(i) - WeightSumT(1.0));
+            mWeightedPositions->set(i, mWeightedPositions->get(i) - WeightedPositionSumT(this->mTargetPosition->get(i)));
+            assert(mWeights->get(i) > WeightSumT(0.0));
             // Now normalize
-            mWeights->set(i, 1.0 / mWeights->get(i));
+            mWeights->set(i, WeightSumT(1.0) / mWeights->get(i));
             mWeightedPositions->set(i, mWeightedPositions->get(i) * mWeights->get(i));
 #endif
         }
         return true;
+    }
+
+private:
+    template<typename ScalarT, typename MaskT> /// Real or SimdT
+    inline void stamp(const ScalarT& Px,
+                    const ScalarT& Py,
+                    const ScalarT& Pz,
+                    const ScalarT& Pix,
+                    const ScalarT& Piy,
+                    const ScalarT& Piz,
+                    const MaskT& m,
+                    const CoordBBox& intersection)
+    {
+        using namespace openvdb::util;
+
+        assert(simd::horizontal_and(simd::is_finite(Px)));
+        assert(simd::horizontal_and(simd::is_finite(Py)));
+        assert(simd::horizontal_and(simd::is_finite(Pz)));
+
+        ScalarT tx, ty, tz;
+
+        const auto* const data = this->template buffer<0>();
+        const auto& mask = *(this->template mask<0>());
+
+        const ScalarT searchRadiusInv(RealT(1.0) / this->mSearchRadius);
+        const ScalarT searchRadius2(math::Pow2(this->mSearchRadius));
+        const RealT searchRadiusIS2 = math::Pow2(this->mSearchRadius * this->mDxInv);
+
+        const Coord& a(intersection.min());
+        const Coord& b(intersection.max());
+        for (Coord c = a; c.x() <= b.x(); ++c.x()) {
+            const ScalarT minx(RealT(c.x()) - RealT(0.5));
+            const ScalarT maxx(RealT(c.x()) + RealT(0.5));
+            const ScalarT x2min = simd::pow2(simd::sub(Pix, minx));
+            const ScalarT x2max = simd::pow2(simd::sub(Pix, maxx));
+            const ScalarT dminx =
+                simd::select(simd::lt(Pix, minx), x2min,
+                    simd::select(simd::gt(Pix, maxx), x2max, ScalarT(0)));
+            if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
+            const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
+
+            for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                const ScalarT miny(RealT(c.y()) - RealT(0.5));
+                const ScalarT maxy(RealT(c.y()) + RealT(0.5));
+                const ScalarT y2min = simd::pow2(simd::sub(Piy, miny));
+                const ScalarT y2max = simd::pow2(simd::sub(Piy, maxy));
+                const ScalarT dminxy = simd::add(dminx,
+                    simd::select(simd::lt(Piy, miny), y2min,
+                        simd::select(simd::gt(Piy, maxy), y2max, ScalarT(0))));
+                if (simd::horizontal_min(dminxy) > searchRadiusIS2) continue;
+                const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
+
+                for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                    const Index offset = ij + /*k*/(c.z() & (DIM-1u));
+                    if (!mask.isOn(offset)) continue;
+
+                    const ScalarT minz(RealT(c.z()) - RealT(0.5));
+                    const ScalarT maxz(RealT(c.z()) + RealT(0.5));
+                    const ScalarT z2min = simd::pow2(simd::sub(Piz, minz));
+                    const ScalarT z2max = simd::pow2(simd::sub(Piz, maxz));
+                    const ScalarT dminxyz = simd::add(dminxy,
+                        simd::select(simd::lt(Piz, minz), z2min,
+                            simd::select(simd::gt(Piz, maxz), z2max, ScalarT(0))));
+
+                    // Does this point's radius overlap the voxel c
+                    if (simd::horizontal_min(dminxyz) > searchRadiusIS2) continue;
+
+                    const Index end = data[offset];
+                    Index id = (offset == 0) ? 0 : Index(data[offset - 1]);
+                    for (; id < end; ++id) {
+                        const math::Vec3<RealT> Ptgt(this->mTargetPosition->get(id));
+                        // compute length to Ptgt and store in tx
+                        // @todo  Length compute should probably always be done
+                        //   at double precision (see comment in scalar impl)
+                        tx = simd::sub(Px, ScalarT(Ptgt[0]));
+                        ty = simd::sub(Py, ScalarT(Ptgt[1]));
+                        tz = simd::sub(Pz, ScalarT(Ptgt[2]));
+                        tx = simd::add(simd::pow2(tx), simd::add(simd::pow2(ty), simd::pow2(tz)));
+
+                        const auto pmask = simd::logical_and(simd::lte(tx, searchRadius2), m);
+                        const int c = simd::horizontal_count(pmask);
+                        if (c == 0) continue;
+
+                        ScalarT weights = simd::sub(ScalarT(1.0), simd::pow3(simd::mul(simd::sqrt(tx), searchRadiusInv)));
+                        weights = simd::select(pmask, weights, ScalarT(0.0));
+                        assert(simd::horizontal_and(simd::is_finite(weights)));
+                        assert(simd::horizontal_min(weights) >= 0.0);
+                        assert(simd::horizontal_max(weights) <= 1.0);
+
+                        const WeightSumT weight = simd::horizontal_add(weights);
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+                        mWeights[id] += weight;
+                        mWeightedPositions[id][0] += simd::horizontal_add(simd::mul(Px, weights)); // @note: world space position is weighted
+                        mWeightedPositions[id][1] += simd::horizontal_add(simd::mul(Py, weights)); // @note: world space position is weighted
+                        mWeightedPositions[id][2] += simd::horizontal_add(simd::mul(Pz, weights)); // @note: world space position is weighted
+#else
+                        // @warning  much slower than accessing the buffers directly
+                        mWeights->set(id, mWeights->get(id) + weight);
+                        auto wp = mWeightedPositions->get(id);
+                        // @note: world space position is weighted
+                        wp[0] += simd::horizontal_add(simd::mul(Px, weights));
+                        wp[1] += simd::horizontal_add(simd::mul(Py, weights));
+                        wp[2] += simd::horizontal_add(simd::mul(Pz, weights));
+                        mWeightedPositions->set(id, wp);
+#endif
+                        mCounts[id] += c;
+                    } //point idx
+                }
+            }
+        }
     }
 
 private:
@@ -314,8 +521,8 @@ struct CovarianceTransfer
     static const Index LOG2DIM = PointDataTreeT::LeafNodeType::LOG2DIM;
 
     CovarianceTransfer(const AttrIndices& indices,
-                       const float searchRadius,
-                       const Real vs,
+                       const RealT searchRadius,
+                       const RealT vs,
                        tree::LeafManager<PointDataTreeT>& manager)
         : BaseT(indices, searchRadius, vs, manager)
         , mIsSameLeaf()
@@ -352,30 +559,30 @@ struct CovarianceTransfer
                     const Index pid,
                     const CoordBBox& bounds)
     {
-        const Vec3d Psrc(this->mSourcePosition->get(pid));
-        const Vec3d PsrcIS = Psrc * this->mDxInv;
+        const math::Vec3<RealT> Psrc(this->mSourcePosition->get(pid));
+        const math::Vec3<RealT> PsrcIS(Psrc * this->mDxInv);
 
         const auto* const data = this->template buffer<0>();
         const auto& mask = *(this->template mask<0>());
 
-        const float searchRadiusInv = 1.0f/this->mSearchRadius;
-        const Real searchRadius2 = math::Pow2(this->mSearchRadius);
-        const Real searchRadiusIS2 = math::Pow2(this->mSearchRadius * this->mDxInv);
+        const RealT searchRadiusInv(RealT(1.0) / this->mSearchRadius);
+        const RealT searchRadius2(math::Pow2(this->mSearchRadius));
+        const RealT searchRadiusIS2(math::Pow2(this->mSearchRadius * this->mDxInv));
 
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
-            const Real minx = c.x() - 0.5;
-            const Real maxx = c.x() + 0.5;
-            const Real dminx =
+            const RealT minx = RealT(c.x()) - RealT(0.5);
+            const RealT maxx = RealT(c.x()) + RealT(0.5);
+            const RealT dminx =
                 (PsrcIS[0] < minx ? math::Pow2(PsrcIS[0] - minx) :
                 (PsrcIS[0] > maxx ? math::Pow2(PsrcIS[0] - maxx) : 0));
             if (dminx > searchRadiusIS2) continue;
             const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
             for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
-                const Real miny = c.y() - 0.5;
-                const Real maxy = c.y() + 0.5;
-                const Real dminxy = dminx +
+                const RealT miny = RealT(c.y()) - RealT(0.5);
+                const RealT maxy = RealT(c.y()) + RealT(0.5);
+                const RealT dminxy = dminx +
                     (PsrcIS[1] < miny ? math::Pow2(PsrcIS[1] - miny) :
                     (PsrcIS[1] > maxy ? math::Pow2(PsrcIS[1] - maxy) : 0));
                 if (dminxy > searchRadiusIS2) continue;
@@ -384,9 +591,9 @@ struct CovarianceTransfer
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue;
 
-                    const Real minz = c.z() - 0.5;
-                    const Real maxz = c.z() + 0.5;
-                    const Real dminxyz = dminxy +
+                    const RealT minz = RealT(c.z()) - RealT(0.5);
+                    const RealT maxz = RealT(c.z()) + RealT(0.5);
+                    const RealT dminxyz = dminxy +
                         (PsrcIS[2] < minz ? math::Pow2(PsrcIS[2] - minz) :
                         (PsrcIS[2] > maxz ? math::Pow2(PsrcIS[2] - maxz) : 0));
                     // Does this point's radius overlap the voxel c
@@ -399,8 +606,14 @@ struct CovarianceTransfer
                         // @note  Could remove self contribution as in WeightPosSumsTransfer
                         //   it adds a small % overhead to this entire operator
                         if (OPENVDB_UNLIKELY(mIsSameLeaf && id == pid)) continue;
-                        const Vec3d Ptgt(this->mTargetPosition->get(id));
-                        const Real d2 = (Psrc - Ptgt).lengthSqr();
+                        // @todo  Length compute should probably always be done
+                        //   at double precision but this needs to match the SimD
+                        //   variant. This is because we are using the world space
+                        //   positions here. If instead we used ijk + P.get(), we
+                        //   could subtract the integer voxel coordinates separately
+                        //   to guarantee better accuracy with 32bit floats
+                        const math::Vec3<RealT> Ptgt(this->mTargetPosition->get(id));
+                        const RealT d2((Psrc - Ptgt).lengthSqr());
                         if (d2 > searchRadius2) continue;
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
@@ -413,7 +626,7 @@ struct CovarianceTransfer
                         const WeightedPositionSumT currWeightSum = mWeightedPositions->get(id);
 #endif
 
-                        const WeightSumT weight = 1.0f - math::Pow3(float(math::Sqrt(d2)) * searchRadiusInv);
+                        const WeightSumT weight = WeightSumT(1.0) - math::Pow3(math::Sqrt(d2) * searchRadiusInv);
                         const WeightedPositionSumT posMeanDiff = Psrc - currWeightSum;
                         const WeightedPositionSumT x = (totalWeightInv * weight) * posMeanDiff;
 
@@ -449,7 +662,212 @@ struct CovarianceTransfer
         } // outer sdf voxel
     } // point idx
 
+    template <size_t Size>
+    inline void rasterizeN2(const Coord&,
+        const std::array<int64_t, BaseT::GetBatchSize()>& points,
+        const CoordBBox& bounds)
+    {
+        using namespace openvdb::util;
+
+        if constexpr (std::is_same<float, RealT>::value && Size == 2) {
+            this->rasterizeN2<4>(Coord(), points, bounds);
+        }
+        else {
+            using SimdT = typename simd::SimdT<RealT, Size>::Type;
+            using SimdIT = typename simd::SimdT<int64_t, Size>::Type;
+            using SimdMT = typename simd::SimdTraits<SimdT>::MaskT;
+
+            // simd containers
+            SimdT px, py, pz, pix, piy, piz;
+            std::array<RealT, 3*Size> cache;
+
+            assert(points[0] != -1);
+            const SimdIT ids = simd::load<Size>(points.data());
+
+            SimdMT validMask;
+            if constexpr (sizeof(RealT) == sizeof(int64_t)) {
+                validMask = simd::neq(ids, SimdIT(-1));
+            }
+            else {
+                using SimdIMT = typename simd::SimdTraits<SimdIT>::MaskT;
+                const SimdIMT v = simd::neq(ids, SimdIT(-1));
+                validMask = SimdMT(simd::compress(SimdIT(v)));
+            }
+
+#if defined(__GNUC__)  && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
+            math::Vec3<RealT> tmp;
+            // convert AoS to SoA
+            for (size_t i = 0; i < Size; ++i) {
+                if (points[i] != -1) {
+                    tmp = math::Vec3<RealT>(this->mSourcePosition->get(Index(points[i])));
+                }
+                cache[i+(Size*0)] = tmp[0];
+                cache[i+(Size*1)] = tmp[1];
+                cache[i+(Size*2)] = tmp[2];
+            }
+#if defined(__GNUC__)  && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
+            px = simd::load<Size>(cache.data() + (Size*0));
+            py = simd::load<Size>(cache.data() + (Size*1));
+            pz = simd::load<Size>(cache.data() + (Size*2));
+
+            pix = simd::mul(px, SimdT(this->mDxInv));
+            piy = simd::mul(py, SimdT(this->mDxInv));
+            piz = simd::mul(pz, SimdT(this->mDxInv));
+
+            this->stamp<SimdT>(px, py, pz, pix, piy, piz, ids, validMask, bounds);
+        }
+    }
+
     bool finalize(const Coord&, size_t) { return true; }
+
+private:
+    template<typename ScalarT, typename IdT, typename MaskT> /// Real or SimdT
+    inline void stamp(const ScalarT& Px,
+                    const ScalarT& Py,
+                    const ScalarT& Pz,
+                    const ScalarT& Pix,
+                    const ScalarT& Piy,
+                    const ScalarT& Piz,
+                    const IdT& ids,
+                    const MaskT& m,
+                    const CoordBBox& intersection)
+    {
+        using namespace openvdb::util;
+
+        assert(simd::horizontal_and(simd::is_finite(Px)));
+        assert(simd::horizontal_and(simd::is_finite(Py)));
+        assert(simd::horizontal_and(simd::is_finite(Pz)));
+
+        ScalarT tx, ty, tz, wx, wy, wz;
+
+        const auto* const data = this->template buffer<0>();
+        const auto& mask = *(this->template mask<0>());
+
+        const ScalarT searchRadiusInv(RealT(1.0) / this->mSearchRadius);
+        const ScalarT searchRadius2(math::Pow2(this->mSearchRadius));
+        const RealT searchRadiusIS2(math::Pow2(this->mSearchRadius * this->mDxInv));
+
+        const Coord& a(intersection.min());
+        const Coord& b(intersection.max());
+        for (Coord c = a; c.x() <= b.x(); ++c.x()) {
+            const ScalarT minx(RealT(c.x()) - RealT(0.5));
+            const ScalarT maxx(RealT(c.x()) + RealT(0.5));
+            const ScalarT x2min = simd::pow2(simd::sub(Pix, minx));
+            const ScalarT x2max = simd::pow2(simd::sub(Pix, maxx));
+            const ScalarT dminx =
+                simd::select(simd::lt(Pix, minx), x2min,
+                    simd::select(simd::gt(Pix, maxx), x2max, ScalarT(0)));
+            if (simd::horizontal_min(dminx) > searchRadiusIS2) continue;
+            const Index i = ((c.x() & (DIM-1u)) << 2*LOG2DIM); // unsigned bit shift mult
+
+            for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                const ScalarT miny(RealT(c.y()) - RealT(0.5));
+                const ScalarT maxy(RealT(c.y()) + RealT(0.5));
+                const ScalarT y2min = simd::pow2(simd::sub(Piy, miny));
+                const ScalarT y2max = simd::pow2(simd::sub(Piy, maxy));
+                const ScalarT dminxy = simd::add(dminx,
+                    simd::select(simd::lt(Piy, miny), y2min,
+                        simd::select(simd::gt(Piy, maxy), y2max, ScalarT(0))));
+                if (simd::horizontal_min(dminxy) > searchRadiusIS2) continue;
+                const Index ij = i + ((c.y() & (DIM-1u)) << LOG2DIM);
+
+                for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                    const Index offset = ij + /*k*/(c.z() & (DIM-1u));
+                    if (!mask.isOn(offset)) continue;
+
+                    const ScalarT minz(RealT(c.z()) - RealT(0.5));
+                    const ScalarT maxz(RealT(c.z()) + RealT(0.5));
+                    const ScalarT z2min = simd::pow2(simd::sub(Piz, minz));
+                    const ScalarT z2max = simd::pow2(simd::sub(Piz, maxz));
+                    const ScalarT dminxyz = simd::add(dminxy,
+                        simd::select(simd::lt(Piz, minz), z2min,
+                            simd::select(simd::gt(Piz, maxz), z2max, ScalarT(0))));
+
+                    // Does this point's radius overlap the voxel c
+                    if (simd::horizontal_min(dminxyz) > searchRadiusIS2) continue;
+
+                    const Index end = data[offset];
+                    Index id = (offset == 0) ? 0 : Index(data[offset - 1]);
+                    for (; id < end; ++id) {
+                        if (!mInclusionGroupHandle->get(id)) continue;
+
+                        const math::Vec3<RealT> Ptgt(this->mTargetPosition->get(id));
+                        tx = simd::sub(Px, ScalarT(Ptgt[0]));
+                        ty = simd::sub(Py, ScalarT(Ptgt[1]));
+                        tz = simd::sub(Pz, ScalarT(Ptgt[2]));
+                        tx = simd::add(simd::pow2(tx), simd::add(simd::pow2(ty), simd::pow2(tz)));
+
+                        // @note  Could remove self contribution as in WeightPosSumsTransfer
+                        //   it adds a small % overhead to this entire operator
+                        using SimdIMT = typename simd::SimdTraits<IdT>::MaskT;
+                        const SimdIMT ipmask = mIsSameLeaf ? simd::neq(ids, IdT(id)) : SimdIMT(true);
+                        MaskT pmask = simd::logical_and(simd::lte(tx, searchRadius2), m);
+
+                        if constexpr (sizeof(RealT) == sizeof(int64_t)) {
+                            pmask = simd::logical_and(MaskT(ipmask), pmask);
+                        }
+                        else {
+                            pmask = simd::logical_and(MaskT(simd::compress(IdT(ipmask))), pmask);
+                        }
+
+                        if (!simd::horizontal_or(pmask)) continue;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+                        const WeightSumT totalWeightInv = mWeights[id];
+                        const WeightedPositionSumT currWeightSum = mWeightedPositions[id];
+#else
+                        const WeightSumT totalWeightInv = mWeights->get(id);
+                        const WeightedPositionSumT currWeightSum = mWeightedPositions->get(id);
+#endif
+
+                        ScalarT weights = simd::sub(ScalarT(1.0), simd::pow3(simd::mul(simd::sqrt(tx), searchRadiusInv)));
+                        weights = simd::select(pmask, weights, ScalarT(0.0));
+                        assert(simd::horizontal_and(simd::is_finite(weights)));
+                        assert(simd::horizontal_min(weights) >= 0.0);
+                        assert(simd::horizontal_max(weights) <= 1.0);
+
+                        weights = simd::mul(weights, ScalarT(totalWeightInv));
+
+                        tx = simd::sub(Px, ScalarT(currWeightSum[0]));
+                        ty = simd::sub(Py, ScalarT(currWeightSum[1]));
+                        tz = simd::sub(Pz, ScalarT(currWeightSum[2]));
+
+                        wx = simd::mul(tx, weights);
+                        wy = simd::mul(ty, weights);
+                        wz = simd::mul(tz, weights);
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+                        float* const m = mCovMats[id].asPointer();
+#else
+                        auto cov = mCovMats->get(id);
+                        float* const m = cov.asPointer();
+#endif
+                        m[0] += float(simd::horizontal_add(simd::mul(wx, tx)));
+                        m[1] += float(simd::horizontal_add(simd::mul(wx, ty)));
+                        m[2] += float(simd::horizontal_add(simd::mul(wx, tz)));
+                        //
+                        m[3] += float(simd::horizontal_add(simd::mul(wy, tx)));
+                        m[4] += float(simd::horizontal_add(simd::mul(wy, ty)));
+                        m[5] += float(simd::horizontal_add(simd::mul(wy, tz)));
+                        //
+                        m[6] += float(simd::horizontal_add(simd::mul(wz, tx)));
+                        m[7] += float(simd::horizontal_add(simd::mul(wz, ty)));
+                        m[8] += float(simd::horizontal_add(simd::mul(wz, tz)));
+
+#if OPENVDB_ABI_VERSION_NUMBER < 9
+                        mCovMats->set(id, cov);
+#endif
+                    } //point idx
+                }
+            }
+        }
+    }
 
 private:
     bool mIsSameLeaf;
@@ -638,9 +1056,9 @@ pca(PointDataGridT& points,
     timer.start("Compute position weights");
     {
         WeightPosSumsTransfer<PointDataTreeT> transfer(indices,
-            settings.searchRadius,
+            RealT(settings.searchRadius),
             int32_t(settings.neighbourThreshold),
-            float(vs),
+            RealT(vs),
             manager);
 
         points::rasterize<PointDataGridT,
@@ -658,7 +1076,7 @@ pca(PointDataGridT& points,
     timer.start("Compute covariance matrices");
     {
         CovarianceTransfer<PointDataTreeT>
-            transfer(indices, settings.searchRadius, float(vs), manager);
+            transfer(indices, RealT(settings.searchRadius), RealT(vs), manager);
 
         points::rasterize<PointDataGridT,
             decltype(transfer),
