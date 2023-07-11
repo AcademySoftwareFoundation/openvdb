@@ -7,7 +7,7 @@
 /// When rebuilding we convert from grid -> mesh -> grid.
 /// The conversion from mesh -> grid will close any internal bubbles.
 /// By using the original grid as an oracle we can set the sign of the
-/// bubbles properly.  Unfortunately, when increasing resolution the 
+/// bubbles properly.  Unfortunately, when increasing resolution the
 /// rasterization of the mesh diverges too far from interpolated original
 /// grid and results in incorrect sign choices.   The likely correct solution
 /// is to use a different approach for rebuilding when resolution is
