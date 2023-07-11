@@ -4448,14 +4448,14 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec4I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

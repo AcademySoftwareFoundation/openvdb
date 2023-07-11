@@ -4,13 +4,25 @@
 #ifndef OPENVDB_TOOLS_LEVELSETREBUILD_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETREBUILD_HAS_BEEN_INCLUDED
 
+/// When rebuilding we convert from grid -> mesh -> grid.
+/// The conversion from mesh -> grid will close any internal bubbles.
+/// By using the original grid as an oracle we can set the sign of the
+/// bubbles properly.  Unfortunately, when increasing resolution the 
+/// rasterization of the mesh diverges too far from interpolated original
+/// grid and results in incorrect sign choices.   The likely correct solution
+/// is to use a different approach for rebuilding when resolution is
+/// increasing.
+#define OPENVDB_USE_ORACLE_IN_REBUILD 0
+
 #include <openvdb/Grid.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
+#if OPENVDB_USE_ORACLE_IN_REBUILD
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/Interpolation.h>
+#endif
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/openvdb.h>
@@ -253,6 +265,7 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
 
     QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, primitives);
 
+#if OPENVDB_USE_ORACLE_IN_REBUILD
     auto backToOldGrid = [&xform, &grid](const Coord& coord) -> openvdb::math::Vec3d {
         return grid.transform().worldToIndex(xform->indexToWorld(coord));
     };
@@ -265,14 +278,23 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
             return value <= 0 ? true : false;
         }
     };
+#endif
 
     if (interrupter) {
         return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
-            DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
+            DISABLE_RENORMALIZATION, nullptr
+#if OPENVDB_USE_ORACLE_IN_REBUILD
+            , interiorTest, EVAL_EVERY_VOXEL
+#endif
+            );
     }
 
     return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
-        DISABLE_RENORMALIZATION, nullptr, interiorTest, EVAL_EVERY_VOXEL);
+        DISABLE_RENORMALIZATION, nullptr
+#if OPENVDB_USE_ORACLE_IN_REBUILD
+        , interiorTest, EVAL_EVERY_VOXEL
+#endif
+        );
 }
 
 
