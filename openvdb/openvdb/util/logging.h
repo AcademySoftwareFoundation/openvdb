@@ -14,6 +14,7 @@
 #include <log4cplus/layout.h>
 #include <log4cplus/logger.h>
 #include <log4cplus/spi/loggingevent.h>
+#include <log4cplus/version.h>
 #include <algorithm> // for std::remove()
 #include <cstring> // for ::strrchr()
 #include <memory>
