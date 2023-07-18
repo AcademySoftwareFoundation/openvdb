@@ -3,7 +3,7 @@ OpenVDB:
       new optional arguments to provide an interior test oracle and an
       interior testing methods.  These allow the default
       outside-flood-fill to be replaced if the actual sidedness can be
-      known.
+      known.  Thanks to Tomas Skrivan for this change.
 
       LevelSetRebuild includes disabled code that uses this for
       resampling levelsets - the original grid is used as the true
