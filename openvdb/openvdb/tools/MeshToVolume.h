@@ -3145,6 +3145,18 @@ template <typename T, Index Log2Dim, typename InteriorTest>
 void
 floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& interiorTest) {
 
+    // Floods fills a single leaf node.
+    // Starts with all voxels in NOT_VISITED.
+    // Final result is voxels in either POSITIVE, NEGATIVE, or NOT_ASSIGNED.
+    // Voxels that were categorized as NEGATIVE are negated.
+    // The NOT_ASSIGNED is all voxels within 0.75 of the zero-crossing.
+    //
+    // NOT_VISITED voxels, if outside the 0.75 band, will query the oracle
+    // to get a POSITIVE Or NEGATIVE sign (with interior being POSITIVE!)
+    //
+    // After setting a NOT_VISITED to either POSITIVE or NEGATIVE, an 8-way
+    // depth-first floodfill is done, stopping at either the 0.75 boundary
+    // or visited voxels.
     enum VoxelState {
         NOT_VISITED = 0,
         POSITIVE = 1,
