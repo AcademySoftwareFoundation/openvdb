@@ -72,7 +72,7 @@ if(UNIX)
 endif()
 
 if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
-  find_package(GTest REQUIRED)
+  find_package(gtest REQUIRED)
 endif()
 
 if(NANOVDB_USE_CUDA)
