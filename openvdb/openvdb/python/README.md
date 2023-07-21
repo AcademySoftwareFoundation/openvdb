@@ -54,14 +54,13 @@ Using GitHub actions, new `openvdb` versions are published to PyPI automatically
 when a new OpenVDB release is made. Releases can also published to PyPI by
 triggering the "Build and Release Python Bindings to PyPI" job, and specifying a
 branch/ref; if no ref is specified, the most recent commit on the given branch
-is used. Publishing to PyPI requires an API token to be specified as a secret
-(`PYPI_API_TOKEN`) on the repository.
+is used. Publishing to PyPI requires [trusted publishing][publishing] to be
+configured on PyPI.
 
 If a maintainer wants to test the release process, they can do so by triggering
-a workflow dispatch, and clicking the option to release to `test.pypi.org`. In
-this case, a separate `TEST_PYPI_API_TOKEN` secret must be defined for the
-repository. Once the release is published to the PYPI testing index, you can
-install the release with
+a workflow dispatch, and clicking the option to release to `test.pypi.org`. Once
+the release is published to the PYPI testing index, you can install the release
+with
 
 ```bash
 pip install -v --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ openvdb
@@ -77,3 +76,4 @@ packaging for openvdb.
 
 [scikit-build-core]: https://github.com/scikit-build/scikit-build-core
 [cmake_flags]: https://cmake.org/cmake/help/latest/module/FindPython.html
+[publishing]: https://docs.pypi.org/trusted-publishers/

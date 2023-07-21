@@ -14,6 +14,11 @@ on:
     name: Publish Python packages on PyPI
     needs: [build-sdist, build-wheels]
     runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/openvdb
+    permissions:
+      id-token: write
     steps:
       - name:   Download artifacts from commit ${{ github.sha }}
         uses: dawidd6/action-download-artifact@v2
@@ -28,15 +33,11 @@ on:
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ inputs.test_pypi }}
         with:
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+          repository-url: https://test.pypi.org/legacy/
           packages_dir: dist
 
       - name: 🎉 Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         if: ${{ !inputs.test_pypi }}
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
           packages_dir: dist

@@ -39,3 +39,13 @@ cmake.minimum-version = "3.18"
 [tool.scikit-build.cmake.define]
 OPENVDB_BUILD_CORE = "ON"
 USE_NUMPY = "ON"
+
+[tool.cibuildwheel]
+manylinux-x86_64-image = "manylinux2014"
+manylinux-i686-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+manylinux-ppc64le-image = "manylinux2014"
+manylinux-s390x-image = "manylinux2014"
+manylinux-pypy_x86_64-image = "manylinux2014"
+manylinux-pypy_i686-image = "manylinux2014"
+manylinux-pypy_aarch64-image = "manylinux2014"
