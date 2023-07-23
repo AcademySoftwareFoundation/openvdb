@@ -102,14 +102,6 @@ if(USE_NUMPY)
   list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS NumPy)
 endif()
 
-# scikit-build doesn't yet support FindPython, but this workaround was
-# supplied by one of the scikit-build devs. See
-# https://github.com/pypa/cibuildwheel/issues/727 for details.
-if(SKBUILD)
-    set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
-    set(Python_NumPy_INCLUDE_DIR "${NUMPY_INCLUDE_DIR}")
-endif()
-
 # Make sure find_package(Python) is only ever invoked once with all required components
 find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
 find_package(pybind11 ${MINIMUM_PYBIND_VERSION} REQUIRED)
