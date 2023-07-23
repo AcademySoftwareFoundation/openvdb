@@ -149,9 +149,9 @@ TEST_F(TestFindActiveValues, testSphere2)
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (class)");
-        int count = 0;
+        //int count = 0;
         while(op.noActiveValues(bbox)) {
-            ++count;
+            //++count;
             bbox.expand(1);
         }
         //const double t = timer.stop();
@@ -165,10 +165,10 @@ TEST_F(TestFindActiveValues, testSphere2)
     {// find largest inscribed cube in index space containing NO active values
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (func)");
-        int count = 0;
+        //int count = 0;
         while(!openvdb::tools::anyActiveValues(tree, bbox)) {
             bbox.expand(1);
-            ++count;
+            //++count;
         }
         //const double t = timer.stop();
         //std::cerr << "Inscribed bbox = " << bbox << std::endl;

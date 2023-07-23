@@ -47,6 +47,12 @@ TestVolumeExecutable::testConstructionDestruction()
     CPPUNIT_ASSERT(openvdb::ax::isInitialized());
 
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    C->setOpaquePointers(false);
+#endif
+
     std::unique_ptr<llvm::Module> M(new llvm::Module("test_module", *C));
     std::shared_ptr<const llvm::ExecutionEngine> E(llvm::EngineBuilder(std::move(M))
             .setEngineKind(llvm::EngineKind::JIT)

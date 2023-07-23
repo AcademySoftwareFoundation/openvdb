@@ -245,7 +245,7 @@ public:
     class ConstRow;
     class RowEditor;
 
-    static const ValueType sZeroValue;
+    static inline constexpr ValueType sZeroValue = zeroVal<ValueType>();
 
     /// Construct an @a n x @a n matrix with at most @a STENCIL_SIZE nonzero elements per row.
     SparseStencilMatrix(SizeType n);
@@ -812,10 +812,6 @@ Vector<T>::str() const
 
 
 ////////////////////////////////////////
-
-
-template<typename ValueType, SizeType STENCIL_SIZE>
-const ValueType SparseStencilMatrix<ValueType, STENCIL_SIZE>::sZeroValue = zeroVal<ValueType>();
 
 
 template<typename ValueType, SizeType STENCIL_SIZE>

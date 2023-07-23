@@ -233,8 +233,7 @@ jobs:
       matrix:
         config:
           - { cxx: 'clang++', build: 'Release', llvm: '14', dir: '@14' }
-          # Can't support LLVM >= 15
-          #- { cxx: 'clang++', build: 'Release', llvm: 'latest', dir: '' }
+          - { cxx: 'clang++', build: 'Release', llvm: 'latest', dir: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2

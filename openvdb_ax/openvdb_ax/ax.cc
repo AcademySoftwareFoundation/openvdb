@@ -108,21 +108,24 @@ void run(const char* ax, openvdb::GridPtrVec& grids, const AttributeBindings& bi
 }
 
 namespace {
-// Declare this at file scope to ensure thread-safe initialization.
-std::mutex sInitMutex;
+inline std::mutex& GetInitMutex()
+{
+    static std::mutex sInitMutex;
+    return sInitMutex;
+}
 bool sIsInitialized = false;
 bool sShutdown = false;
 }
 
 bool isInitialized()
 {
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
     return sIsInitialized;
 }
 
 void initialize()
 {
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
     if (sIsInitialized) return;
 
     if (sShutdown) {
@@ -177,7 +180,7 @@ void initialize()
 
 void uninitialize()
 {
-    std::lock_guard<std::mutex> lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(GetInitMutex());
     if (!sIsInitialized) return;
 
     // @todo consider replacing with storage to Support/InitLLVM

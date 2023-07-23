@@ -33,8 +33,8 @@ public:
     using Limits = std::numeric_limits<ValueType>;
 
     Coord(): mVec{{0, 0, 0}} {}
-    explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
-    Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
+    constexpr explicit Coord(Int32 xyz): mVec{{xyz, xyz, xyz}} {}
+    constexpr Coord(Int32 x, Int32 y, Int32 z): mVec{{x, y, z}} {}
     explicit Coord(const Vec3i& v): mVec{{v[0], v[1], v[2]}} {}
     explicit Coord(const Vec3I& v): mVec{{Int32(v[0]), Int32(v[1]), Int32(v[2])}} {}
     explicit Coord(const Int32* v): mVec{{v[0], v[1], v[2]}} {}
@@ -224,13 +224,15 @@ public:
 
     /// @brief Return a hash value for this coordinate
     /// @note Log2N is the binary logarithm of the hash table size.
-    /// @details The hash function is taken from the SIGGRAPH paper:
+    /// @details The hash function is originally taken from the SIGGRAPH paper:
     /// "VDB: High-resolution sparse volumes with dynamic topology"
+    /// and the prime numbers are modified based on the ACM Transactions on Graphics paper:
+    /// "Real-time 3D reconstruction at scale using voxel hashing"
     template<int Log2N = 20>
     size_t hash() const
     {
         const uint32_t* vec = reinterpret_cast<const uint32_t*>(mVec.data());
-        return ((1<<Log2N)-1) & (vec[0]*73856093 ^ vec[1]*19349663 ^ vec[2]*83492791);
+        return ((1<<Log2N)-1) & (vec[0]*73856093 ^ vec[1]*19349669 ^ vec[2]*83492791);
     }
 
 private:

@@ -368,6 +368,12 @@ void
 TestVDBFunctions::testValidContext()
 {
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    C->setOpaquePointers(false);
+#endif
+
     openvdb::ax::Compiler compiler;
     openvdb::ax::FunctionOptions ops;
     ops.mLazyFunctions = false;

@@ -113,6 +113,7 @@ initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
 
 #ifndef USE_NEW_PASS_MANAGER
 
+#if LLVM_VERSION_MAJOR < 15
 void addStandardLinkPasses(llvm::legacy::PassManagerBase& passes)
 {
     llvm::PassManagerBuilder builder;
@@ -120,6 +121,7 @@ void addStandardLinkPasses(llvm::legacy::PassManagerBase& passes)
     builder.Inliner = llvm::createFunctionInliningPass();
     builder.populateLTOPassManager(passes);
 }
+#endif
 
 /// This routine adds optimization passes based on selected optimization level
 ///
@@ -129,7 +131,6 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
                            const unsigned optLevel,
                            const unsigned sizeLevel,
                            const bool disableInline = false,
-                           const bool disableUnitAtATime = false,
                            const bool disableLoopUnrolling = false,
                            const bool disableLoopVectorization = false,
                            const bool disableSLPVectorization = false)
@@ -147,14 +148,6 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
     } else {
         builder.Inliner = llvm::createAlwaysInlinerLegacyPass();
     }
-
-#if LLVM_VERSION_MAJOR < 9
-    // Enable IPO. This corresponds to gcc's -funit-at-a-time
-    builder.DisableUnitAtATime = disableUnitAtATime;
-#else
-    // unused from llvm 9
-    (void)(disableUnitAtATime);
-#endif
 
     // Disable loop unrolling in all relevant passes
     builder.DisableUnrollLoops =
@@ -198,7 +191,9 @@ void LLVMoptimise(llvm::Module& module,
     else    functionPasses.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
 
 
+#if LLVM_VERSION_MAJOR < 15
     addStandardLinkPasses(passes);
+#endif
     addOptimizationPasses(passes, functionPasses, TM, optLevel, sizeLevel);
 
     functionPasses.doInitialization();
@@ -663,6 +658,11 @@ Compiler::Compiler(const CompilerOptions& options)
     , mFunctionRegistry()
 {
     mContext.reset(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    mContext->setOpaquePointers(false);
+#endif
     mFunctionRegistry = codegen::createDefaultRegistry(&options.mFunctionOptions);
 }
 

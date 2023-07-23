@@ -1,0 +1,4 @@
+OpenVDB:
+    - Bug Fixes:
+        Fixed a bug when compiling with -fvisibility=hidden and GCC 11 which
+        would cause a crash in openvdb::initialize()
