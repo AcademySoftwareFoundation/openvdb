@@ -3177,7 +3177,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 
         // We do not assign anything for voxel close to the mesh
         // This condition is aligned with the condition in traceVoxelLine
-        if (abs(value) <= 0.75) {
+        if (std::abs(value) <= 0.75) {
             voxelState[offset] = NOT_ASSIGNED;
         } else if (voxelState[offset] == NOT_VISITED) {
 
@@ -3213,7 +3213,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
                             (dimIdx < (int)DIM - 1) &&
                             (voxelState[neighOff] == NOT_VISITED)) {
 
-                            if (abs(leafNode.getValue(neighOff)) <= 0.75) {
+                            if (std::abs(leafNode.getValue(neighOff)) <= 0.75) {
                                 voxelState[neighOff] = NOT_ASSIGNED;
                             } else {
                                 offsetStack.push_back({neighOff, state});
