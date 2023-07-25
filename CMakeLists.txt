@@ -118,6 +118,9 @@ required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
 option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
 option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_VCL [=[
+Use the internally supplied copy of Agner Fog's vectorclass (VCL) SIMD wrapper library to instrument OpenVDB tools.
+This also requires VCL to be installed along with OpenVDB headers. ]=] OFF)
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)

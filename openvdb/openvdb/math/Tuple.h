@@ -57,6 +57,11 @@ public:
         }
     }
 
+    /// @brief  Constructor that fills this tuple with a value
+    explicit Tuple(const T val) {
+        for (int i = 0; i < size; ++i) { mm[i] = val; }
+    }
+
     // @brief  const access to an element in the tuple. The offset idx must be
     //   an integral type. A copy of the tuple data is returned.
     template <typename IdxT,

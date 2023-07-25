@@ -280,6 +280,10 @@ endif()
 
 # Configure the version header
 
+if(USE_VCL)
+  set(OPENVDB_USE_VCL 1)
+endif()
+
 if(USE_IMATH_HALF)
   set(OPENVDB_USE_IMATH_HALF 1)
 endif()
@@ -371,7 +375,6 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
-  math/Half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -419,7 +422,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
-  math/Half.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -570,6 +572,13 @@ set(OPENVDB_LIBRARY_THREAD_INCLUDE_FILES
   thread/Threading.h
 )
 
+# Add ext dependency sources if requested
+
+if(NOT USE_IMATH_HALF)
+  list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
+    ../../ext/openexr/openvdb/ext/Half.cc)
+endif()
+
 ##########################################################################
 
 # Configure auto-generation of explicit template definition translation units
@@ -694,6 +703,17 @@ if(OPENVDB_CORE_STATIC)
     endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
+
+
+  # Add ext dependencies if requested
+
+  if(NOT USE_IMATH_HALF)
+    target_include_directories(openvdb_static PUBLIC ../../ext/openexr)
+  endif()
+
+  if(USE_VCL)
+    target_include_directories(openvdb_static PUBLIC ../../ext/vcl_version2)
+  endif()
 endif()
 
 # Configure shared build
@@ -729,6 +749,16 @@ if(OPENVDB_CORE_SHARED)
         "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MD$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
+
+  # Add ext dependencies if requested
+
+  if(NOT USE_IMATH_HALF)
+    target_include_directories(openvdb_shared PUBLIC ../../ext/openexr)
+  endif()
+
+  if(USE_VCL)
+    target_include_directories(openvdb_shared PUBLIC ../../ext/vcl_version2)
+  endif()
 endif()
 
 ##########################################################################
@@ -761,3 +791,13 @@ install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)
 install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/thread)
+
+# Install external files if requested
+
+if(NOT USE_IMATH_HALF)
+  install(DIRECTORY ../../ext/openexr/openvdb DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
+
+if(USE_VCL)
+  install(DIRECTORY ../../ext/vcl_version2/openvdb DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()

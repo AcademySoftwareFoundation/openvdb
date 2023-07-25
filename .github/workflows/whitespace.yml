@@ -25,7 +25,7 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*' ':!pendingchanges/*' ':!*.wlt'
+          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*' ':!pendingchanges/*' ':!*.wlt' ':!ext/'
           test $? -eq 1
 
   # Search for any tabs excluding meeting notes, image files and a few others

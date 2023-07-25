@@ -143,6 +143,13 @@
 #cmakedefine OPENVDB_USE_DELAYED_LOADING
 #endif
 
+/* Denotes whether VDB was built with VCL support */
+#ifndef OPENVDB_USE_VCL
+#cmakedefine OPENVDB_USE_VCL
+// The namespace to use for VCL. See openvdb/util/Simd.h
+#define OPENVDB_VCL_NAMESPACE openvdb_vcl
+#endif
+
 /* Denotes whether VDB was built with explicit template instantiation */
 #ifndef OPENVDB_USE_EXPLICIT_INSTANTIATION
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION
