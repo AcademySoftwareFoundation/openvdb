@@ -406,13 +406,13 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const Vec3T *d_points, size_t 
     auto *d_indx = mMemPool.template alloc<uint32_t>(pointCount);
 
     if (mVerbose==2) mTimer.restart("Generate tile keys");
-    if constexpr(is_same<BuildT, Points>::value) {// points in world space
-        if constexpr(is_same<Vec3T, Vec3f>::value) {
+    if (is_same<BuildT, Points>::value) {// points in world space
+        if (is_same<Vec3T, Vec3f>::value) {
             cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
                 d_indx[tid] = uint32_t(tid);
                 d_keys[tid] = NanoRoot<Points>::CoordToKey(d_data->map.applyInverseMapF(d_points[tid]).round());
             }, mDeviceData); cudaCheckError();
-        } else if constexpr(is_same<Vec3T, Vec3d>::value) {
+        } else if (is_same<Vec3T, Vec3d>::value) {
             cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
                 d_indx[tid] = uint32_t(tid);
                 d_keys[tid] = NanoRoot<Points>::CoordToKey(d_data->map.applyInverseMap(d_points[tid]).round());
@@ -420,12 +420,12 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const Vec3T *d_points, size_t 
         } else {
             throw std::runtime_error("Points (vs voxels) coordinates should be represented as Vec3f or Vec3d");
         }
-    } else if constexpr(is_same<Vec3T, Coord>::value) {
+    } else if (is_same<Vec3T, Coord>::value) {
         cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
             d_indx[tid] = uint32_t(tid);
             d_keys[tid] = NanoRoot<BuildT>::CoordToKey(d_points[tid]);
         }, mDeviceData); cudaCheckError();
-    } else if constexpr(is_same<Vec3T, Vec3f>::value || is_same<Vec3T, Vec3d>::value) {
+    } else if (is_same<Vec3T, Vec3f>::value || is_same<Vec3T, Vec3d>::value) {
         cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
             d_indx[tid] = uint32_t(tid);
             d_keys[tid] = NanoRoot<BuildT>::CoordToKey(d_points[tid].round());
