@@ -8,7 +8,7 @@
 #include <thrust/for_each.h>
 
 #include <nanovdb/util/Primitives.h>
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 
 void scaleActiveVoxels(nanovdb::FloatGrid *grid_d, uint64_t leafCount, float scale)
 {
@@ -29,7 +29,7 @@ int main()
 {
     try {
         // Create an NanoVDB grid of a sphere at the origin with radius 100 and voxel size 1.
-        auto handle = nanovdb::createLevelSetSphere<float, float, nanovdb::CudaDeviceBuffer>(100.0f);
+        auto handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(100.0f);
         using GridT = nanovdb::FloatGrid;
 
         handle.deviceUpload(0, false); // Copy the NanoVDB grid to the GPU asynchronously

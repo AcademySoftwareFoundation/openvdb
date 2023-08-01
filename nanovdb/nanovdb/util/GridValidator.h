@@ -14,7 +14,7 @@
 #ifndef NANOVDB_GRIDVALIDATOR_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRIDVALIDATOR_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"
+#include <nanovdb/NanoVDB.h>
 #include "GridChecksum.h"
 
 namespace nanovdb {
@@ -146,7 +146,7 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
         return errorStr.empty();
     };
 
-    for (auto it2 = grid.tree().root().beginChild(); it2; ++it2) {
+    for (auto it2 = grid.tree().root().cbeginChild(); it2; ++it2) {
         auto &node2 = *it2;
         if (!check(&node2, sizeof(node2))) return;
         for (auto it1 = node2.beginChild(); it1; ++it1) {

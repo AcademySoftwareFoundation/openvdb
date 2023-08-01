@@ -56,7 +56,7 @@ nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid, int verbose = 0);
 /// @brief Forward declaration of free-standing function that de-serializes a NanoVDB GridHandle into an OpenVDB GridBase
 template<typename BufferT>
 openvdb::GridBase::Ptr
-nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose = 0);
+nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose = 0, uint32_t n = 0);
 
 /// @brief This class will serialize an OpenVDB grid into a NanoVDB grid managed by a GridHandle.
 template<typename NanoBuildT>
@@ -304,35 +304,35 @@ nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid, int verbose)
 
 template<typename BufferT>
 openvdb::GridBase::Ptr
-nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose)
+nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose, uint32_t n)
 {
-    if (auto grid = handle.template grid<float>()) {
+    if (auto grid = handle.template grid<float>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<double>()) {
+    } else if (auto grid = handle.template grid<double>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<int32_t>()) {
+    } else if (auto grid = handle.template grid<int32_t>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<int64_t>()) {
+    } else if (auto grid = handle.template grid<int64_t>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<bool>()) {
+    } else if (auto grid = handle.template grid<bool>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Fp4>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Fp4>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Fp8>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Fp8>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Fp16>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Fp16>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::FpN>()) {
+    } else if (auto grid = handle.template grid<nanovdb::FpN>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::ValueMask>()) {
+    } else if (auto grid = handle.template grid<nanovdb::ValueMask>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Vec3f>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Vec3f>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Vec3d>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Vec3d>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Vec4f>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Vec4f>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
-    } else if (auto grid = handle.template grid<nanovdb::Vec4d>()) {
+    } else if (auto grid = handle.template grid<nanovdb::Vec4d>(n)) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else {
         OPENVDB_THROW(openvdb::RuntimeError, "Unsupported NanoVDB grid type!");

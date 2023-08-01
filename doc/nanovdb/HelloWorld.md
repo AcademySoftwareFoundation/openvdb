@@ -4,7 +4,7 @@
 
 ```cpp
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
-#include <nanovdb/util/OpenToNanoVDB.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
+#include <nanovdb/util/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
 #include <nanovdb/util/IO.h>
 
 // Convert an openvdb level set sphere into a nanovdb, use accessors to print out multiple values from both
@@ -17,7 +17,7 @@ int main()
         auto srcGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(100.0f, openvdb::Vec3f(0.0f), 1.0f);
 
         // Convert the OpenVDB grid, srcGrid, into a NanoVDB grid handle.
-        auto handle = nanovdb::openToNanoVDB(*srcGrid);
+        auto handle = nanovdb::createNanoGrid(*srcGrid);
 
         // Define a (raw) pointer to the NanoVDB grid on the host. Note we match the value type of the srcGrid!
         auto* dstGrid = handle.grid<float>();
@@ -77,7 +77,7 @@ int main()
 
 ```cpp
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/DefaultCudaAllocator.h> // required for CUDA memory management
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h> // required for CUDA memory management
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,

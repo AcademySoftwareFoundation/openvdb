@@ -52,7 +52,7 @@
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/OpenToNanoVDB.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
 #endif
 
@@ -1224,6 +1224,7 @@ void Tool::writeNVDB(const std::string &fileName)
     const float tolerance = mParser.get<float>("tolerance");// negative values means derive it from the grid class (eg ls or fog)
     const std::string stats = mParser.get<std::string>("stats");
     const std::string checksum = mParser.get<std::string>("checksum");
+    const int verbose = mParser.verbose ? 1 : 0;
 
     nanovdb::io::Codec codec = nanovdb::io::Codec::NONE;// compression codec for the file
     if (codec_str == "zip") {
@@ -1284,35 +1285,24 @@ void Tool::writeNVDB(const std::string &fileName)
 
     auto openToNano = [&](const GridBase::Ptr& base) {
       if (auto floatGrid = GridBase::grid<FloatGrid>(base)) {
+        using SrcGridT = openvdb::FloatGrid;
         switch (qMode){
-        case nanovdb::GridType::Fp4: {
-          nanovdb::OpenToNanoVDB<float, nanovdb::Fp4> s;
-          s.enableDithering(dither);
-          return s(*floatGrid, sMode, cMode, mParser.verbose ? 1 : 0);
-        } case nanovdb::GridType::Fp8: {
-          nanovdb::OpenToNanoVDB<float, nanovdb::Fp8> s;
-          s.enableDithering(dither);
-          return s(*floatGrid, sMode, cMode, mParser.verbose ? 1 : 0);
-        } case nanovdb::GridType::Fp16: {
-          nanovdb::OpenToNanoVDB<float, nanovdb::Fp16> s;
-          s.enableDithering(dither);
-          return s(*floatGrid, sMode, cMode, mParser.verbose ? 1 : 0);
-        } case nanovdb::GridType::FpN: {
+        case nanovdb::GridType::Fp4:
+          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
+        case nanovdb::GridType::Fp8:
+          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
+        case nanovdb::GridType::Fp16:
+          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
+        case nanovdb::GridType::FpN:
           if (absolute) {
-            nanovdb::OpenToNanoVDB<float, nanovdb::FpN, nanovdb::AbsDiff> s;
-            s.enableDithering(dither);
-            s.oracle() = nanovdb::AbsDiff(tolerance);
-            return s(*floatGrid, sMode, cMode, mParser.verbose ? 1 : 0);
+            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::AbsDiff(tolerance));
           } else {
-            nanovdb::OpenToNanoVDB<float, nanovdb::FpN, nanovdb::RelDiff> s;
-            s.enableDithering(dither);
-            s.oracle() = nanovdb::RelDiff(tolerance);
-            return s(*floatGrid, sMode, cMode, mParser.verbose ? 1 : 0);
+            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::RelDiff(tolerance));
           }
-        } default: break;// 32 bit float grids are handled below
+        default: break;// 32 bit float grids are handled below
         }// end of switch
       }
-      return nanovdb::openToNanoVDB(base, sMode, cMode, mParser.verbose ? 1 : 0);// float and other grids
+      return nanovdb::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
     };// openToNano
 
     if (fileName=="stdout.nvdb") {

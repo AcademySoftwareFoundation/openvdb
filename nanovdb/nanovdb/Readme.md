@@ -3,10 +3,11 @@
 # NanoVDB:
 A lightweight GPU friendly version of VDB initially targeting rendering applications.
 
-* [Build instructions for make and cmake](../../doc/nanovdb/HowToBuild.md)
-* [Frequently asked questions](../../doc/nanovdb/FAQ.md)
-* [Source tree](../../doc/nanovdb/SourceTree.md)
-* [Examples](../../doc/nanovdb/HelloWorld.md)
+* [Build instructions for make and cmake](docs/HowToBuild.md)
+* [Frequently asked questions](docs/FAQ.md)
+* [Grid cells vs grid nodes](docs/GridCells_vs_GridNodes/Main.pdf)
+* [Source tree](docs/SourceTree.md)
+* [Examples](docs/HelloWorld.md)
 
 ### Copyright Contributors to the OpenVDB Project
 ### SPDX-License-Identifier: MPL-2.0

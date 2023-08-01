@@ -14,17 +14,15 @@
 #include <nanovdb/util/SampleFromVoxels.h>
 #include "Image.h"
 #include "Camera.h"
-#include "../ex_util/CpuTimer.h"
+#include <nanovdb/util/CpuTimer.h>
 
 #include "DenseGrid.h"
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 #endif
 
 #if defined(NANOVDB_USE_OPENVDB)
-#include <nanovdb/util/OpenToNanoVDB.h>
-
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
@@ -40,33 +38,6 @@
 #endif
 
 #include <gtest/gtest.h>
-
-namespace nanovdb {
-
-inline std::ostream&
-operator<<(std::ostream& os, const CoordBBox& b)
-{
-    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") ->"
-       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
-    return os;
-}
-
-inline std::ostream&
-operator<<(std::ostream& os, const Coord& ijk)
-{
-    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
-    return os;
-}
-
-template <typename T>
-inline std::ostream&
-operator<<(std::ostream& os, const Vec3<T>& v)
-{
-    os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
-    return os;
-}
-
-}
 
 // define the environment variable VDB_DATA_PATH to use models from the web
 // e.g. setenv VDB_DATA_PATH /home/kmu/dev/data/vdb
@@ -144,7 +115,7 @@ protected:
         return grid;
     }
 #endif
-    nanovdb::CpuTimer<> mTimer;
+    nanovdb::CpuTimer mTimer;
 }; // Benchmark
 
 TEST_F(Benchmark, Ray)
@@ -358,7 +329,7 @@ TEST_F(Benchmark, DenseGrid)
         grid->setValue(pos, 1.0f);
         EXPECT_EQ( 0.0f, grid->getValue(min) );
         EXPECT_EQ( 1.0f, grid->getValue(pos) );
-        EXPECT_EQ( 0.0f, grid->getValue(max) );
+        EXPECT_EQ( 0.0f, grid->getValue(max));
         for (auto it = bbox.begin(); it; ++it) {
             auto &ijk = *it;
             EXPECT_TRUE(grid->test(ijk));
@@ -426,7 +397,7 @@ TEST_F(Benchmark, OpenVDB_CPU)
 
     auto srcGrid = this->getSrcGrid();
     mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Disable, /*verbose=*/0);
+    auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Disable);
     mTimer.restart("Writing NanoVDB grid");
 #if defined(NANOVDB_USE_BLOSC)
     nanovdb::io::writeGrid("data/test.nvdb", handle, nanovdb::io::Codec::BLOSC);
@@ -537,7 +508,7 @@ TEST_F(Benchmark, DenseGrid_CPU)
     const auto  bbox = grid->worldBBox();
     const Vec3T lookat(0.5 * (bbox.min() + bbox.max())), up(0, -1, 0);
     auto        eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * openvdb::math::pi<RealT>() / 180.0f;
+        const RealT theta = angle * RealT(3.14159265358979323846) / 180.0f;
         return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
     };
 
@@ -642,7 +613,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
 #if defined(NANOVDB_USE_OPENVDB)
     auto handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
 #else
-    auto handle = nanovdb::createLevelSetTorus<float, float, BufferT>(100.0f, 50.0f);
+    auto handle = nanovdb::createLevelSetTorus<float, BufferT>(100.0f, 50.0f);
 #endif
     //auto        handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
     const auto* grid = handle.grid<float>();
@@ -650,6 +621,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
     EXPECT_TRUE(grid->isLevelSet());
     EXPECT_FALSE(grid->isFogVolume());
     handle.deviceUpload(stream, false);
+    EXPECT_TRUE(handle.deviceGrid<float>());
 
     std::cout << "\nRay-tracing NanoVDB grid named \"" << grid->gridName() << "\"" << std::endl;
 
@@ -658,7 +630,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
     const auto  bbox = grid->worldBBox();
     const Vec3T lookat(0.5 * (bbox.min() + bbox.max())), up(0, -1, 0);
     auto        eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * openvdb::math::pi<RealT>() / 180.0f;
+        const RealT theta = angle * nanovdb::pi<RealT>() / 180.0f;
         return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
     };
     CameraT *host_camera, *dev_camera;
@@ -675,7 +647,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
         host_camera->update(eye(angle), lookat, up, vfov, aspect);
         cudaCheck(cudaMemcpyAsync(dev_camera, host_camera, sizeof(CameraT), cudaMemcpyHostToDevice, stream));
         mTimer.start(ss.str());
-        launch_kernels(handle, imgHandle, dev_camera, stream);
+        launch_kernels(handle, imgHandle, dev_camera, stream);// defined in BenchKernels_nano.cu
         mTimer.stop();
 
         //mTimer.start("Write image to file");
@@ -689,7 +661,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
     } //frame number angle
 
     cudaCheck(cudaStreamDestroy(stream));
-    cudaCheck(cudaFree(host_camera));
+    cudaCheck(cudaFreeHost(host_camera));
     cudaCheck(cudaFree(dev_camera));
 } // NanoVDB_GPU
 #endif

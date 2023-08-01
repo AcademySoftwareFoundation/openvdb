@@ -1,19 +1,23 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark_nano.cc
+/// @file Benchmark_nano.cpp
 ///
 /// @author Ken Museth
 ///
 /// @brief A super lightweight and portable ray-tracing benchmark
 ///        that only depends on NanoVDB (not OpenVDB) and CUDA.
 
+#ifdef _WIN32
+#define _USE_MATH_DEFINES
+#endif
+
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 #include "Image.h"
 #include "Camera.h"
 #include "DenseGrid.h"
-#include "../ex_util/CpuTimer.h"
+#include <nanovdb/util/CpuTimer.h>
 
 #include <iomanip>// for std::setfill and std::setw
 
@@ -28,7 +32,7 @@ int main(int argc, char** argv)
     using RealT = float;
     using Vec3T = nanovdb::Vec3<RealT>;
     using CameraT = nanovdb::Camera<RealT>;
-    nanovdb::CpuTimer<> timer;
+    nanovdb::CpuTimer timer;
 
     if (argc!=2) {
         std::cerr << "Usage: " << argv[0] << " path/level_set.vol" << std::endl;
@@ -57,7 +61,7 @@ int main(int argc, char** argv)
     const auto* grid = handle.grid<float>();
     if (!grid || !grid->isLevelSet()) {
         std::cerr << "Error loading NanoVDB level set from file" << std::endl;
-        return 1;
+        exit (EXIT_FAILURE);
     }
     handle.deviceUpload(stream, false);
     std::cout << "\nRay-tracing DenseGrid of size "
@@ -96,7 +100,7 @@ int main(int argc, char** argv)
     } //frame number angle
 
     cudaCheck(cudaStreamDestroy(stream));
-    cudaCheck(cudaFree(host_camera));
+    cudaCheck(cudaFreeHost(host_camera));
     cudaCheck(cudaFree(dev_camera));
 
     printf("\nRay-traced %i different frames, each with %i rays, in %5.3f ms.\nThis corresponds to an average of %5.3f ms per frame or %5.3f FPS!\n",

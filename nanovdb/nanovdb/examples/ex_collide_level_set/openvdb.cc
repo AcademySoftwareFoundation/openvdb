@@ -3,13 +3,14 @@
 
 #if defined(NANOVDB_USE_OPENVDB)
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
 
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
 
 #include "common.h"

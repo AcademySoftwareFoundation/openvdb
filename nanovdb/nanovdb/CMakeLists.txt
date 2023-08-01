@@ -76,7 +76,7 @@ if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
 endif()
 
 if(NANOVDB_USE_CUDA)
-  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
   if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
@@ -167,8 +167,16 @@ set(NANOVDB_INCLUDE_FILES
 
 # NanoVDB util header files
 set(NANOVDB_INCLUDE_UTILFILES
+  util/CpuTimer.h
+  util/CreateNanoGrid.h
   util/CSampleFromVoxels.h
-  util/CudaDeviceBuffer.h
+  util/cuda/CudaAddBlindData.handle
+  util/cuda/CudaDeviceBuffer.h
+  util/cuda/CudaIndexToGrid.handle
+  util/cuda/CudaPointsToGrid.handle
+  util/cuda/CudaSignedFloodFill.handle
+  util/cuda/CudaUtils.handle
+  util/cuda/GpuTimer.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
@@ -183,6 +191,7 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/NanoToOpenVDB.h
   util/NodeManager.h
   util/OpenToNanoVDB.h
+  util/PrefixSum.h
   util/Primitives.h
   util/Range.h
   util/Ray.h

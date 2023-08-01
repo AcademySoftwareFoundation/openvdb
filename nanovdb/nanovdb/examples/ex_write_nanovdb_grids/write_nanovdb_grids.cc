@@ -10,7 +10,7 @@
 int main()
 {
     try {
-        std::vector<nanovdb::GridHandle<>> handles;
+		std::vector<nanovdb::GridHandle<>> handles;
         // Create multiple NanoVDB grids of various types
         handles.push_back(nanovdb::createLevelSetSphere<float>(100.0f));
         handles.push_back(nanovdb::createLevelSetTorus<float>(100.0f, 50.0f));

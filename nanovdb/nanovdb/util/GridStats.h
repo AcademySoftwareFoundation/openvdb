@@ -15,7 +15,7 @@
 #ifndef NANOVDB_GRIDSTATS_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRIDSTATS_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"
+#include <nanovdb/NanoVDB.h>
 #include "Range.h"
 #include "ForEach.h"
 
@@ -533,12 +533,12 @@ void GridStats<GridT, StatsT>::process( GridT &grid )
     auto& data = *grid.data();
     const auto& indexBBox = grid.tree().root().bbox();
     if (indexBBox.empty()) {
-        data.mWorldBBox = BBox<Vec3R>();
+        data.mWorldBBox = BBox<Vec3d>();
         data.setBBoxOn(false);
     } else {
         // Note that below max is offset by one since CoordBBox.max is inclusive
-        // while bbox<Vec3R>.max is exclusive. However, min is inclusive in both
-        // CoordBBox and BBox<Vec3R>. This also guarantees that a grid with a single
+        // while bbox<Vec3d>.max is exclusive. However, min is inclusive in both
+        // CoordBBox and BBox<Vec3d>. This also guarantees that a grid with a single
         // active voxel, does not have an empty world bbox! E.g. if a grid with a
         // unit index-to-world transformation only contains the active voxel (0,0,0)
         // then indeBBox = (0,0,0) -> (0,0,0) and then worldBBox = (0.0, 0.0, 0.0)
@@ -547,16 +547,16 @@ void GridStats<GridT, StatsT>::process( GridT &grid )
         const Coord min = indexBBox[0];
         const Coord max = indexBBox[1] + Coord(1);
 
-        auto& worldBBox = data.mWorldBBox;
+        auto& wBBox = data.mWorldBBox;
         const auto& map = grid.map();
-        worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
+        wBBox[0] = wBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
+        wBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
+        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
+        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
+        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
+        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
+        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
+        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
         data.setBBoxOn(true);
     }
 
@@ -604,7 +604,7 @@ void GridStats<GridT, StatsT>::process(RootT &root)
         }
         this->setStats(&data, total.stats);
         if (total.bbox.empty()) {
-            std::cerr << "\nWarning: input tree only contained inactive root tiles!"
+            std::cerr << "\nWarning in GridStats: input tree only contained inactive root tiles!"
                       << "\nWhile not strictly an error it's rather suspicious!\n";
         }
         //data.mActiveVoxelCount = total.activeCount;

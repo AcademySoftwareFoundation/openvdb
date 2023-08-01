@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
 
@@ -44,8 +44,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int num
     using namespace nanovdb;
 
     auto* h_grid = handle.grid<float>();
-    if (!h_grid)
-        throw std::runtime_error("GridHandle does not contain a FloatGrid");
+    if (!h_grid) throw std::runtime_error("GridHandle does not contain a FloatGrid");
 
     Vec3f* h_positions = reinterpret_cast<Vec3f*>(positionBuffer.data());
     computeFill(false, h_positions, 0, sizeof(Vec3f) * numPoints);

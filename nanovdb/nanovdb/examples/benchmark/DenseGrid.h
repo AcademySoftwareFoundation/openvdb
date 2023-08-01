@@ -33,14 +33,15 @@ class DenseGridHandle;
 
 struct DenseData
 {
+    uint64_t    mMagic;// magic number
+    uint64_t    mSize;
     Map         mMap;// defined in NanoVDB.h
     CoordBBox   mIndexBBox;// min/max of bbox
-    BBox<Vec3R> mWorldBBox;// 48B. floating-point AABB of active values in WORLD SPACE (2 x 3 doubles)
-    Vec3R       mVoxelSize;
+    BBox<Vec3d> mWorldBBox;// 48B. floating-point AABB of active values in WORLD SPACE (2 x 3 doubles)
+    Vec3d       mVoxelSize;
     GridClass   mGridClass;// defined in NanoVDB.h
     GridType    mGridType; //  defined in NanoVDB.h
     uint64_t    mY, mX;//strides in the y and x direction
-    uint64_t    mSize;
 
     __hostdev__ Coord dim() const { return mIndexBBox.dim(); }
 
@@ -106,7 +107,7 @@ public:
     __hostdev__ const Map& map() const { return DenseData::mMap; }
 
     // @brief Return a const reference to the size of a voxel in world units
-    __hostdev__ const Vec3R& voxelSize() const { return DenseData::mVoxelSize; }
+    __hostdev__ const Vec3d& voxelSize() const { return DenseData::mVoxelSize; }
 
     /// @brief world to index space transformation
     template<typename Vec3T>
@@ -155,7 +156,7 @@ public:
     __hostdev__ Vec3T indexToWorldGradF(const Vec3T& grad) const { return DenseData::applyIJTF(grad); }
 
     /// @brief Computes a AABB of active values in world space
-    __hostdev__ const BBox<Vec3R>& worldBBox() const { return DenseData::mWorldBBox; }
+    __hostdev__ const BBox<Vec3d>& worldBBox() const { return DenseData::mWorldBBox; }
 
     __hostdev__ bool  isLevelSet() const { return DenseData::mGridClass == GridClass::LevelSet; }
     __hostdev__ bool  isFogVolume() const { return DenseData::mGridClass == GridClass::FogVolume; }
@@ -189,9 +190,7 @@ DenseGrid<ValueT>::create(Coord min,
                           GridClass gridClass,
                           const BufferT& allocator)
 {
-    if (dx <= 0) {
-        throw std::runtime_error("GridBuilder: voxel size is zero or negative");
-    }
+    if (dx <= 0) throw std::runtime_error("GridBuilder: voxel size is zero or negative");
     max += Coord(1,1,1);// now max is exclusive
 
 #if LOG2_TILE_SIZE > 0
@@ -206,8 +205,10 @@ DenseGrid<ValueT>::create(Coord min,
     const uint64_t size = sizeof(DenseGrid) + sizeof(ValueT)*dim[0]*dim[1]*dim[2];
 #endif
 
-    DenseGridHandle<BufferT> handle(allocator.create(size));
-    DenseGrid* grid = reinterpret_cast<DenseGrid*>(handle.data());
+    auto buffer = allocator.create(size);
+    DenseGrid* grid = reinterpret_cast<DenseGrid*>(buffer.data());
+    std::memset(grid, 0, size);// initiate all dense grid values to zero
+    grid->mMagic = DENSE_MAGIC_NUMBER;
     grid->mSize = size;
     const double Tx = p0[0], Ty = p0[1], Tz = p0[2];
     const double mat[4][4] = {
@@ -245,7 +246,7 @@ DenseGrid<ValueT>::create(Coord min,
     grid->mGridType = mapToGridType<ValueT>();
     grid->mY = dim[2];
     grid->mX = dim[2] * dim[1];
-    return handle;
+    return DenseGridHandle<BufferT>(std::move(buffer));
 }
 
 template<typename ValueT>
@@ -299,24 +300,16 @@ template<typename ValueT>
 void writeDense(const DenseGrid<ValueT> &grid, const char* fileName)
 {
     std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!os.is_open()) {
-        throw std::runtime_error("Unable to open file for output");
-    }
-    const uint64_t tmp[2] = {DENSE_MAGIC_NUMBER, grid.memUsage()};
-    os.write(reinterpret_cast<const char*>(tmp), 2*sizeof(uint64_t));
-    os.write(reinterpret_cast<const char*>(&grid), tmp[1]);
+    if (!os.is_open()) throw std::runtime_error("Unable to open file for output");
+    os.write(reinterpret_cast<const char*>(&grid), grid.memUsage());
 }
 
 template<typename BufferT>
 void writeDense(const DenseGridHandle<BufferT> &handle, const char* fileName)
 {
     std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
-    if (!os.is_open()) {
-        throw std::runtime_error("Unable to open file for output");
-    }
-    const uint64_t tmp[2] = {DENSE_MAGIC_NUMBER, handle.size()};
-    os.write(reinterpret_cast<const char*>(tmp), 2*sizeof(uint64_t));
-    os.write(reinterpret_cast<const char*>(handle.data()), tmp[1]);
+    if (!os.is_open()) throw std::runtime_error("Unable to open file for output");
+    os.write(reinterpret_cast<const char*>(handle.data()), handle.size());
 }
 
 template<typename BufferT = HostBuffer>
@@ -329,12 +322,11 @@ readDense(const char* fileName, const BufferT& allocator = BufferT())
     }
     uint64_t tmp[2];
     is.read(reinterpret_cast<char*>(tmp), 2*sizeof(uint64_t));
-    if (tmp[0] != DENSE_MAGIC_NUMBER) {
-        throw std::runtime_error("This is not a dense NanoVDB file!");
-    }
-    DenseGridHandle<BufferT> handle(allocator.create(tmp[1]));
-    is.read(reinterpret_cast<char*>(handle.data()), tmp[1]);
-    return handle;
+    if (tmp[0] != DENSE_MAGIC_NUMBER) throw std::runtime_error("This is not a dense NanoVDB file!");
+    auto buffer = allocator.create(tmp[1]);
+    is.seekg(0);// rewind
+    is.read(reinterpret_cast<char*>(buffer.data()), tmp[1]);
+    return DenseGridHandle<BufferT>(std::move(buffer));
 }
 }// namespace io
 /////////////////////////////////////////////
@@ -359,11 +351,14 @@ DenseGridHandle<BufferT> convertToDense(const GridT &grid, const BufferT& alloca
     const uint64_t size = sizeof(DenseT) + sizeof(ValueT)*dim[0]*dim[1]*dim[2];
 #endif
 
-    DenseGridHandle<BufferT> handle( allocator.create(size) );
-    auto *dense = reinterpret_cast<DenseT*>(handle.data());
+    auto buffer = allocator.create(size);
+    auto *dense = reinterpret_cast<DenseT*>(buffer.data());
     auto *data = dense->data();
+    std::memset(data, 0, size);// zero buffer since we're only setting sparse values below
 
     // copy DenseData
+    data->mMagic = DENSE_MAGIC_NUMBER;
+    data->mSize = size;
     data->mMap = grid.map();
     data->mIndexBBox = grid.indexBBox();
     data->mWorldBBox = grid.worldBBox();
@@ -372,7 +367,6 @@ DenseGridHandle<BufferT> convertToDense(const GridT &grid, const BufferT& alloca
     data->mGridType  = grid.gridType();
     data->mY = dim[2];
     data->mX = dim[2] * dim[1];
-    data->mSize = size;
 
     // copy values
     auto kernel = [&](const Range<1,int> &r) {
@@ -393,7 +387,7 @@ DenseGridHandle<BufferT> convertToDense(const GridT &grid, const BufferT& alloca
     kernel(range);
 #endif
 
-    return handle;
+    return DenseGridHandle<BufferT>( std::move(buffer) );
 }
 /////////////////////////////////////////////
 
@@ -403,7 +397,12 @@ class DenseGridHandle
     BufferT mBuffer;
 
 public:
-    DenseGridHandle(BufferT&& resources) { mBuffer = std::move(resources); }
+    DenseGridHandle(BufferT&& resources) {
+        if (*reinterpret_cast<const uint64_t*>(resources.data()) != DENSE_MAGIC_NUMBER) {
+            throw std::runtime_error("DenseGridHandle was constructed with an invalid buffer");
+        }
+        mBuffer = std::move(resources);
+    }
 
     DenseGridHandle() = default;
     /// @brief Disallow copy-construction

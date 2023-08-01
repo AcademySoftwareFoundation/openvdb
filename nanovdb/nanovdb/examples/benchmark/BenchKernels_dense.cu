@@ -9,7 +9,8 @@
 /// @brief CUDA kernel for a simple ray-tracing benchmark test.
 
 #include "DenseGrid.h"
-#include <nanovdb/util/CudaDeviceBuffer.h> // for CUDA memory management
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h> // for CUDA memory management
+#include <nanovdb/util/cuda/GpuTimer.h>
 #include <nanovdb/util/Ray.h> // for nanovdb::Ray
 #include <nanovdb/util/HDDA.h> // for nanovdb::DDA
 
@@ -78,31 +79,16 @@ extern "C" float launch_kernels(const nanovdb::DenseGridHandle<nanovdb::CudaDevi
     auto*       deviceGrid = gridHandle.deviceGrid<float>(); // note this cannot be de-referenced since it points to a memory address on the GPU!
     auto*       deviceImage = imgHandle.deviceImage(); // note this cannot be de-referenced since it points to a memory address on the GPU!
     assert(deviceGrid && deviceImage);
-
-#ifdef CUDA_TIMING
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, stream);
-#endif
-
-    // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
-    render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
-
     float elapsedTime = 0.0f;
 #ifdef CUDA_TIMING
-    cudaEventRecord(stop, stream);
-    cudaEventSynchronize(stop);
-
-    cudaEventElapsedTime(&elapsedTime, start, stop);
-    //printf("DenseGrid: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.image()->size(), elapsedTime);
-    cudaError_t errCode = cudaGetLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(errCode), __FILE__, __LINE__);
-        exit(errCode);
-    }
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    nanovdb::GpuTimer timer;
+    timer.start();
 #endif
+    // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
+    render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
+    #ifdef CUDA_TIMING
+    elapsedTime = timer.elapsed();
+#endif
+    cudaCheckError();
     return elapsedTime;
 }

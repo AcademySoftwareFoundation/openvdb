@@ -9,9 +9,10 @@
 /// @brief CUDA kernel for a simple ray-tracing benchmark test.
 
 #include <nanovdb/util/GridHandle.h> // for nanovdb::GridHandle
-#include <nanovdb/util/CudaDeviceBuffer.h> // for CUDA memory management
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h> // for CUDA memory management
 #include <nanovdb/util/Ray.h> // for nanovdb::Ray
 #include <nanovdb/util/HDDA.h> // for nanovdb::ZeroCrossing
+#include <nanovdb/util/cuda/GpuTimer.h>
 
 #include "Image.h"
 #include "Camera.h"
@@ -33,8 +34,7 @@ __global__ void render_kernel(const nanovdb::NanoGrid<T>& grid,
 
     const int w = blockIdx.x * blockDim.x + threadIdx.x;
     const int h = blockIdx.y * blockDim.y + threadIdx.y;
-    if (w >= img.width() || h >= img.height())
-        return;
+    if (w >= img.width() || h >= img.height()) return;
 
     const auto& tree = grid.tree();
     const auto& bbox = tree.bbox();
@@ -45,6 +45,7 @@ __global__ void render_kernel(const nanovdb::NanoGrid<T>& grid,
     CoordT ijk;
     float  t;
     float  v0;
+
     if (nanovdb::ZeroCrossing(ray, acc, ijk, v0, t)) {
 #if 1// second-order central difference
         Vec3T grad(acc.getValue(ijk.offsetBy(1,0,0)) - acc.getValue(ijk.offsetBy(-1,0,0)),
@@ -75,38 +76,24 @@ extern "C" float launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuf
                                const nanovdb::Camera<float>*                          camera,
                                cudaStream_t                                           stream)
 {
-    using BuildT = nanovdb::FpN;
+    using BuildT = float;// nanovdb::FpN;
     const auto* img = imgHandle.image(); // host image!
     auto        round = [](int a, int b) { return (a + b - 1) / b; };
     const dim3  threadsPerBlock(8, 8), numBlocks(round(img->width(), threadsPerBlock.x), round(img->height(), threadsPerBlock.y));
     auto*       deviceGrid = gridHandle.deviceGrid<BuildT>(); // note this cannot be de-referenced since it points to a memory address on the GPU!
     auto*       deviceImage = imgHandle.deviceImage(); // note this cannot be de-referenced since it points to a memory address on the GPU!
-    assert(deviceGrid && deviceImage);
-
-#ifdef CUDA_TIMING
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start, stream);
-#endif
-
-    // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
-    render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
-
+    if (!deviceGrid) throw std::runtime_error(std::string("\nError in launch_kernels: No device grid of type: ") + nanovdb::toStr(nanovdb::mapToGridType<BuildT>()));
+    if (!deviceImage) throw std::runtime_error("\nError in launch_kernels: No device image!");
     float elapsedTime = 0.0f;
 #ifdef CUDA_TIMING
-    cudaEventRecord(stop, stream);
-    cudaEventSynchronize(stop);
-
-    cudaEventElapsedTime(&elapsedTime, start, stop);
-    //printf("NanoVDB: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.image()->size(), elapsedTime);
-    cudaError_t errCode = cudaGetLastError();
-    if (errCode != cudaSuccess) {
-        fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(errCode), __FILE__, __LINE__);
-        exit(errCode);
-    }
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
+    nanovdb::GpuTimer timer;
+    timer.start();
 #endif
+    // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
+    render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
+#ifdef CUDA_TIMING
+    elapsedTime = timer.elapsed();
+#endif
+    cudaCheckError();
     return elapsedTime;
 }

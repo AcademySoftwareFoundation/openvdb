@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 
 #include <iostream>
 
@@ -11,14 +12,14 @@
 int main()
 {
     try {
-        nanovdb::GridBuilder<float> builder(0.0f);
-        auto acc = builder.getAccessor();
+        nanovdb::build::Grid<float> grid(0.0f);
+        auto acc = grid.getAccessor();
         acc.setValue(nanovdb::Coord(1, 2, 3), 1.0f);
 
-        printf("GridBuilder: (%i,%i,%i)=%4.2f\t", 1, 2, 3, acc.getValue(nanovdb::Coord(1, 2, 3)));
-        printf("GridBuilder: (%i,%i,%i)=%4.2f\n", 1, 2,-3, acc.getValue(nanovdb::Coord(1, 2,-3)));
+        printf("build::Grid: (%i,%i,%i)=%4.2f\t", 1, 2, 3, acc.getValue(nanovdb::Coord(1, 2, 3)));
+        printf("build::Grid: (%i,%i,%i)=%4.2f\n", 1, 2,-3, acc.getValue(nanovdb::Coord(1, 2,-3)));
 
-        auto handle = builder.getHandle<>();
+        auto handle = nanovdb::createNanoGrid(grid);
         auto* dstGrid = handle.grid<float>(); // Get a (raw) pointer to the NanoVDB grid form the GridManager.
         if (!dstGrid)
             throw std::runtime_error("GridHandle does not contain a grid with value type float");

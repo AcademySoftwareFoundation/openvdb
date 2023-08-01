@@ -474,22 +474,16 @@ public:
         //                 Vec3T(_bbox[1][0]+1e-4,_bbox[1][1]+1e-4,_bbox[1][2]+1e-4));
         RealT t0 = (bbox[mSign[0]][0] - mEye[0]) * mInvDir[0];
         RealT t2 = (bbox[1 - mSign[1]][1] - mEye[1]) * mInvDir[1];
-        if (t0 > t2)
-            return false;
+        if (t0 > t2) return false;
         RealT t1 = (bbox[1 - mSign[0]][0] - mEye[0]) * mInvDir[0];
         RealT t3 = (bbox[mSign[1]][1] - mEye[1]) * mInvDir[1];
-        if (t3 > t1)
-            return false;
-        if (t3 > t0)
-            t0 = t3;
-        if (t2 < t1)
-            t1 = t2;
+        if (t3 > t1) return false;
+        if (t3 > t0) t0 = t3;
+        if (t2 < t1) t1 = t2;
         t3 = (bbox[mSign[2]][2] - mEye[2]) * mInvDir[2];
-        if (t3 > t1)
-            return false;
+        if (t3 > t1) return false;
         t2 = (bbox[1 - mSign[2]][2] - mEye[2]) * mInvDir[2];
-        if (t0 > t2)
-            return false;
+        if (t0 > t2) return false;
         //if (t3 > t0) t0 = t3;
         //if (mTimeSpan.t1 < t0) return false;
         //if (t2 < t1) t1 = t2;

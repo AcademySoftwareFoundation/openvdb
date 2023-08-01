@@ -1,14 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
-#include <nanovdb/util/GridBuilder.h>
 
 #include "common.h"
 

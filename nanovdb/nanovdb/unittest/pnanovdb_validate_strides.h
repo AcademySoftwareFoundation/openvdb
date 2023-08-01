@@ -83,7 +83,7 @@ static void compute_node_strides(
     pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
     pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
     pnanovdb_uint32_t statStride = pnanovdb_grid_type_stat_strides_bits[grid_type] / 8u;
-    pnanovdb_uint32_t postStatStride = 0u;
+    pnanovdb_uint32_t indexMaskStride = 0u;
     if (nodeLevel == 0u)
     {
         if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
@@ -106,17 +106,33 @@ static void compute_node_strides(
             minmaxStride = 0u;
             minmaxAlign = 0u;
             statStride = 0u;
-            postStatStride = 8u;
             tableAlign = 8u;
             tableFullStride = 8u;
+        }
+        else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_INDEXMASK)
+        {
+            minmaxStride = 0u;
+            minmaxAlign = 0u;
+            statStride = 0u;
+            tableAlign = 8u;
+            tableFullStride = 8u;
+            indexMaskStride = 64u;
+        }
+        else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_POINTINDEX)
+        {
+            minmaxStride = 8u;
+            minmaxAlign = 8u;
+            statStride = 0u;
+            tableAlign = 2u;
+            tableFullStride = (16u * node_elements[nodeLevel]) / 8u;
         }
     }
     *min_off = allocate(&offset, minmaxStride, minmaxAlign);
     *max_off = allocate(&offset, minmaxStride, minmaxAlign);
     *ave_off = allocate(&offset, statStride, statStride);
     *stddev_off = allocate(&offset, statStride, statStride);
-    allocate(&offset, postStatStride, postStatStride);
     *table_off = allocate(&offset, tableFullStride, tableAlign);
+    allocate(&offset, indexMaskStride, tableAlign);
     *total_size = allocate(&offset, 0u, 32u);
 }
 

@@ -22,7 +22,7 @@
 #include <numeric>
 #include <type_traits>
 
-#include "../NanoVDB.h"
+#include <nanovdb/NanoVDB.h>
 #include "GridHandle.h"
 #include "ForEach.h"
 #include "NodeManager.h"
@@ -57,6 +57,13 @@ bool validateChecksum(const NanoGrid<ValueT> &grid, ChecksumMode mode = Checksum
 /// @param mode Defines the mode of computation for the checksum.
 template <typename ValueT>
 void updateChecksum(NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default);
+
+/// @brief Updates the checksum of the grids encapsulated by a handle
+//
+/// @param handle Handle with grids whose checksum will be updated.
+/// @param mode Defines the mode of computation for the checksum.
+template <typename BufferT>
+void updateChecksum(GridHandle<BufferT> &handle, ChecksumMode mode = ChecksumMode::Default);
 
 /// @brief Return the CRC32 checksum of the raw @a data of @a size
 /// @param data The beginning of the raw data.
@@ -279,6 +286,87 @@ void updateChecksum(NanoGrid<ValueT> &grid, ChecksumMode mode)
     GridChecksum cs;
     cs(grid, mode);
     grid.data()->mChecksum = cs.checksum();
+}
+
+template<typename BufferT>
+void updateChecksum(GridHandle<BufferT> &handle, ChecksumMode mode)
+{
+    for (uint32_t i = 0; i < handle.gridCount(); ++i)
+    {
+        const GridType& gridType = handle.gridType(i);
+        switch (gridType)
+        {
+            case GridType::Float:
+                updateChecksum(*handle.template grid<float>(i));
+                break;
+            case GridType::Double:
+                updateChecksum(*handle.template grid<double>(i));
+                break;
+            case GridType::Int16:
+                updateChecksum(*handle.template grid<int16_t>(i));
+                break;
+            case GridType::Int32:
+                updateChecksum(*handle.template grid<int32_t>(i));
+                break;
+            case GridType::Int64:
+                updateChecksum(*handle.template grid<int64_t>(i));
+                break;
+            case GridType::Vec3f:
+                updateChecksum(*handle.template grid<Vec3f>(i));
+                break;
+            case GridType::Vec3d:
+                updateChecksum(*handle.template grid<Vec3d>(i));
+                break;
+            case GridType::UInt32:
+                updateChecksum(*handle.template grid<uint32_t>(i));
+                break;
+            case GridType::Mask:
+                updateChecksum(*handle.template grid<ValueMask>(i));
+                break;
+            case GridType::Index:
+                updateChecksum(*handle.template grid<ValueIndex>(i));
+                break;
+            case GridType::OnIndex:
+                updateChecksum(*handle.template grid<ValueOnIndex>(i));
+                break;
+            case GridType::IndexMask:
+                updateChecksum(*handle.template grid<ValueIndexMask>(i));
+                break;
+            case GridType::OnIndexMask:
+                updateChecksum(*handle.template grid<ValueOnIndexMask>(i));
+                break;
+            case GridType::Boolean:
+                updateChecksum(*handle.template grid<bool>(i));
+                break;
+            case GridType::RGBA8:
+                updateChecksum(*handle.template grid<Rgba8>(i));
+                break;
+            case GridType::Fp4:
+                updateChecksum(*handle.template grid<Fp4>(i));
+                break;
+            case GridType::Fp8:
+                updateChecksum(*handle.template grid<Fp8>(i));
+                break;
+            case GridType::Fp16:
+                updateChecksum(*handle.template grid<Fp16>(i));
+                break;
+            case GridType::FpN:
+                updateChecksum(*handle.template grid<FpN>(i));
+                break;
+            case GridType::Vec4f:
+                updateChecksum(*handle.template grid<Vec4f>(i));
+                break;
+            case GridType::Vec4d:
+                updateChecksum(*handle.template grid<Vec4d>(i));
+                break;
+            default:
+            {
+                std::stringstream ss;
+                ss << "Cannot update checksum for grid of unknown type \"" << toStr(handle.gridType(i));
+                throw std::runtime_error(ss.str() + "\"");
+            }
+        }
+    }
 }
 
 } // namespace nanovdb

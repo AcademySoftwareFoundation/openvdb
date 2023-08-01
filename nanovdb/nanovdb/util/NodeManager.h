@@ -14,7 +14,7 @@
     \details The ordering of the sequential access to nodes is always breadth-first!
 */
 
-#include "../NanoVDB.h"// for NanoGrid etc
+#include <nanovdb/NanoVDB.h>// for NanoGrid etc
 #include "HostBuffer.h"// for HostBuffer
 
 #ifndef NANOVDB_NODEMANAGER_H_HAS_BEEN_INCLUDED
@@ -44,9 +44,9 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
 struct NodeManagerData
 {// 48B = 6*8B
     uint64_t        mMagic;// 8B
+    union {int64_t  mPadding; uint8_t mLinear;};// 8B of which 1B is used for a binary flag
     void           *mGrid;//  8B pointer to either host or device grid
     union {int64_t *mPtr[3], mOff[3];};// 24B, use mOff if mLinear!=0
-    uint8_t         mLinear, mPadding[7];// 7B padding to 8B boundary
 };
 
 /// @brief This class serves to manage a raw memory buffer of a NanoVDB NodeManager or LeafManager.
@@ -243,6 +243,10 @@ public:
     /// @details 0 is leaf, 1 is lower internal, and 2 is upper internal level
     __hostdev__ uint64_t nodeCount(int level) const { return this->tree().nodeCount(level); }
 
+    __hostdev__ uint64_t leafCount() const { return this->tree().nodeCount(0); }
+    __hostdev__ uint64_t lowerCount() const { return this->tree().nodeCount(1); }
+    __hostdev__ uint64_t upperCount() const { return this->tree().nodeCount(2); }
+
     /// @brief Return the i'th leaf node with respect to breadth-first ordering
     template <int LEVEL>
     __hostdev__ const NodeT<LEVEL>& node(uint32_t i) const {
@@ -294,8 +298,10 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
     NANOVDB_ASSERT(isValid(data));
     data->mMagic = NANOVDB_MAGIC_NUMBER;
     data->mGrid = const_cast<NanoGrid<BuildT>*>(&grid);
+    data->mPadding = 0;
 
-    if ((data->mLinear = NodeManager<BuildT>::isLinear(grid)?1u:0u)) {
+    if (NodeManager<BuildT>::isLinear(grid)) {
+        data->mLinear = uint8_t(1u);
         data->mOff[0] = PtrDiff(grid.tree().template getFirstNode<0>(), &grid);
         data->mOff[1] = PtrDiff(grid.tree().template getFirstNode<1>(), &grid);
         data->mOff[2] = PtrDiff(grid.tree().template getFirstNode<2>(), &grid);
@@ -304,7 +310,7 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
         int64_t *ptr1 = data->mPtr[1] = data->mPtr[0] + grid.tree().nodeCount(0);
         int64_t *ptr2 = data->mPtr[2] = data->mPtr[1] + grid.tree().nodeCount(1);
         // Performs depth first traversal but breadth first insertion
-        for (auto it2 = grid.tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = grid.tree().root().cbeginChild(); it2; ++it2) {
             *ptr2++ = PtrDiff(&*it2, &grid);
             for (auto it1 = it2->beginChild(); it1; ++it1) {
                 *ptr1++ = PtrDiff(&*it1, &grid);
