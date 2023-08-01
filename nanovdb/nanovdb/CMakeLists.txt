@@ -170,7 +170,7 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/CpuTimer.h
   util/CreateNanoGrid.h
   util/CSampleFromVoxels.h
-  util/cuda/CudaAddBlindData.handle
+  util/cuda/CudaAddBlindData.h
   util/cuda/CudaDeviceBuffer.h
   util/cuda/CudaIndexToGrid.handle
   util/cuda/CudaPointsToGrid.handle
