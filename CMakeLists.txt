@@ -68,6 +68,7 @@ include(GNUInstallDirs)
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
 option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
+option(OPENVDB_BUILD_EXAMPLES "Build OpenVDB examples" OFF)
 option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
@@ -331,6 +332,7 @@ if(NOT (
     OPENVDB_BUILD_AX_UNITTESTS OR
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
+    OPENVDB_BUILD_EXAMPLES OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
     OPENVDB_BUILD_HOUDINI_ABITESTS OR
     OPENVDB_BUILD_MAYA_PLUGIN OR
@@ -368,7 +370,7 @@ include(cmake/config/OpenVDBCXX.cmake)
 # * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
 #   of injecting into the Windows runtime to replace the system allocator.
 
-if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
+if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS OR OPENVDB_BUILD_EXAMPLES) AND CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
@@ -423,6 +425,7 @@ set(NEEDS_OPENVDB OFF)
 if(OPENVDB_BUILD_AX OR
    OPENVDB_BUILD_BINARIES OR
    OPENVDB_BUILD_UNITTESTS OR
+   OPENVDB_BUILD_EXAMPLES OR
    OPENVDB_BUILD_HOUDINI_PLUGIN OR
    OPENVDB_BUILD_MAYA_PLUGIN OR
    OPENVDB_BUILD_PYTHON_MODULE OR
@@ -546,6 +549,10 @@ endif()
 
 if(OPENVDB_BUILD_UNITTESTS)
   add_subdirectory(openvdb/openvdb/unittest)
+endif()
+
+if(OPENVDB_BUILD_EXAMPLES)
+  add_subdirectory(vdb_examples)
 endif()
 
 # Tests the vdb_ax binary so needs to come after openvdb_cmd
