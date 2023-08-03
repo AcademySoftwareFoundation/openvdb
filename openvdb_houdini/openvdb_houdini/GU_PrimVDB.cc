@@ -1813,6 +1813,12 @@ GU_PrimVDB::normal(NormalComp& /*output*/) const
     // No need here.
 }
 
+void
+GU_PrimVDB::normal(NormalCompD& /*output*/) const
+{
+    // No need here.
+}
+
 
 ////////////////////////////////////////
 

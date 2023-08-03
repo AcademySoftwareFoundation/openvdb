@@ -1410,17 +1410,44 @@ GEO_PrimVDB::isActiveRegionMatched(const GEO_PrimVDB *vdb) const
 CE_VDBGrid *
 GEO_PrimVDB::getCEGrid(bool read, bool write) const
 {
-    UT_ASSERT(!write);
-    UT_ASSERT(read);
-
+    // No read means there is no topo either, so likely
+    // for someone who only wants tilestarts.
     if (myCEGrid)
+    {
+        if (read)
+        {
+            if (!myCEGrid->hasBuffer())
+            {
+                // Attempt to load...
+                try
+                {
+                    myCEGrid->initFromVDB(getGrid());
+                }
+                catch (cl::Error &err)
+                {
+                    CE_Context::reportError(err);
+                    return nullptr;
+                }
+            }
+        }
+        if (write)
+        {
+            if (!myCEGridIsOwned)
+            {
+                UT_ASSERT(!"Not implemented");
+            }
+            // Re-flag to write back.
+	    myCEGridAuthorative = true;
+        }
         return myCEGrid;
+    }
 
     CE_VDBGrid  *cegrid = new CE_VDBGrid();
 
     try
     {
-        cegrid->initFromVDB(getGrid());
+        if (read)
+            cegrid->initFromVDB(getGrid());
         myCEGridIsOwned = true;
     }
     catch (cl::Error &err)
@@ -1444,7 +1471,17 @@ GEO_PrimVDB::flushCEWriteCaches()
     if (myCEGridAuthorative)
     {
         // Write back.
-        UT_ASSERT(!"Not implemented");
+        try
+        {
+            openvdb::GridBase::Ptr gpugrid = myCEGrid->createVDB();
+            if (gpugrid)
+                setGrid(*gpugrid);
+            getParent()->getPrimitiveList().bumpDataId();
+        }
+        catch (cl::Error &err)
+        {
+            CE_Context::reportError(err);
+        }
         myCEGridAuthorative = false;
     }
 }
@@ -1954,6 +1991,16 @@ GEO_PrimVDB::setTransform4(const UT_DMatrix4 &xform4)
 {
     using namespace openvdb::math;
     myGridAccessor.setTransform(*geoCreateLinearTransform(xform4), *this);
+}
+
+void
+GEO_PrimVDB::getRes(int64 &rx, int64 &ry, int64 &rz) const
+{
+    int x, y, z;
+    getRes(x, y, z);
+    rx = x;
+    ry = y;
+    rz = z;
 }
 
 void
@@ -3550,6 +3597,7 @@ namespace // anonymous
         geo_INTRINSIC_ACTIVEVOXELDIM,
         geo_INTRINSIC_ACTIVEVOXELCOUNT,
         geo_INTRINSIC_TRANSFORM,
+        geo_INTRINSIC_TAPER,
         geo_INTRINSIC_VOLUMEVISUALMODE,
         geo_INTRINSIC_VOLUMEVISUALDENSITY,
         geo_INTRINSIC_VOLUMEVISUALISO,
@@ -3671,6 +3719,12 @@ namespace // anonymous
         q->setTransform4(m);
         return 16;
     }
+    static fpreal
+    intrinsicTaper(const GEO_PrimVDB *prim)
+    {
+        return prim->getTaper();
+    }
+
     const char *
     intrinsicVisualMode(const GEO_PrimVDB *p)
     {
@@ -3814,6 +3868,8 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
             "transform", 16, intrinsicTransform);
     GA_INTRINSIC_SET_TUPLE_F(GEO_PrimVDB, geo_INTRINSIC_TRANSFORM,
             intrinsicSetTransform);
+    GA_INTRINSIC_F(GEO_PrimVDB, geo_INTRINSIC_TAPER,
+	 "taper", intrinsicTaper)
 
     GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALMODE,
             "volumevisualmode", intrinsicVisualMode)
