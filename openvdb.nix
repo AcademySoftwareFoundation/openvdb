@@ -21,7 +21,8 @@ in
 
   cmakeFlags =["-DOPENVDB_BUILD_VDB_VIEW=ON"];
 
-  enableParallelBuilding = true;
+  # easily maxes out RAM on github actions or systems <64 GB
+  enableParallelBuilding = false;
   nativeBuildInputs = [ cmake pkg-config ];
 
     # required dependencies for downstream development
