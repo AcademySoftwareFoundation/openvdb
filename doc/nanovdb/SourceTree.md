@@ -33,13 +33,14 @@ foo@bar:~$ tree
 │   ├── benchmark
 │   │   ├── BenchKernels_dense.cu
 │   │   ├── BenchKernels_nano.cu
-│   │   ├── Benchmark.cc
-│   │   ├── Benchmark_dense.cc
-│   │   ├── Benchmark_nano.cc
+│   │   ├── Benchmark_dense.cu
+│   │   ├── Benchmark_nano.cu
 │   │   ├── Camera.h
 │   │   ├── CMakeLists.txt
 │   │   ├── DenseGrid.h
-│   │   └── Image.h
+│   │   ├── Image.h
+│   │   ├── TestBenchmark.cc
+│   │   └── TestBenchmark.cu
 │   ├── CMakeLists.txt
 │   ├── ex_bump_pool_buffer
 │   │   └── bump_pool_buffer.cc
@@ -49,13 +50,13 @@ foo@bar:~$ tree
 │   │   ├── nanovdb.cu
 │   │   └── openvdb.cc
 │   ├── ex_index_grid_cuda
-│   │   ├── index_grid_cuda.cc
-│   │   └── index_grid_cuda.cu
+│   │   ├── index_grid_cuda.cu
+│   │   └── index_grid_cuda_kernel.cu
 │   ├── ex_make_custom_nanovdb
 │   │   └── make_custom_nanovdb.cc
 │   ├── ex_make_custom_nanovdb_cuda
 │   │   ├── make_custom_nanovdb_cuda.cc
-│   │   └── make_custom_nanovdb_cuda.cu
+│   │   └── make_custom_nanovdb_cuda_kernel.cu
 │   ├── ex_make_funny_nanovdb
 │   │   └── make_funny_nanovdb.cc
 │   ├── ex_make_nanovdb_sphere
@@ -68,14 +69,14 @@ foo@bar:~$ tree
 │   │   └── modify_nanovdb_thrust.cu
 │   ├── ex_nodemanager_cuda
 │   │   ├── nodemanager_cuda.cc
-│   │   └── nodemanager_cuda.cu
+│   │   └── nodemanager_cuda_kernel.cu
 │   ├── ex_openvdb_to_nanovdb
 │   │   └── openvdb_to_nanovdb.cc
 │   ├── ex_openvdb_to_nanovdb_accessor
 │   │   └── openvdb_to_nanovdb_accessor.cc
 │   ├── ex_openvdb_to_nanovdb_cuda
 │   │   ├── openvdb_to_nanovdb_cuda.cc
-│   │   └── openvdb_to_nanovdb_cuda.cu
+│   │   └── openvdb_to_nanovdb_cuda_kernel.cu
 │   ├── ex_raytrace_fog_volume
 │   │   ├── common.h
 │   │   ├── main.cc
@@ -91,8 +92,8 @@ foo@bar:~$ tree
 │   ├── ex_read_nanovdb_sphere_accessor
 │   │   └── read_nanovdb_sphere_accessor.cc
 │   ├── ex_read_nanovdb_sphere_accessor_cuda
-│   │   ├── read_nanovdb_sphere_accessor_cuda.cc
-│   │   └── read_nanovdb_sphere_accessor_cuda.cu
+│   │   ├── read_nanovdb_sphere_accessor_cuda.cu
+│   │   └── read_nanovdb_sphere_accessor_cuda_kernel.cu
 │   ├── ex_util
 │   │   └── ComputePrimitives.h
 │   ├── ex_voxels_to_grid_cuda
@@ -116,13 +117,14 @@ foo@bar:~$ tree
     ├── CreateNanoGrid.h
     ├── CSampleFromVoxels.h
     ├── cuda
-    │   ├── CudaAddBlindData.h
+    │   ├── CudaAddBlindData.cuh
     │   ├── CudaDeviceBuffer.h
-    │   ├── CudaIndexToGrid.h
-    │   ├── CudaPointsToGrid.h
-    │   ├── CudaSignedFloodFill.h
+    │   ├── CudaGridHandle.cuh
+    │   ├── CudaIndexToGrid.cuh
+    │   ├── CudaPointsToGrid.cuh
+    │   ├── CudaSignedFloodFill.cuh
     │   ├── CudaUtils.h
-    │   └── GpuTimer.h
+    │   └── GpuTimer.cuh
     ├── DitherLUT.h
     ├── ForEach.h
     ├── GridBuilder.h

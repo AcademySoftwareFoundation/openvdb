@@ -1,0 +1,25 @@
+
+
+NanoVDB:
+    Minor version changed from 4 to 5 (major version is unchanged since the ABI is preserved)
+    Transition from C++11 to C++17 in NanoVDB.h and its tools
+    Several new ways to construct and modify NanoVDB grids on the GPU
+    New device function to convert points into a compact grid: nanovdb::cudaPointsToGrid
+    Improved and renamed device function that converts voxels into a grid: nanovdb::cudaVoxelsToGrid
+    Introduced a new extendable API for acceleration of custom random-access methods, e.g. getValue(ijk)
+    Index grids in 4 flavors (Index, OnIndex, IndexMask, and OnIndexMask)
+    Introduced new (dummy) build-type nanovdb::Points and nanovdb::GridType::PointIndex
+    Introduced new types nanovdb::GridType::Vec3u16 and nanovdb::GridType::Vec3u8 used for compressed representations of point coordinates as blind data
+    CreateNanoGrid.h is replacing GridBuilder.h, IndexGridBuilder.h and OpenToNanoVDB.h
+    Moved CudaDeviceBuffer.h to cuda/CudaDeviceBuffer.h
+    Added cuda/CudaUtils.h and cuda/GpuTimer.h with cuda utility functions
+    Added cuda/CudaPointToGrids.h that constructs device grids from points or voxels
+    Added cuda/CudaIndexGridToGrid.h that converts IndexGrids and values into regular Grids
+    Added cuda/CudaSignedFloodFill.h that performs signed-flood filing on SDF on the GPU
+    The move constructor in now requires the GridBuffer to actually contain a valid grid
+    Added types: Ve4f Ve4d, ValueIndex, ValueOnIndex, ValueIndexMask, ValueOnIndexMask
+    Major improvements to GridBuilder.h, which allows user to construct grids with random access on the host
+    Numerous improvements in NanoVDB.h: e.g. Customizable get/set methods on ValueAccessor, BitFlags, transform(Map), expandAtomic(BBox), expandAtomic(Coord), intersectAtomic(BBox), pi(), BuildTraits, more documentation, Mask:: DenseIterator, Mask:: setOnAtomic,Mask:: setOffAtomic, Map constructors, DataType are now public vs private in all node types, GridMetaData can now be copied
+    PNanoVDB.h is now in sync with NanoVDB.h
+    Added PrefixSum.h for concurrent computation of prefix sum on the host
+    Primitives.h can now create grids on the CPU with SDF, FOG and point of torus
