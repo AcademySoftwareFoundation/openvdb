@@ -9,6 +9,7 @@
 
 #include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/cuda/CudaDeviceBuffer.h>
+#include <nanovdb/util/cuda/CudaGridHandle.cuh>
 
 void scaleActiveVoxels(nanovdb::FloatGrid *grid_d, uint64_t leafCount, float scale)
 {
