@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
+#include <nanovdb/util/cuda/CudaGridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
 #include <stdio.h> // for printf
 
 // This is called by the host only
