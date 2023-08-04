@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file CudaSignedFloodFill.h
+    \file CudaSignedFloodFill.cuh
 
     \author Ken Museth
 
@@ -14,14 +14,17 @@
           needs to be modified during the signed flood fill operation. This happens
           when the root-table needs to be expanded with tile values (of size 4096^3)
           that are completely inside the implicit surface.
+
+    \warning The header file contains cuda device code so be sure
+             to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NANOVDB_CUDA_SIGNED_FLOOD_FILL_H_HAS_BEEN_INCLUDED
-#define NANOVDB_CUDA_SIGNED_FLOOD_FILL_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_CUDA_SIGNED_FLOOD_FILL_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_CUDA_SIGNED_FLOOD_FILL_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/GridHandle.h>
-#include <nanovdb/util/cuda/GpuTimer.h>
+#include <nanovdb/util/cuda/GpuTimer.cuh>
 #include <nanovdb/util/cuda/CudaUtils.h>
 
 namespace nanovdb {
@@ -153,7 +156,7 @@ void CudaSignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     cudaCheck(cudaFree(d_count));
 
     static const int threadsPerBlock = 128;
-    auto blocksPerGrid = [&](size_t count){return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
+    auto blocksPerGrid = [&](size_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
     auto *tree = reinterpret_cast<NanoTree<BuildT>*>(d_grid + 1);
 
     if (mVerbose) mTimer.start("\nProcess leaf nodes");
@@ -187,4 +190,4 @@ cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose)
 
 }// nanovdb namespace
 
-#endif // NANOVDB_CUDA_SIGNED_FLOOD_FILL_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_CUDA_SIGNED_FLOOD_FILL_CUH_HAS_BEEN_INCLUDED

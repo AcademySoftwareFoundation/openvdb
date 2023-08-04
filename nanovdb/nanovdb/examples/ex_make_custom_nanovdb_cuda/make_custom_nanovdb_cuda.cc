@@ -1,6 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#undef NANOVDB_USE_OPENVDB // Prevents include/openvdb/points/AttributeArray.h:1841:25: error: ‘stride’ cannot be used as a function
+
 #include <nanovdb/util/GridBuilder.h>
 #include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/cuda/CudaDeviceBuffer.h>

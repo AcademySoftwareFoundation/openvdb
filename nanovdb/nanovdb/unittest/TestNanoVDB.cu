@@ -8,10 +8,10 @@
 #include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/cuda/CudaUtils.h>
-#include <nanovdb/util/cuda/CudaSignedFloodFill.h>
-#include <nanovdb/util/cuda/CudaPointsToGrid.h>
-#include <nanovdb/util/cuda/CudaIndexToGrid.h>
-#include <nanovdb/util/cuda/CudaAddBlindData.h>
+#include <nanovdb/util/cuda/CudaSignedFloodFill.cuh>
+#include <nanovdb/util/cuda/CudaPointsToGrid.cuh>
+#include <nanovdb/util/cuda/CudaIndexToGrid.cuh>
+#include <nanovdb/util/cuda/CudaAddBlindData.cuh>
 #include <nanovdb/util/CpuTimer.h>
 #include <nanovdb/util/IO.h>
 
@@ -501,7 +501,7 @@ TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueOnIndexMask)
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_old)
 {
     using BuildT = nanovdb::ValueOnIndex;
-    nanovdb::CpuTimer timer;
+    //nanovdb::CpuTimer timer;
     const size_t voxelCount = 1 << 20;// 1048576
     std::vector<nanovdb::Coord> voxels;
     {//generate random voxels
@@ -509,22 +509,22 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_old)
         std::srand(98765);
         const int max = 512, min = -max;
         auto op = [&](){return rand() % (max - min) + min;};
-        timer.start("Creating "+std::to_string(voxelCount)+" random voxels on the CPU");
+        //timer.start("Creating "+std::to_string(voxelCount)+" random voxels on the CPU");
         while (voxels.size() < voxelCount) voxels.push_back(nanovdb::Coord(op(), op(), op()));
-        timer.stop();
+        //timer.stop();
         EXPECT_EQ(voxelCount, voxels.size());
     }
 #if 0
     {// Build grid on CPU
         nanovdb::build::Grid<float> buildGrid(0.0f);
-        timer.start("Building grid on CPU from "+std::to_string(voxels.size())+" points");
+        //timer.start("Building grid on CPU from "+std::to_string(voxels.size())+" points");
         nanovdb::forEach(0, voxelCount, voxelCount >> 6, [&](const nanovdb::Range1D &r){
             auto acc = buildGrid.getWriteAccessor();
             for (size_t i=r.begin(); i!=r.end(); ++i) acc.setValueOn(voxels[i]);
         });
-        timer.restart("Converting CPU build::Grid to nanovdb");
+        //timer.restart("Converting CPU build::Grid to nanovdb");
         auto handle = nanovdb::createNanoGrid(buildGrid);
-        timer.stop();
+        //timer.stop();
     }
 #endif
     nanovdb::Coord* d_coords;
@@ -535,11 +535,11 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_old)
     cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxelSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(voxels.size())+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(voxels.size())+" points");
     nanovdb::CudaPointsToGrid<BuildT> converter;
     //converter.setVerbose();
     auto handle = converter.getHandle(d_coords, voxelCount);
-    timer.stop();
+    //timer.stop();
 
     EXPECT_TRUE(handle.deviceData());// grid only exists on the GPU
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
@@ -584,7 +584,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     size_t size1 = 0, size2 = 0;
     std::vector<nanovdb::GridHandle<>> handles1, handles2;
     std::vector<std::string> gridNames;
-    nanovdb::CpuTimer timer("create 5 host grids");
+    //nanovdb::CpuTimer timer("create 5 host grids");
     for (int radius = 100; radius<150; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles1.emplace_back(nanovdb::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
@@ -594,7 +594,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     }
     EXPECT_EQ(5u, gridNames.size());
     EXPECT_EQ(5u, handles1.size());
-    timer.restart("create 5 host grids");
+    //timer.restart("create 5 host grids");
     for (int radius = 150; radius<200; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles2.emplace_back(nanovdb::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
@@ -603,7 +603,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     }
     EXPECT_EQ(10u, gridNames.size());
     EXPECT_EQ( 5u, handles2.size());
-    timer.restart("merging 5 host grids");
+    //timer.restart("merging 5 host grids");
     auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles2);// merge last 5 grid handles
     EXPECT_EQ(size2, mergedHandle.size());
     EXPECT_FALSE(mergedHandle.isPadded());
@@ -613,7 +613,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ(5u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
     EXPECT_EQ(handles2[0].size(), gridData->mGridSize);
-    timer.restart("unit-test host grids");
+    //timer.restart("unit-test host grids");
     for (int i=0; i<5; ++i){
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
@@ -626,7 +626,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     handles1.push_back(std::move(mergedHandle));// append one handle with 5 merged grids
     EXPECT_TRUE(mergedHandle.empty());
     EXPECT_EQ(6u, handles1.size());
-    timer.restart("merging 10 host grids");
+    //timer.restart("merging 10 host grids");
     mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles1);
     EXPECT_EQ(size1 + size2, mergedHandle.size());
     EXPECT_TRUE(mergedHandle.data());
@@ -636,9 +636,9 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ( 0u, gridData->mGridIndex);
     EXPECT_EQ(handles1[0].size(), gridData->mGridSize);
 
-    timer.restart("splitting host grids");
+    //timer.restart("splitting host grids");
     auto splitHandles = nanovdb::splitGrids(mergedHandle);
-    timer.restart("unit-test split grids");
+    //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (int i=0; i<5; ++i){
         EXPECT_EQ(handles1[i].size(), splitHandles[i].size());
@@ -654,7 +654,7 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
-    timer.stop();
+    //timer.stop();
 }//  mergeSplitGrids
 
 TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
@@ -664,7 +664,7 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     size_t size = 0;
     std::vector<HandleT> handles;
     std::vector<std::string> gridNames;
-    nanovdb::CpuTimer timer("create 10 host grids");
+    //nanovdb::CpuTimer timer("create 10 host grids");
     for (int radius = 100; radius<200; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles.emplace_back(nanovdb::createLevelSetSphere<float, BufferT>(radius,nanovdb::Vec3d(0),1,3,
@@ -672,16 +672,16 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
         EXPECT_FALSE(handles.back().isPadded());
         size += handles.back().size();
     }
-    timer.restart("copy grids to device");
+    //timer.restart("copy grids to device");
     for (auto &h : handles) h.deviceUpload();
     EXPECT_EQ(10u, handles.size());
-    timer.restart("merging device grids");
+    //timer.restart("merging device grids");
     auto mergedHandle = nanovdb::mergeDeviceGrids<BufferT, std::vector>(handles);
     EXPECT_EQ(size, mergedHandle.size());
     EXPECT_FALSE(mergedHandle.data());
     EXPECT_TRUE(mergedHandle.deviceData());
     EXPECT_FALSE(mergedHandle.isPadded());
-    timer.restart("copy grids to host");
+    //timer.restart("copy grids to host");
     mergedHandle.deviceDownload();
     EXPECT_TRUE(mergedHandle.data());
     EXPECT_TRUE(mergedHandle.deviceData());
@@ -690,16 +690,16 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     EXPECT_TRUE(gridData);
     EXPECT_EQ(10u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
-    timer.restart("unit-test host grids");
+    //timer.restart("unit-test host grids");
     for (uint32_t i=0; i<10; ++i) {
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
         EXPECT_EQ(i, gridData->mGridIndex);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
-    timer.restart("splitting device grids");
+    //timer.restart("splitting device grids");
     auto splitHandles = nanovdb::splitDeviceGrids<BufferT, std::vector>(mergedHandle);
-    timer.restart("unit-test split grids");
+    //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (uint32_t i=0u; i<10u; ++i) {
         EXPECT_EQ(handles[i].size(), splitHandles[i].size());
@@ -712,7 +712,7 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
-    timer.stop();
+    //timer.stop();
 }//  mergeSplitDeviceGrids
 
 // make -j 4 testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*Cuda*" --gtest_break_on_failure
@@ -1018,7 +1018,7 @@ TEST(TestNanoVDBCUDA, OneVoxelToGrid)
 
 TEST(TestNanoVDBCUDA, ThreePointsToGrid)
 {
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
     using GridT  = nanovdb::NanoGrid<BuildT>;
     const size_t num_points = 3;
@@ -1196,7 +1196,7 @@ TEST(TestNanoVDBCUDA, EightVoxelsToFloatGrid)
 
 TEST(TestNanoVDBCUDA, Random_CudaPointsToGrid_World64)
 {
-    using BuildT = nanovdb::Points;//uint32_t;
+    using BuildT = nanovdb::Point;//uint32_t;
     using Vec3T = nanovdb::Vec3d;
     //nanovdb::CpuTimer timer;
     const size_t pointCount = 1 << 20;// 1048576
@@ -1309,7 +1309,7 @@ TEST(TestNanoVDBCUDA, Random_CudaPointsToGrid_World64)
 
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64)
 {
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3d;
     //nanovdb::CpuTimer timer;
     const size_t pointCount = 1 << 20;// 1048576
@@ -1427,12 +1427,12 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64)
 
 TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_World32)
 {
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
 
-    nanovdb::CpuTimer timer("Generate sphere with points");
+    //nanovdb::CpuTimer timer("Generate sphere with points");
     auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), 0.5);
-    timer.stop();
+    //timer.stop();
 
     auto *pointGrid = pointsHandle.grid<uint32_t>();
     EXPECT_TRUE(pointGrid);
@@ -1456,11 +1456,11 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_World32)
     cudaCheck(cudaMemcpy(d_points, begin, pointSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     nanovdb::CudaPointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     auto handle = converter.getHandle(d_points, pointCount);
-    timer.stop();
+    //timer.stop();
     cudaCheck(cudaFree(d_points));
     //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
 
@@ -1549,12 +1549,12 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_World32)
 
 TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
 {
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
 
-    nanovdb::CpuTimer timer("Generate sphere with points");
+    //nanovdb::CpuTimer timer("Generate sphere with points");
     auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), 0.5);
-    timer.stop();
+    //timer.stop();
 
     auto *pointGrid = pointsHandle.grid<uint32_t>();
     EXPECT_TRUE(pointGrid);
@@ -1578,14 +1578,14 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
     cudaCheck(cudaMemcpy(d_points, begin, pointSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
     nanovdb::CudaPointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     converter.setPointType(nanovdb::PointType::Voxel32);
     auto handle = converter.getHandle(d_points, pointCount);
     /////////////////////////////////////////////////////////////////////////
-    timer.stop();
+    //timer.stop();
     cudaCheck(cudaFree(d_points));
     //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
 
@@ -1681,12 +1681,12 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
 TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
 {
     EXPECT_EQ(6u, sizeof(nanovdb::Vec3u16));
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
 
-    nanovdb::CpuTimer timer("Generate sphere with points");
+    //nanovdb::CpuTimer timer("Generate sphere with points");
     auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), 0.5);
-    timer.stop();
+    //timer.stop();
 
     auto *pointGrid = pointsHandle.grid<uint32_t>();
     EXPECT_TRUE(pointGrid);
@@ -1710,14 +1710,14 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
     cudaCheck(cudaMemcpy(d_points, begin, pointSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
     nanovdb::CudaPointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     converter.setPointType(nanovdb::PointType::Voxel16);
     auto handle = converter.getHandle(d_points, pointCount);
     /////////////////////////////////////////////////////////////////////////
-    timer.stop();
+    //timer.stop();
     cudaCheck(cudaFree(d_points));
     //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
 
@@ -1806,16 +1806,16 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
 {
     EXPECT_EQ(3u, sizeof(nanovdb::Vec3u8));
 
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
 
-    nanovdb::CpuTimer timer("Generate sphere with points");
+    //nanovdb::CpuTimer timer("Generate sphere with points");
     auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), 0.5);
-    timer.stop();
+    //timer.stop();
 
     auto *pointGrid = pointsHandle.grid<uint32_t>();
     EXPECT_TRUE(pointGrid);
-    std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
+    //std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
     nanovdb::PointAccessor<Vec3T, uint32_t> acc2(*pointGrid);
     EXPECT_TRUE(acc2);
     const Vec3T *begin, *end;
@@ -1836,7 +1836,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
     cudaCheck(cudaMemcpy(d_points, begin, pointSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
     //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
     nanovdb::CudaPointsToGrid<BuildT> converter(pointGrid->map());
@@ -1844,7 +1844,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
     converter.setPointType(nanovdb::PointType::Voxel8);
     auto handle = converter.getHandle(d_points, pointCount);
     /////////////////////////////////////////////////////////////////////////
-    timer.stop();
+    //timer.stop();
     cudaCheck(cudaFree(d_points));
     //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
 
@@ -1873,7 +1873,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    std::cerr << grid->indexBBox() << std::endl;
+    //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("Voxel8: Vec3<uint8_t> point coordinates in voxel space", grid->blindMetaData(0).mName);
 
@@ -1933,16 +1933,16 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 {
     EXPECT_EQ(3u, sizeof(nanovdb::Vec3u8));
 
-    using BuildT = nanovdb::Points;
+    using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3f;
 
-    nanovdb::CpuTimer timer("Generate sphere with points");
+    //nanovdb::CpuTimer timer("Generate sphere with points");
     auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), 0.5);
-    timer.stop();
+    //timer.stop();
 
     auto *pointGrid = pointsHandle.grid<uint32_t>();
     EXPECT_TRUE(pointGrid);
-    std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
+    //std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
     nanovdb::PointAccessor<Vec3T, uint32_t> acc2(*pointGrid);
     EXPECT_TRUE(acc2);
     const Vec3T *begin, *end;
@@ -1963,15 +1963,15 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
     cudaCheck(cudaMemcpy(d_points, begin, pointSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
+    //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
     //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
     nanovdb::CudaPointsToGrid<BuildT> converter(pointGrid->map());
-    converter.setVerbose(2);
+    //converter.setVerbose(2);
     converter.setPointType(nanovdb::PointType::PointID);
     auto handle = converter.getHandle(d_points, pointCount);
     /////////////////////////////////////////////////////////////////////////
-    timer.stop();
+    //timer.stop();
     cudaCheck(cudaFree(d_points));
     //std::cerr << "Grid size: " << (handle.size() >> 20) << " MB" << std::endl;
 
@@ -2055,7 +2055,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 TEST(TestNanoVDBCUDA, NanoGrid_Rgba8)
 {
     using BuildT = nanovdb::Rgba8;
-    using GridT = nanovdb::NanoGrid<BuildT>;
+    using GridT  = nanovdb::NanoGrid<BuildT>;
     const size_t num_points = 1;
     nanovdb::Coord coords[num_points] = {nanovdb::Coord(1, 2, 3)}, *d_coords = nullptr;
     cudaCheck(cudaMalloc(&d_coords, num_points * sizeof(nanovdb::Coord)));
@@ -2112,10 +2112,10 @@ TEST(TestNanoVDBCUDA, cudaAddBlindData)
     cudaCheck(cudaMalloc(&d_blind, num_points * sizeof(float)));
     cudaCheck(cudaMemcpy(d_blind, blind, num_points * sizeof(float), cudaMemcpyHostToDevice));// CPU -> GPU
 
-    nanovdb::GpuTimer timer("cudaAddBlindData");
+    //nanovdb::GpuTimer timer("cudaAddBlindData");
     auto handle2 = nanovdb::cudaAddBlindData(d_grid, d_blind, num_points);
     cudaCheck(cudaFree(d_blind));
-    timer.stop();
+    //timer.stop();
     EXPECT_TRUE(handle2.deviceData());// grid only exists on the GPU
     EXPECT_FALSE(handle2.data());// no grid was yet allocated on the CPU
     EXPECT_EQ(handle2.size(), handle.size() + sizeof(nanovdb::GridBlindMetaData) + nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(num_points*sizeof(float)));

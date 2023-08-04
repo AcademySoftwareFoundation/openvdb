@@ -1,41 +1,44 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
-#include <stdio.h> // for printf
+#include <nanovdb/util/CreateNanoGrid.h>
+#include <nanovdb/util/Primitives.h>      // for nanovdb::createLevelSetSphere
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>// for nanovdb::CudaDeviceBuffer
 
-// This is called by the host only
-void cpu_kernel(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* cpuGrid)
+extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// device grid
+                               const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// host grid
+                               cudaStream_t stream);
+
+/// @brief This examples depends on  NanoVDB and CUDA.
+int main(int, char**)
 {
-    nanovdb::ChannelAccessor<float, nanovdb::ValueOnIndex> acc(*cpuGrid);
-    //printf("\nNanoVDB CPU: channels=%u values=%lu\n", acc.grid().blindDataCount(), acc.root().maximum());
-    printf("NanoVDB CPU; %lu\n", acc.idx(  0, 0, 0));
-    printf("NanoVDB CPU; %lu\n", acc.idx( 99, 0, 0));
-    printf("NanoVDB CPU; %lu\n", acc.idx(100, 0, 0));
-    printf("NanoVDB CPU; %4.2f\n",   acc(  0, 0, 0));
-    printf("NanoVDB CPU; %4.2f\n",   acc( 99, 0, 0));
-    printf("NanoVDB CPU; %4.2f\n",   acc(100, 0, 0));
-}
+    using SrcGridT  = nanovdb::FloatGrid;
+    using DstBuildT = nanovdb::ValueOnIndex;
+    using BufferT   = nanovdb::CudaDeviceBuffer;
+    try {
+        // Create an NanoVDB grid of a sphere at the origin with radius 100 and voxel size 1.
+        auto srcHandle = nanovdb::createLevelSetSphere<float>();
+        auto *srcGrid = srcHandle.grid<float>();
 
-// This is called by the device only
-__global__ void gpu_kernel(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* gpuGrid)
-{
-    nanovdb::ChannelAccessor<float, nanovdb::ValueOnIndex> acc(*gpuGrid);
-    //printf("\nNanoVDB GPU: channels=%u values=%lu\n", gpuGrid->blindDataCount(), acc.root().maximum());
-    printf("NanoVDB GPU; %lu\n", acc.idx(  0, 0, 0));
-    printf("NanoVDB GPU; %lu\n", acc.idx( 99, 0, 0));
-    printf("NanoVDB GPU; %lu\n", acc.idx(100, 0, 0));
-    printf("NanoVDB GPU; %4.2f\n",   acc(  0, 0, 0));
-    printf("NanoVDB GPU; %4.2f\n",   acc( 99, 0, 0));
-    printf("NanoVDB GPU; %4.2f\n",   acc(100, 0, 0));
-}
+        // Converts the FloatGrid to an IndexGrid using CUDA for memory management.
+        auto idxHandle = nanovdb::createNanoGrid<SrcGridT, DstBuildT, BufferT>(*srcGrid, 1u, false , false);// 1 channel, no tiles or stats
 
-// This is called by the client code on the host
-extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* gpuGrid,
-                               const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* cpuGrid,
-                               cudaStream_t                                    stream)
-{
-    gpu_kernel<<<1, 1, 0, stream>>>(gpuGrid); // Launch the device kernel asynchronously
+        cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
+        cudaStreamCreate(&stream);
 
-    cpu_kernel(cpuGrid); // Launch the host "kernel" (synchronously)
+        idxHandle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
+        auto* cpuGrid = idxHandle.grid<DstBuildT>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
+        auto* gpuGrid = idxHandle.deviceGrid<DstBuildT>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
+
+        if (!gpuGrid) throw std::runtime_error("GridHandle did not contain a device grid with value type float");
+        if (!cpuGrid) throw std::runtime_error("GridHandle did not contain a host grid with value type float");
+
+        launch_kernels(cpuGrid, cpuGrid, stream); // Call a host method to print a grid value on both the CPU and GPU
+
+        cudaStreamDestroy(stream); // Destroy the CUDA stream
+    }
+    catch (const std::exception& e) {
+        std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
+    }
+    return 0;
 }

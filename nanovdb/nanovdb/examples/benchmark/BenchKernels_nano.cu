@@ -12,7 +12,7 @@
 #include <nanovdb/util/cuda/CudaDeviceBuffer.h> // for CUDA memory management
 #include <nanovdb/util/Ray.h> // for nanovdb::Ray
 #include <nanovdb/util/HDDA.h> // for nanovdb::ZeroCrossing
-#include <nanovdb/util/cuda/GpuTimer.h>
+#include <nanovdb/util/cuda/GpuTimer.cuh>
 
 #include "Image.h"
 #include "Camera.h"

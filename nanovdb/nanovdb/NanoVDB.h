@@ -291,9 +291,10 @@ class FpN
 };
 
 /// @dummy type for indexing points into voxels
-class Points
+class Point
 {
 };
+//using Points = Point;// for backwards compatibility
 
 // --------------------------> GridType <------------------------------------
 
@@ -357,7 +358,7 @@ enum class GridClass : uint32_t { Unknown = 0,
                                   Topology = 6, // grid with active states only (no values)
                                   VoxelVolume = 7, // volume of geometric cubes, e.g. colors cubes in Minecraft
                                   IndexGrid = 8, // grid whose values are offsets, e.g. into an external array
-                                  TensorGrid = 9, // Index grid specefically indexing learnable tensor features
+                                  TensorGrid = 9, // Index grid for indexing learnable tensor features
                                   End = 10 };
 
 #ifndef __CUDACC_RTC__
@@ -417,9 +418,9 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
                                               PointRadius = 4,
                                               PointVelocity = 5,
                                               PointId = 6,
-                                              WorldCoords = 7, // 3D coorinates in world space, e.g. (0.056, 0.8, 1,8)
-                                              GridCoords = 8, // 3D coorinates in grid space, e.g. (1.2, 4.0, 5.7), aka index-space
-                                              VoxelCoords = 9, // 3D coorinates invoxel space, e.g. (0.2, 0.0, 0.7)
+                                              WorldCoords = 7, // 3D coordinates in world space, e.g. (0.056, 0.8, 1,8)
+                                              GridCoords = 8, // 3D coordinates in grid space, e.g. (1.2, 4.0, 5.7), aka index-space
+                                              VoxelCoords = 9, // 3D coordinates in voxel space, e.g. (0.2, 0.0, 0.7)
                                               End = 10 };
 
 // --------------------------> is_same <------------------------------------
@@ -473,7 +474,7 @@ struct BuildTraits
     static constexpr bool is_float = is_floating_point<T>::value;
     // check if T is a template specialization of LeafData<T>, i.e. has T mValues[512]
     static constexpr bool is_special = is_index || is_Fp ||
-                                       is_same<T, Points>::value ||
+                                       is_same<T, Point>::value ||
                                        is_same<T, bool>::value ||
                                        is_same<T, ValueMask>::value;
 }; // BuildTraits
@@ -648,7 +649,7 @@ struct BuildToValueMap<FpN>
 };
 
 template<>
-struct BuildToValueMap<Points>
+struct BuildToValueMap<Point>
 {
     using Type = uint64_t;
     using type = uint64_t;
@@ -1892,7 +1893,7 @@ struct FloatTraits<ValueMask, 1> // size of empty class in C++ is 1 byte and not
 };
 
 template<>
-struct FloatTraits<Points, 1> // size of empty class in C++ is 1 byte and not 0 byte
+struct FloatTraits<Point, 1> // size of empty class in C++ is 1 byte and not 0 byte
 {
     using FloatType = double;
 };
@@ -1945,7 +1946,7 @@ __hostdev__ inline GridType mapToGridType()
         return GridType::Vec4f;
     } else if constexpr(is_same<BuildT, Vec4d>::value) {
         return GridType::Vec4d;
-    } else if (is_same<BuildT, Points>::value) {
+    } else if (is_same<BuildT, Point>::value) {
         return GridType::PointIndex;
     } else if constexpr(is_same<BuildT, Vec3u8>::value) {
         return GridType::Vec3u8;
@@ -1967,7 +1968,7 @@ __hostdev__ inline GridClass mapToGridClass(GridClass defaultClass = GridClass::
         return GridClass::IndexGrid;
     } else if (is_same<BuildT, Rgba8>::value) {
         return GridClass::VoxelVolume;
-    } else if (is_same<BuildT, Points>::value) {
+    } else if (is_same<BuildT, Point>::value) {
         return GridClass::PointIndex;
     }
     return defaultClass;
@@ -3475,9 +3476,9 @@ public:
 
     /// @brief  @brief Return the total number of points indexed by this PointGrid
     ///
-    /// @note This method is only defined for PointGrid = NanoGrid<Points>
+    /// @note This method is only defined for PointGrid = NanoGrid<Point>
     template<typename T = BuildType>
-    __hostdev__ typename enable_if<is_same<T, Points>::value, const uint64_t&>::type
+    __hostdev__ typename enable_if<is_same<T, Point>::value, const uint64_t&>::type
     pointCount() const { return DataType::mData1; }
 
     /// @brief Return a const reference to the tree
@@ -5686,15 +5687,15 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndexMask, CoordT, 
     __hostdev__ void            setMask(uint32_t offset, bool v) { mMask.set(offset, v); }
 }; // LeafData<ValueOnIndexMask>
 
-// --------------------------> LeafData<Points> <------------------------------------
+// --------------------------> LeafData<Point> <------------------------------------
 
 template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<Points, CoordT, MaskT, LOG2DIM>
+struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<Point, CoordT, MaskT, LOG2DIM>
 {
     static_assert(sizeof(CoordT) == sizeof(Coord), "Mismatching sizeof");
     static_assert(sizeof(MaskT<LOG2DIM>) == sizeof(Mask<LOG2DIM>), "Mismatching sizeof");
     using ValueType = uint64_t;
-    using BuildType = Points;
+    using BuildType = Point;
     using FloatType = typename FloatTraits<ValueType>::FloatType;
     using ArrayType = uint16_t; // type used for the internal mValue array
     static constexpr bool FIXED_SIZE = true;
@@ -5751,7 +5752,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<Points, CoordT, MaskT, LOG
     LeafData(const LeafData&) = delete;
     LeafData& operator=(const LeafData&) = delete;
     ~LeafData() = delete;
-}; // LeafData<Points>
+}; // LeafData<Point>
 
 // --------------------------> LeafNode<T> <------------------------------------
 
@@ -6257,6 +6258,7 @@ using Vec4dGrid = Grid<Vec4dTree>;
 using Vec3IGrid = Grid<Vec3ITree>;
 using MaskGrid = Grid<MaskTree>;
 using BoolGrid = Grid<BoolTree>;
+using PointGrid = Grid<Point>;
 using IndexGrid = Grid<IndexTree>;
 using OnIndexGrid = Grid<OnIndexTree>;
 using IndexMaskGrid = Grid<IndexMaskTree>;
@@ -7420,14 +7422,14 @@ public:
 }; // PointAccessor
 
 template<typename AttT>
-class PointAccessor<AttT, Points> : public DefaultReadAccessor<Points>
+class PointAccessor<AttT, Point> : public DefaultReadAccessor<Point>
 {
-    using AccT = DefaultReadAccessor<Points>;
-    const NanoGrid<Points>& mGrid;
+    using AccT = DefaultReadAccessor<Point>;
+    const NanoGrid<Point>& mGrid;
     const AttT*             mData;
 
 public:
-    PointAccessor(const NanoGrid<Points>& grid)
+    PointAccessor(const NanoGrid<Point>& grid)
         : AccT(grid.tree().root())
         , mGrid(grid)
         , mData(grid.template getBlindData<AttT>(0))
@@ -7441,7 +7443,7 @@ public:
     /// @brief  return true if this access was initialized correctly
     __hostdev__ operator bool() const { return mData != nullptr; }
 
-    __hostdev__ const NanoGrid<Points>& grid() const { return mGrid; }
+    __hostdev__ const NanoGrid<Point>& grid() const { return mGrid; }
 
     /// @brief Return the total number of point in the grid and set the
     ///        iterators to the complete range of points.
@@ -7469,7 +7471,7 @@ public:
     __hostdev__ uint64_t voxelPoints(const Coord& ijk, const AttT*& begin, const AttT*& end) const
     {
         if (auto* leaf = this->probeLeaf(ijk)) {
-            const uint32_t n = NanoLeaf<Points>::CoordToOffset(ijk);
+            const uint32_t n = NanoLeaf<Point>::CoordToOffset(ijk);
             if (leaf->isActive(n)) {
                 begin = mData + leaf->first(n);
                 end = mData + leaf->last(n);
@@ -7479,7 +7481,7 @@ public:
         begin = end = nullptr;
         return 0u; // no leaf or inactive voxel
     }
-}; // PointAccessor<AttT, Points>
+}; // PointAccessor<AttT, Point>
 
 /// @brief Class to access values in channels at a specific voxel location.
 ///

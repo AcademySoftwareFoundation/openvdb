@@ -10,7 +10,7 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                cudaStream_t stream);
 
 /// @brief This examples depends on OpenVDB, NanoVDB and CUDA.
-int main()
+int main(int, char**)
 {
     using SrcGridT = openvdb::FloatGrid;
     try {

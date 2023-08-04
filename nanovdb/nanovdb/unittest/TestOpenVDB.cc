@@ -2678,7 +2678,7 @@ TEST_F(TestOpenVDB, BuildNodeManager)
     }
 }// BuildNodeManager
 
-#if 1
+#if 0// toggle to enable benchmark tests
 
 class NanoPointList
 {

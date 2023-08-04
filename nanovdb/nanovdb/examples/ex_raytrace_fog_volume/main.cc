@@ -5,9 +5,9 @@
 #include <iostream>
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Primitives.h>
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 
 #if defined(NANOVDB_USE_CUDA)
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 using BufferT = nanovdb::CudaDeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;

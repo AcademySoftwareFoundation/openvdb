@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark.cc
+/// @file TestBenchmark.cc
 ///
 /// @author Ken Museth
 ///
@@ -17,10 +17,6 @@
 #include <nanovdb/util/CpuTimer.h>
 
 #include "DenseGrid.h"
-
-#if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-#endif
 
 #if defined(NANOVDB_USE_OPENVDB)
 #include <openvdb/openvdb.h>
@@ -67,7 +63,7 @@ protected:
         // Code here will be called immediately after each test (right
         // before the destructor).
     }
-    std::string getEnvVar(const std::string& name, const std::string def = "") const
+    static std::string getEnvVar(const std::string& name, const std::string def = "")
     {
         const char* str = std::getenv(name.c_str());
         return str == nullptr ? def : std::string(str);
@@ -486,9 +482,7 @@ TEST_F(Benchmark, OpenVDB_CPU)
         //mTimer.stop();
     } // loop over angle
 } // OpenVDB_CPU
-#endif
-
-
+#endif// NANOVDB_USE_OPENVDB
 
 TEST_F(Benchmark, DenseGrid_CPU)
 {
@@ -577,95 +571,6 @@ TEST_F(Benchmark, DenseGrid_CPU)
         //mTimer.stop();
     } // loop over angle
 } // DenseGrid_CPU
-
-#if defined(NANOVDB_USE_CUDA)
-
-extern "C" void launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>&,
-                               nanovdb::ImageHandle<nanovdb::CudaDeviceBuffer>&,
-                               const nanovdb::Camera<float>*,
-                               cudaStream_t stream);
-
-TEST_F(Benchmark, NanoVDB_GPU)
-{
-    using BufferT = nanovdb::CudaDeviceBuffer;
-    using RealT = float;
-    using Vec3T = nanovdb::Vec3<RealT>;
-    using CameraT = nanovdb::Camera<RealT>;
-
-    const std::string image_path = this->getEnvVar("VDB_SCRATCH_PATH", ".");
-
-    // The first CUDA run time call initializes the CUDA sub-system (loads the runtime API) which takes time!
-    int deviceCount;
-    cudaGetDeviceCount(&deviceCount);
-    for (int device = 0; device < deviceCount; ++device) {
-        cudaDeviceProp deviceProp;
-        cudaGetDeviceProperties(&deviceProp, device);
-        printf("Device %d has compute capability %d.%d.\n",
-               device,
-               deviceProp.major,
-               deviceProp.minor);
-    }
-    cudaSetDevice(0);
-
-    cudaStream_t stream;
-    cudaCheck(cudaStreamCreate(&stream));
-
-#if defined(NANOVDB_USE_OPENVDB)
-    auto handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
-#else
-    auto handle = nanovdb::createLevelSetTorus<float, BufferT>(100.0f, 50.0f);
-#endif
-    //auto        handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
-    const auto* grid = handle.grid<float>();
-    EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->isLevelSet());
-    EXPECT_FALSE(grid->isFogVolume());
-    handle.deviceUpload(stream, false);
-    EXPECT_TRUE(handle.deviceGrid<float>());
-
-    std::cout << "\nRay-tracing NanoVDB grid named \"" << grid->gridName() << "\"" << std::endl;
-
-    const int   width = 1280, height = 720;
-    const RealT vfov = 25.0f, aspect = RealT(width) / height, radius = 300.0f;
-    const auto  bbox = grid->worldBBox();
-    const Vec3T lookat(0.5 * (bbox.min() + bbox.max())), up(0, -1, 0);
-    auto        eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * nanovdb::pi<RealT>() / 180.0f;
-        return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
-    };
-    CameraT *host_camera, *dev_camera;
-    cudaCheck(cudaMalloc((void**)&dev_camera, sizeof(CameraT))); // un-managed memory on the device
-    cudaCheck(cudaMallocHost((void**)&host_camera, sizeof(CameraT)));
-
-    nanovdb::ImageHandle<BufferT> imgHandle(width, height);
-    auto*                         img = imgHandle.image();
-    imgHandle.deviceUpload(stream, false);
-
-    for (int angle = 0; angle < 6; ++angle) {
-        std::stringstream ss;
-        ss << "NanoVDB: GPU kernel with " << img->size() << " rays";
-        host_camera->update(eye(angle), lookat, up, vfov, aspect);
-        cudaCheck(cudaMemcpyAsync(dev_camera, host_camera, sizeof(CameraT), cudaMemcpyHostToDevice, stream));
-        mTimer.start(ss.str());
-        launch_kernels(handle, imgHandle, dev_camera, stream);// defined in BenchKernels_nano.cu
-        mTimer.stop();
-
-        //mTimer.start("Write image to file");
-        imgHandle.deviceDownload(stream);
-        ss.str("");
-        ss.clear();
-        ss << image_path << "/nanovdb_gpu_" << std::setfill('0') << std::setw(3) << angle << ".ppm";
-        img->writePPM(ss.str(), "Benchmark test");
-        //mTimer.stop();
-
-    } //frame number angle
-
-    cudaCheck(cudaStreamDestroy(stream));
-    cudaCheck(cudaFreeHost(host_camera));
-    cudaCheck(cudaFree(dev_camera));
-} // NanoVDB_GPU
-#endif
-
 
 int main(int argc, char** argv)
 {

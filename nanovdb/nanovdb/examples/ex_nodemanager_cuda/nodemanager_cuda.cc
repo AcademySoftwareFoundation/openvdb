@@ -10,6 +10,8 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,
                                const nanovdb::NodeManager<float>*,
                                cudaStream_t stream);
 
+openvdb::FloatGrid::Ptr createLevelSetSphere();
+
 /// @brief This examples depends on OpenVDB, NanoVDB and CUDA.
 int main()
 {

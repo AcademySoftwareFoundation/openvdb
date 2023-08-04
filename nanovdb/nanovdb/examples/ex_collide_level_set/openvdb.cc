@@ -21,6 +21,8 @@ using BufferT = nanovdb::CudaDeviceBuffer;
 using BufferT = nanovdb::HostBuffer;
 #endif
 
+openvdb::GridBase::Ptr nanoToOpenVDB(nanovdb::GridHandle<BufferT>& handle);
+
 void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int numPoints, BufferT& positionBuffer, BufferT& velocityBuffer)
 {
     using GridT = openvdb::FloatGrid;

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/cuda/CudaPointsToGrid.h>
+#include <nanovdb/util/cuda/CudaPointsToGrid.cuh>
 
 /// @brief Demonstrates how to create a NanoVDB grid from voxel coordinates on the GPU
 int main()

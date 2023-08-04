@@ -18,11 +18,7 @@
 #include <vector>
 #include <initializer_list>
 #include <nanovdb/NanoVDB.h>// for mapToGridType
-#include "HostBuffer.h"
-
-#if defined(__CUDACC__)
-#include "cuda/CudaUtils.h"// for cudaCheckError();
-#endif
+#include <nanovdb/util/HostBuffer.h>
 
 namespace nanovdb {
 
@@ -45,10 +41,17 @@ class GridHandle
 public:
     using BufferType = BufferT;
 
-    /// @brief  Move constructor from a buffer
+    /// @brief  Move constructor from a host buffer
     /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
     /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
-    GridHandle(BufferT&& buffer);
+    template<typename T = BufferT, typename enable_if<BufferTraits<T>::hasDeviceDual, int>::type = 0>
+    GridHandle(T&& buffer);
+
+    /// @brief  Move constructor from a dual host-device buffer
+    /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
+    /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
+    template<typename T = BufferT, typename disable_if<BufferTraits<T>::hasDeviceDual, int>::type = 0>
+    GridHandle(T&& buffer);
 
     /// @brief Constructs an empty GridHandle
     GridHandle() = default;
@@ -218,33 +221,18 @@ inline __hostdev__ void cpyMetaData(const GridData *data, GridHandleMetaData *me
         data = PtrAdd<const GridData>(data, p->size);
     }
 }
-#if defined(__CUDACC__)
-__global__ void cudaCpyMetaData(const GridData *data, GridHandleMetaData *meta){cpyMetaData(data, meta);}
-#endif
 }// anonymous namespace
 
 template<typename BufferT>
-GridHandle<BufferT>::GridHandle(BufferT&& buffer)
+template<typename T, typename disable_if<BufferTraits<T>::hasDeviceDual, int>::type>
+GridHandle<BufferT>::GridHandle(T&& buffer)
 {
+    static_assert(is_same<T,BufferT>::value, "Expected U==BufferT");
     mBuffer = std::move(buffer);
     if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         if (!data->isValid()) throw std::runtime_error("GridHandle was constructed with an invalid host buffer");
         mMetaData.resize(data->mGridCount);
         cpyMetaData(data, mMetaData.data());
-#if defined(__CUDACC__)
-    } else if constexpr(BufferTraits<BufferT>::hasDeviceDual) {
-        if (auto *d_data = reinterpret_cast<const GridData*>(mBuffer.deviceData())) {
-            GridData tmp;
-            cudaCheck(cudaMemcpy(&tmp, d_data, sizeof(GridData), cudaMemcpyDeviceToHost));
-            if (!tmp.isValid()) throw std::runtime_error("GridHandle was constructed with an invalid device buffer");
-            GridHandleMetaData *d_metaData;
-            cudaMalloc((void**)&d_metaData, tmp.mGridCount*sizeof(GridHandleMetaData));
-            cudaCpyMetaData<<<1,1>>>(d_data, d_metaData);
-            mMetaData.resize(tmp.mGridCount);
-            cudaCheck(cudaMemcpy(mMetaData.data(), d_metaData,tmp.mGridCount*sizeof(GridHandleMetaData), cudaMemcpyDeviceToHost));
-            cudaCheck(cudaFree(d_metaData));
-        }
-#endif
     }
 }
 
@@ -285,9 +273,6 @@ inline __hostdev__ void updateGridData(GridData *data, uint32_t gridIndex, uint3
     data->mGridIndex = gridIndex;
     data->mGridCount = gridCount;
 }
-#if defined(__CUDACC__)
-__global__ void cudaUpdateGridData(GridData *data, uint32_t gridIndex, uint32_t gridCount){updateGridData(data, gridIndex, gridCount);}
-#endif
 }// anonymous namespace
 
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
@@ -337,56 +322,10 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = n
     return GridHandle<BufferT>(std::move(buffer));
 }// mergeGrids
 
-#if defined(__CUDACC__)
-
-template<typename BufferT, template <class, class...> class VectorT = std::vector>
-inline typename enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
-splitDeviceGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
-{
-    const uint8_t *ptr = handle.deviceData();
-    if (ptr == nullptr) return VectorT<GridHandle<BufferT>>();
-    VectorT<GridHandle<BufferT>> handles(handle.gridCount());
-    for (uint32_t n=0; n<handle.gridCount(); ++n) {
-        auto buffer = BufferT::create(handle.gridSize(n), other, false);
-        GridData *dst = reinterpret_cast<GridData*>(buffer.deviceData());
-        const GridData *src = reinterpret_cast<const GridData*>(ptr);
-        cudaCheck(cudaMemcpy(dst, src, handle.gridSize(n), cudaMemcpyDeviceToDevice));
-        cudaUpdateGridData<<<1,1>>>(dst, 0u, 1u);
-        cudaCheckError();
-        handles[n] = GridHandle<BufferT>(std::move(buffer));
-        ptr += handle.gridSize(n);
-    }
-    return std::move(handles);
-}// splitDeviceGrids
-
-template<typename BufferT, template <class, class...> class VectorT>
-inline typename enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
-mergeDeviceGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr)
-{
-    uint64_t size = 0u;
-    uint32_t counter = 0u, gridCount = 0u;
-    for (auto &h : handles) {
-        gridCount += h.gridCount();
-        for (uint32_t n=0; n<h.gridCount(); ++n) size += h.gridSize(n);
-    }
-    auto buffer = BufferT::create(size, other, false);
-    uint8_t *dst = buffer.deviceData();
-    for (auto &h : handles) {
-        const uint8_t *src = h.deviceData();
-        for (uint32_t n=0; n<h.gridCount(); ++n) {
-            cudaCheck(cudaMemcpy(dst, src, h.gridSize(n), cudaMemcpyDeviceToDevice));
-            GridData *data = reinterpret_cast<GridData*>(dst);
-            cudaUpdateGridData<<<1,1>>>(data, counter++, gridCount);
-            cudaCheckError();
-            dst += h.gridSize(n);
-            src += h.gridSize(n);
-        }
-    }
-    return GridHandle<BufferT>(std::move(buffer));
-}// mergeDeviceGrids
-
-#endif// defined(__CUDACC__)
-
 } // namespace nanovdb
+
+#if defined(__CUDACC__)
+#include <nanovdb/util/cuda/CudaGridHandle.cuh>
+#endif// defined(__CUDACC__)
 
 #endif // NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED

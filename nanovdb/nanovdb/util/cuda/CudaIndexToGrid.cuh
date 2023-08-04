@@ -2,27 +2,28 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file CudaIndexToGrid.h
+    \file CudaIndexToGrid.cuh
 
     \author Ken Museth
 
     \date April 17, 2023
 
     \brief Combines an IndexGrid and values into a regular Grid on the device
+
+    \warning The header file contains cuda device code so be sure
+             to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_CUDA_INDEX_TO_GRID_H_HAS_BEEN_INCLUDED
-#define NVIDIA_CUDA_INDEX_TO_GRID_H_HAS_BEEN_INCLUDED
+#ifndef NVIDIA_CUDA_INDEX_TO_GRID_CUH_HAS_BEEN_INCLUDED
+#define NVIDIA_CUDA_INDEX_TO_GRID_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 #include "CudaDeviceBuffer.h"
 #include <nanovdb/util/GridHandle.h>
-#include <nanovdb/util/cuda/GpuTimer.h>
+#include <nanovdb/util/cuda/GpuTimer.cuh>
 #include <nanovdb/util/cuda/CudaUtils.h>
 
 namespace nanovdb {
-
-// cudeIndexGridToGrid
 
 /// @brief Freestanding function that combines an IndexGrid and values into a regular Grid
 /// @tparam DstBuildT Build time of the destination/output Grid
@@ -78,7 +79,7 @@ public:
 private:
     GpuTimer mTimer;
     std::string mGridName;
-    bool mVerbose{true};
+    bool mVerbose{false};
     NodeAccessor mNodeAcc, *mDevNodeAcc;
 
     template<typename DstBuildT, typename BufferT>
@@ -367,4 +368,4 @@ cudaIndexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValu
 
 }// nanovdb namespace
 
-#endif // NVIDIA_CUDA_INDEX_TO_GRID_H_HAS_BEEN_INCLUDED
+#endif // NVIDIA_CUDA_INDEX_TO_GRID_CUH_HAS_BEEN_INCLUDED

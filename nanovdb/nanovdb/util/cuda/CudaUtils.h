@@ -114,6 +114,6 @@ __device__ inline bool cudaStrEq(const char *lhs, const char *rhs)
     return cudaStrcmp(lhs, rhs) == 0;
 }
 
-#endif
+#endif// __CUDACC__
 
 #endif// NANOVDB_CUDA_UTILS_H_HAS_BEEN_INCLUDED

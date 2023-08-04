@@ -169,7 +169,7 @@ using MyTypes = ::testing::Types<float,
                                  nanovdb::ValueIndexMask,
                                  nanovdb::ValueOnIndexMask,
                                  bool,
-                                 nanovdb::Points,
+                                 nanovdb::Point,
                                  nanovdb::Vec3u8,
                                  nanovdb::Vec3u16,
                                  int16_t,
@@ -663,9 +663,9 @@ TEST_F(TestNanoVDB, prefixSum)
         EXPECT_EQ(0, array[0]);
         EXPECT_EQ(1, array[1]);
         EXPECT_EQ(size-1, array.back());
-        mTimer.start("multi-threaded inclusive prefix sum");
+        //mTimer.start("multi-threaded inclusive prefix sum");
         EXPECT_EQ(sum, nanovdb::prefixSum(array, true));
-        mTimer.stop();
+        //mTimer.stop();
         EXPECT_EQ(size, array.size());
         EXPECT_EQ(0u, array[0]);// first element of input vector
         EXPECT_EQ(1u, array[1]);// first + second element of input vector
@@ -684,9 +684,9 @@ TEST_F(TestNanoVDB, prefixSum)
         EXPECT_EQ(0, array[0]);
         EXPECT_EQ(1, array[1]);
         EXPECT_EQ(size-1, array.back());
-        mTimer.start("serial inclusive prefix sum");
+        //mTimer.start("serial inclusive prefix sum");
         EXPECT_EQ(sum, nanovdb::prefixSum(array, false));
-        mTimer.stop();
+        //mTimer.stop();
         EXPECT_EQ(size, array.size());
         EXPECT_EQ(0u, array[0]);// first element of input vector
         EXPECT_EQ(1u, array[1]);// first + second element of input vector
@@ -2459,9 +2459,9 @@ void checkLeaf<nanovdb::FpN>(int &offset)
 }
 
 template<>
-void checkLeaf<nanovdb::Points>(int &offset)
+void checkLeaf<nanovdb::Point>(int &offset)
 {
-    using DataT = typename nanovdb::LeafNode<nanovdb::Points>::DataType;
+    using DataT = typename nanovdb::LeafNode<nanovdb::Point>::DataType;
     EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mOffset), offset);
     offset += sizeof(uint64_t);
     EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mPointCount), offset);
@@ -4772,11 +4772,11 @@ void validateLeaf<nanovdb::ValueOnIndexMask>(pnanovdb_grid_type_t grid_type)
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mMask), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8 + 8);
 }
 
-// template specializations for nanovdb::Points types
+// template specializations for nanovdb::Point types
 template <>
-void validateLeaf<nanovdb::Points>(pnanovdb_grid_type_t grid_type)
+void validateLeaf<nanovdb::Point>(pnanovdb_grid_type_t grid_type)
 {
-    using leaf_t = typename nanovdb::LeafNode<nanovdb::Points>;
+    using leaf_t = typename nanovdb::LeafNode<nanovdb::Point>;
     EXPECT_EQ(sizeof(leaf_t), (pnanovdb_grid_type_constants[grid_type].leaf_size));
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mOffset), PNANOVDB_LEAF_OFF_VALUE_MASK + 64);
     EXPECT_EQ(NANOVDB_OFFSETOF(leaf_t, mPointCount), PNANOVDB_LEAF_OFF_VALUE_MASK + 64 + 8);
@@ -4823,7 +4823,7 @@ TYPED_TEST(TestOffsets, PNanoVDB)
         grid_type = PNANOVDB_GRID_TYPE_FP16;
     } else if (std::is_same<nanovdb::FpN, TypeParam>::value) {
         grid_type = PNANOVDB_GRID_TYPE_FPN;
-    } else if (std::is_same<nanovdb::Points, TypeParam>::value) {
+    } else if (std::is_same<nanovdb::Point, TypeParam>::value) {
         grid_type = PNANOVDB_GRID_TYPE_POINTINDEX;
     } else if (std::is_same<nanovdb::Vec3u8, TypeParam>::value) {
         grid_type = PNANOVDB_GRID_TYPE_VEC3U8;
@@ -7427,22 +7427,22 @@ TEST_F(TestNanoVDB, BuildTree)
     nanovdb::CoordBBox bbox(nanovdb::Coord(0), nanovdb::Coord(511));
     nanovdb::build::Grid<nanovdb::ValueMask> grid1(false), grid2(false);
     {
-        mTimer.start("Serial build::Tree");
+        //mTimer.start("Serial build::Tree");
         auto kernel = [&](const nanovdb::CoordBBox& bbox) {
             auto acc = grid1.getAccessor();
             for (auto it = bbox.begin(); it; ++it) acc.setValueOn(*it);
         };
         kernel(bbox);
-        mTimer.stop();
+        //mTimer.stop();
     }
     {
-        mTimer.start("Parallel build::Tree");
+        //mTimer.start("Parallel build::Tree");
         auto kernel = [&](const nanovdb::CoordBBox& bbox) {
             auto acc = grid2.getWriteAccessor();
             for (auto it = bbox.begin(); it; ++it) acc.setValueOn(*it);
         };
         nanovdb::forEach(bbox, kernel);
-        mTimer.stop();
+        //mTimer.stop();
     }
     {
         auto acc1 = grid1.getAccessor(), acc2 = grid2.getAccessor();
@@ -7657,7 +7657,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     size_t size1 = 0, size2 = 0;
     std::vector<nanovdb::GridHandle<>> handles1, handles2;
     std::vector<std::string> gridNames;
-    nanovdb::CpuTimer timer("create 5 host grids");
+    //nanovdb::CpuTimer timer("create 5 host grids");
     for (int radius = 100; radius<150; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles1.emplace_back(nanovdb::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
@@ -7667,7 +7667,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     }
     EXPECT_EQ(5u, gridNames.size());
     EXPECT_EQ(5u, handles1.size());
-    timer.restart("create 5 host grids");
+    //timer.restart("create 5 host grids");
     for (int radius = 150; radius<200; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles2.emplace_back(nanovdb::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
@@ -7676,7 +7676,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     }
     EXPECT_EQ(10u, gridNames.size());
     EXPECT_EQ( 5u, handles2.size());
-    timer.restart("merging 5 host grids");
+    //timer.restart("merging 5 host grids");
     auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles2);// merge last 5 grid handles
     EXPECT_EQ(size2, mergedHandle.size());
     EXPECT_FALSE(mergedHandle.isPadded());
@@ -7686,7 +7686,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     EXPECT_EQ(5u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
     EXPECT_EQ(handles2[0].size(), gridData->mGridSize);
-    timer.restart("unit-test host grids");
+    //timer.restart("unit-test host grids");
     for (int i=0; i<5; ++i){
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
@@ -7715,7 +7715,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     auto& handle = handles3[5];
     EXPECT_EQ(5u, handle.gridCount());
 
-    timer.restart("merging 10 host grids");
+    //timer.restart("merging 10 host grids");
     mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles1);
     EXPECT_EQ(size1 + size2, mergedHandle.size());
     EXPECT_TRUE(mergedHandle.data());
@@ -7725,9 +7725,9 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     EXPECT_EQ( 0u, gridData->mGridIndex);
     EXPECT_EQ(handles1[0].size(), gridData->mGridSize);
 
-    timer.restart("splitting host grids");
+    //timer.restart("splitting host grids");
     auto splitHandles = nanovdb::splitGrids(mergedHandle);
-    timer.restart("unit-test split grids");
+    //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (int i=0; i<5; ++i){
         EXPECT_EQ(handles1[i].size(), splitHandles[i].size());
@@ -7743,7 +7743,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
-    timer.stop();
+    //timer.stop();
 }//  mergeSplitGrids
 
 int main(int argc, char** argv)

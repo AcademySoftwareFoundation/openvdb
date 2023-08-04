@@ -618,7 +618,7 @@ struct InternalNode
     static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; //dimension in index space
     static constexpr uint32_t DIM = 1u << TOTAL;
     static constexpr uint32_t SIZE = 1u << (3 * LOG2DIM); //number of tile values (or child pointers)
-    static constexpr int32_t  MASK = DIM - 1;
+    static constexpr uint32_t MASK = DIM - 1;
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
     static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
     using MaskT = Mask<LOG2DIM>;
@@ -754,9 +754,9 @@ struct InternalNode
 
     static uint32_t CoordToOffset(const Coord& ijk)
     {
-        return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) +
-               (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) +
-                ((ijk[2] & MASK) >> ChildT::TOTAL);
+        return (((ijk[0] & int32_t(MASK)) >> ChildT::TOTAL) << (2 * LOG2DIM)) +
+               (((ijk[1] & int32_t(MASK)) >> ChildT::TOTAL) << (LOG2DIM)) +
+                ((ijk[2] & int32_t(MASK)) >> ChildT::TOTAL);
     }
 
     static Coord OffsetToLocalCoord(uint32_t n)
@@ -1099,7 +1099,7 @@ struct LeafNode
     static constexpr uint32_t TOTAL = LOG2DIM; // needed by parent nodes
     static constexpr uint32_t DIM = 1u << TOTAL;
     static constexpr uint32_t SIZE = 1u << 3 * LOG2DIM; // total number of voxels represented by this node
-    static constexpr int32_t  MASK = DIM - 1; // mask for bit operations
+    static constexpr uint32_t MASK = DIM - 1; // mask for bit operations
     static constexpr uint32_t LEVEL = 0; // level 0 = leaf
     static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
     using NodeMaskType = Mask<LOG2DIM>;
@@ -1195,14 +1195,16 @@ struct LeafNode
     /// @brief Return the linear offset corresponding to the given coordinate
     static uint32_t CoordToOffset(const Coord& ijk)
     {
-        return ((ijk[0] & MASK) << (2 * LOG2DIM)) + ((ijk[1] & MASK) << LOG2DIM) + (ijk[2] & MASK);
+        return ((ijk[0] & int32_t(MASK)) << (2 * LOG2DIM)) +
+               ((ijk[1] & int32_t(MASK)) << LOG2DIM) +
+                (ijk[2] & int32_t(MASK));
     }
 
     static Coord OffsetToLocalCoord(uint32_t n)
     {
         NANOVDB_ASSERT(n < SIZE);
         const int32_t m = n & ((1 << 2 * LOG2DIM) - 1);
-        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & MASK);
+        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & int32_t(MASK));
     }
 
     void localToGlobalCoord(Coord& ijk) const
@@ -1292,7 +1294,7 @@ struct LeafNode<ValueMask>
     static constexpr uint32_t TOTAL = LOG2DIM; // needed by parent nodes
     static constexpr uint32_t DIM = 1u << TOTAL;
     static constexpr uint32_t SIZE = 1u << 3 * LOG2DIM; // total number of voxels represented by this node
-    static constexpr int32_t  MASK = DIM - 1; // mask for bit operations
+    static constexpr uint32_t MASK = DIM - 1; // mask for bit operations
     static constexpr uint32_t LEVEL = 0; // level 0 = leaf
     static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
     using NodeMaskType = Mask<LOG2DIM>;
@@ -1382,14 +1384,16 @@ struct LeafNode<ValueMask>
     /// @brief Return the linear offset corresponding to the given coordinate
     static uint32_t CoordToOffset(const Coord& ijk)
     {
-        return ((ijk[0] & MASK) << (2 * LOG2DIM)) + ((ijk[1] & MASK) << LOG2DIM) + (ijk[2] & MASK);
+        return ((ijk[0] & int32_t(MASK)) << (2 * LOG2DIM)) +
+               ((ijk[1] & int32_t(MASK)) <<       LOG2DIM) +
+                (ijk[2] & int32_t(MASK));
     }
 
     static Coord OffsetToLocalCoord(uint32_t n)
     {
         NANOVDB_ASSERT(n < SIZE);
         const int32_t m = n & ((1 << 2 * LOG2DIM) - 1);
-        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & MASK);
+        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & int32_t(MASK));
     }
 
     void localToGlobalCoord(Coord& ijk) const {ijk += mOrigin;}
@@ -1462,7 +1466,7 @@ struct LeafNode<bool>
     static constexpr uint32_t TOTAL = LOG2DIM; // needed by parent nodes
     static constexpr uint32_t DIM = 1u << TOTAL;
     static constexpr uint32_t SIZE = 1u << 3 * LOG2DIM; // total number of voxels represented by this node
-    static constexpr int32_t  MASK = DIM - 1; // mask for bit operations
+    static constexpr uint32_t MASK = DIM - 1; // mask for bit operations
     static constexpr uint32_t LEVEL = 0; // level 0 = leaf
     static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
     using NodeMaskType = Mask<LOG2DIM>;
@@ -1553,14 +1557,16 @@ struct LeafNode<bool>
     /// @brief Return the linear offset corresponding to the given coordinate
     static uint32_t CoordToOffset(const Coord& ijk)
     {
-        return ((ijk[0] & MASK) << (2 * LOG2DIM)) + ((ijk[1] & MASK) << LOG2DIM) + (ijk[2] & MASK);
+        return ((ijk[0] & int32_t(MASK)) << (2 * LOG2DIM)) +
+               ((ijk[1] & int32_t(MASK)) << LOG2DIM) +
+                (ijk[2] & int32_t(MASK));
     }
 
     static Coord OffsetToLocalCoord(uint32_t n)
     {
         NANOVDB_ASSERT(n < SIZE);
         const int32_t m = n & ((1 << 2 * LOG2DIM) - 1);
-        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & MASK);
+        return Coord(n >> 2 * LOG2DIM, m >> LOG2DIM, m & int32_t(MASK));
     }
 
     void localToGlobalCoord(Coord& ijk) const
@@ -1683,9 +1689,9 @@ struct ValueAccessor
     template<typename NodeT>
     bool isCached(const Coord& ijk) const
     {
-        return (ijk[0] & ~NodeT::MASK) == mKeys[NodeT::LEVEL][0] &&
-               (ijk[1] & ~NodeT::MASK) == mKeys[NodeT::LEVEL][1] &&
-               (ijk[2] & ~NodeT::MASK) == mKeys[NodeT::LEVEL][2];
+        return (ijk[0] & int32_t(~NodeT::MASK)) == mKeys[NodeT::LEVEL][0] &&
+               (ijk[1] & int32_t(~NodeT::MASK)) == mKeys[NodeT::LEVEL][1] &&
+               (ijk[2] & int32_t(~NodeT::MASK)) == mKeys[NodeT::LEVEL][2];
     }
 
     template <typename OpT, typename... ArgsT>

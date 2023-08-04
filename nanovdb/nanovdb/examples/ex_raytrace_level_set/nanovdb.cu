@@ -5,18 +5,18 @@
 #include <cmath>
 #include <chrono>
 
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-#include <nanovdb/util/Ray.h>
-#include <nanovdb/util/HDDA.h>
-
-#include "common.h"
-
 #if defined(NANOVDB_USE_CUDA)
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 using BufferT = nanovdb::CudaDeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
 #endif
+#include <nanovdb/util/GridHandle.h>
+#include <nanovdb/util/IO.h>
+#include <nanovdb/util/Ray.h>
+#include <nanovdb/util/HDDA.h>
+
+#include "common.h"
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {

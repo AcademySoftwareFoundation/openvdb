@@ -850,8 +850,7 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         metaData->mValueSize = valueSize;
         NANOVDB_ASSERT(metaData->isValid());
     }
-
-    ~BlindMetaData(){ delete metaData;}
+    ~BlindMetaData(){ delete [] reinterpret_cast<char*>(metaData); }
     bool operator<(const BlindMetaData& other) const { return order < other.order; } // required by std::set
     static GridType mapToType(const std::string& name)
     {

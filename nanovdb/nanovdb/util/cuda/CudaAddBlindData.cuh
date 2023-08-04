@@ -1,8 +1,21 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#ifndef NVIDIA_CUDA_ADD_BLIND_DATA_H_HAS_BEEN_INCLUDED
-#define NVIDIA_CUDA_ADD_BLIND_DATA_H_HAS_BEEN_INCLUDED
+/*!
+    \file CudaAddBlindData.cuh
+
+    \author Ken Museth
+
+    \date August 3, 2023
+
+    \brief Defines function that appends blind device data to and existing device NanoGrid
+
+    \warning The header file contains cuda device code so be sure
+             to only include it in .cu files (or other .cuh files)
+*/
+
+#ifndef NVIDIA_CUDA_ADD_BLIND_DATA_CUH_HAS_BEEN_INCLUDED
+#define NVIDIA_CUDA_ADD_BLIND_DATA_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
 #include "CudaDeviceBuffer.h"
@@ -91,4 +104,4 @@ cudaAddBlindData(const NanoGrid<BuildT> *d_grid,
 
 }// nanovdb namespace
 
-#endif // NVIDIA_CUDA_ADD_BLIND_DATA_H_HAS_BEEN_INCLUDED
+#endif // NVIDIA_CUDA_ADD_BLIND_DATA_CUH_HAS_BEEN_INCLUDED

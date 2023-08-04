@@ -1,14 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file GpuTimer.h
+/// @file GpuTimer.cuh
 ///
 /// @author Ken Museth
 ///
 /// @brief A simple GPU timing class
 
-#ifndef NANOVDB_GPU_TIMER_H_HAS_BEEN_INCLUDED
-#define NANOVDB_GPU_TIMER_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_GPU_TIMER_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_GPU_TIMER_CUH_HAS_BEEN_INCLUDED
 
 #include <iostream>// for std::cerr
 #include <cuda.h>
@@ -67,6 +67,16 @@ public:
         this->start(stream);
     }
 
+    /// @brief Start the timer
+    /// @param msg string message to be printed when timer is started
+    /// @param stream CUDA stream to be timed (defaults to stream 0)
+    /// @param os output stream for the message above
+    void start(const char* msg, void* stream = nullptr, std::ostream& os = std::cerr)
+    {
+        os << msg << " ... " << std::flush;
+        this->start(stream);
+    }
+
     /// @brief elapsed time (since start) in miliseconds
     /// @param stream CUDA stream to be timed (defaults to stream 0)
     /// @return elapsed time (since start) in miliseconds
@@ -101,4 +111,4 @@ public:
 
 } // namespace nanovdb
 
-#endif // NANOVDB_GPU_TIMER_HAS_BEEN_INCLUDED
+#endif // NANOVDB_GPU_TIMER_CUH_HAS_BEEN_INCLUDED

@@ -1,36 +1,41 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
-#include <stdio.h> // for printf
+#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h> // required for CUDA memory management
+#include <nanovdb/util/GridHandle.h>
 
-// This is called by the host only
-void cpu_kernel(const nanovdb::NanoGrid<float>* cpuGrid)
+extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
+                               const nanovdb::NanoGrid<float>*,
+                               cudaStream_t stream);
+
+/// @brief Read a NanoVDB grid from a file and print out multiple values on both the cpu and gpu.
+///
+/// @note Note This example does NOT depend on OpenVDB, only NanoVDB and CUDA.
+int main(int, char**)
 {
-    auto cpuAcc = cpuGrid->getAccessor();
-    for (int i = 97; i < 104; ++i) {
-        printf("(%3i,0,0) NanoVDB cpu: % -4.2f\n", i, cpuAcc.getValue(nanovdb::Coord(i, 0, 0)));
+    try {
+        // returns a GridHandle using CUDA for memory management.
+        auto handle = nanovdb::io::readGrid<nanovdb::CudaDeviceBuffer>("data/sphere.nvdb");
+
+        cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
+        cudaStreamCreate(&stream);
+
+        handle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
+
+        auto* cpuGrid = handle.grid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
+        auto* deviceGrid = handle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
+
+        if (!deviceGrid || !cpuGrid)
+            throw std::runtime_error("GridHandle did not contain a grid with value type float");
+
+        launch_kernels(deviceGrid, cpuGrid, stream); // Call a host method to print a grid values on both the CPU and GPU
+
+        cudaStreamDestroy(stream); // Destroy the CUDA stream
     }
-}
+    catch (const std::exception& e) {
+        std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
+    }
 
-// This is called by the device only
-__global__ void gpu_kernel(const nanovdb::NanoGrid<float>* deviceGrid)
-{
-    if (threadIdx.x > 6)
-        return;
-    int  i = 97 + threadIdx.x;
-    auto gpuAcc = deviceGrid->getAccessor();
-    printf("(%3i,0,0) NanoVDB gpu: % -4.2f\n", i, gpuAcc.getValue(nanovdb::Coord(i, 0, 0)));
-}
-
-// This is called by the client code on the host
-extern "C" void launch_kernels(const nanovdb::NanoGrid<float>* deviceGrid,
-                               const nanovdb::NanoGrid<float>* cpuGrid,
-                               cudaStream_t                    stream)
-{
-    // Launch the device kernel asynchronously
-    gpu_kernel<<<1, 64, 0, stream>>>(deviceGrid);
-
-    // Launch the host "kernel" (synchronously)
-    cpu_kernel(cpuGrid);
+    return 0;
 }
