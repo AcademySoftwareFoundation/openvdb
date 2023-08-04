@@ -27,13 +27,13 @@ int main()
         // Launch a device kernel that sets the values of voxels define above and prints them
         const unsigned int numThreads = 128, numBlocks = (numVoxels + numThreads - 1) / numThreads;
         cudaLambdaKernel<<<numBlocks, numThreads>>>(numVoxels, [=] __device__(size_t tid) {
-            using OpT = SetVoxel<float>;// defined to type of random-access operation (set value)
+            using OpT = SetVoxel<float>;// defines type of random-access operation (set value)
             const Coord &ijk = d_coords[tid];
-            grid->tree().set<OpT>(ijk, d_values[tid]);
+            grid->tree().set<OpT>(ijk, d_values[tid]);// normally one should use a ValueAccessor
             printf("GPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", tid, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));
         }); cudaCheckError();
 
-        // Copy grid from GPU to CPU and print the voxel values
+        // Copy grid from GPU to CPU and print the voxel values for validation
         handle.deviceDownload();// creates a copy on the CPU
         grid = handle.grid<float>();
         for (size_t i=0; i<numVoxels; ++i) {
