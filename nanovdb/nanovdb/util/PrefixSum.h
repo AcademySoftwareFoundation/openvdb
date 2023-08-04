@@ -10,9 +10,9 @@
 
     \brief Multi-threaded implementations of inclusive prefix sum
 
-	\note An exclusive prefix sum is simply an array starting with zero
-	      followed by the elements in the inclusive prefix sum, minus its
-		  last entry which is the sum of all the input elements.
+    \note An exclusive prefix sum is simply an array starting with zero
+          followed by the elements in the inclusive prefix sum, minus its
+          last entry which is the sum of all the input elements.
 */
 
 #ifndef NANOVDB_PREFIX_SUM_H_HAS_BEEN_INCLUDED
@@ -44,27 +44,27 @@ template<typename T, typename Op>
 void inclusiveScan(T *array, size_t size, const T &identity, bool threaded, Op op)
 {
 #ifndef NANOVDB_USE_TBB
-	threaded = false;
-	(void)identity;// avoids compiler warning
+    threaded = false;
+    (void)identity;// avoids compiler warning
 #endif
 
     if (threaded) {
 #ifdef NANOVDB_USE_TBB
-	    using RangeT = tbb::blocked_range<size_t>;
-	    tbb::parallel_scan(RangeT(0, size), identity,
-		    [&](const RangeT &r, T sum, bool is_final_scan)->T {
-			    T tmp = sum;
-			    for (size_t i = r.begin(); i < r.end(); ++i) {
-				    tmp = op(tmp, array[i]);
-				    if (is_final_scan) array[i] = tmp;
-			    }
-			    return tmp;
-		    },[&](const T &a, const T &b) {return op(a, b);}
-		);
+        using RangeT = tbb::blocked_range<size_t>;
+        tbb::parallel_scan(RangeT(0, size), identity,
+            [&](const RangeT &r, T sum, bool is_final_scan)->T {
+                T tmp = sum;
+                for (size_t i = r.begin(); i < r.end(); ++i) {
+                    tmp = op(tmp, array[i]);
+                    if (is_final_scan) array[i] = tmp;
+                }
+                return tmp;
+            },[&](const T &a, const T &b) {return op(a, b);}
+        );
 #endif
-	} else { // serial inclusive prefix operation
-    	for (size_t i=1; i<size; ++i) array[i] = op(array[i], array[i-1]);
-	}
+    } else { // serial inclusive prefix operation
+        for (size_t i=1; i<size; ++i) array[i] = op(array[i], array[i-1]);
+    }
 }// inclusiveScan
 
 template<typename T, typename OpT>
