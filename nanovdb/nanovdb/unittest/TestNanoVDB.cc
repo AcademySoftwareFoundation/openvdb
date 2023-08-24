@@ -5798,12 +5798,12 @@ TEST_F(TestNanoVDB, StencilIntersection)
               EXPECT_TRUE(mask.none() == (count == 0));
               EXPECT_TRUE(mask.any() == (count > 0));
               EXPECT_EQ(count, mask.count());
-              EXPECT_TRUE(mask.test(0) == mx);
-              EXPECT_TRUE(mask.test(1) == px);
-              EXPECT_TRUE(mask.test(2) == my);
-              EXPECT_TRUE(mask.test(3) == py);
-              EXPECT_TRUE(mask.test(4) == mz);
-              EXPECT_TRUE(mask.test(5) == pz);
+              EXPECT_TRUE(mask.test(0) == (mx > 0));
+              EXPECT_TRUE(mask.test(1) == (px > 0));
+              EXPECT_TRUE(mask.test(2) == (my > 0));
+              EXPECT_TRUE(mask.test(3) == (py > 0));
+              EXPECT_TRUE(mask.test(4) == (mz > 0));
+              EXPECT_TRUE(mask.test(5) == (pz > 0));
             }//pz
           }//mz
         }//py
