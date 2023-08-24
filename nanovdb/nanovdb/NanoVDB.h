@@ -879,7 +879,7 @@ __hostdev__ inline bool isValid(GridType gridType, GridClass gridClass)
     return gridClass < GridClass::End && gridType < GridType::End; // any valid combination
 }
 
-// --------------------------> isValue(GridType, GridClass) <------------------------------------
+// --------------------------> validation of blind data meta data <------------------------------------
 
 /// @brief return true if the combination of GridBlindDataClass, GridBlindDataSemantic and GridType is valid.
 __hostdev__ inline bool isValid(const GridBlindDataClass&    blindClass,
@@ -3152,7 +3152,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     static const int      MaxNameSize = 256; // due to NULL termination the maximum length is one less!
     int64_t               mDataOffset; // byte offset to the blind data, relative to this GridBlindMetaData.
     uint64_t              mValueCount; // number of blind values, e.g. point count
-    uint32_t              mValueSize;// byte size of each value, e.g. 4 if mDataType=Float and 1 if mDataType=Unknown
+    uint32_t              mValueSize;// byte size of each value, e.g. 4 if mDataType=Float and 1 if mDataType=Unknown since that amounts to char
     GridBlindDataSemantic mSemantic; // semantic meaning of the data.
     GridBlindDataClass    mDataClass; // 4 bytes
     GridType              mDataType; // 4 bytes
@@ -3182,7 +3182,29 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     }
 
     /// @brief return true if this meta data has a valid combination of semantic, class and value tags
-    __hostdev__ bool isValid() const { return nanovdb::isValid(mDataClass, mSemantic, mDataType); }
+    __hostdev__ bool isValid() const
+    {
+        auto check = [&]()->bool{
+            switch (mDataType){
+            case GridType::Unknown: return mValueSize==1u;// i.e. we encode data as mValueCount chars
+            case GridType::Float:   return mValueSize==4u;
+            case GridType::Double:  return mValueSize==8u;
+            case GridType::Int16:   return mValueSize==2u;
+            case GridType::Int32:   return mValueSize==4u;
+            case GridType::Int64:   return mValueSize==8u;
+            case GridType::Vec3f:   return mValueSize==12u;
+            case GridType::Vec3d:   return mValueSize==24u;
+            case GridType::RGBA8:   return mValueSize==4u;
+            case GridType::Fp8:     return mValueSize==1u;
+            case GridType::Fp16:    return mValueSize==2u;
+            case GridType::Vec4f:   return mValueSize==16u;
+            case GridType::Vec4d:   return mValueSize==32u;
+            case GridType::Vec3u8:  return mValueSize==3u;
+            case GridType::Vec3u16: return mValueSize==6u;
+            default: return true;}// all other combinations are valid
+        };
+        return nanovdb::isValid(mDataClass, mSemantic, mDataType) && check();
+    }
 
     /// @brief return size in bytes of the blind data represented by this blind meta data
     /// @note This size includes possible padding for 32 byte alignment. The actual amount

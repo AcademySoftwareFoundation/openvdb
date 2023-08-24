@@ -1906,7 +1906,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     os.write(reinterpret_cast<const char*>(&size), sizeof(Index));
 
     // write strided
-    if (!strideOfOne)       os.write(reinterpret_cast<const char*>(&strideOrTotalSize), sizeof(Index));
+    if (!strideOfOne) os.write(reinterpret_cast<const char*>(&strideOrTotalSize), sizeof(Index));
 }
 
 

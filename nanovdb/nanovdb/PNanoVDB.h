@@ -56,7 +56,9 @@
 #endif
 
 #ifdef PNANOVDB_CMATH
+#ifndef __CUDACC_RTC__
 #include <math.h>
+#endif
 #endif
 
 // ------------------------------------------------ Buffer -----------------------------------------------------------
@@ -72,9 +74,11 @@
 #endif
 
 #if defined(PNANOVDB_BUF_C)
+#ifndef __CUDACC_RTC__
 #include <stdint.h>
+#endif
 #if defined(__CUDACC__)
-#define PNANOVDB_BUF_FORCE_INLINE static inline __host__ __device__ __forceinline__
+#define PNANOVDB_BUF_FORCE_INLINE static __host__ __device__ __forceinline__
 #elif defined(_WIN32)
 #define PNANOVDB_BUF_FORCE_INLINE static inline __forceinline
 #else
@@ -272,7 +276,7 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uvec2 value
 // force inline
 #if defined(PNANOVDB_C)
 #if defined(__CUDACC__)
-#define PNANOVDB_FORCE_INLINE static inline __host__ __device__ __forceinline__
+#define PNANOVDB_FORCE_INLINE static __host__ __device__ __forceinline__
 #elif defined(_WIN32)
 #define PNANOVDB_FORCE_INLINE static inline __forceinline
 #else
@@ -287,11 +291,7 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uvec2 value
 // struct typedef, static const, inout
 #if defined(PNANOVDB_C)
 #define PNANOVDB_STRUCT_TYPEDEF(X) typedef struct X X;
-#if defined(__CUDACC__)
-#define PNANOVDB_STATIC_CONST static const __host__ __device__
-#else
 #define PNANOVDB_STATIC_CONST static const
-#endif
 #define PNANOVDB_INOUT(X) X*
 #define PNANOVDB_IN(X) const X*
 #define PNANOVDB_DEREF(X) (*X)
@@ -315,9 +315,13 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uvec2 value
 // basic types, type conversion
 #if defined(PNANOVDB_C)
 #define PNANOVDB_NATIVE_64
+#ifndef __CUDACC_RTC__
 #include <stdint.h>
+#endif
 #if !defined(PNANOVDB_MEMCPY_CUSTOM)
+#ifndef __CUDACC_RTC__
 #include <string.h>
+#endif
 #define pnanovdb_memcpy memcpy
 #endif
 typedef uint32_t pnanovdb_uint32_t;
@@ -2081,12 +2085,12 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_pointindex_get_point_count
 }
 PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_pointindex_get_first(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t i)
 {
-    return pnanovdb_uint64_offset(pnanovdb_leaf_pointindex_get_offset(buf, leaf), 
+    return pnanovdb_uint64_offset(pnanovdb_leaf_pointindex_get_offset(buf, leaf),
         (i == 0u ? 0u : pnanovdb_read_uint16(buf, pnanovdb_leaf_get_table_address(PNANOVDB_GRID_TYPE_POINTINDEX, buf, leaf, i - 1u))));
 }
 PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_pointindex_get_last(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t i)
 {
-    return pnanovdb_uint64_offset(pnanovdb_leaf_pointindex_get_offset(buf, leaf), 
+    return pnanovdb_uint64_offset(pnanovdb_leaf_pointindex_get_offset(buf, leaf),
         pnanovdb_read_uint16(buf, pnanovdb_leaf_get_table_address(PNANOVDB_GRID_TYPE_POINTINDEX, buf, leaf, i)));
 }
 PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_pointindex_get_value(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t i)
@@ -2117,7 +2121,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_leaf_pointindex_set_on(pnanovdb_buf_t buf, p
     pnanovdb_write_uint32(buf, addr, val_mask);
 }
 PNANOVDB_FORCE_INLINE void pnanovdb_leaf_pointindex_set_value(pnanovdb_buf_t buf, pnanovdb_leaf_handle_t leaf, pnanovdb_uint32_t i, pnanovdb_uint32_t value)
-{ 
+{
     pnanovdb_leaf_pointindex_set_on(buf, leaf, i);
     pnanovdb_leaf_pointindex_set_value_only(buf, leaf, i, value);
 }
@@ -2432,11 +2436,11 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_root_onindex_get_value_index(pn
 }
 
 PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_root_pointindex_get_point_range(
-    pnanovdb_buf_t buf, 
-    pnanovdb_address_t value_address, 
-    PNANOVDB_IN(pnanovdb_coord_t) ijk, 
-    pnanovdb_uint32_t level, 
-    PNANOVDB_INOUT(pnanovdb_uint64_t)range_begin, 
+    pnanovdb_buf_t buf,
+    pnanovdb_address_t value_address,
+    PNANOVDB_IN(pnanovdb_coord_t) ijk,
+    pnanovdb_uint32_t level,
+    PNANOVDB_INOUT(pnanovdb_uint64_t)range_begin,
     PNANOVDB_INOUT(pnanovdb_uint64_t)range_end
 )
 {
