@@ -507,7 +507,7 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const Vec3T *d_points, size_t 
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerLeaf, d_maxPointsPerLeaf, mData.nodeCount[0]);
         cudaCheck(cudaMemcpy(&mMaxPointsPerLeaf, d_maxPointsPerLeaf, sizeof(uint32_t), cudaMemcpyDeviceToHost));
         //printf("\n Leaf count = %u, max points per leaf = %u\n", mData.nodeCount[0], mMaxPointsPerLeaf);
-        if (mMaxPointsPerLeaf > std::numeric_limits<u_int16_t>::max()) {
+        if (mMaxPointsPerLeaf > std::numeric_limits<uint16_t>::max()) {
             throw std::runtime_error("Too many points per leaf: "+std::to_string(mMaxPointsPerLeaf));
         }
         mMemPool.free(d_maxPointsPerLeaf);
