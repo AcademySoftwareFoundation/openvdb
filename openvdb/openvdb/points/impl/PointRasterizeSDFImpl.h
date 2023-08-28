@@ -643,11 +643,15 @@ public:
 protected:
     SurfaceMaskOp(const math::Transform& points,
                   const math::Transform& surface,
+                   // Clip the surface to this bounds. Only used for the smooth
+                   // raster workflow to limit to search radii topology init
+                   const CoordBBox* const maxClipBounds = nullptr,
                   InterrupterT* interrupter = nullptr)
         : mMask(new MaskTreeT)
         , mMaskOff(new MaskTreeT)
         , mPointsTransform(points)
         , mSurfaceTransform(surface)
+        , mMaxClipBounds(maxClipBounds ? this->toSurfaceBounds(*maxClipBounds) : CoordBBox::inf())
         , mInterrupter(interrupter) {}
 
     SurfaceMaskOp(const SurfaceMaskOp& other)
@@ -655,6 +659,7 @@ protected:
         , mMaskOff(new MaskTreeT)
         , mPointsTransform(other.mPointsTransform)
         , mSurfaceTransform(other.mSurfaceTransform)
+        , mMaxClipBounds(other.mMaxClipBounds)
         , mInterrupter(other.mInterrupter) {}
 
     // @brief  Sparse fill a tree with activated bounding boxes expanded from
@@ -696,8 +701,16 @@ protected:
         this->deactivate(bounds);
     }
 
-    inline void activate(const CoordBBox& bounds)   { mMask->sparseFill(bounds, true, true); }
-    inline void deactivate(const CoordBBox& bounds) { mMaskOff->sparseFill(bounds, true, true); }
+    inline void activate(CoordBBox& bounds)
+    {
+        bounds.intersect(mMaxClipBounds);
+        mMask->sparseFill(bounds, true, true);
+    }
+
+    inline void deactivate(const CoordBBox& bounds)
+    {
+        mMaskOff->sparseFill(bounds, true, true);
+    }
 
     inline bool interrupted()
     {
@@ -752,6 +765,7 @@ protected:
     std::unique_ptr<MaskTreeT> mMaskOff;
     const math::Transform& mPointsTransform;
     const math::Transform& mSurfaceTransform;
+    const CoordBBox mMaxClipBounds;
     InterrupterT* mInterrupter;
 };
 
@@ -769,8 +783,9 @@ struct FixedSurfaceMaskOp
                    const math::Transform& surface,
                    const double minBandRadius, // sdf index space
                    const double maxBandRadius, // sdf index space
+                   const CoordBBox* const maxClipBounds,
                    InterrupterT* interrupter = nullptr)
-        : BaseT(points, surface, interrupter)
+        : BaseT(points, surface, maxClipBounds, interrupter)
         , mMin(), mMax()
     {
         // calculate the min interior cube area of activity. this is the side
@@ -827,13 +842,15 @@ struct VariableSurfaceMaskOp
 
     VariableSurfaceMaskOp(const math::Transform& pointsTransform,
                          const math::Transform& surfaceTransform,
-                         const RadiusTreeT& min,
+                         const RadiusTreeT* const min,
                          const RadiusTreeT& max,
-                         const Real scale,
+                         const Real minScale,
+                         const Real maxScale,
                          const Real halfband,
+                         const CoordBBox* const maxClipBounds,
                          InterrupterT* interrupter = nullptr)
-        : BaseT(pointsTransform, surfaceTransform, interrupter)
-        , mMin(min), mMax(max), mScale(scale)
+        : BaseT(pointsTransform, surfaceTransform, maxClipBounds, interrupter)
+        , mMin(min), mMax(max), mMinScale(minScale), mMaxScale(maxScale)
         , mHalfband(halfband) {}
 
     VariableSurfaceMaskOp(const VariableSurfaceMaskOp&) = default;
@@ -848,7 +865,9 @@ struct VariableSurfaceMaskOp
             const int32_t max = this->maxDist(maxacc.getValue(leafIter->origin()));
             this->activate(*leafIter, max);
         }
-        const tree::ValueAccessor<const RadiusTreeT> minacc(mMin);
+
+        if (!mMin) return;
+        const tree::ValueAccessor<const RadiusTreeT> minacc(*mMin);
         for (auto leafIter = range.begin(); leafIter; ++leafIter) {
             const int32_t min = this->minDist(minacc.getValue(leafIter->origin()));
             if (min < 0) continue;
@@ -860,14 +879,14 @@ private:
     inline int32_t maxDist(const typename RadiusTreeT::ValueType& maxRadiusWs) const
     {
         // max radius in index space
-        const Real maxBandRadius = (Real(maxRadiusWs) * mScale) + mHalfband;
+        const Real maxBandRadius = (Real(maxRadiusWs) * mMaxScale) + mHalfband;
         return static_cast<int32_t>(math::Round(maxBandRadius)); // furthest voxel
     }
 
     inline int32_t minDist(const typename RadiusTreeT::ValueType& minRadiusWs) const
     {
         // min radius in index space
-        Real minBandRadius = math::Max(0.0, (Real(minRadiusWs) * mScale) - mHalfband);
+        Real minBandRadius = math::Max(0.0, (Real(minRadiusWs) * mMinScale) - mHalfband);
         // calculate the min interior cube area of activity. this is the side
         // of the largest possible cube that fits into the radius "min":
         //   d = 2r -> 2r = 3x^2 -> x = 2r / sqrt(3)
@@ -889,9 +908,9 @@ private:
     }
 
 private:
-    const RadiusTreeT& mMin;
+    const RadiusTreeT* const mMin;
     const RadiusTreeT& mMax;
-    const Real mScale, mHalfband;
+    const Real mMinScale, mMaxScale, mHalfband;
 };
 
 template <typename SdfT, typename MaskTreeT>
@@ -945,7 +964,7 @@ initFixedSdf(const PointDataGridT& points,
     if (interrupter) interrupter->start("Generating uniform surface topology");
 
     FixedSurfaceMaskOp<MaskTreeT, InterrupterT> op(points.transform(),
-       *transform, minBandRadius, maxBandRadius, interrupter);
+       *transform, minBandRadius, maxBandRadius, /*clipbounds=*/nullptr, interrupter);
 
     LeafManagerT manager(points.tree());
     tbb::parallel_reduce(manager.leafRange(), op);
@@ -977,7 +996,72 @@ initVariableSdf(const PointDataGridT& points,
     if (interrupter) interrupter->start("Generating variable surface topology");
 
     VariableSurfaceMaskOp<RadiusTreeT, MaskTreeT, InterrupterT>
-        op(points.transform(), *transform, min, max, scale, halfband, interrupter);
+        op(points.transform(), *transform, &min, max, scale, scale, halfband,
+            /*clipbounds=*/nullptr, interrupter);
+
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
+
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
+    if (interrupter) interrupter->end();
+    return surface;
+}
+
+template <typename SdfT, typename InterrupterT, typename PointDataGridT>
+inline typename SdfT::Ptr
+initFixedSmoothSdf(const PointDataGridT& points,
+        math::Transform::Ptr transform,
+        const typename SdfT::ValueType bg,
+        const Real maxBandRadius,
+        const CoordBBox& bounds,
+        InterrupterT* interrupter)
+{
+    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
+    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
+
+    if (interrupter) interrupter->start("Generating uniform surface topology");
+
+    // @note Currently don't use min radii to deactivate, can't compute
+    //   this with the ZB kernel
+    FixedSurfaceMaskOp<MaskTreeT, InterrupterT> op(points.transform(),
+       *transform, /*minBandRadius=*/0.0, maxBandRadius, &bounds, interrupter);
+
+    LeafManagerT manager(points.tree());
+    tbb::parallel_reduce(manager.leafRange(), op);
+
+    typename SdfT::Ptr surface =
+        initSdfFromMasks<SdfT, MaskTreeT>(transform, bg, op.mask(), op.maskoff());
+
+    if (interrupter) interrupter->end();
+    return surface;
+}
+
+template <typename SdfT,
+    typename InterrupterT,
+    typename PointDataGridT,
+    typename RadiusTreeT>
+inline typename SdfT::Ptr
+initVariableSmoothSdf(const PointDataGridT& points,
+        math::Transform::Ptr transform,
+        const typename SdfT::ValueType bg,
+        const RadiusTreeT& maxTree,
+        const Real scale,
+        const Real halfband,
+        const CoordBBox& bounds,
+        InterrupterT* interrupter)
+{
+    using LeafManagerT = tree::LeafManager<const typename PointDataGridT::TreeType>;
+    using MaskTreeT = typename SdfT::TreeType::template ValueConverter<ValueMask>::Type;
+
+    if (interrupter) interrupter->start("Generating variable surface topology");
+
+    // @note Currently don't use min radii/tree to deactivate, can't
+    //   compute this with the ZB kernel
+    VariableSurfaceMaskOp<RadiusTreeT, MaskTreeT, InterrupterT>
+        op(points.transform(), *transform, nullptr, maxTree, /*minscale=*/1.0,
+           scale, halfband, &bounds, interrupter);
 
     LeafManagerT manager(points.tree());
     tbb::parallel_reduce(manager.leafRange(), op);
@@ -1272,23 +1356,43 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
         static_cast<typename SdfT::ValueType>(vs * halfband);
 
     const Real indexSpaceSearch = settings.searchRadius / vs;
+    // max possible index space search radius
+    const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
+
+    // The topology we need to activate is at a distance based on the maximum
+    // radii of each point and the uniform search radius. Even though we're
+    // guaranteed to be generating new positions within the distribution of
+    // point neighbours, these positions may end up outside of active topology
+    // were we _only_ to use the radius of the particles for topology
+    // activation.
+    const Real maxActivationRadius = std::max(settings.searchRadius, settings.radiusScale) / vs;
     const auto leaf = points.constTree().cbeginLeaf();
+
+    // Compute estimated max bounds for clipping. This is used if the search
+    // radius is larger than the max particle radius (as we don't need to
+    // activate topology further outside the bounds of the point data grid).
+    // This bounds is expanded by the halfband + max radii
+    CoordBBox bounds;
+    points.tree().evalLeafBoundingBox(bounds);
 
     typename SdfT::Ptr surface;
     GridPtrVec grids;
 
     if (settings.radius.empty())
     {
-        const FixedBandRadius<Real> bands(settings.radiusScale / vs, halfband);
+        // This is the max possible distance we need to activate, but we'll
+        // clip this at the edges of the point bounds (as the ZB kernel will
+        // only create positions in between points).
+        const FixedBandRadius<Real> bands(maxActivationRadius, halfband);
         const Real max = bands.max();
 
-        surface = initFixedSdf<SdfT, InterrupterType>
-            (points, transform, background, /*min*/0.0, max, interrupter);
+        // Compute max radius in index space and expand bounds
+        bounds.expand(static_cast<Coord::ValueType>(halfband + math::Round(settings.radiusScale / vs)));
+        // init surface
+        surface = initFixedSmoothSdf<SdfT, InterrupterType>
+            (points, transform, background, max, bounds, interrupter);
 
         if (!leaf) return GridPtrVec(1, surface);
-
-        // max possible index space search radius
-        const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
 
         const FixedRadius<Real> rad(settings.radiusScale / vs);
         if (interrupter) interrupter->start("Rasterizing particles to level set using constant Zhu-Bridson");
@@ -1297,28 +1401,50 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
             (points, attributes, filter, *surface, interrupter,
                 width, rad, indexSpaceSearch, points.transform(), *surface); // args
     }
-    else {
+    else
+    {
         using RadiusT = typename SettingsT::RadiusAttributeType;
         using PointDataTreeT = typename PointDataGridT::TreeType;
         using RadTreeT = typename PointDataTreeT::template ValueConverter<RadiusT>::Type;
 
+        // We currently don't use the min values for the ZB kernel topology
+        // activation.
+        // @todo  We should be able to deactivate on some metric
         RadiusT min(0), max(0);
-        typename RadTreeT::Ptr mintree(new RadTreeT), maxtree(new RadTreeT);
+        typename RadTreeT::Ptr maxtree(new RadTreeT);
         points::evalMinMax<RadiusT, UnknownCodec>
-            (points.tree(), settings.radius, min, max, filter, mintree.get(), maxtree.get());
+            (points.tree(), settings.radius, min, max, filter, nullptr, maxtree.get());
 
-        // search distance at the SDF transform
+        if ((settings.searchRadius > settings.radiusScale) && (min < settings.searchRadius)) {
+            // set radius tree values to search distances if they are less,
+            // just for the surface topology initialization. This is the max
+            // possible distance we need to activate, but we'll clip this at
+            // the edges of the point bounds (as the ZB kernel will only
+            // create positions in-between points).
+            tools::foreach(maxtree->beginValueOn(),
+                [&](auto& iter) {
+                    iter.modifyValue([&](auto& r) {
+                        if (r < settings.searchRadius) {
+                            // initVariableSmoothSdf scales radii by (settings.radiusScale/vs).
+                            // We don't want to scale the search radii by the radius scale, so
+                            // cancel it out here.
+                            r = static_cast<RadiusT>(settings.searchRadius / settings.radiusScale);
+                        }
+                    });
+                }, /*thread=*/true, /*shared=*/true);
+        }
+
         const RadiusT indexSpaceScale = RadiusT(settings.radiusScale / vs);
-        surface = initVariableSdf<SdfT, InterrupterType>
-            (points, transform, background, *mintree, *maxtree,
-                indexSpaceScale, halfband, interrupter);
-        mintree.reset();
+        // Compute max radius in index space and expand bounds
+        bounds.expand(static_cast<Coord::ValueType>(halfband + math::Round(max * indexSpaceScale)));
+
+        // init surface
+        surface = initVariableSmoothSdf<SdfT, InterrupterType>
+            (points, transform, background, *maxtree,
+                indexSpaceScale, halfband, bounds, interrupter);
         maxtree.reset();
 
         if (!leaf) return GridPtrVec(1, surface);
-
-        // max possible index space search radius
-        const size_t width = static_cast<size_t>(math::RoundUp(indexSpaceSearch));
 
         const size_t ridx = leaf->attributeSet().find(settings.radius);
         if (ridx == AttributeSet::INVALID_POS) {
