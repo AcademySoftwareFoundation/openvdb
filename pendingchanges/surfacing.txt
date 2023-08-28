@@ -22,4 +22,6 @@ OpenVDB:
         - Fixed a bug in points::rasterizeSpheres and points::rasterizeSmoothSpheres
         which could cause sections of the generated surface to incorrectly be marked
         as negative interior values.
+        - Fixed a bug in points::rasterizeSmoothSpheres which could result in
+        incomplete surface reconstruction with significantly larger search distances.
         - Fixed some precision issues in various Matrix methods

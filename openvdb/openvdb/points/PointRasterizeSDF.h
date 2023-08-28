@@ -257,6 +257,10 @@ struct SmoothSphereSettings
     ///   larger than the point radius. Both this and the `radiusScale`
     ///   parameters are given in world space units and are applied to every
     ///   point to generate a surface mask.
+    /// @warning  If this value is less than the sum of the maximum particle
+    ///   radius and the half band width, the exterior half band width may be
+    ///   smaller than desired. In these cases, consider running a levelset
+    ///   renormalize or a levelset rebuild.
     Real searchRadius = 1.0;
 };
 

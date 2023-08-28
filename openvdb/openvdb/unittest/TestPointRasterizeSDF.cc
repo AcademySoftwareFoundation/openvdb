@@ -704,6 +704,48 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSmoothSpheres)
         }
     }
 
+    // Test two points qhich create a ghost particle outside of their
+    // radii (to test that the surface topology correctly accounts for the
+    // search distance)
+    {
+        FixedSurfacing<points::NullFilter> s;
+        s.halfband = 2;
+        s.points = PointBuilder({ Vec3f(0), Vec3f(0,5,0) }).voxelsize(0.1).get();
+        s.transform = nullptr;
+        double radius = 0.5, search = 5; // large search
+
+        FloatGrid::Ptr sdf = s.surfaceSmooth(radius, search);
+        EXPECT_TRUE(sdf && sdf->getName() == "fixed_avg");
+        EXPECT_TRUE(sdf->transform() == s.points->transform());
+        EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
+        EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
+
+        // @todo  regression test. find a way to better test these values
+        size_t interiorOn = 0, exteriorOn = 0;
+        EXPECT_EQ(Index32(36), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
+        EXPECT_EQ(Index64(4188), sdf->tree().activeVoxelCount());
+
+        for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
+            EXPECT_TRUE(*iter > -sdf->background());
+            EXPECT_TRUE(*iter < sdf->background());
+            if (*iter > 0) ++exteriorOn;
+            else           ++interiorOn;
+        }
+        EXPECT_EQ(size_t(1244), interiorOn);
+        EXPECT_EQ(size_t(2944), exteriorOn);
+
+        size_t interiorOff = 0, exteriorOff = 0;
+        for (auto iter = sdf->cbeginValueOff(); iter; ++iter) {
+            EXPECT_TRUE((*iter <= -sdf->background()) || (*iter >= sdf->background()))
+                << *iter << " " << sdf->background();;
+            if (*iter > 0) ++exteriorOff;
+            else           ++interiorOff;
+        }
+        EXPECT_EQ(size_t(323), interiorOff);
+        EXPECT_EQ(size_t(308789), exteriorOff);
+    }
+
     // Test multiple points - 8 points at cube corner positions
     {
         FixedSurfacing<points::NullFilter> s;
@@ -726,7 +768,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSmoothSpheres)
 
         // test points from a box with coords at 0.5 and a search radius
         // large enough to create a smoothed box
-        // @todo find a way to better test these values
+        // @todo  regression test. find a way to better test these values
         positions = getBoxPoints(/*scale*/0.5f);
         radius = 0.2, search = 1.2;
         s.halfband = 3;
