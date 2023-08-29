@@ -19,9 +19,13 @@
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/util/Util.h>
 
+#include <UT/UT_Version.h>
 #include <CH/CH_Manager.h>
 #include <PRM/PRM_Parm.h>
 #include <PRM/PRM_SharedFunc.h>
+#if UT_VERSION_INT >= 0x14000000        // 20.0 or later
+#include <GU/GU_WindingNumber.h>
+#endif
 
 #include <algorithm> // for std::max()
 #include <sstream>
@@ -396,6 +400,15 @@ newSopOperator(OP_OperatorTable* table)
             " it is closed or watertight.  It is similar to the Minimum"
             " function of the [Node:sop/isooffset] node."));
 
+#if UT_VERSION_INT >= 0x14000000        // 20.0 or later
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "preserveholes", "Preserve Holes")
+        .setTooltip(
+            "Preserve geometry holes.\n"
+            "When off, generated signed distance field fills any holes of the input mesh. "
+            "Turning this option on prevents this behavior. "
+            "It requires a closed, watertight surface. Otherwise, it can generate invalid signed distance function."));
+#endif
+
     //////////
     // Mesh attribute transfer {Point, Vertex & Primitive}
 
@@ -763,7 +776,9 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
         const bool unsignedDistanceFieldConversion = bool(evalInt("unsigneddist", 0, time));
         const bool outputFogVolumeGrid = bool(evalInt("buildfog", 0, time));
         const bool outputAttributeGrid = bool(evalInt("attrList", 0, time) > 0);
-
+#if UT_VERSION_INT >= 0x14000000        // 20.0 or later
+        const bool preserveHoles = bool(evalInt("preserveholes", 0, time));
+#endif
 
         if (!outputDistanceField && !outputFogVolumeGrid && !outputAttributeGrid) {
 
@@ -862,6 +877,24 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
                 hvdb::PrimCpyOp(inputGdp, primList));
         }
 
+#if UT_VERSION_INT >= 0x14000000        // 20.0 or later
+        //////////
+        // Interior test
+
+        GU_WindingNumber3DApprox windingNumber;
+        auto interiorTest = [transform, &windingNumber](const openvdb::Coord &coord) -> bool
+        {
+            auto pt = UTvdbConvert(transform->indexToWorld(coord));
+            auto wn = windingNumber.eval(pt, 2.0);
+            return fabs(wn) >= 0.5 ? true : false;
+        };
+
+        if (preserveHoles) {
+            windingNumber.init(*inputGdp, nullptr, 2);
+        }
+#endif
+
+
         //////////
         // Mesh to volume conversion
 
@@ -879,8 +912,20 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
             primitiveIndexGrid.reset(new openvdb::Int32Grid(0));
         }
 
-        openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            boss.interrupter(), mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
+        openvdb::FloatGrid::Ptr grid;
+
+#if UT_VERSION_INT >= 0x14000000        // 20.0 or later
+        if (!preserveHoles) {
+            grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+                    boss.interrupter(), mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
+        } else {
+            grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+                    boss.interrupter(), mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get(), interiorTest, openvdb::tools::EVAL_EVERY_TILE);
+        }
+#else
+        grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
+                boss.interrupter(), mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
+#endif
 
         //////////
         // Output
