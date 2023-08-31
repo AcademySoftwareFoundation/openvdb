@@ -112,8 +112,11 @@ public:
     /// @brief Returns the size in bytes of the raw memory buffer managed by this GridHandle.
     uint64_t size() const { return mBuffer.size(); }
 
+    //@{
     /// @brief Return true if this handle is empty, i.e. has no allocated memory
     bool empty() const { return this->size() == 0; }
+    bool isEmpty() const { return this->size() == 0; }
+    //@}
 
     /// @brief Return true if this handle contains any grids
     operator bool() const { return !this->empty(); }

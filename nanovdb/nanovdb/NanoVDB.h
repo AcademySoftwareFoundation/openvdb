@@ -426,8 +426,15 @@ enum class GridBlindDataSemantic : uint32_t { Unknown = 0,
 // --------------------------> is_same <------------------------------------
 
 /// @brief C++11 implementation of std::is_same
-template<typename T1, typename T2>
+/// @note When more than two arguments are provided value = T0==T1 || T0==T2 || ...
+template<typename T0, typename T1, typename ...T>
 struct is_same
+{
+    static constexpr bool value = is_same<T0, T1>::value || is_same<T0, T...>::value;
+};
+
+template<typename T0, typename T1>
+struct is_same<T0, T1>
 {
     static constexpr bool value = false;
 };
@@ -444,7 +451,7 @@ struct is_same<T, T>
 template<typename T>
 struct is_floating_point
 {
-    static constexpr bool value = is_same<T, float>::value || is_same<T, double>::value;
+    static constexpr bool value = is_same<T, float, double>::value;
 };
 
 // --------------------------> BuildTraits <------------------------------------
@@ -454,29 +461,18 @@ template<typename T>
 struct BuildTraits
 {
     // check if T is an index type
-    static constexpr bool is_index = is_same<T, ValueIndex>::value ||
-                                     is_same<T, ValueIndexMask>::value ||
-                                     is_same<T, ValueOnIndex>::value ||
-                                     is_same<T, ValueOnIndexMask>::value;
-    static constexpr bool is_onindex = is_same<T, ValueOnIndex>::value ||
-                                       is_same<T, ValueOnIndexMask>::value;
-    static constexpr bool is_offindex = is_same<T, ValueIndex>::value ||
-                                        is_same<T, ValueIndexMask>::value;
-    static constexpr bool is_indexmask = is_same<T, ValueIndexMask>::value ||
-                                         is_same<T, ValueOnIndexMask>::value;
+    static constexpr bool is_index     = is_same<T, ValueIndex, ValueIndexMask, ValueOnIndex, ValueOnIndexMask>::value;
+    static constexpr bool is_onindex   = is_same<T, ValueOnIndex, ValueOnIndexMask>::value;
+    static constexpr bool is_offindex  = is_same<T, ValueIndex, ValueIndexMask>::value;
+    static constexpr bool is_indexmask = is_same<T, ValueIndexMask, ValueOnIndexMask>::value;
     // check if T is a compressed float type with fixed bit precision
-    static constexpr bool is_FpX = is_same<T, Fp4>::value ||
-                                   is_same<T, Fp8>::value ||
-                                   is_same<T, Fp16>::value;
+    static constexpr bool is_FpX = is_same<T, Fp4, Fp8, Fp16>::value;
     // check if T is a compressed float type with fixed or variable bit precision
-    static constexpr bool is_Fp = is_FpX || is_same<T, FpN>::value;
+    static constexpr bool is_Fp = is_same<T, Fp4, Fp8, Fp16, FpN>::value;
     // check if T is a POD float type, i.e float or double
     static constexpr bool is_float = is_floating_point<T>::value;
     // check if T is a template specialization of LeafData<T>, i.e. has T mValues[512]
-    static constexpr bool is_special = is_index || is_Fp ||
-                                       is_same<T, Point>::value ||
-                                       is_same<T, bool>::value ||
-                                       is_same<T, ValueMask>::value;
+    static constexpr bool is_special = is_index || is_Fp || is_same<T, Point, bool, ValueMask>::value;
 }; // BuildTraits
 
 // --------------------------> enable_if <------------------------------------

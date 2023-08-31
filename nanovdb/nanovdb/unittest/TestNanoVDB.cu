@@ -2178,3 +2178,26 @@ TEST(TestNanoVDBCUDA, cudaAddBlindData)
     EXPECT_TRUE(dataPtr2);
     for (size_t i=0; i<num_points; ++i) EXPECT_EQ(blind2[i], dataPtr2[i]);
 }// cudaAddBlindData
+
+TEST(TestNanoVDBCUDA, testGridHandleCopy)
+{
+    auto cudaHandle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(100);
+    {
+        auto *floatGrid = cudaHandle.grid<float>();
+        EXPECT_TRUE(floatGrid);
+        auto acc = floatGrid->getAccessor();
+        EXPECT_EQ( 3.0f, acc(103,0,0));
+        EXPECT_EQ( 0.0f, acc(100,0,0));
+        EXPECT_EQ(-3.0f, acc( 97,0,0));
+    }
+    auto hostHandle = cudaHandle.copy<nanovdb::HostBuffer>();
+    EXPECT_TRUE(cudaHandle.grid<float>());// should be unchanged
+    {
+        auto *floatGrid = hostHandle.grid<float>();
+        EXPECT_TRUE(floatGrid);
+        auto acc = floatGrid->getAccessor();
+        EXPECT_EQ( 3.0f, acc(103,0,0));
+        EXPECT_EQ( 0.0f, acc(100,0,0));
+        EXPECT_EQ(-3.0f, acc( 97,0,0));
+    }
+}

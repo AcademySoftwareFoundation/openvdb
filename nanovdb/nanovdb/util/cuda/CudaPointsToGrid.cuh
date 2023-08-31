@@ -400,6 +400,12 @@ template <typename BuildT, typename AllocT>
 template <typename Vec3T>
 void CudaPointsToGrid<BuildT, AllocT>::countNodes(const Vec3T *d_points, size_t pointCount)
 {
+    if constexpr(is_same<BuildT, Point>::value) {
+        static_assert(is_same<Vec3T, Vec3f, Vec3d>::value, "Point (vs voxels) coordinates should be represented as Vec3f or Vec3d");
+    } else {
+        static_assert(is_same<Vec3T, Coord, Vec3f, Vec3d>::value, "Voxel coordinates should be represented as Coord, Vec3f or Vec3d");
+    }
+
     mData.d_keys = mMemPool.template alloc<uint64_t>(pointCount);
     mData.d_indx = mMemPool.template alloc<uint32_t>(pointCount);// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
     cudaCheck(cudaMemcpy(mDeviceData, &mData, sizeof(Data), cudaMemcpyHostToDevice));// copy mData from CPU -> GPU
@@ -409,34 +415,22 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const Vec3T *d_points, size_t 
     auto *d_indx = mMemPool.template alloc<uint32_t>(pointCount);
 
     if (mVerbose==2) mTimer.restart("Generate tile keys");
-    if (is_same<BuildT, Point>::value) {// points in world space
-        if (is_same<Vec3T, Vec3f>::value) {
-            cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
-                d_indx[tid] = uint32_t(tid);
-                d_keys[tid] = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMapF(d_points[tid]).round());
-            }, mDeviceData); cudaCheckError();
-        } else if (is_same<Vec3T, Vec3d>::value) {
-            cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
-                d_indx[tid] = uint32_t(tid);
-                d_keys[tid] = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMap(d_points[tid]).round());
-            }, mDeviceData); cudaCheckError();
-        } else {
-            throw std::runtime_error("Point (vs voxels) coordinates should be represented as Vec3f or Vec3d");
+    cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Vec3T *d_points, const Data *d_data) {
+        d_indx[tid] = uint32_t(tid);
+        uint64_t &key = d_keys[tid];
+        if constexpr(is_same<BuildT, Point>::value) {// points are in world space
+            if constexpr(is_same<Vec3T, Vec3f>::value) {
+                key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMapF(d_points[tid]).round());
+            } else {// points are Vec3d
+                key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMap(d_points[tid]).round());
+            }
+        } else if constexpr(is_same<Vec3T, Coord>::value) {// points Coord are in index space
+            key = NanoRoot<BuildT>::CoordToKey(d_points[tid]);
+        } else {// points are Vec3f or Vec3d in index space
+            key = NanoRoot<BuildT>::CoordToKey(d_points[tid].round());
         }
-    } else if (is_same<Vec3T, Coord>::value) {
-        cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
-            d_indx[tid] = uint32_t(tid);
-            d_keys[tid] = NanoRoot<BuildT>::CoordToKey(d_points[tid]);
-        }, mDeviceData); cudaCheckError();
-    } else if (is_same<Vec3T, Vec3f>::value || is_same<Vec3T, Vec3d>::value) {
-        cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads>>>(pointCount, [=] __device__(size_t tid, const Data *d_data) {
-            d_indx[tid] = uint32_t(tid);
-            d_keys[tid] = NanoRoot<BuildT>::CoordToKey(d_points[tid].round());
-        }, mDeviceData); cudaCheckError();
-    } else {
-        throw std::runtime_error("Voxel coordinates should be represented as Coord, Vec3f or Vec3d");
-    }
-
+    }, d_points, mDeviceData);
+    cudaCheckError();
     if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
     CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 62);// 21 bits per coord
     std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx

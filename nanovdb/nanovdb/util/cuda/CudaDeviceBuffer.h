@@ -115,8 +115,11 @@ public:
     /// @brief Returns the size in bytes of the raw memory buffer managed by this allocator.
     uint64_t size() const { return mSize; }
 
+    //@{
     /// @brief Returns true if this allocator is empty, i.e. has no allocated memory
     bool empty() const { return mSize == 0; }
+    bool isEmpty() const { return mSize == 0; }
+    //@}
 
     /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
     void clear();
