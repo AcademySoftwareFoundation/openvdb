@@ -442,7 +442,8 @@ typename GridT::Ptr
 maskSdf(const GridT &sdfGrid,
         const Grid<MaskTreeT> &mask,
         bool ignoreActiveTiles = false,
-        int nIter = 1);
+        int nIter = 1,
+        bool resurfaceReachable = false);
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Computes signed distance values from an initial iso-surface and
@@ -650,8 +651,9 @@ public:
     /// @throw RuntimeError if sweepingVoxelCount() or boundaryVoxelCount() return zero.
     ///        This might happen if none of the initialization methods above were called
     ///        or if that initialization failed.
-    void sweep(int nIter = 1,
-               bool finalize = true);
+    SdfValueT sweep(int nIter = 1,
+               bool finalize = true,
+               bool computeMax = false);
 
     /// @brief Clears all the grids and counters so initialization can be called again.
     void clear();
@@ -842,7 +844,7 @@ bool FastSweeping<SdfGridT, ExtValueT>::initMask(const SdfGridT &sdfGrid, const 
 }// FastSweeping::initMask
 
 template <typename SdfGridT, typename ExtValueT>
-void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
+SdfValueT FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize, bool computeMax)
 {
     if (!mSdfGrid) {
         OPENVDB_THROW(RuntimeError, "FastSweeping::sweep called before initialization!");
@@ -905,7 +907,16 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
 #ifdef BENCHMARK_FAST_SWEEPING
       timer.stop();
 #endif
+      return e.max();
     }
+
+    if (computeMax) {
+      MinMaxKernel kernel;
+      auto e = kernel.run(*mSdfGrid);//multi-threaded
+      return e.max();
+    }
+
+    return 0;
 }// FastSweeping::sweep
 
 /// Private class of FastSweeping to quickly compute the extrema
@@ -1936,10 +1947,19 @@ typename GridT::Ptr
 maskSdf(const GridT &sdfGrid,
         const Grid<MaskTreeT> &mask,
         bool ignoreActiveTiles,
-        int nIter)
+        int nIter,
+        bool resurfaceReachable)
 {
     FastSweeping<GridT> fs;
-    if (fs.initMask(sdfGrid, mask, ignoreActiveTiles)) fs.sweep(nIter);
+    GridT::ValueType reachableMax;
+    if (fs.initMask(sdfGrid, mask, ignoreActiveTiles)) {
+        reachableMax = fs.sweep(nIter, /*finalize*/ !resurfaceReachable,
+            /*computeMax*/ resurfaceReachable);
+    }
+
+    if (resurfaceReachable)
+      return levelSetRebuild(*fs.sdfGrid(), reachableMax);
+    
     return fs.sdfGrid();
 }
 
