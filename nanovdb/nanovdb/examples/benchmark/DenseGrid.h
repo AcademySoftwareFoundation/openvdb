@@ -229,6 +229,9 @@ DenseGrid<ValueT>::create(Coord min,
         grid->mIndexBBox[0][i] = min[i];
         grid->mIndexBBox[1][i] = max[i] - 1;
     }
+#if 1
+    grid->mWorldBBox = grid->mIndexBBox.transform(grid->mMap);
+#else
     grid->mWorldBBox[0] = grid->mWorldBBox[1] = grid->mMap.applyMap(Vec3d(min[0], min[1], min[2]));
     grid->mWorldBBox.expand(grid->mMap.applyMap(Vec3d(min[0], min[1], max[2])));
     grid->mWorldBBox.expand(grid->mMap.applyMap(Vec3d(min[0], max[1], min[2])));
@@ -237,6 +240,7 @@ DenseGrid<ValueT>::create(Coord min,
     grid->mWorldBBox.expand(grid->mMap.applyMap(Vec3d(max[0], min[1], max[2])));
     grid->mWorldBBox.expand(grid->mMap.applyMap(Vec3d(min[0], max[1], max[2])));
     grid->mWorldBBox.expand(grid->mMap.applyMap(Vec3d(max[0], max[1], max[2])));
+#endif
     grid->mVoxelSize = grid->mMap.applyMap(Vec3d(1)) - grid->mMap.applyMap(Vec3d(0));
     if (gridClass == GridClass::LevelSet && !is_floating_point<ValueT>::value)
         throw std::runtime_error("Level sets are expected to be floating point types");

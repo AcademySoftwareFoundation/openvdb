@@ -23,10 +23,10 @@
 
 #include <nanovdb/util/HostBuffer.h>
 
-#if defined(NANOVDB_USE_TBB)
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range2d.h>
-#endif
+//#if defined(NANOVDB_USE_TBB)
+//#include <tbb/parallel_for.h>
+//#include <tbb/blocked_range2d.h>
+//#endif
 
 namespace nanovdb {
 
@@ -126,14 +126,14 @@ inline void Image::clear(int log2)
             }
         };
 
-#if defined(NANOVDB_USE_TBB)
-        tbb::blocked_range2d<int> range(0, ImageData::mWidth, 0, ImageData::mHeight);
-        tbb::parallel_for(range, [&](const tbb::blocked_range2d<int>& r) {
-            kernel2D(r.rows().begin(), r.cols().begin(), r.rows().end(), r.cols().end());
-        });
-#else
+//#if defined(NANOVDB_USE_TBB)
+//        tbb::blocked_range2d<int> range(0, ImageData::mWidth, 0, ImageData::mHeight);
+//        tbb::parallel_for(range, [&](const tbb::blocked_range2d<int>& r) {
+//            kernel2D(r.rows().begin(), r.cols().begin(), r.rows().end(), r.cols().end());
+//        });
+//#else
         kernel2D(0, 0, ImageData::mWidth, ImageData::mHeight);
-#endif
+//#endif
     }
 }
 
