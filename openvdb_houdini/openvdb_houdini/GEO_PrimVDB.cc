@@ -1437,7 +1437,7 @@ GEO_PrimVDB::getCEGrid(bool read, bool write) const
                 UT_ASSERT(!"Not implemented");
             }
             // Re-flag to write back.
-	    myCEGridAuthorative = true;
+            myCEGridAuthorative = true;
         }
         return myCEGrid;
     }
@@ -3500,7 +3500,7 @@ GEO_PrimVDB::GridAccessor::setTransformAdapter(
 
 void
 GEO_PrimVDB::GridAccessor::setGridAdapter(
-        const void* gridPtr,
+    const void* gridPtr,
     GEO_PrimVDB &prim,
     bool copyPosition)
 {
@@ -3581,7 +3581,7 @@ GEO_PrimVDB::getGridName() const
 {
     GA_ROHandleS nameAttr(getParent(), GA_ATTRIB_PRIMITIVE, "name");
     return nameAttr.isValid()
-   ? static_cast<const char *>(nameAttr.get(getMapOffset())) : "";
+        ? static_cast<const char *>(nameAttr.get(getMapOffset())) : "";
 }
 
 
@@ -3824,7 +3824,7 @@ GEO_PrimVDB::backgroundV3() const
             { \
                 UT_String     str; \
                 intrinsicGetMetaString(o, ID, str); \
-        v.append(str); \
+                v.append(str); \
                 return 1; \
             } \
             static geo_Size setSS(CLASS *o, const char **v, GA_Size) \
@@ -3869,7 +3869,7 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
     GA_INTRINSIC_SET_TUPLE_F(GEO_PrimVDB, geo_INTRINSIC_TRANSFORM,
             intrinsicSetTransform);
     GA_INTRINSIC_F(GEO_PrimVDB, geo_INTRINSIC_TAPER,
-	 "taper", intrinsicTaper)
+             "taper", intrinsicTaper)
 
     GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALMODE,
             "volumevisualmode", intrinsicVisualMode)
