@@ -72,8 +72,8 @@
     \note This files replaces GridBuilder.h, IndexGridBuilder.h and OpenToNanoVDB.h
 */
 
-#ifndef NANOVDB_CREATENANOGRID_H_HAS_BEEN_INCLUDED
-#define NANOVDB_CREATENANOGRID_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_CREATE_NANOGRID_H_HAS_BEEN_INCLUDED
+#define NANOVDB_CREATE_NANOGRID_H_HAS_BEEN_INCLUDED
 
 #if defined(NANOVDB_USE_OPENVDB)
 #include <openvdb/openvdb.h>
@@ -813,8 +813,8 @@ CreateNanoGrid<SrcGridT>::CreateNanoGrid(const SrcNodeAccT &srcNodeAcc)
 template <typename SrcGridT>
 struct CreateNanoGrid<SrcGridT>::BlindMetaData
 {
-    BlindMetaData(const std::string& name,
-                  const std::string& type,
+    BlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
+                  const std::string& type,// used to derive GridType of blind data
                   GridBlindDataClass dataClass,
                   size_t i, size_t valueCount, size_t valueSize)
         : metaData(reinterpret_cast<GridBlindMetaData*>(new char[sizeof(GridBlindMetaData)]))
@@ -831,7 +831,7 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         metaData->mValueSize = valueSize;
         NANOVDB_ASSERT(metaData->isValid());
     }
-    BlindMetaData(const std::string& name,
+    BlindMetaData(const std::string& name,// only name
                   GridBlindDataSemantic dataSemantic,
                   GridBlindDataClass dataClass,
                   GridType dataType,
@@ -881,8 +881,6 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
             semantic = GridBlindDataSemantic::PointNormal;
         } else if ("id" == name) {
             semantic = GridBlindDataSemantic::PointId;
-        //} else {
-            //std::cerr << "CreateNanoGrid::mapToSemantics: Unable to map \n" << name << "\" to GridBlindDataSemantic\n";
         }
         return semantic;
     }
@@ -992,9 +990,9 @@ CreateNanoGrid<SrcGridT>::preProcess()
             for (auto it = nameMap.begin(); it != nameMap.end(); ++it) {
                 const size_t index = it->second;
                 auto& attArray = srcLeaf.constAttributeArray(index);
-                mBlindMetaData.emplace(it->first, // name
+                mBlindMetaData.emplace(it->first, // name used to derive semantics
                                        descriptor.valueType(index), // type
-                                       GridBlindDataClass::AttributeArray, // class
+                                       it->first == "id" ? GridBlindDataClass::IndexArray : GridBlindDataClass::AttributeArray, // class
                                        index, // order
                                        pointCount, // element count
                                        attArray.valueTypeSize()); // element size
@@ -1008,7 +1006,6 @@ CreateNanoGrid<SrcGridT>::preProcess()
                            GridBlindDataClass::GridName,
                            GridType::Unknown,
                            mSrcNodeAcc.getName().length() + 1, 1);
-                           //1, mSrcNodeAcc.getName().length() + 1);
     }
     mLeafNodeSize = mSrcNodeAcc.nodeCount(0)*NanoLeaf<DstBuildT>::DataType::memUsage();
 }// CreateNanoGrid::preProcess<T>
@@ -1097,7 +1094,6 @@ CreateNanoGrid<SrcGridT>::preProcess(OracleT oracle)
                            GridBlindDataClass::GridName,
                            GridType::Unknown,
                            mSrcNodeAcc.getName().length() + 1, 1);
-                           //1, mSrcNodeAcc.getName().length() + 1);
     }
 }// CreateNanoGrid::preProcess<FpN>
 
@@ -1186,7 +1182,6 @@ CreateNanoGrid<SrcGridT>::preProcess(uint32_t channels)
                            GridBlindDataClass::GridName,
                            GridType::Unknown,
                            mSrcNodeAcc.getName().length() + 1, 1);
-                           //1, mSrcNodeAcc.getName().length() + 1);
     }
 }// preProcess<ValueIndex or ValueOnIndex>
 
@@ -2075,4 +2070,4 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
 
 } // namespace nanovdb
 
-#endif // NANOVDB_CREATENANOGRID_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_CREATE_NANOGRID_H_HAS_BEEN_INCLUDED

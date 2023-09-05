@@ -438,7 +438,11 @@ inline void Segment::add(const GridHandle<BufferT>& h)
             meta.emplace_back(h.gridSize(i), header.codec, *grid);
         } else if (auto* grid = h.template grid<ValueIndex>(i)) {
             meta.emplace_back(h.gridSize(i), header.codec, *grid);
+        } else if (auto* grid = h.template grid<ValueIndexMask>(i)) {
+            meta.emplace_back(h.gridSize(i), header.codec, *grid);
         } else if (auto* grid = h.template grid<ValueOnIndex>(i)) {
+            meta.emplace_back(h.gridSize(i), header.codec, *grid);
+        } else if (auto* grid = h.template grid<ValueOnIndexMask>(i)) {
             meta.emplace_back(h.gridSize(i), header.codec, *grid);
         } else if (auto* grid = h.template grid<bool>(i)) {
             meta.emplace_back(h.gridSize(i), header.codec, *grid);
@@ -591,7 +595,7 @@ GridHandle<BufferT> readGrid(std::istream& is, uint64_t n, const BufferT& pool)
         }
         is.seekg(seek, std::ios_base::cur); // skip forward from the current position
     }
-    throw std::runtime_error("Grid index exceeds grid count in file");
+    throw std::runtime_error("Grid index " + std::to_string(n) + "exceeds grid count (" + std::to_string(counter) + ") in file");
 }// readGrid
 
 /// @brief Read the first grid with a specific name
@@ -632,7 +636,7 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
         }
         is.seekg(seek, std::ios_base::cur); // skip forward from the current position
     }
-    return GridHandle<BufferT>(); // empty handle
+    throw std::runtime_error("Grid name '" + gridName + "' not found in file");
 }// readGrid
 
 /// @brief Read all the grids

@@ -2134,8 +2134,8 @@ TEST_F(TestOpenVDB, LevelSetFiles)
     // test reading from non-existing file
     EXPECT_THROW(nanovdb::io::readGrid("data/ls.vdb", getGridName(foundModels[0])), std::runtime_error);
 
-    // test reading non-existing grid from an existing file
-    EXPECT_FALSE(nanovdb::io::readGrid("data/ls.nvdb", "bunny"));
+    // test reading of non-existing grid from an existing file
+    EXPECT_THROW(nanovdb::io::readGrid("data/ls.nvdb", "bunny"), std::runtime_error);
 
     // test reading existing grid from an existing file
     {
@@ -2204,8 +2204,8 @@ TEST_F(TestOpenVDB, FogFiles)
     // test reading from non-existing file
     EXPECT_THROW(nanovdb::io::readGrid("data/fog.vdb", getGridName(foundModels[0])), std::runtime_error);
 
-    // test reading non-existing grid from an existing file
-    EXPECT_FALSE(nanovdb::io::readGrid("data/fog.nvdb", "bunny"));
+    // test reading of non-existing grid from an existing file
+    EXPECT_THROW(nanovdb::io::readGrid("data/fog.nvdb", "bunny"), std::runtime_error);
 
     // test reading existing grid from an existing file
     {
