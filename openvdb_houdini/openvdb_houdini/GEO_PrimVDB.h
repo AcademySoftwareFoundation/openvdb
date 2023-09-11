@@ -291,6 +291,7 @@ public:
     /// Returns the resolution of the active voxel array.
     /// Does *not* mean the indices go from 0..rx, however!
     void                getRes(int &rx, int &ry, int &rz) const;
+    void                getRes(int64 &rx, int64 &ry, int64 &rz) const;
 
     /// Computes the voxel diameter by taking a step in x, y, and z
     /// converting to world space and taking the length of that vector.

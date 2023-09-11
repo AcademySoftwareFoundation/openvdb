@@ -219,7 +219,7 @@ an inclusive range, so includes the maximum voxel.)"));
 */
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Expand Voxels")
                 .setDefault(PRMoneDefaults)
-                .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
+              .setRange(PRM_RANGE_UI, -5, PRM_RANGE_UI, 5)
               .setTooltip("Expand the active area by at least the specified number of voxels.")
                 .setDocumentation(
 R"(Expand the active area by at least the specified number of voxels.  Does not support
