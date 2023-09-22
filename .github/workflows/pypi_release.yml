@@ -10,6 +10,7 @@ on:
         description: 'Test release: publish on test.pypi.org'
         default: false
 
+jobs:
   publish:
     name: Publish Python packages on PyPI
     needs: [build-sdist, build-wheels]
