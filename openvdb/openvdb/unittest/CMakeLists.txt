@@ -162,6 +162,7 @@ else()
     TestQuat.cc
     TestRay.cc
     TestStats.cc
+    TestStencils.cc
     TestStream.cc
     TestStreamCompression.cc
     TestStringMetadata.cc
