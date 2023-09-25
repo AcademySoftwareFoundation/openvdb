@@ -79,13 +79,35 @@ public:
     template<typename OtherValueType>
     explicit LeafNode(const LeafNode<OtherValueType, Log2Dim>& other);
 
-    /// Topology copy constructor
+    /// @brief Deprecated topology copy constructor
+    /// @note  This constructor initialises the bool buffer to the ValueMask
+    ///   states (i.e. value will be true if the active state is on and
+    ///   vice-versa). This is not really a "TopologyCopy" and is therefor
+    ///   deprecated. Use the explicit mask/buffer constructor instead:
+    /// @code
+    ///    // build new leaf node with the mask of 'a', but with the mask of
+    ///    // 'b' as the the new value buffer.
+    ///    const LeafNode a = ... ;
+    ///    const LeafNode b = ... ;
+    ///    const LeafNode copy(a.origin(), /*mask=*/a.getValueMask(),
+    ///      /*buff=*/b.getValueMask());
+    /// @endcode
     template<typename ValueType>
+    OPENVDB_DEPRECATED_MESSAGE("Use LeafNodeBool component constructor.")
     LeafNode(const LeafNode<ValueType, Log2Dim>& other, TopologyCopy);
 
+    /// @brief Construct a LeafNodeBool with its individual components
+    /// @param xyz  Leaf origin
+    /// @param mask  The ValueMask to copy
+    /// @param buff  The LeafBuffer to copy (also constructable from a ValueMask)
+    /// @param trans Transient data (ignored until ABI 9)
+    LeafNode(const Coord& xyz,
+        const NodeMaskType& mask,
+        const Buffer& buff,
+        const Index32 trans = 0);
+
     //@{
-    /// @brief Topology copy constructor
-    /// @note This variant exists mainly to enable template instantiation.
+    /// @brief Topology copy constructors
     template<typename ValueType>
     LeafNode(const LeafNode<ValueType, Log2Dim>& other, bool offValue, bool onValue, TopologyCopy);
     template<typename ValueType>
@@ -831,6 +853,23 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, Topolo
 {
 }
 
+template<Index Log2Dim>
+inline
+LeafNode<bool, Log2Dim>::LeafNode(const Coord& xyz,
+    const NodeMaskType& mask,
+    const Buffer& buff,
+#if OPENVDB_ABI_VERSION_NUMBER < 9
+    [[maybe_unused]]
+#endif
+    const Index32 trans)
+    : mValueMask(mask)
+    , mBuffer(buff)
+    , mOrigin(xyz & (~(DIM - 1)))
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(trans)
+#endif
+{
+}
 
 template<Index Log2Dim>
 template<typename ValueT>
@@ -838,13 +877,17 @@ inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
                                   bool offValue, bool onValue, TopologyCopy)
     : mValueMask(other.valueMask())
-    , mBuffer(other.valueMask())
+    , mBuffer(offValue)
     , mOrigin(other.origin())
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
-    if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
+    for (Index i = 0; i < SIZE; ++i) {
+        if (mValueMask.isOn(i)) {
+            mBuffer.setValue(i, onValue);
+        }
+    }
 }
 
 
