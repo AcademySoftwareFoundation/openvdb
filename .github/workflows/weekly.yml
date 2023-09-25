@@ -67,7 +67,7 @@ jobs:
           - { houdini_version: '19.5', houdini_version_str: '19_5' }
       fail-fast: false
     container:
-      image: aswf/ci-base:2021
+      image: aswf/ci-base:2023
     steps:
     - uses: actions/checkout@v3
     - name: timestamp
@@ -128,31 +128,31 @@ jobs:
     - name: test
       run: cd build && ctest -V
 
-  # Test EXR 3 on MacOS
+  # Test latest dependencies, latest compilers and options through homebrew on macos
   macos-latest:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
     runs-on: macos-12
-    env:
-      CXX: clang++
+    strategy:
+      matrix:
+        config:
+          - { brew_compiler: gcc@13,  cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/gcc@13/bin/g++-13' }
+          - { brew_compiler: llvm@16, cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/llvm@16/bin/clang++' }
+      fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: install
       shell: bash
-      # brew boost-python3 installs a "Keg-only" version of python which is
-      # not installed to PATH. We must manually provide the location of the
-      # required python installation to CMake through a hint variable which
-      # is exported in install_macos.sh
-      run: ./ci/install_macos.sh latest
+      run: ./ci/install_macos.sh latest ${{ matrix.config.brew_compiler }}
     - name: build
       shell: bash
       run: >
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,view,render,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DCMAKE_CXX_STANDARD=20 ${{ matrix.config.cmake }}\"
     - name: test
       shell: bash
       run: cd build && ctest -V
@@ -232,8 +232,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: 'clang++', build: 'Release', llvm: '14', dir: '@14' }
-          - { cxx: 'clang++', build: 'Release', llvm: 'latest', dir: '' }
+          - { cxx: 'clang++', build: 'Release', llvm: '14' }
+          - { cxx: 'clang++', build: 'Release', llvm: '15' }
+          #- { cxx: 'clang++', build: 'Release', llvm: '16' } - not supported yet
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -247,7 +248,7 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm${{ matrix.config.dir }}/lib/cmake/llvm
+          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V

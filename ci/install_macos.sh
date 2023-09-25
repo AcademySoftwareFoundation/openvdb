@@ -3,6 +3,17 @@
 set -x
 
 brew update
+
+if [ ! -z $2 ]; then
+    if [[ $2 == "gcc"* || $2 == "llvm"* ]]; then
+        brew install $2
+    else
+        # don't silently succeed
+        echo "Unknown compiler type/version for second argument to install_macos.sh: $2"
+        exit -1
+    fi
+fi
+
 brew install bash gnu-getopt # for CI scripts
 brew install cmake
 brew install boost
