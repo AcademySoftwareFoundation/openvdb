@@ -143,6 +143,102 @@ TEST_F(TestPCA, testPCA)
         EXPECT_THROW(points::pca(*points, s, a), openvdb::KeyError);
     }
 
+    // test two points ontop of each other
+    {
+        auto points = PointBuilder({
+                Vec3f(0.0f, 0.0f, 0.0f),
+                Vec3f(0.0f, 0.0f, 0.0f)
+            }).voxelsize(0.1).get();
+
+        ASSERT_TRUE(points->tree().cbeginLeaf());
+        EXPECT_EQ(Index(1), points->tree().leafCount());
+
+        const auto& leaf = *(points->tree().cbeginLeaf());
+        const auto* desc = &(leaf.attributeSet().descriptor());
+        EXPECT_EQ(desc->find("P"), size_t(0));
+
+        points::AttributeHandle<math::Vec3<float>> pHandle(leaf.attributeArray(desc->find("P")));
+        EXPECT_EQ(pHandle.size(), 2);
+
+        std::vector<Vec3f> posistions;
+        for (Index i = 0; i < Index(pHandle.size()); ++i) posistions.emplace_back(pHandle.get(i));
+        const std::vector<Vec3d> posistionsWs {
+            Vec3d(0.0, 0.0, 0.0), Vec3d(0.0, 0.0, 0.0)
+        };
+
+        points::PcaAttributes a;
+        points::PcaSettings s;
+        s.searchRadius = 0.0001f;
+        s.averagePositions = 0.0f; // disable position smoothing
+        s.neighbourThreshold = 1; // both elipses should be identicle
+
+        points::pca(*points, s, a);
+        ASSERT_TRUE(points->tree().cbeginLeaf());
+        ASSERT_EQ(&leaf, &(*points->tree().cbeginLeaf()));
+        desc = &(leaf.attributeSet().descriptor());
+
+        EXPECT_EQ(leaf.pointCount(), Index64(2));
+        EXPECT_TRUE(leaf.hasAttribute("P"));
+        EXPECT_EQ(desc->find("P"), size_t(0));
+        EXPECT_EQ(desc->size(), size_t(5));
+
+        CheckPCAAttributeValues(
+                posistions,
+                {Vec3f(1.0f), Vec3f(1.0f)},
+                {Mat3s::identity(), Mat3s::identity()},
+                posistionsWs,
+                {true, true},
+            leaf, a, __LINE__);
+    }
+
+    // test two points
+    {
+        auto points = PointBuilder({
+                Vec3f(0.0f, 0.01f, 0.0f),
+                Vec3f(0.0f,  0.0f, 0.0f)
+            }).voxelsize(0.1).get();
+
+        ASSERT_TRUE(points->tree().cbeginLeaf());
+        EXPECT_EQ(Index(1), points->tree().leafCount());
+
+        const auto& leaf = *(points->tree().cbeginLeaf());
+        const auto* desc = &(leaf.attributeSet().descriptor());
+        EXPECT_EQ(desc->find("P"), size_t(0));
+
+        points::AttributeHandle<math::Vec3<float>> pHandle(leaf.attributeArray(desc->find("P")));
+        EXPECT_EQ(pHandle.size(), 2);
+
+        std::vector<Vec3f> posistions;
+        for (Index i = 0; i < Index(pHandle.size()); ++i) posistions.emplace_back(pHandle.get(i));
+        const std::vector<Vec3d> posistionsWs {
+            Vec3d(0.0, 0.01, 0.0), Vec3d(0.0, 0.0, 0.0)
+        };
+
+        points::PcaAttributes a;
+        points::PcaSettings s;
+        s.searchRadius = 1;
+        s.averagePositions = 0.0f; // disable position smoothing
+        s.neighbourThreshold = 1; // both elipses should be identicle
+
+        points::pca(*points, s, a);
+        ASSERT_TRUE(points->tree().cbeginLeaf());
+        ASSERT_EQ(&leaf, &(*points->tree().cbeginLeaf()));
+        desc = &(leaf.attributeSet().descriptor());
+
+        EXPECT_EQ(leaf.pointCount(), Index64(2));
+        EXPECT_TRUE(leaf.hasAttribute("P"));
+        EXPECT_EQ(desc->find("P"), size_t(0));
+        EXPECT_EQ(desc->size(), size_t(5));
+
+        CheckPCAAttributeValues(
+                posistions,
+                {Vec3f(2.51984f, 0.62996f, 0.62996f), Vec3f(2.51984f, 0.62996f, 0.62996f)},
+                {Mat3s(0,1,0, 1,0,0, 0,0,1), Mat3s(0,1,0, 1,0,0, 0,0,1)},
+                posistionsWs,
+                {true, true},
+            leaf, a, __LINE__);
+    }
+
     // test three coincident points with various settings
     {
         auto points = PointBuilder({

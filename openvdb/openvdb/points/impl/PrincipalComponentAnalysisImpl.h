@@ -8,6 +8,11 @@
 #include <openvdb/util/CpuTimer.h>
 #endif
 
+/// @brief  Experimental option to skip storing the self weight for the
+///   weighted PCA.
+/// @todo  Decide what's more correct and remove this
+//#define OPENVDB_PCA_NO_SELF_CONTRIBUTION
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -76,7 +81,10 @@ struct PcaTransfer
         , mDxInv(1.0/vs)
         , mManager(manager)
         , mTargetPosition()
-        , mSourcePosition() {}
+        , mSourcePosition() {
+            assert(std::isfinite(mSearchRadius));
+            assert(std::isfinite(mDxInv));
+        }
 
     PcaTransfer(const PcaTransfer& other)
         : BaseT(other)
@@ -184,6 +192,10 @@ struct WeightPosSumsTransfer
         const Real searchRadius2 = math::Pow2(this->mSearchRadius);
         const Real searchRadiusIS2 = math::Pow2(this->mSearchRadius * this->mDxInv);
 
+        assert(std::isfinite(searchRadiusInv));
+        assert(std::isfinite(searchRadius2));
+        assert(std::isfinite(searchRadiusIS2));
+
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
@@ -257,34 +269,38 @@ struct WeightPosSumsTransfer
         for (Index i = 0; i < this->mTargetPosition->size(); ++i)
         {
             // every point will have a self contribution (unless this operation
-            // has been interrupted or the search radius was 0) so account for
-            // that here
+            // has been interrupted or the search radius was 0)
             assert(mCounts[i] >= 1);
-            assert(mWeights[i] > 0.0f);
-            mCounts[i] -= 1;
+            assert(mWeights[i] >= 1.0f);
 
             // turn points OFF if they are ON and don't meet max neighbour requirements
+            mCounts[i] -= 1; // don't include self in neighbour comparison
             if ((mCounts[i] < mNeighbourThreshold) && group.getUnsafe(i)) {
                 group.setUnsafe(i, false);
             }
 
-            // only self contribution, don't bothering normalizing
-            if (mCounts[i] <= 0) continue;
-
+            // Remove the self contribution if OPENVDB_PCA_NO_SELF_CONTRIBUTION
+#if defined(OPENVDB_PCA_NO_SELF_CONTRIBUTION)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-            // Account for self contribution
             mWeights[i] -= 1.0f;
             mWeightedPositions[i] -= this->mTargetPosition->get(i);
-            assert(mWeights[i] > 0.0f);
-            // Now normalize
+#else
+            mWeights->set(i, mWeights->get(i) - 1.0f);
+            mWeightedPositions->set(i, mWeightedPositions->get(i) - this->mTargetPosition->get(i));
+#endif
+#endif
+            // Only self contribution if counts are now zero. In this case the
+            // weight will be roughly 1.0f (or 0.0f when OPENVDB_PCA_NO_SELF_CONTRIBUTION
+            // is defined) and we don't need to normalize
+            if (mCounts[i] <= 0) continue;
+
+            // Normalize weights
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+            assert(mWeights[i] >= 0.0f);
             mWeights[i] = 1.0 / mWeights[i];
             mWeightedPositions[i] *= mWeights[i];
 #else
-            // Account for self contribution
-            mWeights->set(i, mWeights->get(i) - 1.0f);
-            mWeightedPositions->set(i, mWeightedPositions->get(i) - this->mTargetPosition->get(i));
-            assert(mWeights->get(i) > 0.0f);
-            // Now normalize
+            assert(mWeights[i] >= 0.0f);
             mWeights->set(i, 1.0 / mWeights->get(i));
             mWeightedPositions->set(i, mWeightedPositions->get(i) * mWeights->get(i));
 #endif
@@ -362,6 +378,10 @@ struct CovarianceTransfer
         const Real searchRadius2 = math::Pow2(this->mSearchRadius);
         const Real searchRadiusIS2 = math::Pow2(this->mSearchRadius * this->mDxInv);
 
+        assert(std::isfinite(searchRadiusInv));
+        assert(std::isfinite(searchRadius2));
+        assert(std::isfinite(searchRadiusIS2));
+
         const Coord& a(bounds.min());
         const Coord& b(bounds.max());
         for (Coord c = a; c.x() <= b.x(); ++c.x()) {
@@ -396,9 +416,11 @@ struct CovarianceTransfer
                     Index id = (offset == 0) ? 0 : Index(data[offset - 1]);
                     for (; id < end; ++id) {
                         if (!mInclusionGroupHandle->get(id)) continue;
+#if defined(OPENVDB_PCA_NO_SELF_CONTRIBUTION)
                         // @note  Could remove self contribution as in WeightPosSumsTransfer
                         //   it adds a small % overhead to this entire operator
                         if (OPENVDB_UNLIKELY(mIsSameLeaf && id == pid)) continue;
+#endif
                         const Vec3d Ptgt(this->mTargetPosition->get(id));
                         const Real d2 = (Psrc - Ptgt).lengthSqr();
                         if (d2 > searchRadius2) continue;
@@ -756,7 +778,19 @@ pca(PointDataGridT& points,
             AttributeWriteHandle<Vec3d, NullCodec> Pws(leafnode.attributeArray(pwsIdx));
             AttributeHandle<WeightedPositionSumT, NullCodec> weightedPosSumHandle(leafnode.constAttributeArray(posSumIndex));
 
-            for (Index i = 0; i < Pws.size(); ++i) {
+            for (Index i = 0; i < Pws.size(); ++i)
+            {
+#if defined(OPENVDB_PCA_NO_SELF_CONTRIBUTION)
+                // If OPENVDB_PCA_NO_SELF_CONTRIBUTION is ON, the weights will
+                // be zero if no neighbours were included. When it's OFF, then
+                // it will always be at least set to Pws. So we have to check
+                // if the weights are zero here and continue if so
+                // @note  Technically possible for the weights to be valid
+                //   _and_ zero.
+                if (math::isApproxZero(weightedPosSumHandle.get(i), Vec3d(math::Tolerance<double>::value()))) {
+                    continue;
+                }
+#endif
                 const Vec3d smoothedPosition = (1.0f - settings.averagePositions) *
                     Pws.get(i) + settings.averagePositions * weightedPosSumHandle.get(i);
                 Pws.set(i, smoothedPosition);
