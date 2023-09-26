@@ -698,7 +698,16 @@ pca(PointDataGridT& points,
             sigma[2] = std::max(sigma[2], maxs);
 
             // should only happen if all neighbours are coincident
-            if (math::isApproxZero(sigma)) sigma = Vec3f::ones();
+            // @note  The specific tolerance here relates to the normalization
+            //   of the stetch values in step (7) e.g. s*(1.0/cbrt(s.product())).
+            //   math::Tolerance<float>::value is 1e-7f, but we have a bit more
+            //   flexibility here, we can deal with smaller values, common for
+            //   the case where a point only has one neighbour
+            // @todo  have to manually construct the tolerance because
+            //   math::Tolerance<Vec3f> resolves to 0.0. fix this in the math lib
+            if (math::isApproxZero(sigma, Vec3f(1e-11f))) {
+                sigma = Vec3f::ones();
+            }
 
             stretchHandle.set(idx, sigma);
             rotHandle.set(idx, u);
