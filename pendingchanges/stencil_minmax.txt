@@ -1,0 +1,5 @@
+OpenVDB:
+    - Bug Fixes:
+        Fixed a compilation issue with the min() and max() methods on Stencils
+        in openvdb/math/Stencils.h
+        [Reported by Samuel Mauch]
