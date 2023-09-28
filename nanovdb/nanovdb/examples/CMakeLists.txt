@@ -83,9 +83,9 @@ endfunction()
 
 # -----------------------------------------------------------------------
 
-if(NANOVDB_BUILD_BENCHMARK)
-  add_subdirectory(benchmark)
-endif()
+#if(NANOVDB_BUILD_BENCHMARK)
+#  add_subdirectory(benchmark)
+#endif()
 
 nanovdb_example(NAME "ex_make_custom_nanovdb")
 nanovdb_example(NAME "ex_make_custom_nanovdb_cuda")
