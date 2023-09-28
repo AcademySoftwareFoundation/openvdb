@@ -25,7 +25,7 @@ message(STATUS "----------------------------------------------------")
 option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" OFF)
-option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
+#option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
@@ -71,7 +71,8 @@ if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
+#if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
+if(NANOVDB_BUILD_UNITTESTS)
   find_package(GTest REQUIRED)
 endif()
 
