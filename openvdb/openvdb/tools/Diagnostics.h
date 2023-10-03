@@ -1209,7 +1209,7 @@ public:
     void getInactiveValues(SetType&) const;
 
     inline InactiveTileValues(const InactiveTileValues<TreeType>&, tbb::split);
-    inline void operator()(IterRange&);
+    inline void operator()(const IterRange&);
     inline void join(const InactiveTileValues<TreeType>&);
 
 private:
@@ -1252,10 +1252,10 @@ InactiveTileValues<TreeType>::runSerial(IterRange& range)
 
 template<typename TreeType>
 inline void
-InactiveTileValues<TreeType>::operator()(IterRange& range)
+InactiveTileValues<TreeType>::operator()(const IterRange& range)
 {
-    for (; range && !thread::isGroupExecutionCancelled(); ++range) {
-        typename TreeType::ValueOffCIter iter = range.iterator();
+    for (IterRange it(range); it.test() && !thread::isGroupExecutionCancelled(); ++it) {
+        typename TreeType::ValueOffCIter iter = it.iterator();
         for (; iter; ++iter) {
             mInactiveValues.insert(iter.getValue());
         }

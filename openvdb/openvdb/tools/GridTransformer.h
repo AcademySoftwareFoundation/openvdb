@@ -799,11 +799,11 @@ public:
     void setInterrupt(const InterruptFunc& f) { mInterrupt = f; }
 
     /// Transform each leaf node in the given range.
-    void operator()(LeafRange& r)
+    void operator()(const LeafRange& r)
     {
-        for ( ; r; ++r) {
+        for (LeafRange it(r); it.test(); ++it) {
             if (interrupt()) break;
-            LeafIterT i = r.iterator();
+            LeafIterT i = it.iterator();
             CoordBBox bbox(i->origin(), i->origin() + Coord(i->dim()));
             if (!mBBox.empty()) {
                 // Intersect the leaf node's bounding box with mBBox.
@@ -818,12 +818,12 @@ public:
     }
 
     /// Transform each non-background tile in the given range.
-    void operator()(TileRange& r)
+    void operator()(const TileRange& r)
     {
-        for ( ; r; ++r) {
+        for (TileRange it(r); it.test(); ++it) {
             if (interrupt()) break;
 
-            TileIterT i = r.iterator();
+            TileIterT i = it.iterator();
             // Skip voxels and background tiles.
             if (!i.isTileValue()) continue;
             if (!i.isValueOn() && math::isApproxEqual(*i, mOutTree->background())) continue;

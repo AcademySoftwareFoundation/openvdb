@@ -657,7 +657,7 @@ public:
         }
     }
 
-    void operator()(IterRange& r) { for ( ; r; ++r) (*mOp)(r.iterator()); }
+    void operator()(const IterRange& r) { for (IterRange it(r); it.test(); ++it) (*mOp)(it.iterator()); }
 
     void join(OpAccumulator& other) { mOp->join(*other.mOp); }
 

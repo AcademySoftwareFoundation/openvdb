@@ -290,7 +290,8 @@ AttributeSet::makeUnique(size_t pos)
 {
     assert(pos != INVALID_POS);
     assert(pos < mAttrs.size());
-    if (!mAttrs[pos].unique()) {
+    // Warning: In multithreaded environment, the value returned by use_count is approximate.
+    if (mAttrs[pos].use_count() != 1) {
         mAttrs[pos] = mAttrs[pos]->copy();
     }
 }
