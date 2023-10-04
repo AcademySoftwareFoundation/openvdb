@@ -138,7 +138,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { brew_compiler: gcc@13,  cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/gcc@13/bin/g++-13' }
+          # Don't link against boost on macos with GCC, there are some symbol issues
+          # with brew using clang to build its dependencies vs us trying to use GCC
+          - { brew_compiler: gcc@13,  cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/gcc@13/bin/g++-13 -DOPENVDB_USE_DELAYED_LOADING=OFF' }
           - { brew_compiler: llvm@16, cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/llvm@16/bin/clang++' }
       fail-fast: false
     steps:
