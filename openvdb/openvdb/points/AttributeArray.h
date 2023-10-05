@@ -767,10 +767,8 @@ public:
     /// Return @c true if all data has been loaded
     bool isDataLoaded() const override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
-#endif
 
 protected:
     AccessorBasePtr getAccessor() const override;

@@ -67,12 +67,6 @@
     #if defined(_DLL) && !defined(OPENVDB_STATICLIB) && !defined(OPENVDB_DLL)
         #define OPENVDB_DLL
     #endif
-
-    // By default, assume that we're dynamically linking OpenEXR, unless
-    // OPENVDB_OPENEXR_STATICLIB is defined.
-    #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
-        #define OPENEXR_DLL
-    #endif
 #endif
 
 /// Macros to suppress undefined behaviour sanitizer warnings. Should be used

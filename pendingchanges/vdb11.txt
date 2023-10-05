@@ -1,0 +1,2 @@
+Build:
+    - Support for OpenEXR 2.X has been removed.

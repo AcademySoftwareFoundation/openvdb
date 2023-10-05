@@ -43,6 +43,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linux-ax:
     if: |
@@ -63,7 +67,7 @@ jobs:
         config:
           - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   cmake: '' }
+          - { image: '2023-clang15', cxx: 'clang++', build: 'Debug',   cmake: '' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2021-clang10', cxx: 'clang++', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
@@ -76,13 +80,12 @@ jobs:
         run: ./ci/install_pybind11.sh 2.10.0
       - name: timestamp
         id: timestamp
-        shell: bash
-        run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+        run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
       - name: ccache
         # don't use ccache for debug builds
         if: matrix.config.build == 'Release'
         id: ccache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/ccache
           key: linux-ax${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
@@ -105,7 +108,6 @@ jobs:
       # Keep ccache light by stripping out any caches not accessed in the last day
       - name: ccache_clean
         if: matrix.config.build == 'Release'
-        shell: bash
         run: ccache --evict-older-than 1d
 
   macos-ax:
@@ -121,14 +123,14 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '11' }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '12' }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '13' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
+        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
       - name: build
         run: >
           ./ci/build.sh -v

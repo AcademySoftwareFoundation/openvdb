@@ -358,7 +358,6 @@ struct PointFunctionArguments
 
         // @todo  if the array is shared we should probably make it unique?
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         if (mData.mUseBufferKernel) {
             const_cast<points::AttributeArray&>(array).loadData();
             const char* data = array.constDataAsByteArray();
@@ -373,12 +372,6 @@ struct PointFunctionArguments
             mHandlesOrBuffers.emplace_back(handle->mHandle.get());
             mAttributeHandles.emplace_back(std::move(handle));
         }
-#else
-        assert(!mData.mUseBufferKernel);
-        typename ReadHandle<ValueT>::UniquePtr handle(new ReadHandle<ValueT>(leaf, Index(pos)));
-        mHandlesOrBuffers.emplace_back(handle->mHandle.get());
-        mAttributeHandles.emplace_back(std::move(handle));
-#endif
 
         mFlags.emplace_back(flag);
     }
@@ -390,7 +383,6 @@ struct PointFunctionArguments
         points::AttributeArray& array = leaf.attributeArray(pos);
         array.expand();
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         if (mData.mUseBufferKernel) {
             array.loadData();
             const char* data = array.constDataAsByteArray();
@@ -406,12 +398,6 @@ struct PointFunctionArguments
             mHandlesOrBuffers.emplace_back(handle->mHandle.get());
             mAttributeHandles.emplace_back(std::move(handle));
         }
-#else
-        assert(!mData.mUseBufferKernel);
-        typename WriteHandle<ValueT>::UniquePtr handle(new WriteHandle<ValueT>(leaf, Index(pos)));
-        mHandlesOrBuffers.emplace_back(handle->mHandle.get());
-        mAttributeHandles.emplace_back(std::move(handle));
-#endif
 
         mFlags.emplace_back(flag);
     }
@@ -866,7 +852,6 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     // Compute whether we can use the accelerated kernel
     // @note  Assumes attributes are valid (i.e. has errored out if they are not)
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     if (!usingGroup) {
         const auto& desc = leafIter->attributeSet().descriptor();
         data.mUseBufferKernel = checkCodecs(desc, *mAttributeRegistry,
@@ -877,10 +862,6 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         // if a group has been specified we can't use the buffer range yet
         data.mUseBufferKernel = false;
     }
-#else
-    // can't access data buffers until ABI >= 9
-    data.mUseBufferKernel = false;
-#endif
 
     // execute
 

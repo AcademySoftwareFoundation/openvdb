@@ -405,12 +405,10 @@ public:
     /// Return the bounding box of this RootNode, i.e., an infinite bounding box.
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the transient data value.
     Index32 transientData() const { return mTransientData; }
     /// Set the transient data value.
     void setTransientData(Index32 transientData) { mTransientData = transientData; }
-#endif
 
     /// @brief Change inactive tiles or voxels with a value equal to +/- the
     /// old background to the specified value (with the same sign). Active values
@@ -967,10 +965,8 @@ private:
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     Coord mOrigin;
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Transient Data (not serialized)
     Index32 mTransientData = 0;
-#endif
 }; // end of RootNode class
 
 
@@ -1064,9 +1060,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     , mOrigin(other.mOrigin)
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
-#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1098,9 +1092,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     , mOrigin(other.mOrigin)
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
-#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1171,9 +1163,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         }
         self.mOrigin = other.mOrigin;
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         self.mTransientData = other.mTransientData;
-#endif
 
         self.clear();
         self.initTable();
@@ -1206,9 +1196,7 @@ RootNode<ChildT>::operator=(const RootNode& other)
             OPENVDB_THROW(ValueError, "RootNode::operator=: non-zero offsets are currently not supported");
         }
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
-#endif
 
         this->clear();
         this->initTable();
