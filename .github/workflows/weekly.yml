@@ -119,6 +119,9 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
+    - name: pybind11
+      #if: contains(container.image, '2023') == false
+      run: ./ci/install_pybind11.sh 2.10.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -191,6 +194,9 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: pybind11
+        #f: contains(matrix.config.image, '2023') == false
+        run: ./ci/install_pybind11.sh 2.10.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -239,7 +245,7 @@ jobs:
           #- { cxx: 'clang++', build: 'Release', llvm: '16' } - not supported yet
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install_deps
         run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
       - name: build
@@ -310,6 +316,7 @@ jobs:
         ${{ matrix.config.cmake }}
         \'
     - name: runtime_path
+      shell: pwsh
       run: |
         # note: system path must be modified in a previous step to it's use
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
