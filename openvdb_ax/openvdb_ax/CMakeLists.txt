@@ -267,18 +267,6 @@ if(NOT LLVM_ENABLE_RTTI)
     "$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-sanitize=vptr>")
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  # TBB can't determine libstdc++ version if Clang is in use. This causes issues
-  # with any TBB container using features from C++11 and greater (such as
-  # tbb::concurrent_vector::emplace_back, used in the VolumeExecutable)
-  # https://github.com/01org/tbb/issues/22
-  # https://www.threadingbuildingblocks.org/docs/help/reference/appendices/known_issues/linux_os.html
-  # https://www.threadingbuildingblocks.org/docs/help/reference/environment/feature_macros.html
-  string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-  list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-    -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
-endif()
-
 if(WIN32)
   # Silence deprecation warnings coming from MSVC/LLVM about deriving from std::iterator
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
