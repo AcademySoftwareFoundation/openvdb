@@ -618,6 +618,7 @@ public:
     ConstIterator operator+(const difference_type &pos) const { return Iterator(*mParent,mPos+pos); }
     ConstIterator operator-(const difference_type &pos) const { return Iterator(*mParent,mPos-pos); }
     difference_type operator-(const ConstIterator& other) const { return mPos - other.pos(); }
+    friend ConstIterator operator+(const difference_type& pos, const ConstIterator& other) { return other + pos; }
     // comparisons
     bool operator==(const ConstIterator& other) const { return mPos == other.mPos; }
     bool operator!=(const ConstIterator& other) const { return mPos != other.mPos; }
@@ -632,6 +633,12 @@ private:
     size_t            mPos;
     const PagedArray* mParent;
 };// Public class PagedArray::ConstIterator
+
+#ifdef OPENVDB_HAS_CXX20
+static_assert(std::random_access_iterator<PagedArray<int, 10UL>::ConstIterator>,
+    "ConstIterator must satisfy random_access_iterator concept");
+#endif
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -672,6 +679,7 @@ public:
     Iterator operator+(const difference_type &pos) const { return Iterator(*mParent, mPos+pos); }
     Iterator operator-(const difference_type &pos) const { return Iterator(*mParent, mPos-pos); }
     difference_type operator-(const Iterator& other) const { return mPos - other.pos(); }
+    friend Iterator operator+(const difference_type& pos, const Iterator& other) { return other + pos; }
     // comparisons
     bool operator==(const Iterator& other) const { return mPos == other.mPos; }
     bool operator!=(const Iterator& other) const { return mPos != other.mPos; }
@@ -686,6 +694,11 @@ public:
     size_t      mPos;
     PagedArray* mParent;
 };// Public class PagedArray::Iterator
+
+#ifdef OPENVDB_HAS_CXX20
+static_assert(std::random_access_iterator<PagedArray<int, 10UL>::Iterator>,
+    "Iterator must satisfy random_access_iterator concept");
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 

@@ -522,8 +522,8 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Coord& in_ijk, size_t in_level, size_t out_level) const
 {
-    assert( in_level  >= 0 && in_level  < mTrees.size() );
-    assert( out_level >= 0 && out_level < mTrees.size() );
+    assert( in_level  < mTrees.size() );
+    assert( out_level < mTrees.size() );
     const ConstAccessor acc(*mTrees[out_level]);// has disabled registration!
     return tools::Sampler<Order>::sample( acc, this->xyz(in_ijk, in_level, out_level) );
 }
@@ -533,8 +533,8 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Vec3R& in_xyz, size_t in_level, size_t out_level) const
 {
-    assert( in_level  >= 0 && in_level  < mTrees.size() );
-    assert( out_level >= 0 && out_level < mTrees.size() );
+    assert( in_level  < mTrees.size() );
+    assert( out_level < mTrees.size() );
     const ConstAccessor acc(*mTrees[out_level]);// has disabled registration!
     return tools::Sampler<Order>::sample( acc, this->xyz(in_xyz, in_level, out_level) );
 }
