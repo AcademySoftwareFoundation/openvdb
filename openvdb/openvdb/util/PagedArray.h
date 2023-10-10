@@ -20,6 +20,7 @@
 #include <deque>
 #include <cassert>
 #include <iostream>
+#include <iterator>
 #include <algorithm>// std::swap
 #include <atomic>
 #include <tbb/spin_mutex.h>
