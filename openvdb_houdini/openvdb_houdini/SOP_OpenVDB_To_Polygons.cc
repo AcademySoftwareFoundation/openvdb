@@ -896,7 +896,7 @@ SOP_OpenVDB_To_Polygons::Cache::referenceMeshing(
         typename GridType::ConstPtr grid = openvdb::gridConstPtrCast<GridType>(*it);
 
         if (!grid) {
-            badTypeList.push_back(grid->getName());
+            badTypeList.push_back((*it)->getName());
             continue;
         }
 
