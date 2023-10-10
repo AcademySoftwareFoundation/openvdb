@@ -1,3 +1,0 @@
-Improvements:
-- boost::uuid removed from Archive, instead std::random_device is used
-  directly to generate UUID-like objects.
