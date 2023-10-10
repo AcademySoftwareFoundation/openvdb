@@ -118,8 +118,6 @@ endif()
 if(NANOVDB_USE_OPENVDB)
   if(NOT OPENVDB_BUILD_CORE AND NOT TARGET OpenVDB::openvdb)
     find_package(OpenVDB REQUIRED COMPONENTS openvdb)
-    # disable the shared libs that OpenVDB's cmake switches ON.
-    set(BUILD_SHARED_LIBS OFF)
   endif()
 endif()
 

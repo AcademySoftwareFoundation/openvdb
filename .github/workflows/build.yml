@@ -48,6 +48,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   linux-vfx:
     # VFX platform jobs. These are run on the appropriate CentOS images from
@@ -85,9 +89,11 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
+    - name: pybind11
+      #if: contains(matrix.config.image, '2023') == false
+      run: ./ci/install_pybind11.sh 2.10.0
     - name: timestamp
       id: timestamp
-      shell: bash
       run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
     - name: ccache
       # don't use ccache for debug builds
@@ -118,7 +124,6 @@ jobs:
     # Keep ccache light by stripping out any caches not accessed in the last day
     - name: ccache_clean
       if: matrix.config.build == 'Release'
-      shell: bash
       run: ccache --evict-older-than 1d
 
   windows:
@@ -149,15 +154,14 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: path
+      shell: pwsh
       run: |
         # note: system path must be modified in a previous step to it's use
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: install
-      shell: bash
       run: ./ci/install_windows.sh
     - name: build
-      shell: bash
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
@@ -171,11 +175,9 @@ jobs:
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
         \'
     - name: size
-      shell: bash
       # Print the build directy size (monitor if we're hitting runner limits)
       run: du -h build
     - name: test
-      shell: bash
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2
       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
@@ -192,14 +194,12 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: install
-      shell: bash
       # brew boost-python3 installs a "Keg-only" version of python which is
       # not installed to PATH. We must manually provide the location of the
       # required python installation to CMake through a hint variable which
       # is exported in install_macos.sh
       run: ./ci/install_macos.sh
     - name: build
-      shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to
       # the version of clang installed
       run: >
@@ -208,5 +208,4 @@ jobs:
         --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42\"
     - name: test
-      shell: bash
       run: cd build && ctest -V

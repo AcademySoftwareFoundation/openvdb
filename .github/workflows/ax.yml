@@ -71,6 +71,9 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      - name: pybind11
+        #if: contains(matrix.config.image, '2023') == false
+        run: ./ci/install_pybind11.sh 2.10.0
       - name: timestamp
         id: timestamp
         shell: bash
