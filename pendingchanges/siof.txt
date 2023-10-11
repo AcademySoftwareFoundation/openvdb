@@ -1,3 +1,0 @@
-OpenVDB:
-    Improvements:
-        - Moved all cases of file static/global variables which relied on non-trivial construction into function scopes as static locals. These would previously initialize themselves on start-up in a non deterministic, compiler dictated order (static-initialization-order-fiasco). This order is now defined by the program's execution.

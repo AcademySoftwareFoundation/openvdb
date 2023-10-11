@@ -1,2 +1,0 @@
-Bug-fix:
-- Internal counters in tree::RangeIterator were limited to 32bit precision. They are now extended to size_t. (reported by SpaceX)

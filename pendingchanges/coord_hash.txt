@@ -1,4 +1,0 @@
-Fixes:
-    - Fixed the constants used in openvdb::math::Coord::hash() and nanovdb::Coord::hash()
-    to correctly be prime numbers (note that this changes the result of these methods).
-    [Contributed by Benedikt Mersch]

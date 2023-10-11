@@ -1,4 +1,0 @@
-Improvements:
-- Upgraded OpenVDBs internal half representation to IMath 3.1.6. Brings
-conversion support using F16C instructions (if enabled using -mf16c) and
-the removal of the exponent lookup table in favour of bit shifting.

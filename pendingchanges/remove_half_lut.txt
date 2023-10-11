@@ -1,5 +1,0 @@
-Fixes:
-    - The Half.h is no longer built with an internal lookup table, but
-      explicilty selects the non-lut version and disables creation of
-      a lut.  This is required to avoid symbol conflicts with
-      different namespaced OpenVDB builds.

@@ -1,5 +1,0 @@
-- Build:
-   - Improved support for compiling with C++20
-   [Contributed by Denys Maletskyy and Jérémie Dumas]
-   - OpenVDB's CMake no longer modifies the BUILD_SHARED_LIBS variable
-   [reported by Maksim Shabunin]

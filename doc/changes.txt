@@ -2,11 +2,123 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v10_0_2_changes"></a>@endhtmlonly
+@htmlonly <a name="v10_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 10.0.2</B> - <I>In development</I>
+<B>Version 10.1.0</B> - <I>October 10, 2023</I>
 
+@par
+Highlights:
+  - OpenVDB Python bindings are now implemented using pybind11 instead of Boost.Python.
+    [Contributed by Matthew Cong]
 
+@par
+OpenVDB:
+- New features:
+  - Added points::replicate() for the replication of PointDataGrid points
+    and attributes.
+
+- Improvements:
+  - OpenVDB Python bindings are now implemented using pybind11 instead of Boost.Python.
+    [Contributed by Matthew Cong]
+  - Fix int-in-bool-context GCC9+ warnings by switching to use constexpr if.
+  - Upgraded OpenVDBs internal half representation to IMath 3.1.6. Brings
+    conversion support using F16C instructions (if enabled using -mf16c) and
+    the removal of the exponent lookup table in favor of bit shifting.
+  - LevelSetRebuild includes disabled code that uses this for
+    resampling level sets - the original grid is used as the true
+    sign value.  However, due to differences between
+    polygonalization and trilinear interpolation, it cannot be used
+    directly.  The code is provided so we can learn from this
+    mistake.
+  - boost::uuid removed from Archive, instead std::random_device is used
+    directly to generate UUID-like objects.
+  - Moved all cases of file static/global variables which relied on non-trivial
+    construction into function scopes as static locals. These would previously
+    initialize themselves on start-up in a non-deterministic, compiler dictated
+    order(static-initialization-order-fiasco). This order is now defined by the
+    program's execution.
+  - Introduced openvdb::make_index_sequence to solve clang compilations
+    issues with compiler built-in index_sequence implementations.
+  - Introduced openvdb::TupleList to wrap std::tuple and provide interface
+    interop methods with openvdb::TypeList.
+  - Added OPENVDB_FORCE_INLINE, OPENVDB_LIKELY and OPENVDB_UNLIKELY macros.
+
+- API changes:
+  - openvdb/tools/MeshToVolume's meshToVolume takes two
+    new optional arguments to provide an interior test oracle and an
+    interior testing methods.  These allow the default
+    outside-flood-fill to be replaced if the actual sidedness can be
+    known.
+    [Contributed by Tomas Skrivan]
+  - PagedArray iterators no longer derive from std::iterator
+    (but remains standard compliant).
+  - Significant infrastructural change to the ValueAccessor header and
+    implementation. All ValueAccessor specializations have been consolidated
+    into a single class which supports all possible ValueAccessor configurations
+    using index_sequences. Backward compatible declarations have been provided.
+    The new ValueAccessor implementation is marked as final.
+
+- Bug Fixes:
+  - Fixed a build issue where Boost was not being pulled in when
+    OPENVDB_USE_DELAYED_LOADING was set to OFF.
+  - Fixed the constants used in openvdb::math::Coord::hash() and nanovdb::Coord::hash()
+    to correctly be prime numbers (note that this changes the result of these methods).
+    [Contributed by Benedikt Mersch]
+  - Improved support for compiling with C++20.
+    [Contributed by Denys Maletskyy and Jérémie Dumas]
+  - OpenVDB's CMake no longer modifies the BUILD_SHARED_LIBS variable.
+    [Reported by Maksim Shabunin]
+  - Internal counters in tree::RangeIterator were limited to 32bit precision.
+    They are now extended to size_t.
+    [Reported by SpaceX]
+  - Fixed a bug when compiling with -fvisibility=hidden and GCC 11 which
+    would cause a crash in openvdb::initialize().
+  - Fixed a bug with LeafManager which wouldn't correctly
+    initialize its LeafNode array for single level Tree configurations
+    i.e. RootNode<LeafNode> (bug introduced in 7.2.0).
+    [Reported by @lanwatch]
+  - Fixed a bug with LeafNodeBool Topology constructor with designated
+    on/off values which wouldn't apply them correctly.
+    [Reported by @hozhaoea]
+  - Fixed a compilation error that would be encountered when attempting to
+    enable the SSE4.2 or AVX SIMD options on non-x86 based platforms.
+  - The Half.h is no longer built with an internal lookup table, but
+    explicitly selects the non-LUT version and disables the creation of
+    a LUT.  This is required to avoid symbol conflicts with
+    different namespaced OpenVDB builds.
+  - Fixed a compilation issue with the min() and max() methods on Stencils
+    in openvdb/math/Stencils.h.
+    [Reported by Samuel Mauch]
+  - Introduced openvdb::make_index_sequence to solve clang compilations
+    issues with compiler builtin index_sequence implementations.
+  - Introduced openvdb::TupleList to wrap std::tuple and provide interface
+    interop methods with openvdb::TypeList.
+  - Added OPENVDB_FORCE_INLINE, OPENVDB_LIKELY and OPENVDB_UNLIKELY macros.
+
+@par
+OpenVDB AX:
+- Improvements:
+  - Added support for LLVM 15.
+
+- Bug Fixes:
+  - Fixed a bug in AX on older X86 hardware which could cause a crash when
+    accessing point attributes with half compression (bug introduced in 9.1.0).
+  - Fixed a build issue with AX on 32-bit platforms.
+    [Reported by Mathieu Malaterre]
+  - Fixed an incorrect option in the `vdb_ax` command line tool where the default
+    optimization level was set to NONE instead of O3 (issue introduced in 10.0.0).
+
+@par
+OpenVDB Houdini:
+- Improvements:
+  - Added Preserve Holes option to VDB From Polygons that uses the
+    fast winding oracle to not collapse holes in polygonal geometry.
+
+- Bug Fixes:
+  - Fix a bug in the projection mode of the Advect Points SOP that was causing
+    a segfault.
+
+@par
 @htmlonly <a name="v10_0_1_changes"></a>@endhtmlonly
 @par
 <B>Version 10.0.1</B> - <I>November 30, 2022</I>
