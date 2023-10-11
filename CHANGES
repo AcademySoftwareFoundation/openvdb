@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 10.1.0 - October 10, 2023
+Version 10.1.0 - October 11, 2023
   OpenVDB:
     New features:
     - Added points::replicate() for the replication of PointDataGrid points

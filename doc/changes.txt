@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v10_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 10.1.0</B> - <I>October 10, 2023</I>
+<B>Version 10.1.0</B> - <I>October 11, 2023</I>
 
 @par
 Highlights:
