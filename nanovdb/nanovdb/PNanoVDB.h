@@ -925,10 +925,12 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 // ------------------------------------------------ Core Structures -----------------------------------------------------------
 
 #define PNANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL// "NanoVDB0" in hex - little endian (uint64_t)
+#define PNANOVDB_MAGIC_GRID   0x314244566f6e614eUL// "NanoVDB1" in hex - little endian (uint64_t)
+#define PNANOVDB_MAGIC_FILE   0x324244566f6e614eUL// "NanoVDB2" in hex - little endian (uint64_t)
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
-#define PNANOVDB_MINOR_VERSION_NUMBER  5// reflects changes to the API but not ABI
-#define PNANOVDB_PATCH_VERSION_NUMBER  1// reflects bug-fixes with no ABI or API changes
+#define PNANOVDB_MINOR_VERSION_NUMBER  6// reflects changes to the API but not ABI
+#define PNANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
 #define PNANOVDB_GRID_TYPE_FLOAT 1
@@ -2479,7 +2481,6 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_root_pointindex_get_point_addre
     pnanovdb_uint64_t range_end;
     pnanovdb_uint64_t range_size = pnanovdb_root_pointindex_get_point_range(buf, value_address, ijk, level, PNANOVDB_REF(range_begin), PNANOVDB_REF(range_end));
 
-    pnanovdb_address_t base_address = blindmetadata_value_address;
     pnanovdb_uint32_t stride = 12u; // vec3f
     if (value_type == PNANOVDB_GRID_TYPE_VEC3U8)
     {

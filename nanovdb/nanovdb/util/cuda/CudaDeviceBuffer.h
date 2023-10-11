@@ -8,7 +8,10 @@
 
     \date January 8, 2020
 
-    \brief Implements a simple dual (host/device) CUDA buffer
+    \brief Implements a simple dual (host/device) CUDA buffer.
+
+    \note This file has no device-only (kernel) function calls,
+          which explains why it's a .h and not .cuh file.
 */
 
 #ifndef NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
@@ -28,6 +31,7 @@ namespace nanovdb {
 ///        it is significantly slower then cached (un-pinned) memory on the host.
 class CudaDeviceBuffer
 {
+
     uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)
     uint8_t *mCpuData, *mGpuData; // raw pointers to the host and device buffers
 
@@ -36,18 +40,20 @@ public:
     /// @param size byte size of buffer to be initialized
     /// @param dummy this argument is currently ignored but required to match the API of the HostBuffer
     /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
+    /// @param stream optional stream argument (defaults to stream NULL)
     /// @return An instance of this class using move semantics
-    static CudaDeviceBuffer create(uint64_t size, const CudaDeviceBuffer* dummy = nullptr, bool host = true);
+    static CudaDeviceBuffer create(uint64_t size, const CudaDeviceBuffer* dummy = nullptr, bool host = true, void* stream = nullptr);
 
     /// @brief Constructor
     /// @param size byte size of buffer to be initialized
     /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
-    CudaDeviceBuffer(uint64_t size = 0, bool host = true)
+    /// @param stream optional stream argument (defaults to stream NULL)
+    CudaDeviceBuffer(uint64_t size = 0, bool host = true, void* stream = nullptr)
         : mSize(0)
         , mCpuData(nullptr)
         , mGpuData(nullptr)
     {
-        if (size > 0) this->init(size, host);
+        if (size > 0) this->init(size, host, stream);
     }
 
     /// @brief Disallow copy-construction
@@ -88,7 +94,7 @@ public:
     /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
     /// @note All existing buffers are first cleared
     /// @warning size is expected to be non-zero. Use clear() clear buffer!
-    void init(uint64_t size, bool host = true);
+    void init(uint64_t size, bool host = true, void* stream = nullptr);
 
     /// @brief Retuns a raw pointer to the host/CPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
@@ -122,7 +128,7 @@ public:
     //@}
 
     /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
-    void clear();
+    void clear(void* stream = nullptr);
 
 }; // CudaDeviceBuffer class
 
@@ -134,20 +140,20 @@ struct BufferTraits<CudaDeviceBuffer>
 
 // --------------------------> Implementations below <------------------------------------
 
-inline CudaDeviceBuffer CudaDeviceBuffer::create(uint64_t size, const CudaDeviceBuffer*, bool host)
+inline CudaDeviceBuffer CudaDeviceBuffer::create(uint64_t size, const CudaDeviceBuffer*, bool host, void* stream)
 {
-    return CudaDeviceBuffer(size, host);
+    return CudaDeviceBuffer(size, host, stream);
 }
 
-inline void CudaDeviceBuffer::init(uint64_t size, bool host)
+inline void CudaDeviceBuffer::init(uint64_t size, bool host, void* stream)
 {
-    if (mSize>0) this->clear();
+    if (mSize>0) this->clear(stream);
     NANOVDB_ASSERT(size > 0);
     if (host) {
         cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
         checkPtr(mCpuData, "CudaDeviceBuffer::init: failed to allocate host buffer");
     } else {
-        cudaCheck(cudaMalloc((void**)&mGpuData, size)); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(cudaMallocAsync((void**)&mGpuData, size, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
         checkPtr(mGpuData, "CudaDeviceBuffer::init: failed to allocate device buffer");
     }
     mSize = size;
@@ -157,7 +163,7 @@ inline void CudaDeviceBuffer::deviceUpload(void* stream, bool sync) const
 {
     checkPtr(mCpuData, "uninitialized cpu data");
     if (mGpuData == nullptr) {
-        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(cudaMallocAsync((void**)&mGpuData, mSize, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
     }
     checkPtr(mGpuData, "uninitialized gpu data");
     cudaCheck(cudaMemcpyAsync(mGpuData, mCpuData, mSize, cudaMemcpyHostToDevice, reinterpret_cast<cudaStream_t>(stream)));
@@ -175,9 +181,9 @@ inline void CudaDeviceBuffer::deviceDownload(void* stream, bool sync) const
     if (sync) cudaCheck(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
 } // CudaDeviceBuffer::gpuDownload
 
-inline void CudaDeviceBuffer::clear()
+inline void CudaDeviceBuffer::clear(void *stream)
 {
-    if (mGpuData) cudaCheck(cudaFree(mGpuData));
+    if (mGpuData) cudaCheck(cudaFreeAsync(mGpuData, reinterpret_cast<cudaStream_t>(stream)));
     if (mCpuData) cudaCheck(cudaFreeHost(mCpuData));
     mCpuData = mGpuData = nullptr;
     mSize = 0;

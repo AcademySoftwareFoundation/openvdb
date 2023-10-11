@@ -15,10 +15,14 @@
 #ifndef NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
 
+#include <fstream> // for std::ifstream
+#include <iostream> // for std::cerr/cout
 #include <vector>
 #include <initializer_list>
+
 #include <nanovdb/NanoVDB.h>// for mapToGridType
 #include <nanovdb/util/HostBuffer.h>
+#include <nanovdb/util/GridChecksum.h>// for updateGridCount
 
 namespace nanovdb {
 
@@ -114,7 +118,7 @@ public:
 
     //@{
     /// @brief Return true if this handle is empty, i.e. has no allocated memory
-    bool empty() const { return this->size() == 0; }
+    bool empty()   const { return this->size() == 0; }
     bool isEmpty() const { return this->size() == 0; }
     //@}
 
@@ -173,7 +177,7 @@ public:
     bool isPadded() const {return mMetaData.empty() ? false : mMetaData.back().offset + mMetaData.back().size != mBuffer.size();}
 
     /// @brief Return the total number of grids contained in this buffer
-    uint32_t gridCount() const {return mMetaData.size();}
+    uint32_t gridCount() const {return static_cast<uint32_t>(mMetaData.size());}
 
     /// @brief Return the grid size of the @a n'th grid in this GridHandle
     /// @param n index of the grid (assumed to be less than gridCount())
@@ -194,6 +198,93 @@ public:
     /// @param n zero-based ID of the grid
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
     const GridMetaData* gridMetaData(uint32_t n = 0) const;
+
+    /// @brief Write a specific grid in this buffer to an output stream
+    /// @param os  output stream that the buffer will be written to
+    /// @param n zero-based index of the grid to be written to stream
+    void write(std::ostream& os, uint32_t n) const {
+        if (const GridData* data = this->gridData(n)) {
+            os.write((const char*)data, data->mGridSize);
+        } else {
+            throw std::runtime_error("GridHandle does not contain a #" + std::to_string(n) + " grid");
+        }
+    }
+
+    /// @brief Write the entire grid buffer to an output stream
+    /// @param os output stream that the buffer will be written to
+    void write(std::ostream& os) const {
+        for (uint32_t n=0; n<this->gridCount(); ++n) this->write(os, n);
+    }
+
+    /// @brief Write this entire grid buffer to a file
+    /// @param fileName string name of the output file
+    void write(const std::string &fileName) const {
+        std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!os.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for output");
+        this->write(os);
+    }
+
+    /// @brief Write a specific grid to file
+    /// @param fileName string name of the output file
+    /// @param n zero-based index of the grid to be written to file
+    void write(const std::string &fileName, uint32_t n) const {
+        std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!os.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for output");
+        this->write(os, n);
+    }
+
+    /// @brief Read an entire raw grid buffer from an input stream
+    /// @param is input stream containing a raw grid buffer
+    /// @param pool optional pool from which to allocate the new grid buffer
+    /// @throw Will throw a std::logic_error if the stream does not contain a valid raw grid
+    void read(std::istream& is, const BufferT& pool = BufferT());
+
+    /// @brief Read a specific grid from an input stream containing a raw grid buffer
+    /// @param is input stream containing a raw grid buffer
+    /// @param n zero-based index of the grid to be read
+    /// @param pool optional pool from which to allocate the new grid buffer
+    /// @throw Will throw a std::logic_error if the stream does not contain a valid raw grid
+    void read(std::istream& is, uint32_t n, const BufferT& pool = BufferT());
+
+    /// @brief Read a specific grid from an input stream containing a raw grid buffer
+    /// @param is input stream containing a raw grid buffer
+    /// @param gridName string name of the grid to be read
+    /// @param pool optional pool from which to allocate the new grid buffer
+    /// @throw Will throw a std::logic_error if the stream does not contain a valid raw grid with the speficied name
+    void read(std::istream& is, const std::string &gridName, const BufferT& pool = BufferT());
+
+    /// @brief Read a raw grid buffer from a file
+    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param pool optional pool from which to allocate the new grid buffe
+    void read(const std::string &fileName, const BufferT& pool = BufferT()) {
+        std::ifstream is(fileName, std::ios::in | std::ios::binary);
+        if (!is.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for input");
+        this->read(is, pool);
+    }
+
+    /// @brief Read a specific grid from a file containing a raw grid buffer
+    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param n zero-based index of the grid to be read
+    /// @param pool optional pool from which to allocate the new grid buffer
+    /// @throw Will throw a std::ios_base::failure if the file does not exist and a
+    ///        std::logic_error if the files does not contain a valid raw grid
+    void read(const std::string &fileName, uint32_t n, const BufferT& pool = BufferT()) {
+        std::ifstream is(fileName, std::ios::in | std::ios::binary);
+        if (!is.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for input");
+        this->read(is, n, pool);
+    }
+
+    /// @brief Read a specific grid from a file containing a raw grid buffer
+    /// @param filename string name of the input file containing a raw grid buffer
+    /// @param gridName string name of the grid to be read
+    /// @param pool optional pool from which to allocate the new grid buffer
+    /// @throw Will throw a std::ios_base::failure if the file does not exist and a
+    ///        std::logic_error if the files does not contain a valid raw grid withe the specified name
+    void read(const std::string &fileName, const std::string &gridName, const BufferT& pool = BufferT()) {
+        std::ifstream is(fileName, std::ios::in | std::ios::binary);
+        if (!is.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for input");
+        this->read(is, gridName, pool);
+    }
 }; // GridHandle
 
 // --------------------------> Implementation of private methods in GridHandle <------------------------------------
@@ -204,7 +295,7 @@ inline const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
     const uint8_t *data = this->data();
     if (data == nullptr || n >= mMetaData.size()) return nullptr;
     return reinterpret_cast<const GridData*>(data + mMetaData[n].offset);
-}
+}// const GridData* GridHandle<BufferT>::gridData(uint32_t n) const
 
 template<typename BufferT>
 inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
@@ -212,7 +303,7 @@ inline const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
     const uint8_t *data = this->data();
     if (data == nullptr || n >= mMetaData.size()) return nullptr;
     return reinterpret_cast<const GridMetaData*>(data + mMetaData[n].offset);
-}
+}// const GridMetaData* GridHandle<BufferT>::gridMetaData(uint32_t n) const
 
 namespace {// anonymous namespace
 inline __hostdev__ void cpyMetaData(const GridData *data, GridHandleMetaData *meta)
@@ -223,7 +314,7 @@ inline __hostdev__ void cpyMetaData(const GridData *data, GridHandleMetaData *me
         offset += p->size;
         data = PtrAdd<const GridData>(data, p->size);
     }
-}
+}// void cpyMetaData(const GridData *data, GridHandleMetaData *meta)
 }// anonymous namespace
 
 template<typename BufferT>
@@ -237,7 +328,7 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
         mMetaData.resize(data->mGridCount);
         cpyMetaData(data, mMetaData.data());
     }
-}
+}// GridHandle<BufferT>::GridHandle(T&& buffer)
 
 template<typename BufferT>
 template <typename OtherBufferT>
@@ -247,7 +338,7 @@ inline GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& ot
     auto buffer = OtherBufferT::create(mBuffer.size(), &other);
     std::memcpy(buffer.data(), mBuffer.data(), mBuffer.size());// deep copy of buffer
     return GridHandle<OtherBufferT>(std::move(buffer));
-}
+}// GridHandle<OtherBufferT> GridHandle<BufferT>::copy(const OtherBufferT& other) const
 
 template<typename BufferT>
 template<typename ValueT>
@@ -256,7 +347,7 @@ inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
     const uint8_t *data = mBuffer.data();
     if (data == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != mapToGridType<ValueT>()) return nullptr;
     return reinterpret_cast<const NanoGrid<ValueT>*>(data + mMetaData[n].offset);
-}
+}// const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 
 template<typename BufferT>
 template<typename ValueT, typename U>
@@ -266,18 +357,83 @@ GridHandle<BufferT>::deviceGrid(uint32_t n) const
     const uint8_t *data = mBuffer.deviceData();
     if (data == nullptr || n >= mMetaData.size() || mMetaData[n].gridType != mapToGridType<ValueT>()) return nullptr;
     return reinterpret_cast<const NanoGrid<ValueT>*>(data + mMetaData[n].offset);
-}
+}// GridHandle<BufferT>::deviceGrid(uint32_t n) cons
+
+template<typename BufferT>
+void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
+{
+    GridData data;
+    is.read((char*)&data, 40);// only 40 bytes are required for all the data we need in GridData
+    if (data.isValid()) {
+        uint64_t size = data.mGridSize, sum = 0u;
+        while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
+            is.seekg(data.mGridSize - 40, std::ios::cur);// skip grid
+            is.read((char*)&data, 40);// read 40 bytes of the next GridData
+            sum += data.mGridSize;
+        }
+        is.seekg(-int64_t(sum + 40), std::ios::cur);// rewind to start
+        auto buffer = BufferT::create(size + sum, &pool);
+        is.read((char*)(buffer.data()), buffer.size());
+        *this = GridHandle(std::move(buffer));
+    } else {
+        is.seekg(-40, std::ios::cur);// rewind
+        throw std::logic_error("This stream does not contain a valid raw grid buffer");
+    }
+}// void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
+
+template<typename BufferT>
+void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
+{
+    GridData data;
+    is.read((char*)&data, 40);// only 40 bytes are required for all the data we need in GridData
+    if (data.isValid()) {
+        if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
+        while(data.mGridIndex != n) {
+            is.seekg(data.mGridSize - 40, std::ios::cur);// skip grid
+            is.read((char*)&data, 40);// read 40 bytes
+        }
+        auto buffer = BufferT::create(data.mGridSize, &pool);
+        is.seekg(-40, std::ios::cur);// rewind
+        is.read((char*)(buffer.data()), data.mGridSize);
+        updateGridCount((GridData*)buffer.data(), 0u, 1u);
+        *this = GridHandle(std::move(buffer));
+    } else {
+        is.seekg(-40, std::ios::cur);// rewind 40 bytes to undo initial read
+        throw std::logic_error("This file does not contain a valid raw buffer");
+    }
+}// void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
+
+template<typename BufferT>
+void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, const BufferT& pool)
+{
+    static const std::streamsize byteSize = sizeof(GridData);
+    GridData data;
+    is.read((char*)&data, byteSize);
+    is.seekg(-byteSize, std::ios::cur);// rewind
+    if (data.isValid()) {
+        uint32_t n = 0;
+        while(data.mGridName != gridName && n++ < data.mGridCount) {
+            is.seekg(data.mGridSize, std::ios::cur);// skip grid
+            is.read((char*)&data, byteSize);// read 40 bytes
+            is.seekg(-byteSize, std::ios::cur);// rewind
+        }
+        if (n>data.mGridCount) throw std::runtime_error("No raw grid named \""+gridName+"\"");
+        auto buffer = BufferT::create(data.mGridSize, &pool);
+        is.read((char*)(buffer.data()), data.mGridSize);
+        updateGridCount((GridData*)buffer.data(), 0u, 1u);
+        *this = GridHandle(std::move(buffer));
+    } else {
+        throw std::logic_error("This file does not contain a valid raw buffer");
+    }
+}// void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName n, const BufferT& pool)
 
 // --------------------------> free-standing functions <------------------------------------
 
-namespace {// anonymous namespace
-inline __hostdev__ void updateGridData(GridData *data, uint32_t gridIndex, uint32_t gridCount)
-{
-    data->mGridIndex = gridIndex;
-    data->mGridCount = gridCount;
-}
-}// anonymous namespace
-
+/// @brief Split all grids in a single GridHandle into a vector of multiple GridHandles each with a single grid
+/// @tparam BufferT Type of the input and output grid buffers
+/// @param handle GridHandle with grids that will be slip into individual GridHandles
+/// @param pool optional pool used for allocation of output GridHandle
+/// @return Vector of GridHandles each containing a single grid
 template<typename BufferT, template <class, class...> class VectorT = std::vector>
 inline VectorT<GridHandle<BufferT>>
 splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
@@ -292,16 +448,21 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
         auto buffer = BufferT::create(src->mGridSize, other);
         GridData *dst = reinterpret_cast<GridData*>(buffer.data());
         std::memcpy(dst, src, src->mGridSize);
-        updateGridData(dst, 0u, 1u);
+        updateGridCount(dst, 0u, 1u);
         h = HandleT(std::move(buffer));
         ptr += src->mGridSize;
     }
     return std::move(handles);
 }// splitGrids
 
+/// @brief Combines (or merges) multiple GridHandles into a single GridHandle containing all grids
+/// @tparam BufferT Type of the input and output grid buffers
+/// @param handles Vector of GridHandles to be combined
+/// @param pool optional pool used for allocation of output GridHandle
+/// @return single GridHandle containing all input grids
 template<typename BufferT, template <class, class...> class VectorT>
 inline GridHandle<BufferT>
-mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr)
+mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* pool = nullptr)
 {
     uint64_t size = 0u;
     uint32_t counter = 0u, gridCount = 0u;
@@ -309,7 +470,7 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = n
         gridCount += h.gridCount();
         for (uint32_t n=0; n<h.gridCount(); ++n) size += h.gridSize(n);
     }
-    auto buffer = BufferT::create(size, other);
+    auto buffer = BufferT::create(size, pool);
     uint8_t *dst = buffer.data();
     for (auto &h : handles) {
         const uint8_t *src = h.data();
@@ -317,7 +478,7 @@ mergeGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = n
             std::memcpy(dst, src, h.gridSize(n));
             GridData *data = reinterpret_cast<GridData*>(dst);
             NANOVDB_ASSERT(data->isValid());
-            updateGridData(data, counter++, gridCount);
+            updateGridCount(data, counter++, gridCount);
             dst += data->mGridSize;
             src += data->mGridSize;
         }

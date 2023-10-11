@@ -1629,10 +1629,6 @@ TEST_F(TestOpenVDB, NanoToOpenVDB)
 
 TEST_F(TestOpenVDB, File)
 {
-    { // check nanovdb::io::stringHash
-        EXPECT_EQ(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_0"));
-        EXPECT_NE(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_1"));
-    }
     auto srcGrid = this->getSrcGrid();
 
     //mTimer.start("Reading NanoVDB grids from file");

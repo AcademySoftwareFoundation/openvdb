@@ -94,6 +94,60 @@ private:
     const nanovdb::Vec3<ValueT> mCenter;
     const ValueT                mRadius, mVoxelSize, mBackground;
 }; // Sphere
+
+class DataBuffer : public std::streambuf
+{
+public:
+    DataBuffer(void* data, size_t size)
+    {
+        char* start = static_cast<char*>(data);
+        char* stop = start + size;
+        this->setg(start, start, stop);
+    }
+
+    std::iostream::pos_type seekoff(std::iostream::off_type off, std::ios_base::seekdir way, std::ios_base::openmode which) override
+    {
+        if (which & std::ios_base::in)
+        {
+            if (way == std::ios_base::cur)
+            {
+                gbump(off);
+            }
+            else if (way == std::ios_base::end)
+            {
+                setg(eback(), egptr() + off, egptr());
+            }
+            else if (way == std::ios_base::beg)
+            {
+                setg(eback(), eback() + off, egptr());
+            }
+        }
+
+        if (which & std::ios_base::out)
+        {
+            if (way == std::ios_base::cur)
+            {
+                pbump(off);
+            }
+            else if (way == std::ios_base::end)
+            {
+                setp(pbase(), epptr());
+                pbump(epptr() - pbase() + off);
+            }
+            else if (way == std::ios_base::beg)
+            {
+                setp(pbase(), epptr());
+                pbump(off);
+            }
+        }
+
+        return gptr() - eback();
+    }
+    std::iostream::pos_type seekpos(std::iostream::pos_type sp, std::ios_base::openmode which) override
+    {
+        return seekoff(sp - std::iostream::pos_type(std::iostream::off_type(0)), std::ios_base::beg, which);
+    }
+};
 } // namespace
 
 // The fixture for testing class.
@@ -302,9 +356,9 @@ TEST_F(TestNanoVDB, Basic)
                    d } t;
         EXPECT_EQ(sizeof(int), sizeof(t));
     }
-    {// Check size of io::MetaData
-        EXPECT_EQ(176u, sizeof(nanovdb::io::MetaData));
-        //std::cerr << "sizeof(MetaData) = " << sizeof(nanovdb::io::MetaData) << std::endl;
+    {// Check size of io::FileMetaData
+        EXPECT_EQ(176u, sizeof(nanovdb::io::FileMetaData));
+        //std::cerr << "sizeof(FileMetaData) = " << sizeof(nanovdb::io::FileMetaData) << std::endl;
     }
 }
 
@@ -392,6 +446,29 @@ TEST_F(TestNanoVDB, Magic)
 
     ss2 >> magic;
     EXPECT_EQ(magic, nanovdb::io::reverseEndianness(NANOVDB_MAGIC_NUMBER));
+
+    {// test all magic numbers
+        const std::string a_str("NanoVDB0"), b_str("NanoVDB1"), c_str("NanoVDB2");
+        const uint64_t a = NANOVDB_MAGIC_NUMBER;// NanoVDB0
+        const uint64_t b = NANOVDB_MAGIC_GRID;//   NanoVDB1
+        const uint64_t c = NANOVDB_MAGIC_FILE;//   NanoVDB2
+        const uint64_t m = NANOVDB_MAGIC_MASK;//   masks out most significant byte
+        const char *aa= (const char*)&a, *bb = (const char*)&b, *cc = (const char*)&c;
+        for (int i=0; i<8; ++i) {
+            EXPECT_EQ(a_str[i], aa[i]);
+            EXPECT_EQ(b_str[i], bb[i]);
+            EXPECT_EQ(c_str[i], cc[i]);
+        }
+        for (int i=0; i<7; ++i) {
+            EXPECT_EQ(aa[i], bb[i]);
+            EXPECT_EQ(aa[i], cc[i]);
+        }
+        EXPECT_EQ('0', aa[7]);
+        EXPECT_EQ('1', bb[7]);
+        EXPECT_EQ('2', cc[7]);
+        EXPECT_EQ(m & a, m & b);
+        EXPECT_EQ(NANOVDB_MAGIC_MASK & NANOVDB_MAGIC_NUMBER, NANOVDB_MAGIC_MASK & NANOVDB_MAGIC_FILE);
+    }
 }// Magic
 
 TEST_F(TestNanoVDB, FindBits)
@@ -413,30 +490,53 @@ TEST_F(TestNanoVDB, CRC32)
     { // test function that uses iterators
         const std::string s{"The quick brown fox jumps over the lazy dog"};
         std::stringstream ss;
-        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.begin(), s.end());
+        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32::checksum(s.c_str(), s.size());
         EXPECT_EQ("414fa339", ss.str());
     }
     { // test the checksum for a modified string
         const std::string s{"The quick brown Fox jumps over the lazy dog"};
         std::stringstream ss;
-        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.begin(), s.end());
+        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32::checksum(s.c_str(), s.size());
         EXPECT_NE("414fa339", ss.str());
     }
     { // test function that uses void pointer and byte size
         const std::string s{"The quick brown fox jumps over the lazy dog"};
         std::stringstream ss;
-        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32(s.data(), s.size());
+        ss << std::hex << std::setw(8) << std::setfill('0') << nanovdb::crc32::checksum(s.c_str(), s.size());
         EXPECT_EQ("414fa339", ss.str());
     }
     { // test accumulation
-        nanovdb::CRC32    crc;
         const std::string s1{"The quick brown fox jum"};
-        crc(s1.begin(), s1.end());
+        uint32_t crc = nanovdb::crc32::checksum(s1.c_str(), s1.size());
         const std::string s2{"ps over the lazy dog"};
-        crc(s2.begin(), s2.end());
+        crc = nanovdb::crc32::checksum(s2.c_str(), s2.size(), crc);
         std::stringstream ss;
-        ss << std::hex << std::setw(8) << std::setfill('0') << crc.checksum();
+        ss << std::hex << std::setw(8) << std::setfill('0') << crc;
         EXPECT_EQ("414fa339", ss.str());
+    }
+    { // test accumulation with lookup table
+        auto lut = nanovdb::crc32::createLut();
+        const std::string s1{"The quick brown fox jum"};
+        uint32_t crc = nanovdb::crc32::checksum(s1.c_str(), s1.size(), lut.get());
+        const std::string s2{"ps over the lazy dog"};
+        crc = nanovdb::crc32::checksum(s2.c_str(), s2.size(), lut.get(), crc);
+        std::stringstream ss;
+        ss << std::hex << std::setw(8) << std::setfill('0') << crc;
+        EXPECT_EQ("414fa339", ss.str());
+    }
+    {
+        EXPECT_EQ(~uint64_t(0), nanovdb::GridChecksum::EMPTY);
+        nanovdb::GridChecksum cs(~uint64_t(0));
+        EXPECT_EQ(nanovdb::ChecksumMode::Disable, cs.mode());
+        EXPECT_TRUE(cs.isEmpty());
+        EXPECT_FALSE(cs.isFull());
+    }
+    {
+        nanovdb::GridChecksum cs;
+        EXPECT_EQ(~uint64_t(0), cs.checksum());
+        EXPECT_EQ(nanovdb::ChecksumMode::Disable, cs.mode());
+        EXPECT_TRUE(cs.isEmpty());
+        EXPECT_FALSE(cs.isFull());
     }
 }
 
@@ -712,6 +812,16 @@ TEST_F(TestNanoVDB, DitherLUT)
 
 TEST_F(TestNanoVDB, Traits)
 {
+    {// is_same
+        bool test = nanovdb::is_same<float, float>::value;
+        EXPECT_TRUE(test);
+        test = nanovdb::is_same<float, const float>::value;
+        EXPECT_FALSE(test);
+        test = nanovdb::is_same<float, int>::value;
+        EXPECT_FALSE(test);
+        test = nanovdb::is_same<int, float>::value;
+        EXPECT_FALSE(test);
+    }
     {// float
         using A = typename nanovdb::BuildToValueMap<float>::Type;
         bool test = nanovdb::is_same<A, float>::value;
@@ -2812,6 +2922,7 @@ TEST_F(TestNanoVDB, GridBuilderEmpty)
         EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), meta->version().getMajor());
         EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), meta->version().getMinor());
         EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), meta->version().getPatch());
+        EXPECT_TRUE(meta->isBreadthFirst());
         auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ("test", std::string(dstGrid->gridName()));
@@ -2820,6 +2931,12 @@ TEST_F(TestNanoVDB, GridBuilderEmpty)
         EXPECT_EQ(0.0f, srcAcc.getValue(nanovdb::Coord(1, 2, 3)));
         EXPECT_FALSE(srcAcc.isActive(nanovdb::Coord(1, 2, 3)));
         EXPECT_EQ(0.0f, dstAcc.getValue(nanovdb::Coord(1, 2, 3)));
+        EXPECT_TRUE(dstGrid->isEmpty());
+        EXPECT_TRUE(dstGrid->tree().isEmpty());
+        EXPECT_TRUE(dstGrid->tree().root().isEmpty());
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(0));
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(1));
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(2));
 
         EXPECT_EQ(dstGrid->tree().root().minimum(), 0.0f);
         EXPECT_EQ(dstGrid->tree().root().maximum(), 0.0f);
@@ -2855,6 +2972,12 @@ TEST_F(TestNanoVDB, BuilderGridEmpty)
         EXPECT_EQ(0.0f, srcAcc.getValue(nanovdb::Coord(1, 2, 3)));
         EXPECT_FALSE(srcAcc.isActive(nanovdb::Coord(1, 2, 3)));
         EXPECT_EQ(0.0f, dstAcc.getValue(nanovdb::Coord(1, 2, 3)));
+        EXPECT_TRUE(dstGrid->isEmpty());
+        EXPECT_TRUE(dstGrid->tree().isEmpty());
+        EXPECT_TRUE(dstGrid->tree().root().isEmpty());
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(0));
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(1));
+        EXPECT_EQ(0u, dstGrid->tree().nodeCount(2));
 
         EXPECT_EQ(dstGrid->tree().root().minimum(), 0.0f);
         EXPECT_EQ(dstGrid->tree().root().maximum(), 0.0f);
@@ -2908,10 +3031,16 @@ TEST_F(TestNanoVDB, CreateNanoGrid_Basic1)
         EXPECT_NEAR(dstGrid->tree().root().average(), 1.0f, 1e-6);
         EXPECT_NEAR(dstGrid->tree().root().variance(), 0.0f,1e-6);
         EXPECT_NEAR(dstGrid->tree().root().stdDeviation(), 0.0f, 1e-6);
+        EXPECT_FALSE(dstGrid->isEmpty());
+        EXPECT_FALSE(dstGrid->tree().isEmpty());
+        EXPECT_FALSE(dstGrid->tree().root().isEmpty());
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(0));
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(1));
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(2));
     }
 } // GridBuilderBasic1
 
-TEST_F(TestNanoVDB, CreateNanoGrid_Tile)
+TEST_F(TestNanoVDB, CreateNanoGrid_addTile)
 {
     { // 1 grid point and 1 tile
         using SrcGridT = nanovdb::build::Grid<float>;
@@ -2961,7 +3090,7 @@ TEST_F(TestNanoVDB, CreateNanoGrid_Tile)
         EXPECT_NEAR(dstGrid->tree().root().variance(), 0.0f,1e-6);
         EXPECT_NEAR(dstGrid->tree().root().stdDeviation(), 0.00069f, 1e-6);
     }
-} // GridBuilderTile
+} // CreateNanoGrid_addTile
 
 TEST_F(TestNanoVDB, GridBuilderValueMask)
 {
@@ -3000,6 +3129,12 @@ TEST_F(TestNanoVDB, GridBuilderValueMask)
         EXPECT_FALSE(srcAcc.isActive(nanovdb::Coord(2, 2, 3)));
         EXPECT_EQ(ijk, dstGrid->indexBBox()[0]);
         EXPECT_EQ(ijk, dstGrid->indexBBox()[1]);
+        EXPECT_FALSE(dstGrid->isEmpty());
+        EXPECT_FALSE(dstGrid->tree().isEmpty());
+        EXPECT_FALSE(dstGrid->tree().root().isEmpty());
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(0));
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(1));
+        EXPECT_EQ(1u, dstGrid->tree().nodeCount(2));
         //EXPECT_EQ(dstGrid->tree().root().minimum(), false);// minimum active value
         //EXPECT_EQ(dstGrid->tree().root().maximum(), true);// maximum active value
         //EXPECT_NEAR(dstGrid->tree().root().average(), 1.0f, 1e-6);
@@ -3049,6 +3184,9 @@ TEST_F(TestNanoVDB, GridBuilderBasic2)
         auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ("test", std::string(dstGrid->gridName()));
+        EXPECT_FALSE(dstGrid->isEmpty());
+        EXPECT_FALSE(dstGrid->tree().isEmpty());
+        EXPECT_FALSE(dstGrid->tree().root().isEmpty());
         EXPECT_EQ(2u, dstGrid->activeVoxelCount());
         EXPECT_EQ(2u, dstGrid->tree().nodeCount(0));
         EXPECT_EQ(2u, dstGrid->tree().nodeCount(1));
@@ -3147,6 +3285,9 @@ TEST_F(TestNanoVDB, GridBuilderPrune)
         EXPECT_EQ(nanovdb::Coord(0), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord(8*16-1), dstGrid->indexBBox()[1]);
 
+        EXPECT_FALSE(dstGrid->isEmpty());
+        EXPECT_FALSE(dstGrid->tree().isEmpty());
+        EXPECT_FALSE(dstGrid->tree().root().isEmpty());
         EXPECT_EQ(0u, dstGrid->tree().nodeCount(0));// all pruned away
         EXPECT_EQ(0u, dstGrid->tree().nodeCount(1));// all pruned away
         EXPECT_EQ(1u, dstGrid->tree().nodeCount(2));
@@ -3289,7 +3430,6 @@ TEST_F(TestNanoVDB, GridBuilder_Vec4f)
     }
 } // GridBuilder_Vec4f
 
-
 TEST_F(TestNanoVDB, GridBuilder_Fp4)
 {
     using VoxelT = nanovdb::Fp4;
@@ -3358,7 +3498,7 @@ TEST_F(TestNanoVDB, GridBuilder_Fp4)
         EXPECT_EQ(nanovdb::Coord(-10,-12,-50), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord( 50, 20, 30), dstGrid->indexBBox()[1]);
 
-         auto mgrHandle = nanovdb::createNodeManager(*dstGrid);
+        auto mgrHandle = nanovdb::createNodeManager(*dstGrid);
         auto *nodeMgr = mgrHandle.mgr<VoxelT>();
         EXPECT_TRUE(nanovdb::isValid(nodeMgr));
         EXPECT_TRUE(nodeMgr->isLinear());
@@ -3405,10 +3545,24 @@ TEST_F(TestNanoVDB, GridBuilder_Fp4)
         nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
         nanovdb::io::writeGrid("data/sphere_fp4.nvdb", handle);
-        handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb");
+        ASSERT_THROW(nanovdb::io::readGrid("data/sphere_fp4.nvdb", 1), std::runtime_error);
+        //nanovdb::CpuTimer timer;
+        //timer.start("read all grids");
+        //handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb");
+        //timer.start("read first grid");
+        handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb", 0);
+        //timer.stop();
         nanoGrid = handle.grid<VoxelT>();
         EXPECT_TRUE(nanoGrid);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
+        //timer.start("read first grid");
+        //handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb", 0);
+        //timer.start("read all grids");
+        handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb");
+        //timer.stop();
+        nanoGrid = handle.grid<VoxelT>();
+        EXPECT_TRUE(nanoGrid);
         nanovdb::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_Fp4
@@ -5815,6 +5969,12 @@ TEST_F(TestNanoVDB, StencilIntersection)
 
 TEST_F(TestNanoVDB, MultiFile)
 {
+    { // check nanovdb::io::stringHash
+        EXPECT_EQ(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_0"));
+        EXPECT_NE(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_1"));
+        EXPECT_EQ(0u, nanovdb::io::stringHash("\0"));
+        EXPECT_EQ(0u, nanovdb::io::stringHash(nullptr));
+    }
     std::vector<nanovdb::GridHandle<>> handles;
     { // add an int32_t grid
         nanovdb::build::Grid<int> grid(-1, "Int32 grid");
@@ -7408,6 +7568,26 @@ TEST_F(TestNanoVDB, writeReadUncompressedGrid)
     EXPECT_EQ(1.0f, fltGrid2->tree().getValue(ijk));
 }// writeReadUncompressedGrid
 
+TEST_F(TestNanoVDB, writeReadUncompressedGridRaw)
+{
+    using GridHandleT = nanovdb::GridHandle<nanovdb::HostBuffer>;
+    const nanovdb::Coord ijk(101,0,0);
+    std::vector<GridHandleT> handles1;
+    handles1.emplace_back(nanovdb::createLevelSetSphere<float>());
+    EXPECT_EQ(1u, handles1.size());
+    auto *fltGrid1 = handles1[0].grid<float>();
+    EXPECT_TRUE(fltGrid1);
+    EXPECT_EQ(1.0f, fltGrid1->tree().getValue(ijk));
+
+    nanovdb::io::writeUncompressedGrids("data/test1_raw.nvdb", handles1, true);
+
+    auto handles2 = nanovdb::io::readUncompressedGrids<GridHandleT, std::vector>("data/test1_raw.nvdb");
+    EXPECT_EQ(1u, handles2.size());
+
+    auto *fltGrid2 = handles2[0].grid<float>();
+    EXPECT_TRUE(fltGrid2);
+    EXPECT_EQ(1.0f, fltGrid2->tree().getValue(ijk));
+}// writeReadUncompressedGridRaw
 
 TEST_F(TestNanoVDB, GridMetaData)
 {
@@ -7745,6 +7925,220 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
     }
     //timer.stop();
 }//  mergeSplitGrids
+
+TEST_F(TestNanoVDB, writeReadRadGrid)
+{
+    const nanovdb::Coord ijk(101,0,0);
+    auto handle1 = nanovdb::createLevelSetSphere<float>();
+    auto *fltGrid = handle1.grid<float>();
+    EXPECT_TRUE(fltGrid);
+    //std::cerr << "Grid<float> size: " << (fltGrid->gridSize() >> 20) << " MB\n";
+    EXPECT_EQ(1.0f, fltGrid->tree().getValue(ijk));
+
+    {// create an IndexGrid with an internal channel and write it to file
+        auto handle = nanovdb::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex>(*fltGrid,1u, true, true);// 1 channel, include stats and tile values
+        handle.write("data/raw_grid.nvdb");
+    }
+    {// read and test IndexGrid
+        nanovdb::GridHandle<> handle;
+        ASSERT_THROW(handle.read("data/merge1.nvdb"), std::logic_error);
+    }
+    {// read and test IndexGrid
+        nanovdb::GridHandle<> tmp;
+        tmp.read("data/raw_grid.nvdb");
+        auto *idxGrid = tmp.grid<nanovdb::ValueIndex>();
+        EXPECT_TRUE(idxGrid);
+        //std::cerr << "Dense IndexGrid size: " << (idxGrid->gridSize() >> 20) << " MB\n";
+        EXPECT_GT(idxGrid->gridSize(), fltGrid->gridSize());
+        nanovdb::ChannelAccessor<float> acc(*idxGrid, 0u);// channel ID = 0
+        EXPECT_TRUE(acc);
+        EXPECT_EQ(1.0f, acc(ijk));
+
+        // compute the gradient from channel ID 0
+        nanovdb::GradStencil<nanovdb::ChannelAccessor<float>> stencil(acc);
+        stencil.moveTo(ijk);
+        EXPECT_EQ(nanovdb::Vec3f(1.0f,0.0f,0.0f), stencil.gradient());
+
+        EXPECT_EQ(0.0f, acc(100,0,0));
+        acc(100,0,0) = 1.0f;// legal since acc was template on "float" and not "const float"
+        EXPECT_EQ(1.0f, acc(100,0,0));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f,0.0f,0.0f), stencil.gradient());// since stencil caches
+        stencil.moveTo(ijk);// re-populates the stencil cache
+        EXPECT_EQ(nanovdb::Vec3f(0.5f,0.0f,0.0f), stencil.gradient());
+    }
+}// writeReadRadGrid
+
+TEST_F(TestNanoVDB, GridHandleIO)
+{
+    auto handle = nanovdb::createLevelSetSphere<float>();
+    EXPECT_TRUE(handle.grid<float>());
+    handle.write("data/sphere_raw.nvdb");
+    ASSERT_THROW(handle.read("data/dummy_raw.nvdb"), std::ios_base::failure);
+    ASSERT_THROW(handle.read("data/dummy_raw.nvdb"), std::exception);
+    handle.read("data/sphere_raw.nvdb");
+    auto *grid = handle.grid<float>();
+    EXPECT_TRUE(handle.grid<float>());
+    handle.read("data/raw_grid.nvdb");
+    EXPECT_FALSE(handle.grid<float>());
+    EXPECT_TRUE(handle.grid<nanovdb::ValueIndex>());
+    ASSERT_THROW(handle.read("data/merge1.nvdb"), std::logic_error);
+    ASSERT_THROW(handle.read("data/merge1.nvdb"), std::exception);
+}
+
+TEST_F(TestNanoVDB, GridCountAndIndex)
+{
+    {// create multiple grids and write them to file
+        std::vector<nanovdb::GridHandle<>> handles;
+        handles.emplace_back(nanovdb::createLevelSetSphere<float>());
+        handles.emplace_back(nanovdb::createLevelSetSphere<float>());
+        handles.emplace_back(nanovdb::createLevelSetSphere<float>());
+        EXPECT_EQ(3u, handles.size());
+        for (auto &h : handles) EXPECT_EQ(1u, h.gridCount());
+        nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/3_spheres.nvdb", handles);
+    }
+    {// default readGrid
+        auto handle = nanovdb::io::readGrid("data/3_spheres.nvdb");
+        EXPECT_EQ(1u, handle.gridCount());
+        auto *grid = handle.grid<float>();
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(0u, grid->gridIndex());
+        EXPECT_EQ(1u, grid->gridCount());
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+    }
+    {// readGrid one by one
+        for (uint32_t i=0; i<3u; ++i) {
+            auto handle = nanovdb::io::readGrid("data/3_spheres.nvdb", i);
+            EXPECT_EQ(1u, handle.gridCount());
+            auto *grid = handle.grid<float>();
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(0u, grid->gridIndex());
+            EXPECT_EQ(1u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+    }
+    {// read all grids
+        auto handle = nanovdb::io::readGrid("data/3_spheres.nvdb", -1);
+        handle.write("data/3_spheres_raw.nvdb");
+        EXPECT_EQ(3u, handle.gridCount());
+        for (uint32_t i=0; i<handle.gridCount(); ++i) {
+            auto *grid = handle.grid<float>(i);
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(i,  grid->gridIndex());
+            EXPECT_EQ(3u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+    }
+    {// read all raw grids
+        auto handle = nanovdb::io::readGrid("data/3_spheres_raw.nvdb", -1);
+        handle.write("data/3_spheres_raw.nvdb");
+        EXPECT_EQ(3u, handle.gridCount());
+        for (uint32_t i=0; i<handle.gridCount(); ++i) {
+            auto *grid = handle.grid<float>(i);
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(i,  grid->gridIndex());
+            EXPECT_EQ(3u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+    }
+    {// read all raw grids
+        nanovdb::GridHandle<> handle;
+        handle.read("data/3_spheres_raw.nvdb");
+        EXPECT_EQ(3u, handle.gridCount());
+        for (uint32_t i=0; i<handle.gridCount(); ++i) {
+            auto *grid = handle.grid<float>(i);
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(i,  grid->gridIndex());
+            EXPECT_EQ(3u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+    }
+    {// read single raw grid
+        nanovdb::GridHandle<> handle;
+        for (uint32_t i=0; i<3u; ++i) {
+            handle.read("data/3_spheres_raw.nvdb", i);
+            EXPECT_EQ(1u, handle.gridCount());
+            auto *grid = handle.grid<float>(0u);
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(0u,  grid->gridIndex());
+            EXPECT_EQ(1u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+        ASSERT_THROW(handle.read("data/3_spheres_raw.nvdb", 4), std::runtime_error);
+        ASSERT_THROW(handle.read("data/3_spheres_raw.nvdb",-1), std::runtime_error);
+    }
+    {// read raw grids one by one
+        for (uint32_t i=0; i<3u; ++i) {
+            auto handle = nanovdb::io::readGrid("data/3_spheres_raw.nvdb", i);
+            EXPECT_EQ(1u, handle.gridCount());
+            auto *grid = handle.grid<float>();
+            EXPECT_TRUE(grid);
+            EXPECT_EQ(0u, grid->gridIndex());
+            EXPECT_EQ(1u, grid->gridCount());
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+            EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+        }
+        ASSERT_THROW(nanovdb::io::readGrid("data/3_spheres_raw.nvdb", 4), std::runtime_error);
+    }
+}// GridCountAndIndex
+
+TEST_F(TestNanoVDB, CustomStreamIO)
+{
+    std::ostringstream outputStream(std::ios_base::out | std::ios_base::binary);
+    {
+        std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> handles;
+        handles.emplace_back(nanovdb::createLevelSetSphere<float>());
+        EXPECT_EQ(1u, handles.size());
+        nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>(outputStream, handles, nanovdb::io::Codec::NONE);
+    }
+
+    std::string payload = outputStream.str();
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[payload.length()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    std::memcpy(buffer, payload.data(), payload.length());
+    DataBuffer dataBuffer(buffer, payload.length());
+    std::istream dataStream(&dataBuffer);
+    {
+        std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> handles = nanovdb::io::readGrids(dataStream);
+        EXPECT_EQ(1u, handles.size());
+        auto *grid = handles[0].grid<float>(0u);
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(0u, grid->gridIndex());
+        EXPECT_EQ(1u, grid->gridCount());
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+    }
+}// CustomStreamIO
+
+TEST_F(TestNanoVDB, CustomStreamGridHandleIO)
+{
+    std::ostringstream outputStream(std::ios_base::out | std::ios_base::binary);
+    {
+        nanovdb::createLevelSetSphere<float>().write(outputStream);
+    }
+
+    std::string payload = outputStream.str();
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[payload.length()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    std::memcpy(buffer, payload.data(), payload.length());
+    DataBuffer dataBuffer(buffer, payload.length());
+    std::istream dataStream(&dataBuffer);
+    {
+        nanovdb::GridHandle<nanovdb::HostBuffer> handle;
+        handle.read(dataStream);
+        auto *grid = handle.grid<float>(0u);
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(0u, grid->gridIndex());
+        EXPECT_EQ(1u, grid->gridCount());
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid));
+        EXPECT_TRUE(nanovdb::validateChecksum(*grid, nanovdb::ChecksumMode::Full));
+    }
+}// CustomStreamGridHandleIO
 
 int main(int argc, char** argv)
 {

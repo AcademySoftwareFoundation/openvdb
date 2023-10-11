@@ -102,12 +102,12 @@
 
     Notation: "]---[" implies it has optional padding, and "][" implies zero padding
 
-    [GridData(672B)][TreeData(64B)]---[RootData][N x Root::Tile]---[NodeData<5>]---[ModeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
-    ^                                 ^         ^                  ^               ^               ^
-    |                                 |         |                  |               |               |
-    +-- Start of 32B aligned buffer   |         |                  |               |               +-- Node0::DataType* leafData
-        GridType::DataType* gridData  |         |                  |               |
-                                      |         |                  |               +-- Node1::DataType* lowerData
+    [GridData(672B)][TreeData(64B)]---[RootData][N x Root::Tile]---[InternalData<5>]---[InternalData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
+    ^                                 ^         ^                  ^                   ^                   ^
+    |                                 |         |                  |                   |                   |
+    +-- Start of 32B aligned buffer   |         |                  |                   |                   +-- Node0::DataType* leafData
+        GridType::DataType* gridData  |         |                  |                   |
+                                      |         |                  |                   +-- Node1::DataType* lowerData
        RootType::DataType* rootData --+         |                  |
                                                 |                  +-- Node2::DataType* upperData
                                                 |
@@ -118,19 +118,26 @@
 #ifndef NANOVDB_NANOVDB_H_HAS_BEEN_INCLUDED
 #define NANOVDB_NANOVDB_H_HAS_BEEN_INCLUDED
 
+// NANOVDB_MAGIC_NUMBER is currently used for both grids and files (starting with v32.6.0)
+// NANOVDB_MAGIC_GRID will soon be used exclusively for grids
+// NANOVDB_MAGIC_FILE will soon be used exclusively for files
+// NANOVDB_MAGIC_NODE will soon be used exclusively for NodeManager
+//                              | : 0 in 30 corresponds to 0 in NanoVDB0
 #define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL // "NanoVDB0" in hex - little endian (uint64_t)
+#define NANOVDB_MAGIC_GRID   0x314244566f6e614eUL // "NanoVDB1" in hex - little endian (uint64_t)
+#define NANOVDB_MAGIC_FILE   0x324244566f6e614eUL // "NanoVDB2" in hex - little endian (uint64_t)
+#define NANOVDB_MAGIC_NODE   0x334244566f6e614eUL // "NanoVDB3" in hex - little endian (uint64_t)
+#define NANOVDB_MAGIC_MASK   0x00FFFFFFFFFFFFFFUL // use this mask to remove the number
+//#define NANOVDB_USE_NEW_MAGIC_NUMBERS// used to enable use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER 5 //  reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER 1 //  reflects changes that does not affect the ABI or API
+#define NANOVDB_MINOR_VERSION_NUMBER 6 //  reflects changes to the API but not ABI
+#define NANOVDB_PATCH_VERSION_NUMBER 0 //  reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
 
 // This replaces a Coord key at the root level with a single uint64_t
 #define NANOVDB_USE_SINGLE_ROOT_KEY
-
-// This allows for the old (deprecated) indexing scheme for ValueOnIndex
-//#define NANOVDB_USE_OLD_VALUE_ON_INDEX
 
 // This replaces three levels of Coord keys in the ReadAccessor with one Coord
 //#define NANOVDB_USE_SINGLE_ACCESSOR_KEY
@@ -143,6 +150,7 @@
 
 #define NANOVDB_FPN_BRANCHLESS
 
+// Do not change this value! 32 byte alignment is fixed in NanoVDB
 #define NANOVDB_DATA_ALIGNMENT 32
 
 #if !defined(NANOVDB_ALIGN)
@@ -335,7 +343,9 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  End = 26 }; // should never be used
 
 #ifndef __CUDACC_RTC__
-/// @brief Retuns a c-string used to describe a GridType
+/// @brief Maps a GridType to a c-string
+/// @param gridType GridType to be mapped to a string
+/// @return Retuns a c-string used to describe a GridType
 inline const char* toStr(GridType gridType)
 {
     static const char* LUT[] = {"?", "float", "double", "int16", "int32", "int64", "Vec3f", "Vec3d", "Mask", "Half",
@@ -380,8 +390,9 @@ enum class GridFlags : uint32_t {
     HasMinMax = 1 << 2, // nodes contain min/max of active values
     HasAverage = 1 << 3, // nodes contain averages of active values
     HasStdDeviation = 1 << 4, // nodes contain standard deviations of active values
-    IsBreadthFirst = 1 << 5, // nodes are arranged breadth-first in memory
-    End = 1 << 6, // use End - 1 as a mask for the 5 lower bit flags
+    IsBreadthFirst = 1 << 5, // nodes are typically arranged breadth-first in memory
+    IsLexicographic = 1 << 6, // nodes are occasionally arranged lexicographically in memory
+    End = 1 << 7, // use End - 1 as a mask for the 5 lower bit flags
 };
 
 #ifndef __CUDACC_RTC__
@@ -394,6 +405,7 @@ inline const char* toStr(GridFlags gridFlags)
                                 "has average",
                                 "has standard deviation",
                                 "is breadth-first",
+                                "is IsLexicographic",
                                 "end"};
     static_assert(1 << (sizeof(LUT) / sizeof(char*) - 1) == int(GridFlags::End), "Unexpected size of LUT");
     return LUT[static_cast<int>(gridFlags)];
@@ -516,6 +528,32 @@ struct is_const<const T>
     static constexpr bool value = true;
 };
 
+// --------------------------> is_pointer <------------------------------------
+
+/// @brief Trait used to identify template parameter that are pointers
+/// @tparam T Template parameter to be tested
+template<class T>
+struct is_pointer
+{
+    static constexpr bool value = false;
+};
+
+/// @brief Template specialization of non-const pointers
+/// @tparam T Template parameter to be tested
+template<class T>
+struct is_pointer<T*>
+{
+    static constexpr bool value = true;
+};
+
+/// @brief Template specialization of const pointers
+/// @tparam T Template parameter to be tested
+template<class T>
+struct is_pointer<const T*>
+{
+    static constexpr bool value = true;
+};
+
 // --------------------------> remove_const <------------------------------------
 
 template<typename T>
@@ -529,6 +567,22 @@ struct remove_const<const T>
 {
     using type = T;
 };
+
+// --------------------------> remove_reference <------------------------------------
+
+template <typename T>
+struct remove_reference {using type = T;};
+
+template <typename T>
+struct remove_reference<T&> {using type = T;};
+
+// --------------------------> remove_pointer <------------------------------------
+
+template <typename T>
+struct remove_pointer {using type = T;};
+
+template <typename T>
+struct remove_pointer<T*> {using type = T;};
 
 // --------------------------> match_const <------------------------------------
 
@@ -746,9 +800,18 @@ public:
     static const int SIZE = 4;
     using ValueType = uint8_t;
 
+    /// @brief Default copy constructor
     Rgba8(const Rgba8&) = default;
+
+    /// @brief Default move constructor
     Rgba8(Rgba8&&) = default;
+
+    /// @brief Default move assignment operator
+    /// @return non-const reference to this instance
     Rgba8&      operator=(Rgba8&&) = default;
+
+    /// @brief Default copy assignment operator
+    /// @return non-const reference to this instance
     Rgba8&      operator=(const Rgba8&) = default;
 
     /// @brief Default ctor initializes all channels to zero
@@ -929,6 +992,7 @@ public:
                 uint32_t(NANOVDB_PATCH_VERSION_NUMBER))
     {
     }
+    __hostdev__ Version(uint32_t data) : mData(data) {}
     __hostdev__ Version(uint32_t major, uint32_t minor, uint32_t patch)
         : mData(major << 21 | minor << 10 | patch)
     {
@@ -937,20 +1001,25 @@ public:
         NANOVDB_ASSERT(patch < (1u << 10)); // max value of patch is 1023
     }
     __hostdev__ bool     operator==(const Version& rhs) const { return mData == rhs.mData; }
-    __hostdev__ bool     operator<(const Version& rhs) const { return mData < rhs.mData; }
+    __hostdev__ bool     operator<( const Version& rhs) const { return mData < rhs.mData; }
     __hostdev__ bool     operator<=(const Version& rhs) const { return mData <= rhs.mData; }
-    __hostdev__ bool     operator>(const Version& rhs) const { return mData > rhs.mData; }
+    __hostdev__ bool     operator>( const Version& rhs) const { return mData > rhs.mData; }
     __hostdev__ bool     operator>=(const Version& rhs) const { return mData >= rhs.mData; }
     __hostdev__ uint32_t id() const { return mData; }
     __hostdev__ uint32_t getMajor() const { return (mData >> 21) & ((1u << 11) - 1); }
     __hostdev__ uint32_t getMinor() const { return (mData >> 10) & ((1u << 11) - 1); }
     __hostdev__ uint32_t getPatch() const { return mData & ((1u << 10) - 1); }
+    __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER);}
+    /// @brief Check the major version of this instance relative to NANOVDB_MAJOR_VERSION_NUMBER
+    /// @return return 0 if the major version equals NANOVDB_MAJOR_VERSION_NUMBER, else a negative age if it is
+    ///         older, i.e. smaller, and a positive age if it's newer, i.e.e larger.
+    __hostdev__ int age() const {return int(this->getMajor()) - int(NANOVDB_MAJOR_VERSION_NUMBER);}
 
 #ifndef __CUDACC_RTC__
     const char* c_str() const
     {
         char* buffer = (char*)malloc(4 + 1 + 4 + 1 + 4 + 1); // xxxx.xxxx.xxxx\0
-        snprintf(buffer, 4 + 1 + 4 + 1 + 4 + 1, "%d.%d.%d", this->getMajor(), this->getMinor(), this->getPatch()); // Prevents overflows by enforcing a fixed size of buffer
+        snprintf(buffer, 4 + 1 + 4 + 1 + 4 + 1, "%u.%u.%u", this->getMajor(), this->getMinor(), this->getPatch()); // Prevents overflows by enforcing a fixed size of buffer
         return buffer;
     }
 #endif
@@ -1801,7 +1870,7 @@ __hostdev__ inline Vec4<T2> operator*(T1 scalar, const Vec4<T2>& vec)
     return Vec4<T2>(scalar * vec[0], scalar * vec[1], scalar * vec[2], scalar * vec[3]);
 }
 template<typename T1, typename T2>
-__hostdev__ inline Vec4<T2> operator/(T1 scalar, const Vec3<T2>& vec)
+__hostdev__ inline Vec4<T2> operator/(T1 scalar, const Vec4<T2>& vec)
 {
     return Vec4<T2>(scalar / vec[0], scalar / vec[1], scalar / vec[2], scalar / vec[3]);
 }
@@ -1981,9 +2050,9 @@ __hostdev__ inline GridClass mapToGridClass(GridClass defaultClass = GridClass::
 template<typename Vec3T>
 __hostdev__ inline Vec3T matMult(const float* mat, const Vec3T& xyz)
 {
-    return Vec3T(fmaf(xyz[0], mat[0], fmaf(xyz[1], mat[1], xyz[2] * mat[2])),
-                 fmaf(xyz[0], mat[3], fmaf(xyz[1], mat[4], xyz[2] * mat[5])),
-                 fmaf(xyz[0], mat[6], fmaf(xyz[1], mat[7], xyz[2] * mat[8]))); // 6 fmaf + 3 mult = 9 flops
+    return Vec3T(fmaf(static_cast<float>(xyz[0]), mat[0], fmaf(static_cast<float>(xyz[1]), mat[1], static_cast<float>(xyz[2]) * mat[2])),
+                 fmaf(static_cast<float>(xyz[0]), mat[3], fmaf(static_cast<float>(xyz[1]), mat[4], static_cast<float>(xyz[2]) * mat[5])),
+                 fmaf(static_cast<float>(xyz[0]), mat[6], fmaf(static_cast<float>(xyz[1]), mat[7], static_cast<float>(xyz[2]) * mat[8]))); // 6 fmaf + 3 mult = 9 flops
 }
 
 /// @brief Multiply a 3x3 matrix and a 3d vector using 64bit floating point arithmetics
@@ -2010,9 +2079,9 @@ __hostdev__ inline Vec3T matMult(const double* mat, const Vec3T& xyz)
 template<typename Vec3T>
 __hostdev__ inline Vec3T matMult(const float* mat, const float* vec, const Vec3T& xyz)
 {
-    return Vec3T(fmaf(xyz[0], mat[0], fmaf(xyz[1], mat[1], fmaf(xyz[2], mat[2], vec[0]))),
-                 fmaf(xyz[0], mat[3], fmaf(xyz[1], mat[4], fmaf(xyz[2], mat[5], vec[1]))),
-                 fmaf(xyz[0], mat[6], fmaf(xyz[1], mat[7], fmaf(xyz[2], mat[8], vec[2])))); // 9 fmaf = 9 flops
+    return Vec3T(fmaf(static_cast<float>(xyz[0]), mat[0], fmaf(static_cast<float>(xyz[1]), mat[1], fmaf(static_cast<float>(xyz[2]), mat[2], vec[0]))),
+                 fmaf(static_cast<float>(xyz[0]), mat[3], fmaf(static_cast<float>(xyz[1]), mat[4], fmaf(static_cast<float>(xyz[2]), mat[5], vec[1]))),
+                 fmaf(static_cast<float>(xyz[0]), mat[6], fmaf(static_cast<float>(xyz[1]), mat[7], fmaf(static_cast<float>(xyz[2]), mat[8], vec[2])))); // 9 fmaf = 9 flops
 }
 
 /// @brief Multiply a 3x3 matrix to a 3d vector and add another 3d vector using 64bit floating point arithmetics
@@ -2039,9 +2108,9 @@ __hostdev__ inline Vec3T matMult(const double* mat, const double* vec, const Vec
 template<typename Vec3T>
 __hostdev__ inline Vec3T matMultT(const float* mat, const Vec3T& xyz)
 {
-    return Vec3T(fmaf(xyz[0], mat[0], fmaf(xyz[1], mat[3], xyz[2] * mat[6])),
-                 fmaf(xyz[0], mat[1], fmaf(xyz[1], mat[4], xyz[2] * mat[7])),
-                 fmaf(xyz[0], mat[2], fmaf(xyz[1], mat[5], xyz[2] * mat[8]))); // 6 fmaf + 3 mult = 9 flops
+    return Vec3T(fmaf(static_cast<float>(xyz[0]), mat[0], fmaf(static_cast<float>(xyz[1]), mat[3], static_cast<float>(xyz[2]) * mat[6])),
+                 fmaf(static_cast<float>(xyz[0]), mat[1], fmaf(static_cast<float>(xyz[1]), mat[4], static_cast<float>(xyz[2]) * mat[7])),
+                 fmaf(static_cast<float>(xyz[0]), mat[2], fmaf(static_cast<float>(xyz[1]), mat[5], static_cast<float>(xyz[2]) * mat[8]))); // 6 fmaf + 3 mult = 9 flops
 }
 
 /// @brief Multiply the transposed of a 3x3 matrix and a 3d vector using 64bit floating point arithmetics
@@ -2061,9 +2130,9 @@ __hostdev__ inline Vec3T matMultT(const double* mat, const Vec3T& xyz)
 template<typename Vec3T>
 __hostdev__ inline Vec3T matMultT(const float* mat, const float* vec, const Vec3T& xyz)
 {
-    return Vec3T(fmaf(xyz[0], mat[0], fmaf(xyz[1], mat[3], fmaf(xyz[2], mat[6], vec[0]))),
-                 fmaf(xyz[0], mat[1], fmaf(xyz[1], mat[4], fmaf(xyz[2], mat[7], vec[1]))),
-                 fmaf(xyz[0], mat[2], fmaf(xyz[1], mat[5], fmaf(xyz[2], mat[8], vec[2])))); // 9 fmaf = 9 flops
+    return Vec3T(fmaf(static_cast<float>(xyz[0]), mat[0], fmaf(static_cast<float>(xyz[1]), mat[3], fmaf(static_cast<float>(xyz[2]), mat[6], vec[0]))),
+                 fmaf(static_cast<float>(xyz[0]), mat[1], fmaf(static_cast<float>(xyz[1]), mat[4], fmaf(static_cast<float>(xyz[2]), mat[7], vec[1]))),
+                 fmaf(static_cast<float>(xyz[0]), mat[2], fmaf(static_cast<float>(xyz[1]), mat[5], fmaf(static_cast<float>(xyz[2]), mat[8], vec[2])))); // 9 fmaf = 9 flops
 }
 
 template<typename Vec3T>
@@ -2089,7 +2158,7 @@ struct BaseBBox
     __hostdev__ Vec3T&       max() { return mCoord[1]; }
     __hostdev__ const Vec3T& min() const { return mCoord[0]; }
     __hostdev__ const Vec3T& max() const { return mCoord[1]; }
-    __hostdev__ Coord&       translate(const Vec3T& xyz)
+    __hostdev__ BaseBBox&    translate(const Vec3T& xyz)
     {
         mCoord[0] += xyz;
         mCoord[1] += xyz;
@@ -2155,8 +2224,9 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
     static_assert(is_floating_point<ValueType>::value, "Expected a floating point coordinate type");
     using BaseT = BaseBBox<Vec3T>;
     using BaseT::mCoord;
+    /// @brief Default construction sets BBox to an empty bbox
     __hostdev__ BBox()
-        : BaseT(Vec3T(Maximum<typename Vec3T::ValueType>::value()),
+        : BaseT(Vec3T( Maximum<typename Vec3T::ValueType>::value()),
                 Vec3T(-Maximum<typename Vec3T::ValueType>::value()))
     {
     }
@@ -2482,7 +2552,7 @@ __hostdev__ inline uint32_t CountOn(uint64_t v)
 // __popcnt64 intrinsic support was added in VS 2019 16.8
 #elif defined(_MSC_VER) && defined(_M_X64) && (_MSC_VER >= 1928) && defined(NANOVDB_USE_INTRINSICS)
     //#warning Using popcnt64 for CountOn
-    return __popcnt64(v);
+    return uint32_t(__popcnt64(v));
 #elif (defined(__GNUC__) || defined(__clang__)) && defined(NANOVDB_USE_INTRINSICS)
     //#warning Using builtin_popcountll for CountOn
     return __builtin_popcountll(v);
@@ -3314,7 +3384,7 @@ struct GetNodeInfo;
     N0 LeafNodes each with a bit mask, N0 ValueTypes and min/max
 
     Example layout: ("---" implies it has a custom offset, "..." implies zero or more)
-    [GridData][TreeData]---[RootData][ROOT TILES...]---[NodeData<5>]---[ModeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
+    [GridData][TreeData]---[RootData][ROOT TILES...]---[InternalData<5>]---[InternalData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
 */
 
 /// @brief Struct with all the member data of the Grid (useful during serialization of an openvdb grid)
@@ -3358,8 +3428,12 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
                           GridType                         gridType = GridType::Unknown,
                           GridClass                        gridClass = GridClass::Unknown)
     {
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        mMagic = NANOVDB_MAGIC_GRID;
+#else
         mMagic = NANOVDB_MAGIC_NUMBER;
-        mChecksum = 0u;
+#endif
+        mChecksum = ~uint64_t(0);// all 64 bits ON means checksum is disabled
         mVersion = Version();
         mFlags.initMask(list);
         mGridIndex = 0u;
@@ -3367,7 +3441,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mGridSize = gridSize;
         mGridName[0] = '\0';
         mMap = map;
-        mWorldBBox = BBox<Vec3d>();
+        mWorldBBox = BBox<Vec3d>();// invalid bbox
         mVoxelSize = map.getVoxelSize();
         mGridClass = gridClass;
         mGridType = gridType;
@@ -3378,7 +3452,9 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mData2 = 0u;
     }
     // Set and unset various bit flags
-    __hostdev__ bool isValid() const { return mMagic == NANOVDB_MAGIC_NUMBER; }
+    __hostdev__ bool isValid() const {
+        return mMagic == NANOVDB_MAGIC_GRID || (mMagic == NANOVDB_MAGIC_NUMBER && mVersion.isCompatible());
+    }
     __hostdev__ void setMinMaxOn(bool on = true) { mFlags.setMask(GridFlags::HasMinMax, on); }
     __hostdev__ void setBBoxOn(bool on = true) { mFlags.setMask(GridFlags::HasBBox, on); }
     __hostdev__ void setLongGridNameOn(bool on = true) { mFlags.setMask(GridFlags::HasLongGridName, on); }
@@ -3416,11 +3492,29 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     template<typename Vec3T>
     __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return mMap.applyIJTF(xyz); }
 
-    // @brief Return a non-const void pointer to the tree
-    __hostdev__ void* treePtr() { return this + 1; }
+    // @brief Return a non-const uint8_t pointer to the tree
+    __hostdev__ uint8_t* treePtr() { return reinterpret_cast<uint8_t*>(this + 1); }// TreeData is always right after GridData
 
-    // @brief Return a const void pointer to the tree
-    __hostdev__ const void* treePtr() const { return this + 1; }
+    // @brief Return a const uint8_t pointer to the tree
+    __hostdev__ const uint8_t* treePtr() const { return reinterpret_cast<const uint8_t*>(this + 1); }// TreeData is always right after GridData
+
+    /// @brief Return a non-const uint8_t pointer to the firsr node at @c LEVEL
+    /// @tparam LEVEL of the node. LEVEL 0 means leaf node and LEVEL 3 means root node
+    /// @warning If not nodes exist at @c LEVEL NULL is returned
+    template <uint32_t LEVEL>
+    __hostdev__ const uint8_t* nodePtr() const
+    {
+        static_assert(LEVEL >= 0 && LEVEL <= 3, "invalid LEVEL template parameter");
+        auto *treeData   = this->treePtr();
+        auto nodeOffset = *reinterpret_cast<const uint64_t*>(treeData + 8*LEVEL);// skip LEVEL uint64_t
+        return nodeOffset ? PtrAdd<uint8_t>(treeData, nodeOffset) : nullptr;
+    }
+
+    /// @brief Return a non-const uint8_t pointer to the firsr node at @c LEVEL
+    /// @tparam LEVEL of the node. LEVEL 0 means leaf node and LEVEL 3 means root node
+    /// @warning If not nodes exist at @c LEVEL NULL is returned
+    template <uint32_t LEVEL>
+    __hostdev__ uint8_t* nodePtr(){return const_cast<uint8_t*>(const_cast<const GridData*>(this)->template nodePtr<LEVEL>());}
 
     /// @brief Returns a const reference to the blindMetaData at the specified linear offset.
     ///
@@ -3430,6 +3524,35 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         NANOVDB_ASSERT(n < mBlindMetadataCount);
         return PtrAdd<GridBlindMetaData>(this, mBlindMetadataOffset) + n;
     }
+
+    __hostdev__ const char* gridName() const
+    {
+        if (mFlags.isMaskOn(GridFlags::HasLongGridName)) {// search for first blind meta data that contains a name
+            NANOVDB_ASSERT(mBlindMetadataCount > 0);
+            for (uint32_t i = 0; i < mBlindMetadataCount; ++i) {
+                const auto* metaData = this->blindMetaData(i);// EXTREMELY important to be a pointer
+                if (metaData->mDataClass == GridBlindDataClass::GridName) {
+                    NANOVDB_ASSERT(metaData->mDataType == GridType::Unknown);
+                    return metaData->template getBlindData<const char>();
+                }
+            }
+            NANOVDB_ASSERT(false); // should never hit this!
+        }
+        return mGridName;
+    }
+
+    /// @brief Return memory usage in bytes for this class only.
+    __hostdev__ static uint64_t memUsage() { return sizeof(GridData); }
+
+    /// @brief return AABB of active values in world space
+    __hostdev__ const BBox<Vec3d>& worldBBox() const { return mWorldBBox; }
+
+    /// @brief return AABB of active values in index space
+    __hostdev__ const CoordBBox& indexBBox() const {return *(const CoordBBox*)(this->nodePtr<3>());}
+
+    /// @brief test if the grid is empty, e.i the root table has size 0
+    /// @return  true if this grid contains not data whatsoever
+    __hostdev__ bool isEmpty() const {return *(const uint32_t*)(this->nodePtr<3>() + sizeof(CoordBBox)) == 0u;}
 
 }; // GridData
 
@@ -3474,7 +3597,7 @@ public:
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
     /// @brief Return memory usage in bytes for this class only.
-    __hostdev__ static uint64_t memUsage() { return sizeof(GridData); }
+    //__hostdev__ static uint64_t memUsage() { return sizeof(GridData); }
 
     /// @brief Return the memory footprint of the entire grid, i.e. including all nodes and blind data
     __hostdev__ uint64_t gridSize() const { return DataType::mGridSize; }
@@ -3561,13 +3684,13 @@ public:
     __hostdev__ Vec3T indexToWorldGradF(const Vec3T& grad) const { return DataType::applyIJTF(grad); }
 
     /// @brief Computes a AABB of active values in world space
-    __hostdev__ const BBox<Vec3d>& worldBBox() const { return DataType::mWorldBBox; }
+    //__hostdev__ const BBox<Vec3d>& worldBBox() const { return DataType::mWorldBBox; }
 
     /// @brief Computes a AABB of active values in index space
     ///
     /// @note This method is returning a floating point bounding box and not a CoordBBox. This makes
     ///       it more useful for clipping rays.
-    __hostdev__ const BBox<CoordType>& indexBBox() const { return this->tree().bbox(); }
+    //__hostdev__ const BBox<CoordType>& indexBBox() const { return this->tree().bbox(); }
 
     /// @brief Return the total number of active voxels in this tree.
     __hostdev__ uint64_t activeVoxelCount() const { return this->tree().activeVoxelCount(); }
@@ -3590,6 +3713,7 @@ public:
     __hostdev__ bool             hasAverage() const { return DataType::mFlags.isMaskOn(GridFlags::HasAverage); }
     __hostdev__ bool             hasStdDeviation() const { return DataType::mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return DataType::mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
+    __hostdev__ bool             isLexicographic() const { return DataType::mFlags.isMaskOn(GridFlags::IsLexicographic); }
 
     /// @brief return true if the specified node type is layed out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
@@ -3604,27 +3728,7 @@ public:
     __hostdev__ bool isSequential() const { return UpperNodeType::FIXED_SIZE && LowerNodeType::FIXED_SIZE && LeafNodeType::FIXED_SIZE && this->isBreadthFirst(); }
 
     /// @brief Return a c-string with the name of this grid
-    __hostdev__ const char* gridName() const
-    {
-        if (this->hasLongGridName()) {
-            NANOVDB_ASSERT(DataType::mBlindMetadataCount > 0);
-#if 1// search for first blind meta data that contains a name
-            for (uint32_t i = 0; i < DataType::mBlindMetadataCount; ++i) {
-                const auto& metaData = this->blindMetaData(i);// EXTREMELY important to be a reference
-                if (metaData.mDataClass == GridBlindDataClass::GridName) {
-                    NANOVDB_ASSERT(metaData.mDataType == GridType::Unknown);
-                    return metaData.template getBlindData<const char>();
-                }
-            }
-            NANOVDB_ASSERT(false); // should never hit this!
-#else// this assumes that the long grid name is always the last blind meta data
-            const auto& metaData = this->blindMetaData(DataType::mBlindMetadataCount - 1); // always the last
-            NANOVDB_ASSERT(metaData.mDataClass == GridBlindDataClass::GridName);
-            return metaData.template getBlindData<const char>();
-#endif
-        }
-        return DataType::mGridName;
-    }
+    __hostdev__ const char* gridName() const { return DataType::gridName(); }
 
     /// @brief Return a c-string with the name of this grid, truncated to 255 characters
     __hostdev__ const char* shortGridName() const { return DataType::mGridName; }
@@ -3633,7 +3737,7 @@ public:
     __hostdev__ uint64_t checksum() const { return DataType::mChecksum; }
 
     /// @brief Return true if this grid is empty, i.e. contains no values or nodes.
-    __hostdev__ bool isEmpty() const { return this->tree().isEmpty(); }
+    //__hostdev__ bool isEmpty() const { return this->tree().isEmpty(); }
 
     /// @brief Return the count of blind-data encoded in this grid
     __hostdev__ uint32_t blindDataCount() const { return DataType::mBlindMetadataCount; }
@@ -3733,7 +3837,12 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     {
         mNodeOffset[NodeT::LEVEL] = node ? PtrDiff(node, this) : 0;
     }
-};
+
+    __hostdev__ bool isEmpty() const  {return *PtrAdd<uint32_t>(this, mNodeOffset[3] + sizeof(BBox<Coord>)) == 0;}
+
+    /// @brief Return a const reference to the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
+    __hostdev__ const CoordBBox& bbox() const {return *PtrAdd<CoordBBox>(this, mNodeOffset[3]);}
+};// TreeData
 
 // ----------------------------> GridTree <--------------------------------------
 
@@ -3806,7 +3915,7 @@ public:
     __hostdev__ bool isActive(const CoordType& ijk) const { return this->root().isActive(ijk); }
 
     /// @brief Return true if this tree is empty, i.e. contains no values or nodes
-    __hostdev__ bool isEmpty() const { return this->root().isEmpty(); }
+    //__hostdev__ bool isEmpty() const { return this->root().isEmpty(); }
 
     /// @brief Combines the previous two methods in a single call
     __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const { return this->root().probeValue(ijk, v); }
@@ -3818,7 +3927,7 @@ public:
     __hostdev__ void extrema(ValueType& min, ValueType& max) const;
 
     /// @brief Return a const reference to the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
-    __hostdev__ const BBox<CoordType>& bbox() const { return this->root().bbox(); }
+    //__hostdev__ const BBox<CoordType>& bbox() const { return this->root().bbox(); }
 
     /// @brief Return the total number of active voxels in this tree.
     __hostdev__ uint64_t activeVoxelCount() const { return DataType::mVoxelCount; }
@@ -3845,6 +3954,11 @@ public:
     {
         NANOVDB_ASSERT(level < 3);
         return DataType::mNodeCount[level];
+    }
+
+    __hostdev__ uint32_t totalNodeCount() const
+    {
+        return DataType::mNodeCount[0] + DataType::mNodeCount[1] + DataType::mNodeCount[2];
     }
 
     /// @brief return a pointer to the first node of the specified type
@@ -4181,8 +4295,8 @@ public:
     using ChildIterator = ChildIter<RootNode>;
     using ConstChildIterator = ChildIter<const RootNode>;
 
-    ChildIterator      beginChild() { return ChildIterator(this); }
-    ConstChildIterator cbeginChild() const { return ConstChildIterator(this); }
+    __hostdev__ ChildIterator      beginChild() { return ChildIterator(this); }
+    __hostdev__ ConstChildIterator cbeginChild() const { return ConstChildIterator(this); }
 
     template<typename RootT>
     class ValueIter : public BaseIter<RootT>
@@ -4230,8 +4344,8 @@ public:
     using ValueIterator = ValueIter<RootNode>;
     using ConstValueIterator = ValueIter<const RootNode>;
 
-    ValueIterator      beginValue() { return ValueIterator(this); }
-    ConstValueIterator cbeginValueAll() const { return ConstValueIterator(this); }
+    __hostdev__ ValueIterator      beginValue() { return ValueIterator(this); }
+    __hostdev__ ConstValueIterator cbeginValueAll() const { return ConstValueIterator(this); }
 
     template<typename RootT>
     class ValueOnIter : public BaseIter<RootT>
@@ -4274,8 +4388,8 @@ public:
     using ValueOnIterator = ValueOnIter<RootNode>;
     using ConstValueOnIterator = ValueOnIter<const RootNode>;
 
-    ValueOnIterator      beginValueOn() { return ValueOnIterator(this); }
-    ConstValueOnIterator cbeginValueOn() const { return ConstValueOnIterator(this); }
+    __hostdev__ ValueOnIterator      beginValueOn() { return ValueOnIterator(this); }
+    __hostdev__ ConstValueOnIterator cbeginValueOn() const { return ConstValueOnIterator(this); }
 
     template<typename RootT>
     class DenseIter : public BaseIter<RootT>
@@ -4327,9 +4441,9 @@ public:
     using DenseIterator = DenseIter<RootNode>;
     using ConstDenseIterator = DenseIter<const RootNode>;
 
-    DenseIterator      beginDense() { return DenseIterator(this); }
-    ConstDenseIterator cbeginDense() const { return ConstDenseIterator(this); }
-    ConstDenseIterator cbeginChildAll() const { return ConstDenseIterator(this); }
+    __hostdev__ DenseIterator      beginDense() { return DenseIterator(this); }
+    __hostdev__ ConstDenseIterator cbeginDense() const { return ConstDenseIterator(this); }
+    __hostdev__ ConstDenseIterator cbeginChildAll() const { return ConstDenseIterator(this); }
 
     /// @brief This class cannot be constructed or deleted
     RootNode() = delete;
@@ -4697,10 +4811,17 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
     __hostdev__ const StatsT& average() const { return mAverage; }
     __hostdev__ const StatsT& stdDeviation() const { return mStdDevi; }
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
     __hostdev__ void setMin(const ValueT& v) { mMinimum = v; }
     __hostdev__ void setMax(const ValueT& v) { mMaximum = v; }
     __hostdev__ void setAvg(const StatsT& v) { mAverage = v; }
     __hostdev__ void setDev(const StatsT& v) { mStdDevi = v; }
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
     /// @brief This class cannot be constructed or deleted
     InternalData() = delete;
@@ -4770,7 +4891,7 @@ public:
         }
     }; // Member class ChildIterator
 
-    ChildIterator beginChild() const { return ChildIterator(this); }
+    __hostdev__ ChildIterator beginChild() const { return ChildIterator(this); }
 
     /// @brief Visits all tile values in this node, i.e. both inactive and active tiles
     class ValueIterator : public MaskIterT<false>
@@ -4807,8 +4928,8 @@ public:
         }
     }; // Member class ValueIterator
 
-    ValueIterator beginValue() const { return ValueIterator(this); }
-    ValueIterator cbeginValueAll() const { return ValueIterator(this); }
+    __hostdev__ ValueIterator beginValue() const { return ValueIterator(this); }
+    __hostdev__ ValueIterator cbeginValueAll() const { return ValueIterator(this); }
 
     /// @brief Visits active tile values of this node only
     class ValueOnIterator : public MaskIterT<true>
@@ -4840,8 +4961,8 @@ public:
         }
     }; // Member class ValueOnIterator
 
-    ValueOnIterator beginValueOn() const { return ValueOnIterator(this); }
-    ValueOnIterator cbeginValueOn() const { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator beginValueOn() const { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator cbeginValueOn() const { return ValueOnIterator(this); }
 
     /// @brief Visits all tile values and child nodes of this node
     class DenseIterator : public Mask<Log2Dim>::DenseIterator
@@ -4884,8 +5005,8 @@ public:
         }
     }; // Member class DenseIterator
 
-    DenseIterator beginDense() const { return DenseIterator(this); }
-    DenseIterator cbeginChildAll() const { return DenseIterator(this); } // matches openvdb
+    __hostdev__ DenseIterator beginDense() const { return DenseIterator(this); }
+    __hostdev__ DenseIterator cbeginChildAll() const { return DenseIterator(this); } // matches openvdb
 
     /// @brief This class cannot be constructed or deleted
     InternalNode() = delete;
@@ -5578,16 +5699,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafIndexBase
     uint8_t        mBBoxDif[3]; // 3B.
     uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: has stats, bits5,6,7: bit-width for FpN
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
-#ifdef NANOVDB_USE_OLD_VALUE_ON_INDEX
-    uint64_t mOffset; // 8B offset to first value in this leaf node
-    union
-    {
-        uint8_t  mCountOn[8];
-        uint64_t mPrefixSum;
-    }; // prefix sum of active values per 64 bit words
-#else
     uint64_t mOffset, mPrefixSum; // 8B offset to first value in this leaf node and 9-bit prefix sum
-#endif
     __hostdev__ static constexpr uint32_t padding()
     {
         return sizeof(LeafIndexBase) - (12u + 3u + 1u + sizeof(MaskT<LOG2DIM>) + 2 * 8u);
@@ -5642,11 +5754,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     using BuildType = ValueOnIndex;
     __hostdev__ uint32_t valueCount() const
     {
-#ifdef NANOVDB_USE_OLD_VALUE_ON_INDEX
-        return BaseT::mCountOn[6] + ((uint32_t(BaseT::mCountOn[7] >> 6) & uint32_t(1)) << 8) + CountOn(BaseT::mValueMask.words()[7]);
-#else
         return CountOn(BaseT::mValueMask.words()[7]) + (BaseT::mPrefixSum >> 54u & 511u); // last 9 bits of mPrefixSum do not account for the last word in mValueMask
-#endif
     }
     __hostdev__ uint64_t lastOffset() const { return BaseT::mOffset + this->valueCount() - 1u; }
     __hostdev__ uint64_t getMin() const { return this->hasStats() ? this->lastOffset() + 1u : 0u; }
@@ -5655,23 +5763,14 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueOnIndex, CoordT, Mask
     __hostdev__ uint64_t getDev() const { return this->hasStats() ? this->lastOffset() + 4u : 0u; }
     __hostdev__ uint64_t getValue(uint32_t i) const
     {
-#if 0 // just for debugging
-        return mValueMask.isOn(i) ? mOffset + mValueMask.countOn(i) : 0u;
-#else
+        //return mValueMask.isOn(i) ? mOffset + mValueMask.countOn(i) : 0u;// for debugging
         uint32_t       n = i >> 6;
         const uint64_t w = BaseT::mValueMask.words()[n], mask = uint64_t(1) << (i & 63u);
         if (!(w & mask))
             return uint64_t(0); // if i'th value is inactive return offset to background value
         uint64_t sum = BaseT::mOffset + CountOn(w & (mask - 1u));
-#ifdef NANOVDB_USE_OLD_VALUE_ON_INDEX
-        if (n--)
-            sum += BaseT::mCountOn[n] + ((uint32_t(BaseT::mCountOn[7] >> n) & uint32_t(1)) << 8); // exclude first 64 voxels
-#else
-        if (n--)
-            sum += BaseT::mPrefixSum >> (9u * n) & 511u;
-#endif
+        if (n--) sum += BaseT::mPrefixSum >> (9u * n) & 511u;
         return sum;
-#endif
     }
 
     /// @brief This class cannot be constructed or deleted
@@ -5763,8 +5862,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<Point, CoordT, MaskT, LOG2
     template<typename T>
     __hostdev__ void setOrigin(const T& ijk) { mBBoxMin = ijk; }
 
-    //__hostdev__ void fill(const ValueType &v) {for (auto *p=mValues, *q=p+512; p!=q; ++p) *p = v;}
-
     /// @brief This class cannot be constructed or deleted
     LeafData() = delete;
     LeafData(const LeafData&) = delete;
@@ -5830,8 +5927,8 @@ public:
         }
     }; // Member class ValueOnIterator
 
-    ValueOnIterator beginValueOn() const { return ValueOnIterator(this); }
-    ValueOnIterator cbeginValueOn() const { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator beginValueOn() const { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator cbeginValueOn() const { return ValueOnIterator(this); }
 
     /// @brief Visits all inactive values in a leaf node
     class ValueOffIterator : public MaskIterT<false>
@@ -5863,8 +5960,8 @@ public:
         }
     }; // Member class ValueOffIterator
 
-    ValueOffIterator beginValueOff() const { return ValueOffIterator(this); }
-    ValueOffIterator cbeginValueOff() const { return ValueOffIterator(this); }
+    __hostdev__ ValueOffIterator beginValueOff() const { return ValueOffIterator(this); }
+    __hostdev__ ValueOffIterator cbeginValueOff() const { return ValueOffIterator(this); }
 
     /// @brief Visits all values in a leaf node, i.e. both active and inactive values
     class ValueIterator
@@ -5914,8 +6011,8 @@ public:
         }
     }; // Member class ValueIterator
 
-    ValueIterator beginValue() const { return ValueIterator(this); }
-    ValueIterator cbeginValueAll() const { return ValueIterator(this); }
+    __hostdev__ ValueIterator beginValue() const { return ValueIterator(this); }
+    __hostdev__ ValueIterator cbeginValueAll() const { return ValueIterator(this); }
 
     static_assert(is_same<ValueType, typename BuildToValueMap<BuildType>::Type>::value, "Mismatching BuildType");
     static constexpr uint32_t LOG2DIM = Log2Dim;
@@ -5994,8 +6091,8 @@ public:
 
     __hostdev__ static uint32_t padding() { return DataType::padding(); }
 
-    /// @brief return memory usage in bytes for the class
-    __hostdev__ uint64_t memUsage() { return DataType::memUsage(); }
+    /// @brief return memory usage in bytes for the leaf node
+    __hostdev__ uint64_t memUsage() const { return DataType::memUsage(); }
 
     /// @brief This class cannot be constructed or deleted
     LeafNode() = delete;
@@ -6052,11 +6149,7 @@ public:
     /// @brief Return the linear offset corresponding to the given coordinate
     __hostdev__ static uint32_t CoordToOffset(const CoordT& ijk)
     {
-#if 0
-        return ((ijk[0] & MASK) << (2 * LOG2DIM)) + ((ijk[1] & MASK) << LOG2DIM) + (ijk[2] & MASK);
-#else
         return ((ijk[0] & MASK) << (2 * LOG2DIM)) | ((ijk[1] & MASK) << LOG2DIM) | (ijk[2] & MASK);
-#endif
     }
 
     /// @brief Updates the local bounding box of active voxels in this node. Return true if bbox was updated.
@@ -7300,7 +7393,7 @@ public:
     { // the RootData follows right after the TreeData
         return grid.tree().data()->mNodeOffset[3] == sizeof(TreeData);
     }
-    __hostdev__ bool             isValid() const { return mGridData.mMagic == NANOVDB_MAGIC_NUMBER; }
+    __hostdev__ bool             isValid() const { return mGridData.isValid(); }
     __hostdev__ const GridType&  gridType() const { return mGridData.mGridType; }
     __hostdev__ const GridClass& gridClass() const { return mGridData.mGridClass; }
     __hostdev__ bool             isLevelSet() const { return mGridData.mGridClass == GridClass::LevelSet; }
@@ -7317,6 +7410,7 @@ public:
     __hostdev__ bool             hasAverage() const { return mGridData.mFlags.isMaskOn(GridFlags::HasAverage); }
     __hostdev__ bool             hasStdDeviation() const { return mGridData.mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return mGridData.mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
+    __hostdev__ bool             isLexicographic() const { return mGridData.mFlags.isMaskOn(GridFlags::IsLexicographic); }
     __hostdev__ uint64_t         gridSize() const { return mGridData.mGridSize; }
     __hostdev__ uint32_t         gridIndex() const { return mGridData.mGridIndex; }
     __hostdev__ uint32_t         gridCount() const { return mGridData.mGridCount; }
@@ -7455,7 +7549,10 @@ public:
         NANOVDB_ASSERT(mData);
         NANOVDB_ASSERT(grid.gridType() == GridType::PointIndex);
         NANOVDB_ASSERT((grid.gridClass() == GridClass::PointIndex && is_same<uint32_t, AttT>::value) ||
-                       (grid.gridClass() == GridClass::PointData && is_same<Vec3f, AttT>::value));
+                       (grid.gridClass() == GridClass::PointData && is_same<Vec3f, AttT>::value) ||
+                       (grid.gridClass() == GridClass::PointData && is_same<Vec3d, AttT>::value) ||
+                       (grid.gridClass() == GridClass::PointData && is_same<Vec3u16, AttT>::value) ||
+                       (grid.gridClass() == GridClass::PointData && is_same<Vec3u8, AttT>::value));
     }
 
     /// @brief  return true if this access was initialized correctly
@@ -7593,12 +7690,10 @@ public:
 
 }; // ChannelAccessor
 
-// the following code block uses std and therefore needs to be ignored by CUDA and HIP
-#if !defined(__CUDA_ARCH__) && !defined(__HIP__)
-
 #if 0
 // This MiniGridHandle class is only included as a stand-alone example. Note that aligned_alloc is a C++17 feature!
-// Normally we recommend using GridHandle defined in util/GridHandle.h
+// Normally we recommend using GridHandle defined in util/GridHandle.h but this minimal implementation could be an
+// alternative when using the IO medthods defined below.
 struct MiniGridHandle {
     struct BufferType {
         uint8_t *data;
@@ -7614,7 +7709,80 @@ struct MiniGridHandle {
     const uint8_t* data() const {return buffer.data;}
 };// MiniGridHandle
 #endif
+
 namespace io {
+
+/// @brief Define compression codecs
+///
+/// @note NONE is the default, ZIP is slow but compact and BLOSC offers a great balance.
+///
+/// @throw NanoVDB optionally supports ZIP and BLOSC compression and will throw an exception
+///        if its support is required but missing.
+enum class Codec : uint16_t { NONE = 0,
+                              ZIP = 1,
+                              BLOSC = 2,
+                              END = 3 };
+
+/// @brief Data encoded at the head of each segment of a file or stream.
+///
+/// @note A file or stream is composed of one or more segments that each contain
+//        one or more grids.
+struct FileHeader {// 16 bytes
+    uint64_t magic;//     8 bytes
+    Version  version;//   4 bytes version numbers
+    uint16_t gridCount;// 2 bytes
+    Codec    codec;//     2 bytes
+    bool isValid() const {return magic == NANOVDB_MAGIC_NUMBER || magic == NANOVDB_MAGIC_FILE;}
+}; // FileHeader ( 16 bytes = 2 words )
+
+// @brief Data encoded for each of the grids associated with a segment.
+// Grid size in memory             (uint64_t)   |
+// Grid size on disk               (uint64_t)   |
+// Grid name hash key              (uint64_t)   |
+// Numer of active voxels          (uint64_t)   |
+// Grid type                       (uint32_t)   |
+// Grid class                      (uint32_t)   |
+// Characters in grid name         (uint32_t)   |
+// AABB in world space             (2*3*double) | one per grid in file
+// AABB in index space             (2*3*int)    |
+// Size of a voxel in world units  (3*double)   |
+// Byte size of the grid name      (uint32_t)   |
+// Number of nodes per level       (4*uint32_t) |
+// Numer of active tiles per level (3*uint32_t) |
+// Codec for file compression      (uint16_t)   |
+// Padding due to 8B alignment     (uint16_t)   |
+// Version number                  (uint32_t)   |
+struct FileMetaData
+{// 176 bytes
+    uint64_t    gridSize, fileSize, nameKey, voxelCount; // 4 * 8 = 32B.
+    GridType    gridType;  // 4B.
+    GridClass   gridClass; // 4B.
+    BBox<Vec3d> worldBBox; // 2 * 3 * 8 = 48B.
+    CoordBBox   indexBBox; // 2 * 3 * 4 = 24B.
+    Vec3d       voxelSize; // 24B.
+    uint32_t    nameSize;  // 4B.
+    uint32_t    nodeCount[4]; //4 x 4 = 16B
+    uint32_t    tileCount[3];// 3 x 4 = 12B
+    Codec       codec;  // 2B
+    uint16_t    padding;// 2B, due to 8B alignment from uint64_t
+    Version     version;// 4B
+}; // FileMetaData
+
+// the following code block uses std and therefore needs to be ignored by CUDA and HIP
+#if !defined(__CUDA_ARCH__) && !defined(__HIP__)
+
+inline const char* toStr(Codec codec)
+{
+    static const char * LUT[] = { "NONE", "ZIP", "BLOSC" , "END" };
+    static_assert(sizeof(LUT) / sizeof(char*) - 1 == int(Codec::END), "Unexpected size of LUT");
+    return LUT[static_cast<int>(codec)];
+}
+
+// Note that starting with version 32.6.0 it is possible to write and read raw grid buffers to
+// files, e.g. os.write((const char*)&buffer.data(), buffer.size()) or more conveniently as
+// handle.write(fileName). In addition to this simple approach we offer the methods below to
+// write traditional uncompressed nanovdb files that unlike raw files include metadata that
+// is used for tools like nanovdb_print.
 
 ///
 /// @brief This is a standalone alternative to io::writeGrid(...,Codec::NONE) defined in util/IO.h
@@ -7631,69 +7799,43 @@ namespace io {
 /// @throw std::invalid_argument if buffer does not point to a valid NanoVDB grid.
 ///
 /// @warning This is pretty ugly code that involves lots of pointer and bit manipulations - not for the faint of heart :)
-template<typename StreamT> // StreamT class must support: "void write(char*, size_t)"
-void writeUncompressedGrid(StreamT& os, const void* buffer)
+template<typename StreamT> // StreamT class must support: "void write(const char*, size_t)"
+void writeUncompressedGrid(StreamT& os, const GridData* gridData, bool raw = false)
 {
-    char        header[192] = {0}, *dst = header; // combines io::Header + io::MetaData, see util/IO.h
-    const char *grid = (const char*)buffer, *tree = grid + 672, *root = tree + *(const uint64_t*)(tree + 24);
-    auto        cpy = [&](const char* src, int n) {for (auto *end=src+n; src!=end; ++src) *dst++ = *src; };
-    if (*(const uint64_t*)(grid) != 0x304244566f6e614eUL) {
-        fprintf(stderr, "nanovdb::writeUncompressedGrid: invalid magic number\n");
-        exit(EXIT_FAILURE);
-    } else if (*(const uint32_t*)(grid + 16) >> 21 != 32) {
-        fprintf(stderr, "nanovdb::writeUncompressedGrid: invalid major version\n");
-        exit(EXIT_FAILURE);
+    NANOVDB_ASSERT(gridData->mMagic == NANOVDB_MAGIC_NUMBER || gridData->mMagic == NANOVDB_MAGIC_GRID);
+    NANOVDB_ASSERT(gridData->mVersion.isCompatible());
+    if (!raw) {// segment with a single grid:  FileHeader, FileMetaData, gridName, Grid
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        FileHeader head{NANOVDB_MAGIC_FILE, gridData->mVersion, 1u, Codec::NONE};
+#else
+        FileHeader head{NANOVDB_MAGIC_NUMBER, gridData->mVersion, 1u, Codec::NONE};
+#endif
+        const char* gridName = gridData->gridName();
+        uint32_t nameSize = 1; // '\0'
+        for (const char* p = gridName; *p != '\0'; ++p) ++nameSize;
+        const TreeData* treeData = (const TreeData*)gridData->treePtr();
+        FileMetaData meta{gridData->mGridSize, gridData->mGridSize, 0u, treeData->mVoxelCount,
+                          gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
+                          treeData->bbox(), gridData->mVoxelSize, nameSize,
+                          {treeData->mNodeCount[0], treeData->mNodeCount[1], treeData->mNodeCount[2], 1u},
+                          {treeData->mTileCount[0], treeData->mTileCount[1], treeData->mTileCount[2]},
+                          Codec::NONE, 0u, gridData->mVersion }; // FileMetaData
+        os.write((const char*)&head, sizeof(FileHeader)); // write header
+        os.write((const char*)&meta, sizeof(FileMetaData)); // write meta data
+        os.write(gridName, nameSize); // write grid name
     }
-    cpy(grid, 8); // uint64_t Header::magic
-    cpy(grid + 16, 4); // uint32_t Heder::version
-    *(uint16_t*)(dst) = 1;
-    dst += 4; // uint16_t Header::gridCount=1 and uint16_t Header::codec=0
-    cpy(grid + 32, 8); // uint64_t MetaData::gridSize
-    cpy(grid + 32, 8); // uint64_t MetaData::fileSize
-    dst += 8; //            uint64_t MetaData::nameKey
-    cpy(tree + 56, 8); // uint64_t MetaData::voxelCount
-    cpy(grid + 636, 4); // uint32_t MetaData::gridType
-    cpy(grid + 632, 4); // uint32_t MetaData::gridClass
-    cpy(grid + 560, 48); // double[6] MetaData::worldBBox
-    cpy(root, 24); // int[6] MetaData::indexBBox
-    cpy(grid + 608, 24); // double[3] MetaData::voxelSize
-    const char* gridName = grid + 40; // shortGridName
-    if (*(const uint32_t*)(grid + 20) & uint32_t(1)) { // has long grid name
-        gridName = grid + *(const int64_t*)(grid + 640) + 288 * (*(const uint32_t*)(grid + 648) - 1);
-        gridName += *(const uint64_t*)gridName; // long grid name encoded in blind meta data
-    }
-    uint32_t nameSize = 1; // '\0'
-    for (const char* p = gridName; *p != '\0'; ++p)
-        ++nameSize;
-    *(uint32_t*)(dst) = nameSize;
-    dst += 4; // uint32_t MetaData::nameSize
-    cpy(tree + 32, 12); // uint32_t[3] MetaData::nodeCount
-    *(uint32_t*)(dst) = 1;
-    dst += 4; // uint32_t MetaData::nodeCount[3]=1
-    cpy(tree + 44, 12); // uint32_t[3] MetaData::tileCount
-    dst += 4; //            uint16_t codec and padding
-    cpy(grid + 16, 4); // uint32_t MetaData::version
-    assert(dst - header == 192);
-    os.write(header, 192); // write header
-    os.write(gridName, nameSize); // write grid name
-    while (1) { // loop over all grids in the buffer (typically just one grid per buffer)
-        const uint64_t gridSize = *(const uint64_t*)(grid + 32);
-        os.write(grid, gridSize); // write grid <- bulk of writing!
-        if (*(const uint32_t*)(grid + 24) >= *(const uint32_t*)(grid + 28) - 1)
-            break;
-        grid += gridSize;
-    }
-} // writeUncompressedGrid
+    os.write((const char*)gridData, gridData->mGridSize);// write the grid
+}// writeUncompressedGrid
 
 /// @brief  write multiple NanoVDB grids to a single file, without compression.
+/// @note To write all grids in a single GridHandle simply use handle.write("fieNane")
 template<typename GridHandleT, template<typename...> class VecT>
-void writeUncompressedGrids(const char* fileName, const VecT<GridHandleT>& handles)
+void writeUncompressedGrids(const char* fileName, const VecT<GridHandleT>& handles, bool raw = false)
 {
 #ifdef NANOVDB_USE_IOSTREAMS // use this to switch between std::ofstream or FILE implementations
     std::ofstream os(fileName, std::ios::out | std::ios::binary | std::ios::trunc);
 #else
-    struct StreamT
-    {
+    struct StreamT {
         FILE* fptr;
         StreamT(const char* name) { fptr = fopen(name, "wb"); }
         ~StreamT() { fclose(fptr); }
@@ -7705,8 +7847,9 @@ void writeUncompressedGrids(const char* fileName, const VecT<GridHandleT>& handl
         fprintf(stderr, "nanovdb::writeUncompressedGrids: Unable to open file \"%s\"for output\n", fileName);
         exit(EXIT_FAILURE);
     }
-    for (auto& handle : handles)
-        writeUncompressedGrid(os, handle.data());
+    for (auto& h : handles) {
+        for (uint32_t n=0; n<h.gridCount(); ++n) writeUncompressedGrid(os, h.gridData(n), raw);
+    }
 } // writeUncompressedGrids
 
 /// @brief read all uncompressed grids from a stream and return their handles.
@@ -7716,31 +7859,44 @@ void writeUncompressedGrids(const char* fileName, const VecT<GridHandleT>& handl
 /// @details StreamT class must support: "bool read(char*, size_t)" and "void skip(uint32_t)"
 template<typename GridHandleT, typename StreamT, template<typename...> class VecT>
 VecT<GridHandleT> readUncompressedGrids(StreamT& is, const typename GridHandleT::BufferType& pool = typename GridHandleT::BufferType())
-{ // header1, metadata11, grid11, metadata12, grid2 ... header2, metadata21, grid21, metadata22, grid22 ...
-    char              header[16], metadata[176];
+{
     VecT<GridHandleT> handles;
-    while (is.read(header, 16)) { // read all segments, e.g. header1, metadata11, grid11, metadata12, grid2 ...
-        if (*(uint64_t*)(header) != 0x304244566f6e614eUL) {
-            fprintf(stderr, "nanovdb::readUncompressedGrids: invalid magic number\n");
-            exit(EXIT_FAILURE);
-        } else if (*(uint32_t*)(header + 8) >> 21 != 32) {
-            fprintf(stderr, "nanovdb::readUncompressedGrids: invalid major version\n");
-            exit(EXIT_FAILURE);
-        } else if (*(uint16_t*)(header + 14) != 0) {
-            fprintf(stderr, "nanovdb::readUncompressedGrids: invalid codec\n");
-            exit(EXIT_FAILURE);
+    GridData data;
+    is.read((char*)&data, 40);// we only need to load the first 40 bytes
+    if (data.mMagic == NANOVDB_MAGIC_GRID || data.isValid()) {// stream contains a raw grid buffer
+        uint64_t size = data.mGridSize, sum = 0u;
+        while(data.mGridIndex + 1u < data.mGridCount) {
+            is.skip(data.mGridSize - 40);// skip grid
+            is.read((char*)&data, 40);// read 40 bytes
+            sum += data.mGridSize;
         }
-        for (uint16_t i = 0, e = *(uint16_t*)(header + 12); i < e; ++i) { // read all grids in segment
-            if (!is.read(metadata, 176)) {
-                fprintf(stderr, "nanovdb::readUncompressedGrids: error reading metadata\n");
+        is.skip(-int64_t(sum + 40));// rewind to start
+        auto buffer = GridHandleT::BufferType::create(size + sum, &pool);
+        is.read((char*)(buffer.data()), buffer.size());
+        handles.emplace_back(std::move(buffer));
+    } else {// Header0, MetaData0, gridName0, Grid0...HeaderN, MetaDataN, gridNameN, GridN
+        is.skip(-40);// rewind
+        FileHeader head;
+        while(is.read((char*)&head, sizeof(FileHeader))) {
+            if (!head.isValid()) {
+                fprintf(stderr, "nanovdb::readUncompressedGrids: invalid magic number = \"%s\"\n", (const char*)&(head.magic));
+                exit(EXIT_FAILURE);
+            } else if (!head.version.isCompatible()) {
+                fprintf(stderr, "nanovdb::readUncompressedGrids: invalid major version = \"%s\"\n", head.version.c_str());
+                exit(EXIT_FAILURE);
+            } else if (head.codec != Codec::NONE) {
+                fprintf(stderr, "nanovdb::readUncompressedGrids: invalid codec = \"%s\"\n", toStr(head.codec));
                 exit(EXIT_FAILURE);
             }
-            const uint64_t gridSize = *(uint64_t*)(metadata);
-            auto           buffer = GridHandleT::BufferType::create(gridSize, &pool);
-            is.skip(*(uint32_t*)(metadata + 136)); // skip grid name
-            is.read((char*)buffer.data(), gridSize);
-            handles.emplace_back(std::move(buffer));
-        }
+            FileMetaData meta;
+            for (uint16_t i = 0; i < head.gridCount; ++i) { // read all grids in segment
+                is.read((char*)&meta, sizeof(FileMetaData));// read meta data
+                is.skip(meta.nameSize); // skip grid name
+                auto buffer = GridHandleT::BufferType::create(meta.gridSize, &pool);
+                is.read((char*)buffer.data(), meta.gridSize);// read grid
+                handles.emplace_back(std::move(buffer));
+            }// loop over grids in segment
+        }// loop over segments
     }
     return handles;
 } // readUncompressedGrids
@@ -7750,26 +7906,20 @@ template<typename GridHandleT, template<typename...> class VecT>
 VecT<GridHandleT> readUncompressedGrids(const char* fileName, const typename GridHandleT::BufferType& buffer = typename GridHandleT::BufferType())
 {
 #ifdef NANOVDB_USE_IOSTREAMS // use this to switch between std::ifstream or FILE implementations
-    struct StreamT : public std::ifstream
-    {
-        StreamT(const char* name)
-            : std::ifstream(name, std::ios::in | std::ios::binary)
-        {
-        }
-        void skip(uint32_t off) { this->seekg(off, std::ios_base::cur); }
+    struct StreamT : public std::ifstream {
+        StreamT(const char* name) : std::ifstream(name, std::ios::in | std::ios::binary){}
+        void skip(int64_t off) { this->seekg(off, std::ios_base::cur); }
     };
 #else
-    struct StreamT
-    {
+    struct StreamT {
         FILE* fptr;
         StreamT(const char* name) { fptr = fopen(name, "rb"); }
         ~StreamT() { fclose(fptr); }
-        bool read(char* data, size_t n)
-        {
+        bool read(char* data, size_t n) {
             size_t m = fread(data, 1, n, fptr);
             return n == m;
         }
-        void skip(uint32_t off) { fseek(fptr, off, SEEK_CUR); }
+        void skip(int64_t off) { fseek(fptr, (long int)off, SEEK_CUR); }
         bool is_open() const { return fptr != NULL; }
     };
 #endif
@@ -7781,9 +7931,9 @@ VecT<GridHandleT> readUncompressedGrids(const char* fileName, const typename Gri
     return readUncompressedGrids<GridHandleT, StreamT, VecT>(is, buffer);
 } // readUncompressedGrids
 
-} // namespace io
-
 #endif // if !defined(__CUDA_ARCH__) && !defined(__HIP__)
+
+} // namespace io
 
 // ----------------------------> Implementations of random access methods <--------------------------------------
 

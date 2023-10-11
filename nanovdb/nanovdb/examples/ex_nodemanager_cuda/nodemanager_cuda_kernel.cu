@@ -4,6 +4,7 @@
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
 #include <nanovdb/util/NodeManager.h>
 #include <nanovdb/util/cuda/CudaGridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
+#include <nanovdb/util/cuda/CudaNodeManager.cuh>
 #include <stdio.h> // for printf
 
 // This is called by the host only
@@ -26,4 +27,9 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>* deviceMgr,
     gpu_kernel<<<1, 1, 0, stream>>>(deviceMgr); // Launch the device kernel asynchronously
 
     cpu_kernel(cpuMgr); // Launch the host "kernel" (synchronously)
+}
+
+// Simple wrapper that makes sure nanovdb::cudaCreateNodeManager is initiated
+extern "C" auto cudaCreateNodeManager(const nanovdb::NanoGrid<float> *d_grid) {
+    return nanovdb::cudaCreateNodeManager<float>(d_grid);
 }

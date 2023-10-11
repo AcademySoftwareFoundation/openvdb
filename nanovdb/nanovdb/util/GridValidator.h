@@ -59,8 +59,16 @@ std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
     std::stringstream ss;
     if (!isValid(data)) {
         errorStr.assign("Grid is not 32B aligned");
-    } else if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
-        ss << "Incorrect magic number: Expected " << NANOVDB_MAGIC_NUMBER << ", but read " << data->mMagic;
+    } else if (data->mMagic != NANOVDB_MAGIC_NUMBER && data->mMagic != NANOVDB_MAGIC_GRID) {
+        const uint64_t magic1 = NANOVDB_MAGIC_NUMBER, magic2 = NANOVDB_MAGIC_GRID;
+        const char *c0 = (const char*)&(data->mMagic), *c1=(const char*)&magic1, *c2=(const char*)&magic2;
+        ss << "Incorrect magic number: Expected \"";
+        for (int i=0; i<8; ++i) ss << c1[i];
+        ss << "\" or \"";
+        for (int i=0; i<8; ++i) ss << c2[i];
+        ss << "\", but found \"";
+        for (int i=0; i<8; ++i) ss << c0[i];
+        ss << "\"";
         errorStr = ss.str();
     } else if (!validateChecksum(grid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
         errorStr.assign("Mis-matching checksum");

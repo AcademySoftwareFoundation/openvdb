@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
         for (auto& file : fileNames) {
             auto list = nanovdb::io::readGridMetaData(file);
             if (!gridName.empty()) {
-                std::vector<nanovdb::io::GridMetaData> tmp;
+                std::vector<nanovdb::io::FileGridMetaData> tmp;
                 for (auto& m : list) {
                     if (nameKey == m.nameKey && gridName == m.gridName)
                         tmp.emplace_back(m);

@@ -94,7 +94,6 @@
 #include "DitherLUT.h"// for nanovdb::DitherLUT
 
 #include <limits>
-#include <sstream> // for stringstream
 #include <vector>
 #include <set>
 #include <cstring> // for memcpy
@@ -1719,14 +1718,17 @@ void CreateNanoGrid<SrcGridT>::processGrid()
     auto* dstData = this->template dstGrid<DstBuildT>()->data();
     dstData->init({GridFlags::IsBreadthFirst}, mOffset.size, mSrcNodeAcc.map(),
                   mapToGridType<DstBuildT>(), mapToGridClass<DstBuildT>(mSrcNodeAcc.gridClass()));
-     dstData->mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
-     dstData->mData1 = this->valueCount();
+    dstData->mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
+    dstData->mData1 = this->valueCount();
 
     if (!isValid(dstData->mGridType, dstData->mGridClass)) {
-        std::stringstream ss;
-        ss << "Invalid combination of GridType("<<int(dstData->mGridType)
-           << ") and GridClass("<<int(dstData->mGridClass)<<"). See NanoVDB.h for details!";
-        throw std::runtime_error(ss.str());
+#if 1
+        fprintf(stderr,"Warning: Strange combination of GridType(\"%s\") and GridClass(\"%s\"). Consider changing GridClass to \"Unknown\"\n",
+                toStr(dstData->mGridType), toStr(dstData->mGridClass));
+#else
+        throw std::runtime_error("Invalid combination of GridType("+std::to_string(int(dstData->mGridType))+
+                                 ") and GridClass("+std::to_string(int(dstData->mGridClass))+"). See NanoVDB.h for details!");
+#endif
     }
 
     std::memset(dstData->mGridName, '\0', GridData::MaxNameSize);//overwrite mGridName
@@ -1806,7 +1808,7 @@ CreateNanoGrid<SrcGridT>::postProcess()
         (void)metaData;
     }
 #endif
-    updateChecksum(*(this->template dstGrid<DstBuildT>()), mChecksum);
+    updateChecksum(*dstGrid, mChecksum);
 }// CreateNanoGrid::postProcess<T>
 
 //================================================================================================
@@ -1818,7 +1820,7 @@ CreateNanoGrid<SrcGridT>::postProcess(uint32_t channels)
 {
     const std::string typeName = toStr(mapToGridType<SrcValueT>());
     const uint64_t valueCount = this->valueCount();
-    const auto *dstGrid = this->template dstGrid<DstBuildT>();
+    auto *dstGrid = this->template dstGrid<DstBuildT>();
     for (uint32_t i=0; i<channels; ++i) {
         const std::string name = "channel_"+std::to_string(i);
         int j = dstGrid->findBlindData(name.c_str());
@@ -1837,7 +1839,7 @@ CreateNanoGrid<SrcGridT>::postProcess(uint32_t channels)
         }
     }// loop over channels
     gridStats(*(this->template dstGrid<DstBuildT>()), std::min(StatsMode::BBox, mStats));
-    updateChecksum(*(this->template dstGrid<DstBuildT>()), mChecksum);
+    updateChecksum(*dstGrid, mChecksum);
 }// CreateNanoGrid::postProcess<ValueIndex or ValueOnIndex>
 
 //================================================================================================

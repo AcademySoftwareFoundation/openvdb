@@ -53,21 +53,26 @@ struct NodeManagerData
 template<typename BufferT>
 class NodeManagerHandle
 {
-    BufferT mBuffer;
+    GridType mGridType{GridType::Unknown};
+    BufferT  mBuffer;
 
     template<typename BuildT>
-    const NodeManager<BuildT>* getMgr() const;
+    const NodeManager<BuildT>* getMgr() const {
+        return mGridType == mapToGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.data() : nullptr;
+    }
 
     template<typename BuildT, typename U = BufferT>
-    typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
-    getDeviceMgr() const;
+    typename enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
+    getDeviceMgr() const {
+        return mGridType == mapToGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.deviceData() : nullptr;
+    }
 
     template <typename T>
     static T* no_const(const T* ptr) { return const_cast<T*>(ptr); }
 
 public:
     /// @brief Move constructor from a buffer
-    NodeManagerHandle(BufferT&& buffer) { mBuffer = std::move(buffer); }
+    NodeManagerHandle(GridType gridType, BufferT&& buffer) : mGridType(gridType) { mBuffer = std::move(buffer); }
     /// @brief Empty ctor
     NodeManagerHandle() = default;
     /// @brief Disallow copy-construction
@@ -75,13 +80,18 @@ public:
     /// @brief Disallow copy assignment operation
     NodeManagerHandle& operator=(const NodeManagerHandle&) = delete;
     /// @brief Move copy assignment operation
-    NodeManagerHandle& operator=(NodeManagerHandle&& other) noexcept
-    {
+    NodeManagerHandle& operator=(NodeManagerHandle&& other) noexcept {
+        mGridType = other.mGridType;
         mBuffer = std::move(other.mBuffer);
+        other.mGridType = GridType::Unknown;
         return *this;
     }
     /// @brief Move copy-constructor
-    NodeManagerHandle(NodeManagerHandle&& other) noexcept { mBuffer = std::move(other.mBuffer); }
+    NodeManagerHandle(NodeManagerHandle&& other) noexcept {
+        mGridType = other.mGridType;
+        mBuffer = std::move(other.mBuffer);
+        other.mGridType = GridType::Unknown;
+    }
     /// @brief Default destructor
     ~NodeManagerHandle() { this->reset(); }
     /// @brief clear the buffer
@@ -122,21 +132,21 @@ public:
     ///
     /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
     template<typename BuildT, typename U = BufferT>
-    typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
+    typename enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
     deviceMgr() const { return this->template getDeviceMgr<BuildT>(); }
 
     /// @brief Return a const pointer to the NodeManager encoded in this NodeManagerHandle on the device, e.g. GPU
     ///
     /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
     template<typename BuildT, typename U = BufferT>
-    typename std::enable_if<BufferTraits<U>::hasDeviceDual, NodeManager<BuildT>*>::type
+    typename enable_if<BufferTraits<U>::hasDeviceDual, NodeManager<BuildT>*>::type
     deviceMgr() { return no_const(this->template getDeviceMgr<BuildT>()); }
 
     /// @brief Upload the NodeManager to the device, e.g. from CPU to GPU
     ///
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
-    typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
+    typename enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(void* deviceGrid, void* stream = nullptr, bool sync = true)
     {
         assert(deviceGrid);
@@ -151,7 +161,7 @@ public:
     ///
     /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
-    typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
+    typename enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceDownload(void* stream = nullptr, bool sync = true)
     {
         auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
@@ -160,25 +170,6 @@ public:
         data->mGrid = tmp;
     }
 };// NodeManagerHandle
-
-template<typename BufferT>
-template<typename BuildT>
-inline const NodeManager<BuildT>* NodeManagerHandle<BufferT>::getMgr() const
-{
-    using T = const NodeManager<BuildT>*;
-    T mgr = reinterpret_cast<T>(mBuffer.data());// host
-    return mgr && mgr->grid().gridType() == mapToGridType<BuildT>() ? mgr : nullptr;
-}
-
-template<typename BufferT>
-template<typename BuildT, typename U>
-inline typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
-NodeManagerHandle<BufferT>::getDeviceMgr() const
-{
-    using T = const NodeManager<BuildT>*;
-    T mgr = reinterpret_cast<T>(mBuffer.data());// host
-    return mgr && mgr->grid().gridType() == mapToGridType<BuildT>() ? reinterpret_cast<T>(mBuffer.deviceData()) : nullptr;
-}
 
 /// @brief This class allows for sequential access to nodes in a NanoVDB tree
 ///
@@ -196,9 +187,9 @@ class NodeManager : private NodeManagerData
     using Node2 = NodeT<2>;// upper internal node
     using Node1 = NodeT<1>;// lower internal node
     using Node0 = NodeT<0>;// leaf node
-    static constexpr bool FIXED_SIZE = Node0::FIXED_SIZE && Node1::FIXED_SIZE && Node2::FIXED_SIZE;
 
 public:
+    static constexpr bool FIXED_SIZE = Node0::FIXED_SIZE && Node1::FIXED_SIZE && Node2::FIXED_SIZE;
 
     NodeManager(const NodeManager&) = delete;
     NodeManager(NodeManager&&) = delete;
@@ -218,7 +209,7 @@ public:
     __hostdev__ static uint64_t memUsage(const GridT &grid) {
         uint64_t size = sizeof(NodeManagerData);
         if (!NodeManager::isLinear(grid)) {
-            const uint32_t *p = grid.tree().data()->mNodeCount;
+            const uint32_t *p = grid.tree().mNodeCount;
             size += sizeof(int64_t)*(p[0]+p[1]+p[2]);
         }
         return size;
@@ -293,12 +284,15 @@ template <typename BuildT, typename BufferT>
 NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
                                              const BufferT& buffer)
 {
-    NodeManagerHandle<BufferT> handle(BufferT::create(NodeManager<BuildT>::memUsage(grid), &buffer));
+    NodeManagerHandle<BufferT> handle(mapToGridType<BuildT>(), BufferT::create(NodeManager<BuildT>::memUsage(grid), &buffer));
     auto *data = reinterpret_cast<NodeManagerData*>(handle.data());
     NANOVDB_ASSERT(isValid(data));
-    data->mMagic = NANOVDB_MAGIC_NUMBER;
-    data->mGrid = const_cast<NanoGrid<BuildT>*>(&grid);
-    data->mPadding = 0;
+    NANOVDB_ASSERT(mapToGridType<BuildT>() == grid.gridType());
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+    *data = NodeManagerData{NANOVDB_MAGIC_NODE,   0u, (void*)&grid, {0u,0u,0u}};
+#else
+    *data = NodeManagerData{NANOVDB_MAGIC_NUMBER, 0u, (void*)&grid, {0u,0u,0u}};
+#endif
 
     if (NodeManager<BuildT>::isLinear(grid)) {
         data->mLinear = uint8_t(1u);
@@ -325,5 +319,9 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
 }
 
 } // namespace nanovdb
+
+#if defined(__CUDACC__)
+#include <nanovdb/util/cuda/CudaNodeManager.cuh>
+#endif// defined(__CUDACC__)
 
 #endif // NANOVDB_NODEMANAGER_H_HAS_BEEN_INCLUDED

@@ -24,8 +24,9 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/GridHandle.h>
-#include <nanovdb/util/cuda/GpuTimer.cuh>
+#include <nanovdb/util/cuda/GpuTimer.h>
 #include <nanovdb/util/cuda/CudaUtils.h>
+#include <nanovdb/util/cuda/CudaGridChecksum.cuh>
 
 namespace nanovdb {
 
@@ -33,9 +34,10 @@ namespace nanovdb {
 /// @tparam BuildT Build type of the grid to be flood-filled
 /// @param d_grid Non-const device pointer to the grid that will be flood-filled
 /// @param verbose If true timing information will be printed to the terminal
+/// @param stream optional cuda stream
 template<typename BuildT>
 typename enable_if<BuildTraits<BuildT>::is_float, void>::type
-cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose = false);
+cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose = false, cudaStream_t stream = 0);
 
 namespace {// anonymous namespace
 
@@ -43,7 +45,8 @@ template<typename BuildT>
 class CudaSignedFloodFill
 {
 public:
-    CudaSignedFloodFill() {}
+    CudaSignedFloodFill(bool verbose = false, cudaStream_t stream = 0)
+        : mStream(stream), mVerbose(verbose) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param on if true verbose is turned on
@@ -52,8 +55,9 @@ public:
     void operator()(NanoGrid<BuildT> *d_grid);
 
 private:
-    GpuTimer mTimer;
-    bool mVerbose{false};
+    cudaStream_t mStream{0};
+    GpuTimer     mTimer;
+    bool         mVerbose{false};
 
 };// CudaSignedFloodFill
 
@@ -149,30 +153,30 @@ void CudaSignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     static_assert(BuildTraits<BuildT>::is_float, "CudaSignedFloodFill only works on float grids");
     NANOVDB_ASSERT(d_grid);
     uint64_t count[4], *d_count = nullptr;
-    cudaCheck(cudaMalloc((void**)&d_count, 4*sizeof(uint64_t)));
-    cudaCpyNodeCount<BuildT><<<1,1>>>(d_grid, d_count);
+    cudaCheck(cudaMallocAsync((void**)&d_count, 4*sizeof(uint64_t), mStream));
+    cudaCpyNodeCount<BuildT><<<1, 1, 0, mStream>>>(d_grid, d_count);
     cudaCheckError();
-    cudaCheck(cudaMemcpy(&count, d_count, 4*sizeof(uint64_t), cudaMemcpyDeviceToHost));
-    cudaCheck(cudaFree(d_count));
+    cudaCheck(cudaMemcpyAsync(&count, d_count, 4*sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaFreeAsync(d_count, mStream));
 
     static const int threadsPerBlock = 128;
     auto blocksPerGrid = [&](size_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
     auto *tree = reinterpret_cast<NanoTree<BuildT>*>(d_grid + 1);
 
     if (mVerbose) mTimer.start("\nProcess leaf nodes");
-    cudaProcessLeafNodes<BuildT><<<blocksPerGrid(count[0]<<9), threadsPerBlock>>>(tree, count[0]<<9);
+    cudaProcessLeafNodes<BuildT><<<blocksPerGrid(count[0]<<9), threadsPerBlock, 0, mStream>>>(tree, count[0]<<9);
     cudaCheckError();
 
     if (mVerbose) mTimer.restart("Process lower internal nodes");
-    cudaProcessInternalNodes<BuildT,1><<<blocksPerGrid(count[1]<<12), threadsPerBlock>>>(tree, count[1]<<12);
+    cudaProcessInternalNodes<BuildT,1><<<blocksPerGrid(count[1]<<12), threadsPerBlock, 0, mStream>>>(tree, count[1]<<12);
     cudaCheckError();
 
     if (mVerbose) mTimer.restart("Process upper internal nodes");
-    cudaProcessInternalNodes<BuildT,2><<<blocksPerGrid(count[2]<<15), threadsPerBlock>>>(tree, count[2]<<15);
+    cudaProcessInternalNodes<BuildT,2><<<blocksPerGrid(count[2]<<15), threadsPerBlock, 0, mStream>>>(tree, count[2]<<15);
     cudaCheckError();
 
     //if (mVerbose) mTimer.restart("Process root node");
-    //cudaProcessRootNode<BuildT><<<1, 1>>>(tree);
+    //cudaProcessRootNode<BuildT><<<1, 1, 0, mStream>>>(tree);
     if (mVerbose) mTimer.stop();
     cudaCheckError();
 }// CudaSignedFloodFill::operator()
@@ -181,11 +185,15 @@ void CudaSignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
 
 template<typename BuildT>
 typename enable_if<BuildTraits<BuildT>::is_float, void>::type
-cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose)
+cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose, cudaStream_t stream)
 {
-    CudaSignedFloodFill<BuildT> tmp;
-    tmp.setVerbose(verbose);
-    tmp(d_grid);
+    CudaSignedFloodFill<BuildT> sff(verbose, stream);
+    sff(d_grid);
+    auto *d_gridData = d_grid->data();
+    GridChecksum cs = cudaGetGridChecksum(d_gridData, stream);
+    if (cs.mode() == ChecksumMode::Full) {// ChecksumMode::Partial checksum is unaffected
+        cudaGridChecksum(d_gridData, ChecksumMode::Full, stream);
+    }
 }
 
 }// nanovdb namespace

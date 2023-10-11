@@ -10,7 +10,9 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,
                                const nanovdb::NodeManager<float>*,
                                cudaStream_t stream);
 
-openvdb::FloatGrid::Ptr createLevelSetSphere();
+extern "C" nanovdb::NodeManagerHandle<nanovdb::CudaDeviceBuffer> cudaCreateNodeManager(const nanovdb::NanoGrid<float>*);
+
+//openvdb::FloatGrid::Ptr createLevelSetSphere();// not sure why this is needed
 
 /// @brief This examples depends on OpenVDB, NanoVDB and CUDA.
 int main()
@@ -34,9 +36,14 @@ int main()
         }
 
         auto nodeHandle = nanovdb::createNodeManager<float, BufferT>(*grid);
-        nodeHandle.deviceUpload(deviceGrid, stream, false);
         auto *nodeMgr = nodeHandle.template mgr<float>();
+#if 0// this approach copies a NodeManager from host to device
+        nodeHandle.deviceUpload(deviceGrid, stream, false);
         auto *deviceNodeMgr = nodeHandle.template deviceMgr<float>();
+#else// the approach below constructs a new NodeManager directly for a device grid
+        auto nodeHandle2 = cudaCreateNodeManager(deviceGrid);
+        auto *deviceNodeMgr = nodeHandle2.template deviceMgr<float>();
+#endif
         if (!deviceNodeMgr || !nodeMgr) {
             throw std::runtime_error("NodeManagerHandle did not contain a grid with value type float");
         }
