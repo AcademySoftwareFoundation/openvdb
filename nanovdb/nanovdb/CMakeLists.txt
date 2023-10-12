@@ -173,12 +173,14 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/CSampleFromVoxels.h
   util/cuda/CudaAddBlindData.cuh
   util/cuda/CudaDeviceBuffer.h
+  util/cuda/CudaGridChecksum.cuh
   util/cuda/CudaGridHandle.cuh
   util/cuda/CudaIndexToGrid.cuh
+  util/cuda/CudaNodeManager.cuh
   util/cuda/CudaPointsToGrid.cuh
   util/cuda/CudaSignedFloodFill.cuh
   util/cuda/CudaUtils.h
-  util/cuda/GpuTimer.cuh
+  util/cuda/GpuTimer.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
