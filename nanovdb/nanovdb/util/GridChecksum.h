@@ -104,7 +104,7 @@ inline __hostdev__ uint32_t checksum(const void* data, size_t size, uint32_t crc
 }
 
 /// @brief Compute crc32 checksum of data between @c begin and @c end
-/// @param begin points to beginning of @data
+/// @param begin points to beginning of data
 /// @param end points to end of @data, (exclusive)
 /// @param crc initial value of crc32 checksum
 /// @return return crc32 checksum
@@ -115,12 +115,12 @@ inline __hostdev__ uint32_t checksum(const void *begin, const void *end, uint32_
     return checksum(begin, (const char*)end - (const char*)begin, crc);
 }
 
-/// @brief
-/// @param data
-/// @param size
-/// @param lut
-/// @param crc
-/// @return
+/// @brief Compute crc32 checksum of @c data with @c size bytes using a lookup table
+/// @param data pointer to begenning of data
+/// @param size byte size
+/// @param lut pointer to loopup table for accelerated crc32 computation
+/// @param crc initial value of the checksum
+/// @return crc32 checksum of @c data with @c size bytes
 inline __hostdev__ uint32_t checksum(const void *data, size_t size, const uint32_t lut[256], uint32_t crc = 0)
 {
     crc = ~crc;
@@ -128,12 +128,12 @@ inline __hostdev__ uint32_t checksum(const void *data, size_t size, const uint32
     return ~crc;
 }
 
-/// @brief
-/// @param begin
-/// @param end
-/// @param lut
-/// @param crc
-/// @return
+/// @brief Compute crc32 checksum of data between @c begin and @c end using a lookup table
+/// @param begin points to beginning of data
+/// @param end points to end of @data, (exclusive)
+/// @param lut pointer to loopup table for accelerated crc32 computation
+/// @param crc initial value of crc32 checksum
+/// @return return crc32 checksum
 inline __hostdev__ uint32_t checksum(const void *begin, const void *end, const uint32_t lut[256], uint32_t crc = 0)
 {
     NANOVDB_ASSERT(begin && end);
@@ -174,60 +174,53 @@ public:
         if (mode == ChecksumMode::Partial) mCRC[1] = EMPTY32;
     }
 
-    /// @brief
-    /// @return
+    /// @brief return the 64 bit checksum of this instance
     uint64_t checksum() const { return mChecksum; }
 
-    /// @brief
-    /// @param i
-    /// @return
+    /// @brief return 32 bit (crc32) checksum of this instance
+    /// @param i index of value 0 or 1 indicated the 32 bit checksum of the head or nodes
+    /// @return non-const reference of the i'th 32bit checksum
     uint32_t& checksum(int i) {NANOVDB_ASSERT(i==0 || i==1); return mCRC[i]; }
 
-    /// @brief
-    /// @param i
-    /// @return
+    /// @brief return 32 bit (crc32) checksum of this instance
+    /// @param i index of value 0 or 1 indicated the 32 bit checksum of the head or nodes
+    /// @return copy of the i'th 32bit checksum
     uint32_t checksum(int i) const {NANOVDB_ASSERT(i==0 || i==1); return mCRC[i]; }
 
-    /// @brief
-    /// @return
+    /// @brief return true if the 64 bit checksum is partial, i.e. of head only
     bool isPartial() const { return mCRC[0] != EMPTY32 && mCRC[1] == EMPTY32; }
 
-    /// @brief
-    /// @return
+    /// @brief return true if the 64 bit checksum is fill, i.e. of both had and nodes
     bool isFull() const { return mCRC[0] != EMPTY32 && mCRC[1] != EMPTY32; }
 
-    /// @brief
-    /// @return
+    /// @brief return true if the 64 bit checksum is disables (unset)
     bool isEmpty() const { return mChecksum == EMPTY; }
 
-    /// @brief
-    /// @return
+    /// @brief return the mode of the 64 bit checksum
     ChecksumMode mode() const
     {
         return mChecksum == EMPTY ? ChecksumMode::Disable :
                mCRC[1] == EMPTY32 ? ChecksumMode::Partial : ChecksumMode::Full;
     }
 #ifdef NANOVDB_CRC32_LOG2_BLOCK_SIZE
-    /// @brief
-    /// @param gridData
-    /// @param mode
+    /// @brief compute checksum of @c gridData using a 4KB blocked approach
+    /// @param gridData Reference to GridData
+    /// @param mode Mode of the checksum computation
     ChecksumMode operator()(const GridData &gridData, ChecksumMode mode = ChecksumMode::Full);
 #else
-    /// @brief
-    /// @tparam ValueT
-    /// @param grid
-    /// @param mode
+    /// @brief Compute checksum using old (node-based) approach
+    /// @tparam ValueT Build type of the grid
+    /// @param grid Reference to Grid
+    /// @param mode Mode of the checksum computation
     template <typename ValueT>
     void operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Full);
 #endif
-    /// @brief
-    /// @param rhs
-    /// @return
+    /// @brief return true if the checksums are identical
+    /// @param rhs other GridChecksum
     bool operator==(const GridChecksum &rhs) const {return mChecksum == rhs.mChecksum;}
 
-    /// @brief
-    /// @param rhs
-    /// @return
+    /// @brief return true if the checksums are not identical
+    /// @param rhs other GridChecksum
     bool operator!=(const GridChecksum &rhs) const {return mChecksum != rhs.mChecksum;}
 };// GridChecksum
 
