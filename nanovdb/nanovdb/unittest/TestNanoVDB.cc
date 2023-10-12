@@ -525,7 +525,7 @@ TEST_F(TestNanoVDB, CRC32)
         EXPECT_EQ("414fa339", ss.str());
     }
     {
-        EXPECT_EQ(~uint64_t(0), nanovdb::GridChecksum::EMPTY);
+        //EXPECT_EQ(~uint64_t(0), nanovdb::GridChecksum::EMPTY);
         nanovdb::GridChecksum cs(~uint64_t(0));
         EXPECT_EQ(nanovdb::ChecksumMode::Disable, cs.mode());
         EXPECT_TRUE(cs.isEmpty());

@@ -55,24 +55,18 @@
 
 #if CUDART_VERSION < 11020  // 11.2 introduced cudaMallocAsync and cudaFreeAsync
 
-/// @brief ummy implementation of cudaMallocAsync that calls cudaMalloc
-/// @param devPtr  device pointer to allocated device memory
-/// @param size byte size to be allocated
-/// @param dummy stream argument
-/// @return uda error code
-inline cudaError_t cudaMallocAsync(void** devPtr, size_t size, cudaStream_t)
-{
-    return cudaMalloc(devPtr, size); // un-managed memory on the device, always 32B aligned!
-}
+/// @brief Dummy implementation of cudaMallocAsync that calls cudaMalloc
+/// @param d_ptr Device pointer to allocated device memory
+/// @param size  Number of bytes to allocate
+/// @param dummy The stream establishing the stream ordering contract and the memory pool to allocate from (ignored)
+/// @return Cuda error code
+inline cudaError_t cudaMallocAsync(void** d_ptr, size_t size, cudaStream_t){return cudaMalloc(d_ptr, size);}
 
 /// @brief Dummy implementation of cudaFreeAsync that calls cudaFree
-/// @param devPtr device pointer that will be freed
-/// @param dummy stream argument
-/// @return cuda error code
-inline cudaError_t cudaFreeAsync(void* devPtr, cudaStream_t)
-{
-    return cudaFree(devPtr);
-}
+/// @param d_ptr Device pointer that will be freed
+/// @param dummy The stream establishing the stream ordering promise (ignored)
+/// @return Cuda error code
+inline cudaError_t cudaFreeAsync(void* d_ptr, cudaStream_t){return cudaFree(d_ptr);}
 
 #endif
 
