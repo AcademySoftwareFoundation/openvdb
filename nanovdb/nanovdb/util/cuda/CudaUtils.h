@@ -53,6 +53,27 @@
         cudaCheck(cudaGetLastError()); \
     }
 
+#if CUDART_VERSION < 11020  // 11.2 introduced cudaMallocAsync and cudaFreeAsync
+
+/// @brief ummy implementation of cudaMallocAsync that calls cudaMalloc
+/// @param devPtr  device pointer to allocated device memory
+/// @param size byte size to be allocated
+/// @param dummy stream argument
+/// @return uda error code
+inline cudaError_t cudaMallocAsync(void** devPtr, size_t size, cudaStream_t)
+{
+    return cudaMalloc(devPtr, size); // un-managed memory on the device, always 32B aligned!
+}
+/// @brief Dummy implementation of cudaFreeAsync that calls cudaFree
+/// @param devPtr device pointer that will be freed
+/// @param dummy stream argument
+/// @return cuda error code
+inline ​cudaError_t cudaFreeAsync(void* devPtr, cudaStream_t)
+{
+    return cudaFree(devPtr);
+}
+#endif
+
 #if defined(__CUDACC__)// the following functions only run on the GPU!
 
 // --- Wrapper for launching lambda kernels
