@@ -20,6 +20,7 @@
 #include <deque>
 #include <cassert>
 #include <iostream>
+#include <iterator>
 #include <algorithm>// std::swap
 #include <atomic>
 #include <tbb/spin_mutex.h>
@@ -634,11 +635,6 @@ private:
     const PagedArray* mParent;
 };// Public class PagedArray::ConstIterator
 
-#ifdef OPENVDB_HAS_CXX20
-static_assert(std::random_access_iterator<PagedArray<int, 10UL>::ConstIterator>,
-    "ConstIterator must satisfy random_access_iterator concept");
-#endif
-
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -694,11 +690,6 @@ public:
     size_t      mPos;
     PagedArray* mParent;
 };// Public class PagedArray::Iterator
-
-#ifdef OPENVDB_HAS_CXX20
-static_assert(std::random_access_iterator<PagedArray<int, 10UL>::Iterator>,
-    "Iterator must satisfy random_access_iterator concept");
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 

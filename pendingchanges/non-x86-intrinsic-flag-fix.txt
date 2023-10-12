@@ -1,4 +1,0 @@
-OpenVDB:
-    - Bug Fixes:
-        Fixed a compilation error that would be encountered when attempting to
-        enable the SSE4.2 or AVX SIMD options on non-x86 based platforms.
