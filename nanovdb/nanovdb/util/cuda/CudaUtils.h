@@ -64,14 +64,16 @@ inline cudaError_t cudaMallocAsync(void** devPtr, size_t size, cudaStream_t)
 {
     return cudaMalloc(devPtr, size); // un-managed memory on the device, always 32B aligned!
 }
+
 /// @brief Dummy implementation of cudaFreeAsync that calls cudaFree
 /// @param devPtr device pointer that will be freed
 /// @param dummy stream argument
 /// @return cuda error code
-inline ​cudaError_t cudaFreeAsync(void* devPtr, cudaStream_t)
+inline cudaError_t cudaFreeAsync(void* devPtr, cudaStream_t)
 {
     return cudaFree(devPtr);
 }
+
 #endif
 
 #if defined(__CUDACC__)// the following functions only run on the GPU!
