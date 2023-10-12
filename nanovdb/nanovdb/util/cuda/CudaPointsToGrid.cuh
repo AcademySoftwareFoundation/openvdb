@@ -4,6 +4,8 @@
 /*!
     \file CudaPointsToGrid.cuh
 
+    \authors Greg Klar (initial version) and Ken Museth (final version)
+
     \brief Generates NanoVDB grids from a list of voxels or points on the device
 
     \warning The header file contains cuda device code so be sure

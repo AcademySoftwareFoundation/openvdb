@@ -4811,7 +4811,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
     __hostdev__ const StatsT& average() const { return mAverage; }
     __hostdev__ const StatsT& stdDeviation() const { return mStdDevi; }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__APPLE__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
@@ -4819,7 +4819,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
     __hostdev__ void setMax(const ValueT& v) { mMaximum = v; }
     __hostdev__ void setAvg(const StatsT& v) { mAverage = v; }
     __hostdev__ void setDev(const StatsT& v) { mStdDevi = v; }
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__APPLE__)
 #pragma GCC diagnostic pop
 #endif
 
