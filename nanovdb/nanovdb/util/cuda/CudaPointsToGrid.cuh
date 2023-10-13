@@ -59,9 +59,21 @@ class fancy_ptr
 {
     const T* mPtr;
 public:
+    /// @brief Default constructor.
+    /// @note  This method is atcually not required by CudaPointsToGrid
+    /// @param ptr Pointer to array of elements
     __hostdev__ explicit fancy_ptr(const T* ptr = nullptr) : mPtr(ptr) {}
-    __hostdev__ inline const T& operator[](size_t i) const {return mPtr[i];}// required by CudaPointsToGrid
-    __hostdev__ inline const T& operator*() const {return *mPtr;}// required by pointer_traits
+    /// @brief Index acces into the array pointed to by the stored pointer.
+    /// @note  This method is required by CudaPointsToGrid!
+    /// @param i Unsigned index of the element to be returned
+    /// @return Const refernce to the element at the i'th poisiton
+    __hostdev__ inline const T& operator[](size_t i) const {return mPtr[i];}
+    /// @brief Dummy implementation required by pointer_traits.
+    /// @note  Note that only the return type matters!
+    /// @details Unlike operator[] it is safe to assume that all pointer types have operator*,
+    ///          which is why pointer_traits makes use of it to determine the element_type that
+    ///          a pointer class is pointing to. E.g. operator[] is not always defined for std::shared_ptr! 
+    __hostdev__ inline const T& operator*() const {return *mPtr;}
 };// fancy_ptr<T>
 
 /// @brief Simple stand-alone function that can be used to conveniently construct a fancy_ptr
