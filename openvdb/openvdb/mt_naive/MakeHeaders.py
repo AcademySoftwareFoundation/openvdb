@@ -1,3 +1,6 @@
+# This is a temporary python script to get us going with tbb replacement headers.
+# This script should NOT end up merged back in the mainline repo.
+
 
 # These are the types being used in openvdb
 '''
