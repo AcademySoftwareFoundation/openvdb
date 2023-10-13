@@ -14,9 +14,11 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
+namespace mt {
 
-namespace mt = ::tbb;
+using namespace ::tbb;
 
+} // mt
 } // OPENVDB_VERSION_NAME
 } // openvdb
 
