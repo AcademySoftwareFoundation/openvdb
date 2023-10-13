@@ -22,7 +22,7 @@
 #ifdef BENCHMARK_PAGED_ARRAY
 #include <deque> // for std::deque
 #include <vector> // for std::vector
-#include <openvdb/mt/tbb.h> // for mt::concurrent_vector
+#include <openvdb/mt/concurrent_vector.h> // for mt::concurrent_vector
 #endif
 
 class TestUtil: public ::testing::Test
