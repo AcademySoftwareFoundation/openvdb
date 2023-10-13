@@ -399,11 +399,11 @@ public:
         if (serial) {
             mRoot->copyToDense(mDense->bbox(), *mDense);
         } else {
-            tbb::parallel_for(mDense->bbox(), *this);
+            mt::parallel_for(mDense->bbox(), *this);
         }
     }
 
-    /// @brief Public method called by tbb::parallel_for
+    /// @brief Public method called by mt::parallel_for
     void operator()(const CoordBBox& bbox) const
     {
         mRoot->copyToDense(bbox, *mDense);
@@ -489,9 +489,9 @@ public:
 
         // Multi-threaded process: Convert dense grid into leaf nodes and tiles
         if (serial) {
-            (*this)(tbb::blocked_range<size_t>(0, mBlocks->size()));
+            (*this)(mt::blocked_range<size_t>(0, mBlocks->size()));
         } else {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, mBlocks->size()), *this);
+            mt::parallel_for(mt::blocked_range<size_t>(0, mBlocks->size()), *this);
         }
 
         // Post-process: Insert leaf nodes and tiles into the tree, and prune the tiles only!
@@ -510,9 +510,9 @@ public:
         tools::pruneTiles(*mTree, mTolerance);//multi-threaded
     }
 
-    /// @brief Public method called by tbb::parallel_for
+    /// @brief Public method called by mt::parallel_for
     /// @warning Never call this method directly!
-    void operator()(const tbb::blocked_range<size_t> &r) const
+    void operator()(const mt::blocked_range<size_t> &r) const
     {
         assert(mBlocks);
         LeafT* leaf = new LeafT();

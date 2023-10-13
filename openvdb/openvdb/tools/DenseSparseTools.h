@@ -181,7 +181,7 @@ public:
     using ResultLeafNodeType = typename ResultTreeType::LeafNodeType;
     using MaskTree = typename ResultTreeType::template ValueConverter<ValueMask>::Type;
 
-    using Range3d = tbb::blocked_range3d<Index, Index, Index>;
+    using Range3d = mt::blocked_range3d<Index, Index, Index>;
 
 private:
     const DenseType&                     mDense;
@@ -218,7 +218,7 @@ public:
         }
     }
 
-    SparseExtractor(SparseExtractor& other, tbb::split):
+    SparseExtractor(SparseExtractor& other, mt::split):
         mDense(other.mDense), mFunctor(other.mFunctor),
         mBackground(other.mBackground), mBBox(other.mBBox),
         mWidth(other.mWidth),
@@ -260,7 +260,7 @@ public:
 
         // Iterate over the leafnodes applying *this as a functor.
         if (threaded) {
-            tbb::parallel_reduce(leafRange, *this);
+            mt::parallel_reduce(leafRange, *this);
         } else {
             (*this)(leafRange);
         }
@@ -423,17 +423,17 @@ public:
         mResult(new ResultTreeType(mBackground))
     {}
 
-    SparseMaskedExtractor(const SparseMaskedExtractor& other, tbb::split):
+    SparseMaskedExtractor(const SparseMaskedExtractor& other, mt::split):
         mDense(other.mDense), mBackground(other.mBackground), mBBox(other.mBBox),
         mLeafVec(other.mLeafVec), mResult( new ResultTreeType(mBackground))
     {}
 
     typename ResultTreeType::Ptr extract(bool threaded = true)
     {
-        tbb::blocked_range<size_t> range(0, mLeafVec.size());
+        mt::blocked_range<size_t> range(0, mLeafVec.size());
 
         if (threaded) {
-            tbb::parallel_reduce(range, *this);
+            mt::parallel_reduce(range, *this);
         } else {
             (*this)(range);
         }
@@ -443,7 +443,7 @@ public:
 
     // Used in looping over leaf nodes in the masked grid
     // and using the active mask to select data to
-    void operator()(const tbb::blocked_range<size_t>& range)
+    void operator()(const mt::blocked_range<size_t>& range)
     {
         ResultLeafNodeType* leaf = nullptr;
 
@@ -647,7 +647,7 @@ public:
     using ValueT = _ValueT;
     using DenseT = Dense<ValueT, openvdb::tools::LayoutZYX>;
     using IntType = openvdb::math::Coord::ValueType;
-    using RangeType = tbb::blocked_range2d<IntType, IntType>;
+    using RangeType = mt::blocked_range2d<IntType, IntType>;
 
 private:
     DenseT&                  mDense;
@@ -681,7 +681,7 @@ public:
                               start.y(), end.y(), 1);
 
         if (threaded) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }
@@ -763,7 +763,7 @@ public:
     using MaskLeafT = typename MaskTreeT::LeafNodeType;
     using DenseT = Dense<ValueT, openvdb::tools::LayoutZYX>;
     using Index = openvdb::math::Coord::ValueType;
-    using Range3d = tbb::blocked_range3d<Index, Index, Index>;
+    using Range3d = mt::blocked_range3d<Index, Index, Index>;
 
     SparseToDenseCompositor(DenseT& dense, const TreeT& source, const TreeT& alpha,
                             const ValueT beta, const ValueT strength) :
@@ -953,7 +953,7 @@ public:
         // the dense grid using value accessors for
         // sparse the grids.
         if (threaded) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }

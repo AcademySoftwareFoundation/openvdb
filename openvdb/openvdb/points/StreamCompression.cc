@@ -415,7 +415,7 @@ Page::doLoad() const
 
     // This lock will be contended at most once, after which this buffer
     // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
+    mt::spin_mutex::scoped_lock lock(self->mMutex);
     if (!this->isOutOfCore()) return;
 
     assert(self->mInfo);

@@ -24,7 +24,7 @@ struct NodeCountOp {
     NodeCountOp() : nodeCount(TreeT::DEPTH, 0), totalCount(0)
     {
     }
-    NodeCountOp(const NodeCountOp&, tbb::split)
+    NodeCountOp(const NodeCountOp&, mt::split)
         : nodeCount(TreeT::DEPTH, 0), totalCount(0)
     {
     }
@@ -227,7 +227,7 @@ struct RootOnlyOp
     using RootT = typename TreeT::RootNodeType;
 
     RootOnlyOp() = default;
-    RootOnlyOp(const RootOnlyOp&, tbb::split) { }
+    RootOnlyOp(const RootOnlyOp&, mt::split) { }
     void join(const RootOnlyOp&) { }
 
     // do nothing for the root node but return false
@@ -247,7 +247,7 @@ struct SumOp {
     using LeafT = typename TreeT::LeafNodeType;
 
     explicit SumOp(bool zeroOnly = false) : mZeroOnly(zeroOnly) { }
-    SumOp(const SumOp& other, tbb::split): totalCount(0), mZeroOnly(other.mZeroOnly) { }
+    SumOp(const SumOp& other, mt::split): totalCount(0), mZeroOnly(other.mZeroOnly) { }
     void join(const SumOp& other)
     {
         totalCount += other.totalCount;

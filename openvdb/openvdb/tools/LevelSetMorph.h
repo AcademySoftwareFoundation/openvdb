@@ -184,28 +184,28 @@ private:
     {
         /// Main constructor
         Morph(LevelSetMorphing<GridT, InterruptT>& parent);
-        /// Shallow copy constructor called by tbb::parallel_for() threads
+        /// Shallow copy constructor called by mt::parallel_for() threads
         Morph(const Morph& other);
-        /// Shallow copy constructor called by tbb::parallel_reduce() threads
-        Morph(Morph& other, tbb::split);
+        /// Shallow copy constructor called by mt::parallel_reduce() threads
+        Morph(Morph& other, mt::split);
         /// destructor
         virtual ~Morph() {}
         /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
-        /// Used internally by tbb::parallel_for()
+        /// Used internally by mt::parallel_for()
         void operator()(const LeafRange& r) const
         {
             if (mTask) mTask(const_cast<Morph*>(this), r);
             else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
         }
-        /// Used internally by tbb::parallel_reduce()
+        /// Used internally by mt::parallel_reduce()
         void operator()(const LeafRange& r)
         {
             if (mTask) mTask(this, r);
             else OPENVDB_THROW(ValueError, "task is undefined - don\'t call this method directly");
         }
-        /// This is only called by tbb::parallel_reduce() threads
+        /// This is only called by mt::parallel_reduce() threads
         void join(const Morph& other) { mMaxAbsS = math::Max(mMaxAbsS, other.mMaxAbsS); }
 
         /// Enum to define the type of multithreading
@@ -351,7 +351,7 @@ template <typename MapT, math::BiasedGradientScheme SpatialScheme,
 inline
 LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
-Morph(Morph& other, tbb::split)
+Morph(Morph& other, mt::split)
     : mParent(other.mParent)
     , mMinAbsS(other.mMinAbsS)
     , mMaxAbsS(other.mMaxAbsS)
@@ -587,9 +587,9 @@ cook(ThreadingMode mode, size_t swapBuffer)
     if (mParent->mTracker.getGrainSize()==0) {
         (*this)(range);
     } else if (mode == PARALLEL_FOR) {
-        tbb::parallel_for(range, *this);
+        mt::parallel_for(range, *this);
     } else if (mode == PARALLEL_REDUCE) {
-        tbb::parallel_reduce(range, *this);
+        mt::parallel_reduce(range, *this);
     } else {
         OPENVDB_THROW(ValueError, "expected threading mode " << int(PARALLEL_FOR)
             << " or " << int(PARALLEL_REDUCE) << ", got " << int(mode));

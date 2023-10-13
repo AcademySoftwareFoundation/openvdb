@@ -681,7 +681,7 @@ template<typename TreeType>
 struct MultiResGrid<TreeType>::MaskOp
 {
     using MaskT = typename TreeType::template ValueConverter<ValueMask>::Type;
-    using PoolType = tbb::enumerable_thread_specific<TreeType>;
+    using PoolType = mt::enumerable_thread_specific<TreeType>;
     using ManagerT = tree::LeafManager<const MaskT>;
     using RangeT = typename ManagerT::LeafRange;
     using VoxelIterT = typename ManagerT::LeafNodeType::ValueOnCIter;
@@ -699,7 +699,7 @@ struct MultiResGrid<TreeType>::MaskOp
 
         // Restriction by injection using thread-local storage of coarse tree masks
         ManagerT leafs( mask );
-        tbb::parallel_for(leafs.leafRange( grainSize ), *this);
+        mt::parallel_for(leafs.leafRange( grainSize ), *this);
 
         // multithreaded union of thread-local coarse tree masks with the coarse tree
         using IterT = typename PoolType::const_iterator;
@@ -725,7 +725,7 @@ template<Index Order>
 struct MultiResGrid<TreeType>::FractionOp
 {
     using MaskT = typename TreeType::template ValueConverter<ValueMask>::Type;
-    using PoolType = tbb::enumerable_thread_specific<MaskT>;
+    using PoolType = mt::enumerable_thread_specific<MaskT>;
     using PoolIterT = typename PoolType::iterator;
     using Manager1 = tree::LeafManager<const TreeType>;
     using Manager2 = tree::LeafManager<TreeType>;
@@ -750,11 +750,11 @@ struct MultiResGrid<TreeType>::FractionOp
 
         {// create mask from re-mapping coarse tree to mid-level tree
             tree::LeafManager<const TreeType> manager( *mTree1 );
-            tbb::parallel_for( manager.leafRange(grainSize), *this );
+            mt::parallel_for( manager.leafRange(grainSize), *this );
         }
 
         // Multi-threaded dilation of mask
-        tbb::parallel_for(tbb::blocked_range<PoolIterT>(mPool->begin(),mPool->end(),1), *this);
+        mt::parallel_for(mt::blocked_range<PoolIterT>(mPool->begin(),mPool->end(),1), *this);
 
         // Union thread-local coarse tree masks into the coarse tree
         for (PoolIterT it=mPool->begin(); it!=mPool->end(); ++it) midTree.topologyUnion( *it );
@@ -762,7 +762,7 @@ struct MultiResGrid<TreeType>::FractionOp
 
         {// Interpolate values into the static mid level tree
             Manager2 manager( midTree );
-            tbb::parallel_for(manager.leafRange(grainSize), *this);
+            mt::parallel_for(manager.leafRange(grainSize), *this);
         }
     }
     void operator()(const Range1& range) const
@@ -794,7 +794,7 @@ struct MultiResGrid<TreeType>::FractionOp
             }//loop over active voxels in the fine tree
         }// loop over leaf nodes in the fine tree
     }
-    void operator()(const tbb::blocked_range<PoolIterT>& range) const
+    void operator()(const mt::blocked_range<PoolIterT>& range) const
     {
         for (PoolIterT it=range.begin(); it!=range.end(); ++it) {
             tools::dilateActiveValues(*it, 1, tools::NN_FACE_EDGE_VERTEX, tools::IGNORE_TILES);
@@ -848,7 +848,7 @@ struct MultiResGrid<TreeType>::CookOp
     CookOp(const TreeType& srcTree, TreeType& dstTree, size_t grainSize): acc(srcTree)
     {
         ManagerT leafs(dstTree);
-        tbb::parallel_for(leafs.leafRange(grainSize), *this);
+        mt::parallel_for(leafs.leafRange(grainSize), *this);
     }
     CookOp(const CookOp &other): acc(other.acc.tree()) {}
 

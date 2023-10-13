@@ -144,7 +144,7 @@ struct RasterizeOp
     using ValueT = typename TreeT::ValueType;
     using PointLeafT = typename PointDataGridT::TreeType::LeafNodeType;
     using PointIndexT = typename PointLeafT::ValueType;
-    using CombinableT = tbb::combinable<GridT>;
+    using CombinableT = mt::combinable<GridT>;
     using SumOpT = tools::valxform::SumOp<ValueT>;
     using MaxOpT = tools::valxform::MaxOp<ValueT>;
     using PositionHandleT = openvdb::points::AttributeHandle<Vec3f>;
@@ -794,11 +794,11 @@ private:
 
 
 /// @brief Combines multiple grids into one by stealing leaf nodes and summing voxel values
-/// This class is designed to work with thread local storage containers such as tbb::combinable
+/// This class is designed to work with thread local storage containers such as mt::combinable
 template<typename GridT>
 struct GridCombinerOp
 {
-    using CombinableT = typename tbb::combinable<GridT>;
+    using CombinableT = typename mt::combinable<GridT>;
 
     using TreeT = typename GridT::TreeType;
     using LeafT = typename TreeT::LeafNodeType;

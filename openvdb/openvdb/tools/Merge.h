@@ -519,9 +519,9 @@ bool TreeToMerge<TreeT>::MaskUnionOp::operator()(RootT& root, size_t /*idx*/) co
 
     // allocate new root children
 
-    tbb::parallel_for(
-        tbb::blocked_range<Index>(0, count),
-        [&](tbb::blocked_range<Index>& range)
+    mt::parallel_for(
+        mt::blocked_range<Index>(0, count),
+        [&](mt::blocked_range<Index>& range)
         {
             for (Index i = range.begin(); i < range.end(); i++) {
                 children[i] = std::make_unique<ChildT>(Coord::max(), true, true);
@@ -627,9 +627,9 @@ struct Dispatch
             }
 
             // parallelize across children
-            tbb::parallel_for(
-                tbb::blocked_range<Index32>(0, childCount),
-                [&](tbb::blocked_range<Index32>& range) {
+            mt::parallel_for(
+                mt::blocked_range<Index32>(0, childCount),
+                [&](mt::blocked_range<Index32>& range) {
                     for (Index32 n = range.begin(); n < range.end(); n++) {
                         DepthFirstNodeVisitor<ChildT>::visit(*children[n], op);
                     }

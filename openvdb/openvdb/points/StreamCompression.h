@@ -160,7 +160,7 @@ private:
 
     std::unique_ptr<Info> mInfo = std::unique_ptr<Info>(new Info);
     std::unique_ptr<char[]> mData;
-    tbb::spin_mutex mMutex;
+    mt::spin_mutex mMutex;
 }; // class Page
 
 

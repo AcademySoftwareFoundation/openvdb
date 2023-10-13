@@ -41,7 +41,7 @@ class Archive;
 /// {
 ///     // Use a concurrent container, because queue callback functions
 ///     // must be thread-safe.
-///     using FilenameMap = tbb::concurrent_hash_map<Queue::Id, std::string>;
+///     using FilenameMap = mt::concurrent_hash_map<Queue::Id, std::string>;
 ///     FilenameMap filenames;
 ///
 ///     // Callback function that prints the status of a completed task.

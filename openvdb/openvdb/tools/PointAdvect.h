@@ -158,15 +158,15 @@ public:
 
         if (mInterrupter) mInterrupter->start("Advecting points by OpenVDB velocity field: ");
         if (mThreaded) {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, mPoints->size()), *this);
+            mt::parallel_for(mt::blocked_range<size_t>(0, mPoints->size()), *this);
         } else {
-            (*this)(tbb::blocked_range<size_t>(0, mPoints->size()));
+            (*this)(mt::blocked_range<size_t>(0, mPoints->size()));
         }
         if (mInterrupter) mInterrupter->end();
     }
 
     /// Never call this method directly - it is use by TBB and has to be public!
-    void operator() (const tbb::blocked_range<size_t> &range) const
+    void operator() (const mt::blocked_range<size_t> &range) const
     {
         if (mInterrupter && mInterrupter->wasInterrupted()) {
             thread::cancelGroupExecution();
@@ -297,16 +297,16 @@ public:
         const size_t N = mPoints->size();
 
         if (mThreaded) {
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, N), *this);
+            mt::parallel_for(mt::blocked_range<size_t>(0, N), *this);
         } else {
-            (*this)(tbb::blocked_range<size_t>(0, N));
+            (*this)(mt::blocked_range<size_t>(0, N));
         }
         if (mInterrupter) mInterrupter->end();
     }
 
 
     /// Never call this method directly - it is use by TBB and has to be public!
-    void operator() (const tbb::blocked_range<size_t> &range) const
+    void operator() (const mt::blocked_range<size_t> &range) const
     {
         if (mInterrupter && mInterrupter->wasInterrupted()) {
             thread::cancelGroupExecution();

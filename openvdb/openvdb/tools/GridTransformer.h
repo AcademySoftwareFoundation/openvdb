@@ -785,7 +785,7 @@ public:
     ~RangeProcessor() { if (!mIsRoot) delete mOutTree; }
 
     /// Splitting constructor: don't copy the original processor's output tree
-    RangeProcessor(RangeProcessor& other, tbb::split):
+    RangeProcessor(RangeProcessor& other, mt::split):
         mIsRoot(false),
         mXform(other.mXform),
         mBBox(other.mBBox),
@@ -897,7 +897,7 @@ GridResampler::applyTransform(const Transformer& xform,
         typename RangeProc::TileRange tileRange(tileIter);
 
         if (mThreaded) {
-            tbb::parallel_reduce(tileRange, proc);
+            mt::parallel_reduce(tileRange, proc);
         } else {
             proc(tileRange);
         }
@@ -918,7 +918,7 @@ GridResampler::applyTransform(const Transformer& xform,
     typename RangeProc::LeafRange leafRange(inTree.cbeginLeaf());
 
     if (mThreaded) {
-        tbb::parallel_reduce(leafRange, proc);
+        mt::parallel_reduce(leafRange, proc);
     } else {
         proc(leafRange);
     }

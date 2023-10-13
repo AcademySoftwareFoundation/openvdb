@@ -120,9 +120,9 @@ TEST_F(TestCoord, testCoordBBox)
         EXPECT_EQ(min, b.min());
         EXPECT_EQ(max, b.max());
     }
-    {// tbb::split constructor
+    {// mt::split constructor
          const openvdb::Coord min(-1,-2,30), max(20,30,55);
-         openvdb::CoordBBox a(min, max), b(a, tbb::split());
+         openvdb::CoordBBox a(min, max), b(a, mt::split());
          EXPECT_EQ(min, b.min());
          EXPECT_EQ(openvdb::Coord(20, 14, 55), b.max());
          EXPECT_EQ(openvdb::Coord(-1, 15, 30), a.min());
@@ -155,9 +155,9 @@ TEST_F(TestCoord, testCoordBBox)
     {// volume and split constructor
         const openvdb::Coord min(-1,-2,30), max(20,30,55);
         const openvdb::CoordBBox bbox(min,max);
-        openvdb::CoordBBox a(bbox), b(a, tbb::split());
+        openvdb::CoordBBox a(bbox), b(a, mt::split());
         EXPECT_EQ(bbox.volume(), a.volume() + b.volume());
-        openvdb::CoordBBox c(b, tbb::split());
+        openvdb::CoordBBox c(b, mt::split());
         EXPECT_EQ(bbox.volume(), a.volume() + b.volume() + c.volume());
     }
     {// getCenter

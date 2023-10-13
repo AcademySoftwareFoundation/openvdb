@@ -160,7 +160,7 @@ bool evalExtents(const PointDataTreeT& points,
     std::vector<std::unique_ptr<typename ExtentOp::ExtentT>> values;
     if (minTree || maxTree) values.resize(manager.leafCount());
 
-    const ResultType result = tbb::parallel_reduce(manager.leafRange(),
+    const ResultType result = mt::parallel_reduce(manager.leafRange(),
         ResultType(),
         [idx, &filter, &values]
             (const auto& range, ResultType in) -> ResultType
@@ -338,7 +338,7 @@ bool evalAverage(const PointDataTreeT& points,
 
     std::vector<std::unique_ptr<Sample>> values;
     values.resize(manager.leafCount());
-    tbb::parallel_for(manager.leafRange(),
+    mt::parallel_for(manager.leafRange(),
         [idx, &filter, &values] (const auto& range) {
             for (auto leaf = range.begin(); leaf; ++leaf) {
                 AttributeHandle<ValueT, CodecT> handle(leaf->constAttributeArray(idx));
@@ -427,7 +427,7 @@ bool accumulate(const PointDataTreeT& points,
 
     std::vector<std::unique_ptr<ResultT>> values;
     values.resize(manager.leafCount());
-    tbb::parallel_for(manager.leafRange(),
+    mt::parallel_for(manager.leafRange(),
         [idx, &filter, &values](const auto& range) {
             for (auto leaf = range.begin(); leaf; ++leaf) {
                 AttributeHandle<ValueT, CodecT> handle(leaf->constAttributeArray(idx));
@@ -459,9 +459,9 @@ bool accumulate(const PointDataTreeT& points,
     total = **iter; ++iter;
 
     if (std::is_integral<ElementT>::value) {
-        using RangeT = tbb::blocked_range<const std::unique_ptr<ResultT>*>;
+        using RangeT = mt::blocked_range<const std::unique_ptr<ResultT>*>;
         // reasonable grain size for accumulation of single to matrix types
-        total = tbb::parallel_reduce(RangeT(&(*iter), (&values.back())+1, 32), total,
+        total = mt::parallel_reduce(RangeT(&(*iter), (&values.back())+1, 32), total,
            [](const RangeT& range, ResultT p) -> ResultT {
                 for (const auto& r : range) if (r) p += *r;
                 return p;

@@ -147,14 +147,14 @@ private:
     {
         /// Main constructor
         Advect(LevelSetAdvection& parent);
-        /// Shallow copy constructor called by tbb::parallel_for() threads
+        /// Shallow copy constructor called by mt::parallel_for() threads
         Advect(const Advect& other);
         /// Destructor
         virtual ~Advect() { if (mIsMaster) this->clearField(); }
         /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
         size_t advect(ValueType time0, ValueType time1);
-        /// Used internally by tbb::parallel_for()
+        /// Used internally by mt::parallel_for()
         void operator()(const LeafRange& r) const
         {
             if (mTask) mTask(const_cast<Advect*>(this), r);
@@ -524,7 +524,7 @@ cook(const char* msg, size_t swapBuffer)
     const int grainSize   = mParent.mTracker.getGrainSize();
     const LeafRange range = mParent.mTracker.leafs().leafRange(grainSize);
 
-    grainSize == 0 ? (*this)(range) : tbb::parallel_for(range, *this);
+    grainSize == 0 ? (*this)(range) : mt::parallel_for(range, *this);
 
     mParent.mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize == 0);
 

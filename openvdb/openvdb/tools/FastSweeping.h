@@ -867,7 +867,7 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
 #endif
 
         // Exploiting nested parallelism - all voxel slice data is precomputed
-        tbb::task_group tasks;
+        mt::task_group tasks;
         tasks.run([&] { kernels[0].computeVoxelSlices([](const Coord &a){ return a[0]+a[1]+a[2]; });/*+++ & ---*/ });
         tasks.run([&] { kernels[1].computeVoxelSlices([](const Coord &a){ return a[0]+a[1]-a[2]; });/*++- & --+*/ });
         tasks.run([&] { kernels[2].computeVoxelSlices([](const Coord &a){ return a[0]-a[1]+a[2]; });/*+-+ & -+-*/ });
@@ -919,12 +919,12 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
     using LeafMgr = tree::LeafManager<const SdfTreeT>;
     using LeafRange = typename LeafMgr::LeafRange;
     MinMaxKernel() : mMin(std::numeric_limits<SdfValueT>::max()), mMax(-mMin), mFltMinExists(false), mFltMaxExists(true) {}
-    MinMaxKernel(MinMaxKernel& other, tbb::split) : mMin(other.mMin), mMax(other.mMax), mFltMinExists(other.mFltMinExists), mFltMaxExists(other.mFltMaxExists) {}
+    MinMaxKernel(MinMaxKernel& other, mt::split) : mMin(other.mMin), mMax(other.mMax), mFltMinExists(other.mFltMinExists), mFltMaxExists(other.mFltMaxExists) {}
 
     math::MinMax<SdfValueT> run(const SdfGridT &grid)
     {
         LeafMgr mgr(grid.tree());// super fast
-        tbb::parallel_reduce(mgr.leafRange(), *this);
+        mt::parallel_reduce(mgr.leafRange(), *this);
         return math::MinMax<SdfValueT>(mMin, mMax);
     }
 
@@ -1015,7 +1015,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
     {
         mSdfGridInput = mParent->mSdfGrid->deepCopy();
     }
-    DilateKernel(const DilateKernel &parent) = default;// for tbb::parallel_for
+    DilateKernel(const DilateKernel &parent) = default;// for mt::parallel_for
     DilateKernel& operator=(const DilateKernel&) = delete;
 
     void run(int dilation, NearestNeighbors nn)
@@ -1121,7 +1121,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
     using LeafRange = typename tree::LeafManager<SdfTreeT>::LeafRange;
     InitSdf(FastSweeping &parent): mParent(&parent),
       mSdfGrid(parent.mSdfGrid.get()), mIsoValue(0), mAboveSign(0) {}
-    InitSdf(const InitSdf&) = default;// for tbb::parallel_for
+    InitSdf(const InitSdf&) = default;// for mt::parallel_for
     InitSdf& operator=(const InitSdf&) = delete;
 
     void run(SdfValueT isoValue)
@@ -1143,7 +1143,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
 
         {// Process all voxels
           tree::LeafManager<SdfTreeT> mgr(tree, 1);// we need one auxiliary buffer
-          tbb::parallel_for(mgr.leafRange(32), *this);//multi-threaded
+          mt::parallel_for(mgr.leafRange(32), *this);//multi-threaded
           mgr.swapLeafBuffer(1);//swap voxel values
         }
 
@@ -1229,11 +1229,11 @@ template <typename OpT>
 struct FastSweeping<SdfGridT, ExtValueT>::InitExt
 {
     using LeafRange = typename tree::LeafManager<SdfTreeT>::LeafRange;
-    using OpPoolT = tbb::enumerable_thread_specific<OpT>;
+    using OpPoolT = mt::enumerable_thread_specific<OpT>;
     InitExt(FastSweeping &parent) : mParent(&parent),
       mOpPool(nullptr), mSdfGrid(parent.mSdfGrid.get()),
       mExtGrid(parent.mExtGrid.get()), mIsoValue(0), mAboveSign(0) {}
-    InitExt(const InitExt&) = default;// for tbb::parallel_for
+    InitExt(const InitExt&) = default;// for mt::parallel_for
     InitExt& operator=(const InitExt&) = delete;
     void run(SdfValueT isoValue, const OpT &opPrototype)
     {
@@ -1265,7 +1265,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
           mOpPool = &opPool;
 
           tree::LeafManager<SdfTreeT> mgr(tree1, 1);// we need one auxiliary buffer
-          tbb::parallel_for(mgr.leafRange(32), *this);//multi-threaded
+          mt::parallel_for(mgr.leafRange(32), *this);//multi-threaded
           mgr.swapLeafBuffer(1);//swap out auxiliary buffer
         }
 
@@ -1406,7 +1406,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::MaskKernel
     using LeafRange = typename tree::LeafManager<const MaskTreeT>::LeafRange;
     MaskKernel(FastSweeping &parent) : mParent(&parent),
       mSdfGrid(parent.mSdfGrid.get()) {}
-    MaskKernel(const MaskKernel &parent) = default;// for tbb::parallel_for
+    MaskKernel(const MaskKernel &parent) = default;// for mt::parallel_for
     MaskKernel& operator=(const MaskKernel&) = delete;
 
     void run(const MaskTreeT &mask)
@@ -1516,7 +1516,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         // the key of the hash map is the slice index of the voxel coord (ijk.x() + ijk.y() + ijk.z())
         // the values are an array of indices for every leaf that has active voxels with this slice index
         using ThreadLocalMap = std::unordered_map</*voxelSliceKey=*/int64_t, /*leafIdx=*/std::deque<size_t>>;
-        tbb::enumerable_thread_specific<ThreadLocalMap> pool;
+        mt::enumerable_thread_specific<ThreadLocalMap> pool;
         auto kernel2 = [&](const LeafT& leaf, size_t leafIdx) {
             ThreadLocalMap& map = pool.local();
             const Coord& origin = leaf.origin();
@@ -1550,7 +1550,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         }
 
         // allocate the node masks in parallel, as the map is populated in serial
-        auto kernel3 = [&](tbb::blocked_range<size_t>& range) {
+        auto kernel3 = [&](mt::blocked_range<size_t>& range) {
             for (size_t i = range.begin(); i < range.end(); i++) {
                 const int64_t key = mVoxelSliceKeys[i];
                 for (auto& it : mVoxelSliceMap[key]) {
@@ -1558,14 +1558,14 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                 }
             }
         };
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mVoxelSliceKeys.size()), kernel3);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mVoxelSliceKeys.size()), kernel3);
 
         // each voxel slice contains a leafIdx-nodeMask pair,
         // this routine populates these node masks to select only the active voxels
         // from the mask tree that have the same voxel slice key
         // TODO: a small optimization here would be to union this leaf node mask with
         // a pre-computed one for this particular slice pattern
-        auto kernel4 = [&](tbb::blocked_range<size_t>& range) {
+        auto kernel4 = [&](mt::blocked_range<size_t>& range) {
             for (size_t i = range.begin(); i < range.end(); i++) {
                 const int64_t voxelSliceKey = mVoxelSliceKeys[i];
                 LeafSliceArray& leafSliceArray = mVoxelSliceMap[voxelSliceKey];
@@ -1586,7 +1586,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                 }
             }
         };
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mVoxelSliceKeys.size()), kernel4);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mVoxelSliceKeys.size()), kernel4);
     }// FastSweeping::SweepingKernel::computeVoxelSlices
 
     // Private struct for nearest neighbor grid points (very memory light!)
@@ -1642,7 +1642,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
         int64_t voxelSliceIndex(0);
 
-        auto kernel = [&](const tbb::blocked_range<size_t>& range) {
+        auto kernel = [&](const mt::blocked_range<size_t>& range) {
             using LeafT = typename SdfGridT::TreeType::LeafNodeType;
 
             SdfAccT acc1(mParent->mSdfGrid->tree());
@@ -1799,7 +1799,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
         for (size_t i = 0; i < mVoxelSliceKeys.size(); i++) {
             voxelSliceIndex = mVoxelSliceKeys[i];
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, mVoxelSliceMap[voxelSliceIndex].size()), kernel);
+            mt::parallel_for(mt::blocked_range<size_t>(0, mVoxelSliceMap[voxelSliceIndex].size()), kernel);
         }
 
 #ifdef BENCHMARK_FAST_SWEEPING
@@ -1807,7 +1807,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 #endif
         for (size_t i = mVoxelSliceKeys.size(); i > 0; i--) {
             voxelSliceIndex = mVoxelSliceKeys[i-1];
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, mVoxelSliceMap[voxelSliceIndex].size()), kernel);
+            mt::parallel_for(mt::blocked_range<size_t>(0, mVoxelSliceMap[voxelSliceIndex].size()), kernel);
         }
 
 #ifdef BENCHMARK_FAST_SWEEPING

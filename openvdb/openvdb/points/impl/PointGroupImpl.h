@@ -411,7 +411,7 @@ inline void compactGroups(PointDataTreeT& tree)
 
         CopyGroupOp<PointDataTreeT> copy(targetIndex, sourceIndex);
         LeafManagerT leafManager(tree);
-        tbb::parallel_for(leafManager.leafRange(), copy);
+        mt::parallel_for(leafManager.leafRange(), copy);
 
         descriptor->setGroup(sourceName, targetOffset);
     }
@@ -464,7 +464,7 @@ inline void setGroup(   PointDataTreeT& tree,
         using IndexTreeManager = tree::LeafManager<const PointIndexTreeT>;
         IndexTreeManager leafManager(indexTree);
 
-        const int64_t max = tbb::parallel_reduce(leafManager.leafRange(), -1,
+        const int64_t max = mt::parallel_reduce(leafManager.leafRange(), -1,
             [](const typename IndexTreeManager::LeafRange& range, int64_t value) -> int64_t {
                 for (auto leaf = range.begin(); leaf; ++leaf) {
                     auto it = std::max_element(leaf->indices().begin(), leaf->indices().end());
@@ -491,12 +491,12 @@ inline void setGroup(   PointDataTreeT& tree,
     if (remove) {
         SetGroupFromIndexOp<PointDataTreeT, PointIndexTreeT, true>
             set(indexTree, membership, index);
-        tbb::parallel_for(leafManager.leafRange(), set);
+        mt::parallel_for(leafManager.leafRange(), set);
     }
     else {
         SetGroupFromIndexOp<PointDataTreeT, PointIndexTreeT, false>
             set(indexTree, membership, index);
-        tbb::parallel_for(leafManager.leafRange(), set);
+        mt::parallel_for(leafManager.leafRange(), set);
     }
 }
 
@@ -530,8 +530,8 @@ inline void setGroup(   PointDataTreeT& tree,
 
     // set membership based on member variable
 
-    if (member)     tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, true>(index));
-    else            tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, false>(index));
+    if (member)     mt::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, true>(index));
+    else            mt::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, false>(index));
 }
 
 
@@ -566,7 +566,7 @@ inline void setGroupByFilter(   PointDataTreeT& tree,
     SetGroupByFilterOp<PointDataTreeT, FilterT> set(index, filter);
     LeafManagerT leafManager(tree);
 
-    tbb::parallel_for(leafManager.leafRange(), set);
+    mt::parallel_for(leafManager.leafRange(), set);
 }
 
 

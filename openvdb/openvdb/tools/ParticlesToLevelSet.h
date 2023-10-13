@@ -496,7 +496,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     }
 
     /// @brief Copy constructor called by tbb threads
-    Raster(Raster& other, tbb::split)
+    Raster(Raster& other, mt::split)
         : mParent(other.mParent)
         , mParticles(other.mParticles)
         , mGrid(new GridT(*other.mGrid, openvdb::ShallowCopy()))
@@ -564,7 +564,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     }
 
     /// @brief Kick off the optionally multithreaded computation.
-    void operator()(const tbb::blocked_range<size_t>& r)
+    void operator()(const mt::blocked_range<size_t>& r)
     {
         assert(mTask);
         mTask(this, r);
@@ -572,7 +572,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         mParent.mMaxCount = mMaxCount;
     }
 
-    /// @brief Required by tbb::parallel_reduce
+    /// @brief Required by mt::parallel_reduce
     void join(Raster& other)
     {
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
@@ -610,7 +610,7 @@ private:
 
     /// @brief Threaded rasterization of particles as spheres with variable radius
     /// @param r  range of indices into the list of particles
-    void rasterSpheres(const tbb::blocked_range<size_t>& r)
+    void rasterSpheres(const mt::blocked_range<size_t>& r)
     {
         AccessorT acc = mGrid->getAccessor(); // local accessor
         bool run = true;
@@ -638,7 +638,7 @@ private:
     /// @brief Threaded rasterization of particles as spheres with a fixed radius
     /// @param r  range of indices into the list of particles
     /// @param R  radius of fixed-size spheres
-    void rasterFixedSpheres(const tbb::blocked_range<size_t>& r, Real R)
+    void rasterFixedSpheres(const mt::blocked_range<size_t>& r, Real R)
     {
         AccessorT acc = mGrid->getAccessor(); // local accessor
         AttT att;
@@ -660,7 +660,7 @@ private:
     /// @brief Threaded rasterization of particles as spheres with velocity trails
     /// @param r      range of indices into the list of particles
     /// @param delta  inter-sphere spacing
-    void rasterTrails(const tbb::blocked_range<size_t>& r, Real delta)
+    void rasterTrails(const mt::blocked_range<size_t>& r, Real delta)
     {
         AccessorT acc = mGrid->getAccessor(); // local accessor
         bool run = true;
@@ -702,10 +702,10 @@ private:
         const Index32 bucketCount = Index32(mPointPartitioner->size());
 
         if (mParent.mGrainSize>0) {
-            tbb::parallel_reduce(
-              tbb::blocked_range<size_t>(0, bucketCount, mParent.mGrainSize), *this);
+            mt::parallel_reduce(
+              mt::blocked_range<size_t>(0, bucketCount, mParent.mGrainSize), *this);
         } else {
-            (*this)(tbb::blocked_range<size_t>(0, bucketCount));
+            (*this)(mt::blocked_range<size_t>(0, bucketCount));
         }
     }
 
@@ -832,7 +832,7 @@ private:
         return true;
     }
 
-    using FuncType = typename std::function<void (Raster*, const tbb::blocked_range<size_t>&)>;
+    using FuncType = typename std::function<void (Raster*, const mt::blocked_range<size_t>&)>;
 
     template<typename DisableType>
     typename std::enable_if<DisableType::value>::type

@@ -179,11 +179,11 @@ struct BuildPrimarySegment
             mLhsTree->getNodes(internalNodes);
 
             ProcessInternalNodes op(internalNodes, *mRhsTree, *mSegment, leafNodes);
-            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, internalNodes.size()), op);
+            mt::parallel_reduce(mt::blocked_range<size_t>(0, internalNodes.size()), op);
         }
 
         ProcessLeafNodes op(leafNodes, *mRhsTree, *mSegment);
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, leafNodes.size()), op);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, leafNodes.size()), op);
     }
 
     TreePtrType& segment() { return mSegment; }
@@ -204,7 +204,7 @@ private:
         {
         }
 
-        ProcessInternalNodes(ProcessInternalNodes& other, tbb::split)
+        ProcessInternalNodes(ProcessInternalNodes& other, mt::split)
             : mLhsNodes(other.mLhsNodes)
             , mRhsTree(other.mRhsTree)
             , mLocalTree(mRhsTree->background())
@@ -221,7 +221,7 @@ private:
                 other.mOutputLeafNodes->begin(), other.mOutputLeafNodes->end());
         }
 
-        void operator()(const tbb::blocked_range<size_t>& range)
+        void operator()(const mt::blocked_range<size_t>& range)
         {
             tree::ValueAccessor<const TreeType> rhsAcc(*mRhsTree);
             tree::ValueAccessor<TreeType>       outputAcc(*mOutputTree);
@@ -279,7 +279,7 @@ private:
         {
         }
 
-        ProcessLeafNodes(ProcessLeafNodes& other, tbb::split)
+        ProcessLeafNodes(ProcessLeafNodes& other, mt::split)
             : mLhsNodes(other.mLhsNodes)
             , mRhsTree(other.mRhsTree)
             , mLocalTree(mRhsTree->background())
@@ -289,7 +289,7 @@ private:
 
         void join(ProcessLeafNodes& rhs) { mOutputTree->merge(*rhs.mOutputTree); }
 
-        void operator()(const tbb::blocked_range<size_t>& range)
+        void operator()(const mt::blocked_range<size_t>& range)
         {
             tree::ValueAccessor<const TreeType> rhsAcc(*mRhsTree);
             tree::ValueAccessor<TreeType>       outputAcc(*mOutputTree);
@@ -387,11 +387,11 @@ struct BuildSecondarySegment
             mRhsTree->getNodes(internalNodes);
 
             ProcessInternalNodes op(internalNodes, *mLhsTree, *mSegment, leafNodes);
-            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, internalNodes.size()), op);
+            mt::parallel_reduce(mt::blocked_range<size_t>(0, internalNodes.size()), op);
         }
 
         ProcessLeafNodes op(leafNodes, *mLhsTree, *mSegment);
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, leafNodes.size()), op);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, leafNodes.size()), op);
     }
 
     TreePtrType& segment() { return mSegment; }
@@ -412,7 +412,7 @@ private:
         {
         }
 
-        ProcessInternalNodes(ProcessInternalNodes& other, tbb::split)
+        ProcessInternalNodes(ProcessInternalNodes& other, mt::split)
             : mRhsNodes(other.mRhsNodes)
             , mLhsTree(other.mLhsTree)
             , mLocalTree(mLhsTree->background())
@@ -429,7 +429,7 @@ private:
                 other.mOutputLeafNodes->begin(), other.mOutputLeafNodes->end());
         }
 
-        void operator()(const tbb::blocked_range<size_t>& range)
+        void operator()(const mt::blocked_range<size_t>& range)
         {
             tree::ValueAccessor<const TreeType> lhsAcc(*mLhsTree);
             tree::ValueAccessor<TreeType>       outputAcc(*mOutputTree);
@@ -497,7 +497,7 @@ private:
         {
         }
 
-        ProcessLeafNodes(ProcessLeafNodes& rhs, tbb::split)
+        ProcessLeafNodes(ProcessLeafNodes& rhs, mt::split)
             : mRhsNodes(rhs.mRhsNodes)
             , mLhsTree(rhs.mLhsTree)
             , mLocalTree(mLhsTree->background())
@@ -507,7 +507,7 @@ private:
 
         void join(ProcessLeafNodes& rhs) { mOutputTree->merge(*rhs.mOutputTree); }
 
-        void operator()(const tbb::blocked_range<size_t>& range)
+        void operator()(const mt::blocked_range<size_t>& range)
         {
             tree::ValueAccessor<const TreeType> lhsAcc(*mLhsTree);
             tree::ValueAccessor<TreeType>       outputAcc(*mOutputTree);
@@ -559,7 +559,7 @@ doCSGCopy(const TreeType& lhs, const TreeType& rhs)
     BuildSecondarySegment<TreeType, Operation> secondary(lhs, rhs);
 
     // Exploiting nested parallelism
-    tbb::task_group tasks;
+    mt::task_group tasks;
     tasks.run(primary);
     tasks.run(secondary);
     tasks.wait();
@@ -644,8 +644,8 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
     LeafPairList<LeafT> overlapping;//dst, src
     transferLeafNodes(srcTree, dstTree, overlapping);
 
-    using RangeT = tbb::blocked_range<size_t>;
-    tbb::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
+    using RangeT = mt::blocked_range<size_t>;
+    mt::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             LeafT *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
             dstLeaf->getValueMask() |= srcLeaf->getValueMask();
@@ -668,8 +668,8 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT)
     LeafPairList<LeafT> overlapping;//dst, src
     transferLeafNodes(srcTree, dstTree, overlapping);
 
-    using RangeT = tbb::blocked_range<size_t>;
-    tbb::parallel_for(RangeT(0, overlapping.size()), [&overlapping](const RangeT& r) {
+    using RangeT = mt::blocked_range<size_t>;
+    mt::parallel_for(RangeT(0, overlapping.size()), [&overlapping](const RangeT& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             overlapping[i].first->getValueMask() |= overlapping[i].second->getValueMask();
             delete overlapping[i].second;
@@ -689,9 +689,9 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
     LeafPairList<LeafT> overlapping;//dst, src
     transferLeafNodes(srcTree, dstTree, overlapping);
 
-    using RangeT = tbb::blocked_range<size_t>;
+    using RangeT = mt::blocked_range<size_t>;
     using WordT = typename LeafT::Buffer::WordType;
-    tbb::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
+    mt::parallel_for(RangeT(0, overlapping.size()), [op, &overlapping](const RangeT& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
             LeafT *dstLeaf = overlapping[i].first, *srcLeaf = overlapping[i].second;
             WordT *w1 = dstLeaf->buffer().data();

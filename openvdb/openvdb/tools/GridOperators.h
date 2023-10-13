@@ -349,7 +349,7 @@ public:
         LeafManagerT leafManager(*tree);
 
         if (threaded) {
-            tbb::parallel_for(leafManager.leafRange(), *this);
+            mt::parallel_for(leafManager.leafRange(), *this);
         } else {
             (*this)(leafManager.leafRange());
         }

@@ -192,7 +192,7 @@ void StringMetaInserter::resetCache()
         stringIndices.emplace_back(index);
     }
 
-    tbb::parallel_sort(stringIndices.begin(), stringIndices.end());
+    mt::parallel_sort(stringIndices.begin(), stringIndices.end());
 
     // bucket string indices
 

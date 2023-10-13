@@ -88,7 +88,7 @@ namespace point_move_internal {
 using IndexArray = std::vector<Index>;
 
 using IndexTriple = std::tuple<LeafIndex, Index, Index>;
-using IndexTripleArray = tbb::concurrent_vector<IndexTriple>;
+using IndexTripleArray = mt::concurrent_vector<IndexTriple>;
 using GlobalPointIndexMap = std::vector<IndexTripleArray>;
 using GlobalPointIndexIndices = std::vector<IndexArray>;
 

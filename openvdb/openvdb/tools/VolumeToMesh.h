@@ -382,7 +382,7 @@ struct FillArray
 {
     FillArray(ValueType* array, const ValueType& v) : mArray(array), mValue(v) { }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         const ValueType v = mValue;
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             mArray[n] = v;
@@ -399,9 +399,9 @@ inline void
 fillArray(ValueType* array, const ValueType& val, const size_t length)
 {
     const auto grainSize = std::max<size_t>(
-        length / tbb::this_task_arena::max_concurrency(), 1024);
-    const tbb::blocked_range<size_t> range(0, length, grainSize);
-    tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
+        length / mt::this_task_arena::max_concurrency(), 1024);
+    const mt::blocked_range<size_t> range(0, length, grainSize);
+    mt::parallel_for(range, FillArray<ValueType>(array, val), mt::simple_partitioner());
 }
 
 
@@ -1461,7 +1461,7 @@ struct ComputePoints
         const uint32_t * quantizedSeamLinePoints,
         uint8_t * seamLinePointsFlags);
 
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
     Vec3s                             * const mPoints;
@@ -1522,7 +1522,7 @@ ComputePoints<InputTreeType>::setRefData(
 
 template <typename InputTreeType>
 void
-ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range) const
+ComputePoints<InputTreeType>::operator()(const mt::blocked_range<size_t>& range) const
 {
     using InputTreeAccessor = tree::ValueAccessor<const InputTreeType>;
     using Index32TreeAccessor = tree::ValueAccessor<const Index32TreeType>;
@@ -1740,7 +1740,7 @@ struct SeamLineWeights
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         tree::ValueAccessor<const InputTreeType> inputTreeAcc(*mInputTree);
         tree::ValueAccessor<const Index32TreeType> pointIndexTreeAcc(*mRefPointIndexTree);
@@ -1835,7 +1835,7 @@ struct SetSeamLineFlags
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         tree::ValueAccessor<const TreeType> refSignFlagsTreeAcc(*mRefSignFlagsTree);
 
@@ -1891,7 +1891,7 @@ struct TransferSeamLineFlags
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         tree::ValueAccessor<const BoolTreeType> maskAcc(*mMaskTree);
 
@@ -1937,7 +1937,7 @@ struct MaskSeamLineVoxels
     {
     }
 
-    MaskSeamLineVoxels(MaskSeamLineVoxels& rhs, tbb::split)
+    MaskSeamLineVoxels(MaskSeamLineVoxels& rhs, mt::split)
         : mSignFlagsNodes(rhs.mSignFlagsNodes)
         , mSignFlagsTree(rhs.mSignFlagsTree)
         , mTempMask(false)
@@ -1947,7 +1947,7 @@ struct MaskSeamLineVoxels
 
     void join(MaskSeamLineVoxels& rhs) { mMask->merge(*rhs.mMask); }
 
-    void operator()(const tbb::blocked_range<size_t>& range)
+    void operator()(const mt::blocked_range<size_t>& range)
     {
         using ValueOnCIter = typename LeafNodeType::ValueOnCIter;
         using ValueType = typename LeafNodeType::ValueType;
@@ -2029,9 +2029,9 @@ markSeamLineData(SignDataTreeType& signFlagsTree, const SignDataTreeType& refSig
     std::vector<SignDataLeafNodeType*> signFlagsLeafNodes;
     signFlagsTree.getNodes(signFlagsLeafNodes);
 
-    const tbb::blocked_range<size_t> nodeRange(0, signFlagsLeafNodes.size());
+    const mt::blocked_range<size_t> nodeRange(0, signFlagsLeafNodes.size());
 
-    tbb::parallel_for(nodeRange,
+    mt::parallel_for(nodeRange,
         SetSeamLineFlags<SignDataTreeType>(signFlagsLeafNodes, refSignFlagsTree));
 
     BoolTreeType seamLineMaskTree(false);
@@ -2039,9 +2039,9 @@ markSeamLineData(SignDataTreeType& signFlagsTree, const SignDataTreeType& refSig
     MaskSeamLineVoxels<SignDataTreeType>
         maskSeamLine(signFlagsLeafNodes, signFlagsTree, seamLineMaskTree);
 
-    tbb::parallel_reduce(nodeRange, maskSeamLine);
+    mt::parallel_reduce(nodeRange, maskSeamLine);
 
-    tbb::parallel_for(nodeRange,
+    mt::parallel_for(nodeRange,
         TransferSeamLineFlags<BoolTreeType, SignDataType>(signFlagsLeafNodes, seamLineMaskTree));
 }
 
@@ -2097,7 +2097,7 @@ struct MergeVoxelRegions
         mInternalAdaptivity = internalAdaptivity;
     }
 
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
     InputTreeType               const * const mInputTree;
@@ -2146,7 +2146,7 @@ MergeVoxelRegions<InputGridType>::MergeVoxelRegions(
 
 template <typename InputGridType>
 void
-MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& range) const
+MergeVoxelRegions<InputGridType>::operator()(const mt::blocked_range<size_t>& range) const
 {
     using Vec3sType = math::Vec3<float>;
     using Vec3sLeafNodeType = typename InputLeafNodeType::template ValueConverter<Vec3sType>::Type;
@@ -2620,7 +2620,7 @@ struct MaskTileBorders
     {
     }
 
-    MaskTileBorders(MaskTileBorders& rhs, tbb::split)
+    MaskTileBorders(MaskTileBorders& rhs, mt::split)
         : mInputTree(rhs.mInputTree)
         , mIsovalue(rhs.mIsovalue)
         , mTempMask(false)
@@ -2631,7 +2631,7 @@ struct MaskTileBorders
 
     void join(MaskTileBorders& rhs) { mMask->merge(*rhs.mMask); }
 
-    void operator()(const tbb::blocked_range<size_t>&);
+    void operator()(const mt::blocked_range<size_t>&);
 
 private:
     InputTreeType   const * const mInputTree;
@@ -2644,7 +2644,7 @@ private:
 
 template<typename InputTreeType>
 void
-MaskTileBorders<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range)
+MaskTileBorders<InputTreeType>::operator()(const mt::blocked_range<size_t>& range)
 {
     tree::ValueAccessor<const InputTreeType> inputTreeAcc(*mInputTree);
 
@@ -2808,7 +2808,7 @@ maskActiveTileBorders(const InputTreeType& inputTree,
         }
 
         MaskTileBorders<InputTreeType> op(inputTree, iso, mask, tiles.get());
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, tileCount), op);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, tileCount), op);
     }
 }
 
@@ -2825,7 +2825,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(); n < range.end(); ++n) {
             mPointsOut[n] = mPointsIn[n];
@@ -3218,8 +3218,8 @@ struct IdentifyIntersectingVoxels
         BoolTreeType& intersectionTree,
         InputValueType iso);
 
-    IdentifyIntersectingVoxels(IdentifyIntersectingVoxels&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>&);
+    IdentifyIntersectingVoxels(IdentifyIntersectingVoxels&, mt::split);
+    void operator()(const mt::blocked_range<size_t>&);
     void join(const IdentifyIntersectingVoxels& rhs) {
         mIntersectionAccessor.tree().merge(rhs.mIntersectionAccessor.tree());
     }
@@ -3255,7 +3255,7 @@ IdentifyIntersectingVoxels<InputTreeType>::IdentifyIntersectingVoxels(
 
 template<typename InputTreeType>
 IdentifyIntersectingVoxels<InputTreeType>::IdentifyIntersectingVoxels(
-    IdentifyIntersectingVoxels& rhs, tbb::split)
+    IdentifyIntersectingVoxels& rhs, mt::split)
     : mInputAccessor(rhs.mInputAccessor.tree())
     , mInputNodes(rhs.mInputNodes)
     , mIntersectionTree(false)
@@ -3268,7 +3268,7 @@ IdentifyIntersectingVoxels<InputTreeType>::IdentifyIntersectingVoxels(
 
 template<typename InputTreeType>
 void
-IdentifyIntersectingVoxels<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range)
+IdentifyIntersectingVoxels<InputTreeType>::operator()(const mt::blocked_range<size_t>& range)
 {
     VoxelEdgeAccessor<tree::ValueAccessor<BoolTreeType>, 0> xEdgeAcc(mIntersectionAccessor);
     VoxelEdgeAccessor<tree::ValueAccessor<BoolTreeType>, 1> yEdgeAcc(mIntersectionAccessor);
@@ -3323,7 +3323,7 @@ identifySurfaceIntersectingVoxels(
     IdentifyIntersectingVoxels<InputTreeType> op(
         inputTree, inputLeafNodes, offsets, intersectionTree, isovalue);
 
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, inputLeafNodes.size()), op);
+    mt::parallel_reduce(mt::blocked_range<size_t>(0, inputLeafNodes.size()), op);
 
     maskActiveTileBorders(inputTree, isovalue, intersectionTree);
 }
@@ -3347,8 +3347,8 @@ struct MaskIntersectingVoxels
         BoolTreeType& intersectionTree,
         InputValueType iso);
 
-    MaskIntersectingVoxels(MaskIntersectingVoxels&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>&);
+    MaskIntersectingVoxels(MaskIntersectingVoxels&, mt::split);
+    void operator()(const mt::blocked_range<size_t>&);
     void join(const MaskIntersectingVoxels& rhs) {
         mIntersectionAccessor.tree().merge(rhs.mIntersectionAccessor.tree());
     }
@@ -3381,7 +3381,7 @@ MaskIntersectingVoxels<InputTreeType>::MaskIntersectingVoxels(
 
 template<typename InputTreeType>
 MaskIntersectingVoxels<InputTreeType>::MaskIntersectingVoxels(
-    MaskIntersectingVoxels& rhs, tbb::split)
+    MaskIntersectingVoxels& rhs, mt::split)
     : mInputAccessor(rhs.mInputAccessor.tree())
     , mNodes(rhs.mNodes)
     , mIntersectionTree(false)
@@ -3393,7 +3393,7 @@ MaskIntersectingVoxels<InputTreeType>::MaskIntersectingVoxels(
 
 template<typename InputTreeType>
 void
-MaskIntersectingVoxels<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range)
+MaskIntersectingVoxels<InputTreeType>::operator()(const mt::blocked_range<size_t>& range)
 {
     VoxelEdgeAccessor<tree::ValueAccessor<BoolTreeType>, 0> xEdgeAcc(mIntersectionAccessor);
     VoxelEdgeAccessor<tree::ValueAccessor<BoolTreeType>, 1> yEdgeAcc(mIntersectionAccessor);
@@ -3443,7 +3443,7 @@ struct MaskBorderVoxels
         , mTmpBorderTree(false)
         , mBorderTree(&borderTree) {}
 
-    MaskBorderVoxels(MaskBorderVoxels& rhs, tbb::split)
+    MaskBorderVoxels(MaskBorderVoxels& rhs, mt::split)
         : mMaskTree(rhs.mMaskTree)
         , mMaskNodes(rhs.mMaskNodes)
         , mTmpBorderTree(false)
@@ -3451,7 +3451,7 @@ struct MaskBorderVoxels
 
     void join(MaskBorderVoxels& rhs) { mBorderTree->merge(*rhs.mBorderTree); }
 
-    void operator()(const tbb::blocked_range<size_t>& range)
+    void operator()(const mt::blocked_range<size_t>& range)
     {
         tree::ValueAccessor<const BoolTreeType> maskAcc(*mMaskTree);
         tree::ValueAccessor<BoolTreeType> borderAcc(*mBorderTree);
@@ -3518,7 +3518,7 @@ struct SyncMaskValues
         : mNodes(nodes.data())
         , mMaskTree(&mask) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using ValueOnIter = typename BoolLeafNodeType::ValueOnIter;
 
@@ -3567,7 +3567,7 @@ struct MaskSurface
         , mMatchingTransforms(mInputTransform == mMaskTransform)
         , mInvertMask(invert) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using ValueOnIter = typename BoolLeafNodeType::ValueOnIter;
 
@@ -3659,9 +3659,9 @@ applySurfaceMask(
     std::vector<BoolLeafNodeType*> intersectionLeafNodes;
     intersectionTree.getNodes(intersectionLeafNodes);
 
-    const tbb::blocked_range<size_t> intersectionRange(0, intersectionLeafNodes.size());
+    const mt::blocked_range<size_t> intersectionRange(0, intersectionLeafNodes.size());
 
-    tbb::parallel_for(intersectionRange,
+    mt::parallel_for(intersectionRange,
         MaskSurface<BoolTreeType>(
             intersectionLeafNodes, maskTree, transform, maskTransform, invertMask));
 
@@ -3670,7 +3670,7 @@ applySurfaceMask(
 
     MaskBorderVoxels<BoolTreeType> borderOp(
         intersectionTree, intersectionLeafNodes, borderTree);
-    tbb::parallel_reduce(intersectionRange, borderOp);
+    mt::parallel_reduce(intersectionRange, borderOp);
 
 
     // recompute isosurface intersection mask
@@ -3680,12 +3680,12 @@ applySurfaceMask(
     MaskIntersectingVoxels<InputTreeType> op(
         inputTree, intersectionLeafNodes, tmpIntersectionTree, isovalue);
 
-    tbb::parallel_reduce(intersectionRange, op);
+    mt::parallel_reduce(intersectionRange, op);
 
     std::vector<BoolLeafNodeType*> tmpIntersectionLeafNodes;
     tmpIntersectionTree.getNodes(tmpIntersectionLeafNodes);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, tmpIntersectionLeafNodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, tmpIntersectionLeafNodes.size()),
         SyncMaskValues<BoolTreeType>(tmpIntersectionLeafNodes, intersectionTree));
 
     intersectionTree.clear();
@@ -3714,8 +3714,8 @@ struct ComputeAuxiliaryData
         Index32TreeType& pointIndexTree,
         InputValueType iso);
 
-    ComputeAuxiliaryData(ComputeAuxiliaryData&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>&);
+    ComputeAuxiliaryData(ComputeAuxiliaryData&, mt::split);
+    void operator()(const mt::blocked_range<size_t>&);
     void join(const ComputeAuxiliaryData& rhs) {
         mSignFlagsAccessor.tree().merge(rhs.mSignFlagsAccessor.tree());
         mPointIndexAccessor.tree().merge(rhs.mPointIndexAccessor.tree());
@@ -3754,7 +3754,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
 
 
 template<typename InputTreeType>
-ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& rhs, tbb::split)
+ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& rhs, mt::split)
     : mInputAccessor(rhs.mInputAccessor.tree())
     , mIntersectionNodes(rhs.mIntersectionNodes)
     , mSignFlagsTree(0)
@@ -3768,7 +3768,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& 
 
 template<typename InputTreeType>
 void
-ComputeAuxiliaryData<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range)
+ComputeAuxiliaryData<InputTreeType>::operator()(const mt::blocked_range<size_t>& range)
 {
     using Int16LeafNodeType = typename Int16TreeType::LeafNodeType;
 
@@ -3860,7 +3860,7 @@ computeAuxiliaryData(
     ComputeAuxiliaryData<InputTreeType> op(
         inputTree, intersectionLeafNodes, signFlagsTree, pointIndexTree, isovalue);
 
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, intersectionLeafNodes.size()), op);
+    mt::parallel_reduce(mt::blocked_range<size_t>(0, intersectionLeafNodes.size()), op);
 }
 
 
@@ -3877,7 +3877,7 @@ struct LeafNodePointCount
         : mLeafNodes(leafNodes.data())
         , mData(leafNodeCount.get()) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -3913,7 +3913,7 @@ struct AdaptiveLeafNodePointCount
         , mSignDataNodes(signDataNodes.data())
         , mData(leafNodeCount.get()) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using IndexType = typename PointIndexLeafNode::ValueType;
 
@@ -3960,7 +3960,7 @@ struct MapPoints
         , mSignDataNodes(signDataNodes.data())
         , mData(leafNodeCount.get()) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
@@ -4003,7 +4003,7 @@ struct ComputePolygons
 
     void setRefSignTree(const Int16TreeType * r) { mRefSignFlagsTree = r; }
 
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
     Int16LeafNodeType * const * const mSignFlagsLeafNodes;
@@ -4033,7 +4033,7 @@ ComputePolygons<TreeType, PrimBuilder>::ComputePolygons(
 
 template<typename InputTreeType, typename PrimBuilder>
 void
-ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range<size_t>& range) const
+ComputePolygons<InputTreeType, PrimBuilder>::operator()(const mt::blocked_range<size_t>& range) const
 {
     using Int16ValueAccessor = tree::ValueAccessor<const Int16TreeType>;
     Int16ValueAccessor signAcc(*mSignFlagsTree);
@@ -4126,7 +4126,7 @@ struct CopyArray
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& inputArrayRange) const
+    void operator()(const mt::blocked_range<size_t>& inputArrayRange) const
     {
         const size_t offset = mOutputOffset;
         for (size_t n = inputArrayRange.begin(), N = inputArrayRange.end(); n < N; ++n) {
@@ -4154,7 +4154,7 @@ struct FlagAndCountQuadsToSubdivide
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -4217,7 +4217,7 @@ struct SubdivideQuads
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -4342,11 +4342,11 @@ subdivideNonplanarSeamLineQuads(
     size_t& pointListSize,
     std::vector<uint8_t>& pointFlags)
 {
-    const tbb::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
+    const mt::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
 
     std::unique_ptr<unsigned[]> numQuadsToDivide(new unsigned[polygonPoolListSize]);
 
-    tbb::parallel_for(polygonPoolListRange,
+    mt::parallel_for(polygonPoolListRange,
         FlagAndCountQuadsToSubdivide(polygonPoolList, pointFlags, pointList, numQuadsToDivide));
 
     std::unique_ptr<unsigned[]> centroidOffsets(new unsigned[polygonPoolListSize]);
@@ -4364,7 +4364,7 @@ subdivideNonplanarSeamLineQuads(
 
     std::unique_ptr<Vec3s[]> centroidList(new Vec3s[centroidCount]);
 
-    tbb::parallel_for(polygonPoolListRange,
+    mt::parallel_for(polygonPoolListRange,
         SubdivideQuads(polygonPoolList, pointList, pointListSize,
             centroidList, numQuadsToDivide, centroidOffsets));
 
@@ -4374,10 +4374,10 @@ subdivideNonplanarSeamLineQuads(
 
         std::unique_ptr<openvdb::Vec3s[]> newPointList(new openvdb::Vec3s[newPointListSize]);
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, pointListSize),
+        mt::parallel_for(mt::blocked_range<size_t>(0, pointListSize),
             CopyArray<Vec3s>(newPointList.get(), pointList.get()));
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, newPointListSize - pointListSize),
+        mt::parallel_for(mt::blocked_range<size_t>(0, newPointListSize - pointListSize),
             CopyArray<Vec3s>(newPointList.get(), centroidList.get(), pointListSize));
 
         pointListSize = newPointListSize;
@@ -4396,7 +4396,7 @@ struct ReviseSeamLineFlags
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -4451,7 +4451,7 @@ inline void
 reviseSeamLineFlags(PolygonPoolList& polygonPoolList, size_t polygonPoolListSize,
     std::vector<uint8_t>& pointFlags)
 {
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, polygonPoolListSize),
+    mt::parallel_for(mt::blocked_range<size_t>(0, polygonPoolListSize),
         ReviseSeamLineFlags(polygonPoolList, pointFlags));
 }
 
@@ -4474,7 +4474,7 @@ struct MaskDisorientedTrianglePoints
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using ValueType = typename InputTreeType::LeafNodeType::ValueType;
 
@@ -4546,12 +4546,12 @@ relaxDisorientedTriangles(
     PointList& pointList,
     const size_t pointListSize)
 {
-    const tbb::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
+    const mt::blocked_range<size_t> polygonPoolListRange(0, polygonPoolListSize);
 
     std::unique_ptr<uint8_t[]> pointMask(new uint8_t[pointListSize]);
     fillArray(pointMask.get(), uint8_t(0), pointListSize);
 
-    tbb::parallel_for(polygonPoolListRange,
+    mt::parallel_for(polygonPoolListRange,
         MaskDisorientedTrianglePoints<InputTree>(
             inputTree, polygonPoolList, pointList, pointMask, transform, invertSurfaceOrientation));
 
@@ -4632,7 +4632,7 @@ doVolumeToMesh(
 
     { // Copy points
         volume_to_mesh_internal::PointListCopy ptnCpy(mesher.pointList(), points);
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, points.size()), ptnCpy);
+        mt::parallel_for(mt::blocked_range<size_t>(0, points.size()), ptnCpy);
         mesher.pointList().reset(nullptr);
     }
 
@@ -4952,7 +4952,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
     std::vector<Int16LeafNodeType*> signFlagsLeafNodes;
     signFlagsTree.getNodes(signFlagsLeafNodes);
 
-    const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
+    const mt::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
 
 
     // optionally collect auxiliary data from a reference volume.
@@ -5011,7 +5011,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
                 std::unique_ptr<Index32[]> leafNodeOffsets(
                     new Index32[refSignFlagsLeafNodes.size()]);
 
-                tbb::parallel_for(tbb::blocked_range<size_t>(0, refSignFlagsLeafNodes.size()),
+                mt::parallel_for(mt::blocked_range<size_t>(0, refSignFlagsLeafNodes.size()),
                     volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>(
                         refSignFlagsLeafNodes, leafNodeOffsets));
 
@@ -5034,7 +5034,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
                     std::vector<Index32LeafNodeType*> refPointIndexLeafNodes;
                     refPointIndexTree->getNodes(refPointIndexLeafNodes);
 
-                    tbb::parallel_for(tbb::blocked_range<size_t>(0, refPointIndexLeafNodes.size()),
+                    mt::parallel_for(mt::blocked_range<size_t>(0, refPointIndexLeafNodes.size()),
                         volume_to_mesh_internal::MapPoints<Index32LeafNodeType>(
                             refPointIndexLeafNodes, refSignFlagsLeafNodes, leafNodeOffsets));
                 }
@@ -5042,7 +5042,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
             if (mSeamPointListSize != 0) {
 
-                tbb::parallel_for(auxiliaryLeafNodeRange,
+                mt::parallel_for(auxiliaryLeafNodeRange,
                     volume_to_mesh_internal::SeamLineWeights<InputTreeType>(
                         signFlagsLeafNodes, inputTree, *refPointIndexTree, *refSignFlagsTree,
                             mQuantizedSeamPoints.get(), isovalue));
@@ -5076,19 +5076,19 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
             mergeOp.setRefSignFlagsData(*refSignFlagsTree, float(mSecAdaptivity));
         }
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, mergeOp);
+        mt::parallel_for(auxiliaryLeafNodeRange, mergeOp);
 
         volume_to_mesh_internal::AdaptiveLeafNodePointCount<Index32LeafNodeType>
             op(pointIndexLeafNodes, signFlagsLeafNodes, leafNodeOffsets);
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, op);
+        mt::parallel_for(auxiliaryLeafNodeRange, op);
 
     } else {
 
         volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
             op(signFlagsLeafNodes, leafNodeOffsets);
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, op);
+        mt::parallel_for(auxiliaryLeafNodeRange, op);
     }
 
 
@@ -5119,7 +5119,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
                 mQuantizedSeamPoints.get(), mPointFlags.data());
         }
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, op);
+        mt::parallel_for(auxiliaryLeafNodeRange, op);
     }
 
 
@@ -5140,7 +5140,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
             op.setRefSignTree(refSignFlagsTree);
         }
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, op);
+        mt::parallel_for(auxiliaryLeafNodeRange, op);
 
     } else {
 
@@ -5154,7 +5154,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
             op.setRefSignTree(refSignFlagsTree);
         }
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, op);
+        mt::parallel_for(auxiliaryLeafNodeRange, op);
     }
 
 

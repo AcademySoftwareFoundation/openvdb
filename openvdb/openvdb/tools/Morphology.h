@@ -219,8 +219,8 @@ public:
 
         if (this->getThreaded()) {
             // @note this is marginally faster than using leafRange or foreach
-            tbb::parallel_for(mManager.getRange(),
-                [&](const tbb::blocked_range<size_t>& r){
+            mt::parallel_for(mManager.getRange(),
+                [&](const mt::blocked_range<size_t>& r){
                 for (size_t idx = r.begin(); idx < r.end(); ++idx)
                     masks[idx] = mManager.leaf(idx).getValueMask();
             });
@@ -507,8 +507,8 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         };
 
         if (this->getThreaded()) {
-            tbb::parallel_for(manager.getRange(),
-                [&](const tbb::blocked_range<size_t>& r){
+            mt::parallel_for(manager.getRange(),
+                [&](const mt::blocked_range<size_t>& r){
                 for (size_t idx = r.begin(); idx < r.end(); ++idx) {
                     computeWavefront(idx);
                 }
@@ -532,8 +532,8 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         };
 
         if (this->getThreaded()) {
-            tbb::parallel_for(mManager.getRange(),
-                [&](const tbb::blocked_range<size_t>& r){
+            mt::parallel_for(mManager.getRange(),
+                [&](const mt::blocked_range<size_t>& r){
                 for (size_t idx = r.begin(); idx < r.end(); ++idx) {
                     subtractTopology(idx);
                 }
@@ -557,8 +557,8 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
             for (size_t i = 0; i < iter; ++i) {
                 // For each leaf, in parallel, gather neighboring off values
                 // and update the cached value mask
-                tbb::parallel_for(range,
-                    [&](const tbb::blocked_range<size_t>& r) {
+                mt::parallel_for(range,
+                    [&](const mt::blocked_range<size_t>& r) {
                     AccessorType accessor(tree);
                     NodeMaskOp cache(accessor, nn);
                     for (size_t idx = r.begin(); idx < r.end(); ++idx) {
@@ -571,8 +571,8 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
                 });
 
                 // update the masks after all nodes have been eroded
-                tbb::parallel_for(range,
-                    [&](const tbb::blocked_range<size_t>& r){
+                mt::parallel_for(range,
+                    [&](const mt::blocked_range<size_t>& r){
                     for (size_t idx = r.begin(); idx < r.end(); ++idx)
                         mManager.leaf(idx).setValueMask(nodeMasks[idx]);
                 });
@@ -716,8 +716,8 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
         else if (preserveMaskLeafNodes) {
             mask = nullptr; // act as if theres no mask tree
             array.resize(mManager.leafCount());
-            tbb::parallel_for(mManager.getRange(),
-                [&](const tbb::blocked_range<size_t>& r){
+            mt::parallel_for(mManager.getRange(),
+                [&](const mt::blocked_range<size_t>& r){
                 for (size_t idx = r.begin(); idx < r.end(); ++idx) {
                     array[idx] = new MaskLeafT(mManager.leaf(idx));
                 }
@@ -729,14 +729,14 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
         }
 
         // @note this grain size is used for optimal threading
-        const size_t numThreads = size_t(tbb::this_task_arena::max_concurrency());
+        const size_t numThreads = size_t(mt::this_task_arena::max_concurrency());
         const size_t subTreeSize = math::Max(size_t(1), array.size()/(2*numThreads));
 
         // perform recursive dilation to sub trees
-        tbb::enumerable_thread_specific<std::unique_ptr<MaskTreeT>> pool;
+        mt::enumerable_thread_specific<std::unique_ptr<MaskTreeT>> pool;
         MaskLeafT** start = array.data();
-        tbb::parallel_for(tbb::blocked_range<MaskLeafT**>(start, start + array.size(), subTreeSize),
-            [&](const tbb::blocked_range<MaskLeafT**>& range) {
+        mt::parallel_for(mt::blocked_range<MaskLeafT**>(start, start + array.size(), subTreeSize),
+            [&](const mt::blocked_range<MaskLeafT**>& range) {
                 std::unique_ptr<MaskTreeT> mask(new MaskTreeT);
                 for (MaskLeafT** it = range.begin(); it != range.end(); ++it) mask->addLeaf(*it);
                 tree::LeafManager<MaskTreeT> manager(*mask, range.begin(), range.end());

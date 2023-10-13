@@ -169,7 +169,7 @@ uniformPointScatter(const GridT& grid,
         return points;
     }
 
-    tbb::parallel_sort(values.begin(), values.end());
+    mt::parallel_sort(values.begin(), values.end());
     const bool fractionalOnly(pointsPerVoxel == 0);
 
     leafManager.foreach([&voxelOffsets, &values, fractionalOnly]

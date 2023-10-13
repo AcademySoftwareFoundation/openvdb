@@ -121,8 +121,8 @@ public:
 
     typename TreeT::Ptr tree() const { return mNewTree; }
 
-    CopyLeafNodes(CopyLeafNodes&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>&);
+    CopyLeafNodes(CopyLeafNodes&, mt::split);
+    void operator()(const mt::blocked_range<size_t>&);
     void join(const CopyLeafNodes& rhs) { mNewTree->merge(*rhs.mNewTree); }
 
 private:
@@ -143,7 +143,7 @@ CopyLeafNodes<TreeT>::CopyLeafNodes(const TreeT& tree, const MaskLeafManagerT& l
 
 
 template<typename TreeT>
-CopyLeafNodes<TreeT>::CopyLeafNodes(CopyLeafNodes& rhs, tbb::split)
+CopyLeafNodes<TreeT>::CopyLeafNodes(CopyLeafNodes& rhs, mt::split)
     : mTree(rhs.mTree)
     , mLeafNodes(rhs.mLeafNodes)
     , mNewTree(new TreeT(mTree->background()))
@@ -155,14 +155,14 @@ template<typename TreeT>
 void
 CopyLeafNodes<TreeT>::run(bool threaded)
 {
-    if (threaded) tbb::parallel_reduce(mLeafNodes->getRange(), *this);
+    if (threaded) mt::parallel_reduce(mLeafNodes->getRange(), *this);
     else (*this)(mLeafNodes->getRange());
 }
 
 
 template<typename TreeT>
 void
-CopyLeafNodes<TreeT>::operator()(const tbb::blocked_range<size_t>& range)
+CopyLeafNodes<TreeT>::operator()(const mt::blocked_range<size_t>& range)
 {
     tree::ValueAccessor<TreeT> acc(*mNewTree);
     tree::ValueAccessor<const TreeT> refAcc(*mTree);
@@ -495,7 +495,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
                     // bounding box test is comparable to testing every voxel.
                     if (bboxVec.back().volume() > 64 && bboxVec.back().is_divisible()) {
                         // Subdivide this region in-place and append the other half to the list.
-                        bboxVec.emplace_back(bboxVec.back(), tbb::split{});
+                        bboxVec.emplace_back(bboxVec.back(), mt::split{});
                         continue;
                     }
                     auto subBBox = bboxVec.back();

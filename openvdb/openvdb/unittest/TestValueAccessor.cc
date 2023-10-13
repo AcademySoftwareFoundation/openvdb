@@ -408,7 +408,7 @@ TestValueAccessor::multithreadedAccessorTest()
         RootTask(AccessorT& c): acc(c) {}
         void execute()
         {
-            tbb::task_group tasks;
+            mt::task_group tasks;
             for (int i = 0; i < 3; ++i) {
                 tasks.run([&] { ReadTask r(acc); r.execute(); });
                 tasks.run([&] { WriteTask w(acc); w.execute(); });

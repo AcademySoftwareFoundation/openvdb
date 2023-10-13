@@ -78,7 +78,7 @@ public:
         if (newMsg.size() < 50)     newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
         std::cerr << newMsg << " ... ";
 #endif
-        mT0 = tbb::tick_count::now();
+        mT0 = mt::tick_count::now();
     }
 
     ~ProfileTimer() { this->stop(); }
@@ -86,7 +86,7 @@ public:
     /// Return Time diference in milliseconds since construction or start was called.
     inline double delta() const
     {
-        tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;
+        mt::tick_count::interval_t dt = mt::tick_count::now() - mT0;
         return 1000.0*dt.seconds();
     }
 
@@ -101,7 +101,7 @@ public:
     }
 
 private:
-    tbb::tick_count mT0;
+    mt::tick_count mT0;
 };// ProfileTimer
 
 

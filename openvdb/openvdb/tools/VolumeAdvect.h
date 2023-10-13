@@ -381,7 +381,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     inline void cook(const LeafRangeT& range)
     {
         if (mParent->mGrainSize > 0) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }

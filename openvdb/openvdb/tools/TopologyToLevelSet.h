@@ -98,7 +98,7 @@ struct OffsetAndMinComp
         , mRhsTree(rhsTree)
         , mOffset(offset) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using Iterator = typename LeafNodeType::ValueOnIter;
 
@@ -162,7 +162,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
 
     const ValueType offset = ValueType(double(0.5) * grid.transform().voxelSize()[0]);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
         OffsetAndMinComp<TreeType>(nodes, filterGrid.tree(), -offset));
 
     // Clean up any damanage that was done by the min operation
@@ -206,7 +206,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
     typename FloatTreeT::Ptr lsTree(
         new FloatTreeT(maskTree, /*out=*/background, /*in=*/-background, openvdb::TopologyCopy()));
 
-    tbb::task_group pool;
+    mt::task_group pool;
     pool.run([&]() {
         tools::erodeActiveValues(maskTree, /*iterations=*/halfWidth, tools::NN_FACE, tools::PRESERVE_TILES);
         tools::pruneInactive(maskTree);

@@ -32,7 +32,7 @@ namespace pcg {
 
 using SizeType = Index32;
 
-using SizeRange = tbb::blocked_range<SizeType>;
+using SizeRange = mt::blocked_range<SizeType>;
 
 template<typename ValueType> class Vector;
 
@@ -212,10 +212,10 @@ public:
     //@}
 
 private:
-    // Functor for use with tbb::parallel_for()
+    // Functor for use with mt::parallel_for()
     template<typename Scalar> struct ScaleOp;
     struct DeterministicDotProductOp;
-    // Functors for use with tbb::parallel_reduce()
+    // Functors for use with mt::parallel_reduce()
     template<typename OtherValueType> struct EqOp;
     struct InfNormOp;
     struct IsFiniteOp;
@@ -440,12 +440,12 @@ public:
     }; // class RowEditor
 
 private:
-    // Functors for use with tbb::parallel_for()
+    // Functors for use with mt::parallel_for()
     struct MatrixCopyOp;
     template<typename VecValueType> struct VecMultOp;
     template<typename Scalar> struct RowScaleOp;
 
-    // Functors for use with tbb::parallel_reduce()
+    // Functors for use with mt::parallel_reduce()
     struct IsFiniteOp;
     template<typename OtherValueType> struct EqOp;
 
@@ -485,7 +485,7 @@ public:
 
 namespace internal {
 
-// Functor for use with tbb::parallel_for() to copy data from one array to another
+// Functor for use with mt::parallel_for() to copy data from one array to another
 template<typename T>
 struct CopyOp
 {
@@ -500,7 +500,7 @@ struct CopyOp
 };
 
 
-// Functor for use with tbb::parallel_for() to fill an array with a constant value
+// Functor for use with mt::parallel_for() to fill an array with a constant value
 template<typename T>
 struct FillOp
 {
@@ -515,7 +515,7 @@ struct FillOp
 };
 
 
-// Functor for use with tbb::parallel_for() that computes a * x + y
+// Functor for use with mt::parallel_for() that computes a * x + y
 template<typename T>
 struct LinearOp
 {
@@ -558,7 +558,7 @@ template<typename T>
 inline
 Vector<T>::Vector(const Vector& other): mData(new T[other.mSize]), mSize(other.mSize)
 {
-    tbb::parallel_for(SizeRange(0, mSize),
+    mt::parallel_for(SizeRange(0, mSize),
         internal::CopyOp<T>(/*from=*/other.mData, /*to=*/mData));
 }
 
@@ -576,7 +576,7 @@ Vector<T>& Vector<T>::operator=(const Vector<T>& other)
     }
 
     // Deep copy the data
-    tbb::parallel_for(SizeRange(0, mSize),
+    mt::parallel_for(SizeRange(0, mSize),
         internal::CopyOp<T>(/*from=*/other.mData, /*to=*/mData));
 
     return *this;
@@ -599,7 +599,7 @@ template<typename T>
 inline void
 Vector<T>::fill(const ValueType& value)
 {
-    tbb::parallel_for(SizeRange(0, mSize), internal::FillOp<T>(mData, value));
+    mt::parallel_for(SizeRange(0, mSize), internal::FillOp<T>(mData, value));
 }
 
 
@@ -623,7 +623,7 @@ template<typename Scalar>
 inline void
 Vector<T>::scale(const Scalar& s)
 {
-    tbb::parallel_for(SizeRange(0, mSize), ScaleOp<Scalar>(mData, s));
+    mt::parallel_for(SizeRange(0, mSize), ScaleOp<Scalar>(mData, s));
 }
 
 
@@ -689,7 +689,7 @@ Vector<T>::dot(const Vector<T>& other) const
         const SizeType binCount = 100;
         T partialSums[100];
 
-        tbb::parallel_for(SizeRange(0, binCount),
+        mt::parallel_for(SizeRange(0, binCount),
             DeterministicDotProductOp(aData, bData, binCount, arraySize, partialSums));
 
         for (SizeType n = 0; n < binCount; ++n) {
@@ -723,7 +723,7 @@ inline T
 Vector<T>::infNorm() const
 {
     // Parallelize over the elements of this vector.
-    T result = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/zeroVal<T>(),
+    T result = mt::parallel_reduce(SizeRange(0, this->size()), /*seed=*/zeroVal<T>(),
         InfNormOp(this->data()), /*join=*/[](T max1, T max2) { return Max(max1, max2); });
     return result;
 }
@@ -753,7 +753,7 @@ inline bool
 Vector<T>::isFinite() const
 {
     // Parallelize over the elements of this vector.
-    bool finite = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
+    bool finite = mt::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
         IsFiniteOp(this->data()),
         /*join=*/[](bool finite1, bool finite2) { return (finite1 && finite2); });
     return finite;
@@ -788,7 +788,7 @@ inline bool
 Vector<T>::eq(const Vector<OtherValueType>& other, ValueType eps) const
 {
     if (this->size() != other.size()) return false;
-    bool equal = tbb::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
+    bool equal = mt::parallel_reduce(SizeRange(0, this->size()), /*seed=*/true,
         EqOp<OtherValueType>(this->data(), other.data(), eps),
         /*join=*/[](bool eq1, bool eq2) { return (eq1 && eq2); });
     return equal;
@@ -823,7 +823,7 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::SparseStencilMatrix(SizeType numRo
     , mRowSizeArray(new SizeType[mNumRows])
 {
     // Initialize the matrix to a null state by setting the size of each row to zero.
-    tbb::parallel_for(SizeRange(0, mNumRows),
+    mt::parallel_for(SizeRange(0, mNumRows),
         internal::FillOp<SizeType>(mRowSizeArray.get(), /*value=*/0));
 }
 
@@ -861,10 +861,10 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::SparseStencilMatrix(const SparseSt
     SizeType size = mNumRows * STENCIL_SIZE;
 
     // Copy the value and column index arrays from the other matrix to this matrix.
-    tbb::parallel_for(SizeRange(0, size), MatrixCopyOp(/*from=*/other, /*to=*/*this));
+    mt::parallel_for(SizeRange(0, size), MatrixCopyOp(/*from=*/other, /*to=*/*this));
 
     // Copy the row size array from the other matrix to this matrix.
-    tbb::parallel_for(SizeRange(0, mNumRows),
+    mt::parallel_for(SizeRange(0, mNumRows),
         internal::CopyOp<SizeType>(/*from=*/other.mRowSizeArray.get(), /*to=*/mRowSizeArray.get()));
 }
 
@@ -921,7 +921,7 @@ inline void
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::scale(const Scalar& s)
 {
     // Parallelize over the rows in the matrix.
-    tbb::parallel_for(SizeRange(0, mNumRows), RowScaleOp<Scalar>(*this, s));
+    mt::parallel_for(SizeRange(0, mNumRows), RowScaleOp<Scalar>(*this, s));
 }
 
 
@@ -972,7 +972,7 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::vectorMultiply(
     const VecValueType* inVec, VecValueType* resultVec) const
 {
     // Parallelize over the rows in the matrix.
-    tbb::parallel_for(SizeRange(0, mNumRows),
+    mt::parallel_for(SizeRange(0, mNumRows),
         VecMultOp<VecValueType>(*this, inVec, resultVec));
 }
 
@@ -1008,7 +1008,7 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::eq(
     const SparseStencilMatrix<OtherValueType, STENCIL_SIZE>& other, ValueType eps) const
 {
     if (this->numRows() != other.numRows()) return false;
-    bool equal = tbb::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
+    bool equal = mt::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
         EqOp<OtherValueType>(*this, other, eps),
         /*join=*/[](bool eq1, bool eq2) { return (eq1 && eq2); });
     return equal;
@@ -1042,7 +1042,7 @@ inline bool
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::isFinite() const
 {
     // Parallelize over the rows of this matrix.
-    bool finite = tbb::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
+    bool finite = mt::parallel_reduce(SizeRange(0, this->numRows()), /*seed=*/true,
         IsFiniteOp(*this), /*join=*/[](bool finite1, bool finite2) { return (finite1&&finite2); });
     return finite;
 }
@@ -1288,7 +1288,7 @@ public:
     JacobiPreconditioner(const MatrixType& A): BaseType(A), mDiag(A.numRows())
     {
         // Initialize vector mDiag with the values from the matrix diagonal.
-        tbb::parallel_for(SizeRange(0, A.numRows()), InitOp(A, mDiag.data()));
+        mt::parallel_for(SizeRange(0, A.numRows()), InitOp(A, mDiag.data()));
     }
 
     ~JacobiPreconditioner() override = default;
@@ -1300,14 +1300,14 @@ public:
         assert(r.size() == z.size());
         assert(r.size() == size);
 
-        tbb::parallel_for(SizeRange(0, size), ApplyOp(mDiag.data(), r.data(), z.data()));
+        mt::parallel_for(SizeRange(0, size), ApplyOp(mDiag.data(), r.data(), z.data()));
     }
 
     /// Return @c true if all values along the diagonal are finite.
     bool isFinite() const { return mDiag.isFinite(); }
 
 private:
-    // Functor for use with tbb::parallel_for()
+    // Functor for use with mt::parallel_for()
     struct InitOp
     {
         InitOp(const MatrixType& m, ValueType* v): mat(&m), vec(v) {}
@@ -1321,7 +1321,7 @@ private:
         const MatrixType* mat; ValueType* vec;
     };
 
-    // Functor for use with tbb::parallel_reduce()
+    // Functor for use with mt::parallel_reduce()
     struct ApplyOp
     {
         ApplyOp(const ValueType* x_, const ValueType* y_, ValueType* out_):
@@ -1364,7 +1364,7 @@ public:
         const SizeType numRows = mLowerTriangular.numRows();
 
         // Copy the upper triangular part to the lower triangular part.
-        tbb::parallel_for(SizeRange(0, numRows), CopyToLowerOp(matrix, mLowerTriangular));
+        mt::parallel_for(SizeRange(0, numRows), CopyToLowerOp(matrix, mLowerTriangular));
 
         // Build the Incomplete Cholesky Matrix
         //
@@ -1443,7 +1443,7 @@ public:
         }
 
         // Build the transpose of the IC matrix: mUpperTriangular
-        tbb::parallel_for(SizeRange(0, numRows),
+        mt::parallel_for(SizeRange(0, numRows),
             TransposeOp(matrix, mLowerTriangular, mUpperTriangular));
     }
 
@@ -1503,7 +1503,7 @@ public:
     const TriangularMatrix& upperMatrix() const { return mUpperTriangular; }
 
 private:
-    // Functor for use with tbb::parallel_for()
+    // Functor for use with mt::parallel_for()
     struct CopyToLowerOp
     {
         CopyToLowerOp(const MatrixType& m, TriangularMatrix& l): mat(&m), lower(&l) {}
@@ -1521,7 +1521,7 @@ private:
         const MatrixType* mat; TriangularMatrix* lower;
     };
 
-    // Functor for use with tbb::parallel_for()
+    // Functor for use with mt::parallel_for()
     struct TransposeOp
     {
         TransposeOp(const MatrixType& m, const TriangularMatrix& l, TriangularMatrix& u):
@@ -1559,7 +1559,7 @@ template<typename T>
 inline void
 axpy(const T& a, const T* xVec, const T* yVec, T* resultVec, SizeType size)
 {
-    tbb::parallel_for(SizeRange(0, size), LinearOp<T>(a, xVec, yVec, resultVec));
+    mt::parallel_for(SizeRange(0, size), LinearOp<T>(a, xVec, yVec, resultVec));
 }
 
 /// Compute @e ax + @e y.
@@ -1582,7 +1582,7 @@ computeResidual(const MatrixOperator& A, const VecValueType* x,
     // Compute r = A * x.
     A.vectorMultiply(x, r);
     // Compute r = b - r.
-    tbb::parallel_for(SizeRange(0, A.numRows()), LinearOp<VecValueType>(-1.0, r, b, r));
+    mt::parallel_for(SizeRange(0, A.numRows()), LinearOp<VecValueType>(-1.0, r, b, r));
 }
 
 /// Compute @e r = @e b &minus; @e Ax.

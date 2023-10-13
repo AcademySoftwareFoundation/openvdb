@@ -94,7 +94,7 @@ struct ActiveVoxelCountOp
     using LeafT = typename TreeType::LeafNodeType;
 
     ActiveVoxelCountOp() = default;
-    ActiveVoxelCountOp(const ActiveVoxelCountOp&, tbb::split) { }
+    ActiveVoxelCountOp(const ActiveVoxelCountOp&, mt::split) { }
 
     //  accumulate all voxels in active tile children
     template<typename NodeT>
@@ -130,7 +130,7 @@ struct ActiveVoxelCountBBoxOp
 
     explicit ActiveVoxelCountBBoxOp(const CoordBBox& bbox)
         : mBBox(bbox) { }
-    ActiveVoxelCountBBoxOp(const ActiveVoxelCountBBoxOp& other, tbb::split)
+    ActiveVoxelCountBBoxOp(const ActiveVoxelCountBBoxOp& other, mt::split)
         : mBBox(other.mBBox) { }
 
     // accumulate all voxels in active tile children bounded by the bbox
@@ -212,7 +212,7 @@ struct InactiveVoxelCountOp
     using LeafT = typename TreeType::LeafNodeType;
 
     InactiveVoxelCountOp() = default;
-    InactiveVoxelCountOp(const InactiveVoxelCountOp&, tbb::split) { }
+    InactiveVoxelCountOp(const InactiveVoxelCountOp&, mt::split) { }
 
     // accumulate all inactive voxels in the root node
     bool operator()(const RootT& root, size_t)
@@ -261,7 +261,7 @@ struct ActiveTileCountOp
     using LeafT = typename TreeType::LeafNodeType;
 
     ActiveTileCountOp() = default;
-    ActiveTileCountOp(const ActiveTileCountOp&, tbb::split) { }
+    ActiveTileCountOp(const ActiveTileCountOp&, mt::split) { }
 
     // accumulate all active tiles in root node
     bool operator()(const RootT& root, size_t)
@@ -301,7 +301,7 @@ struct MemUsageOp
 
     MemUsageOp(const bool inCoreOnly) : mInCoreOnly(inCoreOnly) {}
     MemUsageOp(const MemUsageOp& other) : mCount(0), mInCoreOnly(other.mInCoreOnly) {}
-    MemUsageOp(const MemUsageOp& other, tbb::split) : MemUsageOp(other) {}
+    MemUsageOp(const MemUsageOp& other, mt::split) : MemUsageOp(other) {}
 
     // accumulate size of the root node in bytes
     bool operator()(const RootT& root, size_t)
@@ -348,7 +348,7 @@ struct MinMaxValuesOp
         , max(zeroVal<ValueT>())
         , seen_value(false) {}
 
-    MinMaxValuesOp(const MinMaxValuesOp&, tbb::split)
+    MinMaxValuesOp(const MinMaxValuesOp&, mt::split)
         : MinMaxValuesOp() {}
 
     template <typename NodeType>
