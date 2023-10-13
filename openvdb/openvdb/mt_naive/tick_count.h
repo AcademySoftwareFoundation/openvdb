@@ -16,7 +16,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+using tick_count = ::tbb::tick_count;
 
 } // mt
 } // OPENVDB_VERSION_NAME

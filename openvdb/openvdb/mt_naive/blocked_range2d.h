@@ -16,7 +16,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template<typename RowValue, typename ColValue=RowValue>
+using blocked_range2d = ::tbb::blocked_range2d<RowValue, ColValue>;
 
 } // mt
 } // OPENVDB_VERSION_NAME

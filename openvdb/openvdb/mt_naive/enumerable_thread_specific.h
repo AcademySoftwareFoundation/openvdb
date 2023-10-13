@@ -16,7 +16,10 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template <typename T,
+              typename Allocator=::tbb::cache_aligned_allocator<T>,
+              ::tbb::ets_key_usage_type ETS_key_type=::tbb::ets_no_key >
+using enumerable_thread_specific = ::tbb::enumerable_thread_specific<T, Allocator, ETS_key_type>;
 
 } // mt
 } // OPENVDB_VERSION_NAME

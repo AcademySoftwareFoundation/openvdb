@@ -16,7 +16,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template <typename T>
+using combinable = ::tbb::combinable<T>;
 
 } // mt
 } // OPENVDB_VERSION_NAME

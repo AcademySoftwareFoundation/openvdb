@@ -16,7 +16,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template<typename T, class A = ::tbb::cache_aligned_allocator<T> >
+using concurrent_vector = ::tbb::concurrent_vector<T, A>;
 
 } // mt
 } // OPENVDB_VERSION_NAME

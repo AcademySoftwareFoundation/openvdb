@@ -16,7 +16,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+using simple_partitioner = ::tbb::simple_partitioner;
 
 } // mt
 } // OPENVDB_VERSION_NAME

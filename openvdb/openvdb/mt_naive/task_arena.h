@@ -16,7 +16,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+namespace this_task_arena = ::tbb::this_task_arena;
+using task_arena = ::tbb::task_arena;
 
 } // mt
 } // OPENVDB_VERSION_NAME

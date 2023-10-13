@@ -16,7 +16,10 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template<typename ... T>
+void parallel_invoke( T && ... t ) {
+    ::tbb::parallel_invoke(std::forward<T>(t)...);
+}
 
 } // mt
 } // OPENVDB_VERSION_NAME

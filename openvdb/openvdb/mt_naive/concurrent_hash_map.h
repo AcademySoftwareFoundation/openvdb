@@ -16,7 +16,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using namespace ::tbb;
+template<typename Key, typename T, typename HashCompare = ::tbb::tbb_hash_compare<Key>, typename A = ::tbb::tbb_allocator<std::pair<const Key, T> > >
+using concurrent_hash_map = ::tbb::concurrent_hash_map<Key, T, HashCompare, A>;
 
 } // mt
 } // OPENVDB_VERSION_NAME
