@@ -13,7 +13,7 @@
 #include "Math.h"
 #include "Vec3.h"
 
-#include <tbb/blocked_range.h> // for tbb::split
+#include <openvdb/mt/blocked_range.h> // for tbb::split
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

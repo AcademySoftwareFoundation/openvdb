@@ -26,8 +26,8 @@
 #include <openvdb/thread/Threading.h>
 #include "Interpolation.h"
 
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_vector.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/concurrent_vector.h>
 
 #include <algorithm> // for std::max()
 #include <functional>

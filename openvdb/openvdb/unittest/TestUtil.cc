@@ -9,9 +9,9 @@
 
 #include <gtest/gtest.h>
 
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
 
 #include <chrono>
 #include <iostream>
@@ -22,7 +22,7 @@
 #ifdef BENCHMARK_PAGED_ARRAY
 #include <deque> // for std::deque
 #include <vector> // for std::vector
-#include <tbb/tbb.h> // for tbb::concurrent_vector
+#include <openvdb/mt/tbb.h> // for tbb::concurrent_vector
 #endif
 
 class TestUtil: public ::testing::Test

@@ -20,9 +20,9 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_sort.h>
-#include <tbb/parallel_invoke.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_sort.h>
+#include <openvdb/mt/parallel_invoke.h>
 
 #include <type_traits>
 

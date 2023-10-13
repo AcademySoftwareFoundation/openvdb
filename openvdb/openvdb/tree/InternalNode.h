@@ -16,7 +16,7 @@
 #include <openvdb/Types.h>
 #include "Iterator.h"
 #include "NodeUnion.h"
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_for.h>
 #include <memory>
 #include <type_traits>
 

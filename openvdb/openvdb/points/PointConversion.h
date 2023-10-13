@@ -23,7 +23,7 @@
 #include "PointDataGrid.h"
 #include "PointGroup.h"
 
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 #include <type_traits>
 

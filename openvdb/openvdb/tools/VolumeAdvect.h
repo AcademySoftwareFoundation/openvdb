@@ -23,7 +23,7 @@
 #include "Prune.h"// for prune
 #include "Statistics.h" // for extrema
 
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_for.h>
 
 #include <functional>
 

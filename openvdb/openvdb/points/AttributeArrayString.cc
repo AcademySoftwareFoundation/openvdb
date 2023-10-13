@@ -8,7 +8,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
 
-#include <tbb/parallel_sort.h>
+#include <openvdb/mt/parallel_sort.h>
 
 #include <string>
 

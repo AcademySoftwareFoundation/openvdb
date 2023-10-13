@@ -14,8 +14,8 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <algorithm> // for std::lower_bound()
 #include <cassert>
 #include <cmath> // for std::isfinite()

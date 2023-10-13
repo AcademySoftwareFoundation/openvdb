@@ -17,8 +17,8 @@
 #include "SignedFloodFill.h" // for signedFloodFill
 #include "Prune.h" // for pruneLevelSet
 #include <openvdb/openvdb.h>
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <cmath>
 #include <functional>
 

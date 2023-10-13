@@ -27,7 +27,7 @@
 #include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
 
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_for.h>
 
 #include <functional>
 #include <type_traits>

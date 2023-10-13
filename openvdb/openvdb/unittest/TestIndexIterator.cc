@@ -6,7 +6,7 @@
 #include <openvdb/tree/LeafNode.h>
 
 #include <gtest/gtest.h>
-#include <tbb/tick_count.h>
+#include <openvdb/mt/tick_count.h>
 
 #include <sstream>
 #include <iostream>

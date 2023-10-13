@@ -37,7 +37,7 @@
 #include "PointDataGrid.h"
 #include "PointMask.h"
 
-#include <tbb/concurrent_vector.h>
+#include <openvdb/mt/concurrent_vector.h>
 
 #include <algorithm>
 #include <iterator> // for std::begin(), std::end()

@@ -20,8 +20,8 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 #include <cmath> // for std::isnan(), std::isfinite()
 #include <set>

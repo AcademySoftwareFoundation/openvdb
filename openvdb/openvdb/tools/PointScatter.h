@@ -26,8 +26,8 @@
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
-#include <tbb/parallel_sort.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_sort.h>
+#include <openvdb/mt/parallel_for.h>
 #include <iostream>
 #include <memory>
 #include <string>

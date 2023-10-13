@@ -29,13 +29,13 @@
 #include "Prune.h" // for pruneInactive and pruneLevelSet
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
-#include <tbb/blocked_range.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/partitioner.h>
-#include <tbb/task_group.h>
-#include <tbb/task_arena.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/partitioner.h>
+#include <openvdb/mt/task_group.h>
+#include <openvdb/mt/task_arena.h>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()

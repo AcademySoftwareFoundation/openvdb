@@ -18,10 +18,10 @@
 #include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/parallel_sort.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/parallel_sort.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>

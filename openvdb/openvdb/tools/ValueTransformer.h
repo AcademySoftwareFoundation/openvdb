@@ -30,8 +30,8 @@
 #define OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 
 #include <algorithm> // for std::min(), std::max()
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>

@@ -44,9 +44,9 @@
 #include <openvdb/util/CpuTimer.h>
 #endif
 
-#include <tbb/parallel_for.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_group.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/task_group.h>
 
 #include <type_traits>// for static_assert
 #include <cmath>

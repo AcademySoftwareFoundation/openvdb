@@ -19,7 +19,7 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
-#include <tbb/concurrent_hash_map.h>
+#include <openvdb/mt/concurrent_hash_map.h>
 #include <cstdint>
 #include <iostream>
 #include <mutex>

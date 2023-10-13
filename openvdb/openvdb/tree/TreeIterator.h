@@ -6,8 +6,8 @@
 #ifndef OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include <algorithm>

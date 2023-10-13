@@ -4,10 +4,10 @@
 #ifndef OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSESPARSETOOLS_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range3d.h>
-#include <tbb/blocked_range2d.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/blocked_range3d.h>
+#include <openvdb/mt/blocked_range2d.h>
+#include <openvdb/mt/blocked_range.h>
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafManager.h>
 #include "Dense.h"

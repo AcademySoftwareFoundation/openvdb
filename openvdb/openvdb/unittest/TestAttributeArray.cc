@@ -34,7 +34,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #endif
 #endif // OPENVDB_USE_DELAYED_LOADING
 
-#include <tbb/tick_count.h>
+#include <openvdb/mt/tick_count.h>
 #include <atomic>
 
 #include <cstdio> // for std::remove()

@@ -48,7 +48,7 @@
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 
-#include <tbb/spin_mutex.h>
+#include <openvdb/mt/spin_mutex.h>
 
 #include <cassert>
 #include <limits>

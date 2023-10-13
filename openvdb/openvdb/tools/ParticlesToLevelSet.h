@@ -76,8 +76,8 @@
 #include "Prune.h"
 #include "SignedFloodFill.h"
 
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
 
 #include <functional>
 #include <iostream>

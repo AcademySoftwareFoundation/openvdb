@@ -19,8 +19,8 @@
 #include "Interpolation.h"                 // sampling
 #include "VelocityFields.h"                // VelocityIntegrator
 
-#include <tbb/blocked_range.h>             // threading
-#include <tbb/parallel_for.h>              // threading
+#include <openvdb/mt/blocked_range.h>             // threading
+#include <openvdb/mt/parallel_for.h>              // threading
 
 #include <vector>
 

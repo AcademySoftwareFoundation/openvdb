@@ -30,8 +30,8 @@
 #include "VolumeToMesh.h"
 #include "MeshToVolume.h"
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
 #include <type_traits>
 
 
