@@ -72,7 +72,7 @@ public:
     /// @note  Note that only the return type matters!
     /// @details Unlike operator[] it is safe to assume that all pointer types have operator*,
     ///          which is why pointer_traits makes use of it to determine the element_type that
-    ///          a pointer class is pointing to. E.g. operator[] is not always defined for std::shared_ptr! 
+    ///          a pointer class is pointing to. E.g. operator[] is not always defined for std::shared_ptr!
     __hostdev__ inline const T& operator*() const {return *mPtr;}
 };// fancy_ptr<T>
 
