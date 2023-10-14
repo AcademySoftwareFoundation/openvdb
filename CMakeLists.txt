@@ -285,19 +285,44 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
-    cmake/FindBlosc.cmake
-    cmake/FindJemalloc.cmake
-    cmake/FindIlmBase.cmake
-    cmake/FindLog4cplus.cmake
-    cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
     cmake/OpenVDBGLFW3Setup.cmake
-    cmake/OpenVDBHoudiniSetup.cmake
-    cmake/OpenVDBMayaSetup.cmake
-    cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+
+  if(USE_BLOSC)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/FindBlosc.cmake)
+  endif()
+
+  if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/FindJemalloc.cmake)
+  endif()
+
+  if(USE_IMATH_HALF)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/FindIlmBase.cmake)
+  endif()
+  if(USE_EXR)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/FindOpenEXR.cmake)
+  endif()
+
+  if(USE_LOG4CPLUS)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/FindLog4cplus.cmake)
+  endif()
+
+  if(USE_HOUDINI)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/OpenVDBHoudiniSetup.cmake)
+  endif()
+
+  if(USE_MAYA)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/OpenVDBMayaSetup.cmake)
+  endif()
+
+  if(OPENVDB_BUILD_BINARIES)
+    list(APPEND OPENVDB_CMAKE_MODULES cmake/OpenVDBUtils.cmake)
+  endif()
+
+  install(FILES ${OPENVDB_CMAKE_MODULES}
+          DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure component dependencies by loading the Houdini/Maya setup
