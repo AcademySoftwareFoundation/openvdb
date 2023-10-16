@@ -785,90 +785,6 @@ __hostdev__ inline static const DstT* PtrAdd(const SrcT* p, int64_t offset)
     return reinterpret_cast<const DstT*>(reinterpret_cast<const char*>(p) + offset);
 }
 
-// --------------------------> Rgba8 <------------------------------------
-
-/// @brief 8-bit red, green, blue, alpha packed into 32 bit unsigned int
-class Rgba8
-{
-    union
-    {
-        uint8_t  c[4];   // 4 integer color channels of red, green, blue and alpha components.
-        uint32_t packed; // 32 bit packed representation
-    } mData;
-
-public:
-    static const int SIZE = 4;
-    using ValueType = uint8_t;
-
-    /// @brief Default copy constructor
-    Rgba8(const Rgba8&) = default;
-
-    /// @brief Default move constructor
-    Rgba8(Rgba8&&) = default;
-
-    /// @brief Default move assignment operator
-    /// @return non-const reference to this instance
-    Rgba8&      operator=(Rgba8&&) = default;
-
-    /// @brief Default copy assignment operator
-    /// @return non-const reference to this instance
-    Rgba8&      operator=(const Rgba8&) = default;
-
-    /// @brief Default ctor initializes all channels to zero
-    __hostdev__ Rgba8()
-        : mData{{0, 0, 0, 0}}
-    {
-        static_assert(sizeof(uint32_t) == sizeof(Rgba8), "Unexpected sizeof");
-    }
-
-    /// @brief integer r,g,b,a ctor where alpha channel defaults to opaque
-    /// @note all values should be in the range 0u to 255u
-    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u)
-        : mData{{r, g, b, a}}
-    {
-    }
-
-    /// @brief  @brief ctor where all channels are initialized to the same value
-    /// @note value should be in the range 0u to 255u
-    explicit __hostdev__ Rgba8(uint8_t v)
-        : mData{{v, v, v, v}}
-    {
-    }
-
-    /// @brief floating-point r,g,b,a ctor where alpha channel defaults to opaque
-    /// @note all values should be in the range 0.0f to 1.0f
-    __hostdev__ Rgba8(float r, float g, float b, float a = 1.0f)
-        : mData{{static_cast<uint8_t>(0.5f + r * 255.0f), // round floats to nearest integers
-                 static_cast<uint8_t>(0.5f + g * 255.0f), // double {{}} is needed due to union
-                 static_cast<uint8_t>(0.5f + b * 255.0f),
-                 static_cast<uint8_t>(0.5f + a * 255.0f)}}
-    {
-    }
-    __hostdev__ bool  operator<(const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
-    __hostdev__ bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
-    __hostdev__ float lengthSqr() const
-    {
-        return 0.0000153787005f * (float(mData.c[0]) * mData.c[0] +
-                                   float(mData.c[1]) * mData.c[1] +
-                                   float(mData.c[2]) * mData.c[2]); //1/255^2
-    }
-    __hostdev__ float           length() const { return sqrtf(this->lengthSqr()); }
-    __hostdev__ const uint8_t&  operator[](int n) const { return mData.c[n]; }
-    __hostdev__ uint8_t&        operator[](int n) { return mData.c[n]; }
-    __hostdev__ const uint32_t& packed() const { return mData.packed; }
-    __hostdev__ uint32_t&       packed() { return mData.packed; }
-    __hostdev__ const uint8_t&  r() const { return mData.c[0]; }
-    __hostdev__ const uint8_t&  g() const { return mData.c[1]; }
-    __hostdev__ const uint8_t&  b() const { return mData.c[2]; }
-    __hostdev__ const uint8_t&  a() const { return mData.c[3]; }
-    __hostdev__ uint8_t&        r() { return mData.c[0]; }
-    __hostdev__ uint8_t&        g() { return mData.c[1]; }
-    __hostdev__ uint8_t&        b() { return mData.c[2]; }
-    __hostdev__ uint8_t&        a() { return mData.c[3]; }
-}; // Rgba8
-
-using PackedRGBA8 = Rgba8; // for backwards compatibility
-
 // --------------------------> isFloatingPoint(GridType) <------------------------------------
 
 /// @brief return true if the GridType maps to a floating point type
@@ -1879,6 +1795,114 @@ using Vec4R = Vec4<double>;
 using Vec4d = Vec4<double>;
 using Vec4f = Vec4<float>;
 using Vec4i = Vec4<int>;
+
+
+// --------------------------> Rgba8 <------------------------------------
+
+/// @brief 8-bit red, green, blue, alpha packed into 32 bit unsigned int
+class Rgba8
+{
+    union
+    {
+        uint8_t  c[4];   // 4 integer color channels of red, green, blue and alpha components.
+        uint32_t packed; // 32 bit packed representation
+    } mData;
+
+public:
+    static const int SIZE = 4;
+    using ValueType = uint8_t;
+
+    /// @brief Default copy constructor
+    Rgba8(const Rgba8&) = default;
+
+    /// @brief Default move constructor
+    Rgba8(Rgba8&&) = default;
+
+    /// @brief Default move assignment operator
+    /// @return non-const reference to this instance
+    Rgba8&      operator=(Rgba8&&) = default;
+
+    /// @brief Default copy assignment operator
+    /// @return non-const reference to this instance
+    Rgba8&      operator=(const Rgba8&) = default;
+
+    /// @brief Default ctor initializes all channels to zero
+    __hostdev__ Rgba8()
+        : mData{{0, 0, 0, 0}}
+    {
+        static_assert(sizeof(uint32_t) == sizeof(Rgba8), "Unexpected sizeof");
+    }
+
+    /// @brief integer r,g,b,a ctor where alpha channel defaults to opaque
+    /// @note all values should be in the range 0u to 255u
+    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u)
+        : mData{{r, g, b, a}}
+    {
+    }
+
+    /// @brief  @brief ctor where all channels are initialized to the same value
+    /// @note value should be in the range 0u to 255u
+    explicit __hostdev__ Rgba8(uint8_t v)
+        : mData{{v, v, v, v}}
+    {
+    }
+
+    /// @brief floating-point r,g,b,a ctor where alpha channel defaults to opaque
+    /// @note all values should be in the range 0.0f to 1.0f
+    __hostdev__ Rgba8(float r, float g, float b, float a = 1.0f)
+        : mData{{static_cast<uint8_t>(0.5f + r * 255.0f), // round floats to nearest integers
+                 static_cast<uint8_t>(0.5f + g * 255.0f), // double {{}} is needed due to union
+                 static_cast<uint8_t>(0.5f + b * 255.0f),
+                 static_cast<uint8_t>(0.5f + a * 255.0f)}}
+    {
+    }
+
+    /// @brief Vec3f r,g,b ctor (alpha channel it set to 1)
+    /// @note all values should be in the range 0.0f to 1.0f
+    __hostdev__ Rgba8(const Vec3f& rgb)
+        : Rgba8(rgb[0], rgb[1], rgb[2])
+    {
+    }
+
+    /// @brief Vec4f r,g,b,a ctor
+    /// @note all values should be in the range 0.0f to 1.0f
+    __hostdev__ Rgba8(const Vec4f& rgba)
+        : Rgba8(rgba[0], rgba[1], rgba[2], rgba[3])
+    {
+    }
+
+    __hostdev__ bool  operator< (const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
+    __hostdev__ bool  operator==(const Rgba8& rhs) const { return mData.packed == rhs.mData.packed; }
+    __hostdev__ float lengthSqr() const
+    {
+        return 0.0000153787005f * (float(mData.c[0]) * mData.c[0] +
+                                   float(mData.c[1]) * mData.c[1] +
+                                   float(mData.c[2]) * mData.c[2]); //1/255^2
+    }
+    __hostdev__ float           length() const { return sqrtf(this->lengthSqr()); }
+    /// @brief return n'th color channel as a float in the range 0 to 1
+    __hostdev__ float           asFloat(int n) const { return 0.003921569f*float(mData.c[n]); }// divide by 255
+    __hostdev__ const uint8_t&  operator[](int n) const { return mData.c[n]; }
+    __hostdev__ uint8_t&        operator[](int n) { return mData.c[n]; }
+    __hostdev__ const uint32_t& packed() const { return mData.packed; }
+    __hostdev__ uint32_t&       packed() { return mData.packed; }
+    __hostdev__ const uint8_t&  r() const { return mData.c[0]; }
+    __hostdev__ const uint8_t&  g() const { return mData.c[1]; }
+    __hostdev__ const uint8_t&  b() const { return mData.c[2]; }
+    __hostdev__ const uint8_t&  a() const { return mData.c[3]; }
+    __hostdev__ uint8_t&        r() { return mData.c[0]; }
+    __hostdev__ uint8_t&        g() { return mData.c[1]; }
+    __hostdev__ uint8_t&        b() { return mData.c[2]; }
+    __hostdev__ uint8_t&        a() { return mData.c[3]; }
+    __hostdev__                 operator Vec3f() const {
+        return Vec3f(this->asFloat(0), this->asFloat(1), this->asFloat(2));
+    }
+    __hostdev__                 operator Vec4f() const {
+        return Vec4f(this->asFloat(0), this->asFloat(1), this->asFloat(2), this->asFloat(3));
+    }
+}; // Rgba8
+
+using PackedRGBA8 = Rgba8; // for backwards compatibility
 
 // ----------------------------> TensorTraits <--------------------------------------
 
