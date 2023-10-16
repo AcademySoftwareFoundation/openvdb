@@ -330,10 +330,10 @@ namespace {
 
 template<typename T>
 inline bool
-writeAsType(std::ostream& os, const boost::any& val)
+writeAsType(std::ostream& os, const std::any& val)
 {
     if (val.type() == typeid(T)) {
-        os << boost::any_cast<T>(val);
+        os << std::any_cast<T>(val);
         return true;
     }
     return false;
@@ -415,8 +415,8 @@ operator<<(std::ostream& os, const StreamMetadata::AuxDataMap& auxData)
         it != end; ++it)
     {
         os << it->first << ": ";
-        // Note: boost::any doesn't support serialization.
-        const boost::any& val = it->second;
+        // Note: std::any doesn't support serialization.
+        const std::any& val = it->second;
         if (!writeAsType<int32_t>(os, val)
             && !writeAsType<int64_t>(os, val)
             && !writeAsType<int16_t>(os, val)
