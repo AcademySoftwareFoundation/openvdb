@@ -9,8 +9,7 @@
 
 #include <openvdb/version.h>
 
-//#include <openvdb/mt/split.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/split.h>
 
 #include <cassert>
 
@@ -19,7 +18,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-#if 1
+#if 0
 
 using split = ::tbb::split;
 
@@ -95,11 +94,11 @@ private:
         return middle;
     }
 
-    template<typename RowValue, typename ColValue>
-    friend class blocked_range2d;
+    //template<typename RowValue, typename ColValue>
+    //friend class blocked_range2d;
 
-    template<typename RowValue, typename ColValue, typename PageValue>
-    friend class blocked_range3d;
+    //template<typename RowValue, typename ColValue, typename PageValue>
+    //friend class ::tbb::blocked_range3d;
 
     //template<typename DimValue, unsigned int N, typename>
     //friend class internal::blocked_rangeNd_impl;
