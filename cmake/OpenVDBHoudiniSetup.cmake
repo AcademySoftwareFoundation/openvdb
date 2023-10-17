@@ -49,8 +49,6 @@ overwrite user provided values.
 ``ZLIB_LIBRARY``
 ``OPENEXR_INCLUDEDIR``
 ``OPENEXR_LIBRARYDIR``
-``ILMBASE_INCLUDEDIR``
-``ILMBASE_LIBRARYDIR``
 ``TBB_INCLUDEDIR``
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
@@ -145,14 +143,6 @@ elseif(MINIMUM_HOUDINI_VERSION)
       "supported is ${MINIMUM_HOUDINI_VERSION}."
     )
   endif()
-endif()
-
-# Temporary change to support Houdini 19 which deploys with Blosc 1.5.
-# This allows VDB to continue to build using Blosc 1.5. This support
-# will be dropped in VDB 11
-if(Houdini_VERSION VERSION_LESS 19.5)
-  message(DEPRECATION "Setting MINIMUM_BLOSC_VERSION to 1.5.0 for Houdini 19.0 compatibility.")
-  set(MINIMUM_BLOSC_VERSION 1.5.0)
 endif()
 
 set(Houdini_VERSION_MAJOR_MINOR "${Houdini_VERSION_MAJOR}.${Houdini_VERSION_MINOR}")
@@ -311,21 +301,10 @@ if(NOT OPENEXR_LIBRARYDIR)
   set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
-# IlmBase
-
-if(NOT ILMBASE_INCLUDEDIR)
-  set(ILMBASE_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
-endif()
-if(NOT ILMBASE_LIBRARYDIR)
-  set(ILMBASE_LIBRARYDIR ${HOUDINI_LIB_DIR})
-endif()
-
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
 
-# Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
-
 if(APPLE)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
 elseif(UNIX)

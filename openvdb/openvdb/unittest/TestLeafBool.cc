@@ -641,7 +641,6 @@ TEST_F(TestLeafBool, testMedian)
 //     EXPECT_TRUE(tree->hasSameTopology(*copyOfTree));
 // }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
 TEST_F(TestLeafBool, testTransientData)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
@@ -654,4 +653,3 @@ TEST_F(TestLeafBool, testTransientData)
     LeafType leaf3 = leaf;
     EXPECT_EQ(openvdb::Index32(5), leaf3.transientData());
 }
-#endif

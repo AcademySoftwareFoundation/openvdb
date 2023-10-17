@@ -77,15 +77,13 @@ jobs:
           # @note  we specifically use clang15.0 (not clang15) here as the newest
           #  versions of the clang15.X containers have some issues with the GLFW
           #  installation
-          - { cxx: clang++, image: '2023-clang15.0', abi: '10', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2023-clang15.0', abi: '10', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2022-clang11',   abi: '11', build: 'Debug',   cmake: '' }
           - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Debug'  , cmake: '' }
           - { cxx: g++,     image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2021',           abi: '8',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2021',           abi: '8',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
@@ -94,12 +92,12 @@ jobs:
       run: ./ci/install_pybind11.sh 2.10.0
     - name: timestamp
       id: timestamp
-      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+      run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: ccache
       # don't use ccache for debug builds
       if: matrix.config.build == 'Release'
       id: ccache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: /tmp/ccache
         key: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
@@ -188,24 +186,17 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-11
+    runs-on: macos-latest
     env:
       CXX: clang++
     steps:
     - uses: actions/checkout@v3
     - name: install
-      # brew boost-python3 installs a "Keg-only" version of python which is
-      # not installed to PATH. We must manually provide the location of the
-      # required python installation to CMake through a hint variable which
-      # is exported in install_macos.sh
       run: ./ci/install_macos.sh
     - name: build
-      # Also need to disable compiler warnings for ABI 6 and above due to
-      # the version of clang installed
       run: >
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,view,render,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42\"
     - name: test
       run: cd build && ctest -V

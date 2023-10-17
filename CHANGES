@@ -1,6 +1,13 @@
 OpenVDB Version History
 =======================
 
+Version 11.0.0 - In Progress
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 9 for
+      Houdini 19.5 and 10 for Houdini 20.0.
+
 Version 10.1.0 - October 11, 2023
 
   Highlights:
@@ -117,6 +124,11 @@ Version 10.0.1 - November 30, 2022
     - Fixed CXX standard requirement for VDB components in FindOpenVDB.cmake
 
 Version 10.0.0 - October 27, 2022
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 8 for
+      Houdini 19.0 and 9 for Houdini 19.5.
 
   Highlights:
   - Introducing OpenVDBLink, which provides a Mathematica interface to

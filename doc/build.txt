@@ -87,7 +87,7 @@ given FindModule e.g. `FindBlosc.cmake`:
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
-   find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
+   find package .i.e. Blosc_ROOT, TBB_ROOT etc.
    - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
    directories
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
@@ -238,8 +238,8 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 19.0              | 8           |
 Houdini  | 19.5              | 9           |
+Houdini  | 20.0              | 10          |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
 
@@ -355,7 +355,7 @@ CppUnit        | A unit testing framework module for C++                        
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
-IlmBase        | Used half precision floating points and EXR serialization support | Optional (All)                   |
+Imath          | Used half precision floating points and EXR serialization support | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 PyBind11       | C++/python bindings                                               | Optional (Python)                |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
@@ -394,14 +394,12 @@ Optional:
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
   - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
  CMake may find it automatically
-  - @b IlmBase_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D IlmBase_ROOT=/path/to/ilmbase/install \
       -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../
@@ -609,8 +607,17 @@ OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_
 for all its dependencies. For imported Boost compatibility, the following
 versions of CMake are required:
 
-  - Boost 1.68, 1.69 require CMake 3.13 or newer.
-  - Boost 1.70 requires CMake 3.14 or newer.
+  - Boost 1.73 requires CMake 3.17.2 or newer.
+  - Boost 1.74 requires CMake 3.19 or newer.
+  - Boost 1.75 requires CMake 3.19.5 or newer.
+  - Boost 1.76 requires CMake 3.20.3 or newer.
+  - Boost 1.77 requires CMake 3.21.3 or newer.
+  - Boost 1.78 requires CMake 3.22.2 or newer.
+  - Boost 1.79 requires CMake 3.23.2 or newer.
+  - Boost 1.80 requires CMake 3.24.2 or newer.
+  - Boost 1.81 requires CMake 3.25.2 or newer.
+  - Boost 1.82 requires CMake 3.27.0 or newer.
+  - Boost 1.83 requires CMake 3.27.4 or newer.
 
 Use the above list to identify the version of CMake you require for your version
 of Boost. Note that this may be implemented into the OpenVDB CMake in the future.
