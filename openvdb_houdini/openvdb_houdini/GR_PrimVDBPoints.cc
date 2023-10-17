@@ -39,6 +39,10 @@
 #include <utility>
 #include <vector>
 
+#if UT_VERSION_INT < 0x14000000 // Below 20.0, there is no RE_RenderContext
+#define RE_RenderContext  RE_Render *
+#endif
+
 ////////////////////////////////////////
 
 static RE_ShaderHandle theMarkerDecorShader("decor/GL32/point_marker.prog");
@@ -112,7 +116,7 @@ public:
     /// Called whenever the parent detail is changed, draw modes are changed,
     /// selection is changed, or certain volatile display options are changed
     /// (such as level of detail).
-    void update(RE_Render*, const GT_PrimitiveHandle&, const GR_UpdateParms&) override;
+    void update(RE_RenderContext, const GT_PrimitiveHandle&, const GR_UpdateParms&) override;
 
     /// return true if the primitive is in or overlaps the view frustum.
     /// always returning true will effectively disable frustum culling.
@@ -126,12 +130,12 @@ public:
     /// than one time per viewport redraw (beauty, shadow passes, wireframe-over)
     /// It also may be called outside of a viewport redraw to do picking of the
     /// geometry.
-    void render(RE_Render*, GR_RenderMode, GR_RenderFlags, GR_DrawParms) override;
+    void render(RE_RenderContext, GR_RenderMode, GR_RenderFlags, GR_DrawParms) override;
 
-    int renderPick(RE_Render*, const GR_DisplayOption*, unsigned int,
+    int renderPick(RE_RenderContext, const GR_DisplayOption*, unsigned int,
         GR_PickStyle, bool) override { return 0; }
 
-    void renderDecoration(RE_Render*, GR_Decoration, const GR_DecorationParms&) override;
+    void renderDecoration(RE_RenderContext, GR_Decoration, const GR_DecorationParms&) override;
 
 protected:
     void computeCentroid(const openvdb::points::PointDataGrid& grid);
@@ -711,7 +715,7 @@ GR_PrimVDBPoints::updateWireBuffer(RE_Render *r,
 }
 
 void
-GR_PrimVDBPoints::update(RE_Render *r,
+GR_PrimVDBPoints::update(RE_RenderContext r,
              const GT_PrimitiveHandle &primh,
              const GR_UpdateParms &p)
 {
@@ -861,7 +865,7 @@ GR_PrimVDBPoints::removeBuffer(const std::string& name)
 }
 
 void
-GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
+GR_PrimVDBPoints::render(RE_RenderContext r, GR_RenderMode, GR_RenderFlags, GR_DrawParms dp)
 {
     if (!myGeo && !myWire)  return;
 
@@ -934,7 +938,7 @@ GR_PrimVDBPoints::render(RE_Render *r, GR_RenderMode, GR_RenderFlags, GR_DrawPar
 
 
 void
-GR_PrimVDBPoints::renderDecoration(RE_Render* r, GR_Decoration decor, const GR_DecorationParms& p)
+GR_PrimVDBPoints::renderDecoration(RE_RenderContext r, GR_Decoration decor, const GR_DecorationParms& p)
 {
     // just render native GR_Primitive decorations if position not available
 
