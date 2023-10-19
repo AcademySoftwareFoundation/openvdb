@@ -323,7 +323,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
                                  Vec3f = 6, //  single precision floating 3D vector
                                  Vec3d = 7, //  double precision floating 3D vector
                                  Mask = 8, //  no value, just the active state
-                                 Half = 9, //  half precision floating point value
+                                 Half = 9, //  half precision floating point value (placeholder for IEEE 754 Half)
                                  UInt32 = 10, // single precision unsigned integer value
                                  Boolean = 11, // boolean value, encoded in bit array
                                  RGBA8 = 12, // RGBA packed into 32bit word in reverse-order, i.e. R is lowest byte.
@@ -792,6 +792,7 @@ __hostdev__ inline bool isFloatingPoint(GridType gridType)
 {
     return gridType == GridType::Float ||
            gridType == GridType::Double ||
+           gridType == GridType::Half ||
            gridType == GridType::Fp4 ||
            gridType == GridType::Fp8 ||
            gridType == GridType::Fp16 ||
@@ -2011,6 +2012,8 @@ __hostdev__ inline GridType mapToGridType()
         return GridType::UInt32;
     } else if constexpr(is_same<BuildT, ValueMask>::value) {
         return GridType::Mask;
+    } else if constexpr(is_same<BuildT, Half>::value) {
+        return GridType::Half;
     } else if constexpr(is_same<BuildT, ValueIndex>::value) {
         return GridType::Index;
     } else if constexpr(is_same<BuildT, ValueOnIndex>::value) {
@@ -3284,6 +3287,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
             case GridType::Int64:   return mValueSize==8u;
             case GridType::Vec3f:   return mValueSize==12u;
             case GridType::Vec3d:   return mValueSize==24u;
+            case GridType::Half:    return mValueSize==2u;
             case GridType::RGBA8:   return mValueSize==4u;
             case GridType::Fp8:     return mValueSize==1u;
             case GridType::Fp16:    return mValueSize==2u;
