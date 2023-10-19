@@ -110,7 +110,7 @@ cmake --build . --parallel 4 --config Release --target install
 #### Building OpenVDB AX and NanoVDB
 
 OpenVDB AX depends on the core OpenVDB library. NanoVDB can be built with and
-without OpenVDB support. Note that NanoVDB has its own build instructuins, see
+without OpenVDB support. Note that NanoVDB has its own build instructions, see
 the [NanoVDB build documentation](https://www.openvdb.org/documentation/doxygen/NanoVDB_HowToBuild.html)
 for details.
 

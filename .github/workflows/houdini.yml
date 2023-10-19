@@ -96,7 +96,7 @@ jobs:
         key: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
         restore-keys: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-
     - name: fetch_houdini
-      uses: actions/cache@v3
+      uses: actions/cache/restore@v3
       with:
         path: hou
         key: dummy-houdini${{ matrix.config.hou }}-${{ steps.timestamp.outputs.timestamp }}
