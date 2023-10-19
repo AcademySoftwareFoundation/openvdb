@@ -812,7 +812,8 @@ __hostdev__ inline bool isFloatingPointVector(GridType gridType)
 
 // --------------------------> isInteger(GridType) <------------------------------------
 
-/// @brief return true if the GridType maps to a index type.
+/// @brief Return true if the GridType maps to a POD integer type.
+/// @details These types are used to associate a voxel with a POD integer type
 __hostdev__ inline bool isInteger(GridType gridType)
 {
     return gridType == GridType::Int16 ||
@@ -823,13 +824,14 @@ __hostdev__ inline bool isInteger(GridType gridType)
 
 // --------------------------> isIndex(GridType) <------------------------------------
 
-/// @brief return true if the GridType maps to a index type.
+/// @brief Return true if the GridType maps to a special index type (not a POD integer type).
+/// @details These types are used to index from a voxel into an external array of values, e.g. sidecar or blind data.
 __hostdev__ inline bool isIndex(GridType gridType)
 {
-    return gridType == GridType::Index ||
-           gridType == GridType::OnIndex ||
-           gridType == GridType::IndexMask ||
-           gridType == GridType::OnIndexMask;
+    return gridType == GridType::Index ||// index both active and inactive values
+           gridType == GridType::OnIndex ||// index active values only
+           gridType == GridType::IndexMask ||// as Index, but with an additionl mask
+           gridType == GridType::OnIndexMask;// as OnIndex, but with an additional mask
 }
 
 // --------------------------> isValue(GridType, GridClass) <------------------------------------
