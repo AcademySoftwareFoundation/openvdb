@@ -87,16 +87,12 @@ public:
     }
     __hostdev__ Extrema& min(const ValueT& v)
     {
-        if (v < mMin) {
-            mMin = v;
-        }
+        if (v < mMin) mMin = v;
         return *this;
     }
     __hostdev__ Extrema& max(const ValueT& v)
     {
-        if (v > mMax) {
-            mMax = v;
-        }
+        if (v > mMax) mMax = v;
         return *this;
     }
     __hostdev__ Extrema& add(const ValueT& v)
@@ -147,12 +143,8 @@ protected:
     } mMin, mMax;
     __hostdev__ Extrema& add(const Pair& p)
     {
-        if (p < mMin) {
-            mMin = p;
-        }
-        if (mMax < p) {
-            mMax = p;
-        }
+        if (p < mMin) mMin = p;
+        if (mMax < p) mMax = p;
         return *this;
     }
 
@@ -181,29 +173,21 @@ public:
     __hostdev__ Extrema& min(const VecT& v)
     {
         Pair tmp(v);
-        if (tmp < mMin) {
-            mMin = tmp;
-        }
+        if (tmp < mMin) mMin = tmp;
         return *this;
     }
     __hostdev__ Extrema& max(const VecT& v)
     {
         Pair tmp(v);
-        if (mMax < tmp) {
-            mMax = tmp;
-        }
+        if (mMax < tmp) mMax = tmp;
         return *this;
     }
     __hostdev__ Extrema& add(const VecT& v) { return this->add(Pair(v)); }
     __hostdev__ Extrema& add(const VecT& v, uint64_t) { return this->add(Pair(v)); }
     __hostdev__ Extrema& add(const Extrema& other)
     {
-        if (other.mMin < mMin) {
-            mMin = other.mMin;
-        }
-        if (mMax < other.mMax) {
-            mMax = other.mMax;
-        }
+        if (other.mMin < mMin) mMin = other.mMin;
+        if (mMax < other.mMax) mMax = other.mMax;
         return *this;
     }
     __hostdev__ const VecT& min() const { return mMin.vector; }

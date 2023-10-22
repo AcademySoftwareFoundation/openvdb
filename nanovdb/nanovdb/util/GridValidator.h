@@ -157,10 +157,10 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
     for (auto it2 = grid.tree().root().cbeginChild(); it2; ++it2) {
         auto &node2 = *it2;
         if (!check(&node2, sizeof(node2))) return;
-        for (auto it1 = node2.beginChild(); it1; ++it1) {
+        for (auto it1 = node2.cbeginChild(); it1; ++it1) {
             auto &node1 = *it1;
             if (!check(&node1, sizeof(node1))) return;
-            for (auto it0 = node1.beginChild(); it0; ++it0) {
+            for (auto it0 = node1.cbeginChild(); it0; ++it0) {
                 auto &node0 = *it0;
                 if (!check(&node2, sizeof(node2))) return;
             }// loop over child nodes of the lower internal node

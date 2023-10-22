@@ -175,6 +175,7 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/cuda/CudaDeviceBuffer.h
   util/cuda/CudaGridChecksum.cuh
   util/cuda/CudaGridHandle.cuh
+  util/cuda/CudaGridStats.cuh
   util/cuda/CudaIndexToGrid.cuh
   util/cuda/CudaNodeManager.cuh
   util/cuda/CudaPointsToGrid.cuh

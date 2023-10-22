@@ -31,7 +31,6 @@ __global__ void cudaUpdateGridCount(GridData *data, uint32_t gridIndex, uint32_t
         data->mGridIndex = gridIndex;
         data->mGridCount = gridCount;
         if (data->mChecksum == GridChecksum::EMPTY) *d_dirty = false;// no need to update checksum if it didn't already exist
-        //data->mChecksum  = GridChecksum::EMPTY;// disable the checksum (in the future this should call cudaGridChecksum)
     }
 }
 }// anonymous namespace
@@ -86,7 +85,6 @@ cudaSplitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = n
         ptr += handle.gridSize(n);
     }
     cudaCheck(cudaFreeAsync(d_dirty, stream));
-    //cudaCheck(cudaFreeAsync(d_lut,  stream));
     return std::move(handles);
 }// cudaSplitGridHandles
 

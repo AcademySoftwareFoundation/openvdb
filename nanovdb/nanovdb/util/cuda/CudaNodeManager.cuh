@@ -72,9 +72,9 @@ cudaCreateNodeManager(const NanoGrid<BuildT> *d_grid,
             // Performs depth first traversal but breadth first insertion
             for (auto it2 = tree.root().cbeginChild(); it2; ++it2) {
                 *ptr2++ = PtrDiff(&*it2, d_grid);
-                for (auto it1 = it2->beginChild(); it1; ++it1) {
+                for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                     *ptr1++ = PtrDiff(&*it1, d_grid);
-                    for (auto it0 = it1->beginChild(); it0; ++it0) {
+                    for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                         *ptr0++ = PtrDiff(&*it0, d_grid);
                     }// loop over child nodes of the lower internal node
                 }// loop over child nodes of the upper internal node

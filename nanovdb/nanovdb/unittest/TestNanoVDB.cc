@@ -1047,9 +1047,11 @@ TEST_F(TestNanoVDB, BBox)
     EXPECT_EQ(-std::numeric_limits<float>::max(), bbox[1][1]);
     EXPECT_EQ(-std::numeric_limits<float>::max(), bbox[1][2]);
     EXPECT_TRUE(bbox.empty());
+    EXPECT_FALSE(bbox);
 
     bbox.expand(nanovdb::Vec3f(57.0f, -31.0f, 60.0f));
     EXPECT_TRUE(bbox.empty());
+    EXPECT_FALSE(bbox);
     EXPECT_EQ(nanovdb::Vec3f(0.0f), bbox.dim());
     EXPECT_EQ(57.0f, bbox[0][0]);
     EXPECT_EQ(-31.0f, bbox[0][1]);
@@ -1060,6 +1062,7 @@ TEST_F(TestNanoVDB, BBox)
 
     bbox.expand(nanovdb::Vec3f(58.0f, 0.0f, 62.0f));
     EXPECT_FALSE(bbox.empty());
+    EXPECT_TRUE(bbox);
     EXPECT_EQ(nanovdb::Vec3f(1.0f, 31.0f, 2.0f), bbox.dim());
     EXPECT_EQ(57.0f, bbox[0][0]);
     EXPECT_EQ(-31.0f, bbox[0][1]);
@@ -1080,9 +1083,11 @@ TEST_F(TestNanoVDB, CoordBBox)
     EXPECT_EQ(std::numeric_limits<int32_t>::min(), bbox[1][1]);
     EXPECT_EQ(std::numeric_limits<int32_t>::min(), bbox[1][2]);
     EXPECT_TRUE(bbox.empty());
+    EXPECT_FALSE(bbox);
 
     bbox.expand(nanovdb::Coord(57, -31, 60));
     EXPECT_FALSE(bbox.empty());
+    EXPECT_TRUE(bbox);
     EXPECT_EQ(nanovdb::Coord(1), bbox.dim());
     EXPECT_EQ(57, bbox[0][0]);
     EXPECT_EQ(-31, bbox[0][1]);
@@ -1093,6 +1098,7 @@ TEST_F(TestNanoVDB, CoordBBox)
 
     bbox.expand(nanovdb::Coord(58, 0, 62));
     EXPECT_FALSE(bbox.empty());
+    EXPECT_TRUE(bbox);
     EXPECT_EQ(nanovdb::Coord(2, 32, 3), bbox.dim());
     EXPECT_EQ(57, bbox[0][0]);
     EXPECT_EQ(-31, bbox[0][1]);
@@ -1104,6 +1110,7 @@ TEST_F(TestNanoVDB, CoordBBox)
     { // test convert
         auto bbox2 = bbox.asReal<float>();
         EXPECT_FALSE(bbox2.empty());
+        EXPECT_TRUE(bbox2);
         EXPECT_EQ(nanovdb::Vec3f(57.0f, -31.0f, 60.0f), bbox2.min());
         EXPECT_EQ(nanovdb::Vec3f(59.0f, 1.0f, 63.0f), bbox2.max());
     }
@@ -3503,15 +3510,15 @@ TEST_F(TestNanoVDB, GridBuilder_Fp4)
         EXPECT_TRUE(nanovdb::isValid(nodeMgr));
         EXPECT_TRUE(nodeMgr->isLinear());
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -3638,15 +3645,15 @@ TEST_F(TestNanoVDB, GridBuilder_Fp8)
         EXPECT_TRUE(nanovdb::isValid(nodeMgr));
         EXPECT_TRUE(nodeMgr->isLinear());
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -3758,15 +3765,15 @@ TEST_F(TestNanoVDB, GridBuilder_Fp16)
         EXPECT_TRUE(nanovdb::isValid(nodeMgr));
         EXPECT_TRUE(nodeMgr->isLinear());
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -3938,15 +3945,15 @@ TEST_F(TestNanoVDB, GridBuilder_FpN_Basic3)
         EXPECT_TRUE(nanovdb::isValid(nodeMgr));
         EXPECT_FALSE(nodeMgr->isLinear());
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -4051,15 +4058,15 @@ TEST_F(TestNanoVDB, NodeManager)
         EXPECT_EQ(&nodeMgr->upper(0), dstGrid->tree().getFirstNode< 2 >());
 
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -4119,15 +4126,15 @@ TEST_F(TestNanoVDB, NodeManager)
         EXPECT_EQ(2.0f, nodeMgr->leaf(1).getValue(x2));
 
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -4160,7 +4167,7 @@ TEST_F(TestNanoVDB, NodeManager)
         }
         auto handle = nanovdb::createNanoGrid(srcGrid);
         EXPECT_TRUE(handle);
-        auto* dstGrid = handle.grid<float>();
+        const auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
         EXPECT_TRUE(dstGrid->isBreadthFirst());
         using GridT = std::remove_pointer<decltype(dstGrid)>::type;
@@ -4178,15 +4185,15 @@ TEST_F(TestNanoVDB, NodeManager)
         }
 
         uint64_t n[3]={0};
-        for (auto it2 = dstGrid->tree().root().beginChild(); it2; ++it2) {
+        for (auto it2 = dstGrid->tree().root().cbeginChild(); it2; ++it2) {
             auto *node2 = &nodeMgr->upper(n[0]++);
             EXPECT_TRUE(nanovdb::isValid(node2));
             EXPECT_EQ(&*it2, node2);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 auto *node1 = &nodeMgr->lower(n[1]++);
                 EXPECT_TRUE(nanovdb::isValid(node1));
                 EXPECT_EQ(&*it1, node1);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     auto *node0 = &nodeMgr->leaf(n[2]++);
                     EXPECT_TRUE(nanovdb::isValid(node0));
                     EXPECT_EQ(&*it0, node0);
@@ -7160,10 +7167,10 @@ TEST_F(TestNanoVDB, IndexGridBuilder2)
         });
         auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
         //mTimer.start("Dense IndexGrid: Sequential node iterator test of active voxels");
-        for (auto it2 = idxRoot.beginChild(); it2; ++it2) {
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
-                    for (auto vox = it0->beginValueOn(); vox; ++vox) {
+        for (auto it2 = idxRoot.cbeginChild(); it2; ++it2) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
+                    for (auto vox = it0->cbeginValueOn(); vox; ++vox) {
                         EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
                     }// loop over active voxels in the leaf node
                 }// loop over child nodes of the lower internal nodes
@@ -7313,10 +7320,10 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
         });
         auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
         //mTimer.start("Sparse IndexGrid: Sequential node iterator test of active voxels");
-        for (auto it2 = idxRoot.beginChild(); it2; ++it2) {
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
-                    for (auto v = it0->beginValueOn(); v; ++v) {
+        for (auto it2 = idxRoot.cbeginChild(); it2; ++it2) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
+                    for (auto v = it0->cbeginValueOn(); v; ++v) {
                         EXPECT_EQ(values[*v], fltAcc.getValue(v.getCoord()));
                     }// loop over active voxels in the leaf node
                 }// loop over child nodes of the lower internal nodes
@@ -7594,6 +7601,7 @@ TEST_F(TestNanoVDB, GridMetaData)
     auto handle = nanovdb::createLevelSetSphere<float>();
     auto *grid = handle.grid<float>();
     EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->isRootConnected());
     nanovdb::GridMetaData meta(*grid);// deep copy
     EXPECT_EQ(672 + 64 + 24 + 8, sizeof(meta));
     EXPECT_TRUE(nanovdb::GridMetaData::safeCast(*grid));

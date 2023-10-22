@@ -14,11 +14,13 @@
 #include <nanovdb/util/cuda/CudaIndexToGrid.cuh>
 #include <nanovdb/util/cuda/CudaAddBlindData.cuh>
 #include <nanovdb/util/cuda/CudaGridChecksum.cuh>
+#include <nanovdb/util/cuda/CudaGridStats.cuh>
 #include <nanovdb/util/cuda/GpuTimer.h>
 #include <nanovdb/util/CpuTimer.h>
 #include <nanovdb/util/IO.h>
 
 #include <gtest/gtest.h>
+#include <algorithm>// for std::sort
 
 namespace nanovdb {// this namespace is required by gtest
 
@@ -955,7 +957,7 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     EXPECT_EQ( 3.0f, acc(103,0,0));
     EXPECT_EQ( 0.0f, acc(100,0,0));
     EXPECT_EQ(-3.0f, acc( 97,0,0));
-    EXPECT_FALSE(floatGrid->isLexicographic());
+    //EXPECT_FALSE(floatGrid->isLexicographic());
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill
 
@@ -1062,8 +1064,8 @@ TEST(TestNanoVDBCUDA, ThreePointsToGrid)
     EXPECT_TRUE(data);
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     EXPECT_EQ(1u, grid->blindDataCount());
     const Vec3T *blindData = grid->getBlindData<Vec3T>(0);
     EXPECT_TRUE(blindData);
@@ -1176,8 +1178,8 @@ TEST(TestNanoVDBCUDA, EightVoxelsToFloatGrid)
     EXPECT_TRUE(data);
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
 
     //timer.start("Unit-testing grid on the CPU");
     auto acc = grid->getAccessor();
@@ -1262,8 +1264,8 @@ TEST(TestNanoVDBCUDA, Random_CudaPointsToGrid_World64)
     EXPECT_TRUE(data);
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     EXPECT_EQ(nanovdb::Vec3d(voxelSize), grid->voxelSize());
     EXPECT_TRUE(nanovdb::CoordBBox::createCube(min, max-1).isInside(grid->indexBBox()));
     //std::cerr << grid->indexBBox() << std::endl;
@@ -1377,8 +1379,8 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64)
     EXPECT_TRUE(data);
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     EXPECT_EQ(nanovdb::Vec3d(voxelSize), grid->voxelSize());
     EXPECT_EQ(pointCount, grid->pointCount());
     EXPECT_TRUE(nanovdb::CoordBBox::createCube(min, max-1).isInside(grid->indexBBox()));
@@ -1503,8 +1505,8 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_World32)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("World32: Vec3<float> point coordinates in world space", grid->blindMetaData(0).mName);
@@ -1630,8 +1632,8 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel32)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("Voxel32: Vec3<float> point coordinates in voxel space", grid->blindMetaData(0).mName);
@@ -1764,8 +1766,8 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel16)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("Voxel16: Vec3<uint16_t> point coordinates in voxel space", grid->blindMetaData(0).mName);
@@ -1893,8 +1895,8 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("Voxel8: Vec3<uint8_t> point coordinates in voxel space", grid->blindMetaData(0).mName);
@@ -2022,8 +2024,8 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
     grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_EQ(pointGrid->voxelSize(), grid->voxelSize());
-    EXPECT_TRUE(grid->isLexicographic());
-    EXPECT_FALSE(grid->isBreadthFirst());
+    //EXPECT_TRUE(grid->isLexicographic());
+    EXPECT_TRUE(grid->isBreadthFirst());
     //std::cerr << grid->indexBBox() << std::endl;
 
     EXPECT_STREQ("PointID: uint32_t indices to points", grid->blindMetaData(0).mName);
@@ -2224,13 +2226,48 @@ TEST(TestNanoVDBCUDA, testGridHandleCopy)
         EXPECT_EQ( 0.0f, acc(100,0,0));
         EXPECT_EQ(-3.0f, acc( 97,0,0));
     }
-}
+}// testGridHandleCopy
 
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_break_on_failure --gtest_filter="*compareNodeOrdering"
 TEST(TestNanoVDBCUDA, compareNodeOrdering)
 {
     using namespace nanovdb;
-    const int voxelCount = 4;
-    Coord coords[voxelCount]={Coord(0,0,0), Coord(256,0,0), Coord(0,0,8), Coord(0,2,4)};
+#if 0
+    const int voxelCount = 2;
+    Coord coords[voxelCount]={Coord(-1,0,0), Coord(0,0,0)};
+#else
+    const int voxelCount = 5;
+    Coord coords[voxelCount]={Coord(0,0,0), Coord(256,0,0), Coord(0,0,8), Coord(0,-256,0), Coord(0,2,4)};
+#endif
+
+    {// check coordToKey and keyToCoord used in CudaPointsToGrid
+        auto coordToKey = [](const nanovdb::Coord &ijk)->uint64_t{
+            static constexpr int32_t offset = 1 << 30;
+            return (uint64_t(uint32_t(ijk[2] + offset) >> 12)) | //       z is the lower 21 bits
+                   (uint64_t(uint32_t(ijk[1] + offset) >> 12) << 21) | // y is the middle 21 bits
+                   (uint64_t(uint32_t(ijk[0] + offset) >> 12) << 42); //  x is the upper 21 bits
+        };
+        auto keyToCoord = [](uint64_t key)->nanovdb::Coord{
+            static constexpr int32_t offset = 1 << 30;
+            static constexpr uint64_t MASK = (1u << 21) - 1; // used to mask out 21 lower bits
+            return nanovdb::Coord((((key >> 42) & MASK) << 12) - offset, // x are the upper 21 bits
+                                  (((key >> 21) & MASK) << 12) - offset, // y are the middle 21 bits
+                                   ((key & MASK) << 12) - offset); // z are the lower 21 bits
+        };
+        using KeyT = std::pair<nanovdb::Coord, uint64_t>;
+        KeyT keys[voxelCount];
+        for (int i=0; i<voxelCount; ++i) {
+            keys[i].second = coordToKey(coords[i]);
+            keys[i].first  = keyToCoord(keys[i].second);//coords[i];
+            //std::cerr << "i=" << i << " ijk=" << coords[i] << " key=" << keys[i].second << " coord=" << keyToCoord(keys[i].second) << std::endl;
+        }
+        std::sort(keys, keys + voxelCount, [](KeyT a, KeyT b){return a.second < b.second;});
+        for (int i=1; i<voxelCount; ++i) {
+            EXPECT_LE(keys[i-1].second, keys[i].second);// due to sort
+            EXPECT_LE(keys[i-1].first,  keys[i].first);// if keys are sorted then by design so are the coordinates
+        }
+    }
+
     GridHandle<HostBuffer> handle1, handle2;
 
     {
@@ -2242,7 +2279,24 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
     auto grid1 = handle1.grid<float>();
     EXPECT_TRUE(grid1);
     EXPECT_TRUE(grid1->isBreadthFirst());
-    EXPECT_FALSE(grid1->isLexicographic());
+    //EXPECT_FALSE(grid1->isLexicographic());
+
+    {// check that nodes are arranged breath-first in memory
+        float min = std::numeric_limits<float>::max(), max = -min;
+        int n2=0, n1=0, n0=0;
+        for (auto it2 = grid1->tree().root().beginChild(); it2; ++it2) {
+            EXPECT_EQ(grid1->tree().getFirstUpper() + n2++, &(*it2));
+            for (auto it1 = it2->beginChild(); it1; ++it1) {
+                EXPECT_EQ(grid1->tree().getFirstLower() + n1++, &(*it1));
+                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                    EXPECT_EQ(grid1->tree().getFirstLeaf() + n0++, &(*it0));
+                }// loop over child nodes of the lower internal node
+            }// loop over child nodes of the upper internal node
+        }// loop over child nodes of the root node
+        EXPECT_EQ(n2, grid1->tree().nodeCount(2));
+        EXPECT_EQ(n1, grid1->tree().nodeCount(1));
+        EXPECT_EQ(n0, grid1->tree().nodeCount(0));
+    }
 
     {
         Coord *d_coords = nullptr;
@@ -2259,25 +2313,27 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
     }
     auto grid2 = handle2.grid<float>();
     EXPECT_TRUE(grid2);
-    EXPECT_FALSE(grid2->isBreadthFirst());
-    EXPECT_TRUE(grid2->isLexicographic());
+    EXPECT_TRUE(grid2->isBreadthFirst());
+    //EXPECT_TRUE(grid2->isLexicographic());
 
-    // Check that both grids have the rxpecteds voxel values
+    // Check that both grids have the expected voxel values
     for (int i=0; i<voxelCount; ++i) {
         EXPECT_EQ(1.0f, grid2->tree().getValue(coords[i]));
         EXPECT_EQ(1.0f, grid1->tree().getValue(coords[i]));
     }
 
-    // Check that both grid have the same count counts
+    // Check that both grid have the same node counts
     for (int i=0; i<3; ++i) EXPECT_EQ(grid1->tree().nodeCount(i), grid2->tree().nodeCount(i));
 
-    {// Check that the order of the leaf nodes are identical
-        auto *leaf1 = grid1->tree().getFirstLeaf(), *leaf2 = grid2->tree().getFirstLeaf();
-        EXPECT_TRUE(leaf1);
-        EXPECT_TRUE(leaf2);
-        for (int i=0; i<grid1->tree().nodeCount(0); ++i) {
-            EXPECT_EQ(leaf1[i].origin(),    leaf2[i].origin());
-            EXPECT_EQ(leaf1[i].valueMask(), leaf2[i].valueMask());
+     {// Check that the order of the upper nodes are identical
+        auto *upper1 = grid1->tree().getFirstUpper(), *upper2 = grid2->tree().getFirstUpper();
+        EXPECT_TRUE(upper1);
+        EXPECT_TRUE(upper2);
+        for (int i=0; i<grid1->tree().nodeCount(2); ++i) {
+            //std::cerr << "#" << i << " origin(CPU)=" << upper1[i].origin() << " origin(GPU)=" << upper2[i].origin() << std::endl;
+            EXPECT_EQ(upper1[i].origin(),    upper2[i].origin());
+            EXPECT_EQ(upper1[i].valueMask(), upper2[i].valueMask());
+            EXPECT_EQ(upper1[i].childMask(), upper2[i].childMask());
         }
     }
 
@@ -2292,17 +2348,17 @@ TEST(TestNanoVDBCUDA, compareNodeOrdering)
         }
     }
 
-    {// Check that the order of the upper nodes are identical
-        auto *upper1 = grid1->tree().getFirstUpper(), *upper2 = grid2->tree().getFirstUpper();
-        EXPECT_TRUE(upper1);
-        EXPECT_TRUE(upper2);
-        for (int i=0; i<grid1->tree().nodeCount(2); ++i) {
-            EXPECT_EQ(upper1[i].origin(),    upper2[i].origin());
-            EXPECT_EQ(upper1[i].valueMask(), upper2[i].valueMask());
-            EXPECT_EQ(upper1[i].childMask(), upper2[i].childMask());
+    {// Check that the order of the leaf nodes are identical
+        auto *leaf1 = grid1->tree().getFirstLeaf(), *leaf2 = grid2->tree().getFirstLeaf();
+        EXPECT_TRUE(leaf1);
+        EXPECT_TRUE(leaf2);
+        for (int i=0; i<grid1->tree().nodeCount(0); ++i) {
+            EXPECT_EQ(leaf1[i].origin(),    leaf2[i].origin());
+            EXPECT_EQ(leaf1[i].valueMask(), leaf2[i].valueMask());
         }
     }
-}
+
+}// compareNodeOrdering
 
 namespace {
 template <typename PtrT>
@@ -2362,7 +2418,7 @@ TEST(TestNanoVDBCUDA, fancy_ptr)
     auto q = nanovdb::make_fancy(p);
     test_ptr(q);
     delete p;
-}
+}// fancy_ptr
 
 TEST(TestNanoVDBCUDA, CudaGridChecksum)
 {
@@ -2495,7 +2551,8 @@ size_t countActiveVoxels(const nanovdb::NodeManager<BuildT> *d_mgr)
     cudaCheck(cudaFree(d_count));
     EXPECT_EQ(count[0], count[1]);
     return count[0];
-}
+}// countActiveVoxels
+
 TEST(TestNanoVDBCUDA, NodeManager)
 {
     auto handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(100);
@@ -2526,3 +2583,109 @@ TEST(TestNanoVDBCUDA, NodeManager)
         EXPECT_EQ(count, countActiveVoxels(d_mgr));
     }
 }// NodeManager
+
+TEST(TestNanoVDBCUDA, GridStats)
+{
+    using GridT = nanovdb::NanoGrid<float>;
+    auto handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(100,
+                                                                                  nanovdb::Vec3d(0),
+                                                                                  1.0,
+                                                                                  3.0,
+                                                                                  nanovdb::Vec3d(0),
+                                                                                  "test",
+                                                                                  nanovdb::StatsMode::Disable);
+    EXPECT_TRUE(handle.data());
+    GridT *grid = handle.grid<float>();
+    EXPECT_TRUE(grid);
+    handle.deviceUpload();
+    GridT *d_grid = handle.deviceGrid<float>();
+    EXPECT_TRUE(d_grid);
+
+    {// check min/max using const iterators
+        float min = std::numeric_limits<float>::max(), max = -min;
+        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
+        for (auto it2 = grid->tree().root().cbeginChild(); it2; ++it2) {
+            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
+                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
+                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
+                    for (auto it = it0->cbeginValueOn(); it; ++it) {
+                        if (*it < min) min = *it;
+                        if (*it > max) max = *it;
+                    }
+                }// loop over child nodes of the lower internal node
+            }// loop over child nodes of the upper internal node
+        }// loop over child nodes of the root node
+        EXPECT_NE(min, grid->tree().root().minimum());
+        EXPECT_NE(max, grid->tree().root().maximum());
+        EXPECT_EQ(n2, grid->tree().nodeCount(2));
+        EXPECT_EQ(n1, grid->tree().nodeCount(1));
+        EXPECT_EQ(n0, grid->tree().nodeCount(0));
+    }
+    {
+        //nanovdb::CpuTimer cpuTimer("CPU gridStats: Default = Full");
+        nanovdb::gridStats(*grid);
+        //cpuTimer.stop();
+    }
+    {// check min/max using const iterators
+        float min = std::numeric_limits<float>::max(), max = -min;
+        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
+        for (auto it2 = grid->tree().root().cbeginChild(); it2; ++it2) {
+            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
+                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
+                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
+                    for (auto it = it0->cbeginValueOn(); it; ++it) {
+                        if (*it < min) min = *it;
+                        if (*it > max) max = *it;
+                    }
+                }// loop over child nodes of the lower internal node
+            }// loop over child nodes of the upper internal node
+        }// loop over child nodes of the root node
+        EXPECT_EQ(min, grid->tree().root().minimum());
+        EXPECT_EQ(max, grid->tree().root().maximum());
+        EXPECT_EQ(n2, grid->tree().nodeCount(2));
+        EXPECT_EQ(n1, grid->tree().nodeCount(1));
+        EXPECT_EQ(n0, grid->tree().nodeCount(0));
+    }
+    {// check min/max using non-const iterators
+        float min = std::numeric_limits<float>::max(), max = -min;
+        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
+        for (auto it2 = grid->tree().root().beginChild(); it2; ++it2) {
+            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
+            for (auto it1 = it2->beginChild(); it1; ++it1) {
+                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
+                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
+                    for (auto it = it0->beginValueOn(); it; ++it) {
+                        if (*it < min) min = *it;
+                        if (*it > max) max = *it;
+                    }
+                }// loop over child nodes of the lower internal node
+            }// loop over child nodes of the upper internal node
+        }// loop over child nodes of the root node
+        EXPECT_EQ(min, grid->tree().root().minimum());
+        EXPECT_EQ(max, grid->tree().root().maximum());
+        EXPECT_EQ(n2, grid->tree().nodeCount(2));
+        EXPECT_EQ(n1, grid->tree().nodeCount(1));
+        EXPECT_EQ(n0, grid->tree().nodeCount(0));
+    }
+
+    {
+        //nanovdb::GpuTimer gpuTimer("GPU gridStats: Default = Full");
+        nanovdb::cudaGridStats(d_grid);
+        //gpuTimer.stop();
+    }
+    {// check bbox and stats of device grid
+        using DataT = nanovdb::NanoRoot<float>::DataType;
+        std::unique_ptr<char[]> buffer(new char[sizeof(DataT)]);
+        cudaMemcpy(buffer.get(), (char*)d_grid + sizeof(nanovdb::GridData) + sizeof(nanovdb::TreeData), sizeof(DataT), cudaMemcpyDeviceToHost);
+        auto *data = (const DataT*)buffer.get();
+        EXPECT_EQ(grid->indexBBox(), data->mBBox);
+        EXPECT_EQ(grid->tree().root().background(), data->mBackground);
+        EXPECT_EQ(grid->tree().root().minimum(),    data->mMinimum);
+        EXPECT_EQ(grid->tree().root().maximum(),    data->mMaximum);
+    }
+}// GridStats

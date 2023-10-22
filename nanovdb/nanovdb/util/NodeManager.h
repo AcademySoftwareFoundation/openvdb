@@ -219,22 +219,22 @@ public:
     __hostdev__ uint64_t memUsage() const {return NodeManager::memUsage(this->grid());}
 
     /// @brief Return a reference to the grid
-    __hostdev__ GridT& grid() { return *reinterpret_cast<GridT*>(DataT::mGrid); }
+    __hostdev__       GridT& grid()       { return *reinterpret_cast<GridT*>(DataT::mGrid); }
     __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>(DataT::mGrid); }
 
     /// @brief Return a reference to the tree
-    __hostdev__ TreeT& tree() { return this->grid().tree(); }
+    __hostdev__       TreeT& tree()       { return this->grid().tree(); }
     __hostdev__ const TreeT& tree() const { return this->grid().tree(); }
 
     /// @brief Return a reference to the root
-    __hostdev__ RootT& root() { return this->tree().root(); }
+    __hostdev__       RootT& root()       { return this->tree().root(); }
     __hostdev__ const RootT& root() const { return this->tree().root(); }
 
     /// @brief Return the number of tree nodes at the specified level
     /// @details 0 is leaf, 1 is lower internal, and 2 is upper internal level
     __hostdev__ uint64_t nodeCount(int level) const { return this->tree().nodeCount(level); }
 
-    __hostdev__ uint64_t leafCount() const { return this->tree().nodeCount(0); }
+    __hostdev__ uint64_t leafCount()  const { return this->tree().nodeCount(0); }
     __hostdev__ uint64_t lowerCount() const { return this->tree().nodeCount(1); }
     __hostdev__ uint64_t upperCount() const { return this->tree().nodeCount(2); }
 
@@ -268,15 +268,15 @@ public:
 
     /// @brief Return the i'th leaf node with respect to breadth-first ordering
     __hostdev__ const Node0& leaf(uint32_t i) const { return this->node<0>(i); }
-    __hostdev__ Node0& leaf(uint32_t i) { return this->node<0>(i); }
+    __hostdev__       Node0& leaf(uint32_t i)       { return this->node<0>(i); }
 
     /// @brief Return the i'th lower internal node with respect to breadth-first ordering
     __hostdev__ const Node1& lower(uint32_t i) const { return this->node<1>(i); }
-    __hostdev__ Node1& lower(uint32_t i) { return this->node<1>(i); }
+    __hostdev__       Node1& lower(uint32_t i)       { return this->node<1>(i); }
 
     /// @brief Return the i'th upper internal node with respect to breadth-first ordering
     __hostdev__ const Node2& upper(uint32_t i) const { return this->node<2>(i); }
-    __hostdev__ Node2& upper(uint32_t i) { return this->node<2>(i); }
+    __hostdev__       Node2& upper(uint32_t i)       { return this->node<2>(i); }
 
 }; // NodeManager<BuildT> class
 
@@ -306,9 +306,9 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
         // Performs depth first traversal but breadth first insertion
         for (auto it2 = grid.tree().root().cbeginChild(); it2; ++it2) {
             *ptr2++ = PtrDiff(&*it2, &grid);
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
+            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
                 *ptr1++ = PtrDiff(&*it1, &grid);
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
+                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
                     *ptr0++ = PtrDiff(&*it0, &grid);
                 }// loop over child nodes of the lower internal node
             }// loop over child nodes of the upper internal node

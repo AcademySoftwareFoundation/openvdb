@@ -264,7 +264,7 @@ public:
         , mPointType(is_same<BuildT,Point>::value ? PointType::Default : PointType::Disable)
     {
         mData.map = map;
-        mData.flags.initMask({GridFlags::HasBBox, GridFlags::IsLexicographic});
+        mData.flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
         cudaCheck(cudaMallocAsync((void**)&mDeviceData, sizeof(Data), mStream));
     }
 
@@ -487,18 +487,30 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const PtrT points, size_t poin
 
     if (mVerbose==2) mTimer.restart("Generate tile keys");
     cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, const Data *d_data, const PtrT points) {
+        auto coordToKey = [](const Coord &ijk)->uint64_t{
+            //  int32_t has a range of -2^31 to 2^31 - 1
+            // uint32_t has a range of 0 to 2^32 - 1
+            static constexpr int64_t offset = 1 << 31;
+            return (uint64_t(uint32_t(int64_t(ijk[2]) + offset) >> 12)      ) | // z is the lower 21 bits
+                   (uint64_t(uint32_t(int64_t(ijk[1]) + offset) >> 12) << 21) | // y is the middle 21 bits
+                   (uint64_t(uint32_t(int64_t(ijk[0]) + offset) >> 12) << 42); //  x is the upper 21 bits
+        };
         d_indx[tid] = uint32_t(tid);
         uint64_t &key = d_keys[tid];
         if constexpr(is_same<BuildT, Point>::value) {// points are in world space
             if constexpr(is_same<Vec3T, Vec3f>::value) {
-                key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMapF(points[tid]).round());
+                key = coordToKey(d_data->map.applyInverseMapF(points[tid]).round());
+                //key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMapF(points[tid]).round());
             } else {// points are Vec3d
-                key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMap(points[tid]).round());
+                //key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMap(points[tid]).round());
+                key = coordToKey(d_data->map.applyInverseMap(points[tid]).round());
             }
         } else if constexpr(is_same<Vec3T, Coord>::value) {// points Coord are in index space
-            key = NanoRoot<BuildT>::CoordToKey(points[tid]);
+            //key = NanoRoot<BuildT>::CoordToKey(points[tid]);
+            key = coordToKey(points[tid]);
         } else {// points are Vec3f or Vec3d in index space
-            key = NanoRoot<BuildT>::CoordToKey(points[tid].round());
+            //key = NanoRoot<BuildT>::CoordToKey(points[tid].round());
+            key = coordToKey(points[tid].round());
         }
     }, mDeviceData, points);
     cudaCheckError();
@@ -521,16 +533,15 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const PtrT points, size_t poin
     cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     mMemPool.free(d_points_per_tile);
 
-    auto voxelKey = [] __device__ (uint64_t tileID, const Coord &ijk){
-        return tileID << 36 |                                          // upper offset: 64-15-12-9=28, i.e. last 28 bits
-               uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 | // lower offset: 32^3 = 2^15,   i.e. next 15 bits
-               uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
-               uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
-    };
-
     for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
         const uint32_t count = points_per_tile[id];
         cudaLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, [=] __device__(size_t tid, const Data *d_data) {
+            auto voxelKey = [] __device__ (uint64_t tileID, const Coord &ijk){
+                return tileID << 36 |                                       // upper offset: 64-15-12-9=28, i.e. last 28 bits
+                    uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 | // lower offset: 32^3 = 2^15,   i.e. next 15 bits
+                    uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
+                    uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
+            };
             tid += offset;
             Vec3T p = points[d_indx[tid]];
             if constexpr(is_same<BuildT, Point>::value) p = is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
@@ -662,7 +673,7 @@ inline void CudaPointsToGrid<BuildT, AllocT>::processGridTreeRoot(const PtrT poi
 
         // process Grid
         auto &grid = d_data->getGrid();
-        grid.init({GridFlags::HasBBox, GridFlags::IsLexicographic}, d_data->size, d_data->map, mapToGridType<BuildT>());
+        grid.init({GridFlags::HasBBox, GridFlags::IsBreadthFirst}, d_data->size, d_data->map, mapToGridType<BuildT>());
         grid.mChecksum = ~uint64_t(0);// set all bits on which means it's disabled
         grid.mBlindMetadataCount  = is_same<BuildT, Point>::value;// ? 1u : 0u;
         grid.mBlindMetadataOffset = d_data->meta;
@@ -778,7 +789,18 @@ inline void CudaPointsToGrid<BuildT, AllocT>::processUpperNodes()
     cudaLambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], [=] __device__(size_t tid, Data *d_data) {
         auto &root  = d_data->getRoot();
         auto &upper = d_data->getUpper(tid);
+#if 1
+        auto keyToCoord = [](uint64_t key)->nanovdb::Coord{
+            static constexpr int64_t offset = 1 << 31;// max values of uint32_t is 2^31 - 1
+            static constexpr uint64_t MASK = (1u << 21) - 1; // used to mask out 21 lower bits
+            return nanovdb::Coord(int(int64_t(((key >> 42) & MASK) << 12) - offset),  // x are the upper 21 bits
+                                  int(int64_t(((key >> 21) & MASK) << 12) - offset),  // y are the middle 21 bits
+                                  int(int64_t(( key        & MASK) << 12) - offset)); // z are the lower 21 bits
+        };
+        const Coord ijk = keyToCoord(d_data->d_tile_keys[tid]);
+#else
         const Coord ijk = NanoRoot<uint32_t>::KeyToCoord(d_data->d_tile_keys[tid]);
+#endif
         root.tile(tid)->setChild(ijk, &upper, &root);
         upper.mBBox[0] = ijk;
         upper.mFlags = 0;

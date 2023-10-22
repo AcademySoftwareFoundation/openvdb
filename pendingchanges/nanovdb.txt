@@ -14,13 +14,14 @@ NanoVDB:
     - CreateNanoGrid.h is replacing GridBuilder.h, IndexGridBuilder.h and OpenToNanoVDB.h
     - Moved CudaDeviceBuffer.h to cuda/CudaDeviceBuffer.h
     - Added cuda/CudaUtils.h and cuda/GpuTimer.h with cuda utility functions
-    - Added cuda/CudaPointToGrids.cuh that constructs device grids from points or voxels
+    - Added cuda/CudaPointToGrids.cuh that constructs device grids from lists of points or voxels
     - Added cuda/CudaIndexToGrid.cuh that converts IndexGrids and values into regular Grids
     - Added cuda/CudaSignedFloodFill.cuh that performs signed-flood filing on SDF on the GPU
     - Added cuda/CudaAddBlindData.cuh that adds bind data to an existing grid on the GPU
     - Added cuda/CudaGridChecksum.cuh that computes CRC32 checksums of grids on the GPU
     - Added cuda/CudaGridHandle.cuh that handles grids on the GPU
     - Added cuda/CudaNodeManager.cuh that constructs a NodeManager on the GPU
+    - Added cuda/CudaGridStats.cuh that computes grid statistics on the GPU
     - The move constructor in GridHandle now requires the GridBuffer to actually contain a valid grid
     - Added new types: Ve4f, Ve4d, ValueIndex, ValueOnIndex, ValueIndexMask, and ValueOnIndexMask
     - Major improvements to GridBuilder.h, which allows user to construct grids with random access on the host
