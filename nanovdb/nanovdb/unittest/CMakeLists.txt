@@ -41,6 +41,14 @@ add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 
 # -----------------------------------------------------------------------------
 
+if(NANOVDB_USE_CUDA)
+  add_executable(nanovdb_test_cuda "TestNanoVDB.cu")
+  target_link_libraries(nanovdb_test_cuda PRIVATE nanovdb GTest::GTest GTest::Main)
+  add_test(nanovdb_cuda_unit_test nanovdb_test_cuda)
+endif()
+
+# -----------------------------------------------------------------------------
+
 if(NOT (NANOVDB_USE_TBB AND NANOVDB_USE_OPENVDB))
   message(WARNING " - OpenVDB required to build OpenVDB unit tests. Skipping.")
   return()
