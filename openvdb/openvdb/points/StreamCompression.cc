@@ -6,6 +6,7 @@
 #include "StreamCompression.h"
 #include <openvdb/util/logging.h>
 #include <map>
+#include <cstring> // std::memcpy
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif

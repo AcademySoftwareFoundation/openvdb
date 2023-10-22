@@ -1150,73 +1150,103 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
     this->readBuffers(is, CoordBBox::inf(), fromHalf);
 }
 
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+
+
+namespace page_stream
+{
+
+template <typename StreamT>
+inline void destroyPagedStream(const MetaMap& auxData, const Index index)
+{
+    // if paged stream exists, delete it
+    const std::string key("paged:" + std::to_string(index));
+    (const_cast<MetaMap&>(auxData)).removeMeta(key);
+}
+
+template <>
+inline void destroyPagedStream<compression::PagedOutputStream>
+    (const MetaMap& auxData, const Index index)
+{
+    using TypedMetaT = TypedMetadata<compression::PagedOutputStream::Ptr>;
+
+    // if paged stream exists, flush and delete it
+    const std::string key("paged:" + std::to_string(index));
+    const TypedMetaT::ConstPtr it = auxData.getMetadata<TypedMetaT>(key);
+    if (it) {
+        it->value()->flush();
+        (const_cast<MetaMap&>(auxData)).removeMeta(key);
+    }
+}
+
+template <typename StreamT>
+inline StreamT&
+getOrInsertPagedStream(const MetaMap& auxData,
+                       const Index index)
+{
+    using TypedMetaT = TypedMetadata<typename StreamT::Ptr>;
+
+    const std::string key("paged:" + std::to_string(index));
+    typename TypedMetaT::ConstPtr it = auxData.getMetadata<TypedMetaT>(key);
+    if (it) {
+        return *(it->value());
+    }
+    else {
+        typename StreamT::Ptr pagedStream = std::make_shared<StreamT>();
+        (const_cast<MetaMap&>(auxData)).insertMeta(key, TypedMetaT(pagedStream));
+        return *pagedStream;
+    }
+}
+
+} // namespace page_stream
+
+
+////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////
+
+
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*bbox*/, bool fromHalf)
 {
     struct Local
     {
-        static void destroyPagedStream(const io::StreamMetadata::AuxDataMap& auxData, const Index index)
+        static bool hasMatchingDescriptor(const MetaMap& auxData)
         {
-            // if paged stream exists, delete it
-            std::string key("paged:" + std::to_string(index));
-            auto it = auxData.find(key);
-            if (it != auxData.end()) {
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
-            }
+            // note operator[] doesn't create the metadata in MetaMap
+            const std::string matchingKey("hasMatchingDescriptor");
+            return static_cast<bool>(auxData[matchingKey].get());
         }
 
-        static compression::PagedInputStream& getOrInsertPagedStream(   const io::StreamMetadata::AuxDataMap& auxData,
-                                                                        const Index index)
+        static void clearMatchingDescriptor(const MetaMap& auxData)
         {
-            std::string key("paged:" + std::to_string(index));
-            auto it = auxData.find(key);
-            if (it != auxData.end()) {
-                return *(boost::any_cast<compression::PagedInputStream::Ptr>(it->second));
-            }
-            else {
-                compression::PagedInputStream::Ptr pagedStream = std::make_shared<compression::PagedInputStream>();
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[key] = pagedStream;
-                return *pagedStream;
-            }
+            const std::string matchingKey("hasMatchingDescriptor");
+            const std::string descriptorKey("descriptorPtr");
+            const_cast<MetaMap&>(auxData).removeMeta(matchingKey);
+            const_cast<MetaMap&>(auxData).removeMeta(descriptorKey);
         }
 
-        static bool hasMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        static void insertDescriptor(const MetaMap& auxData,
+                                     const Descriptor::Ptr descriptor)
         {
-            std::string matchingKey("hasMatchingDescriptor");
-            auto itMatching = auxData.find(matchingKey);
-            return itMatching != auxData.end();
-        }
-
-        static void clearMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
-        {
-            std::string matchingKey("hasMatchingDescriptor");
-            std::string descriptorKey("descriptorPtr");
-            auto itMatching = auxData.find(matchingKey);
-            auto itDescriptor = auxData.find(descriptorKey);
-            if (itMatching != auxData.end())    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itMatching);
-            if (itDescriptor != auxData.end())  (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
-        }
-
-        static void insertDescriptor(   const io::StreamMetadata::AuxDataMap& auxData,
-                                        const Descriptor::Ptr descriptor)
-        {
-            std::string descriptorKey("descriptorPtr");
-            std::string matchingKey("hasMatchingDescriptor");
-            auto itMatching = auxData.find(matchingKey);
-            if (itMatching == auxData.end()) {
+            const std::string descriptorKey("descriptorPtr");
+            const std::string matchingKey("hasMatchingDescriptor");
+            if (!static_cast<bool>(auxData[matchingKey].get())) {
                 // if matching bool is not found, insert "true" and the descriptor
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = true;
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[descriptorKey] = descriptor;
+                (const_cast<MetaMap&>(auxData)).insertMeta(matchingKey, TypedMetadata<bool>(true));
+                (const_cast<MetaMap&>(auxData)).insertMeta(descriptorKey, TypedMetadata<Descriptor::Ptr>(descriptor));
             }
         }
 
-        static AttributeSet::Descriptor::Ptr retrieveMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        static AttributeSet::Descriptor::Ptr
+        retrieveMatchingDescriptor(const MetaMap& auxData)
         {
-            std::string descriptorKey("descriptorPtr");
-            auto itDescriptor = auxData.find(descriptorKey);
-            assert(itDescriptor != auxData.end());
-            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+            const std::string descriptorKey("descriptorPtr");
+            const TypedMetadata<Descriptor::Ptr>::ConstPtr itDescriptor =
+                auxData.getMetadata<TypedMetadata<Descriptor::Ptr>>(descriptorKey);
+            const Descriptor::Ptr descriptor = itDescriptor->value();
             return descriptor;
         }
     };
@@ -1281,7 +1311,8 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             mAttributeSet->get(attributeIndex) : nullptr;
         if (array) {
             compression::PagedInputStream& pagedStream =
-                Local::getOrInsertPagedStream(meta->auxData(), static_cast<Index>(attributeIndex));
+                page_stream::getOrInsertPagedStream<compression::PagedInputStream>
+                    (meta->auxData(), static_cast<Index>(attributeIndex));
             pagedStream.setInputStream(is);
             pagedStream.setSizeOnly(true);
             array->readPagedBuffers(pagedStream);
@@ -1309,20 +1340,20 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             mAttributeSet->get(attributeIndex) : nullptr;
         if (array) {
             compression::PagedInputStream& pagedStream =
-                Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+                page_stream::getOrInsertPagedStream<compression::PagedInputStream>(meta->auxData(), attributeIndex);
             pagedStream.setInputStream(is);
             pagedStream.setSizeOnly(false);
             array->readPagedBuffers(pagedStream);
         }
         // cleanup paged stream reference in auxiliary metadata
         if (pass > attributes + 3) {
-            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+            page_stream::destroyPagedStream<compression::PagedInputStream>(meta->auxData(), attributeIndex-1);
         }
     }
     else if (pass < buffers()) {
         // pass 2n+3 - cleanup last paged stream
         const Index attributeIndex = pass - attributes - 4;
-        Local::destroyPagedStream(meta->auxData(), attributeIndex);
+        page_stream::destroyPagedStream<compression::PagedInputStream>(meta->auxData(), attributeIndex);
     }
 }
 
@@ -1332,91 +1363,67 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
 {
     struct Local
     {
-        static void destroyPagedStream(const io::StreamMetadata::AuxDataMap& auxData, const Index index)
+        static void insertDescriptor(const MetaMap& auxData,
+                                     const Descriptor::Ptr descriptor)
         {
-            // if paged stream exists, flush and delete it
-            std::string key("paged:" + std::to_string(index));
-            auto it = auxData.find(key);
-            if (it != auxData.end()) {
-                compression::PagedOutputStream& stream = *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
-                stream.flush();
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
-            }
-        }
+            const std::string descriptorKey("descriptorPtr");
+            const std::string matchingKey("hasMatchingDescriptor");
 
-        static compression::PagedOutputStream& getOrInsertPagedStream(  const io::StreamMetadata::AuxDataMap& auxData,
-                                                                        const Index index)
-        {
-            std::string key("paged:" + std::to_string(index));
-            auto it = auxData.find(key);
-            if (it != auxData.end()) {
-                return *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
-            }
-            else {
-                compression::PagedOutputStream::Ptr pagedStream = std::make_shared<compression::PagedOutputStream>();
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[key] = pagedStream;
-                return *pagedStream;
-            }
-        }
-
-        static void insertDescriptor(   const io::StreamMetadata::AuxDataMap& auxData,
-                                        const Descriptor::Ptr descriptor)
-        {
-            std::string descriptorKey("descriptorPtr");
-            std::string matchingKey("hasMatchingDescriptor");
-            auto itMatching = auxData.find(matchingKey);
-            auto itDescriptor = auxData.find(descriptorKey);
-            if (itMatching == auxData.end()) {
+            if (!static_cast<bool>(auxData[matchingKey].get())) {
+                assert(!static_cast<bool>(auxData[descriptorKey].get()));
                 // if matching bool is not found, insert "true" and the descriptor
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = true;
-                assert(itDescriptor == auxData.end());
-                (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[descriptorKey] = descriptor;
+                (const_cast<MetaMap&>(auxData)).insertMeta(matchingKey, TypedMetadata<bool>(true));
+                (const_cast<MetaMap&>(auxData)).insertMeta(descriptorKey,
+                    TypedMetadata<AttributeSet::Descriptor::Ptr>(descriptor));
             }
             else {
                 // if matching bool is found and is false, early exit (a previous descriptor did not match)
-                bool matching = boost::any_cast<bool>(itMatching->second);
-                if (!matching)    return;
-                assert(itDescriptor != auxData.end());
+                const TypedMetadata<bool>::ConstPtr meta =
+                    auxData.getMetadata<TypedMetadata<bool>>(matchingKey);
+                if (!meta->value()) return;
+                const TypedMetadata<AttributeSet::Descriptor::Ptr>::ConstPtr descMeta =
+                    auxData.getMetadata<TypedMetadata<AttributeSet::Descriptor::Ptr>>(descriptorKey);
                 // if matching bool is true, check whether the existing descriptor matches the current one and set
                 // matching bool to false if not
-                const Descriptor::Ptr existingDescriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+                const Descriptor::Ptr existingDescriptor = descMeta->value();
                 if (*existingDescriptor != *descriptor) {
-                    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = false;
+                    (const_cast<MetaMap&>(auxData)).insertMeta(matchingKey, TypedMetadata<bool>(false));
                 }
             }
         }
 
-        static bool hasMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        static bool hasMatchingDescriptor(const MetaMap& auxData)
         {
-            std::string matchingKey("hasMatchingDescriptor");
-            auto itMatching = auxData.find(matchingKey);
+            const std::string matchingKey("hasMatchingDescriptor");
             // if matching key is not found, no matching descriptor
-            if (itMatching == auxData.end())                return false;
+            const TypedMetadata<bool>::ConstPtr meta =
+                auxData.getMetadata<TypedMetadata<bool>>(matchingKey);
+            if (!meta) return false;
             // if matching key is found and is false, no matching descriptor
-            if (!boost::any_cast<bool>(itMatching->second)) return false;
-            return true;
+            return meta->value();
         }
 
-        static AttributeSet::Descriptor::Ptr retrieveMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        static AttributeSet::Descriptor::Ptr
+        retrieveMatchingDescriptor(const MetaMap& auxData)
         {
-            std::string descriptorKey("descriptorPtr");
-            auto itDescriptor = auxData.find(descriptorKey);
+            using TypedMetaT = TypedMetadata<AttributeSet::Descriptor::Ptr>;
+
+            const std::string descriptorKey("descriptorPtr");
+            const TypedMetaT::ConstPtr meta = auxData.getMetadata<TypedMetaT>(descriptorKey);
             // if matching key is true, however descriptor is not found, it has already been retrieved
-            if (itDescriptor == auxData.end())              return nullptr;
+            if (!meta) return nullptr;
             // otherwise remove it and return it
-            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
-            (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
+            const AttributeSet::Descriptor::Ptr descriptor = meta->value();
+            const_cast<MetaMap&>(auxData).removeMeta(descriptorKey);
             return descriptor;
         }
 
-        static void clearMatchingDescriptor(const io::StreamMetadata::AuxDataMap& auxData)
+        static void clearMatchingDescriptor(const MetaMap& auxData)
         {
-            std::string matchingKey("hasMatchingDescriptor");
-            std::string descriptorKey("descriptorPtr");
-            auto itMatching = auxData.find(matchingKey);
-            auto itDescriptor = auxData.find(descriptorKey);
-            if (itMatching != auxData.end())    (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itMatching);
-            if (itDescriptor != auxData.end())  (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
+            const std::string matchingKey("hasMatchingDescriptor");
+            const std::string descriptorKey("descriptorPtr");
+            const_cast<MetaMap&>(auxData).removeMeta(matchingKey);
+            const_cast<MetaMap&>(auxData).removeMeta(descriptorKey);
         }
     };
 
@@ -1473,13 +1480,13 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         const Index attributeIndex = pass - 2;
         // destroy previous paged stream
         if (pass > 2) {
-            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+            page_stream::destroyPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex-1);
         }
         const AttributeArray* array = attributeIndex < mAttributeSet->size() ?
             mAttributeSet->getConst(attributeIndex) : nullptr;
         if (array) {
             compression::PagedOutputStream& pagedStream =
-                Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+                page_stream::getOrInsertPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex);
             pagedStream.setOutputStream(os);
             pagedStream.setSizeOnly(true);
             array->writePagedBuffers(pagedStream, /*outputTransient*/false);
@@ -1487,7 +1494,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
     }
     else if (pass == attributes + 2) {
         const Index attributeIndex = pass - 3;
-        Local::destroyPagedStream(meta->auxData(), attributeIndex);
+        page_stream::destroyPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex);
         // pass n+2 - voxel data
         BaseLeaf::writeBuffers(os, toHalf);
     }
@@ -1496,13 +1503,13 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         const Index attributeIndex = pass - attributes - 3;
         // destroy previous paged stream
         if (pass > attributes + 2) {
-            Local::destroyPagedStream(meta->auxData(), attributeIndex-1);
+            page_stream::destroyPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex-1);
         }
         const AttributeArray* array = attributeIndex < mAttributeSet->size() ?
             mAttributeSet->getConst(attributeIndex) : nullptr;
         if (array) {
             compression::PagedOutputStream& pagedStream =
-                Local::getOrInsertPagedStream(meta->auxData(), attributeIndex);
+                page_stream::getOrInsertPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex);
             pagedStream.setOutputStream(os);
             pagedStream.setSizeOnly(false);
             array->writePagedBuffers(pagedStream, /*outputTransient*/false);
@@ -1512,7 +1519,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
         Local::clearMatchingDescriptor(meta->auxData());
         // pass 2n+3 - cleanup last paged stream
         const Index attributeIndex = pass - attributes - 4;
-        Local::destroyPagedStream(meta->auxData(), attributeIndex);
+        page_stream::destroyPagedStream<compression::PagedOutputStream>(meta->auxData(), attributeIndex);
     }
 }
 
