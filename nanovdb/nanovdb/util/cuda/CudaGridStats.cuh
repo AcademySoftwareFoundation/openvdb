@@ -10,8 +10,6 @@
 
     \brief Re-computes min/max/avg/var/bbox information for each node in a
            pre-existing NanoVDB grid on the device.
-
-    \todo Currently this class only compute min/max/bbox -  avg/var will be added shortly
 */
 
 #ifndef NANOVDB_CUDAGRIDSTATS_CUH_HAS_BEEN_INCLUDED
@@ -59,25 +57,29 @@ public:
 namespace {// define cuda kernels in an unnamed namespace
 
 template<typename BuildT, typename StatsT>
-__global__ void processLeaf(NodeManager<BuildT> *d_nodeMgr)//, StatsT *d_stats)
+__global__ void processLeaf(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid >= d_nodeMgr->leafCount()) return;
     auto &d_leaf = d_nodeMgr->leaf(tid);
 
     if (d_leaf.updateBBox()) {// updates active bounding box (also updates data->mFlags) and return true if non-empty
-        if constexpr( StatsT::hasMinMax() ) { // resolved at compile time
-            StatsT s;
-            for (auto it = d_leaf.cbeginValueOn(); it; ++it) s.add(*it);
-            d_leaf.setMin(s.min());
-            d_leaf.setMax(s.max());
+        if constexpr(StatsT::hasStats()) {
+            StatsT stats;
+            for (auto it = d_leaf.cbeginValueOn(); it; ++it) stats.add(*it);
+            if constexpr(StatsT::hasAverage()) {
+                d_stats[tid] = stats;
+                *reinterpret_cast<uint32_t*>(&d_leaf.mMinimum) = tid;
+            } else {
+                stats.setStats(d_leaf);
+            }
         }
     }
     d_leaf.mFlags &= ~uint8_t(1u);// enable rendering
 }// processLeaf
 
 template<typename BuildT, typename StatsT, int LEVEL>
-__global__ void processInternal(NodeManager<BuildT> *d_nodeMgr)//, StatsT *d_stats)
+__global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = typename NanoNode<BuildT,LEVEL-1>::type;
     const uint32_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -85,32 +87,39 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr)//, StatsT *d_sta
     auto &d_node = d_nodeMgr->template node<LEVEL>(tid);
     auto &bbox   = d_node.mBBox;
     bbox         = CoordBBox();// empty bbox
+    StatsT stats;
+    uint32_t childID = 0u;
 
-    StatsT s;
-
-    for (auto it = d_node.cbeginChild(); it; ++it) {
-        const auto &child = *it;
+    for (auto it = d_node.beginChild(); it; ++it) {
+        auto &child = *it;
         bbox.expand( child.bbox() );
-        if constexpr(StatsT::hasMinMax()){
-            s.add(child.getMin());
-            s.add(child.getMax());
+        if constexpr(StatsT::hasAverage()) {
+            childID = *reinterpret_cast<uint32_t*>(&child.mMinimum);
+            StatsT &s = d_stats[childID];
+            s.setStats(child);
+            stats.add(s);
+        } else if constexpr(StatsT::hasMinMax()) {
+            stats.add(child.minimum());
+            stats.add(child.maximum());
         }
     }
     for (auto it = d_node.cbeginValueOn(); it; ++it) {
         const Coord ijk = it.getCoord();
         bbox[0].minComponent(ijk);
         bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-        if constexpr(StatsT::hasMinMax()) s.add(*it, ChildT::NUM_VALUES);
+        if constexpr(StatsT::hasStats()) stats.add(*it, ChildT::NUM_VALUES);
     }
-    if constexpr(StatsT::hasMinMax()) {
-        d_node.setMin(s.min());
-        d_node.setMax(s.max());
+    if constexpr(StatsT::hasAverage()) {
+        d_stats[childID] = stats;
+        *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = childID;
+    } else if constexpr(StatsT::hasMinMax()) {
+        stats.setStats(d_node);    
     }
     d_node.mFlags &= ~uint64_t(1u);// enable rendering
 }// processInternal
 
 template<typename BuildT, typename StatsT>
-__global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr)
+__global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
 {
     using ChildT = NanoUpper<BuildT>;
     using ValueT = typename ChildT::ValueType;
@@ -127,21 +136,22 @@ __global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr)
         for (auto it = root.beginDense(); it; ++it) {
             if (auto *child = it.probeChild(v)) {
                 root.mBBox.expand( child->bbox() );
-                if constexpr(StatsT::hasMinMax()){
-                    s.add(child->getMin());
-                    s.add(child->getMax());
+                if constexpr(StatsT::hasAverage()) {
+                    StatsT &stats = d_stats[*reinterpret_cast<uint32_t*>(&child->mMinimum)];
+                    stats.setStats(*child);
+                    s.add(stats);
+                } else if constexpr(StatsT::hasMinMax()){
+                    s.add(child->minimum());
+                    s.add(child->maximum());
                 }
             } else if (it.isValueOn()) {
                 const Coord ijk = it.getCoord();
                 root.mBBox[0].minComponent(ijk);
                 root.mBBox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-                if constexpr(StatsT::hasMinMax()) s.add(v, ChildT::NUM_VALUES);
+                if constexpr(StatsT::hasStats()) s.add(v, ChildT::NUM_VALUES);
             }
         }
-        if constexpr(StatsT::hasMinMax()) {
-            root.mMinimum = s.min();
-            root.mMaximum = s.max();
-        }
+        s.setStats(root);
     }
 
     // process Grid
@@ -198,13 +208,19 @@ void CudaGridStats<BuildT, StatsT>::operator()(NanoGrid<BuildT> *d_grid, cudaStr
     cudaCheck(cudaMemcpyAsync(nodeCount, (char*)d_grid + sizeof(GridData) + 4*sizeof(uint64_t), 3*sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
     cudaStreamSynchronize(stream);// finish all device tasks in stream
 
-    processLeaf<BuildT, StatsT><<<blocksPerGrid(nodeCount[0]), threadsPerBlock, 0, stream>>>(d_nodeMgr);
+    StatsT *d_stats = nullptr;
 
-    processInternal<BuildT, StatsT, 1><<<blocksPerGrid(nodeCount[1]), threadsPerBlock, 0, stream>>>(d_nodeMgr);
+    if constexpr(StatsT::hasAverage()) cudaCheck(cudaMallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
 
-    processInternal<BuildT, StatsT, 2><<<blocksPerGrid(nodeCount[2]), threadsPerBlock, 0, stream>>>(d_nodeMgr);
+    processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
-    processRootAndGrid<BuildT, StatsT><<<1, 1, 0, stream>>>(d_nodeMgr);
+    processInternal<BuildT, StatsT, 1><<<blocksPerGrid(nodeCount[1]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+
+    processInternal<BuildT, StatsT, 2><<<blocksPerGrid(nodeCount[2]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
+
+    processRootAndGrid<BuildT><<<1, 1, 0, stream>>>(d_nodeMgr, d_stats);
+
+    if constexpr(StatsT::hasAverage()) cudaCheck(cudaFreeAsync(d_stats, stream));
 
 } // CudaGridStats::operator()( Grid )
 

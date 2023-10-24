@@ -391,7 +391,6 @@ enum class GridFlags : uint32_t {
     HasAverage = 1 << 3, // nodes contain averages of active values
     HasStdDeviation = 1 << 4, // nodes contain standard deviations of active values
     IsBreadthFirst = 1 << 5, // nodes are typically arranged breadth-first in memory
-    //IsLexicographic = 1 << 6, // nodes are occasionally arranged lexicographically in memory
     End = 1 << 6, // use End - 1 as a mask for the 5 lower bit flags
 };
 
@@ -405,7 +404,6 @@ inline const char* toStr(GridFlags gridFlags)
                                 "has average",
                                 "has standard deviation",
                                 "is breadth-first",
-                                //"is IsLexicographic",
                                 "end"};
     static_assert(1 << (sizeof(LUT) / sizeof(char*) - 1) == int(GridFlags::End), "Unexpected size of LUT");
     return LUT[static_cast<int>(gridFlags)];
@@ -556,12 +554,18 @@ struct is_pointer<const T*>
 
 // --------------------------> remove_const <------------------------------------
 
+/// @brief Trait use to const from type. Default implementation is just a pass-through
+/// @tparam T Type
+/// @details remove_pointer<float>::type = float
 template<typename T>
 struct remove_const
 {
     using type = T;
 };
 
+/// @brief Template specialization of trait class use to remove const qualifier type from a type
+/// @tparam T Type of the const type
+/// @details remove_pointer<const float>::type = float
 template<typename T>
 struct remove_const<const T>
 {
@@ -570,28 +574,50 @@ struct remove_const<const T>
 
 // --------------------------> remove_reference <------------------------------------
 
+/// @brief Trait use to remove reference, i.e. "&", qualifier from a type. Default implementation is just a pass-through
+/// @tparam T Type
+/// @details remove_pointer<float>::type = float
 template <typename T>
 struct remove_reference {using type = T;};
 
+/// @brief Template specialization of trait class use to remove reference, i.e. "&", qualifier from a type
+/// @tparam T Type of the reference
+/// @details remove_pointer<float&>::type = float
 template <typename T>
 struct remove_reference<T&> {using type = T;};
 
 // --------------------------> remove_pointer <------------------------------------
 
+/// @brief Trait use to remove pointer, i.e. "*", qualifier from a type. Default implementation is just a pass-through
+/// @tparam T Type
+/// @details remove_pointer<float>::type = float
 template <typename T>
 struct remove_pointer {using type = T;};
 
+/// @brief Template specialization of trait class use to to remove pointer, i.e. "*", qualifier from a type
+/// @tparam T Type of the pointer
+/// @details remove_pointer<float*>::type = float
 template <typename T>
 struct remove_pointer<T*> {using type = T;};
 
 // --------------------------> match_const <------------------------------------
 
+/// @brief Trait used to transfer the const-ness of a reference type to another type
+/// @tparam T Type whoes const-ness needs to match the reference type
+/// @tparam ReferenceT Reference type that is not const
+/// @details match_const<const int, float>::type = int
+///          match_const<int, float>::type = int
 template<typename T, typename ReferenceT>
 struct match_const
 {
     using type = typename remove_const<T>::type;
 };
 
+/// @brief Template specialization used to transfer the const-ness of a reference type to another type
+/// @tparam T Type that will adopt the const-ness of the reference type
+/// @tparam ReferenceT Reference type that is const
+/// @details match_const<const int, const float>::type = const int
+///          match_const<int, const float>::type = const int
 template<typename T, typename ReferenceT>
 struct match_const<T, const ReferenceT>
 {
@@ -832,6 +858,23 @@ __hostdev__ inline bool isIndex(GridType gridType)
            gridType == GridType::OnIndex ||// index active values only
            gridType == GridType::IndexMask ||// as Index, but with an additionl mask
            gridType == GridType::OnIndexMask;// as OnIndex, but with an additional mask
+}
+
+// --------------------------> memcpy64 <------------------------------------
+
+/// @brief copy 64 bit words from @c src to @c dst
+/// @param dst pointer to destination
+/// @param src pointer to soruce
+/// @param word_count number of 64 bit words to be copied
+/// @return destination pointer
+/// @warning @c src and @c dst cannot overlap and should both be 64 bit aligned
+__hostdev__ inline static void* memcpy64(void *dst, const void *src, size_t word_count)
+{
+    NANOVDB_ASSERT(uint64_t(dst) % 8 == 0 && uint64_t(src) % 8 == 0);
+    auto *d = reinterpret_cast<uint64_t*>(dst), *e = d + word_count;
+    auto *s = reinterpret_cast<const uint64_t*>(src);
+    while (d != e) *d++ = *s++;
+    return dst;
 }
 
 // --------------------------> isValue(GridType, GridClass) <------------------------------------
@@ -2891,8 +2934,7 @@ public:
 
     __hostdev__ Mask& operator=(const Mask& other)
     {
-        for (uint32_t i = 0; i < WORD_COUNT; ++i)
-            mWords[i] = other.mWords[i];
+        memcpy64(mWords, other.mWords, WORD_COUNT);
         return *this;
     }
 
@@ -3460,9 +3502,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     __hostdev__ GridData& operator=(const GridData& other)
     {
         static_assert(8 * 84 == sizeof(GridData), "GridData has unexpected size");
-        auto* src = reinterpret_cast<const uint64_t*>(&other);
-        for (auto *dst = reinterpret_cast<uint64_t*>(this), *end = dst + 84; dst != end; ++dst)
-            *dst = *src++;
+        memcpy64(this, &other, 84);
         return *this;
     }
     __hostdev__ void init(std::initializer_list<GridFlags> list = {GridFlags::IsBreadthFirst},
@@ -3770,7 +3810,6 @@ public:
     __hostdev__ bool             hasAverage() const { return DataType::mFlags.isMaskOn(GridFlags::HasAverage); }
     __hostdev__ bool             hasStdDeviation() const { return DataType::mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return DataType::mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
-    //__hostdev__ bool             isLexicographic() const { return DataType::mFlags.isMaskOn(GridFlags::IsLexicographic); }
 
     /// @brief return true if the specified node type is layed out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
@@ -3870,7 +3909,7 @@ __hostdev__ int Grid<TreeT>::findBlindData(const char* name) const
 
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
 { // sizeof(TreeData) == 64B
-    uint64_t mNodeOffset[4]; //32B, byte offset from this tree to first leaf, lower, upper and root node
+    int64_t  mNodeOffset[4];// 32B, byte offset from this tree to first leaf, lower, upper and root node. A zero offset means no node exists
     uint32_t mNodeCount[3]; // 12B, total number of nodes of type: leaf, lower internal, upper internal
     uint32_t mTileCount[3]; // 12B, total number of active tile values at the lower internal, upper internal and root node levels
     uint64_t mVoxelCount; //    8B, total number of active voxels in the root and all its child nodes.
@@ -3878,31 +3917,23 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     __hostdev__ TreeData& operator=(const TreeData& other)
     {
         static_assert(8 * 8 == sizeof(TreeData), "TreeData has unexpected size");
-        auto* src = reinterpret_cast<const uint64_t*>(&other);
-        for (auto *dst = reinterpret_cast<uint64_t*>(this), *end = dst + 8; dst != end; ++dst)
-            *dst = *src++;
+        memcpy64(this, &other, 8);
         return *this;
     }
-    template<typename RootT>
-    __hostdev__ void setRoot(const RootT* root) { mNodeOffset[3] = PtrDiff(root, this); }
-    template<typename RootT>
-    __hostdev__ RootT* getRoot() { return PtrAdd<RootT>(this, mNodeOffset[3]); }
-    template<typename RootT>
-    __hostdev__ const RootT* getRoot() const { return PtrAdd<RootT>(this, mNodeOffset[3]); }
+    __hostdev__ void setRoot(const void* root) {mNodeOffset[3] = root ? PtrDiff(root, this) : 0;}
+    __hostdev__ uint8_t* getRoot() { return mNodeOffset[3] ? PtrAdd<uint8_t>(this, mNodeOffset[3]) : nullptr; }
+    __hostdev__ const uint8_t* getRoot() const { return mNodeOffset[3] ? PtrAdd<uint8_t>(this, mNodeOffset[3]) : nullptr; }
 
     template<typename NodeT>
-    __hostdev__ void setFirstNode(const NodeT* node)
-    {
-        mNodeOffset[NodeT::LEVEL] = node ? PtrDiff(node, this) : 0;
-    }
+    __hostdev__ void setFirstNode(const NodeT* node) {mNodeOffset[NodeT::LEVEL] = node ? PtrDiff(node, this) : 0;}
 
-    __hostdev__ bool isEmpty() const  {return *PtrAdd<uint32_t>(this, mNodeOffset[3] + sizeof(BBox<Coord>)) == 0;}
+    __hostdev__ bool isEmpty() const  {return  mNodeOffset[3] ? *PtrAdd<uint32_t>(this, mNodeOffset[3] + sizeof(BBox<Coord>)) == 0 : true;}
 
-    /// @brief Return a const reference to the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
-    __hostdev__ const CoordBBox& bbox() const {return *PtrAdd<CoordBBox>(this, mNodeOffset[3]);}
+    /// @brief Return the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
+    __hostdev__ CoordBBox bbox() const {return  mNodeOffset[3] ? *PtrAdd<CoordBBox>(this, mNodeOffset[3]) : CoordBBox();}
 
     /// @brief  return true if RootData is layout out immidiatly after TreeData in memory
-    __hostdev__ bool isRootNext() const {return mNodeOffset[3] == sizeof(TreeData); }
+    __hostdev__ bool isRootNext() const {return mNodeOffset[3] ? mNodeOffset[3] == sizeof(TreeData) : false; }
 };// TreeData
 
 // ----------------------------> GridTree <--------------------------------------
@@ -3962,9 +3993,19 @@ public:
     /// @brief return memory usage in bytes for the class
     __hostdev__ static uint64_t memUsage() { return sizeof(DataType); }
 
-    __hostdev__ RootT& root() { return *DataType::template getRoot<RootT>(); }
+    __hostdev__ RootT& root()
+    {
+        RootT* ptr = reinterpret_cast<RootT*>(DataType::getRoot());
+        NANOVDB_ASSERT(ptr);
+        return *ptr;
+    }
 
-    __hostdev__ const RootT& root() const { return *DataType::template getRoot<RootT>(); }
+    __hostdev__ const RootT& root() const
+    {
+        const RootT* ptr = reinterpret_cast<const RootT*>(DataType::getRoot());
+        NANOVDB_ASSERT(ptr);
+        return *ptr;
+    }
 
     __hostdev__ AccessorType getAccessor() const { return AccessorType(this->root()); }
 
@@ -4028,8 +4069,8 @@ public:
     template<typename NodeT>
     __hostdev__ NodeT* getFirstNode()
     {
-        const uint64_t offset = DataType::mNodeOffset[NodeT::LEVEL];
-        return offset > 0 ? PtrAdd<NodeT>(this, offset) : nullptr;
+        const int64_t offset = DataType::mNodeOffset[NodeT::LEVEL];
+        return offset ? PtrAdd<NodeT>(this, offset) : nullptr;
     }
 
     /// @brief return a const pointer to the first node of the specified type
@@ -4038,8 +4079,8 @@ public:
     template<typename NodeT>
     __hostdev__ const NodeT* getFirstNode() const
     {
-        const uint64_t offset = DataType::mNodeOffset[NodeT::LEVEL];
-        return offset > 0 ? PtrAdd<NodeT>(this, offset) : nullptr;
+        const int64_t offset = DataType::mNodeOffset[NodeT::LEVEL];
+        return offset ? PtrAdd<NodeT>(this, offset) : nullptr;
     }
 
     /// @brief return a pointer to the first node at the specified level
@@ -7438,11 +7479,10 @@ ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2> createAccessor(const NanoRoot<Value
 ///        its ValueType.
 class GridMetaData
 { // 768 bytes (32 byte aligned)
-#if 1
     GridData  mGridData; // 672B
     TreeData  mTreeData; // 64B
     CoordBBox mIndexBBox; // 24B. AABB of active values in index space.
-    uint32_t  mRootTableSize, mPadding; // 8B
+    uint32_t  mRootTableSize, mPadding{0}; // 8B
 
 public:
     template<typename T>
@@ -7455,11 +7495,15 @@ public:
     }
     GridMetaData(const GridData* gridData)
     {
-        NANOVDB_ASSERT(gridData && gridData->isValid());
-        mGridData  = *gridData;
-        mTreeData  = *reinterpret_cast<const TreeData*>(gridData->treePtr());
-        mIndexBBox = gridData->indexBBox();
-        mRootTableSize = gridData->rootTableSize();
+        static_assert(8 * 96 == sizeof(GridMetaData), "GridMetaData has unexpected size");
+        if (GridMetaData::safeCast(gridData)) {
+            memcpy64(this, gridData, 96);
+        } else {// otherwise copy each member individually
+            mGridData  = *gridData;
+            mTreeData  = *reinterpret_cast<const TreeData*>(gridData->treePtr());
+            mIndexBBox = gridData->indexBBox();
+            mRootTableSize = gridData->rootTableSize();
+        }
     }
     /// @brief return true if the RootData follows right after the TreeData.
     ///        If so, this implies that it's safe to cast the grid from which
@@ -7468,8 +7512,14 @@ public:
 
     /// @brief return true if it is safe to cast the grid to a pointer
     ///        of type GridMetaData, i.e. construction can be avoided.
+    __hostdev__ static bool      safeCast(const GridData *gridData){
+        NANOVDB_ASSERT(gridData && gridData->isValid());
+        return gridData->isRootConnected();
+    }
+    /// @brief return true if it is safe to cast the grid to a pointer
+    ///        of type GridMetaData, i.e. construction can be avoided.
     template<typename T>
-    __hostdev__ static bool safeCast(const NanoGrid<T>& grid){return grid.tree().isRootNext();}
+    __hostdev__ static bool      safeCast(const NanoGrid<T>& grid){return grid.tree().isRootNext();}
     __hostdev__ bool             isValid() const { return mGridData.isValid(); }
     __hostdev__ const GridType&  gridType() const { return mGridData.mGridType; }
     __hostdev__ const GridClass& gridClass() const { return mGridData.mGridClass; }
@@ -7487,7 +7537,6 @@ public:
     __hostdev__ bool             hasAverage() const { return mGridData.mFlags.isMaskOn(GridFlags::HasAverage); }
     __hostdev__ bool             hasStdDeviation() const { return mGridData.mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return mGridData.mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
-    //__hostdev__ bool             isLexicographic() const { return mGridData.mFlags.isMaskOn(GridFlags::IsLexicographic); }
     __hostdev__ uint64_t         gridSize() const { return mGridData.mGridSize; }
     __hostdev__ uint32_t         gridIndex() const { return mGridData.mGridIndex; }
     __hostdev__ uint32_t         gridCount() const { return mGridData.mGridCount; }
@@ -7497,7 +7546,6 @@ public:
     __hostdev__ const BBox<Coord>& indexBBox() const { return mIndexBBox; }
     __hostdev__ Vec3d              voxelSize() const { return mGridData.mVoxelSize; }
     __hostdev__ int                blindDataCount() const { return mGridData.mBlindMetadataCount; }
-    //__hostdev__ const GridBlindMetaData& blindMetaData(uint32_t n) const {return *mGridData.blindMetaData(n);}
     __hostdev__ uint64_t        activeVoxelCount() const { return mTreeData.mVoxelCount; }
     __hostdev__ const uint32_t& activeTileCount(uint32_t level) const { return mTreeData.mTileCount[level - 1]; }
     __hostdev__ uint32_t        nodeCount(uint32_t level) const { return mTreeData.mNodeCount[level]; }
@@ -7505,43 +7553,6 @@ public:
     __hostdev__ uint32_t        rootTableSize() const { return mRootTableSize; }
     __hostdev__ bool            isEmpty() const { return mRootTableSize == 0; }
     __hostdev__ Version         version() const { return mGridData.mVersion; }
-#else
-    // We cast to a grid templated on a dummy ValueType which is safe because we are very
-    // careful only to call certain methods which are known to be invariant to the ValueType!
-    // In other words, don't use this technique unless you are intimately familiar with the
-    // memory-layout of the data structure and the reasons why certain methods are safe
-    // to call and others are not!
-    using GridT = NanoGrid<int>;
-    __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>(this); }
-
-public:
-    __hostdev__ bool        isValid() const { return this->grid().isValid(); }
-    __hostdev__ uint64_t    gridSize() const { return this->grid().gridSize(); }
-    __hostdev__ uint32_t    gridIndex() const { return this->grid().gridIndex(); }
-    __hostdev__ uint32_t    gridCount() const { return this->grid().gridCount(); }
-    __hostdev__ const char* shortGridName() const { return this->grid().shortGridName(); }
-    __hostdev__ GridType    gridType() const { return this->grid().gridType(); }
-    __hostdev__ GridClass   gridClass() const { return this->grid().gridClass(); }
-    __hostdev__ bool        isLevelSet() const { return this->grid().isLevelSet(); }
-    __hostdev__ bool        isFogVolume() const { return this->grid().isFogVolume(); }
-    __hostdev__ bool        isPointIndex() const { return this->grid().isPointIndex(); }
-    __hostdev__ bool        isPointData() const { return this->grid().isPointData(); }
-    __hostdev__ bool        isMask() const { return this->grid().isMask(); }
-    __hostdev__ bool        isStaggered() const { return this->grid().isStaggered(); }
-    __hostdev__ bool        isUnknown() const { return this->grid().isUnknown(); }
-    __hostdev__ const Map&  map() const { return this->grid().map(); }
-    __hostdev__ const BBox<Vec3d>& worldBBox() const { return this->grid().worldBBox(); }
-    __hostdev__ const BBox<Coord>&       indexBBox() const { return this->grid().indexBBox(); }
-    __hostdev__ Vec3d                    voxelSize() const { return this->grid().voxelSize(); }
-    __hostdev__ int                      blindDataCount() const { return this->grid().blindDataCount(); }
-    __hostdev__ const GridBlindMetaData& blindMetaData(uint32_t n) const { return this->grid().blindMetaData(n); }
-    __hostdev__ uint64_t                 activeVoxelCount() const { return this->grid().activeVoxelCount(); }
-    __hostdev__ const uint32_t&          activeTileCount(uint32_t level) const { return this->grid().tree().activeTileCount(level); }
-    __hostdev__ uint32_t                 nodeCount(uint32_t level) const { return this->grid().tree().nodeCount(level); }
-    __hostdev__ uint64_t                 checksum() const { return this->grid().checksum(); }
-    __hostdev__ bool                     isEmpty() const { return this->grid().isEmpty(); }
-    __hostdev__ Version                  version() const { return this->grid().version(); }
-#endif
 }; // GridMetaData
 
 /// @brief Class to access points at a specific voxel location

@@ -116,6 +116,13 @@ public:
     __hostdev__ static constexpr bool hasStdDeviation() { return false; }
     __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, ValueT>::value; }
     __hostdev__ static constexpr size_t size() { return 0; }
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+    }
 }; // Extrema<T, 0>
 
 /// @brief Template specialization of Extrema on vector value types, i.e. rank = 1
@@ -198,6 +205,13 @@ public:
     __hostdev__ static constexpr bool hasStdDeviation() { return false; }
     __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, Real>::value; }
     __hostdev__ static constexpr size_t size() { return 0; }
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+    }
 }; // Extrema<T, 1>
 
 //================================================================================================
@@ -301,6 +315,15 @@ public:
     __hostdev__ double std() const { return sqrt(this->var()); }
     __hostdev__ double stdDev() const { return this->std(); }
     //@}
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+        node.setAvg(this->avg());
+        node.setDev(this->std());
+    }
 }; // end Stats<T, 0>
 
 /// @brief This class computes statistics (minimum value, maximum
@@ -394,6 +417,15 @@ public:
     __hostdev__ double std() const { return sqrt(this->var()); }
     __hostdev__ double stdDev() const { return this->std(); }
     //@}
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+        node.setAvg(this->avg());
+        node.setDev(this->std());
+    }
 }; // end Stats<T, 1>
 
 /// @brief No-op Stats class
@@ -411,11 +443,13 @@ struct NoopStats
     __hostdev__ static constexpr bool hasAverage() { return false; }
     __hostdev__ static constexpr bool hasStdDeviation() { return false; }
     __hostdev__ static constexpr bool hasStats() { return false; }
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT&) const{}
 }; // end NoopStats<T>
 
 //================================================================================================
 
-/// @brief Allows for the construction of NanoVDB grids without any dependecy
+/// @brief Allows for the construction of NanoVDB grids without any dependency
 template<typename GridT, typename StatsT = Stats<typename GridT::ValueType>>
 class GridStats
 {
@@ -465,7 +499,6 @@ template<typename GridT, typename StatsT>
 struct GridStats<GridT, StatsT>::NodeStats
 {
     StatsT    stats;
-    //uint64_t  activeCount;
     CoordBBox bbox;
 
     NodeStats(): stats(), bbox() {}//activeCount(0), bbox() {};
@@ -473,7 +506,6 @@ struct GridStats<GridT, StatsT>::NodeStats
     NodeStats& add(const NodeStats &other)
     {
         stats.add( other.stats );// no-op for NoopStats?!
-        //activeCount += other.activeCount;
         bbox[0].minComponent(other.bbox[0]);
         bbox[1].maxComponent(other.bbox[1]);
         return *this;
@@ -588,7 +620,6 @@ void GridStats<GridT, StatsT>::process(RootT &root)
     if (data.mTableSize == 0) { // empty root node
         data.mMinimum = data.mMaximum = data.mBackground;
         data.mAverage = data.mStdDevi = 0;
-        //data.mActiveVoxelCount = 0;
         data.mBBox = CoordBBox();
     } else {
         NodeStats total;
@@ -597,7 +628,6 @@ void GridStats<GridT, StatsT>::process(RootT &root)
             if (tile->isChild()) { // process child node
                 total.add( this->process( *data.getChild(tile) ) );
             } else if (tile->state) { // active tile
-                //total.activeCount += ChildT::NUM_VALUES;
                 const Coord ijk = tile->origin();
                 total.bbox[0].minComponent(ijk);
                 total.bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
@@ -611,7 +641,6 @@ void GridStats<GridT, StatsT>::process(RootT &root)
             std::cerr << "\nWarning in GridStats: input tree only contained inactive root tiles!"
                       << "\nWhile not strictly an error it's rather suspicious!\n";
         }
-        //data.mActiveVoxelCount = total.activeCount;
         data.mBBox = total.bbox;
     }
 } // GridStats::process( RootNode )

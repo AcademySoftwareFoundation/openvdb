@@ -335,10 +335,10 @@ TEST_F(TestNanoVDB, Version)
 
 TEST_F(TestNanoVDB, Basic)
 {
-    { // CHAR_BIT
+    { // verify size of CHAR_BIT
         EXPECT_EQ(8, CHAR_BIT);
     }
-    {
+    {// check that keys in a map are sorted in ascending order
         std::vector<int> v = {3, 1, 7, 0};
         EXPECT_FALSE(std::is_sorted(v.begin(), v.end()));
         std::map<int, void*> m;
@@ -349,7 +349,7 @@ TEST_F(TestNanoVDB, Basic)
             v.push_back(i.first);
         EXPECT_TRUE(std::is_sorted(v.begin(), v.end()));
     }
-    {
+    {// check that size of enum is the size of an integer
         enum tmp { a = 0,
                    b,
                    c,
@@ -359,6 +359,12 @@ TEST_F(TestNanoVDB, Basic)
     {// Check size of io::FileMetaData
         EXPECT_EQ(176u, sizeof(nanovdb::io::FileMetaData));
         //std::cerr << "sizeof(FileMetaData) = " << sizeof(nanovdb::io::FileMetaData) << std::endl;
+    }
+    {// check that it's safe to case uint64_t to int64_t (as long as its no larger than 2^63 - 1)
+        const uint64_t i = 9223372036854775807ULL;// = 2^63 - 1
+        const int64_t *j = reinterpret_cast<const int64_t*>(&i);
+        EXPECT_EQ(i, *j);
+        //std::cerr << "i="<<i<<" j="<<*j<<std::endl;
     }
 }
 

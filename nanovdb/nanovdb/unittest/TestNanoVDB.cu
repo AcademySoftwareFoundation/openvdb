@@ -2684,8 +2684,10 @@ TEST(TestNanoVDBCUDA, GridStats)
         cudaMemcpy(buffer.get(), (char*)d_grid + sizeof(nanovdb::GridData) + sizeof(nanovdb::TreeData), sizeof(DataT), cudaMemcpyDeviceToHost);
         auto *data = (const DataT*)buffer.get();
         EXPECT_EQ(grid->indexBBox(), data->mBBox);
-        EXPECT_EQ(grid->tree().root().background(), data->mBackground);
-        EXPECT_EQ(grid->tree().root().minimum(),    data->mMinimum);
-        EXPECT_EQ(grid->tree().root().maximum(),    data->mMaximum);
+        EXPECT_EQ(grid->tree().root().background(),   data->mBackground);
+        EXPECT_EQ(grid->tree().root().minimum(),      data->mMinimum);
+        EXPECT_EQ(grid->tree().root().maximum(),      data->mMaximum);
+        EXPECT_EQ(grid->tree().root().average(),      data->mAverage);
+        EXPECT_EQ(grid->tree().root().stdDeviation(), data->mStdDevi);
     }
 }// GridStats
