@@ -209,7 +209,7 @@ TEST_F(TestCount, testMemUsage)
 
     Index64 internalNodeMemUsage(0);
     Index64 expectedMaxMem(sizeof(tree) + sizeof(root));
-    Index64 leafCount(0);
+    [[maybe_unused]] Index64 leafCount(0);
 
     for (auto internal1Iter = root.cbeginChildOn(); internal1Iter; ++internal1Iter) {
         internalNodeMemUsage += Internal1NodeT::NUM_VALUES * sizeof(Internal1NodeT::UnionType);
