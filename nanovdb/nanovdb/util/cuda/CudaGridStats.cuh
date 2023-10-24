@@ -113,7 +113,7 @@ __global__ void processInternal(NodeManager<BuildT> *d_nodeMgr, StatsT *d_stats)
         d_stats[childID] = stats;
         *reinterpret_cast<uint32_t*>(&d_node.mMinimum) = childID;
     } else if constexpr(StatsT::hasMinMax()) {
-        stats.setStats(d_node);    
+        stats.setStats(d_node);
     }
     d_node.mFlags &= ~uint64_t(1u);// enable rendering
 }// processInternal
