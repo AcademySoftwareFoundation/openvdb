@@ -1444,14 +1444,15 @@ exportGrid(py::module_ m)
     using ValueAllIterT = typename GridType::ValueAllIter;
 
     const std::string pyGridTypeName = Traits::name();
-    const std::string defaultCtorDescr = "Initialize with a background value of "
-        + pyutil::str(pyGrid::getZeroValue<GridType>()) + ".";
+    std::stringstream docstream;
+    docstream << "Initialize with a background value of " << pyGrid::getZeroValue<GridType>() << ".";
+    std::string docstring = docstream.str();
 
     // Define the Grid wrapper class and make it the current scope.
     py::class_<GridType, GridPtr, GridBase>(m,
         /*classname=*/pyGridTypeName.c_str(),
         /*docstring=*/(Traits::descr()).c_str())
-        .def(py::init<>(), defaultCtorDescr.c_str())
+        .def(py::init<>(), docstring.c_str())
         .def(py::init<const ValueT&>(), py::arg("background"),
             "Initialize with the given background value.")
 
