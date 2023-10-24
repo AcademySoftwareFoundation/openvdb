@@ -148,11 +148,6 @@
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION
 #endif
 
-/* Defines the macros for explicit template declarations. */
-#define OPENVDB_INSTANTIATE extern template OPENVDB_TEMPLATE_IMPORT
-#define OPENVDB_INSTANTIATE_CLASS extern template class OPENVDB_TEMPLATE_IMPORT
-#define OPENVDB_INSTANTIATE_STRUCT extern template struct OPENVDB_TEMPLATE_IMPORT
-
 /* Defines the macros for explicit template instantiations. */
 #define OPENVDB_REAL_TREE_INSTANTIATE(Function)     @OPENVDB_REAL_TREE_INSTANTIATIONS@
 #define OPENVDB_NUMERIC_TREE_INSTANTIATE(Function)  @OPENVDB_NUMERIC_TREE_INSTANTIATIONS@

@@ -1,0 +1,3 @@
+Build:
+ - Fixed symbols visibilities on Unix when USE_EXPLICIT_INSTANTIATION is ON and
+ used with -fvisibility=hidden

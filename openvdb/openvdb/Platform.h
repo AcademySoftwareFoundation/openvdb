@@ -249,18 +249,24 @@
 #endif
 
 /// Helper macros for explicit template instantiation
-#if defined(_WIN32) && defined(OPENVDB_DLL)
-    #ifdef OPENVDB_PRIVATE
-        #define OPENVDB_TEMPLATE_EXPORT OPENVDB_EXPORT
-        #define OPENVDB_TEMPLATE_IMPORT
-    #else
-        #define OPENVDB_TEMPLATE_EXPORT
-        #define OPENVDB_TEMPLATE_IMPORT OPENVDB_IMPORT
-    #endif
+#ifdef OPENVDB_PRIVATE
+#define OPENVDB_TEMPLATE_IMPORT
 #else
-    #define OPENVDB_TEMPLATE_IMPORT
-    #define OPENVDB_TEMPLATE_EXPORT
+#define OPENVDB_TEMPLATE_IMPORT OPENVDB_IMPORT
 #endif
+
+/// Defines the macros for explicit template declarations. Three possible
+/// values for these defines:
+///  1) When building VDB, headers which include these instantiations simply
+///     define the prototypes with no symbol specification.
+///  2) When building VDB, instantiation translation units are generated on
+///     the fly and include the ExplicitInstantiation header. Only these units
+///     explicitly EXPORT the required symbols and undef the below.
+///  3) Otherwise, when downstream libraries include instatiations, these
+///     resolve to the import spec.
+#define OPENVDB_INSTANTIATE extern template OPENVDB_TEMPLATE_IMPORT
+#define OPENVDB_INSTANTIATE_CLASS extern template class OPENVDB_TEMPLATE_IMPORT
+#define OPENVDB_INSTANTIATE_STRUCT extern template struct OPENVDB_TEMPLATE_IMPORT
 
 /// All classes and public free standing functions must be explicitly marked
 /// as \<lib\>_API to be exported. The \<lib\>_PRIVATE macros are defined when
