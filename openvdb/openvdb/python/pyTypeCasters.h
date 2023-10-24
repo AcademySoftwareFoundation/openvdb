@@ -721,42 +721,343 @@ namespace pybind11 { namespace detail {
         }
     };
 
-    template <> struct type_caster<openvdb::MetaMap> {
+    template <> struct type_caster<openvdb::StringMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::MetaMap, _("openvdb::Metamap"));
+        PYBIND11_TYPE_CASTER(openvdb::StringMetadata, _("openvdb::StringMetadata"));
 
         bool load(handle src, bool) {
+            if (!py::isinstance<py::str>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<std::string>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::StringMetadata src, return_value_policy, handle) {
+            return py::str(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::BoolMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::BoolMetadata, _("openvdb::BoolMetadata"));
+
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::bool_>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<bool>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::BoolMetadata src, return_value_policy, handle) {
+            return py::bool_(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::Int32Metadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Int32Metadata, _("openvdb::Int32Metadata"));
+
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::int_>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<openvdb::Int32>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::Int32Metadata src, return_value_policy, handle) {
+            return py::int_(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::Int64Metadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Int64Metadata, _("openvdb::Int64Metadata"));
+
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::int_>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<openvdb::Int64>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::Int64Metadata src, return_value_policy, handle) {
+            return py::int_(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::FloatMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::FloatMetadata, _("openvdb::FloatMetadata"));
+
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::float_>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<float>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::FloatMetadata src, return_value_policy, handle) {
+            return py::float_(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::DoubleMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::DoubleMetadata, _("openvdb::DoubleMetadata"));
+
+        bool load(handle src, bool) {
+            if (!py::isinstance<py::float_>(src)) {
+                return false;
+            }
+
+            value.setValue(py::cast<double>(src));
+            return true;
+        }
+
+        static handle cast(openvdb::DoubleMetadata src, return_value_policy, handle) {
+            return py::float_(src.value()).release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec2IMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec2IMetadata, _("openvdb::Vec2IMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec2i> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec2i&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec2IMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec2i>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec3IMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec3IMetadata, _("openvdb::Vec3IMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec3i> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec3i&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec3IMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec3i>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec4IMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec4IMetadata, _("openvdb::Vec4IMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec4i> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec4i&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec4IMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec4i>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec2DMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec2DMetadata, _("openvdb::Vec2DMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec2d> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec2d&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec2DMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec2d>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec3DMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec3DMetadata, _("openvdb::Vec3DMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec3d> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec3d&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec3DMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec3d>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Vec4DMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Vec4DMetadata, _("openvdb::Vec4DMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::tuple>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Vec4d> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Vec4d&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Vec4DMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Vec4d>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Mat4SMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Mat4SMetadata, _("openvdb::Mat4SMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::list>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Mat4s> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Mat4s&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Mat4SMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Mat4s>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::Mat4DMetadata> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::Mat4DMetadata, _("openvdb::Mat4DMetadata"));
+
+        bool load(handle src, bool convert) {
+            if (!py::isinstance<py::list>(src)) {
+                return false;
+            }
+
+            make_caster<openvdb::Mat4d> conv;
+            if (!conv.load(src, convert))
+                return false;
+
+            value.setValue(cast_op<openvdb::Mat4d&&>(std::move(conv)));
+            return true;
+        }
+
+        static handle cast(openvdb::Mat4DMetadata src, return_value_policy policy, handle parent) {
+            return make_caster<openvdb::Mat4d>::cast(src.value(), policy, parent);
+        }
+    };
+
+    template <> struct type_caster<openvdb::MetaMap> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::MetaMap, _("openvdb::MetaMap"));
+
+        bool load(handle src, bool convert) {
             py::dict dictionary = py::reinterpret_borrow<py::dict>(src);
-            for (auto item : dictionary) {
+            for (auto [key, val] : dictionary) {
                 std::string name;
-                py::object key = py::reinterpret_borrow<py::object>(item.first);
                 if (py::isinstance<py::str>(key)) {
                     name = py::cast<std::string>(key);
                 } else {
                     throw py::type_error("Expected string as metadata name");
                 }
 
-                openvdb::Metadata::Ptr metadata;
                 // Note: the order of the following tests is significant, as it
                 // avoids unnecessary type promotion (e.g., of ints to doubles).
                 // Python does not natively support single precision and therefore
                 // all floating point metadata is promoted to doubles.
-                py::object val = py::reinterpret_borrow<py::object>(item.second);
 
+                bool success = false;
                 if (py::isinstance<py::str>(val)) {
-                    metadata.reset(new openvdb::StringMetadata(py::cast<std::string>(val)));
+                    make_caster<openvdb::StringMetadata> conv;
+                    if(conv.load(val, convert)) {
+                        value.insertMeta(name, cast_op<openvdb::StringMetadata&&>(std::move(conv)));
+                        success = true;
+                    }
                 } else if (py::isinstance<py::bool_>(val)) {
-                    metadata.reset(new openvdb::BoolMetadata(py::cast<bool>(val)));
+                    make_caster<openvdb::BoolMetadata> conv;
+                    if(conv.load(val, convert)) {
+                        value.insertMeta(name, cast_op<openvdb::BoolMetadata&&>(std::move(conv)));
+                        success = true;
+                    }
                 } else if (py::isinstance<py::int_>(val)) {
                     const openvdb::Int64 n = py::cast<openvdb::Int64>(val);
-                    if (n <= std::numeric_limits<openvdb::Int32>::max()
-                        && n >= std::numeric_limits<openvdb::Int32>::min()) {
-                        metadata.reset(new openvdb::Int32Metadata(static_cast<openvdb::Int32>(n)));
+                    if (n <= std::numeric_limits<openvdb::Int32>::max() && n >= std::numeric_limits<openvdb::Int32>::min()) {
+                        make_caster<openvdb::Int32Metadata> conv;
+                        if(conv.load(val, convert)) {
+                            value.insertMeta(name, cast_op<openvdb::Int32Metadata&&>(std::move(conv)));
+                            success = true;
+                        }
                     } else {
-                        metadata.reset(new openvdb::Int64Metadata(n));
+                        make_caster<openvdb::Int64Metadata> conv;
+                        if(conv.load(val, convert)) {
+                            value.insertMeta(name, cast_op<openvdb::Int64Metadata&&>(std::move(conv)));
+                            success = true;
+                        }
                     }
                 } else if (py::isinstance<py::float_>(val)) {
-                    metadata.reset(new openvdb::DoubleMetadata(py::cast<double>(val)));
+                    make_caster<openvdb::DoubleMetadata> conv;
+                    if(conv.load(val, convert)) {
+                        value.insertMeta(name, cast_op<openvdb::DoubleMetadata&&>(std::move(conv)));
+                        success = true;
+                    }
                 } else if (py::isinstance<py::tuple>(val)) {
                     py::tuple t = py::cast<py::tuple>(val);
                     size_t size = t.size();
@@ -767,110 +1068,127 @@ namespace pybind11 { namespace detail {
 
                     if (isIntegerTuple) {
                         switch(size) {
-                            case 2:
-                                metadata.reset(new openvdb::Vec2IMetadata(py::cast<openvdb::Vec2i>(t)));
+                            case 2: {
+                                make_caster<openvdb::Vec2IMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec2IMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
-                            case 3:
-                                metadata.reset(new openvdb::Vec3IMetadata(py::cast<openvdb::Vec3i>(t)));
+                                }
+                            case 3: {
+                                make_caster<openvdb::Vec3IMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec3IMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
-                            case 4:
-                                metadata.reset(new openvdb::Vec4IMetadata(py::cast<openvdb::Vec4i>(t)));
+                                }
+                            case 4: {
+                                make_caster<openvdb::Vec4IMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec4IMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
+                                }
                             default:
                                 break;
                         }
                     } else {
                         switch(size) {
-                            case 2:
-                                metadata.reset(new openvdb::Vec2DMetadata(py::cast<openvdb::Vec2d>(t)));
+                            case 2: {
+                                make_caster<openvdb::Vec2DMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec2DMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
-                            case 3:
-                                metadata.reset(new openvdb::Vec3DMetadata(py::cast<openvdb::Vec3d>(t)));
+                                }
+                            case 3: {
+                                make_caster<openvdb::Vec3DMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec3DMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
-                            case 4:
-                                metadata.reset(new openvdb::Vec4DMetadata(py::cast<openvdb::Vec4d>(t)));
+                                }
+                            case 4: {
+                                make_caster<openvdb::Vec4DMetadata> conv;
+                                if (conv.load(val, convert)) {
+                                    value.insertMeta(name, cast_op<openvdb::Vec4DMetadata&&>(std::move(conv)));
+                                    success = true;
+                                }
                                 break;
+                                }
                             default:
                                 break;
                         }
                     }
                 } else if (py::isinstance<py::list>(val)) {
-                    py::list list = py::cast<py::list>(val);
-                    bool valid = (list.size() == 4);
-                    if (valid) {
-                        for (size_t i = 0; i < list.size(); ++i) {
-                            valid &= py::isinstance<py::list>(list[i]);
-                            if (valid) {
-                                py::list sublist = py::cast<py::list>(list[i]);
-                                valid &= (sublist.size() == 4);
-                                if (valid) {
-                                    for (size_t j = 0; j < sublist.size(); ++j) {
-                                        valid &= (py::isinstance<py::float_>(sublist[j]) || py::isinstance<py::int_>(sublist[j]));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (valid) {
-                        metadata.reset(new openvdb::Mat4DMetadata(py::cast<openvdb::Mat4d>(val)));
+                    make_caster<openvdb::Mat4DMetadata> conv;
+                    if (conv.load(val, convert)) {
+                        value.insertMeta(name, cast_op<openvdb::Mat4DMetadata&&>(std::move(conv)));
+                        success = true;
                     }
                 } else if (py::isinstance<openvdb::Metadata::Ptr>(val)) {
-                    metadata = py::cast<openvdb::Metadata::Ptr>(val);
+                    openvdb::Metadata::Ptr metadata = py::cast<openvdb::Metadata::Ptr>(val);
+                    if (metadata) {
+                        value.insertMeta(name, *metadata);
+                    }
+
                 }
 
-                if (metadata) {
-                    value.insertMeta(name, *metadata);
-                } else {
+                if (!success) {
                     const std::string valAsStr = py::cast<std::string>(val.attr("__str__")());
                     const std::string valType = py::cast<std::string>(val.attr("__class__").attr("__name__"));
                     throw py::type_error(std::string("metadata value " + valAsStr + " of type " + valType + " is not allowed"));
                 }
-
             }
 
             return true;
         }
 
-        static handle cast(openvdb::MetaMap src, return_value_policy, handle) {
+        static handle cast(openvdb::MetaMap src, return_value_policy policy, handle parent) {
             py::dict dict;
             for (openvdb::MetaMap::ConstMetaIterator it = src.beginMeta(); it != src.endMeta(); ++it) {
                 if (openvdb::Metadata::Ptr meta = it->second) {
                     py::object obj(py::cast(meta));
                     const std::string typeName = meta->typeName();
                     if (typeName == openvdb::StringMetadata::staticTypeName()) {
-                        obj = py::str(static_cast<openvdb::StringMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::StringMetadata>::cast(static_cast<openvdb::StringMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::DoubleMetadata::staticTypeName()) {
-                        obj = py::float_(static_cast<openvdb::DoubleMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::DoubleMetadata>::cast(static_cast<openvdb::DoubleMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::FloatMetadata::staticTypeName()) {
-                        obj = py::float_(static_cast<openvdb::FloatMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::FloatMetadata>::cast(static_cast<openvdb::FloatMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Int32Metadata::staticTypeName()) {
-                        obj = py::int_(static_cast<openvdb::Int32Metadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Int32Metadata>::cast(static_cast<openvdb::Int32Metadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Int64Metadata::staticTypeName()) {
-                        obj = py::int_(static_cast<openvdb::Int64Metadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Int64Metadata>::cast(static_cast<openvdb::Int64Metadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::BoolMetadata::staticTypeName()) {
-                        obj = py::bool_(static_cast<openvdb::BoolMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::BoolMetadata>::cast(static_cast<openvdb::BoolMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec2DMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec2DMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2DMetadata>::cast(static_cast<openvdb::Vec2DMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec2IMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec2IMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2IMetadata>::cast(static_cast<openvdb::Vec2IMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec2SMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec2SMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2SMetadata>::cast(static_cast<openvdb::Vec2SMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec3DMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec3DMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3DMetadata>::cast(static_cast<openvdb::Vec3DMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec3IMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec3IMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3IMetadata>::cast(static_cast<openvdb::Vec3IMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec3SMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec3SMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3SMetadata>::cast(static_cast<openvdb::Vec3SMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec4DMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec4DMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4DMetadata>::cast(static_cast<openvdb::Vec4DMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec4IMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec4IMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4IMetadata>::cast(static_cast<openvdb::Vec4IMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Vec4SMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Vec4SMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4SMetadata>::cast(static_cast<openvdb::Vec4SMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Mat4SMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Mat4SMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Mat4SMetadata>::cast(static_cast<openvdb::Mat4SMetadata&>(*meta), policy, parent));
                     } else if (typeName == openvdb::Mat4DMetadata::staticTypeName()) {
-                        obj = py::cast(static_cast<openvdb::Mat4DMetadata&>(*meta).value());
+                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Mat4DMetadata>::cast(static_cast<openvdb::Mat4DMetadata&>(*meta), policy, parent));
                     }
                     dict[py::str(it->first)] = obj;
                 }
