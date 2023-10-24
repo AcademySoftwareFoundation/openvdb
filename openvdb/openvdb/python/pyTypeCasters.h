@@ -681,6 +681,62 @@ namespace pybind11 { namespace detail {
         }
     };
 
+    template <> struct type_caster<openvdb::PointDataIndex32> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::PointDataIndex32, const_name("openvdb::PointDataIndex32"));
+
+        bool load(handle src, bool) {
+            PyObject* source = src.ptr();
+            PyObject* number = PyNumber_Long(source);
+            if (number) {
+#if PY_MAJOR_VERSION >= 3
+                value = static_cast<typename openvdb::PointDataIndex32::IntType>(PyLong_AsLong(number));
+#else
+                value = static_cast<typename openvdb::PointDataIndex32::IntType>(PyInt_AsLong(number));
+#endif
+            }
+            Py_XDECREF(number);
+
+            if (PyErr_Occurred())
+                return false;
+
+            return true;
+        }
+
+        static handle cast(openvdb::PointDataIndex32 src, return_value_policy, handle) {
+            py::int_ integer(static_cast<openvdb::PointDataIndex32::IntType>(src));
+            return integer.release();
+        }
+    };
+
+    template <> struct type_caster<openvdb::PointDataIndex64> {
+    public:
+        PYBIND11_TYPE_CASTER(openvdb::PointDataIndex64, const_name("openvdb::PointDataIndex64"));
+
+        bool load(handle src, bool) {
+            PyObject* source = src.ptr();
+            PyObject* number = PyNumber_Long(source);
+            if (number) {
+#if PY_MAJOR_VERSION >= 3
+                value = static_cast<typename openvdb::PointDataIndex64::IntType>(PyLong_AsLong(number));
+#else
+                value = static_cast<typename openvdb::PointDataIndex64::IntType>(PyInt_AsLong(number));
+#endif
+            }
+            Py_XDECREF(number);
+
+            if (PyErr_Occurred())
+                return false;
+
+            return true;
+        }
+
+        static handle cast(openvdb::PointDataIndex64 src, return_value_policy, handle) {
+            py::int_ integer(static_cast<openvdb::PointDataIndex64::IntType>(src));
+            return integer.release();
+        }
+    };
+
     template <> struct type_caster<openvdb::MetaMap> {
     public:
         PYBIND11_TYPE_CASTER(openvdb::MetaMap, _("openvdb::Metamap"));
@@ -691,7 +747,7 @@ namespace pybind11 { namespace detail {
                 std::string name;
                 py::object key = py::reinterpret_borrow<py::object>(item.first);
                 if (py::isinstance<py::str>(key)) {
-                    name = key.cast<std::string>();
+                    name = py::cast<std::string>(key);
                 } else {
                     throw py::type_error("Expected string as metadata name");
                 }
@@ -704,11 +760,11 @@ namespace pybind11 { namespace detail {
                 py::object val = py::reinterpret_borrow<py::object>(item.second);
 
                 if (py::isinstance<py::str>(val)) {
-                    metadata.reset(new openvdb::StringMetadata(val.cast<std::string>()));
+                    metadata.reset(new openvdb::StringMetadata(py::cast<std::string>(val)));
                 } else if (py::isinstance<py::bool_>(val)) {
-                    metadata.reset(new openvdb::BoolMetadata(val.cast<bool>()));
+                    metadata.reset(new openvdb::BoolMetadata(py::cast<bool>(val)));
                 } else if (py::isinstance<py::int_>(val)) {
-                    const openvdb::Int64 n = val.cast<openvdb::Int64>();
+                    const openvdb::Int64 n = py::cast<openvdb::Int64>(val);
                     if (n <= std::numeric_limits<openvdb::Int32>::max()
                         && n >= std::numeric_limits<openvdb::Int32>::min()) {
                         metadata.reset(new openvdb::Int32Metadata(static_cast<openvdb::Int32>(n)));
@@ -716,9 +772,9 @@ namespace pybind11 { namespace detail {
                         metadata.reset(new openvdb::Int64Metadata(n));
                     }
                 } else if (py::isinstance<py::float_>(val)) {
-                    metadata.reset(new openvdb::DoubleMetadata(val.cast<double>()));
+                    metadata.reset(new openvdb::DoubleMetadata(py::cast<double>(val)));
                 } else if (py::isinstance<py::tuple>(val)) {
-                    py::tuple t = val.cast<py::tuple>();
+                    py::tuple t = py::cast<py::tuple>(val);
                     size_t size = t.size();
                     bool isIntegerTuple = true;
                     for (size_t i = 0; i < size; ++i) {
@@ -728,13 +784,13 @@ namespace pybind11 { namespace detail {
                     if (isIntegerTuple) {
                         switch(size) {
                             case 2:
-                                metadata.reset(new openvdb::Vec2IMetadata(t.cast<openvdb::Vec2i>()));
+                                metadata.reset(new openvdb::Vec2IMetadata(py::cast<openvdb::Vec2i>(t)));
                                 break;
                             case 3:
-                                metadata.reset(new openvdb::Vec3IMetadata(t.cast<openvdb::Vec3i>()));
+                                metadata.reset(new openvdb::Vec3IMetadata(py::cast<openvdb::Vec3i>(t)));
                                 break;
                             case 4:
-                                metadata.reset(new openvdb::Vec4IMetadata(t.cast<openvdb::Vec4i>()));
+                                metadata.reset(new openvdb::Vec4IMetadata(py::cast<openvdb::Vec4i>(t)));
                                 break;
                             default:
                                 break;
@@ -742,26 +798,26 @@ namespace pybind11 { namespace detail {
                     } else {
                         switch(size) {
                             case 2:
-                                metadata.reset(new openvdb::Vec2DMetadata(t.cast<openvdb::Vec2d>()));
+                                metadata.reset(new openvdb::Vec2DMetadata(py::cast<openvdb::Vec2d>(t)));
                                 break;
                             case 3:
-                                metadata.reset(new openvdb::Vec3DMetadata(t.cast<openvdb::Vec3d>()));
+                                metadata.reset(new openvdb::Vec3DMetadata(py::cast<openvdb::Vec3d>(t)));
                                 break;
                             case 4:
-                                metadata.reset(new openvdb::Vec4DMetadata(t.cast<openvdb::Vec4d>()));
+                                metadata.reset(new openvdb::Vec4DMetadata(py::cast<openvdb::Vec4d>(t)));
                                 break;
                             default:
                                 break;
                         }
                     }
                 } else if (py::isinstance<py::list>(val)) {
-                    py::list list = val.cast<py::list>();
+                    py::list list = py::cast<py::list>(val);
                     bool valid = (list.size() == 4);
                     if (valid) {
                         for (size_t i = 0; i < list.size(); ++i) {
                             valid &= py::isinstance<py::list>(list[i]);
                             if (valid) {
-                                py::list sublist = list[i].cast<py::list>();
+                                py::list sublist = py::cast<py::list>(list[i]);
                                 valid &= (sublist.size() == 4);
                                 if (valid) {
                                     for (size_t j = 0; j < sublist.size(); ++j) {
@@ -772,17 +828,17 @@ namespace pybind11 { namespace detail {
                         }
                     }
                     if (valid) {
-                        metadata.reset(new openvdb::Mat4DMetadata(val.cast<openvdb::Mat4d>()));
+                        metadata.reset(new openvdb::Mat4DMetadata(py::cast<openvdb::Mat4d>(val)));
                     }
                 } else if (py::isinstance<openvdb::Metadata::Ptr>(val)) {
-                    metadata = val.cast<openvdb::Metadata::Ptr>();
+                    metadata = py::cast<openvdb::Metadata::Ptr>(val);
                 }
 
                 if (metadata) {
                     value.insertMeta(name, *metadata);
                 } else {
-                    const std::string valAsStr = (val.attr("__str__")()).cast<std::string>();
-                    const std::string valType = val.attr("__class__").attr("__name__").cast<std::string>();
+                    const std::string valAsStr = py::cast<std::string>(val.attr("__str__")());
+                    const std::string valType = py::cast<std::string>(val.attr("__class__").attr("__name__"));
                     throw py::type_error(std::string("metadata value " + valAsStr + " of type " + valType + " is not allowed"));
                 }
 

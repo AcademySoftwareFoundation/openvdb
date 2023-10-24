@@ -177,7 +177,7 @@ str(const T& val)
 inline std::string
 className(py::handle h)
 {
-    return h.attr("__class__").attr("__name__").cast<std::string>();
+    return py::cast<std::string>(h.attr("__class__").attr("__name__"));
 }
 
 } // namespace pyutil

@@ -118,7 +118,7 @@ exportGridBase(py::module_ m)
         MetaMap metamap;
         metamap.insertMeta(name, *metadata);
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
-        return py::dict(py::cast(metamap))[py::str(name)].cast<py::object>();
+        return py::cast<py::object>(py::dict(py::cast(metamap))[py::str(name)]);
     };
 
 
@@ -135,7 +135,7 @@ exportGridBase(py::module_ m)
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
         py::dict dictObj;
         dictObj[py::str(name)] = value;
-        MetaMap metamap = dictObj.cast<MetaMap>();
+        MetaMap metamap = py::cast<MetaMap>(dictObj);
 
         if (Metadata::Ptr metadata = metamap[name]) {
             grid->removeMeta(name);

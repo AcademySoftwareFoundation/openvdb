@@ -125,7 +125,7 @@ struct PickleSuite
             uint32_t version[3] = { 0, 0, 0 };
             for (int i = 0; i < 3 && !badState; ++i) {
                 if (py::isinstance<py::int_>(state[idx[i]]))
-                    version[i] = state[idx[i]].cast<uint32_t>();
+                    version[i] = py::cast<uint32_t>(state[idx[i]]);
                 else badState = true;
             }
             libVersion.first = version[0];
@@ -139,10 +139,10 @@ struct PickleSuite
             py::object bytesObj = state[int(STATE_XFORM)];
 #if PY_MAJOR_VERSION >= 3
             if (py::isinstance<py::bytes>(bytesObj))
-                serialized = bytesObj.cast<py::bytes>();
+                serialized = py::cast<py::bytes>(bytesObj);
 #else
             if (py::isinstance<std::string>(bytesObj))
-                serialized = bytesObj.cast<std::string>();
+                serialized = py::cast<std::string>(bytesObj);
 #endif
             else badState = true;
         }
@@ -154,7 +154,7 @@ struct PickleSuite
 #else
             os << "expected (int, int, int, str) tuple in call to __setstate__; found ";
 #endif
-            os << state.attr("__repr__")().cast<std::string>();
+            os << py::cast<std::string>(state.attr("__repr__")());
             throw py::value_error(os.str());
         }
 
