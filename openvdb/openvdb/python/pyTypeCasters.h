@@ -633,11 +633,7 @@ namespace pybind11 { namespace detail {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
-#if PY_MAJOR_VERSION >= 3
                 value = static_cast<typename openvdb::PointIndex32::IntType>(PyLong_AsLong(number));
-#else
-                value = static_cast<typename openvdb::PointIndex32::IntType>(PyInt_AsLong(number));
-#endif
             }
             Py_XDECREF(number);
 
@@ -661,11 +657,7 @@ namespace pybind11 { namespace detail {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
-#if PY_MAJOR_VERSION >= 3
                 value = static_cast<typename openvdb::PointIndex64::IntType>(PyLong_AsLong(number));
-#else
-                value = static_cast<typename openvdb::PointIndex64::IntType>(PyInt_AsLong(number));
-#endif
             }
             Py_XDECREF(number);
 
@@ -689,11 +681,7 @@ namespace pybind11 { namespace detail {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
-#if PY_MAJOR_VERSION >= 3
                 value = static_cast<typename openvdb::PointDataIndex32::IntType>(PyLong_AsLong(number));
-#else
-                value = static_cast<typename openvdb::PointDataIndex32::IntType>(PyInt_AsLong(number));
-#endif
             }
             Py_XDECREF(number);
 
@@ -717,11 +705,7 @@ namespace pybind11 { namespace detail {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
-#if PY_MAJOR_VERSION >= 3
                 value = static_cast<typename openvdb::PointDataIndex64::IntType>(PyLong_AsLong(number));
-#else
-                value = static_cast<typename openvdb::PointDataIndex64::IntType>(PyInt_AsLong(number));
-#endif
             }
             Py_XDECREF(number);
 

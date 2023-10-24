@@ -1379,13 +1379,9 @@ struct PickleSuite
         }
 
         // Construct a state tuple for the serialized Grid.
-#if PY_MAJOR_VERSION >= 3
         // Convert the byte string to a "bytes" sequence.
         const std::string s = ostr.str();
         py::bytes bytesObj(s);
-#else
-        py::str bytesObj(ostr.str());
-#endif
         return py::make_tuple(bytesObj);
     }
 
@@ -1397,24 +1393,15 @@ struct PickleSuite
         std::string serialized;
         if (!badState) {
             // Extract the sequence containing the serialized Grid.
-#if PY_MAJOR_VERSION >= 3
             if (py::isinstance<py::bytes>(state[0]))
                 serialized = py::cast<py::bytes>(state[0]);
-#else
-            if (py::isinstance<std::string>(state[0]))
-                serialized = py::cast<std::string>(state[0]);
-#endif
             else
                 badState = true;
         }
 
         if (badState) {
             std::ostringstream os;
-#if PY_MAJOR_VERSION >= 3
             os << "expected (dict, bytes) tuple in call to __setstate__; found ";
-#else
-            os << "expected (dict, str) tuple in call to __setstate__; found ";
-#endif
             os << py::cast<std::string>(state.attr("__repr__")());
             throw py::value_error(os.str());
         }

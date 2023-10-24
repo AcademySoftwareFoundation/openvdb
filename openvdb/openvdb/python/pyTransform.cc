@@ -99,12 +99,8 @@ struct PickleSuite
 
         // Construct a state tuple comprising the version numbers of
         // the serialization format and the serialized Transform.
-#if PY_MAJOR_VERSION >= 3
         // Convert the byte string to a "bytes" sequence.
         py::bytes bytesObj(ostr.str());
-#else
-        py::str bytesObj(ostr.str());
-#endif
         return py::make_tuple(
             uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
             uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
@@ -137,23 +133,14 @@ struct PickleSuite
         if (!badState) {
             // Extract the sequence containing the serialized Transform.
             py::object bytesObj = state[int(STATE_XFORM)];
-#if PY_MAJOR_VERSION >= 3
             if (py::isinstance<py::bytes>(bytesObj))
                 serialized = py::cast<py::bytes>(bytesObj);
-#else
-            if (py::isinstance<std::string>(bytesObj))
-                serialized = py::cast<std::string>(bytesObj);
-#endif
             else badState = true;
         }
 
         if (badState) {
             std::ostringstream os;
-#if PY_MAJOR_VERSION >= 3
             os << "expected (int, int, int, bytes) tuple in call to __setstate__; found ";
-#else
-            os << "expected (int, int, int, str) tuple in call to __setstate__; found ";
-#endif
             os << py::cast<std::string>(state.attr("__repr__")());
             throw py::value_error(os.str());
         }

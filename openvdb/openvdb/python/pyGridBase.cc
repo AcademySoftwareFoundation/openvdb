@@ -100,12 +100,8 @@ exportGridBase(py::module_ m)
 
 
     auto getMetadataKeys = [](GridBase::ConstPtr grid) {
-#if PY_MAJOR_VERSION >= 3
         // Return an iterator over the "keys" view of a dict.
         return py::make_key_iterator(static_cast<const MetaMap&>(*grid).beginMeta(), static_cast<const MetaMap&>(*grid).endMeta());
-#else
-        return py::dict(py::cast(static_cast<const MetaMap&>(*grid))).iterkeys();
-#endif
     };
 
 
