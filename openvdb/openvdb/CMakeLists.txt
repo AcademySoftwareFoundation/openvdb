@@ -584,13 +584,19 @@ if(USE_EXPLICIT_INSTANTIATION)
 
     # Define the source file location - "<binary_dir>/instantiations/Activate.cc"
     set(INSTANTIATE_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/instantiations/${NAME}.cc")
+    set(INSTANTIATE_INPUT "${CMAKE_CURRENT_BINARY_DIR}/instantiations.in/${NAME}.cc")
 
     # The auto-generated file holds the instantiate define and the header
     # which contains all the functions to be explicitly instantiated.
-    file(WRITE ${INSTANTIATE_SOURCE}
+    file(WRITE ${INSTANTIATE_INPUT}
       "#define OPENVDB_INSTANTIATE_${UPPER_NAME}\n"
       "#include <openvdb/${HEADER}>\n"
     )
+
+    # Update the actual source file only if the content has been modified.
+    # Without this step, rerunning CMake would update the timestamp of the
+    # auto-generated file systematically, retriggering compilation.
+    configure_file(${INSTANTIATE_INPUT} ${INSTANTIATE_SOURCE} COPYONLY)
 
     # Add to the list of library source files
     # (prepend as instantiations tend to be slow to compile).
