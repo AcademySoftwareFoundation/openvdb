@@ -1,2 +1,4 @@
 Build:
     - Support for OpenEXR 2.X has been removed.
+    - Better support for building with external package configurations
+    with CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON.
