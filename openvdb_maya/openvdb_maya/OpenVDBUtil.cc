@@ -7,10 +7,9 @@
 
 #include "OpenVDBUtil.h"
 #include <openvdb/math/Math.h>
+#include <openvdb/util/Name.h>
 
 #include <maya/MGlobal.h>
-
-#include <boost/algorithm/string.hpp>
 
 #include <iomanip> // std::setw, std::setfill, std::left
 #include <sstream> // std::stringstream
@@ -64,12 +63,13 @@ void getGrids(std::vector<openvdb::GridBase::ConstPtr>& grids,
 
 std::string getGridNames(const OpenVDBData& vdb)
 {
-    std::vector<std::string> names;
+    std::string names;
     for (size_t n = 0, N = vdb.numberOfGrids(); n < N; ++n) {
-        names.push_back(vdb.grid(n).getName());
+        names += std::string(vdb.grid(n).getName());
+        names += " ";
     }
-
-    return boost::algorithm::join(names, " ");
+    if (!names.empty()) names.pop_back();
+    return names;
 }
 
 
@@ -111,8 +111,12 @@ getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
 {
     grids.clear();
 
-    std::vector<std::string> selectionList;
-    boost::split(selectionList, selection, boost::is_any_of(" "));
+    std::string input(selection);
+    size_t pos = 0;
+    while ((pos = input.find(" ")) != std::string::npos) {
+        selectionList.emplace_back(input.substr(0, pos));
+        input.erase(0, pos + 1);
+    }
 
     for (size_t n = 0, N = inputVdb.numberOfGrids(); n < N; ++n) {
 
@@ -135,8 +139,12 @@ getSelectedGrids(GridCPtrVec& grids, const std::string& selection,
 {
     grids.clear();
 
-    std::vector<std::string> selectionList;
-    boost::split(selectionList, selection, boost::is_any_of(" "));
+    std::string input(selection);
+    size_t pos = 0;
+    while ((pos = input.find(" ")) != std::string::npos) {
+        selectionList.emplace_back(input.substr(0, pos));
+        input.erase(0, pos + 1);
+    }
 
     for (size_t n = 0, N = inputVdb.numberOfGrids(); n < N; ++n) {
 
