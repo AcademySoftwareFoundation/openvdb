@@ -2372,14 +2372,14 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         __hostdev__ Iterator& operator++()
         {
             if (mPos[2] < mBBox[1][2]) { // this is the most common case
-                ++mPos[2];
+                ++mPos[2];// increment z
             } else if (mPos[1] < mBBox[1][1]) {
-                mPos[2] = mBBox[0][2];// reset
-                ++mPos[1];
+                mPos[2] = mBBox[0][2];// reset z
+                ++mPos[1];// increment y
             } else if (mPos[0] <= mBBox[1][0]) {
-                mPos[2] = mBBox[0][2];// reset
-                mPos[1] = mBBox[0][1];// reset
-                ++mPos[0];
+                mPos[2] = mBBox[0][2];// reset z
+                mPos[1] = mBBox[0][1];// reset y
+                ++mPos[0];// increment x
             }
             return *this;
         }
@@ -2393,6 +2393,11 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         {
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos == rhs.mPos;
+        }
+        __hostdev__ bool operator!=(const Iterator& rhs) const
+        {
+            NANOVDB_ASSERT(mBBox == rhs.mBBox);
+            return mPos != rhs.mPos;
         }
         /// @brief Return @c true if the iterator still points to a valid coordinate.
         __hostdev__ operator bool() const { return mPos[0] <= mBBox[1][0]; }

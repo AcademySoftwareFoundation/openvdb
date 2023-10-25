@@ -1124,11 +1124,14 @@ TEST_F(TestNanoVDB, CoordBBox)
     { // test prefix iterator
         auto iter = bbox.begin();
         EXPECT_TRUE(iter);
+        EXPECT_FALSE(bbox.end());
+        EXPECT_NE(iter, bbox.end());
         for (int i = bbox.min()[0]; i <= bbox.max()[0]; ++i) {
             for (int j = bbox.min()[1]; j <= bbox.max()[1]; ++j) {
                 for (int k = bbox.min()[2]; k <= bbox.max()[2]; ++k) {
                     EXPECT_TRUE(bbox.isInside(*iter));
                     EXPECT_TRUE(iter);
+                    EXPECT_NE(iter, bbox.end());
                     const auto& ijk = *iter; // note, copy by reference
                     EXPECT_EQ(ijk[0], i);
                     EXPECT_EQ(ijk[1], j);
@@ -1138,15 +1141,19 @@ TEST_F(TestNanoVDB, CoordBBox)
             }
         }
         EXPECT_FALSE(iter);
+        EXPECT_EQ(iter, bbox.end());
     }
 
     { // test postfix iterator
         auto iter = bbox.begin();
         EXPECT_TRUE(iter);
+        EXPECT_FALSE(bbox.end());
+        EXPECT_NE(iter, bbox.end());
         for (int i = bbox.min()[0]; i <= bbox.max()[0]; ++i) {
             for (int j = bbox.min()[1]; j <= bbox.max()[1]; ++j) {
                 for (int k = bbox.min()[2]; k <= bbox.max()[2]; ++k) {
                     EXPECT_TRUE(iter);
+                    EXPECT_NE(iter, bbox.end());
                     const auto ijk = *iter++; // note, copy by value!
                     EXPECT_EQ(ijk[0], i);
                     EXPECT_EQ(ijk[1], j);
@@ -1155,6 +1162,14 @@ TEST_F(TestNanoVDB, CoordBBox)
             }
         }
         EXPECT_FALSE(iter);
+        EXPECT_EQ(iter, bbox.end());
+    }
+
+    {// test two approaches to iteration
+        auto iter1 = bbox.begin(), iter2 = bbox.begin();
+        while(iter1 != bbox.end()) ++iter1;
+        while(iter2) ++iter2;
+        EXPECT_EQ(iter1, iter2);
     }
 
     {// test CoordBBox::createCube
