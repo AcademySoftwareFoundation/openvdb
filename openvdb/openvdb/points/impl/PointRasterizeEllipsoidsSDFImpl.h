@@ -282,8 +282,8 @@ struct EllipsSurfaceMaskOp
         for (Index i = 0; i < Index(stretchHandle.size()); ++i)
         {
             const Vec3d Pws = pwsHandle.get(i);
-            maxPos = math::maxComponent(maxPos, Pws);
             minPos = math::minComponent(minPos, Pws);
+            maxPos = math::maxComponent(maxPos, Pws);
             const auto stretch = stretchHandle.get(i);
 
             float maxcoef = std::max(stretch[0], std::max(stretch[1], stretch[2]));
@@ -296,23 +296,7 @@ struct EllipsSurfaceMaskOp
             maxs *= float(rad.get());
         }
 
-        // @note  This addition of the halfband here doesn't take into account
-        //   the squash on the halfband itself. The subsequent rasterizer
-        //   squashes the halfband but probably shouldn't, so although this
-        //   expansion is more then necessary, I'm leaving the logic here for
-        //   now.
-        // @note Assumes max stretch coeef <= 1.0f (i.e. always squashes)
-        const Coord dist(static_cast<int>(math::Round(maxs + float(mHalfband))));
-        mMaxDist = math::maxComponent(mMaxDist, dist.asVec3i());
-
-        // Convert point bounds to surface transform, expand and fill
-        CoordBBox surfaceBounds(
-            Coord::round(this->mSurfaceTransform.worldToIndex(minPos)),
-            Coord::round(this->mSurfaceTransform.worldToIndex(maxPos)));
-        surfaceBounds.min() -= dist;
-        surfaceBounds.max() += dist;
-        this->activate(surfaceBounds);
-        /// @todo deactivate min
+        this->activateAndComputeMaxLookup(Vec3d(maxs), minPos, maxPos, leaf);
     }
 
     /// @brief  Fill activity by analyzing the axis aligned ellips bounding
@@ -338,8 +322,8 @@ struct EllipsSurfaceMaskOp
         for (Index i = 0; i < stretchHandle.size(); ++i)
         {
             const Vec3d Pws = pwsHandle.get(i);
-            maxPos = math::maxComponent(maxPos, Pws);
             minPos = math::minComponent(minPos, Pws);
+            maxPos = math::maxComponent(maxPos, Pws);
 
             const Vec3f stretch = stretchHandle.get(i);
             const bool isEllips = (stretch.x() != stretch.y()) || (stretch.x() != stretch.z());
@@ -397,23 +381,7 @@ struct EllipsSurfaceMaskOp
         maxBounds[1] = std::max(double(maxs), maxBounds[1]);
         maxBounds[2] = std::max(double(maxs), maxBounds[2]);
 
-        // @note  This addition of the halfband here doesn't take into account
-        //   the squash on the halfband itself. The subsequent rasterizer
-        //   squashes the halfband but probably shouldn't, so although this
-        //   expansion is more then necessary, I'm leaving the logic here for
-        //   now.
-        // @note Assumes max stretch coeef <= 1.0f (i.e. always squashes)
-        const Coord dist = Coord::round(maxBounds + mHalfband);
-        mMaxDist = math::maxComponent(mMaxDist, dist.asVec3i());
-
-        // Convert point bounds to surface transform, expand and fill
-        CoordBBox surfaceBounds(
-            Coord::round(this->mSurfaceTransform.worldToIndex(minPos)),
-            Coord::round(this->mSurfaceTransform.worldToIndex(maxPos)));
-        surfaceBounds.min() -= dist;
-        surfaceBounds.max() += dist;
-        this->activate(surfaceBounds);
-        /// @todo deactivate min
+        this->activateAndComputeMaxLookup(maxBounds, minPos, maxPos, leaf);
     }
 
     void operator()(const typename LeafManagerT::LeafRange& range)
@@ -421,6 +389,69 @@ struct EllipsSurfaceMaskOp
         for (auto leaf = range.begin(); leaf; ++leaf) {
             this->fillFromStretchAndRotation(*leaf);
         }
+    }
+
+private:
+
+    void activateAndComputeMaxLookup(const Vec3d& ellipsBounds,
+        const Vec3d& minWs,
+        const Vec3d& maxWs,
+        const typename LeafManagerT::LeafNodeType& leaf)
+    {
+        // @note  This addition of the halfband here doesn't take into account
+        //   the squash on the halfband itself. The subsequent rasterizer
+        //   squashes the halfband but probably shouldn't, so although this
+        //   expansion is more then necessary, I'm leaving the logic here for
+        //   now. We ignore stretches as these are capped to the half band
+        //   length anyway
+        Coord dist = Coord::round(ellipsBounds + mHalfband);
+
+        // Convert point bounds to surface transform, expand and fill
+        CoordBBox surfaceBounds(
+            Coord::round(this->mSurfaceTransform.worldToIndex(minWs)),
+            Coord::round(this->mSurfaceTransform.worldToIndex(maxWs)));
+        surfaceBounds.min() -= dist;
+        surfaceBounds.max() += dist;
+        this->activate(surfaceBounds);
+        /// @todo deactivate min
+
+        // Compute the maximum lookup required if points have moved outside of
+        // this node by finding the voxel furthest away from our node and using
+        // it's maximum index coordinate as the distance we need to search
+        Coord minIdx = this->mPointsTransform.worldToIndexCellCentered(minWs);
+        Coord maxIdx = this->mPointsTransform.worldToIndexCellCentered(maxWs);
+        const auto bounds = leaf.getNodeBoundingBox();
+
+        // If any of the ijk coords are > 0 then we need to subtract
+        // the dimension of the current leaf node from the offset distance.
+        // Note that min and max can both be in the negative or positive
+        // direction
+        if (!bounds.isInside(maxIdx)) {
+            maxIdx -= leaf.origin();
+            if (maxIdx.x() > 0) maxIdx.x() -= DIM;
+            if (maxIdx.y() > 0) maxIdx.y() -= DIM;
+            if (maxIdx.z() > 0) maxIdx.z() -= DIM;
+            maxIdx = Abs(maxIdx);
+        }
+        else {
+            maxIdx.reset(0);
+        }
+        if (!bounds.isInside(minIdx))
+        {
+            minIdx -= leaf.origin();
+            if (minIdx.x() > 0) minIdx.x() -= DIM;
+            if (minIdx.y() > 0) minIdx.y() -= DIM;
+            if (minIdx.z() > 0) minIdx.z() -= DIM;
+            minIdx = Abs(minIdx);
+        }
+        else {
+            minIdx.reset(0);
+        }
+
+        // Now compute the max offset
+        maxIdx.maxComponent(minIdx);
+        dist += maxIdx;
+        mMaxDist = math::maxComponent(mMaxDist, dist.asVec3i());
     }
 
 private:
