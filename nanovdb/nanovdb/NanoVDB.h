@@ -1520,7 +1520,7 @@ public:
 
 // ----------------------------> Vec3 <--------------------------------------
 
-/// @brief A simple vector class with three double components, similar to openvdb::math::Vec3
+/// @brief A simple vector class with three components, similar to openvdb::math::Vec3
 template<typename T>
 class Vec3
 {
@@ -1718,7 +1718,7 @@ __hostdev__ inline Vec3d Coord::asVec3d() const
 
 // ----------------------------> Vec4 <--------------------------------------
 
-/// @brief A simple vector class with three double components, similar to openvdb::math::Vec4
+/// @brief A simple vector class with four components, similar to openvdb::math::Vec4
 template<typename T>
 class Vec4
 {
@@ -2364,6 +2364,11 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
             , mPos(b.min())
         {
         }
+        __hostdev__ Iterator(const BBox& b, const Coord& p)
+            : mBBox(b)
+            , mPos(p)
+        {
+        }
         __hostdev__ Iterator& operator++()
         {
             if (mPos[2] < mBBox[1][2]) { // this is the most common case
@@ -2384,11 +2389,17 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
             ++(*this);
             return tmp;
         }
+        __hostdev__ bool operator==(const Iterator& rhs) const
+        {
+            NANOVDB_ASSERT(mBBox == rhs.mBBox);
+            return mPos == rhs.mPos;
+        }
         /// @brief Return @c true if the iterator still points to a valid coordinate.
         __hostdev__ operator bool() const { return mPos[0] <= mBBox[1][0]; }
         __hostdev__ const CoordT& operator*() const { return mPos; }
     }; // Iterator
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
+    __hostdev__ Iterator end() const { return Iterator{*this, this->max().offsetBy(1)}; }
     __hostdev__          BBox()
         : BaseT(CoordT::max(), CoordT::min())
     {
@@ -2449,7 +2460,7 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     }
 
     /// @warning This converts a CoordBBox into a floating-point bounding box which implies that max += 1 !
-    template<typename RealT>
+    template<typename RealT = double>
     __hostdev__ BBox<Vec3<RealT>> asReal() const
     {
         static_assert(is_floating_point<RealT>::value, "CoordBBox::asReal: Expected a floating point coordinate");
@@ -3932,7 +3943,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     /// @brief Return the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
     __hostdev__ CoordBBox bbox() const {return  mNodeOffset[3] ? *PtrAdd<CoordBBox>(this, mNodeOffset[3]) : CoordBBox();}
 
-    /// @brief  return true if RootData is layout out immidiatly after TreeData in memory
+    /// @brief  return true if RootData is layout out immediately after TreeData in memory
     __hostdev__ bool isRootNext() const {return mNodeOffset[3] ? mNodeOffset[3] == sizeof(TreeData) : false; }
 };// TreeData
 
@@ -8160,12 +8171,14 @@ struct ProbeValue
 template<typename BuildT>
 struct GetNodeInfo
 {
+    using ValueType = typename NanoLeaf<BuildT>::ValueType;
+    using FloatType = typename NanoLeaf<BuildT>::FloatType;
     struct NodeInfo
     {
-        uint32_t                             level, dim;
-        typename NanoLeaf<BuildT>::ValueType minimum, maximum;
-        typename NanoLeaf<BuildT>::FloatType average, stdDevi;
-        CoordBBox                            bbox;
+        uint32_t level, dim;
+        ValueType minimum, maximum;
+        FloatType average, stdDevi;
+        CoordBBox bbox;
     };
     __hostdev__ static NodeInfo get(const NanoRoot<BuildT>& root)
     {
@@ -8173,7 +8186,7 @@ struct GetNodeInfo
     }
     __hostdev__ static NodeInfo get(const typename NanoRoot<BuildT>::Tile& tile)
     {
-        return NodeInfo{3u, NanoUpper<BuildT>::DIM, tile.value, tile.value, tile.value, 0, CoordBBox::createCube(tile.origin(), NanoUpper<BuildT>::DIM)};
+        return NodeInfo{3u, NanoUpper<BuildT>::DIM, tile.value, tile.value, static_cast<FloatType>(tile.value), 0, CoordBBox::createCube(tile.origin(), NanoUpper<BuildT>::DIM)};
     }
     __hostdev__ static NodeInfo get(const NanoUpper<BuildT>& node, uint32_t n)
     {

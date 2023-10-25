@@ -751,6 +751,15 @@ inline uint64_t stringHash(const char* c_str)
 
 } // namespace io
 
+template<typename T>
+inline std::ostream&
+operator<<(std::ostream& os, const BBox<Vec3<T>>& b)
+{
+    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
+       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
+    return os;
+}
+
 inline std::ostream&
 operator<<(std::ostream& os, const CoordBBox& b)
 {
@@ -771,6 +780,14 @@ inline std::ostream&
 operator<<(std::ostream& os, const Vec3<T>& v)
 {
     os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
+    return os;
+}
+
+template<typename T>
+inline std::ostream&
+operator<<(std::ostream& os, const Vec4<T>& v)
+{
+    os << "(" << v[0] << "," << v[1] << "," << v[2] << "," << v[3] << ")";
     return os;
 }
 

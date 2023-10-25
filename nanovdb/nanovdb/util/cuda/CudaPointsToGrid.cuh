@@ -121,7 +121,7 @@ cudaPointsToGrid(const PtrT dWorldPoints,
                  int pointCount,
                  double voxelSize = 1.0,
                  PointType type = PointType::Default,
-                 BufferT &buffer = BufferT(),
+                 const BufferT &buffer = BufferT(),
                  cudaStream_t stream = 0);
 
 //================================================================================================
@@ -1089,7 +1089,7 @@ inline void CudaPointsToGrid<BuildT, AllocT>::processBBox()
 
 template<typename PtrT, typename BufferT, typename AllocT>
 GridHandle<BufferT>// Grid<Point> with PointType coordinates as blind data
-cudaPointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, BufferT &buffer, cudaStream_t stream)
+cudaPointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, const BufferT &buffer, cudaStream_t stream)
 {
     CudaPointsToGrid<Point, AllocT> converter(voxelSize, Vec3d(0.0), stream);
     converter.setPointType(type);

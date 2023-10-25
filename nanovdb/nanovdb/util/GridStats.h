@@ -580,20 +580,8 @@ void GridStats<GridT, StatsT>::process( GridT &grid )
         // then indeBBox = (0,0,0) -> (0,0,0) and then worldBBox = (0.0, 0.0, 0.0)
         // -> (1.0, 1.0, 1.0). This is a consequence of the different definitions
         // of index and world bounding boxes inherited from OpenVDB!
-        const Coord min = indexBBox[0];
-        const Coord max = indexBBox[1] + Coord(1);
-
-        auto& wBBox = data.mWorldBBox;
-        const auto& map = grid.map();
-        wBBox[0] = wBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
-        wBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
-        data.setBBoxOn(true);
+        grid.mWorldBBox = CoordBBox(indexBBox[0], indexBBox[1].offsetBy(1)).transform(grid.map());
+        grid.setBBoxOn(true);
     }
 
     // set bit flags
