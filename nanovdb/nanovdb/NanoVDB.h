@@ -2399,7 +2399,7 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         __hostdev__ const CoordT& operator*() const { return mPos; }
     }; // Iterator
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
-    __hostdev__ Iterator end() const { return Iterator{*this, this->max().offsetBy(1)}; }
+    __hostdev__ Iterator end() const { return Iterator{*this, this->max().offsetBy(1,0,0)}; }
     __hostdev__          BBox()
         : BaseT(CoordT::max(), CoordT::min())
     {
