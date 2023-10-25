@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+    "scikit_build_core==0.4.7",
+    "pybind11==2.10.4",
+    "oldest-supported-numpy"
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "openvdb"
+version = "10.0.2"
+description= "Python bindings for OpenVDB: sparse volume data structure and tools."
+dependencies = [
+    "numpy",
+]
+readme = "README.md"
+authors = [
+  { name = "OpenVDB Developer Team", email = "openvdb-dev@lists.aswf.io" },
+]
+requires-python = ">=3.8"
+classifiers = [
+  "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+homepage = "https://www.openvdb.org/"
+documentation = "https://www.openvdb.org/documentation"
+forum = "https://github.com/AcademySoftwareFoundation/openvdb/discussions"
+repository = "https://github.com/AcademySoftwareFoundation/openvdb"
+slack = "https://slack.aswf.io/"
+
+[tool.scikit-build]
+cmake.minimum-version = "3.18"
+
+[tool.scikit-build.cmake.define]
+OPENVDB_BUILD_CORE = "ON"
+USE_NUMPY = "ON"
+
+[tool.cibuildwheel]
+manylinux-x86_64-image = "manylinux2014"
+manylinux-i686-image = "manylinux2014"
+manylinux-aarch64-image = "manylinux2014"
+manylinux-ppc64le-image = "manylinux2014"
+manylinux-s390x-image = "manylinux2014"
+manylinux-pypy_x86_64-image = "manylinux2014"
+manylinux-pypy_i686-image = "manylinux2014"
+manylinux-pypy_aarch64-image = "manylinux2014"

@@ -55,16 +55,10 @@ message(STATUS "Maya base install path: ${OPENVDB_MAYA_INSTALL_PREFIX}")
 
 # Collect and configure lib dependencies
 
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
-endif()
-
 find_package(OpenGL REQUIRED)
 
 set(OPENVDB_MAYA_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   Maya
   OpenGL::GL
 )

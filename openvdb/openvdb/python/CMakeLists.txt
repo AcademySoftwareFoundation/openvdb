@@ -32,11 +32,8 @@ message(STATUS "----------------------------------------------------")
 ##########################################################################
 
 # Collect and configure lib dependencies
-
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
+if(NOT TARGET OpenVDB::openvdb)
+  add_subdirectory(../../.. openvdb_build)
 endif()
 
 if(USE_AX)
@@ -142,33 +139,37 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
   set(PYOPENVDB_INSTALL_DIRECTORY
     ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
-    CACHE STRING "The directory to install the pyopenvdb.so module."
+    CACHE STRING "The directory to install the _openvdb.so module."
   )
 endif()
 
-pybind11_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
+pybind11_add_module(_openvdb MODULE ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
 
-target_link_libraries(pyopenvdb PUBLIC
-  ${OPENVDB_LIB}
+target_link_libraries(_openvdb PUBLIC
+  OpenVDB::openvdb
   ${OPENVDB_PYTHON_DEPS}
 )
 
 if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
-  target_compile_definitions(pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
+  target_compile_definitions(_openvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
 endif()
 if(USE_NUMPY)
-  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
+  target_compile_definitions(_openvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
 if(USE_AX)
-  target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
-  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
+  target_link_libraries(_openvdb PUBLIC ${OPENVDB_AX_LIB})
+  target_compile_definitions(_openvdb PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
 
-install(TARGETS
-  pyopenvdb
-  DESTINATION
-  ${PYOPENVDB_INSTALL_DIRECTORY}
-)
+if (SKBUILD)
+    install(TARGETS _openvdb DESTINATION openvdb)
+else()
+    install(TARGETS
+      _openvdb
+      DESTINATION
+      ${PYOPENVDB_INSTALL_DIRECTORY}
+    )
+endif()
 
 # pytest
 if(OPENVDB_BUILD_PYTHON_UNITTESTS)

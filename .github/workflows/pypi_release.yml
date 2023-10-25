@@ -1,0 +1,44 @@
+name: Release Python Bindings to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        type: boolean
+        description: 'Test release: publish on test.pypi.org'
+        default: false
+
+jobs:
+  publish:
+    name: Publish Python packages on PyPI
+    needs: [build-sdist, build-wheels]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/openvdb
+    permissions:
+      id-token: write
+    steps:
+      - name:   Download artifacts from commit ${{ github.sha }}
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          workflow: wheels.yml
+          workflow_conclustion: success
+          commit: ${{ github.sha }}
+          name: dist
+          path: dist
+
+      - name: 🧪 Publish to PyPI Testing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.test_pypi }}
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages_dir: dist
+
+      - name: 🎉 Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ !inputs.test_pypi }}
+        with:
+          packages_dir: dist

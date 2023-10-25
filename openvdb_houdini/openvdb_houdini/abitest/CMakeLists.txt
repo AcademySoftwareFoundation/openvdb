@@ -85,14 +85,8 @@ add_executable(openvdb_houdini_abi_test
 
 # Collect lib dependencies
 
-if(NOT OPENVDB_BUILD_CORE)
-  set(OPENVDB_LIB OpenVDB::openvdb)
-else()
-  set(OPENVDB_LIB openvdb)
-endif()
-
 target_link_libraries(openvdb_houdini_abi_test PUBLIC
-  ${OPENVDB_LIB}
+  OpenVDB::openvdb
   ${OPENVDB_SESI_LIB}
 )
 

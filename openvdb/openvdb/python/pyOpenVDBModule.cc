@@ -326,13 +326,8 @@ struct VecTypeDescr
 ////////////////////////////////////////
 
 
-#ifdef DWA_OPENVDB
 #define PY_OPENVDB_MODULE_NAME  _openvdb
 extern "C" { void init_openvdb(); }
-#else
-#define PY_OPENVDB_MODULE_NAME  pyopenvdb
-extern "C" { void initpyopenvdb(); }
-#endif
 
 PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
 {

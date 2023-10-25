@@ -23,7 +23,7 @@ if 'add_dll_directory' in dir(os):
         os.add_dll_directory(os.getcwd() +
             '\\..\\..\\..\\..\\openvdb_ax\\openvdb_ax\\' + config)
 
-import pyopenvdb as openvdb
+import openvdb
 
 
 def valueFactory(zeroValue, elemValue):
@@ -839,4 +839,3 @@ if __name__ == '__main__':
     args = [a for a in args if a != '-t']
 
     unittest.main(argv=args)
-
