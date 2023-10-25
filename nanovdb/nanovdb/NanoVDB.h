@@ -2374,11 +2374,11 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
             if (mPos[2] < mBBox[1][2]) { // this is the most common case
                 ++mPos[2];
             } else if (mPos[1] < mBBox[1][1]) {
-                mPos[2] = mBBox[0][2];
+                mPos[2] = mBBox[0][2];// reset
                 ++mPos[1];
             } else if (mPos[0] <= mBBox[1][0]) {
-                mPos[2] = mBBox[0][2];
-                mPos[1] = mBBox[0][1];
+                mPos[2] = mBBox[0][2];// reset
+                mPos[1] = mBBox[0][1];// reset
                 ++mPos[0];
             }
             return *this;
@@ -2399,7 +2399,7 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         __hostdev__ const CoordT& operator*() const { return mPos; }
     }; // Iterator
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
-    __hostdev__ Iterator end() const { return Iterator{*this, this->max().offsetBy(1,0,0)}; }
+    __hostdev__ Iterator end() const { return Iterator{*this, CoordT(mCoord[1][0]+1, mCoord[0][1], mCoord[0][2])}; }
     __hostdev__          BBox()
         : BaseT(CoordT::max(), CoordT::min())
     {
