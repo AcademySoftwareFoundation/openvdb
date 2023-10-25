@@ -943,7 +943,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
     {
         points::EllipsoidSettings<> s;
         s.radiusScale = 0.2f;
-        s.sphereScale = 1.0f;
         s.halfband = 3;
         s.transform = nullptr;
 
@@ -959,19 +958,17 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
     }
 
     // Test single point which is not treated as an ellips. This should give
-    // identicle results to SphereSettings<> (as long as the sphereScale is 1)
+    // identicle results to SphereSettings<>
     {
         points::EllipsoidSettings<> s;
         s.radiusScale = 0.2f;
-        s.sphereScale = 1.0f;
         s.halfband = 3;
         s.transform = nullptr;
 
-        /// 1) test with a single point but that is not in the ellips ellipses group
+        /// 1) test with a single point with uniform stretch
         auto points = PointBuilder({Vec3f(0)})
             .voxelsize(0.1)
-            .group({0}, s.pca.ellipses) // surface as a sphere
-            .attribute(points::PcaAttributes::StretchT(1.0), s.pca.stretch)
+            .attribute(points::PcaAttributes::StretchT(1.0), s.pca.stretch) // uniform stretch
             .attribute(points::PcaAttributes::RotationT::identity(), s.pca.rotation)
             .attribute(points::PcaAttributes::PosWsT(0.0), s.pca.positionWS)
             .get();
@@ -999,46 +996,17 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
             EXPECT_EQ(sdf->background(), *iter);
         }
 
-        /// 2) test with a single point that is marked as an ellips, but has an identity
-        ///    transformation matrix (and so is essentially a sphere)
-        points = PointBuilder({Vec3f(0)})
-            .voxelsize(0.1)
-            .group({1}, s.pca.ellipses) // surface as an ellips
-            .attribute(points::PcaAttributes::StretchT(1.0), s.pca.stretch)
-            .attribute(points::PcaAttributes::RotationT::identity(), s.pca.rotation)
-            .attribute(points::PcaAttributes::PosWsT(0.0), s.pca.positionWS)
-            .get();
-
-        grids = points::rasterizeSdf(*points, s);
-        sdf = StaticPtrCast<FloatGrid>(grids.front());
-        EXPECT_TRUE(sdf);
-        EXPECT_TRUE(sdf->transform() == points->transform());
-        EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
-        EXPECT_EQ(float(s.halfband * points->voxelSize()[0]), sdf->background());
-
-        EXPECT_EQ(Index32(8), sdf->tree().leafCount());
-        EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
-        EXPECT_EQ(Index64(485), sdf->tree().activeVoxelCount());
-
-        for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
-            const Vec3d ws = sdf->transform().indexToWorld(iter.getCoord());
-            float length = float(ws.length()); // dist to center
-            length -= float(s.radiusScale); // account for radius
-            EXPECT_NEAR(length, *iter, 1e-6f);
-        }
-
         // should only have exterior background
         for (auto iter = sdf->cbeginValueOff(); iter; ++iter) {
             EXPECT_EQ(sdf->background(), *iter);
         }
 
-        /// 3) larger radius, larger voxel size, with sphere scale
+        /// 2) larger radius, larger voxel size
         s.radiusScale = 1.3f;
-        s.sphereScale = 1.6f;
+        float stretch = 1.6f;
         points = PointBuilder({Vec3f(0)})
             .voxelsize(0.5)
-            .group({0}, s.pca.ellipses) // surface as a sphere
-            .attribute(points::PcaAttributes::StretchT(1.0), s.pca.stretch)
+            .attribute(points::PcaAttributes::StretchT(stretch), s.pca.stretch) // uniform stretch
             .attribute(points::PcaAttributes::RotationT::identity(), s.pca.rotation)
             .attribute(points::PcaAttributes::PosWsT(0.0), s.pca.positionWS)
             .get();
@@ -1058,7 +1026,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
             const Vec3d ws = sdf->transform().indexToWorld(iter.getCoord());
             float length = float(ws.length()); // dist to center
-            length -= float(s.radiusScale * s.sphereScale); // account for radius and sphere scale
+            length -= float(s.radiusScale * stretch); // account for radius and sphere scale
             EXPECT_NEAR(length, *iter, 1e-6f);
         }
 
@@ -1068,7 +1036,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
             const Vec3d ws = sdf->transform().indexToWorld(iter.getCoord());
             float length = float(ws.length()); // dist to center
             // if length is <= the (rad - halfbandws), voxel is inside the surface
-            const bool interior = (length <= ((s.radiusScale * s.sphereScale) - (s.halfband * sdf->voxelSize()[0])));
+            const bool interior = (length <= ((s.radiusScale * stretch) - (s.halfband * sdf->voxelSize()[0])));
             if (interior) EXPECT_EQ(-(sdf->background()), *iter);
             else          EXPECT_EQ(sdf->background(), *iter);
             interior ? ++interiorOff : ++exteriorOff;
@@ -1077,18 +1045,19 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         EXPECT_EQ(size_t(7), interiorOff);
         EXPECT_EQ(size_t(297441), exteriorOff);
 
-        /// 4) offset position, different transform, larger half band
-        s.sphereScale = 1.0f;
+        /// 3) offset position, different transform, larger half band
+        stretch = 1.0f;
         s.radiusScale = 2.0f;
         s.halfband = 4;
         s.transform = math::Transform::createLinearTransform(0.3);
+        points::PcaAttributes::RotationT rot;
+        rot.setToRotation({0,1,0}, 45); // arbitrary rotation should have no effect
 
         const Vec3f center(-1.2f, 3.4f,-5.6f);
         points = PointBuilder({Vec3f(center)})
             .voxelsize(0.1)
-            .group({0}, s.pca.ellipses) // surface as a sphere
-            .attribute(points::PcaAttributes::StretchT(1.0), s.pca.stretch)
-            .attribute(points::PcaAttributes::RotationT::identity(), s.pca.rotation)
+            .attribute(points::PcaAttributes::StretchT(stretch), s.pca.stretch)
+            .attribute(rot, s.pca.rotation)
             .attribute(points::PcaAttributes::PosWsT(center), s.pca.positionWS)
             .get();
 
@@ -1133,7 +1102,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
     {
         points::EllipsoidSettings<> s;
         s.radiusScale = 0.8f;
-        s.sphereScale = 1.0f; // should have no effect
         s.halfband = 3;
         s.transform = nullptr;
 
@@ -1149,7 +1117,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         /// 1) test with a single ellips with Y stretch/rotation
         auto points = PointBuilder({Vec3f(0)})
             .voxelsize(0.1)
-            .group({1}, s.pca.ellipses) // surface as an ellips
             .attribute(stretch, s.pca.stretch)
             .attribute(rot, s.pca.rotation)
             .attribute(points::PcaAttributes::PosWsT(0.0), s.pca.positionWS)
@@ -1192,8 +1159,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         EXPECT_EQ(size_t(306067), exteriorOff);
 
         // Run again with a different Y rotation, should be the same as the above
-        // as we're only squashing in Y. Also test sphereScale has no impact
-        s.sphereScale = 10.0f; // should have no effect
+        // as we're only squashing in Y
         rot.setToRotation({0,1,0}, -88);
         points = PointBuilder({Vec3f(0)})
             .voxelsize(0.1)
@@ -1220,7 +1186,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
     // along multiple axis
     {
         points::EllipsoidSettings<> s;
-        s.sphereScale = 3.0f; // should have no effect
         s.halfband = 5;
 
         // Design an ellips that is squashed in XYZ and then rotated
@@ -1239,7 +1204,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         const Vec3f center(-1.2f, 3.4f,-5.6f);
         auto points = PointBuilder({center})
             .voxelsize(0.2)
-            .group({1}, s.pca.ellipses) // surface as an ellips
             .attribute(stretch, s.pca.stretch)
             .attribute(rot, s.pca.rotation)
             .attribute(points::PcaAttributes::PosWsT(center), s.pca.positionWS)
@@ -1286,20 +1250,18 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
     {
         points::EllipsoidSettings<> s;
         s.radiusScale = 2.0f;
-        s.sphereScale = 0.8f;
         s.halfband = 5;
         s.transform = nullptr;
 
         const auto positions = getBoxPoints();
         const std::vector<Vec3d> positionsVec3d(positions.begin(), positions.end());
-        const std::vector<short> ellips {0,1,0,1, 0,1,1,1};
-        const std::vector<points::PcaAttributes::StretchT> stretches {
-            {0.0f, 0.0f, 0.0f}, // sphere (should be ignored)
+        std::vector<points::PcaAttributes::StretchT> stretches {
+            {0.8f, 0.8f, 0.8f}, // sphere, 0.8f
             {1.0f, 1.0f, 1.0f}, // ellips
-            {5.0f, 5.0f, 5.0f}, // sphere  (should be ignored)
+            {0.7f, 0.7f, 0.7f}, // sphere, 0.7f
             {2.0f, 0.3f, 1.5f}, // ellips
 
-            {1.0f, 1.0f, 1.0f}, // sphere  (should be ignored)
+            {0.8f, 0.8f, 0.8f}, // sphere, 0.8f
             {1.1f, 0.8f, 1.0f}, // ellips
             {0.8f, 4.0f, 1.5f}, // ellips
             {0.4f, 1.1f, 1.0f}  // ellips
@@ -1319,7 +1281,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         /// 1) test with uniform radius
         auto points = PointBuilder(positions)
             .voxelsize(0.3)
-            .group(ellips, s.pca.ellipses) // surface as an ellips
             .attribute(stretches, s.pca.stretch)
             .attribute(rotations, s.pca.rotation)
             .attribute(positionsVec3d, s.pca.positionWS)
@@ -1334,7 +1295,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
 
         EXPECT_EQ(Index32(147), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
-        EXPECT_EQ(Index64(33252), sdf->tree().activeVoxelCount());
+        EXPECT_EQ(Index64(33213), sdf->tree().activeVoxelCount());
 
         // Small lambda that finds the cloest length to a point that could
         // either be an ellips of sphere, for a given voxel
@@ -1347,13 +1308,14 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
                 math::Mat3s inv = math::Mat3s::identity();
                 double scale = s.radiusScale / sdf->voxelSize()[0];
                 if (radii) scale *= double((*radii)[idx]);
+                auto stretch = stretches[idx];
 
-                if (ellips[idx]) {
+                if ((stretch.x() != stretch.y()) || (stretch.x() != stretch.z())) {
                     inv = rotations[idx].timesDiagonal(1.0 / stretches[idx]) *
                         rotations[idx].transpose();
                 }
                 else {
-                    scale *= s.sphereScale;
+                    scale *= stretch.x();
                 }
 
                 const Vec3d is = inv * (ijk.asVec3d() - sdf->transform().worldToIndex(pos));
@@ -1384,23 +1346,24 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         }
 
         EXPECT_EQ(size_t(147), interiorOff);
-        EXPECT_EQ(size_t(336622), exteriorOff);
+        EXPECT_EQ(size_t(336661), exteriorOff);
 
         /// 2) test with varying radius
-
         const std::vector<float> radii {
             1.0f, 0.0f, 2.0f, 1.1f,
             0.2f, 0.5f, 0.8f, 3.0f
         };
 
         s.radiusScale = 1.2;
-        s.sphereScale = 0.3;
         s.radius = "pscale";
         s.halfband = 1;
 
+        // new sphere radii, note that getClosestLength() reads from this vector
+        stretches[0] = points::PcaAttributes::StretchT(0.3f);
+        stretches[4] = points::PcaAttributes::StretchT(0.3f);
+
         points = PointBuilder(positions)
             .voxelsize(0.3)
-            .group(ellips, s.pca.ellipses) // surface as an ellips
             .attribute(radii, s.radius)
             .attribute(stretches, s.pca.stretch)
             .attribute(rotations, s.pca.rotation)
@@ -1416,7 +1379,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
 
         EXPECT_EQ(Index32(39), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
-        EXPECT_EQ(Index64(2613), sdf->tree().activeVoxelCount());
+        EXPECT_EQ(Index64(2754), sdf->tree().activeVoxelCount());
 
         for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
             // get closest dist from all points
@@ -1436,8 +1399,8 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
             interior ? ++interiorOff : ++exteriorOff;
         }
 
-        EXPECT_EQ(size_t(2137), interiorOff);
-        EXPECT_EQ(size_t(310083), exteriorOff);
+        EXPECT_EQ(size_t(2456), interiorOff);
+        EXPECT_EQ(size_t(309623), exteriorOff);
     }
 }
 

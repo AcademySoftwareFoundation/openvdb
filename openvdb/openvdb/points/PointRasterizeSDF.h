@@ -290,12 +290,6 @@ struct EllipsoidSettings
     using BaseT::filter;
     using BaseT::interrupter;
 
-    /// @brief  The sphere scale. Points which are not in the inclusion group
-    ///   specified by the pca attributes have their world space radius scaled
-    ///   by this amount. Typically you'd want this value to be <= 1.0 to
-    ///   produce smaller spheres for isolated points.
-    Real sphereScale = 1.0;
-
     /// @brief  The required principal component analysis attributes which are
     ///   required to exist on the points being rasterized. These attributes
     ///   define the rotational and affine transformations which can be used to
