@@ -48,11 +48,9 @@ struct EllipsIndicies
             const PcaAttributes& attribs)
         : stretch(EllipsIndicies::getAttributeIndex<Vec3f>(desc, attribs.stretch))
         , rotation(EllipsIndicies::getAttributeIndex<Mat3s>(desc, attribs.rotation))
-        , position(EllipsIndicies::getAttributeIndex<Vec3d>(desc, attribs.positionWS))
-        , ellipsesGroup(desc.groupIndex(attribs.ellipses)) {}
+        , position(EllipsIndicies::getAttributeIndex<Vec3d>(desc, attribs.positionWS)) {}
 
     const size_t stretch, rotation, position;
-    const points::AttributeSet::Descriptor::GroupIndex ellipsesGroup;
 
 private:
     template<typename ValueT>
@@ -97,26 +95,21 @@ struct EllipsoidTransfer :
             const RadiusType& rt,
             const math::Transform& source,
             SdfT& surface,
-            const Real sphereScale,
             const EllipsIndicies& indices,
             Int64Tree* cpg = nullptr,
             const std::unordered_map<const PointDataTree::LeafNodeType*, Index>* ids = nullptr)
         : BaseT(pidx, width, rt, source, surface, cpg, ids)
-        , mSphereScale(sphereScale)
         , mIndices(indices)
         , mStretchHandle()
         , mRotationHandle()
-        , mPositionWSHandle()
-        , mEllipsesGroupHandle() {}
+        , mPositionWSHandle() {}
 
     EllipsoidTransfer(const EllipsoidTransfer& other)
         : BaseT(other)
-        , mSphereScale(other.mSphereScale)
         , mIndices(other.mIndices)
         , mStretchHandle()
         , mRotationHandle()
-        , mPositionWSHandle()
-        , mEllipsesGroupHandle() {}
+        , mPositionWSHandle() {}
 
     inline bool startPointLeaf(const PointDataTree::LeafNodeType& leaf)
     {
@@ -124,7 +117,6 @@ struct EllipsoidTransfer :
         mStretchHandle.reset(new StretchHandleT(leaf.constAttributeArray(mIndices.stretch)));
         mRotationHandle.reset(new RotationHandleT(leaf.constAttributeArray(mIndices.rotation)));
         mPositionWSHandle.reset(new PwsHandleT(leaf.constAttributeArray(mIndices.position)));
-        mEllipsesGroupHandle.reset(new points::GroupHandle(leaf.groupHandle(mIndices.ellipsesGroup)));
         return ret;
     }
 
@@ -135,18 +127,18 @@ struct EllipsoidTransfer :
         // Position may have been smoothed so we need to use the ws handle
         const Vec3d PWS = this->mPositionWSHandle->get(id);
         const Vec3d P = this->targetTransform().worldToIndex(PWS);
-        // group membership denotes non-isolated points
-        const bool isolated = !mEllipsesGroupHandle->get(id);
+        const Vec3f stretch = mStretchHandle->get(id);
 
-        if (isolated) {
+        // If we have a uniform stretch, treat as a sphere
+        // @todo  worth using a tolerance here?
+        if ((stretch.x() == stretch.y()) && (stretch.x() == stretch.z())) {
             this->BaseT::rasterizePoint(P, id, bounds,
-                this->mRadius.eval(id, typename RadiusType::ValueType(mSphereScale)));
+                this->mRadius.eval(id, typename RadiusType::ValueType(stretch.x())));
             return;
         }
 
         const auto& r = this->mRadius.eval(id);
         const RealT radius = r.get(); // index space radius
-        const Vec3f stretch = mStretchHandle->get(id);
         const math::Mat3s rotation = mRotationHandle->get(id);
         const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(stretch);
         const Vec3d max = calcEllipsoidBoundMax(ellipsoidTransform, r.max());
@@ -222,12 +214,10 @@ struct EllipsoidTransfer :
     }
 
 private:
-    const RealT mSphereScale;
     const EllipsIndicies& mIndices;
     std::unique_ptr<StretchHandleT> mStretchHandle;
     std::unique_ptr<RotationHandleT> mRotationHandle;
     std::unique_ptr<PwsHandleT> mPositionWSHandle;
-    std::unique_ptr<points::GroupHandle> mEllipsesGroupHandle;
 };
 
 
@@ -245,12 +235,10 @@ struct EllipsSurfaceMaskOp
             const math::Transform& src,
             const math::Transform& trg,
             const RadiusType& rad,
-            const Real sphereScale,
             const Real halfband,
             const EllipsIndicies& indices)
         : BaseT(src, trg, nullptr)
         , mRadius(rad)
-        , mSphereScale(sphereScale)
         , mHalfband(halfband)
         , mIndices(indices)
         , mMaxDist(0) {}
@@ -258,7 +246,6 @@ struct EllipsSurfaceMaskOp
     EllipsSurfaceMaskOp(const EllipsSurfaceMaskOp& other, tbb::split)
         : BaseT(other)
         , mRadius(other.mRadius)
-        , mSphereScale(other.mSphereScale)
         , mHalfband(other.mHalfband)
         , mIndices(other.mIndices)
         , mMaxDist(0) {}
@@ -280,10 +267,8 @@ struct EllipsSurfaceMaskOp
         // @todo  detect this from PcaSettings and avoid checking if no smoothing
         points::AttributeHandle<Vec3d> pwsHandle(leaf.constAttributeArray(mIndices.position));
         points::AttributeHandle<Vec3f> stretchHandle(leaf.constAttributeArray(mIndices.stretch));
-        points::GroupHandle ellipses(leaf.groupHandle(mIndices.ellipsesGroup));
         if (stretchHandle.size() == 0) return;
 
-        RadiusT maxr = 0;
         // The max stretch coefficient. We can't analyze each xyz component
         // individually as we don't take into account the ellips rotation, so
         // have to expand the worst case uniformly
@@ -293,57 +278,22 @@ struct EllipsSurfaceMaskOp
 
         RadiusType rad(mRadius);
         rad.reset(leaf);
-        bool hasIsolatedPoints = false;
 
         for (Index i = 0; i < Index(stretchHandle.size()); ++i)
         {
             const Vec3d Pws = pwsHandle.get(i);
             maxPos = math::maxComponent(maxPos, Pws);
             minPos = math::minComponent(minPos, Pws);
+            const auto stretch = stretchHandle.get(i);
 
-            if constexpr(!RadiusType::Fixed) {
-                // This is doing an unnecessary multi by the scale for every
-                // point as we could defer the radius scale multi till after
-                // all min/max operations
-                const auto r = rad.eval(i).get(); // index space radius
-                maxr = std::max(maxr, r);
-
-                if (!ellipses.get(i)) {
-                    hasIsolatedPoints = true;
-                }
-                else {
-                    const auto stretch = stretchHandle.get(i);
-                    const float maxcoef = std::max(stretch[0], std::max(stretch[1], stretch[2]));
-                    // scaling by r puts the stretch values in index space
-                    maxs = std::max(maxs, maxcoef * r);
-                }
-            }
-            else {
-                if (!ellipses.get(i)) {
-                    hasIsolatedPoints = true;
-                }
-                else {
-                    const auto stretch = stretchHandle.get(i);
-                    const float maxcoef = std::max(stretch[0], std::max(stretch[1], stretch[2]));
-                    maxs = std::max(maxs, maxcoef);
-                }
-            }
+            float maxcoef = std::max(stretch[0], std::max(stretch[1], stretch[2]));
+            if constexpr(!RadiusType::Fixed) maxcoef *= rad.eval(i).get(); // index space radius
+            maxs = std::max(maxs, maxcoef);
         }
 
         if constexpr(RadiusType::Fixed) {
-            maxr = rad.get();
             // scaling by r puts the stretch values in index space
-            maxs *= float(maxr);
-        }
-
-        // If there are isolated points that we will surface as spheres, use
-        // the max between the stretch values and scaled sphere radii
-        if (hasIsolatedPoints) {
-            // scale radius by sphere scale
-            maxr *= RadiusT(mSphereScale);
-            // choose max component scale - compare the ellips to isolated
-            // points and choose the largest radius of the two
-            maxs = std::max(maxs, float(maxr));
+            maxs *= float(rad.get());
         }
 
         // @note  This addition of the halfband here doesn't take into account
@@ -375,17 +325,15 @@ struct EllipsSurfaceMaskOp
         points::AttributeHandle<Vec3d> pwsHandle(leaf.constAttributeArray(mIndices.position));
         points::AttributeHandle<Vec3f> stretchHandle(leaf.constAttributeArray(mIndices.stretch));
         points::AttributeHandle<math::Mat3s> rotHandle(leaf.constAttributeArray(mIndices.rotation));
-        points::GroupHandle ellipses(leaf.groupHandle(mIndices.ellipsesGroup));
         if (stretchHandle.size() == 0) return;
 
-        RadiusT maxr = 0;
+        RadiusT maxr = 0, maxs = 0;
         Vec3d maxBounds(0),
             maxPos(std::numeric_limits<Real>::lowest()),
             minPos(std::numeric_limits<Real>::max());
 
         RadiusType rad(mRadius);
         rad.reset(leaf);
-        bool hasIsolatedPoints = false;
 
         for (Index i = 0; i < stretchHandle.size(); ++i)
         {
@@ -393,31 +341,15 @@ struct EllipsSurfaceMaskOp
             maxPos = math::maxComponent(maxPos, Pws);
             minPos = math::minComponent(minPos, Pws);
 
-            if constexpr(!RadiusType::Fixed) {
-                // This is doing an unnecessary multi by the scale for every
-                // point as we could defer the radius scale multi till after
-                // all min/max operations
-                const auto r = rad.eval(i).get(); // index space radius
-                maxr = std::max(maxr, r);
+            const Vec3f stretch = stretchHandle.get(i);
+            const bool isEllips = (stretch.x() != stretch.y()) || (stretch.x() != stretch.z());
 
-                if (!ellipses.get(i)) {
-                    hasIsolatedPoints = true;
+            if constexpr(RadiusType::Fixed)
+            {
+                if (!isEllips) {
+                    maxs = std::max(maxs, RadiusT(stretch.x()));
                 }
                 else {
-                    const Vec3f stretch = stretchHandle.get(i);
-                    const math::Mat3s rotation = rotHandle.get(i);
-                    const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(stretch);
-                    // scaling by r puts the bounds values in index space
-                    const Vec3d bounds = calcEllipsoidBoundMax(ellipsoidTransform, r);
-                    maxBounds = math::maxComponent(maxBounds, bounds);
-                }
-            }
-            else {
-                if (!ellipses.get(i)) {
-                    hasIsolatedPoints = true;
-                }
-                else {
-                    const Vec3f stretch = stretchHandle.get(i);
                     const math::Mat3s rotation = rotHandle.get(i);
                     const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(stretch);
                     // For fixed radii, compared the squared distances - we sqrt at the end
@@ -425,25 +357,45 @@ struct EllipsSurfaceMaskOp
                     maxBounds = math::maxComponent(maxBounds, bounds);
                 }
             }
+            else
+            {
+                // This is doing an unnecessary multi by the scale for every
+                // point as we could defer the radius scale multi till after
+                // all min/max operations
+                const auto r = rad.eval(i).get(); // index space radius
+                maxr = std::max(maxr, r);
+
+                if (!isEllips) {
+                    // for variable radii, scale each stretch by r
+                    maxs = std::max(maxs, r * RadiusT(stretch.x()));
+                }
+                else {
+                    const math::Mat3s rotation = rotHandle.get(i);
+                    const math::Mat3s ellipsoidTransform = rotation.timesDiagonal(stretch);
+                    // scaling by r puts the bounds values in index space
+                    const Vec3d bounds = calcEllipsoidBoundMax(ellipsoidTransform, r);
+                    maxBounds = math::maxComponent(maxBounds, bounds);
+                }
+            }
         }
 
-        if constexpr(RadiusType::Fixed) {
+        // We don't do the sqrt per point for fixed radii - resolve the
+        // actual maxBounds now
+        if constexpr(RadiusType::Fixed)
+        {
             maxr = rad.get(); // index space radius
+            maxs *= maxr; // Also scale maxs by the radius
             // scaling by r puts the bounds values in index space
             maxBounds[0] = std::sqrt(maxBounds[0]) * double(maxr);
             maxBounds[1] = std::sqrt(maxBounds[1]) * double(maxr);
             maxBounds[2] = std::sqrt(maxBounds[2]) * double(maxr);
         }
 
-        if (hasIsolatedPoints) {
-            // scale radius by sphere scale
-            maxr *= RadiusT(mSphereScale);
-            // choose max component scale - compare the ellips to isolated
-            // points and choose the largest radius of the two
-            maxBounds[0] = std::max(double(maxr), maxBounds[0]);
-            maxBounds[1] = std::max(double(maxr), maxBounds[1]);
-            maxBounds[2] = std::max(double(maxr), maxBounds[2]);
-        }
+        // Account for uniform stretch values - compare the ellips to isolated
+        // points and choose the largest radius of the two
+        maxBounds[0] = std::max(double(maxs), maxBounds[0]);
+        maxBounds[1] = std::max(double(maxs), maxBounds[1]);
+        maxBounds[2] = std::max(double(maxs), maxBounds[2]);
 
         // @note  This addition of the halfband here doesn't take into account
         //   the squash on the halfband itself. The subsequent rasterizer
@@ -473,7 +425,6 @@ struct EllipsSurfaceMaskOp
 
 private:
     const RadiusType& mRadius;
-    const Real mSphereScale;
     const Real mHalfband;
     const EllipsIndicies& mIndices;
     Vec3i mMaxDist;
@@ -501,7 +452,6 @@ rasterizeEllipsoids(const PointDataGridT& points,
     const std::vector<std::string>& attributes = settings.attributes;
     const Real halfband = settings.halfband;
     const Real radiusScale = settings.radiusScale;
-    const Real sphereScale = settings.sphereScale;
     auto* interrupter = settings.interrupter;
 
     math::Transform::Ptr transform = settings.transform;
@@ -547,7 +497,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
             // pass radius scale as index space
 
             EllipsSurfaceMaskOp<FixedBandRadius<Real>, MaskTreeT, InterrupterType>
-                op(points.transform(), *transform, rad, sphereScale, halfband, indices);
+                op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 
             surface = rasterize_sdf_internal::initSdfFromMasks<SdfT, MaskTreeT>
@@ -562,7 +512,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
 
         grids = doRasterizeSurface<SdfT, EllipsoidTransfer, AttributeTypes, InterrupterType>
             (points, attributes, filter, *surface, interrupter,
-                width, rad, points.transform(), *surface, sphereScale, indices); // args
+                width, rad, points.transform(), *surface, indices); // args
     }
     else
     {
@@ -593,7 +543,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
 
             // pass radius scale as index space
             EllipsSurfaceMaskOp<VaryingBandRadius<RadiusT>, MaskTreeT, InterrupterType>
-                op(points.transform(), *transform, rad, sphereScale, halfband, indices);
+                op(points.transform(), *transform, rad, halfband, indices);
             tbb::parallel_reduce(manager.leafRange(), op);
 
             surface = rasterize_sdf_internal::initSdfFromMasks<SdfT, MaskTreeT>
@@ -608,7 +558,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
 
         grids = doRasterizeSurface<SdfT, EllipsoidTransfer, AttributeTypes, InterrupterType>
             (points, attributes, filter, *surface, interrupter,
-                    width, rad, points.transform(), *surface, sphereScale, indices); // args
+                    width, rad, points.transform(), *surface, indices); // args
     }
 
     if (interrupter) interrupter->end();

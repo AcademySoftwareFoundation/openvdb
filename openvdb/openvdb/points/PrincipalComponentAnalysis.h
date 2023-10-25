@@ -32,7 +32,6 @@
 #include <vector>
 #include <memory>
 #include <cmath> // std::cbrt
-#include <algorithm> // std::accumulate
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -88,6 +87,11 @@ struct PcaSettings
     ///   so a reasonable minimum should be set. Values equal to or less than
     ///   0.0, or values greater than 1.0 have undefined results.
     float allowedAnisotropyRatio = 0.25f;
+    /// @param nonAnisotropicStretch  The stretch coefficient that should be
+    ///   used for points which have no anisotropic neighbourhood (due to
+    ///   being isolated or not having enough neighbours to reach the
+    ///   specified @sa neighbourThreshold).
+    float nonAnisotropicStretch = 1.0;
     /// @param neighbourThreshold  the number of neighbours a point must have
     ///   to be classified as having an elliptical distribution. Points with
     ///   less neighbours than this will end up with uniform stretch values of

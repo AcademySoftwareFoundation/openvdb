@@ -586,7 +586,7 @@ pca(PointDataGridT& points,
     // 1) Create persisting attributes
     const size_t pwsIdx = initAttribute(attrs.positionWS, zeroVal<PcaAttributes::PosWsT>());
     const size_t rotIdx = initAttribute(attrs.rotation, zeroVal<PcaAttributes::RotationT>());
-    const size_t strIdx = initAttribute(attrs.stretch, PcaAttributes::StretchT(1));
+    const size_t strIdx = initAttribute(attrs.stretch, PcaAttributes::StretchT(settings.nonAnisotropicStretch));
 
     // 2) Create temporary attributes
     const auto& descriptor = leaf->attributeSet().descriptor();

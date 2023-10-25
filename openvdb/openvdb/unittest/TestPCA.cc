@@ -268,6 +268,7 @@ TEST_F(TestPCA, testPCA)
         s.searchRadius = std::numeric_limits<float>::max();
         s.averagePositions = 0.0f; // disable position smoothing
         s.neighbourThreshold = 3; // more than 2, points should end up as spheres
+        s.nonAnisotropicStretch = 2.0f;
 
         points::pca(*points, s, a);
         ASSERT_TRUE(points->tree().cbeginLeaf());
@@ -281,7 +282,7 @@ TEST_F(TestPCA, testPCA)
 
         CheckPCAAttributeValues(
                 posistions,
-                {Vec3f(1.0f), Vec3f(1.0f), Vec3f(1.0f)},
+                {Vec3f(s.nonAnisotropicStretch), Vec3f(s.nonAnisotropicStretch), Vec3f(s.nonAnisotropicStretch)},
                 {Mat3s::identity(), Mat3s::identity(), Mat3s::identity()},
                 posistionsWs,
                 {false, false, false},
@@ -294,6 +295,7 @@ TEST_F(TestPCA, testPCA)
 
         s.searchRadius = 0.001f;
         s.neighbourThreshold = 1;
+        s.nonAnisotropicStretch = 1.0f;
 
         points::pca(*points, s, a);
         ASSERT_TRUE(points->tree().cbeginLeaf());
@@ -323,6 +325,7 @@ TEST_F(TestPCA, testPCA)
         s.searchRadius = std::nextafter(0.01f, 1.0f);
         s.neighbourThreshold = 2; // only center point
         s.averagePositions = 0.0f; // disable position smoothing
+        s.nonAnisotropicStretch = 1.3f;
 
         points::pca(*points, s, a);
         ASSERT_TRUE(points->tree().cbeginLeaf());
@@ -336,7 +339,7 @@ TEST_F(TestPCA, testPCA)
 
         CheckPCAAttributeValues(
                 posistions,
-                {Vec3f(1.0), Vec3f(2.51984f, 0.62996f, 0.62996f), Vec3f(1.0)},
+                {Vec3f(s.nonAnisotropicStretch), Vec3f(2.51984f, 0.62996f, 0.62996f), Vec3f(s.nonAnisotropicStretch)},
                 {Mat3s::identity(), Mat3s(0,1,0, 1,0,0, 0,0,1), Mat3s::identity()},
                 posistionsWs,
                 {false, true, false},
@@ -356,6 +359,7 @@ TEST_F(TestPCA, testPCA)
         s.neighbourThreshold = 1; // make sure they get classified
         s.averagePositions = 0.0f; // disable position smoothing
         s.allowedAnisotropyRatio = 0.25f;
+        s.nonAnisotropicStretch = 1.0f;
 
         points::pca(*points, s, a);
         ASSERT_TRUE(points->tree().cbeginLeaf());
