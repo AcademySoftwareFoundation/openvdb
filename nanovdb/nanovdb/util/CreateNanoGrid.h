@@ -40,7 +40,7 @@
 
     \brief Create a NanoVDB grid from scratch
     \code
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
     using SrcGridT = openvdb::FloatGrid;
 #else
     using SrcGridT = nanovdb::build::FloatGrid;
@@ -75,7 +75,7 @@
 #ifndef NANOVDB_CREATE_NANOGRID_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CREATE_NANOGRID_H_HAS_BEEN_INCLUDED
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/PointIndexGrid.h>
@@ -108,7 +108,7 @@ template <typename> struct MapToNano;
 
 //================================================================================================
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
 /// @brief Forward declaration of free-standing function that converts an OpenVDB GridBase into a NanoVDB GridHandle
 /// @tparam BufferT Type of the buffer used to allocate the destination grid
 /// @param base Shared pointer to a base openvdb grid to be converted
@@ -370,7 +370,7 @@ private:
 template<typename T>
 struct MapToNano { using type = T; };
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
 
 template<>
 struct MapToNano<openvdb::ValueMask> {using type = nanovdb::ValueMask;};
@@ -739,7 +739,7 @@ private:
     typename enable_if<BuildTraits<DstBuildT>::is_index, uint64_t>::type
     countValues();
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
     template<typename T = SrcGridT>
     typename disable_if<is_same<T, openvdb::tools::PointIndexGrid>::value ||
                                is_same<T, openvdb::points::PointDataGrid>::value, uint64_t>::type
@@ -971,7 +971,7 @@ inline typename disable_if<is_same<FpN, DstBuildT>::value || BuildTraits<DstBuil
 CreateNanoGrid<SrcGridT>::preProcess()
 {
     if (const uint64_t pointCount = this->countPoints()) {
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
         if constexpr(is_same<openvdb::tools::PointIndexGrid, SrcGridT>::value) {
             if (!mBlindMetaData.empty()) throw std::runtime_error("expected no blind meta data");
             this->addBlindData("index",
@@ -1762,7 +1762,7 @@ CreateNanoGrid<SrcGridT>::postProcess()
     if constexpr(is_same<FpN, DstBuildT>::value) mCodec.reset();
     auto *dstGrid = this->template dstGrid<DstBuildT>();
     gridStats(*dstGrid, mStats);
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
     auto *metaData = this->dstMeta(0);
     if constexpr(is_same<openvdb::tools::PointIndexGrid, SrcGridT>::value ||
                  is_same<openvdb::points::PointDataGrid, SrcGridT>::value) {
@@ -1905,7 +1905,7 @@ CreateNanoGrid<SrcGridT>::copyValues(SrcValueT *buffer)
 
 //================================================================================================
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
 
 template <typename SrcGridT>
 template<typename T>
@@ -2023,7 +2023,7 @@ createNanoGrid(const SrcGridT &srcGrid,
 
 //================================================================================================
 
-#if defined(NANOVDB_USE_OPENVDB)
+#if defined(NANOVDB_USE_OPENVDB) && !defined(__CUDACC__)
 template<typename BufferT>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::GridBase::Ptr& base,
