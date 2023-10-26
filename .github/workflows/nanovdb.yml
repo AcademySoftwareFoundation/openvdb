@@ -53,16 +53,16 @@ jobs:
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
-      image: aswf/ci-base:2022
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: g++,     build: 'Release' }
-          - { cxx: g++,     build: 'Debug' }
-          - { cxx: clang++, build: 'Release' }
-          - { cxx: clang++, build: 'Debug' }
+          - { cxx: g++,     image: '2022-clang11', build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', build: 'Debug' }
+          - { cxx: clang++, image: '2022-clang11', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -71,9 +71,9 @@ jobs:
           yum -y install yum-utils
           yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
           echo "Installing cuda toolkit"
-          yum --enablerepo=epel -y install cuda-toolkit-11-0
-          echo "/usr/local/cuda-11.0/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-11.0/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          yum --enablerepo=epel -y install cuda-toolkit-11-6
+          echo "/usr/local/cuda-11.6/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-11.6/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
         run: >
           ./ci/build.sh -v
@@ -87,7 +87,7 @@ jobs:
           -DUSE_BLOSC=OFF
           \'
       - name: test
-        run: cd build && sudo ctest -V
+        run: cd build && sudo ctest -V -E ".*cuda.*"
 
   windows-nanovdb:
     if: |
@@ -105,7 +105,7 @@ jobs:
           # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON'}
           - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
@@ -142,7 +142,7 @@ jobs:
         \'
     - name: test
       shell: bash
-      run: cd build && ctest -V
+      run: cd build && ctest -V -E ".*cuda.*"
 
   macos-nanovdb:
     if: |
@@ -169,7 +169,7 @@ jobs:
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
           --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
       - name: test
-        run: cd build && ctest -V
+        run: cd build && ctest -V -E ".*cuda.*"
 
   nanovdb-lite:
     if: |
