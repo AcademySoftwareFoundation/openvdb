@@ -14,8 +14,6 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFloatVector.h>
 
-#include <boost/math/constants/constants.hpp> // boost::math::constants::pi
-
 
 namespace mvdb = openvdb_maya;
 

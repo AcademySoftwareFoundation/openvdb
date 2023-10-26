@@ -1,2 +1,10 @@
+OpenVDB:
+    Improvements:
+        - Removed last traces of Boost when OPENVDB_USE_DELAYED_LOADING is OFF
+        [Contributed by Brian McKinnon]
+
 Build:
     - Support for OpenEXR 2.X has been removed.
+    - Boost is no longer required if OPENVDB_USE_DELAYED_LOADING is OFF
+    - Better support for building with external package configurations
+    with CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON.
