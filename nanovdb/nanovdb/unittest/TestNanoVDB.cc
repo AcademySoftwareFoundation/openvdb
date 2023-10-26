@@ -1165,11 +1165,15 @@ TEST_F(TestNanoVDB, CoordBBox)
         EXPECT_EQ(iter, bbox.end());
     }
 
-    {// test two approaches to iteration
-        auto iter1 = bbox.begin(), iter2 = bbox.begin();
-        while(iter1 != bbox.end()) ++iter1;
-        while(iter2) ++iter2;
-        EXPECT_EQ(iter1, iter2);
+    {// test different approaches to iteration
+        auto it1 = bbox.begin(), it2 = bbox.begin(), it3 = bbox.begin(), it4 = bbox.begin();
+        while(it1 != bbox.end()) ++it1;
+        while(it2) ++it2;
+        while(it3 <   bbox.end()) ++it3;
+        while(*it4 <= bbox.max()) ++it4;
+        EXPECT_EQ(it1, it2);
+        EXPECT_EQ(it2, it3);
+        EXPECT_EQ(it3, it4);
     }
 
     {// test CoordBBox::createCube

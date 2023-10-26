@@ -127,7 +127,7 @@ cudaMergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT*
 template<typename BufferT, template <class, class...> class VectorT>
 inline typename enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
 mergeDeviceGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{ return cudaMergeGridHandles(handles, other, stream); }
+{ return cudaMergeGridHandles<BufferT, VectorT>(handles, other, stream); }
 
 } // namespace nanovdb
 

@@ -603,7 +603,7 @@ struct remove_pointer<T*> {using type = T;};
 // --------------------------> match_const <------------------------------------
 
 /// @brief Trait used to transfer the const-ness of a reference type to another type
-/// @tparam T Type whoes const-ness needs to match the reference type
+/// @tparam T Type whose const-ness needs to match the reference type
 /// @tparam ReferenceT Reference type that is not const
 /// @details match_const<const int, float>::type = int
 ///          match_const<int, float>::type = int
@@ -856,7 +856,7 @@ __hostdev__ inline bool isIndex(GridType gridType)
 {
     return gridType == GridType::Index ||// index both active and inactive values
            gridType == GridType::OnIndex ||// index active values only
-           gridType == GridType::IndexMask ||// as Index, but with an additionl mask
+           gridType == GridType::IndexMask ||// as Index, but with an additional mask
            gridType == GridType::OnIndexMask;// as OnIndex, but with an additional mask
 }
 
@@ -864,7 +864,7 @@ __hostdev__ inline bool isIndex(GridType gridType)
 
 /// @brief copy 64 bit words from @c src to @c dst
 /// @param dst pointer to destination
-/// @param src pointer to soruce
+/// @param src pointer to source
 /// @param word_count number of 64 bit words to be copied
 /// @return destination pointer
 /// @warning @c src and @c dst cannot overlap and should both be 64 bit aligned
@@ -1373,16 +1373,20 @@ public:
     /// @brief Return true if this Coord is lexicographically less than the given Coord.
     __hostdev__ bool operator<(const Coord& rhs) const
     {
-        return mVec[0] < rhs[0] ? true : mVec[0] > rhs[0] ? false
-             : mVec[1] < rhs[1] ? true : mVec[1] > rhs[1] ? false
+        return mVec[0] < rhs[0] ? true
+             : mVec[0] > rhs[0] ? false
+             : mVec[1] < rhs[1] ? true
+             : mVec[1] > rhs[1] ? false
              : mVec[2] < rhs[2] ? true : false;
     }
 
     /// @brief Return true if this Coord is lexicographically less or equal to the given Coord.
     __hostdev__ bool operator<=(const Coord& rhs) const
     {
-        return mVec[0] < rhs[0] ? true : mVec[0] > rhs[0] ? false
-             : mVec[1] < rhs[1] ? true : mVec[1] > rhs[1] ? false
+        return mVec[0] < rhs[0] ? true
+             : mVec[0] > rhs[0] ? false
+             : mVec[1] < rhs[1] ? true
+             : mVec[1] > rhs[1] ? false
              : mVec[2] <=rhs[2] ? true : false;
     }
 
@@ -1514,7 +1518,7 @@ public:
     /// @brief Return a double precision floating-point vector of this coordinate
     __hostdev__ inline Vec3<double> asVec3d() const;
 
-    // returns a copy of itself, so it minics the behaviour of Vec3<T>::round()
+    // returns a copy of itself, so it mimics the behaviour of Vec3<T>::round()
     __hostdev__ inline Coord round() const { return *this; }
 }; // Coord class
 
@@ -2250,7 +2254,7 @@ struct BaseBBox
         return *this;
     }
 
-    /// @brief Expand this bounding box to enclode the given bounding box.
+    /// @brief Expand this bounding box to enclose the given bounding box.
     __hostdev__ BaseBBox& expand(const BaseBBox& bbox)
     {
         mCoord[0].minComponent(bbox[0]);
@@ -2399,12 +2403,22 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
             NANOVDB_ASSERT(mBBox == rhs.mBBox);
             return mPos != rhs.mPos;
         }
+        __hostdev__ bool operator<(const Iterator& rhs) const
+        {
+            NANOVDB_ASSERT(mBBox == rhs.mBBox);
+            return mPos < rhs.mPos;
+        }
+        __hostdev__ bool operator<=(const Iterator& rhs) const
+        {
+            NANOVDB_ASSERT(mBBox == rhs.mBBox);
+            return mPos <= rhs.mPos;
+        }
         /// @brief Return @c true if the iterator still points to a valid coordinate.
-        __hostdev__ operator bool() const { return mPos[0] <= mBBox[1][0]; }
+        __hostdev__ operator bool() const { return mPos <= mBBox[1]; }
         __hostdev__ const CoordT& operator*() const { return mPos; }
     }; // Iterator
     __hostdev__ Iterator begin() const { return Iterator{*this}; }
-    __hostdev__ Iterator end() const { return Iterator{*this, CoordT(mCoord[1][0]+1, mCoord[0][1], mCoord[0][2])}; }
+    __hostdev__ Iterator end()   const { return Iterator{*this, CoordT(mCoord[1][0]+1, mCoord[0][1], mCoord[0][2])}; }
     __hostdev__          BBox()
         : BaseT(CoordT::max(), CoordT::min())
     {
@@ -3227,7 +3241,7 @@ struct Map
     /// @note Typically this operation is used for the world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
-    /// @return Inverse afine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
+    /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseMap(const Vec3T& xyz) const
     {
@@ -3238,7 +3252,7 @@ struct Map
     /// @note Typically this operation is used for the world -> index mapping
     /// @tparam Vec3T Template type of the 3D vector to be mapped
     /// @param xyz 3D vector to be mapped - typically floating point world coordinates
-    /// @return Inverse afine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
+    /// @return Inverse affine mapping of the input @c xyz i.e. (xyz - translation) x mat^-1
     template<typename Vec3T>
     __hostdev__ Vec3T applyInverseMapF(const Vec3T& xyz) const
     {
@@ -3600,7 +3614,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     __hostdev__ const uint8_t* treePtr() const { return reinterpret_cast<const uint8_t*>(this + 1); }// TreeData is always right after GridData
     //__hostdev__ const TreeData* treePtr() const { return reinterpret_cast<const TreeData*>(this + 1); }// TreeData is always right after GridData
 
-    /// @brief Return a non-const uint8_t pointer to the firsr node at @c LEVEL
+    /// @brief Return a non-const uint8_t pointer to the first node at @c LEVEL
     /// @tparam LEVEL of the node. LEVEL 0 means leaf node and LEVEL 3 means root node
     /// @warning If not nodes exist at @c LEVEL NULL is returned
     template <uint32_t LEVEL>
@@ -3612,7 +3626,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         return nodeOffset ? PtrAdd<uint8_t>(treeData, nodeOffset) : nullptr;
     }
 
-    /// @brief Return a non-const uint8_t pointer to the firsr node at @c LEVEL
+    /// @brief Return a non-const uint8_t pointer to the first node at @c LEVEL
     /// @tparam LEVEL of the node. LEVEL 0 means leaf node and LEVEL 3 means root node
     /// @warning If not nodes exist at @c LEVEL NULL is returned
     template <uint32_t LEVEL>
@@ -4691,7 +4705,7 @@ public:
     }
 
     template<typename OpT, typename... ArgsT>
-    // __hostdev__ auto // occationally fails with NVCC
+    // __hostdev__ auto // occasionally fails with NVCC
     __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
     set(const CoordType& ijk, ArgsT&&... args)
     {
@@ -4816,7 +4830,7 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    // __hostdev__ auto // occationally fails with NVCC
+    // __hostdev__ auto // occasionally fails with NVCC
     __hostdev__ decltype(OpT::set(std::declval<Tile&>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
@@ -5287,7 +5301,7 @@ public:
     }
 
     template<typename OpT, typename... ArgsT>
-    //__hostdev__ auto // occationally fails with NVCC
+    //__hostdev__ auto // occasionally fails with NVCC
     __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     set(const CoordType& ijk, ArgsT&&... args)
     {
@@ -5396,7 +5410,7 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__ auto // occationally fails with NVCC
+    //__hostdev__ auto // occasionally fails with NVCC
     __hostdev__ decltype(OpT::set(std::declval<InternalNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
@@ -6371,7 +6385,7 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__ auto // occationally fails with NVCC
+    //__hostdev__ auto // occasionally fails with NVCC
     __hostdev__ decltype(OpT::set(std::declval<LeafNode&>(), std::declval<uint32_t>(), std::declval<ArgsT>()...))
     setAndCache(const CoordType& ijk, const AccT&, ArgsT&&... args)
     {
