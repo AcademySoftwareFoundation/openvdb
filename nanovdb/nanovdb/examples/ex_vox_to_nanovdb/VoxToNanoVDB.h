@@ -4,6 +4,7 @@
 #pragma once
 
 #include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 
 #define OGT_VOX_IMPLEMENTATION
 #include "ogt_vox.h"
@@ -28,7 +29,7 @@ inline const ogt_vox_scene* load_vox_scene(const char* filename, uint32_t scene_
     uint32_t buffer_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
     uint8_t* buffer = new uint8_t[buffer_size];
-    fread(buffer, buffer_size, 1, fp);
+    size_t bytes = fread(buffer, buffer_size, 1, fp);
     fclose(fp);
     const ogt_vox_scene* scene = ogt_vox_read_scene_with_flags(buffer, buffer_size, scene_read_flags);
     delete[] buffer; // the buffer can be safely deleted once the scene is instantiated.
@@ -131,8 +132,8 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
     try {
         if (const auto* scene = detail::load_vox_scene(inFilename.c_str())) {
             // we just merge into one grid...
-            nanovdb::GridBuilder<nanovdb::PackedRGBA8> builder;
-            auto                           acc = builder.getAccessor();
+            nanovdb::build::Grid<nanovdb::Rgba8> grid(nanovdb::Rgba8(),modelName,nanovdb::GridClass::VoxelVolume);
+            auto acc = grid.getAccessor();
 
             auto processModelFn = [&](int modelIndex, const ogt_vox_transform& xform) {
                 const auto* model = scene->models[modelIndex];
@@ -143,7 +144,7 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
                         for (uint32_t x = 0; x < model->size_x; ++x, ++voxel_index) {
                             if (uint8_t color_index = model->voxel_data[voxel_index]) {
                                 ogt_vox_rgba rgba = scene->palette.color[color_index];
-                                auto         ijk = nanovdb::Coord::Floor(detail::matMult4x4((float*)&xform, nanovdb::Vec4f(x, y, z, 1)));
+                                auto ijk = nanovdb::Coord::Floor(detail::matMult4x4((float*)&xform, nanovdb::Vec4f(x, y, z, 1)));
                                 acc.setValue(nanovdb::Coord(ijk[0], ijk[2], -ijk[1]), *reinterpret_cast<nanovdb::PackedRGBA8*>(&rgba));
                             }
                         }
@@ -184,8 +185,7 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
 
             printf("scene processing end.\n");
             ogt_vox_destroy_scene(scene);
-            builder.setGridClass(nanovdb::GridClass::VoxelVolume);
-            return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), modelName);
+            return nanovdb::createNanoGrid(grid);
         } else {
             std::ostringstream ss;
             ss << "Invalid file \"" << inFilename << "\"";

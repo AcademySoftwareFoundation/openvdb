@@ -5,9 +5,9 @@
 #include <iostream>
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Primitives.h>
-#include <nanovdb/util/CudaDeviceBuffer.h>
 
 #if defined(NANOVDB_USE_CUDA)
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
 using BufferT = nanovdb::CudaDeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
@@ -26,7 +26,7 @@ int main(int ac, char** av)
             handle = nanovdb::io::readGrid<BufferT>(av[1]);
             std::cout << "Loaded NanoVDB grid[" << handle.gridMetaData()->shortGridName() << "]...\n";
         } else {
-            handle = nanovdb::createFogVolumeSphere<float, float, BufferT>(100.0f, nanovdb::Vec3f(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
+            handle = nanovdb::createFogVolumeSphere<float, BufferT>(100.0f, nanovdb::Vec3d(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
         }
 
         if (handle.gridMetaData()->isFogVolume() == false) {

@@ -12,7 +12,7 @@
 #ifndef NANOVDB_DITHERLUT_HAS_BEEN_INCLUDED
 #define NANOVDB_DITHERLUT_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"// for __hosedev__, Vec3, Min, Max, Pow2, Pow3, Pow4
+#include <nanovdb/NanoVDB.h>// for __hostdev__, Vec3, Min, Max, Pow2, Pow3, Pow4
 
 namespace nanovdb {
 

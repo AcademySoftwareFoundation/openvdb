@@ -25,7 +25,7 @@ message(STATUS "----------------------------------------------------")
 option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" OFF)
-option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
+#option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
@@ -71,12 +71,13 @@ if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
+#if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
+if(NANOVDB_BUILD_UNITTESTS)
   find_package(GTest REQUIRED)
 endif()
 
 if(NANOVDB_USE_CUDA)
-  set(CMAKE_CUDA_STANDARD 11)
+  set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
   if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
@@ -165,8 +166,20 @@ set(NANOVDB_INCLUDE_FILES
 
 # NanoVDB util header files
 set(NANOVDB_INCLUDE_UTILFILES
+  util/CpuTimer.h
+  util/CreateNanoGrid.h
   util/CSampleFromVoxels.h
-  util/CudaDeviceBuffer.h
+  util/cuda/CudaAddBlindData.cuh
+  util/cuda/CudaDeviceBuffer.h
+  util/cuda/CudaGridChecksum.cuh
+  util/cuda/CudaGridHandle.cuh
+  util/cuda/CudaGridStats.cuh
+  util/cuda/CudaIndexToGrid.cuh
+  util/cuda/CudaNodeManager.cuh
+  util/cuda/CudaPointsToGrid.cuh
+  util/cuda/CudaSignedFloodFill.cuh
+  util/cuda/CudaUtils.h
+  util/cuda/GpuTimer.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
@@ -181,6 +194,7 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/NanoToOpenVDB.h
   util/NodeManager.h
   util/OpenToNanoVDB.h
+  util/PrefixSum.h
   util/Primitives.h
   util/Range.h
   util/Ray.h

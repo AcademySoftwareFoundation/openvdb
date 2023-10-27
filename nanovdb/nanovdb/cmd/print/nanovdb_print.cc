@@ -103,7 +103,7 @@ int main(int argc, char* argv[])
         if (size > n)
             n = size;
     };
-    auto vec3RToStr = [](const nanovdb::Vec3R& v) {
+    auto Vec3dToStr = [](const nanovdb::Vec3d& v) {
         std::stringstream ss;
         ss << std::setprecision(3);
         ss << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
         for (auto& file : fileNames) {
             auto list = nanovdb::io::readGridMetaData(file);
             if (!gridName.empty()) {
-                std::vector<nanovdb::io::GridMetaData> tmp;
+                std::vector<nanovdb::io::FileGridMetaData> tmp;
                 for (auto& m : list) {
                     if (nameKey == m.nameKey && gridName == m.gridName)
                         tmp.emplace_back(m);
@@ -186,7 +186,7 @@ int main(int argc, char* argv[])
                 width(configWidth, nodesToStr(m.nodeCount));
                 width(tileWidth, nodesToStr(m.tileCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
-                width(voxelSizeWidth, vec3RToStr(m.voxelSize));
+                width(voxelSizeWidth, Vec3dToStr(m.voxelSize));
             }
             std::cout << "\nThe file \"" << file << "\" contains the following ";
             if (list.size()>1) {
@@ -227,7 +227,7 @@ int main(int argc, char* argv[])
                               << std::left << std::setw(codecWidth) << nanovdb::io::toStr(m.codec)
                               << std::left << std::setw(sizeWidth) << format(m.gridSize)
                               << std::left << std::setw(fileWidth) << format(m.fileSize)
-                              << std::left << std::setw(voxelSizeWidth) << vec3RToStr(m.voxelSize);
+                              << std::left << std::setw(voxelSizeWidth) << Vec3dToStr(m.voxelSize);
                 }
                 std::cout << std::left << std::setw(voxelsWidth) << m.voxelCount
                           << std::left << std::setw(resWidth) << resToStr(m.indexBBox);
@@ -316,7 +316,7 @@ int main(int argc, char* argv[])
         exitStatus = EXIT_FAILURE;
     }
     catch (...) {
-        std::cerr << "Exception oof unexpected type caught" << std::endl;
+        std::cerr << "Exception of unexpected type caught" << std::endl;
         exitStatus = EXIT_FAILURE;
     }
 

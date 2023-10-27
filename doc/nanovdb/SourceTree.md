@@ -15,120 +15,135 @@
 ```bash
 foo@bar:~$ tree
 .
-└── nanovdb
-    ├── CMakeLists.txt
-    ├── cmd
-    │   ├── CMakeLists.txt
-    │   ├── convert
-    │   │   └── nanovdb_convert.cc
-    │   ├── print
-    │   │   └── nanovdb_print.cc
-    │   └── validate
-    │       └── nanovdb_validate.cc
-    ├── CNanoVDB.h
-    ├── docs
-    │   ├── CMakeLists.txt
-    │   ├── codingstyle.txt
-    │   └── doxygen-config
-    ├── examples
-    │   ├── benchmark
-    │   │   ├── BenchKernels_dense.cu
-    │   │   ├── BenchKernels_nano.cu
-    │   │   ├── Benchmark.cc
-    │   │   ├── Benchmark_dense.cc
-    │   │   ├── Benchmark_nano.cc
-    │   │   ├── Camera.h
-    │   │   ├── CMakeLists.txt
-    │   │   ├── DenseGrid.h
-    │   │   └── Image.h
-    │   ├── CMakeLists.txt
-    │   ├── ex_bump_pool_buffer
-    │   │   └── bump_pool_buffer.cc
-    │   ├── ex_collide_level_set
-    │   │   ├── common.h
-    │   │   ├── main.cc
-    │   │   ├── nanovdb.cu
-    │   │   └── openvdb.cc
-    │   ├── ex_index_grid_cuda
-    │   │   ├── index_grid_cuda.cc
-    │   │   └── index_grid_cuda.cu
-    │   ├── ex_make_custom_nanovdb
-    │   │   └── make_custom_nanovdb.cc
-    │   ├── ex_make_funny_nanovdb
-    │   │   └── make_funny_nanovdb.cc
-    │   ├── ex_make_nanovdb_sphere
-    │   │   └── make_nanovdb_sphere.cc
-    │   ├── ex_make_typed_grids
-    │   │   └── make_typed_grids.cc
-    │   ├── ex_map_pool_buffer
-    │   │   └── map_pool_buffer.cc
-    │   ├── ex_modify_nanovdb_thrust
-    │   │   └── modify_nanovdb_thrust.cu
-    │   ├── ex_nodemanager_cuda
-    │   │   ├── nodemanager_cuda.cc
-    │   │   └── nodemanager_cuda.cu
-    │   ├── ex_openvdb_to_nanovdb
-    │   │   └── openvdb_to_nanovdb.cc
-    │   ├── ex_openvdb_to_nanovdb_accessor
-    │   │   └── openvdb_to_nanovdb_accessor.cc
-    │   ├── ex_openvdb_to_nanovdb_cuda
-    │   │   ├── openvdb_to_nanovdb_cuda.cc
-    │   │   └── openvdb_to_nanovdb_cuda.cu
-    │   ├── ex_raytrace_fog_volume
-    │   │   ├── common.h
-    │   │   ├── main.cc
-    │   │   ├── nanovdb.cu
-    │   │   └── openvdb.cc
-    │   ├── ex_raytrace_level_set
-    │   │   ├── common.h
-    │   │   ├── main.cc
-    │   │   ├── nanovdb.cu
-    │   │   └── openvdb.cc
-    │   ├── ex_read_nanovdb_sphere
-    │   │   └── read_nanovdb_sphere.cc
-    │   ├── ex_read_nanovdb_sphere_accessor
-    │   │   └── read_nanovdb_sphere_accessor.cc
-    │   ├── ex_read_nanovdb_sphere_accessor_cuda
-    │   │   ├── read_nanovdb_sphere_accessor_cuda.cc
-    │   │   └── read_nanovdb_sphere_accessor_cuda.cu
-    │   ├── ex_util
-    │   │   ├── ComputePrimitives.h
-    │   │   └── CpuTimer.h
-    │   ├── ex_vox_to_nanovdb
-    │   │   ├── vox_to_nanovdb.cc
-    │   │   └── VoxToNanoVDB.h
-    │   └── ex_write_nanovdb_grids
-    │       └── write_nanovdb_grids.cc
-    ├── NanoVDB.h
-    ├── PNanoVDB.h
-    ├── Readme.md
-    ├── unittest
-    │   ├── CMakeLists.txt
-    │   ├── pnanovdb_validate_strides.h
-    │   ├── TestNanoVDB.cc
-    │   └── TestOpenVDB.cc
-    └── util
-        ├── CSampleFromVoxels.h
-        ├── CudaDeviceBuffer.h
-        ├── DitherLUT.h
-        ├── ForEach.h
-        ├── GridBuilder.h
-        ├── GridChecksum.h
-        ├── GridHandle.h
-        ├── GridStats.h
-        ├── GridValidator.h
-        ├── HDDA.h
-        ├── HostBuffer.h
-        ├── IndexGridBuilder.h
-        ├── Invoke.h
-        ├── IO.h
-        ├── NanoToOpenVDB.h
-        ├── NodeManager.h
-        ├── OpenToNanoVDB.h
-        ├── Primitives.h
-        ├── Range.h
-        ├── Ray.h
-        ├── Reduce.h
-        ├── SampleFromVoxels.h
-        └── Stencils.h
+├── CMakeLists.txt
+├── cmd
+│   ├── CMakeLists.txt
+│   ├── convert
+│   │   └── nanovdb_convert.cc
+│   ├── print
+│   │   └── nanovdb_print.cc
+│   └── validate
+│       └── nanovdb_validate.cc
+├── CNanoVDB.h
+├── docs
+│   ├── CMakeLists.txt
+│   ├── codingstyle.txt
+│   └── doxygen-config
+├── examples
+│   ├── benchmark
+│   │   ├── BenchKernels_dense.cu
+│   │   ├── BenchKernels_nano.cu
+│   │   ├── Benchmark_dense.cu
+│   │   ├── Benchmark_nano.cu
+│   │   ├── Camera.h
+│   │   ├── CMakeLists.txt
+│   │   ├── DenseGrid.h
+│   │   ├── Image.h
+│   │   ├── TestBenchmark.cc
+│   │   └── TestBenchmark.cu
+│   ├── CMakeLists.txt
+│   ├── ex_bump_pool_buffer
+│   │   └── bump_pool_buffer.cc
+│   ├── ex_collide_level_set
+│   │   ├── common.h
+│   │   ├── main.cc
+│   │   ├── nanovdb.cu
+│   │   └── openvdb.cc
+│   ├── ex_index_grid_cuda
+│   │   ├── index_grid_cuda.cu
+│   │   └── index_grid_cuda_kernel.cu
+│   ├── ex_make_custom_nanovdb
+│   │   └── make_custom_nanovdb.cc
+│   ├── ex_make_custom_nanovdb_cuda
+│   │   ├── make_custom_nanovdb_cuda.cc
+│   │   └── make_custom_nanovdb_cuda_kernel.cu
+│   ├── ex_make_funny_nanovdb
+│   │   └── make_funny_nanovdb.cc
+│   ├── ex_make_nanovdb_sphere
+│   │   └── make_nanovdb_sphere.cc
+│   ├── ex_make_typed_grids
+│   │   └── make_typed_grids.cc
+│   ├── ex_map_pool_buffer
+│   │   └── map_pool_buffer.cc
+│   ├── ex_modify_nanovdb_thrust
+│   │   └── modify_nanovdb_thrust.cu
+│   ├── ex_nodemanager_cuda
+│   │   ├── nodemanager_cuda.cc
+│   │   └── nodemanager_cuda_kernel.cu
+│   ├── ex_openvdb_to_nanovdb
+│   │   └── openvdb_to_nanovdb.cc
+│   ├── ex_openvdb_to_nanovdb_accessor
+│   │   └── openvdb_to_nanovdb_accessor.cc
+│   ├── ex_openvdb_to_nanovdb_cuda
+│   │   ├── openvdb_to_nanovdb_cuda.cc
+│   │   └── openvdb_to_nanovdb_cuda_kernel.cu
+│   ├── ex_raytrace_fog_volume
+│   │   ├── common.h
+│   │   ├── main.cc
+│   │   ├── nanovdb.cu
+│   │   └── openvdb.cc
+│   ├── ex_raytrace_level_set
+│   │   ├── common.h
+│   │   ├── main.cc
+│   │   ├── nanovdb.cu
+│   │   └── openvdb.cc
+│   ├── ex_read_nanovdb_sphere
+│   │   └── read_nanovdb_sphere.cc
+│   ├── ex_read_nanovdb_sphere_accessor
+│   │   └── read_nanovdb_sphere_accessor.cc
+│   ├── ex_read_nanovdb_sphere_accessor_cuda
+│   │   ├── read_nanovdb_sphere_accessor_cuda.cu
+│   │   └── read_nanovdb_sphere_accessor_cuda_kernel.cu
+│   ├── ex_util
+│   │   └── ComputePrimitives.h
+│   ├── ex_voxels_to_grid_cuda
+│   │   └── ex_voxels_to_grid_cuda.cu
+│   ├── ex_vox_to_nanovdb
+│   │   ├── vox_to_nanovdb.cc
+│   │   └── VoxToNanoVDB.h
+│   └── ex_write_nanovdb_grids
+│       └── write_nanovdb_grids.cc
+├── NanoVDB.h
+├── PNanoVDB.h
+├── Readme.md
+├── unittest
+│   ├── CMakeLists.txt
+│   ├── pnanovdb_validate_strides.h
+│   ├── TestNanoVDB.cc
+│   ├── TestNanoVDB.cu
+│   └── TestOpenVDB.cc
+└── util
+    ├── CpuTimer.h
+    ├── CreateNanoGrid.h
+    ├── CSampleFromVoxels.h
+    ├── cuda
+    │   ├── CudaAddBlindData.cuh
+    │   ├── CudaDeviceBuffer.h
+    │   ├── CudaGridHandle.cuh
+    │   ├── CudaIndexToGrid.cuh
+    │   ├── CudaPointsToGrid.cuh
+    │   ├── CudaSignedFloodFill.cuh
+    │   ├── CudaUtils.h
+    │   └── GpuTimer.cuh
+    ├── DitherLUT.h
+    ├── ForEach.h
+    ├── GridBuilder.h
+    ├── GridChecksum.h
+    ├── GridHandle.h
+    ├── GridStats.h
+    ├── GridValidator.h
+    ├── HDDA.h
+    ├── HostBuffer.h
+    ├── Invoke.h
+    ├── IO.h
+    ├── NanoToOpenVDB.h
+    ├── NodeManager.h
+    ├── OpenToNanoVDB.h
+    ├── PrefixSum.h
+    ├── Primitives.h
+    ├── Range.h
+    ├── Ray.h
+    ├── Reduce.h
+    ├── SampleFromVoxels.h
+    └── Stencils.h
 ```
