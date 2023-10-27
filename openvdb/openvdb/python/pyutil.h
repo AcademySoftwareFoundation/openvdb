@@ -163,21 +163,11 @@ struct StringEnum
 
 ////////////////////////////////////////
 
-
-/// Return str(val) for the given value.
-template<typename T>
-inline std::string
-str(const T& val)
-{
-    return py::str(py::cast(val));
-}
-
-
 /// Return the name of the given Python object's class.
 inline std::string
 className(py::handle h)
 {
-    return h.attr("__class__").attr("__name__").cast<std::string>();
+    return py::cast<std::string>(h.attr("__class__").attr("__name__"));
 }
 
 } // namespace pyutil
