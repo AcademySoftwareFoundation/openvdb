@@ -107,7 +107,7 @@ endif()
 
 # Make sure find_package(Python) is only ever invoked once with all required components
 find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-find_package(pybind11 ${MINIMUM_PYBIND_VERSION} REQUIRED)
+find_package(pybind11 ${MINIMUM_PYBIND_VERSION} CONFIG REQUIRED)
 
 openvdb_check_python_version(Python::Module
   "${Python_VERSION}"

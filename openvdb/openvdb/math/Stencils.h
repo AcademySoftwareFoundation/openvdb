@@ -40,7 +40,6 @@ public:
     typedef typename GridT::ValueType                   ValueType;
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
-    typedef typename BufferType::iterator               IterType;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -146,14 +145,14 @@ public:
     /// @brief Return the smallest value in the stencil buffer.
     inline ValueType min() const
     {
-        IterType iter = std::min_element(mValues.begin(), mValues.end());
+        const auto iter = std::min_element(mValues.begin(), mValues.end());
         return *iter;
     }
 
     /// @brief Return the largest value in the stencil buffer.
     inline ValueType max() const
     {
-        IterType iter = std::max_element(mValues.begin(), mValues.end());
+        const auto iter = std::max_element(mValues.begin(), mValues.end());
         return *iter;
     }
 

@@ -121,6 +121,13 @@ if(${CMAKE_VERSION} VERSION_LESS 3.19)
   )
 endif()
 
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GLFW_VERSION)
+  if(glfw3_VERSION VERSION_LESS ${FUTURE_MINIMUM_GLFW_VERSION})
+    message(DEPRECATION "Support for GLFW versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
 unset(glfw3_FIND_VERSION)
 
 # GLFW 3.1 does not export INTERFACE_LINK_LIBRARIES so detect this

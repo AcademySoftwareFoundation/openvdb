@@ -4,10 +4,8 @@
 
 This section describes the OpenVDB Python module and includes Python code
 snippets and some complete programs that illustrate how to perform common tasks.
-(An <a href="./python/index.html">API reference</a> is also available,
-if <a href="http://epydoc.sourceforge.net/">Epydoc</a> is installed.)
-As of OpenVDB 2.0, the Python module exposes most of the functionality
-of the C++ @vdblink::Grid Grid@endlink class, including I/O, metadata
+The Python module exposes most of the functionality of the C++
+@vdblink::Grid Grid@endlink class, including I/O, metadata
 management, voxel access and iteration, but almost none of the many
 @ref secToolUtils "tools".
 We expect to add support for tools in forthcoming releases.

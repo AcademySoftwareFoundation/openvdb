@@ -1,3 +1,0 @@
-Build:
-    - Fixed a build issue where Boost was not being pulled in when 
-    OPENVDB_USE_DELAYED_LOADING was set to OFF.

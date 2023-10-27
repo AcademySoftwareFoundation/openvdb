@@ -462,12 +462,13 @@ public:
     }
 
     /// Transform each element in the given range.
-    void operator()(IterRange& range) const
+    void operator()(const IterRange& range) const
     {
         if (!mOutputTree) return;
+        IterRange r(range);
         typename tree::ValueAccessor<OutTreeT> outAccessor(*mOutputTree);
-        for ( ; range; ++range) {
-            mOp(range.iterator(), outAccessor);
+        for ( ; r; ++r) {
+            mOp(r.iterator(), outAccessor);
         }
     }
 
@@ -550,12 +551,13 @@ public:
     }
 
     /// Transform each element in the given range.
-    void operator()(IterRange& range)
+    void operator()(const IterRange& range)
     {
         if (!mOutputTree) return;
+        IterRange r(range);
         typename tree::ValueAccessor<OutTreeT> outAccessor(*mOutputTree);
-        for ( ; range; ++range) {
-            mOp(range.iterator(), outAccessor);
+        for ( ; r; ++r) {
+            mOp(r.iterator(), outAccessor);
         }
     }
 
@@ -657,7 +659,7 @@ public:
         }
     }
 
-    void operator()(IterRange& r) { for ( ; r; ++r) (*mOp)(r.iterator()); }
+    void operator()(const IterRange& r) { for (IterRange it(r); it.test(); ++it) (*mOp)(it.iterator()); }
 
     void join(OpAccumulator& other) { mOp->join(*other.mOp); }
 

@@ -1172,7 +1172,7 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             std::string key("paged:" + std::to_string(index));
             auto it = auxData.find(key);
             if (it != auxData.end()) {
-                return *(boost::any_cast<compression::PagedInputStream::Ptr>(it->second));
+                return *(std::any_cast<compression::PagedInputStream::Ptr>(it->second));
             }
             else {
                 compression::PagedInputStream::Ptr pagedStream = std::make_shared<compression::PagedInputStream>();
@@ -1216,7 +1216,7 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             std::string descriptorKey("descriptorPtr");
             auto itDescriptor = auxData.find(descriptorKey);
             assert(itDescriptor != auxData.end());
-            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+            const Descriptor::Ptr descriptor = std::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
             return descriptor;
         }
     };
@@ -1338,7 +1338,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
             std::string key("paged:" + std::to_string(index));
             auto it = auxData.find(key);
             if (it != auxData.end()) {
-                compression::PagedOutputStream& stream = *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
+                compression::PagedOutputStream& stream = *(std::any_cast<compression::PagedOutputStream::Ptr>(it->second));
                 stream.flush();
                 (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(it);
             }
@@ -1350,7 +1350,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
             std::string key("paged:" + std::to_string(index));
             auto it = auxData.find(key);
             if (it != auxData.end()) {
-                return *(boost::any_cast<compression::PagedOutputStream::Ptr>(it->second));
+                return *(std::any_cast<compression::PagedOutputStream::Ptr>(it->second));
             }
             else {
                 compression::PagedOutputStream::Ptr pagedStream = std::make_shared<compression::PagedOutputStream>();
@@ -1374,12 +1374,12 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
             }
             else {
                 // if matching bool is found and is false, early exit (a previous descriptor did not match)
-                bool matching = boost::any_cast<bool>(itMatching->second);
+                bool matching = std::any_cast<bool>(itMatching->second);
                 if (!matching)    return;
                 assert(itDescriptor != auxData.end());
                 // if matching bool is true, check whether the existing descriptor matches the current one and set
                 // matching bool to false if not
-                const Descriptor::Ptr existingDescriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+                const Descriptor::Ptr existingDescriptor = std::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
                 if (*existingDescriptor != *descriptor) {
                     (const_cast<io::StreamMetadata::AuxDataMap&>(auxData))[matchingKey] = false;
                 }
@@ -1393,7 +1393,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
             // if matching key is not found, no matching descriptor
             if (itMatching == auxData.end())                return false;
             // if matching key is found and is false, no matching descriptor
-            if (!boost::any_cast<bool>(itMatching->second)) return false;
+            if (!std::any_cast<bool>(itMatching->second)) return false;
             return true;
         }
 
@@ -1404,7 +1404,7 @@ PointDataLeafNode<T, Log2Dim>::writeBuffers(std::ostream& os, bool toHalf) const
             // if matching key is true, however descriptor is not found, it has already been retrieved
             if (itDescriptor == auxData.end())              return nullptr;
             // otherwise remove it and return it
-            const Descriptor::Ptr descriptor = boost::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
+            const Descriptor::Ptr descriptor = std::any_cast<AttributeSet::Descriptor::Ptr>(itDescriptor->second);
             (const_cast<io::StreamMetadata::AuxDataMap&>(auxData)).erase(itDescriptor);
             return descriptor;
         }

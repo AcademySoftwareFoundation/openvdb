@@ -583,7 +583,8 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     if (parms.mNeedExt) {
         typename ExtGridT::ConstPtr extGrid = openvdb::gridConstPtrCast<ExtGridT>(exPrim->getConstGridPtr());
         if (!extGrid) {
-            std::string msg = "Extension grid (" + extGrid->getName() + ") cannot be converted " +
+            auto grid = exPrim->getConstGridPtr();
+            std::string msg = "Extension grid (" + grid->getName() + ") cannot be converted " +
                               "to the explicit type specified.";
             throw std::runtime_error(msg);
         }

@@ -518,7 +518,6 @@ TEST_F(TestLeaf, testCount)
     EXPECT_EQ(Index(3), dims[0]);
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
 TEST_F(TestLeaf, testTransientData)
 {
     using namespace openvdb;
@@ -534,4 +533,3 @@ TEST_F(TestLeaf, testTransientData)
     LeafT leaf3 = leaf;
     EXPECT_EQ(Index32(5), leaf3.transientData());
 }
-#endif

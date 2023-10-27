@@ -35,9 +35,12 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
-/// OpenVDB now requires C++11
-#define OPENVDB_HAS_CXX11 1
+/// OpenVDB now requires C++17
+#define OPENVDB_HAS_CXX11 1 // kept for backward compatibility
 
+#if __cplusplus >= 202002L
+    #define OPENVDB_HAS_CXX20
+#endif
 
 /// SIMD Intrinsic Headers
 #if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)
@@ -63,12 +66,6 @@
     // linking in the CRT, unless OPENVDB_STATICLIB is defined.
     #if defined(_DLL) && !defined(OPENVDB_STATICLIB) && !defined(OPENVDB_DLL)
         #define OPENVDB_DLL
-    #endif
-
-    // By default, assume that we're dynamically linking OpenEXR, unless
-    // OPENVDB_OPENEXR_STATICLIB is defined.
-    #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
-        #define OPENEXR_DLL
     #endif
 #endif
 

@@ -37,13 +37,18 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
+set(OPENVDB_TEST_DEPENDENT_LIBS ${OPENVDB_LIB})
+
 find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
-set(OPENVDB_TEST_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
-  GTest::GTest
-  GTest::Main
-)
+if(TARGET GTest::gtest_main)
+  # New gtest targets as of CMake 3.20. Defined by both the Config and Module
+  # find modes
+  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS GTest::gtest GTest::gtest_main)
+else()
+  # Older targets, only defined by the Module find_package calls
+  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS GTest::GTest GTest::Main)
+endif()
 
 if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
   find_package(Jemalloc REQUIRED)
@@ -162,6 +167,7 @@ else()
     TestQuat.cc
     TestRay.cc
     TestStats.cc
+    TestStencils.cc
     TestStream.cc
     TestStreamCompression.cc
     TestStringMetadata.cc

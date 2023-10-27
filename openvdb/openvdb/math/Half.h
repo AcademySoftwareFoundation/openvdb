@@ -200,6 +200,15 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 namespace internal {
 
+// Use of lookup table is explicitly suppressed and the generation of
+// a lookup table is suppressed.  This is required because we namespace
+// our type, but the lookup table is extern "C" and lacks a namespace.
+// Thus any attempt to link two versions of OpenVDB with different
+// namespaces will clash due to redefinition with a new type.
+// The default was not to use a lookup table.
+#undef  IMATH_HALF_USE_LOOKUP_TABLE
+#define IMATH_HALF_NO_LOOKUP_TABLE
+
 //-------------------------------------------------------------------------
 // Limits
 //

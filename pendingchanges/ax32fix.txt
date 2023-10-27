@@ -1,3 +1,0 @@
-Build:
- - Fixed a build issue with AX on 32bit platforms.
- [Reported by Mathieu Malaterre]

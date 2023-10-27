@@ -10,7 +10,6 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
-#include <boost/numeric/conversion/conversion_traits.hpp>
 #include <algorithm> // for std::max()
 #include <cassert>
 #include <cmath>     // for std::ceil(), std::fabs(), std::pow(), std::sqrt(), etc.
@@ -916,10 +915,9 @@ enum RotationOrder {
     ZXZ_ROTATION
 };
 
-
-template <typename S, typename T>
+template <typename S, typename T, typename = std::enable_if_t<std::is_arithmetic_v<S>&& std::is_arithmetic_v<T>>>
 struct promote {
-    using type = typename boost::numeric::conversion_traits<S, T>::supertype;
+    using type = typename std::common_type_t<S,T>;
 };
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.

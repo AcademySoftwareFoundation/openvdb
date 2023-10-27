@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 10)
+set(OpenVDB_MAJOR_VERSION 11)
 set(OpenVDB_MINOR_VERSION 0)
-set(OpenVDB_PATCH_VERSION 2)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -89,8 +89,8 @@ cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
 
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
+When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
+provided. Imath/OpenEXR can optionally be provided.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -281,13 +281,11 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add cmake modules to installation command
-# @todo fix our glew cmake module
 
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
-    cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
@@ -406,7 +404,6 @@ endif()
 if(USE_STATIC_DEPENDENCIES)
   set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
-  set(ILMBASE_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)

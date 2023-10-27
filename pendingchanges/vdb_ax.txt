@@ -1,7 +1,0 @@
-AX:
-- Improvements:
-    Added support for LLVM 15
-
-- Bug Fix:
-    Fixed an incorrect option in the `vdb_ax` command line tool where the default
-    optimization level was set to NONE instead of O3 (issue introduced in 10.0.0).

@@ -391,12 +391,7 @@ struct MergeOp
 
         auto hasUniqueTree = [&](GU_PrimVDB* vdbPrim)
         {
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
             return vdbPrim->getConstGridPtr()->isTreeUnique();
-#else
-            const TreeBase::ConstPtr treeBaseConstPtr = vdbPrim->getConstGridPtr()->constBaseTreePtr();
-            return treeBaseConstPtr.use_count() <= 2;
-#endif
         };
 
         auto stealTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)
@@ -480,12 +475,7 @@ struct MergeOp
 
         auto hasUniqueTree = [&](GU_PrimVDB* vdbPrim)
         {
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
             return vdbPrim->getConstGridPtr()->isTreeUnique();
-#else
-            const TreeBase::ConstPtr treeBaseConstPtr = vdbPrim->getConstGridPtr()->constBaseTreePtr();
-            return treeBaseConstPtr.use_count() <= 2;
-#endif
         };
 
         auto stealTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)
