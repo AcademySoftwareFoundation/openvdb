@@ -107,7 +107,7 @@ endif()
 
 # Make sure find_package(Python) is only ever invoked once with all required components
 find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-find_package(pybind11 ${MINIMUM_PYBIND_VERSION} CONFIG REQUIRED)
+find_package(nanobind REQUIRED)
 
 openvdb_check_python_version(Python::Module
   "${Python_VERSION}"
@@ -128,14 +128,14 @@ endif()
 ##########################################################################
 
 set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
-  pyFloatGrid.cc
+  # pyFloatGrid.cc
   pyGridBase.cc
   pyIntGrid.cc
   pyMetadata.cc
   pyOpenVDBModule.cc
-  pyPointGrid.cc
+  # pyPointGrid.cc
   pyTransform.cc
-  pyVec3Grid.cc
+  # pyVec3Grid.cc
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
@@ -146,7 +146,7 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   )
 endif()
 
-pybind11_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
+nanobind_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
 
 target_link_libraries(pyopenvdb PUBLIC
   ${OPENVDB_LIB}

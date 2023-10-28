@@ -7,7 +7,7 @@
 #include "pyGrid.h"
 
 void
-exportIntGrid(py::module_ m)
+exportIntGrid(nb::module_ m)
 {
     pyGrid::exportGrid<BoolGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
