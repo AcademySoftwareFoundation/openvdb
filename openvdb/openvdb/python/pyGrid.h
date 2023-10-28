@@ -68,7 +68,7 @@ inline bool
 sharesWith(const GridType& grid, py::object other)
 {
     if (py::isinstance<GridType>(other)) {
-        typename GridType::ConstPtr otherGrid = other.cast<typename GridType::Ptr>();
+        typename GridType::ConstPtr otherGrid = py::cast<typename GridType::Ptr>(other);
         return (&otherGrid->tree() == &grid.tree());
     }
     return false;
@@ -893,7 +893,7 @@ applyMap(const char* methodName, GridType& grid, py::object funcObj)
 
         // Verify that the result is of type GridType::ValueType.
         try {
-            result.cast<ValueT>();
+            py::cast<ValueT>(result);
         } catch (py::cast_error&) {
             std::ostringstream os;
             os << "expected callable argument to ";
@@ -904,7 +904,7 @@ applyMap(const char* methodName, GridType& grid, py::object funcObj)
             throw py::type_error(os.str());
         }
 
-        it.setValue(result.cast<ValueT>());
+        it.setValue(py::cast<ValueT>(result));
     }
 }
 
@@ -955,7 +955,7 @@ struct TreeCombineOp
             throw py::type_error(os.str());
         }
 
-        result = resultObj.cast<ValueT>();
+        result = py::cast<ValueT>(resultObj);
     }
     py::function op;
 };
@@ -1177,7 +1177,7 @@ public:
     py::object getItem(py::object keyObj) const
     {
         if (py::isinstance<std::string>(keyObj)) {
-            const std::string key = keyObj.cast<std::string>();
+            const std::string key = py::cast<std::string>(keyObj);
             if (key == "value") return py::cast(this->getValue());
             else if (key == "active") return py::cast(this->getActive());
             else if (key == "depth") return py::cast(this->getDepth());
@@ -1185,7 +1185,7 @@ public:
             else if (key == "max") return py::cast(this->getBBoxMax());
             else if (key == "count") return py::cast(this->getVoxelCount());
         }
-        throw py::key_error(keyObj.attr("__repr__")().cast<std::string>());
+        throw py::key_error(py::cast<std::string>(keyObj.attr("__repr__")()));
         return py::object();
     }
 
@@ -1195,20 +1195,20 @@ public:
     void setItem(py::object keyObj, py::object valObj)
     {
         if (py::isinstance<std::string>(keyObj)) {
-            const std::string key = keyObj.cast<std::string>();
+            const std::string key = py::cast<std::string>(keyObj);
             if (key == "value") {
-                this->setValue(valObj.cast<ValueT>()); return;
+                this->setValue(py::cast<ValueT>(valObj)); return;
             } else if (key == "active") {
-                this->setActive(valObj.cast<bool>()); return;
+                this->setActive(py::cast<bool>(valObj)); return;
             } else if (this->hasKey(key)) {
                 std::ostringstream os;
                 os << "can't set attribute '";
-                os << keyObj.attr("__repr__")().cast<std::string>();
+                os << py::cast<std::string>(keyObj.attr("__repr__")());
                 os << "'";
                 throw py::attribute_error(os.str());
             }
         }
-        throw py::key_error(keyObj.attr("__repr__")().cast<std::string>());
+        throw py::key_error(py::cast<std::string>(keyObj.attr("__repr__")()));
     }
 
     bool operator==(const IterValueProxy& other) const
@@ -1235,7 +1235,7 @@ public:
         }
         // print ", ".join(valuesAsStrings)
         py::object joined = py::str(", ").attr("join")(valuesAsStrings);
-        std::string s = joined.cast<std::string>();
+        std::string s = py::cast<std::string>(joined);
         os << "{" << s << "}";
         return os;
     }
@@ -1379,13 +1379,9 @@ struct PickleSuite
         }
 
         // Construct a state tuple for the serialized Grid.
-#if PY_MAJOR_VERSION >= 3
         // Convert the byte string to a "bytes" sequence.
         const std::string s = ostr.str();
         py::bytes bytesObj(s);
-#else
-        py::str bytesObj(ostr.str());
-#endif
         return py::make_tuple(bytesObj);
     }
 
@@ -1397,25 +1393,16 @@ struct PickleSuite
         std::string serialized;
         if (!badState) {
             // Extract the sequence containing the serialized Grid.
-#if PY_MAJOR_VERSION >= 3
             if (py::isinstance<py::bytes>(state[0]))
-                serialized = state[0].cast<py::bytes>();
-#else
-            if (py::isinstance<std::string>(state[0]))
-                serialized = state[0].cast<std::string>();
-#endif
+                serialized = py::cast<py::bytes>(state[0]);
             else
                 badState = true;
         }
 
         if (badState) {
             std::ostringstream os;
-#if PY_MAJOR_VERSION >= 3
             os << "expected (dict, bytes) tuple in call to __setstate__; found ";
-#else
-            os << "expected (dict, str) tuple in call to __setstate__; found ";
-#endif
-            os << state.attr("__repr__")().cast<std::string>();
+            os << py::cast<std::string>(state.attr("__repr__")());
             throw py::value_error(os.str());
         }
 
@@ -1457,14 +1444,15 @@ exportGrid(py::module_ m)
     using ValueAllIterT = typename GridType::ValueAllIter;
 
     const std::string pyGridTypeName = Traits::name();
-    const std::string defaultCtorDescr = "Initialize with a background value of "
-        + pyutil::str(pyGrid::getZeroValue<GridType>()) + ".";
+    std::stringstream docstream;
+    docstream << "Initialize with a background value of " << pyGrid::getZeroValue<GridType>() << ".";
+    std::string docstring = docstream.str();
 
     // Define the Grid wrapper class and make it the current scope.
     py::class_<GridType, GridPtr, GridBase>(m,
         /*classname=*/pyGridTypeName.c_str(),
         /*docstring=*/(Traits::descr()).c_str())
-        .def(py::init<>(), defaultCtorDescr.c_str())
+        .def(py::init<>(), docstring.c_str())
         .def(py::init<const ValueT&>(), py::arg("background"),
             "Initialize with the given background value.")
 
@@ -1711,7 +1699,7 @@ exportGrid(py::module_ m)
     IterWrap<GridType, ValueAllIterT>::wrap(m);
 
     // Add the Python type object for this grid type to the module-level list.
-    m.attr("GridTypes").cast<py::list>().append(m.attr(pyGridTypeName.c_str()));
+    py::cast<py::list>(m.attr("GridTypes")).append(m.attr(pyGridTypeName.c_str()));
 }
 
 } // namespace pyGrid
