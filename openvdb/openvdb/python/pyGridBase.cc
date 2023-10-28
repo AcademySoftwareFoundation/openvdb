@@ -1,20 +1,25 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/make_iterator.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/tuple.h>
+#include <nanobind/stl/variant.h>
+#include <nanobind/stl/shared_ptr.h>
 #include <openvdb/openvdb.h>
+#include <variant>
 #include "pyTypeCasters.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 using namespace openvdb::OPENVDB_VERSION_NAME;
 
 /// Create a Python wrapper for GridBase.
 void
-exportGridBase(py::module_ m)
+exportGridBase(nb::module_ m)
 {
     // Add a module-level list that gives the types of all supported Grid classes.
-    m.attr("GridTypes") = py::list();
+    m.attr("GridTypes") = nb::list();
 
     auto setName = [](GridBase::Ptr grid, const std::string& name) {
         if (name.empty()) {
@@ -101,20 +106,20 @@ exportGridBase(py::module_ m)
 
     auto getMetadataKeys = [](GridBase::ConstPtr grid) {
         // Return an iterator over the "keys" view of a dict.
-        return py::make_key_iterator(static_cast<const MetaMap&>(*grid).beginMeta(), static_cast<const MetaMap&>(*grid).endMeta());
+        return nb::make_key_iterator(nb::type<MetaMap>(), "key_iterator", static_cast<const MetaMap&>(*grid).beginMeta(), static_cast<const MetaMap&>(*grid).endMeta());
     };
 
 
     auto getMetadata = [](GridBase::ConstPtr grid, const std::string& name) {
         Metadata::ConstPtr metadata = (*grid)[name];
         if (!metadata) {
-            throw py::key_error(name.c_str());
+            throw nb::key_error(name.c_str());
         }
 
         MetaMap metamap;
         metamap.insertMeta(name, *metadata);
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
-        return py::cast<py::object>(py::dict(py::cast(metamap))[py::str(name)]);
+        return nb::cast<nb::object>(nb::cast<nb::dict>(nb::cast(metamap))[nb::str(name.c_str())]);
     };
 
 
@@ -129,9 +134,9 @@ exportGridBase(py::module_ m)
         // converter (see pyOpenVDBModule.cc) to convert the dict to a MetaMap
         // containing a Metadata object of the appropriate type.
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
-        py::dict dictObj;
-        dictObj[py::str(name)] = value;
-        MetaMap metamap = py::cast<MetaMap>(dictObj);
+        nb::dict dictObj;
+        dictObj[nb::str(name.c_str())] = value;
+        MetaMap metamap = nb::cast<MetaMap>(dictObj);
 
         if (Metadata::Ptr metadata = metamap[name]) {
             grid->removeMeta(name);
@@ -143,7 +148,7 @@ exportGridBase(py::module_ m)
     auto removeMetadata = [](GridBase::Ptr grid, const std::string& name) {
         Metadata::Ptr metadata = (*grid)[name];
         if (!metadata) {
-            throw py::key_error(name.c_str());
+            throw nb::key_error(name.c_str());
         }
         grid->removeMeta(name);
     };
@@ -155,12 +160,12 @@ exportGridBase(py::module_ m)
 
     auto evalActiveVoxelBoundingBox = [](GridBase::ConstPtr grid) {
         CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-        return py::make_tuple(bbox.min(), bbox.max());
+        return nb::make_tuple(bbox.min(), bbox.max());
     };
 
     // Export GridBase in order to properly support inheritance for typed Grids
     // and expose the corresponding base-class properties.
-    py::class_<GridBase, GridBase::Ptr>(m, "GridBase")
+    nb::class_<GridBase>(m, "GridBase")
         .def("empty", &GridBase::empty,
             "empty() -> bool\n\n"
             "Return True if this grid contains only background voxels.")
@@ -168,18 +173,18 @@ exportGridBase(py::module_ m)
         .def("clear", &GridBase::clear,
             "clear()\n\n"
             "Remove all tiles from this grid and all nodes other than the root node.")
-        .def_property("name", &GridBase::getName, setName,
+        .def_prop_rw("name", &GridBase::getName, setName,
             "this grid's user-specified name")
-        .def_property("creator", &GridBase::getCreator, setCreator,
+        .def_prop_rw("creator", &GridBase::getCreator, setCreator,
             "user-specified description of this grid's creator")
-        .def_property("gridClass", getGridClass, setGridClass,
+        .def_prop_rw("gridClass", getGridClass, setGridClass,
             "the class of volumetric data (level set, fog volume, etc.)\n"
             "stored in this grid")
-        .def_property("vectorType", getVecType, setVecType,
+        .def_prop_rw("vectorType", getVecType, setVecType,
             "how transforms are applied to values stored in this grid")
-        .def_property("transform", static_cast<math::Transform::Ptr (GridBase::*)()>(&GridBase::transformPtr),
+        .def_prop_rw("transform", static_cast<math::Transform::Ptr (GridBase::*)()>(&GridBase::transformPtr),
             setGridTransform, "transform associated with this grid")
-        .def("info", gridInfo, py::arg("verbosity") = 1,
+        .def("info", gridInfo, nb::arg("verbosity") = 1,
             "info(verbosity=1) -> str\n\n"
             "Return a string containing information about this grid\n"
             "with a specified level of verbosity.\n")
@@ -207,7 +212,7 @@ exportGridBase(py::module_ m)
             "getStatsMetadata() -> dict\n\n"
             "Return a (possibly empty) dict containing just the metadata\n"
             "that was added to this grid with addStatsMetadata().")
-        .def_property("metadata", getAllMetadata, replaceAllMetadata,
+        .def_prop_rw("metadata", getAllMetadata, replaceAllMetadata,
             "dict of this grid's metadata\n\n"
             "Setting this attribute replaces all of this grid's metadata,\n"
             "but mutating it in place has no effect on the grid, since\n"
@@ -236,7 +241,7 @@ exportGridBase(py::module_ m)
         .def("iterkeys", getMetadataKeys,
             "iterkeys() -> iterator\n\n"
             "Return an iterator over this grid's metadata keys.")
-        .def_property("saveFloatAsHalf",
+        .def_prop_rw("saveFloatAsHalf",
             &GridBase::saveFloatAsHalf, &GridBase::setSaveFloatAsHalf,
             "if True, write floating-point voxel values as 16-bit half floats");
 }
