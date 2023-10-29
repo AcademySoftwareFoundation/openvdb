@@ -25,10 +25,10 @@ namespace nb = nanobind;
 void exportTransform(nb::module_ m);
 void exportMetadata(nb::module_ m);
 void exportGridBase(nb::module_ m);
-// void exportFloatGrid(nb::module_ m);
+void exportFloatGrid(nb::module_ m);
 void exportIntGrid(nb::module_ m);
-// void exportVec3Grid(nb::module_ m);
-// void exportPointGrid(nb::module_ m);
+void exportVec3Grid(nb::module_ m);
+void exportPointGrid(nb::module_ m);
 
 namespace _openvdbmodule {
 
@@ -376,10 +376,10 @@ NB_MODULE(PY_OPENVDB_MODULE_NAME, m)
     exportTransform(m);
     exportMetadata(m);
     exportGridBase(m);
-    // exportFloatGrid(m);
+    exportFloatGrid(m);
     exportIntGrid(m);
-    // exportVec3Grid(m);
-    // exportPointGrid(m);
+    exportVec3Grid(m);
+    exportPointGrid(m);
 
 
     m.def("read",
