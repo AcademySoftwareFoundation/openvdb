@@ -11,9 +11,9 @@
 void
 exportFloatGrid(nb::module_ m)
 {
-    pyGrid::exportGrid<FloatGrid>(m);
+    pyGrid::exportScalarGrid<FloatGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    pyGrid::exportGrid<DoubleGrid>(m);
+    pyGrid::exportScalarGrid<DoubleGrid>(m);
 #endif
 
     m.def("createLevelSetSphere",

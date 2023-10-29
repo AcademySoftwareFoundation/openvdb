@@ -14,7 +14,7 @@ include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
 
-option(USE_NUMPY "Build the python library with numpy support." OFF)
+option(USE_NUMPY "Build the python library with numpy support." ON)
 option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
@@ -101,12 +101,8 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-if(USE_NUMPY)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS NumPy)
-endif()
-
 # Make sure find_package(Python) is only ever invoked once with all required components
-find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+find_package(Python 3.8 REQUIRED COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
 find_package(nanobind REQUIRED)
 
 openvdb_check_python_version(Python::Module
@@ -115,15 +111,6 @@ openvdb_check_python_version(Python::Module
   "${MINIMUM_PYTHON_VERSION}"
   "${FUTURE_MINIMUM_PYTHON_VERSION}")
 list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
-
-if(USE_NUMPY)
-  openvdb_check_python_version(Python::NumPy
-    "${Python_NumPy_VERSION}"
-    "${Python_NumPy_INCLUDE_DIRS}"
-    "${MINIMUM_NUMPY_VERSION}"
-    "${FUTURE_MINIMUM_NUMPY_VERSION}")
-  list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-endif()
 
 ##########################################################################
 
