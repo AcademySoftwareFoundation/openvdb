@@ -12,6 +12,9 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/function.h>
+#include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/optional.h>
+#include <nanobind/stl/tuple.h>
 #ifdef PY_OPENVDB_USE_NUMPY
 #include <nanobind/ndarray.h>
 #include <openvdb/tools/MeshToVolume.h>
@@ -937,10 +940,27 @@ mapAll(GridType& grid, nb::object funcObj)
 
 ////////////////////////////////////////
 
+
+template<typename GridType>
+struct TreeCombineOp
+{
+    using TreeT = typename GridType::TreeType;
+    using ValueT = typename GridType::ValueType;
+
+    TreeCombineOp(const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& _op): op(_op) {}
+    void operator()(const ValueT& a, const ValueT& b, ValueT& result)
+    {
+        result = op(a, b);
+    }
+    const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& op;
+};
+
+
 template<typename GridType>
 inline void
-combine(GridType& grid, GridType& otherGrid, const std::function<void(typename GridType::ValueType, typename GridType::ValueType, typename GridType::ValueType&)>& op)
+combine(GridType& grid, GridType& otherGrid, const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& func)
 {
+    TreeCombineOp<GridType> op(func);
     grid.tree().combine(otherGrid.tree(), op, /*prune=*/true);
 }
 
@@ -1321,7 +1341,7 @@ public:
             .def("__getitem__", &IterValueProxyT::getItem,
                 "__getitem__(key) -> value\n\n"
                 "Return the value of the item with the given key.")
-            .def("__setitem__", &IterValueProxyT::getItem,
+            .def("__setitem__", &IterValueProxyT::setItem,
                 "__setitem__(key, value)\n\n"
                 "Set the value of the item with the given key.");
     }
@@ -1337,13 +1357,11 @@ private:
 ////////////////////////////////////////
 
 
-template<typename GridT>
+template<typename GridType>
 struct PickleSuite
 {
-    using GridPtrT = typename GridT::Ptr;
-
     /// Return a tuple representing the state of the given Grid.
-    static nb::tuple getState(const GridPtrT& grid)
+    static std::tuple<nb::bytes> getState(const typename GridType::Ptr& grid)
     {
         // Serialize the Grid to a string.
         std::ostringstream ostr(std::ios_base::binary);
@@ -1356,30 +1374,15 @@ struct PickleSuite
         // Construct a state tuple for the serialized Grid.
         // Convert the byte string to a "bytes" sequence.
         const std::string s = ostr.str();
-        nb::bytes bytesObj(s.c_str());
-        return nb::make_tuple(bytesObj);
+        nb::bytes bytesObj(s.c_str(), s.length());
+        return std::make_tuple(bytesObj);
     }
 
     /// Restore the given Grid to a saved state.
-    static GridPtrT setState(nb::tuple state)
+    static void setState(GridType& grid, std::tuple<nb::bytes> state)
     {
-        bool badState = (nb::len(state) != 1);
-
-        std::string serialized;
-        if (!badState) {
-            // Extract the sequence containing the serialized Grid.
-            if (nb::isinstance<nb::bytes>(state[0]))
-                serialized = nb::cast<nb::bytes>(state[0]).c_str();
-            else
-                badState = true;
-        }
-
-        if (badState) {
-            std::ostringstream os;
-            os << "expected (dict, bytes) tuple in call to __setstate__; found ";
-            os << nb::cast<std::string>(state.attr("__repr__")());
-            throw nb::value_error(os.str().c_str());
-        }
+        nb::bytes bytesObj = std::get<0>(state);
+        std::string serialized(bytesObj.c_str(), bytesObj.c_str() + bytesObj.size());
 
         // Restore the internal state of the C++ object.
         GridPtrVecPtr grids;
@@ -1389,12 +1392,13 @@ struct PickleSuite
             grids = strm.getGrids(); // (note: file-level metadata is ignored)
         }
         if (grids && !grids->empty()) {
-            if (GridPtrT savedGrid = gridPtrCast<GridT>((*grids)[0])) {
-                return savedGrid;
+            if (typename GridType::Ptr savedGrid = gridPtrCast<GridType>((*grids)[0])) {
+                new (&grid) GridType(*savedGrid);
+                return;
             }
         }
 
-        return GridPtrT();
+        new (&grid) GridType();
     }
 }; // struct PickleSuite
 
@@ -1439,7 +1443,8 @@ exportGrid(nb::module_ m)
             ("deepCopy() -> " + pyGridTypeName + "\n\n"
             "Return a deep copy of this grid.\n").c_str())
 
-        // .def(nb::pickle(&PickleSuite<GridType>::getState, &PickleSuite<GridType>::setState))
+        .def("__getstate__", &PickleSuite<GridType>::getState)
+        .def("__setstate__", &PickleSuite<GridType>::setState)
 
         .def("sharesWith", &pyGrid::sharesWith<GridType>,
             ("sharesWith(" + pyGridTypeName + ") -> bool\n\n"
