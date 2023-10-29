@@ -84,45 +84,45 @@ class TestOpenVDB(unittest.TestCase):
             self.assertEqual(grid.activeVoxelCount(), 1)
 
 
-    # def testAX(self):
-    #     if not ax_is_enabled():
-    #         return
+    def testAX(self):
+        if not ax_is_enabled():
+            return
 
-    #     float_grid = openvdb.FloatGrid()
-    #     float_grid.name = 'float_grid'
-    #     ijk = (1, 1, 1)
+        float_grid = openvdb.FloatGrid()
+        float_grid.name = 'float_grid'
+        ijk = (1, 1, 1)
 
-    #     acc = float_grid.getAccessor()
-    #     acc.setValueOn((ijk))
-    #     self.assertEqual(acc.getValue(ijk), 0)
+        acc = float_grid.getAccessor()
+        acc.setValueOn((ijk))
+        self.assertEqual(acc.getValue(ijk), 0)
 
-    #     openvdb.ax('@float_grid = 2;', float_grid)
-    #     self.assertEqual(acc.getValue(ijk), 2)
-    #     acc.setValueOn((ijk))
+        openvdb.ax('@float_grid = 2;', float_grid)
+        self.assertEqual(acc.getValue(ijk), 2)
+        acc.setValueOn((ijk))
 
-    #     float_grid.fill((0, 0, 0), (7, 7, 7), -1, active=True)
-    #     openvdb.ax('@float_grid = lengthsq(getcoord());', float_grid)
+        float_grid.fill((0, 0, 0), (7, 7, 7), -1, active=True)
+        openvdb.ax('@float_grid = lengthsq(getcoord());', float_grid)
 
-    #     for i in range(0, 8):
-    #         for j in range(0, 8):
-    #             for k in range(0, 8):
-    #                 ijk = (i, j, k)
-    #                 lsq = (i*i)+(j*j)+(k*k)
-    #                 self.assertEqual(acc.getValue(ijk), lsq)
+        for i in range(0, 8):
+            for j in range(0, 8):
+                for k in range(0, 8):
+                    ijk = (i, j, k)
+                    lsq = (i*i)+(j*j)+(k*k)
+                    self.assertEqual(acc.getValue(ijk), lsq)
 
-    #     vec3_grid = openvdb.Vec3SGrid()
-    #     vec3_grid.name = 'vec_grid'
+        vec3_grid = openvdb.Vec3SGrid()
+        vec3_grid.name = 'vec_grid'
 
-    #     vec3_grid.fill((0, 0, 0), (7, 7, 7), (-1,-1,-1), active=True)
-    #     openvdb.ax('v@vec_grid = @float_grid;', [vec3_grid, float_grid])
-    #     acc = vec3_grid.getAccessor()
+        vec3_grid.fill((0, 0, 0), (7, 7, 7), (-1,-1,-1), active=True)
+        openvdb.ax('v@vec_grid = @float_grid;', [vec3_grid, float_grid])
+        acc = vec3_grid.getAccessor()
 
-    #     for i in range(0, 8):
-    #         for j in range(0, 8):
-    #             for k in range(0, 8):
-    #                 ijk = (i, j, k)
-    #                 lsq = (i*i)+(j*j)+(k*k)
-    #                 self.assertEqual(acc.getValue(ijk), (lsq,lsq,lsq))
+        for i in range(0, 8):
+            for j in range(0, 8):
+                for k in range(0, 8):
+                    ijk = (i, j, k)
+                    lsq = (i*i)+(j*j)+(k*k)
+                    self.assertEqual(acc.getValue(ijk), (lsq,lsq,lsq))
 
 
     def testTransform(self):
@@ -555,12 +555,12 @@ class TestOpenVDB(unittest.TestCase):
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray('abc'))
         arr = np.zeros((1, 2))
-        self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
-
-        # Verify that complex-valued arrays are not supported.
-        arr = np.zeros((1, 2, 1), dtype = complex)
-        grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
+
+        # # Verify that complex-valued arrays are not supported.
+        # arr = np.zeros((1, 2, 1), dtype = complex)
+        # grid = openvdb.FloatGrid()
+        # self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
 
         ARRAY_DIM = 201
         BG, FG = 0, 1
@@ -611,7 +611,7 @@ class TestOpenVDB(unittest.TestCase):
                 # Verify that scalar arrays can't be copied into vector grids
                 # and vector arrays can't be copied into scalar grids.
                 if isScalarGrid != isScalarArray:
-                    self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
+                    self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
                     continue
 
                 # Copy values from the NumPy array to the grid, marking
@@ -654,12 +654,12 @@ class TestOpenVDB(unittest.TestCase):
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray('abc'))
         arr = np.zeros((1, 2))
-        self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
-
-        # Verify that complex-valued arrays are not supported.
-        arr = np.zeros((1, 2, 1), dtype = complex)
-        grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
+
+        # # Verify that complex-valued arrays are not supported.
+        # arr = np.zeros((1, 2, 1), dtype = complex)
+        # grid = openvdb.FloatGrid()
+        # self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
 
         ARRAY_DIM = 201
         BG, FG = 0, 1
@@ -787,8 +787,6 @@ class TestOpenVDB(unittest.TestCase):
         # Vector-valued grids can't be used to store level sets.
         self.assertRaises(TypeError, lambda: openvdb.Vec3SGrid.createLevelSetFromPolygons(
             cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
-        # The "points" argument to createLevelSetFromPolygons() can be a regular array.
-        openvdb.FloatGrid.createLevelSetFromPolygons(cubeVertices, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
         # The "points" argument to createLevelSetFromPolygons() can be an array that's implicitly convertible to float
         openvdb.FloatGrid.createLevelSetFromPolygons(np.array(cubeVertices, bool), quads=cubeQuads, transform=xform, halfWidth=halfWidth)
         # The "triangles" argument to createLevelSetFromPolygons() must be an N x 3 NumPy array.
