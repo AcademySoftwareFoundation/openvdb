@@ -6,6 +6,7 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/vector.h>
 #include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/tuple.h>
 #include <openvdb/openvdb.h>
 #include "pyTypeCasters.h"
 
@@ -83,17 +84,18 @@ struct PickleSuite
     enum { STATE_MAJOR = 0, STATE_MINOR, STATE_FORMAT, STATE_XFORM };
 
     /// Return a tuple representing the state of the given Transform.
-    static nb::tuple getState(const math::Transform& xform)
+    static std::tuple<uint32_t, uint32_t, uint32_t, nb::bytes> getState(const math::Transform& xform)
     {
         std::ostringstream ostr(std::ios_base::binary);
         // Serialize the Transform to a string.
         xform.write(ostr);
 
+        nb::bytes bytesObj(ostr.str().c_str(), ostr.str().length());
+
         // Construct a state tuple comprising the version numbers of
         // the serialization format and the serialized Transform.
         // Convert the byte string to a "bytes" sequence.
-        nb::bytes bytesObj(ostr.str().c_str());
-        return nb::make_tuple(
+        return std::make_tuple(
             uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
             uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
             uint32_t(OPENVDB_FILE_VERSION),
@@ -101,48 +103,23 @@ struct PickleSuite
     }
 
     /// Restore the given Transform to a saved state.
-    static math::Transform setState(nb::tuple state)
+    static void setState(math::Transform& xform, const std::tuple<uint32_t, uint32_t, uint32_t, nb::bytes>& state)
     {
-        bool badState = (nb::len(state) != 4);
-
         openvdb::VersionId libVersion;
         uint32_t formatVersion = 0;
-        if (!badState) {
-            // Extract the serialization format version numbers.
-            const int idx[3] = { STATE_MAJOR, STATE_MINOR, STATE_FORMAT };
-            uint32_t version[3] = { 0, 0, 0 };
-            for (int i = 0; i < 3 && !badState; ++i) {
-                if (nb::isinstance<nb::int_>(state[idx[i]]))
-                    version[i] = nb::cast<uint32_t>(state[idx[i]]);
-                else badState = true;
-            }
-            libVersion.first = version[0];
-            libVersion.second = version[1];
-            formatVersion = version[2];
-        }
 
-        std::string serialized;
-        if (!badState) {
-            // Extract the sequence containing the serialized Transform.
-            nb::object bytesObj = state[int(STATE_XFORM)];
-            if (nb::isinstance<nb::bytes>(bytesObj))
-                serialized = nb::cast<nb::bytes>(bytesObj).c_str();
-            else badState = true;
-        }
+        libVersion.first = std::get<0>(state);
+        libVersion.second = std::get<1>(state);
+        formatVersion = std::get<2>(state);
 
-        if (badState) {
-            std::ostringstream os;
-            os << "expected (int, int, int, bytes) tuple in call to __setstate__; found ";
-            os << nb::cast<std::string>(state.attr("__repr__")());
-            throw nb::value_error(os.str().c_str());
-        }
+        nb::bytes bytesObj = std::get<3>(state);
+        std::string serialized(bytesObj.c_str(), bytesObj.c_str() + bytesObj.size());
 
         // Restore the internal state of the C++ object.
         std::istringstream istr(serialized, std::ios_base::binary);
         io::setVersion(istr, libVersion, formatVersion);
-        math::Transform xform;
+        new (&xform) math::Transform;
         xform.read(istr);
-        return xform;
     }
 }; // struct PickleSuite
 
@@ -170,7 +147,8 @@ exportTransform(nb::module_ m)
             "info() -> str\n\n"
             "Return a string containing a description of this transform.\n")
 
-        // .def(nb::pickle(&pyTransform::PickleSuite::getState, &pyTransform::PickleSuite::setState))
+        .def("__getstate__", &pyTransform::PickleSuite::getState)
+        .def("__setstate__", &pyTransform::PickleSuite::setState)
 
         .def_prop_ro("typeName", &math::Transform::mapType,
             "name of this transform's type")
