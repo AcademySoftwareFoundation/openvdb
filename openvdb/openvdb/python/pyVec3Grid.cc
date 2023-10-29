@@ -9,9 +9,9 @@
 void
 exportVec3Grid(nb::module_ m)
 {
-    pyGrid::exportGrid<Vec3SGrid>(m);
+    pyGrid::exportVectorGrid<Vec3SGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    pyGrid::exportGrid<Vec3IGrid>(m);
-    pyGrid::exportGrid<Vec3DGrid>(m);
+    pyGrid::exportVectorGrid<Vec3IGrid>(m);
+    pyGrid::exportVectorGrid<Vec3DGrid>(m);
 #endif
 }
