@@ -371,10 +371,6 @@ PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
 
 #undef PYOPENVDB_TRANSLATE_EXCEPTION
 
-    py::class_<openvdb::PointDataIndex32>(m, "PointDataIndex32")
-        .def(py::init<openvdb::Index32>(), py::arg("i") = openvdb::Index32(0));
-
-
     // Export the python bindings.
     exportTransform(m);
     exportMetadata(m);
