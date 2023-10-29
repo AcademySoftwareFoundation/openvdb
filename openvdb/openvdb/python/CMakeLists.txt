@@ -128,14 +128,14 @@ endif()
 ##########################################################################
 
 set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
-  # pyFloatGrid.cc
+  pyFloatGrid.cc
   pyGridBase.cc
   pyIntGrid.cc
   pyMetadata.cc
   pyOpenVDBModule.cc
-  # pyPointGrid.cc
+  pyPointGrid.cc
   pyTransform.cc
-  # pyVec3Grid.cc
+  pyVec3Grid.cc
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
