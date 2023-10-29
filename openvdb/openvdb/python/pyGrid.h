@@ -17,6 +17,7 @@
 #include <nanobind/stl/tuple.h>
 #ifdef PY_OPENVDB_USE_NUMPY
 #include <nanobind/ndarray.h>
+#include <nanobind/stl/optional.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/VolumeToMesh.h> // for tools::volumeToMesh()
 #endif
@@ -327,355 +328,53 @@ copyToArray(GridType&, const nb::object&, nb::object)
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
 
-using ArrayDimVec = std::vector<ssize_t>;
-
-// ID numbers for supported value types
-enum class DtId { NONE, FLOAT, DOUBLE, BOOL, INT16, INT32, INT64, UINT32, UINT64/*, HALF*/ };
-
-template<DtId TypeId> struct NumPyToCpp {};
-template<> struct NumPyToCpp<DtId::FLOAT>  { using type = float; };
-template<> struct NumPyToCpp<DtId::DOUBLE> { using type = double; };
-template<> struct NumPyToCpp<DtId::BOOL>   { using type = bool; };
-template<> struct NumPyToCpp<DtId::INT16>  { using type = Int16; };
-template<> struct NumPyToCpp<DtId::INT32>  { using type = Int32; };
-template<> struct NumPyToCpp<DtId::INT64>  { using type = Int64; };
-template<> struct NumPyToCpp<DtId::UINT32> { using type = Index32; };
-template<> struct NumPyToCpp<DtId::UINT64> { using type = Index64; };
-//template<> struct NumPyToCpp<DtId::HALF>   { using type = math::half; };
-
-
-#if 0
-template<typename T> struct CppToNumPy { static const DtId typeId = DtId::NONE; };
-template<> struct CppToNumPy<float>    { static const DtId typeId = DtId::FLOAT; };
-template<> struct CppToNumPy<double>   { static const DtId typeId = DtId::DOUBLE; };
-template<> struct CppToNumPy<bool>     { static const DtId typeId = DtId::BOOL; };
-template<> struct CppToNumPy<Int16>    { static const DtId typeId = DtId::INT16; };
-template<> struct CppToNumPy<Int32>    { static const DtId typeId = DtId::INT32; };
-template<> struct CppToNumPy<Int64>    { static const DtId typeId = DtId::INT64; };
-template<> struct CppToNumPy<Index32>  { static const DtId typeId = DtId::UINT32; };
-template<> struct CppToNumPy<Index64>  { static const DtId typeId = DtId::UINT64; };
-//template<> struct CppToNumPy<math::half>     { static const DtId typeId = DtId::HALF; };
-#endif
-
-
-// Return the ID number of the given NumPy array's data type.
-/// @todo Revisit this if and when nb::numnb::dtype ever provides a type number accessor.
-inline DtId
-arrayTypeId(const nb::array& array)
-{
-    const auto dtype = array.dtype();
-    if (dtype.is(nb::dtype::of<float>())) return DtId::FLOAT;
-    if (dtype.is(nb::dtype::of<double>())) return DtId::DOUBLE;
-    if (dtype.is(nb::dtype::of<bool>())) return DtId::BOOL;
-    if (dtype.is(nb::dtype::of<Int16>())) return DtId::INT16;
-    if (dtype.is(nb::dtype::of<Int32>())) return DtId::INT32;
-    if (dtype.is(nb::dtype::of<Int64>())) return DtId::INT64;
-    if (dtype.is(nb::dtype::of<Index32>())) return DtId::UINT32;
-    if (dtype.is(nb::dtype::of<Index64>())) return DtId::UINT64;
-    //if (dtype.is(nb::dtype::of<math::half>())) return DtId::HALF;
-    throw openvdb::TypeError{};
-}
-
-
-// Return a string description of the given NumPy array's data type.
-inline std::string
-arrayTypeName(const nb::array& array)
-{
-    return nb::str(array.dtype());
-}
-
-
-// Return the dimensions of the given NumPy array.
-inline ArrayDimVec
-arrayDimensions(const nb::array& array)
-{
-    ArrayDimVec dims;
-    for (size_t i = 0, N = array.ndim(); i < N; ++i) {
-        dims.push_back(array.shape(i));
-    }
-    return dims;
-}
-
-
-
-// Abstract base class for helper classes that copy data between
-// NumPy arrays of various types and grids of various types
 template<typename GridType>
-class CopyOpBase
+inline void
+copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType, nb::shape<nb::any, nb::any, nb::any>> array, const Coord& origin, const typename GridType::ValueType& tolerance)
 {
-public:
-    using ValueT = typename GridType::ValueType;
-
-    CopyOpBase(bool toGrid, GridType& grid, nb::array array,
-        const Coord& origin, const typename GridType::ValueType& tolerance)
-        : mToGrid(toGrid)
-        , mGrid(&grid)
-    {
-        mArray = array.mutable_data();
-        mArrayTypeName = arrayTypeName(array);
-        mArrayTypeId = arrayTypeId(array);
-        mArrayDims = arrayDimensions(array);
-
-        mTolerance = tolerance;
-
-        // Compute the bounding box of the region of the grid that is to be copied from or to.
-        // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
-        // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-        Coord bboxMax = origin;
-        for (size_t n = 0, N = std::min<size_t>(mArrayDims.size(), 3); n < N; ++n) {
-            bboxMax[n] += int(mArrayDims[n]) - 1;
-        }
-        mBBox.reset(origin, bboxMax);
-    }
-    virtual ~CopyOpBase() {}
-
-    void operator()() const
-    {
-        try {
-            if (mToGrid) {
-                copyFromArray(); // copy data from the array to the grid
-            } else {
-                copyToArray(); // copy data from the grid to the array
-            }
-        } catch (openvdb::TypeError&) {
-            std::ostringstream os;
-            os << "unsupported NumPy data type ";
-            os << mArrayTypeName.c_str();
-            throw nb::type_error(os.str().c_str());
-        }
-    }
-
-protected:
-    virtual void validate() const = 0;
-    virtual void copyFromArray() const = 0;
-    virtual void copyToArray() const = 0;
-
-    template<typename ArrayValueType>
-    void fromArray() const
-    {
-        validate();
-        tools::Dense<ArrayValueType> valArray(mBBox, static_cast<ArrayValueType*>(mArray));
-        tools::copyFromDense(valArray, *mGrid, mTolerance);
-    }
-
-    template<typename ArrayValueType>
-    void toArray() const
-    {
-        validate();
-        tools::Dense<ArrayValueType> valArray(mBBox, static_cast<ArrayValueType*>(mArray));
-        tools::copyToDense(*mGrid, valArray);
-    }
-
-
-    bool mToGrid; // if true, copy from the array to the grid, else vice-versa
-    void* mArray;
-    GridType* mGrid;
-    DtId mArrayTypeId;
-    ArrayDimVec mArrayDims;
-    std::string mArrayTypeName;
-    CoordBBox mBBox;
-    ValueT mTolerance;
-}; // class CopyOpBase
-
-
-// Helper subclass that can be specialized for various grid and NumPy array types
-template<typename GridType, int VecSize> class CopyOp: public CopyOpBase<GridType> {};
-
-// Specialization for scalar grids
-template<typename GridType>
-class CopyOp<GridType, /*VecSize=*/1>: public CopyOpBase<GridType>
-{
-public:
-    CopyOp(bool toGrid, GridType& grid,  nb::array array, const Coord& coord,
-        const typename GridType::ValueType& tolerance = zeroVal<typename GridType::ValueType>()):
-        CopyOpBase<GridType>(toGrid, grid, array, coord, tolerance)
-    {
-    }
-
-protected:
-    void validate() const override
-    {
-        if (this->mArrayDims.size() != 3) {
-            std::ostringstream os;
-            os << "expected 3-dimensional array, found "
-                << this->mArrayDims.size() << "-dimensional array";
-            throw nb::value_error(os.str());
-        }
-    }
-
-#ifdef __clang__
-    // Suppress "enum value not explicitly handled" warnings
-    PRAGMA(clang diagnostic push)
-    PRAGMA(clang diagnostic ignored "-Wswitch-enum")
-#endif
-
-    void copyFromArray() const override
-    {
-        switch (this->mArrayTypeId) {
-        case DtId::FLOAT: this->template fromArray<typename NumPyToCpp<DtId::FLOAT>::type>(); break;
-        case DtId::DOUBLE:this->template fromArray<typename NumPyToCpp<DtId::DOUBLE>::type>();break;
-        case DtId::BOOL:  this->template fromArray<typename NumPyToCpp<DtId::BOOL>::type>(); break;
-        case DtId::INT16: this->template fromArray<typename NumPyToCpp<DtId::INT16>::type>(); break;
-        case DtId::INT32: this->template fromArray<typename NumPyToCpp<DtId::INT32>::type>(); break;
-        case DtId::INT64: this->template fromArray<typename NumPyToCpp<DtId::INT64>::type>(); break;
-        case DtId::UINT32:this->template fromArray<typename NumPyToCpp<DtId::UINT32>::type>();break;
-        case DtId::UINT64:this->template fromArray<typename NumPyToCpp<DtId::UINT64>::type>();break;
-        default: throw openvdb::TypeError(); break;
-        }
-    }
-
-    void copyToArray() const override
-    {
-        switch (this->mArrayTypeId) {
-        case DtId::FLOAT:  this->template toArray<typename NumPyToCpp<DtId::FLOAT>::type>(); break;
-        case DtId::DOUBLE: this->template toArray<typename NumPyToCpp<DtId::DOUBLE>::type>(); break;
-        case DtId::BOOL:   this->template toArray<typename NumPyToCpp<DtId::BOOL>::type>(); break;
-        case DtId::INT16:  this->template toArray<typename NumPyToCpp<DtId::INT16>::type>(); break;
-        case DtId::INT32:  this->template toArray<typename NumPyToCpp<DtId::INT32>::type>(); break;
-        case DtId::INT64:  this->template toArray<typename NumPyToCpp<DtId::INT64>::type>(); break;
-        case DtId::UINT32: this->template toArray<typename NumPyToCpp<DtId::UINT32>::type>(); break;
-        case DtId::UINT64: this->template toArray<typename NumPyToCpp<DtId::UINT64>::type>(); break;
-        default: throw openvdb::TypeError(); break;
-        }
-    }
-
-#ifdef __clang__
-    PRAGMA(clang diagnostic pop)
-#endif
-
-}; // class CopyOp
-
-// Specialization for Vec3 grids
-template<typename GridType>
-class CopyOp<GridType, /*VecSize=*/3>: public CopyOpBase<GridType>
-{
-public:
-    CopyOp(bool toGrid, GridType& grid, nb::array array, const Coord& coord,
-        const typename GridType::ValueType& tolerance = zeroVal<typename GridType::ValueType>()):
-        CopyOpBase<GridType>(toGrid, grid, array, coord, tolerance)
-    {
-    }
-
-protected:
-    void validate() const override
-    {
-        if (this->mArrayDims.size() != 4) {
-            std::ostringstream os;
-            os << "expected 4-dimensional array, found "
-                << this->mArrayDims.size() << "-dimensional array";
-            throw nb::value_error(os.str());
-        }
-        if (this->mArrayDims[3] != 3) {
-            std::ostringstream os;
-            os << "expected " << this->mArrayDims[0] << "x" << this->mArrayDims[1]
-                << "x" << this->mArrayDims[2] << "x3 array, found " << this->mArrayDims[0]
-                << "x" << this->mArrayDims[1] << "x" << this->mArrayDims[2]
-                << "x" << this->mArrayDims[3] << " array";
-            throw nb::value_error(os.str());
-        }
-    }
-
-#ifdef __clang__
-    // Suppress "enum value not explicitly handled" warnings
-    PRAGMA(clang diagnostic push)
-    PRAGMA(clang diagnostic ignored "-Wswitch-enum")
-#endif
-
-    void copyFromArray() const override
-    {
-        switch (this->mArrayTypeId) {
-        case DtId::FLOAT:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::FLOAT>::type>>(); break;
-        case DtId::DOUBLE:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::DOUBLE>::type>>(); break;
-        case DtId::BOOL:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::BOOL>::type>>(); break;
-        case DtId::INT16:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::INT16>::type>>(); break;
-        case DtId::INT32:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::INT32>::type>>(); break;
-        case DtId::INT64:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::INT64>::type>>(); break;
-        case DtId::UINT32:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::UINT32>::type>>(); break;
-        case DtId::UINT64:
-            this->template fromArray<math::Vec3<typename NumPyToCpp<DtId::UINT64>::type>>(); break;
-        default: throw openvdb::TypeError(); break;
-        }
-    }
-
-    void copyToArray() const override
-    {
-        switch (this->mArrayTypeId) {
-        case DtId::FLOAT:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::FLOAT>::type>>(); break;
-        case DtId::DOUBLE:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::DOUBLE>::type>>(); break;
-        case DtId::BOOL:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::BOOL>::type>>(); break;
-        case DtId::INT16:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::INT16>::type>>(); break;
-        case DtId::INT32:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::INT32>::type>>(); break;
-        case DtId::INT64:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::INT64>::type>>(); break;
-        case DtId::UINT32:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::UINT32>::type>>(); break;
-        case DtId::UINT64:
-            this->template toArray<math::Vec3<typename NumPyToCpp<DtId::UINT64>::type>>(); break;
-        default: throw openvdb::TypeError(); break;
-        }
-    }
-
-#ifdef __clang__
-    PRAGMA(clang diagnostic pop)
-#endif
-
-}; // class CopyOp
-
+    // Compute the bounding box of the region of the grid that is to be copied from or to.
+    // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
+    // Voxel (i, j, k) will correspond to array element (0, 0, 0).
+    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    tools::copyFromDense(valArray, grid, tolerance);
+}
 
 template<typename GridType>
 inline void
-copyFromArray(GridType& grid, nb::array array, const Coord& coord, const typename GridType::ValueType& tolerance)
+copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType::ValueType, nb::shape<nb::any, nb::any, nb::any, VecTraits<typename GridType::ValueType>::Size>> array, const Coord& origin, const typename GridType::ValueType& tolerance)
 {
-    using ValueT = typename GridType::ValueType;
-    CopyOp<GridType, VecTraits<ValueT>::Size>
-        op(/*toGrid=*/true, grid, array, coord, tolerance);
-    op();
+    // Compute the bounding box of the region of the grid that is to be copied from or to.
+    // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
+    // Voxel (i, j, k) will correspond to array element (0, 0, 0).
+    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    tools::copyFromDense(valArray, grid, tolerance);
 }
-
 
 template<typename GridType>
 inline void
-copyToArray(GridType& grid, nb::array array, const Coord& coord)
+copyToArrayScalar(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType, nb::shape<nb::any, nb::any, nb::any>> array, const Coord& origin)
 {
-    using ValueT = typename GridType::ValueType;
-    CopyOp<GridType, VecTraits<ValueT>::Size>
-        op(/*toGrid=*/false, grid, array, coord);
-    op();
+    // Compute the bounding box of the region of the grid that is to be copied from or to.
+    // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
+    // Voxel (i, j, k) will correspond to array element (0, 0, 0).
+    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    tools::copyToDense(grid, valArray);
 }
 
-
-template<>
+template<typename GridType>
 inline void
-copyFromArray(points::PointDataGrid& /*grid*/, nb::array /*array*/,
-    const Coord& /*coord*/, const typename points::PointDataGrid::ValueType& /*tolerance*/)
+copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType::ValueType, nb::shape<nb::any, nb::any, nb::any, VecTraits<typename GridType::ValueType>::Size>> array, const Coord& origin)
 {
-    PyErr_SetString(PyExc_NotImplementedError,
-        "copying NumPy arrays for PointDataGrids is not supported");
-    throw nb::python_error();
+    // Compute the bounding box of the region of the grid that is to be copied from or to.
+    // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
+    // Voxel (i, j, k) will correspond to array element (0, 0, 0).
+    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    tools::copyToDense(grid, valArray);
 }
-
-
-template<>
-inline void
-copyToArray(points::PointDataGrid& /*grid*/, nb::array /*array*/, const Coord& /*coord*/)
-{
-    PyErr_SetString(PyExc_NotImplementedError,
-        "copying NumPy arrays for PointDataGrids is not supported");
-    throw nb::python_error();
-}
-
 
 #endif // defined(PY_OPENVDB_USE_NUMPY)
 
@@ -714,96 +413,37 @@ volumeToMesh(const GridType&, nb::object, nb::object)
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
 
-// Helper class for meshToLevelSet()
-template<typename SrcT, typename DstT>
-struct CopyVecOp {
-    void operator()(const void* srcPtr, DstT* dst, size_t count) {
-        const SrcT* src = static_cast<const SrcT*>(srcPtr);
-        for (size_t i = count; i > 0; --i, ++src, ++dst) {
-            *dst = static_cast<DstT>(*src);
-        }
-    }
-};
-// Partial specialization for source and destination arrays of the same type
-template<typename T>
-struct CopyVecOp<T, T> {
-    void operator()(const void* srcPtr, T* dst, size_t count) {
-        const T* src = static_cast<const T*>(srcPtr);
-        ::memcpy(dst, src, count * sizeof(T));
-    }
-};
-
-
-// Helper function for use with meshToLevelSet() to copy vectors of various types
-// and sizes from NumPy arrays to STL vectors
-template<typename VecT>
-inline void
-copyVecArray(nb::array& arrayObj, std::vector<VecT>& vec)
-{
-    using ValueT = typename VecT::ValueType;
-
-    // Get the input array dimensions.
-    const auto dims = arrayDimensions(arrayObj);
-    const size_t M = dims.empty() ? 0 : dims[0];
-    const size_t N = VecT().numElements();
-    if (M == 0 || N == 0) return;
-
-    // Preallocate the output vector.
-    vec.resize(M);
-
-    // Copy values from the input array to the output vector (with type conversion, if necessary).
-    const void* src = arrayObj.data();
-    ValueT* dst = &vec[0][0];
-    switch (arrayTypeId(arrayObj)) {
-    case DtId::FLOAT:  CopyVecOp<NumPyToCpp<DtId::FLOAT>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::DOUBLE: CopyVecOp<NumPyToCpp<DtId::DOUBLE>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::INT16:  CopyVecOp<NumPyToCpp<DtId::INT16>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::INT32:  CopyVecOp<NumPyToCpp<DtId::INT32>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::INT64:  CopyVecOp<NumPyToCpp<DtId::INT64>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::UINT32: CopyVecOp<NumPyToCpp<DtId::UINT32>::type, ValueT>()(src, dst, M*N); break;
-    case DtId::UINT64: CopyVecOp<NumPyToCpp<DtId::UINT64>::type, ValueT>()(src, dst, M*N); break;
-    default: break;
-    }
-}
-
-
 /// @brief Given NumPy arrays of points, triangle indices, and quad indices,
 /// call tools::meshToLevelSet() to generate a level set grid.
 template<typename GridType>
 inline typename GridType::Ptr
-meshToLevelSet(nb::array_t<float> pointsObj, nb::array_t<Index32> trianglesObj, nb::array_t<Index32> quadsObj, math::Transform::Ptr xform, float halfWidth)
+meshToLevelSet(
+        nb::ndarray<float, nb::shape<nb::any, 3>, nb::device::cpu> pointsObj,
+        std::optional<nb::ndarray<Index32, nb::shape<nb::any, 3>, nb::device::cpu>>& trianglesObj,
+        std::optional<nb::ndarray<Index32, nb::shape<nb::any, 4>, nb::device::cpu>>& quadsObj,
+        math::Transform::Ptr xform, float halfWidth)
 {
-    auto validate2DArray = [](nb::array array, ssize_t N) {
-        if (array.ndim() != 2 || array.shape(1) != N) {
-            std::ostringstream os;
-            os << "Expected a 2-dimensional numpy.ndarray with shape(1) = "<< N;
-            os << ", found " << array.ndim() << "-dimensional array with shape = (";
-            for (ssize_t i = 0; i < array.ndim(); ++i) {
-                os << array.shape(i);
-                if (i != array.ndim() - 1)
-                    os << ", ";
-            }
-            os <<").";
-            throw nb::type_error(os.str());
-        }
-    };
-
     // Extract the list of mesh vertices from the arguments to this method.
-    std::vector<Vec3s> points;
-    // Throw an exception if the array has the wrong type or dimensions.
-    validate2DArray(pointsObj, 3);
+    std::vector<Vec3s> points(pointsObj.shape(0));
     // Copy values from the array to the vector.
-    copyVecArray(pointsObj, points);
+    for (size_t i = 0; i < pointsObj.shape(0); ++i)
+        points[i] = Vec3s(pointsObj(i, 0), pointsObj(i, 1), pointsObj(i, 2));
 
     // Extract the list of triangle indices from the arguments to this method.
     std::vector<Vec3I> triangles;
-    validate2DArray(trianglesObj, 3);
-    copyVecArray(trianglesObj, triangles);
+    if (trianglesObj) {
+        triangles.resize(trianglesObj->shape(0));
+         for (size_t i = 0; i < trianglesObj->shape(0); ++i)
+             triangles[i] = Vec3I((*trianglesObj)(i, 0), (*trianglesObj)(i, 1), (*trianglesObj)(i, 2));
+    }
 
     // Extract the list of quad indices from the arguments to this method.
-    std::vector<Vec4I> quads;
-    validate2DArray(quadsObj, 4);
-    copyVecArray(quadsObj, quads);
+     std::vector<Vec4I> quads;
+    if (quadsObj) {
+        quads.resize(quadsObj->shape(0));
+         for (size_t i = 0; i < quadsObj->shape(0); ++i)
+             quads[i] = Vec4I((*quadsObj)(i, 0), (*quadsObj)(i, 1), (*quadsObj)(i, 2), (*quadsObj)(i, 3));
+    }
 
     // Generate and return a level set grid.
     if (xform) {
@@ -816,66 +456,65 @@ meshToLevelSet(nb::array_t<float> pointsObj, nb::array_t<Index32> trianglesObj, 
 }
 
 template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
-inline std::tuple<nb::array_t<float>, nb::array_t<Index32> >
+inline std::tuple<nb::ndarray<nb::numpy, float>, nb::ndarray<nb::numpy, Index32> >
 volumeToQuadMesh(const GridType&, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
 
 template<typename GridType, typename std::enable_if_t<std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
-inline std::tuple<nb::array_t<float>, nb::array_t<Index32> >
+inline std::tuple<nb::ndarray<nb::numpy, float>, nb::ndarray<nb::numpy, Index32> >
 volumeToQuadMesh(const GridType& grid, double isovalue)
 {
     // Mesh the input grid and populate lists of mesh vertices and face vertex indices.
-    std::vector<Vec3s> points;
-    std::vector<Vec4I> quads;
-    tools::volumeToMesh(grid, points, quads, isovalue);
+    auto points = new std::vector<Vec3s>();
+    auto quads = new std::vector<Vec4I>();
+    tools::volumeToMesh(grid, *points, *quads, isovalue);
 
-    std::vector<ssize_t> shape = { static_cast<ssize_t>(points.size()), 3 };
-    std::vector<ssize_t> strides = { 3 * static_cast<ssize_t>(sizeof(float)), static_cast<ssize_t>(sizeof(float))};
-    nb::array_t<float> pointArrayObj(nb::buffer_info(points.data(), sizeof(float), nb::format_descriptor<float>::format(), 2, shape, strides));
+    nb::capsule pointsDeleter(points, [](void* p) noexcept {
+        delete (std::vector<Vec3s>*) p;
+    });
+    nb::ndarray<nb::numpy, float> pointArray(points->data(), {points->size(), 3}, pointsDeleter, {3, 1});
 
-    shape = { static_cast<ssize_t>(quads.size()), 4 };
-    strides = { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
-    nb::array_t<Index32> quadArrayObj(nb::buffer_info(quads.data(), sizeof(Index32), nb::format_descriptor<Index32>::format(), 2, shape, strides));
+    nb::capsule quadsDeleter(quads, [](void* p) noexcept {
+        delete (std::vector<Vec4I>*) p;
+    });
+    nb::ndarray<nb::numpy, Index32> quadArray(quads->data(), {quads->size(), 4}, quadsDeleter, {4, 1});
 
-    return std::make_tuple(pointArrayObj, quadArrayObj);
+    return std::make_tuple(pointArray, quadArray);
 }
 
 template<typename GridType, typename std::enable_if_t<!std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
-inline std::tuple<nb::array_t<float>, nb::array_t<Index32>, nb::array_t<Index32> >
+inline std::tuple<nb::ndarray<nb::numpy, float>, nb::ndarray<nb::numpy, Index32>, nb::ndarray<nb::numpy, Index32> >
 volumeToMesh(const GridType&, double, double)
 {
     OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
 }
 
 template<typename GridType, typename std::enable_if_t<std::is_scalar<typename GridType::ValueType>::value>* = nullptr>
-inline std::tuple<nb::array_t<float>, nb::array_t<Index32>, nb::array_t<Index32> >
+inline std::tuple<nb::ndarray<nb::numpy, float>, nb::ndarray<nb::numpy, Index32>, nb::ndarray<nb::numpy, Index32> >
 volumeToMesh(const GridType& grid, double isovalue, double adaptivity)
 {
     // Mesh the input grid and populate lists of mesh vertices and face vertex indices.
-    std::vector<Vec3s> points;
-    std::vector<Vec3I> triangles;
-    std::vector<Vec4I> quads;
-    tools::volumeToMesh(grid, points, triangles, quads, isovalue, adaptivity);
+    auto points = new std::vector<Vec3s>();
+    auto triangles = new std::vector<Vec3I>();
+    auto quads = new std::vector<Vec4I>();
+    tools::volumeToMesh(grid, *points, *triangles, *quads, isovalue, adaptivity);
 
-    // Create a deep copy of the array (because the point vector will be destroyed
-    // when this function returns).
+    nb::capsule pointsDeleter(points, [](void* p) noexcept {
+        delete (std::vector<Vec3s>*) p;
+    });
+    nb::ndarray<nb::numpy, float> pointArray(points->data(), {points->size(), 3}, pointsDeleter, {3, 1});
 
-    std::vector<ssize_t> shape = { static_cast<ssize_t>(points.size()), 3 };
-    std::vector<ssize_t> strides = { 3 * static_cast<ssize_t>(sizeof(float)), static_cast<ssize_t>(sizeof(float))};
-    nb::buffer_info pointInfo(points.data(), sizeof(float), nb::format_descriptor<float>::format(), 2, shape, strides);
-    nb::array_t<float> pointArray(pointInfo);
+    nb::capsule trianglesDeleter(triangles, [](void* p) noexcept {
+        delete (std::vector<Vec3I>*) p;
+    });
+    nb::ndarray<nb::numpy, Index32> triangleArray(triangles->data(), {triangles->size(), 3}, trianglesDeleter, {3, 1});
 
-    shape = { static_cast<ssize_t>(triangles.size()), 3 };
-    strides = { 3 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
-    nb::buffer_info triangleInfo(triangles.data(), sizeof(Index32), nb::format_descriptor<Index32>::format(), 2, shape, strides);
-    nb::array_t<Index32> triangleArray(triangleInfo);
-
-    shape = { static_cast<ssize_t>(quads.size()), 4 };
-    strides = { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))};
-    nb::buffer_info quadInfo(quads.data(), sizeof(Index32), nb::format_descriptor<Index32>::format(), 2, shape, strides);
-    nb::array_t<Index32> quadArray(quadInfo);
+    nb::capsule quadsDeleter(quads, [](void* p) noexcept {
+        delete (std::vector<Vec4I>*) p;
+    });
+    nb::ndarray<nb::numpy, Index32> quadArray(quads->data(), {quads->size(), 4}, quadsDeleter, {4, 1});
 
     return std::make_tuple(pointArray, triangleArray, quadArray);
 }
@@ -1408,7 +1047,7 @@ struct PickleSuite
 
 /// Create a Python wrapper for a particular template instantiation of Grid.
 template<typename GridType>
-inline void
+inline nb::class_<GridType, GridBase>
 exportGrid(nb::module_ m)
 {
     using ValueT = typename GridType::ValueType;
@@ -1428,9 +1067,10 @@ exportGrid(nb::module_ m)
     std::string docstring = docstream.str();
 
     // Define the Grid wrapper class and make it the current scope.
-    nb::class_<GridType, GridBase>(m,
+    nb::class_<GridType, GridBase> typedGridClass(m,
         /*classname=*/pyGridTypeName.c_str(),
-        /*docstring=*/(Traits::descr()).c_str())
+        /*docstring=*/(Traits::descr()).c_str());
+    typedGridClass
         .def(nb::init<>(), docstring.c_str())
         .def(nb::init<const ValueT&>(), nb::arg("background"),
             "Initialize with the given background value.")
@@ -1529,23 +1169,6 @@ exportGrid(nb::module_ m)
             "signedFloodFill()\n\n"
             "Propagate the sign from a narrow-band level set into inactive\n"
             "voxels and tiles.")
-
-        .def("copyFromArray", &pyGrid::copyFromArray<GridType>,
-            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
-                 nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
-            ("copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
-            "Populate this grid, starting at voxel (i, j, k), with values\nfrom a "
-            + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-            + "-dimensional array.  Mark voxels as inactive\n"
-            "if and only if their values are equal to this grid's\n"
-            "background value within the given tolerance.").c_str())
-        .def("copyToArray", &pyGrid::copyToArray<GridType>,
-            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
-            ("copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
-            + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-            + "-dimensional array with values\n"
-            "from this grid, starting at voxel (i, j, k).").c_str())
-
         .def("convertToQuads",
             &pyGrid::volumeToQuadMesh<GridType>,
             nb::arg("isovalue")=0,
@@ -1570,28 +1193,28 @@ exportGrid(nb::module_ m)
             &pyGrid::meshToLevelSet<GridType>,
             nb::arg("points"),
 #ifdef PY_OPENVDB_USE_NUMPY
-            nb::arg("triangles")=nb::array_t<Index32>({ 0, 3 }, { 3 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))} ),
-            nb::arg("quads")=nb::array_t<Index32>({ 0, 4 }, { 4 * static_cast<ssize_t>(sizeof(Index32)), static_cast<ssize_t>(sizeof(Index32))} ),
+            nb::arg("triangles")=nb::none(),
+            nb::arg("quads")=nb::none(),
 #else
             nb::arg("triangles")=std::vector<Index32>(),
             nb::arg("quads")=std::vector<Index32>(),
 #endif
-            nb::arg("transform")=nb::none(),
+            nb::arg("transform")=openvdb::math::Transform(),
             nb::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
-            ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
-             "    transform=None, halfWidth="
-             + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
-             + pyGridTypeName + "\n\n"
-            "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
-            "The mesh must form a closed surface, but the surface need not be\n"
-            "manifold and may have self intersections and degenerate faces.\n"
-            "The mesh is described by a NumPy array of world-space points\n"
-            "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
-            "the vertices of the triangles and quadrilaterals that form the mesh.\n"
-            "Either the triangle or the quad array may be empty or None.\n"
-            "The resulting volume will have the given transform (or the identity\n"
-            "transform if no transform is given) and a narrow band width of\n"
-            "2 x halfWidth voxels.").c_str())
+             ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
+              "    transform=None, halfWidth="
+              + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
+              + pyGridTypeName + "\n\n"
+             "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
+             "The mesh must form a closed surface, but the surface need not be\n"
+             "manifold and may have self intersections and degenerate faces.\n"
+             "The mesh is described by a NumPy array of world-space points\n"
+             "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+             "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+             "Either the triangle or the quad array may be empty or None.\n"
+             "The resulting volume will have the given transform (or the identity\n"
+             "transform if no transform is given) and a narrow band width of\n"
+             "2 x halfWidth voxels.").c_str())
 
         .def("prune", &pyGrid::prune<GridType>,
             nb::arg("tolerance") = 0,
@@ -1665,6 +1288,23 @@ exportGrid(nb::module_ m)
             "iterAllValues() -> iterator\n\n"
             "Return a read/write iterator over all of this grid's\ntile and voxel values.");
 
+        // .def("copyFromArray", &pyGrid::copyFromArray<GridType>,
+        //     nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+        //          nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
+        //     ("copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
+        //     "Populate this grid, starting at voxel (i, j, k), with values\nfrom a "
+        //     + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
+        //     + "-dimensional array.  Mark voxels as inactive\n"
+        //     "if and only if their values are equal to this grid's\n"
+        //     "background value within the given tolerance.").c_str());
+        // .def("copyToArray", &pyGrid::copyToArray<GridType>,
+        //     nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+        //     ("copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
+        //     + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
+        //     + "-dimensional array with values\n"
+        //     "from this grid, starting at voxel (i, j, k).").c_str())
+
+
     // Wrap const and non-const value accessors and expose them
     // as nested classes of the Grid class.
     pyAccessor::AccessorWrap<const GridType>::wrap(m);
@@ -1680,6 +1320,48 @@ exportGrid(nb::module_ m)
 
     // Add the Python type object for this grid type to the module-level list.
     nb::cast<nb::list>(m.attr("GridTypes")).append(m.attr(pyGridTypeName.c_str()));
+
+    return typedGridClass;
+}
+
+template<typename GridType>
+inline void
+exportScalarGrid(nb::module_ m)
+{
+    exportGrid<GridType>(m)
+        .def("copyFromArray", &pyGrid::copyFromArrayScalar<GridType>,
+           nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+                nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
+           "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
+           "Populate this grid, starting at voxel (i, j, k), with values\n"
+           "from a three-dimensional array.  Mark voxels as inactive\n"
+           "if and only if their values are equal to this grid's\n"
+           "background value within the given tolerance.")
+        .def("copyToArray", &pyGrid::copyToArrayScalar<GridType>,
+            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+            "copyToArray(array, ijk=(0, 0, 0))\n\n"
+            "Populate a three-dimensional array with values\n"
+            "from this grid, starting at voxel (i, j, k).");
+}
+
+template<typename GridType>
+inline void
+exportVectorGrid(nb::module_ m)
+{
+    exportGrid<GridType>(m)
+        .def("copyFromArray", &pyGrid::copyFromArrayVector<GridType>,
+           nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+                nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
+           "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
+           "Populate this grid, starting at voxel (i, j, k), with values\n"
+           "from a four-dimensional array.  Mark voxels as inactive\n"
+           "if and only if their values are equal to this grid's\n"
+           "background value within the given tolerance.")
+        .def("copyToArray", &pyGrid::copyToArrayVector<GridType>,
+            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+            "copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
+            "Populate a four-dimensional array with values\n"
+            "from this grid, starting at voxel (i, j, k).");
 }
 
 } // namespace pyGrid
