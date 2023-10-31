@@ -1,0 +1,3 @@
+Bug Fixes:
+    - Fix potential crash reading corrupt .vdb files with invalid
+      blosc or zip chunks.  [Fix thanks to Matthias Ueberheide]
