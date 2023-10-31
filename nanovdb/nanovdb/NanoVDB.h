@@ -249,60 +249,37 @@ namespace nanovdb {
 // --------------------------> Build types <------------------------------------
 
 /// @brief Dummy type for a voxel whose value equals an offset into an external value array
-class ValueIndex
-{
-};
+class ValueIndex{};
 
 /// @brief Dummy type for a voxel whose value equals an offset into an external value array of active values
-class ValueOnIndex
-{
-};
+class ValueOnIndex{};
 
 /// @brief Like @c ValueIndex but with a mutable mask
-class ValueIndexMask
-{
-};
+class ValueIndexMask{};
 
 /// @brief Like @c ValueOnIndex but with a mutable mask
-class ValueOnIndexMask
-{
-};
+class ValueOnIndexMask{};
 
 /// @brief Dummy type for a voxel whose value equals its binary active state
-class ValueMask
-{
-};
+class ValueMask{};
 
-/// @brief Dummy type for a 16 bit floating point values
-class Half
-{
-};
+/// @brief Dummy type for a 16 bit floating point values (placeholder for IEEE 754 Half)
+class Half{};
 
 /// @brief Dummy type for a 4bit quantization of float point values
-class Fp4
-{
-};
+class Fp4{};
 
 /// @brief Dummy type for a 8bit quantization of float point values
-class Fp8
-{
-};
+class Fp8{};
 
 /// @brief Dummy type for a 16bit quantization of float point values
-class Fp16
-{
-};
+class Fp16{};
 
 /// @brief Dummy type for a variable bit quantization of floating point values
-class FpN
-{
-};
+class FpN{};
 
-/// @dummy type for indexing points into voxels
-class Point
-{
-};
-//using Points = Point;// for backwards compatibility
+/// @brief Dummy type for indexing points into voxels
+class Point{};
 
 // --------------------------> GridType <------------------------------------
 
@@ -760,7 +737,7 @@ __hostdev__ inline static T* alignPtr(T* p)
     return reinterpret_cast<T*>( (uint8_t*)p + alignmentPadding(p) );
 }
 
-/// @brief offset the specified pointer so it is aligned.
+/// @brief offset the specified const pointer so it is aligned.
 template <typename T>
 __hostdev__ inline static const T* alignPtr(const T* p)
 {
@@ -863,10 +840,10 @@ __hostdev__ inline bool isIndex(GridType gridType)
 // --------------------------> memcpy64 <------------------------------------
 
 /// @brief copy 64 bit words from @c src to @c dst
-/// @param dst pointer to destination
-/// @param src pointer to source
+/// @param dst 64 bit aligned pointer to destination
+/// @param src 64 bit aligned pointer to source
 /// @param word_count number of 64 bit words to be copied
-/// @return destination pointer
+/// @return destination pointer @c dst
 /// @warning @c src and @c dst cannot overlap and should both be 64 bit aligned
 __hostdev__ inline static void* memcpy64(void *dst, const void *src, size_t word_count)
 {
@@ -948,13 +925,16 @@ class Version
 {
     uint32_t mData; // 11 + 11 + 10 bit packing of major + minor + patch
 public:
+    /// @brief Default constructor
     __hostdev__ Version()
         : mData(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER) << 21 |
                 uint32_t(NANOVDB_MINOR_VERSION_NUMBER) << 10 |
                 uint32_t(NANOVDB_PATCH_VERSION_NUMBER))
     {
     }
+    /// @brief Constructor from a raw uint32_t data representation
     __hostdev__ Version(uint32_t data) : mData(data) {}
+    /// @brief Constructor from major.minor.patch version numbers
     __hostdev__ Version(uint32_t major, uint32_t minor, uint32_t patch)
         : mData(major << 21 | minor << 10 | patch)
     {
@@ -970,14 +950,15 @@ public:
     __hostdev__ uint32_t id() const { return mData; }
     __hostdev__ uint32_t getMajor() const { return (mData >> 21) & ((1u << 11) - 1); }
     __hostdev__ uint32_t getMinor() const { return (mData >> 10) & ((1u << 11) - 1); }
-    __hostdev__ uint32_t getPatch() const { return mData & ((1u << 10) - 1); }
-    __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER);}
-    /// @brief Check the major version of this instance relative to NANOVDB_MAJOR_VERSION_NUMBER
-    /// @return return 0 if the major version equals NANOVDB_MAJOR_VERSION_NUMBER, else a negative age if it is
-    ///         older, i.e. smaller, and a positive age if it's newer, i.e.e larger.
+    __hostdev__ uint32_t getPatch() const { return  mData        & ((1u << 10) - 1); }
+    __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER); }
+    /// @brief Returns the difference between major version of this instance and NANOVDB_MAJOR_VERSION_NUMBER
+    /// @return return 0 if the major version equals NANOVDB_MAJOR_VERSION_NUMBER, else a negative age if this
+    ///         instance has a smaller major verion (is older), and a positive age if it is newer, i.e. larger.
     __hostdev__ int age() const {return int(this->getMajor()) - int(NANOVDB_MAJOR_VERSION_NUMBER);}
 
 #ifndef __CUDACC_RTC__
+    /// @brief returns a c-string of the semantic version, i.e. major.minor.patch
     const char* c_str() const
     {
         char* buffer = (char*)malloc(4 + 1 + 4 + 1 + 4 + 1); // xxxx.xxxx.xxxx\0
@@ -990,7 +971,7 @@ public:
 // ----------------------------> Various math functions <-------------------------------------
 
 //@{
-/// @brief  Pi constant taken from Boost to match old behaviour
+/// @brief Pi constant taken from Boost to match old behaviour
 template<typename T>
 inline __hostdev__ constexpr T pi()
 {
@@ -3560,13 +3541,18 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mGridType = gridType;
         mBlindMetadataOffset = mGridSize; // i.e. no blind data
         mBlindMetadataCount = 0u; // i.e. no blind data
-        mData0 = 0u;
+        mData0 = 0u; // zero padding
         mData1 = 0u; // only used for index and point grids
-        mData2 = 0u;
+        mData2 = NANOVDB_MAGIC_GRID; // since version 32.6.0 (might be removed in the future)
     }
     /// @brief return true if the magic number and the version are both valid
     __hostdev__ bool isValid() const {
-        return mMagic == NANOVDB_MAGIC_GRID || (mMagic == NANOVDB_MAGIC_NUMBER && mVersion.isCompatible());
+        if (mMagic == NANOVDB_MAGIC_GRID || mData2 == NANOVDB_MAGIC_GRID) return true;
+        bool test = mMagic == NANOVDB_MAGIC_NUMBER;// could be GridData or io::FileHeader
+        if (test) test = mVersion.isCompatible();
+        if (test) test = mGridCount > 0u && mGridIndex < mGridCount;
+        if (test) test = mGridClass < GridClass::End && mGridType < GridType::End;
+        return test;
     }
     // Set and unset various bit flags
     __hostdev__ void setMinMaxOn(bool on = true) { mFlags.setMask(GridFlags::HasMinMax, on); }
@@ -7980,20 +7966,20 @@ VecT<GridHandleT> readUncompressedGrids(StreamT& is, const typename GridHandleT:
 {
     VecT<GridHandleT> handles;
     GridData data;
-    is.read((char*)&data, 40);// we only need to load the first 40 bytes
-    if (data.mMagic == NANOVDB_MAGIC_GRID || data.isValid()) {// stream contains a raw grid buffer
+    is.read((char*)&data, sizeof(GridData));
+    if (data.isValid()) {// stream contains a raw grid buffer
         uint64_t size = data.mGridSize, sum = 0u;
         while(data.mGridIndex + 1u < data.mGridCount) {
-            is.skip(data.mGridSize - 40);// skip grid
-            is.read((char*)&data, 40);// read 40 bytes
+            is.skip(data.mGridSize - sizeof(GridData));// skip grid
+            is.read((char*)&data, sizeof(GridData));// read sizeof(GridData) bytes
             sum += data.mGridSize;
         }
-        is.skip(-int64_t(sum + 40));// rewind to start
+        is.skip(-int64_t(sum + sizeof(GridData)));// rewind to start
         auto buffer = GridHandleT::BufferType::create(size + sum, &pool);
         is.read((char*)(buffer.data()), buffer.size());
         handles.emplace_back(std::move(buffer));
     } else {// Header0, MetaData0, gridName0, Grid0...HeaderN, MetaDataN, gridNameN, GridN
-        is.skip(-40);// rewind
+        is.skip(-sizeof(GridData));// rewind
         FileHeader head;
         while(is.read((char*)&head, sizeof(FileHeader))) {
             if (!head.isValid()) {

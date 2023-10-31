@@ -17,7 +17,7 @@ int main()
 
         // Generate a NanoVDB grid that contains the list of voxels on the device
         auto handle = cudaVoxelsToGrid<float>(d_coords, numVoxels);
-        auto *grid = handle.deviceGrid<float>();
+        auto *d_grid = handle.deviceGrid<float>();
 
         // Define a list of values and copy them to the device
         float values[numVoxels] = {1.4f, 6.7f, -5.0f}, *d_values;
@@ -29,13 +29,13 @@ int main()
         cudaLambdaKernel<<<numBlocks, numThreads>>>(numVoxels, [=] __device__(size_t tid) {
             using OpT = SetVoxel<float>;// defines type of random-access operation (set value)
             const Coord &ijk = d_coords[tid];
-            grid->tree().set<OpT>(ijk, d_values[tid]);// normally one should use a ValueAccessor
-            printf("GPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", tid, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));
+            d_grid->tree().set<OpT>(ijk, d_values[tid]);// normally one should use a ValueAccessor
+            printf("GPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", tid, ijk[0], ijk[1], ijk[2], d_grid->tree().getValue(ijk));
         }); cudaCheckError();
 
         // Copy grid from GPU to CPU and print the voxel values for validation
         handle.deviceDownload();// creates a copy on the CPU
-        grid = handle.grid<float>();
+        auto *grid = handle.grid<float>();
         for (size_t i=0; i<numVoxels; ++i) {
             const Coord &ijk = coords[i];
             printf("CPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", i, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));

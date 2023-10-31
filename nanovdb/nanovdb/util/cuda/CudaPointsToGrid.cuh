@@ -552,28 +552,23 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const PtrT points, size_t poin
     if (mVerbose==2) mTimer.restart("Generate tile keys");
     cudaLambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, const Data *d_data, const PtrT points) {
         auto coordToKey = [](const Coord &ijk)->uint64_t{
-            //  int32_t has a range of -2^31 to 2^31 - 1
-            // uint32_t has a range of 0 to 2^32 - 1
+            // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
             static constexpr int64_t offset = 1 << 31;
             return (uint64_t(uint32_t(int64_t(ijk[2]) + offset) >> 12)      ) | // z is the lower 21 bits
                    (uint64_t(uint32_t(int64_t(ijk[1]) + offset) >> 12) << 21) | // y is the middle 21 bits
                    (uint64_t(uint32_t(int64_t(ijk[0]) + offset) >> 12) << 42); //  x is the upper 21 bits
-        };
+        };// coordToKey lambda functor
         d_indx[tid] = uint32_t(tid);
         uint64_t &key = d_keys[tid];
         if constexpr(is_same<BuildT, Point>::value) {// points are in world space
             if constexpr(is_same<Vec3T, Vec3f>::value) {
                 key = coordToKey(d_data->map.applyInverseMapF(points[tid]).round());
-                //key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMapF(points[tid]).round());
             } else {// points are Vec3d
-                //key = NanoRoot<Point>::CoordToKey(d_data->map.applyInverseMap(points[tid]).round());
                 key = coordToKey(d_data->map.applyInverseMap(points[tid]).round());
             }
         } else if constexpr(is_same<Vec3T, Coord>::value) {// points Coord are in index space
-            //key = NanoRoot<BuildT>::CoordToKey(points[tid]);
             key = coordToKey(points[tid]);
         } else {// points are Vec3f or Vec3d in index space
-            //key = NanoRoot<BuildT>::CoordToKey(points[tid].round());
             key = coordToKey(points[tid].round());
         }
     }, mDeviceData, points);
@@ -605,7 +600,7 @@ void CudaPointsToGrid<BuildT, AllocT>::countNodes(const PtrT points, size_t poin
                     uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 | // lower offset: 32^3 = 2^15,   i.e. next 15 bits
                     uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
                     uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
-            };
+            };// voxelKey lambda functor
             tid += offset;
             Vec3T p = points[d_indx[tid]];
             if constexpr(is_same<BuildT, Point>::value) p = is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
