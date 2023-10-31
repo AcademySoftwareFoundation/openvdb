@@ -1,12 +1,97 @@
 OpenVDB Version History
 =======================
 
-Version 11.0.0 - In Progress
+Version 11.0.0 - October 31, 2023
 
       This version introduces ABI changes relative to older major releases,
       so to preserve ABI compatibility it might be necessary to define the
       macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 9 for
       Houdini 19.5 and 10 for Houdini 20.0.
+
+      OpenEXR 2 and Python 2 are no longer supported.
+      Boost is now an optional OpenVDB dependency.
+
+  OpenVDB:
+    Improvements:
+    - Removed last traces of Boost when OPENVDB_USE_DELAYED_LOADING is OFF
+      [Contributed by Brian McKinnon]
+
+  NanoVDB:
+    API Changes:
+    - Minor version changed from 4 to 6 (major version is unchanged since the ABI is
+      preserved)
+    - nanovdb::Vec3R is deprecated. Use nanovdb::Vec3d instead.
+    - nanoToOpenVDB now accepts the index of the NanoVDB grid contained inside of a
+      GridHandle to be converted to OpenVDB.
+    - DataTypes are now public in all node types.
+    - GridMetaData can be copied.
+    - Major improvements to GridBuilder.h, which allows users to construct grids
+      with random access on the host
+    - The move constructor now requires the GridBuffer to actually contain a
+      valid grid
+    - Moved CudaDeviceBuffer.h to cuda/CudaDeviceBuffer.h
+    - Added nanovdb::pi()
+    - Introduced a new extendable API for acceleration of custom random-access
+      get/set methods on ValueAccessor, e.g. getValue(ijk), isActive
+      (ijk), probeValue(ijk, val).
+    - Added nanovdb::BitFlags.
+    - Added minComponentAtomic and maxComponentAtomic methods on the GPU to
+      nanovdb::Vec2 and nanovdb::Vec3. Added expandAtomic and intersectAtomic on
+      nanovdb::BBox, and expandAtomic in nanovdb::Coord.
+    - Added nanovdb::Map constructors.
+    - Mask:: DenseIterator, Mask:: setOnAtomic,Mask:: setOffAtomic.
+    - Improved and renamed device function that converts voxels into a grid -
+      nanovdb::cudaVoxelsToGrid
+
+    New Features:
+    - Added a new grid class called IndexGrid in 4 flavors (Index, OnIndex,
+      IndexMask, OnIndexMask).
+    - Several new ways to construct and modify NanoVDB grids on the GPU. See
+      CreateNanoGrid.h and CudaPointsToGrid.cuh.
+    - New device function to convert points into a compact grid -
+      nanovdb::cudaPointsToGrid
+    - Added cuda/CudaUtils.h and cuda/GpuTimer.h with cuda utility functions
+    - Added cuda/CudaPointToGrids.cuh that constructs device grids from points or
+      voxels
+    - Added cuda/CudaIndexToGrid.cuh that converts IndexGrids and values into
+      regular Grids
+    - Added cuda/CudaSignedFloodFill.cuh that performs signed-flood filing on SDF on
+      the GPU
+    - Added cuda/CudaAddBlindData.cuh that adds blind data to an existing grid on the
+      GPU
+    - Added cuda/CudaGridChecksum.cuh that computes CRC32 checksums of grids on the
+      GPU
+    - Added cuda/CudaGridHandle.cuh that handles grids on the GPU
+    - Added cuda/CudaNodeManager.cuh that constructs a NodeManager on the GPU
+    - Introduced new (dummy) build-type nanovdb::Points and
+      nanovdb::GridType::PointIndex
+    - Introduced new types nanovdb::GridType::Vec3u16 and nanovdb::GridType::Vec3u8
+      used for compressed representations of point coordinates as blind data
+    - Added PrefixSum.h for concurrent computation of prefix sum on the host
+    - Primitives.h can now create grids on the CPU with SDF, FOG, and point or
+      torus
+
+    Improvements:
+    - Transition from C++11 to C++17 in NanoVDB.h and its tools
+    - Improve NanoVDB Build Traits.
+    - CreateNanoGrid.h is replacing GridBuilder.h, IndexGridBuilder.h and
+      OpenToNanoVDB.h.
+    - Syncing PNanoVDB.h with NanoVDB.h.
+
+  Build:
+  - Support for OpenEXR 2.X has been removed.
+  - Boost is no longer required if OPENVDB_USE_DELAYED_LOADING is OFF
+  - Better support for building with external package configurations
+    with CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON.
+
+  Python:
+  - Removed Python 2 support.
+  [Contributed by Matthew Cong]
+  - Removed explicit bindings for Math types.
+  [Contributed by Matthew Cong]
+  - Improved type casting for TypedMetadata.
+  [Contributed by Matthew Cong]
+
 
 Version 10.1.0 - October 11, 2023
 
