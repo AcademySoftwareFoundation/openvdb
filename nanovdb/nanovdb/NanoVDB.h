@@ -970,8 +970,8 @@ public:
     __hostdev__ uint32_t id() const { return mData; }
     __hostdev__ uint32_t getMajor() const { return (mData >> 21) & ((1u << 11) - 1); }
     __hostdev__ uint32_t getMinor() const { return (mData >> 10) & ((1u << 11) - 1); }
-    __hostdev__ uint32_t getPatch() const { return mData & ((1u << 10) - 1); }
-    __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER);}
+    __hostdev__ uint32_t getPatch() const { return  mData        & ((1u << 10) - 1); }
+    __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER); }
     /// @brief Check the major version of this instance relative to NANOVDB_MAJOR_VERSION_NUMBER
     /// @return return 0 if the major version equals NANOVDB_MAJOR_VERSION_NUMBER, else a negative age if it is
     ///         older, i.e. smaller, and a positive age if it's newer, i.e.e larger.
@@ -3560,13 +3560,20 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mGridType = gridType;
         mBlindMetadataOffset = mGridSize; // i.e. no blind data
         mBlindMetadataCount = 0u; // i.e. no blind data
-        mData0 = 0u;
+        mData0 = 0u; // zero padding
         mData1 = 0u; // only used for index and point grids
-        mData2 = 0u;
+        mData2 = 0u; // zero padding
     }
     /// @brief return true if the magic number and the version are both valid
     __hostdev__ bool isValid() const {
-        return mMagic == NANOVDB_MAGIC_GRID || (mMagic == NANOVDB_MAGIC_NUMBER && mVersion.isCompatible());
+        bool test = NANOVDB_MAGIC_GRID || mMagic == NANOVDB_MAGIC_NUMBER;
+#if 1// extra tests that might not be needed in the future
+        if (test) test = mVersion.isCompatible();
+        if (test) test = mGridCount > 0u && mGridIndex < mGridCount;
+        if (test) test = mGridClass < GridClass::End && mGridType < GridType::End;
+        if (test) test = mData0 == 0u && mData2 == 0u;
+#endif
+        return test;
     }
     // Set and unset various bit flags
     __hostdev__ void setMinMaxOn(bool on = true) { mFlags.setMask(GridFlags::HasMinMax, on); }
@@ -7980,20 +7987,20 @@ VecT<GridHandleT> readUncompressedGrids(StreamT& is, const typename GridHandleT:
 {
     VecT<GridHandleT> handles;
     GridData data;
-    is.read((char*)&data, 40);// we only need to load the first 40 bytes
-    if (data.mMagic == NANOVDB_MAGIC_GRID || data.isValid()) {// stream contains a raw grid buffer
+    is.read((char*)&data, sizeof(GridData));
+    if (data.isValid()) {// stream contains a raw grid buffer
         uint64_t size = data.mGridSize, sum = 0u;
         while(data.mGridIndex + 1u < data.mGridCount) {
-            is.skip(data.mGridSize - 40);// skip grid
-            is.read((char*)&data, 40);// read 40 bytes
+            is.skip(data.mGridSize - sizeof(GridData));// skip grid
+            is.read((char*)&data, sizeof(GridData));// read sizeof(GridData) bytes
             sum += data.mGridSize;
         }
-        is.skip(-int64_t(sum + 40));// rewind to start
+        is.skip(-int64_t(sum + sizeof(GridData)));// rewind to start
         auto buffer = GridHandleT::BufferType::create(size + sum, &pool);
         is.read((char*)(buffer.data()), buffer.size());
         handles.emplace_back(std::move(buffer));
     } else {// Header0, MetaData0, gridName0, Grid0...HeaderN, MetaDataN, gridNameN, GridN
-        is.skip(-40);// rewind
+        is.skip(-sizeof(GridData));// rewind
         FileHeader head;
         while(is.read((char*)&head, sizeof(FileHeader))) {
             if (!head.isValid()) {

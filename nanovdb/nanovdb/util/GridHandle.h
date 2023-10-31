@@ -363,20 +363,20 @@ template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 {
     GridData data;
-    is.read((char*)&data, 40);// only 40 bytes are required for all the data we need in GridData
+    is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
         uint64_t size = data.mGridSize, sum = 0u;
         while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
-            is.seekg(data.mGridSize - 40, std::ios::cur);// skip grid
-            is.read((char*)&data, 40);// read 40 bytes of the next GridData
+            is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
+            is.read((char*)&data, sizeof(GridData));
             sum += data.mGridSize;
         }
-        is.seekg(-int64_t(sum + 40), std::ios::cur);// rewind to start
         auto buffer = BufferT::create(size + sum, &pool);
+        is.seekg(-int64_t(sum + sizeof(GridData)), std::ios::cur);// rewind to start
         is.read((char*)(buffer.data()), buffer.size());
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-40, std::ios::cur);// rewind
+        is.seekg(-sizeof(GridData), std::ios::cur);// rewind
         throw std::logic_error("This stream does not contain a valid raw grid buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
@@ -385,20 +385,20 @@ template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
 {
     GridData data;
-    is.read((char*)&data, 40);// only 40 bytes are required for all the data we need in GridData
+    is.read((char*)&data, sizeof(GridData));
     if (data.isValid()) {
         if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
         while(data.mGridIndex != n) {
-            is.seekg(data.mGridSize - 40, std::ios::cur);// skip grid
-            is.read((char*)&data, 40);// read 40 bytes
+            is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
+            is.read((char*)&data, sizeof(GridData));
         }
         auto buffer = BufferT::create(data.mGridSize, &pool);
-        is.seekg(-40, std::ios::cur);// rewind
+        is.seekg(-sizeof(GridData), std::ios::cur);// rewind
         is.read((char*)(buffer.data()), data.mGridSize);
         updateGridCount((GridData*)buffer.data(), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-40, std::ios::cur);// rewind 40 bytes to undo initial read
+        is.seekg(-sizeof(GridData), std::ios::cur);// rewind sizeof(GridData) bytes to undo initial read
         throw std::logic_error("This file does not contain a valid raw buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
@@ -414,7 +414,7 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
         uint32_t n = 0;
         while(data.mGridName != gridName && n++ < data.mGridCount) {
             is.seekg(data.mGridSize, std::ios::cur);// skip grid
-            is.read((char*)&data, byteSize);// read 40 bytes
+            is.read((char*)&data, byteSize);// read sizeof(GridData) bytes
             is.seekg(-byteSize, std::ios::cur);// rewind
         }
         if (n>data.mGridCount) throw std::runtime_error("No raw grid named \""+gridName+"\"");
