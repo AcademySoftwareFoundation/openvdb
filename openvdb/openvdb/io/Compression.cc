@@ -123,19 +123,22 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 {
     // Read the size of the compressed data.
     // A negative size indicates uncompressed data.
-    Int64 numZippedBytes;
+    Int64 numZippedBytes{0};
     is.read(reinterpret_cast<char*>(&numZippedBytes), 8);
+    if (!is.good())
+        OPENVDB_THROW(RuntimeError, "Stream failure reading the size of a zip chunk");
 
     if (numZippedBytes <= 0) {
+        // Check for an error
+        if (size_t(-numZippedBytes) != numBytes) {
+            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
+                << "-byte chunk, got a " << -numZippedBytes << "-byte chunk");
+        }
         // Read the uncompressed data.
         if (data == nullptr) {
             is.seekg(-numZippedBytes, std::ios_base::cur);
         } else {
             is.read(data, -numZippedBytes);
-        }
-        if (size_t(-numZippedBytes) != numBytes) {
-            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
-                << "-byte chunk, got a " << -numZippedBytes << "-byte chunk");
         }
     } else {
         if (data == nullptr) {
@@ -268,19 +271,23 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
 {
     // Read the size of the compressed data.
     // A negative size indicates uncompressed data.
-    Int64 numCompressedBytes;
+    Int64 numCompressedBytes{0};
     is.read(reinterpret_cast<char*>(&numCompressedBytes), 8);
 
+    if (!is.good())
+        OPENVDB_THROW(RuntimeError, "Stream failure reading the size of a blosc chunk");
+
     if (numCompressedBytes <= 0) {
+        // Check for an error
+        if (size_t(-numCompressedBytes) != numBytes) {
+            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
+                << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
+        }
         // Read the uncompressed data.
         if (data == nullptr) {
             is.seekg(-numCompressedBytes, std::ios_base::cur);
         } else {
             is.read(data, -numCompressedBytes);
-        }
-        if (size_t(-numCompressedBytes) != numBytes) {
-            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
-                << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
         }
     } else {
         if (data == nullptr) {
