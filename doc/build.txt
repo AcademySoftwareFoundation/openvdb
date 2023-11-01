@@ -267,7 +267,7 @@ PyBind11       | C++/python bindings                                            
 NumPy          | Scientific computing with Python                                | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
-At a minimum a matching C++17 compiler and CMake will be required. See
+At a minimum, boost, a matching C++17 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
 installing the above software. Note that as Blosc and ZLib are provided as part
 of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
