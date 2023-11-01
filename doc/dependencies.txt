@@ -36,7 +36,7 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                    | Optional
 ----------------------- | ----------------------------------------------- | --------
-OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb                 | Blosc, ZLib, Log4cplus, Imath::Imath, Boost::iostream
+OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb, Boost::headers | Blosc, ZLib, Log4cplus, Imath::Imath, Boost::iostream
 OpenVDB Print           | Core Library dependencies                       | -
 OpenVDB LOD             | Core Library dependencies                       | -
 OpenVDB Render          | Core Library dependencies                       | OpenEXR, Imath::Imath, libpng
@@ -65,7 +65,7 @@ Imath          | 3.1     | Latest      | Half precision floating points         
 OpenEXR        | 3.1     | Latest      | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 2020.2  | 2020.3      | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.73    | 1.80        | Components: iostreams                                             | Y       | Y        | https://www.boost.org
+Boost          | 1.73    | 1.80        | Components: headers, iostreams                                    | Y       | Y        | https://www.boost.org
 LLVM           | 10.0.0  | 13.0.0*     | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison          | 3.0.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.0   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
