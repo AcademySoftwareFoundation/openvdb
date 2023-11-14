@@ -330,52 +330,174 @@ copyToArray(GridType&, const nb::object&, nb::object)
 
 template<typename GridType>
 inline void
-copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType, nb::shape<nb::any, nb::any, nb::any>> array, const Coord& origin, const typename GridType::ValueType& tolerance)
+copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& origin, const typename GridType::ValueType& tolerance)
 {
+    if (array.ndim() != 3) {
+        std::stringstream ss;
+        ss << "Expected array with ndim = 3, found array with ndim = " << array.ndim();
+        throw openvdb::TypeError(ss.str());
+    }
+
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
-    tools::copyFromDense(valArray, grid, tolerance);
+    if (array.dtype() == nb::dtype<float>()) {
+        tools::Dense<float> valArray(bbox, reinterpret_cast<float*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<double>()) {
+        tools::Dense<double> valArray(bbox, reinterpret_cast<double*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<bool>()) {
+        tools::Dense<bool> valArray(bbox, reinterpret_cast<bool*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int16>()) {
+        tools::Dense<Int16> valArray(bbox, reinterpret_cast<Int16*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int32>()) {
+        tools::Dense<Int32> valArray(bbox, reinterpret_cast<Int32*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int64>()) {
+        tools::Dense<Int64> valArray(bbox, reinterpret_cast<Int64*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Index32>()) {
+        tools::Dense<Index32> valArray(bbox, reinterpret_cast<Index32*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Index64>()) {
+        tools::Dense<Index64> valArray(bbox, reinterpret_cast<Index64*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else {
+        throw openvdb::TypeError();
+    }
 }
 
 template<typename GridType>
 inline void
-copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType::ValueType, nb::shape<nb::any, nb::any, nb::any, VecTraits<typename GridType::ValueType>::Size>> array, const Coord& origin, const typename GridType::ValueType& tolerance)
+copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& origin, const typename GridType::ValueType& tolerance)
 {
+    if (array.ndim() != 4) {
+        std::stringstream ss;
+        ss << "Expected array with ndim = 4, found array with ndim = " << array.ndim();
+        throw openvdb::TypeError(ss.str());
+    }
+
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    // NB: The reinterpret_cast is necessary in order to force GCC to cast the pointer correctly
-    tools::Dense<typename GridType::ValueType> valArray(bbox, reinterpret_cast<typename GridType::ValueType*>(array.data()));
-    tools::copyFromDense(valArray, grid, tolerance);
+    if (array.dtype() == nb::dtype<float>()) {
+        tools::Dense<math::Vec3<float>> valArray(bbox, reinterpret_cast<math::Vec3<float>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<double>()) {
+        tools::Dense<math::Vec3<double>> valArray(bbox, reinterpret_cast<math::Vec3<double>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<bool>()) {
+        tools::Dense<math::Vec3<bool>> valArray(bbox, reinterpret_cast<math::Vec3<bool>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int16>()) {
+        tools::Dense<math::Vec3<Int16>> valArray(bbox, reinterpret_cast<math::Vec3<Int16>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int32>()) {
+        tools::Dense<math::Vec3<Int32>> valArray(bbox, reinterpret_cast<math::Vec3<Int32>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Int64>()) {
+        tools::Dense<math::Vec3<Int64>> valArray(bbox, reinterpret_cast<math::Vec3<Int64>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Index32>()) {
+        tools::Dense<math::Vec3<Index32>> valArray(bbox, reinterpret_cast<math::Vec3<Index32>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else if (array.dtype() == nb::dtype<Index64>()) {
+        tools::Dense<math::Vec3<Index64>> valArray(bbox, reinterpret_cast<math::Vec3<Index64>*>(array.data()));
+        tools::copyFromDense(valArray, grid, tolerance);
+    } else {
+        throw openvdb::TypeError();
+    }
 }
 
 template<typename GridType>
 inline void
-copyToArrayScalar(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType, nb::shape<nb::any, nb::any, nb::any>> array, const Coord& origin)
+copyToArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& origin)
 {
+    if (array.ndim() != 3) {
+        std::stringstream ss;
+        ss << "Expected array with ndim = 3, found array with ndim = " << array.ndim();
+        throw openvdb::TypeError(ss.str());
+    }
+
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
-    tools::copyToDense(grid, valArray);
+    if (array.dtype() == nb::dtype<float>()) {
+        tools::Dense<float> valArray(bbox, reinterpret_cast<float*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<double>()) {
+        tools::Dense<double> valArray(bbox, reinterpret_cast<double*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<bool>()) {
+        tools::Dense<bool> valArray(bbox, reinterpret_cast<bool*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int16>()) {
+        tools::Dense<Int16> valArray(bbox, reinterpret_cast<Int16*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int32>()) {
+        tools::Dense<Int32> valArray(bbox, reinterpret_cast<Int32*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int64>()) {
+        tools::Dense<Int64> valArray(bbox, reinterpret_cast<Int64*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Index32>()) {
+        tools::Dense<Index32> valArray(bbox, reinterpret_cast<Index32*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Index64>()) {
+        tools::Dense<Index64> valArray(bbox, reinterpret_cast<Index64*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else {
+        throw openvdb::TypeError();
+    }
 }
 
 template<typename GridType>
 inline void
-copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::ValueType::ValueType, nb::shape<nb::any, nb::any, nb::any, VecTraits<typename GridType::ValueType>::Size>> array, const Coord& origin)
+copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& origin)
 {
+    if (array.ndim() != 4) {
+        std::stringstream ss;
+        ss << "Expected array with ndim = 4, found array with ndim = " << array.ndim();
+        throw openvdb::TypeError(ss.str());
+    }
+
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    // NB: The reinterpret_cast is necessary in order to force GCC to cast the pointer correctly
-    tools::Dense<typename GridType::ValueType> valArray(bbox, reinterpret_cast<typename GridType::ValueType*>(array.data()));
-    tools::copyToDense(grid, valArray);
+    if (array.dtype() == nb::dtype<float>()) {
+        tools::Dense<math::Vec3<float>> valArray(bbox, reinterpret_cast<math::Vec3<float>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<double>()) {
+        tools::Dense<math::Vec3<double>> valArray(bbox, reinterpret_cast<math::Vec3<double>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<bool>()) {
+        tools::Dense<math::Vec3<bool>> valArray(bbox, reinterpret_cast<math::Vec3<bool>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int16>()) {
+        tools::Dense<math::Vec3<Int16>> valArray(bbox, reinterpret_cast<math::Vec3<Int16>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int32>()) {
+        tools::Dense<math::Vec3<Int32>> valArray(bbox, reinterpret_cast<math::Vec3<Int32>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Int64>()) {
+        tools::Dense<math::Vec3<Int64>> valArray(bbox, reinterpret_cast<math::Vec3<Int64>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Index32>()) {
+        tools::Dense<math::Vec3<Index32>> valArray(bbox, reinterpret_cast<math::Vec3<Index32>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else if (array.dtype() == nb::dtype<Index64>()) {
+        tools::Dense<math::Vec3<Index64>> valArray(bbox, reinterpret_cast<math::Vec3<Index64>*>(array.data()));
+        tools::copyToDense(grid, valArray);
+    } else {
+        throw openvdb::TypeError();
+    }
 }
 
 #endif // defined(PY_OPENVDB_USE_NUMPY)
@@ -1290,23 +1412,6 @@ exportGrid(nb::module_ m)
             "iterAllValues() -> iterator\n\n"
             "Return a read/write iterator over all of this grid's\ntile and voxel values.");
 
-        // .def("copyFromArray", &pyGrid::copyFromArray<GridType>,
-        //     nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
-        //          nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
-        //     ("copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
-        //     "Populate this grid, starting at voxel (i, j, k), with values\nfrom a "
-        //     + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-        //     + "-dimensional array.  Mark voxels as inactive\n"
-        //     "if and only if their values are equal to this grid's\n"
-        //     "background value within the given tolerance.").c_str());
-        // .def("copyToArray", &pyGrid::copyToArray<GridType>,
-        //     nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
-        //     ("copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
-        //     + std::string(openvdb::VecTraits<ValueT>::IsVec ? "four" : "three")
-        //     + "-dimensional array with values\n"
-        //     "from this grid, starting at voxel (i, j, k).").c_str())
-
-
     // Wrap const and non-const value accessors and expose them
     // as nested classes of the Grid class.
     pyAccessor::AccessorWrap<const GridType>::wrap(m);
@@ -1332,7 +1437,7 @@ exportScalarGrid(nb::module_ m)
 {
     exportGrid<GridType>(m)
         .def("copyFromArray", &pyGrid::copyFromArrayScalar<GridType>,
-           nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+           nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
                 nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
            "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
            "Populate this grid, starting at voxel (i, j, k), with values\n"
@@ -1352,7 +1457,7 @@ exportVectorGrid(nb::module_ m)
 {
     exportGrid<GridType>(m)
         .def("copyFromArray", &pyGrid::copyFromArrayVector<GridType>,
-           nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+           nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
                 nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
            "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
            "Populate this grid, starting at voxel (i, j, k), with values\n"
