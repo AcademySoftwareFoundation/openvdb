@@ -348,7 +348,8 @@ copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::Va
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    // NB: The reinterpret_cast is necessary in order to force GCC to cast the pointer correctly
+    tools::Dense<typename GridType::ValueType> valArray(bbox, reinterpret_cast<typename GridType::ValueType*>(array.data()));
     tools::copyFromDense(valArray, grid, tolerance);
 }
 
@@ -372,7 +373,8 @@ copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy, typename GridType::Valu
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
     CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
-    tools::Dense<typename GridType::ValueType> valArray(bbox, array.data());
+    // NB: The reinterpret_cast is necessary in order to force GCC to cast the pointer correctly
+    tools::Dense<typename GridType::ValueType> valArray(bbox, reinterpret_cast<typename GridType::ValueType*>(array.data()));
     tools::copyToDense(grid, valArray);
 }
 
@@ -1338,7 +1340,7 @@ exportScalarGrid(nb::module_ m)
            "if and only if their values are equal to this grid's\n"
            "background value within the given tolerance.")
         .def("copyToArray", &pyGrid::copyToArrayScalar<GridType>,
-            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+            nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
             "copyToArray(array, ijk=(0, 0, 0))\n\n"
             "Populate a three-dimensional array with values\n"
             "from this grid, starting at voxel (i, j, k).");
@@ -1358,7 +1360,7 @@ exportVectorGrid(nb::module_ m)
            "if and only if their values are equal to this grid's\n"
            "background value within the given tolerance.")
         .def("copyToArray", &pyGrid::copyToArrayVector<GridType>,
-            nb::arg("array"), nb::arg("ijk")=Coord(0,0,0),
+            nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
             "copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
             "Populate a four-dimensional array with values\n"
             "from this grid, starting at voxel (i, j, k).");
