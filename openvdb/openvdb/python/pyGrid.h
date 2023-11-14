@@ -312,7 +312,7 @@ signedFloodFill(GridType& grid)
 
 template<typename GridType>
 inline void
-copyFromArray(GridType&, const nb::object&, nb::object, nb::object)
+copyFromArrayScalar(GridType&, const nb::object&, nb::object, nb::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     throw nb::python_error();
@@ -320,7 +320,23 @@ copyFromArray(GridType&, const nb::object&, nb::object, nb::object)
 
 template<typename GridType>
 inline void
-copyToArray(GridType&, const nb::object&, nb::object)
+copyFromArrayVector(GridType&, const nb::object&, nb::object, nb::object)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
+    throw nb::python_error();
+}
+
+template<typename GridType>
+inline void
+copyToArrayScalar(GridType&, const nb::object&, nb::object)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
+    throw nb::python_error();
+}
+
+template<typename GridType>
+inline void
+copyToArrayVector(GridType&, const nb::object&, nb::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
     throw nb::python_error();
@@ -335,7 +351,7 @@ copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& o
     if (array.ndim() != 3) {
         std::stringstream ss;
         ss << "Expected array with ndim = 3, found array with ndim = " << array.ndim();
-        throw openvdb::TypeError(ss.str());
+        throw nb::value_error(ss.str().c_str());
     }
 
     // Compute the bounding box of the region of the grid that is to be copied from or to.
@@ -378,7 +394,7 @@ copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& o
     if (array.ndim() != 4) {
         std::stringstream ss;
         ss << "Expected array with ndim = 4, found array with ndim = " << array.ndim();
-        throw openvdb::TypeError(ss.str());
+        throw nb::value_error(ss.str().c_str());
     }
 
     // Compute the bounding box of the region of the grid that is to be copied from or to.
@@ -421,7 +437,7 @@ copyToArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& ori
     if (array.ndim() != 3) {
         std::stringstream ss;
         ss << "Expected array with ndim = 3, found array with ndim = " << array.ndim();
-        throw openvdb::TypeError(ss.str());
+        throw nb::value_error(ss.str().c_str());
     }
 
     // Compute the bounding box of the region of the grid that is to be copied from or to.
@@ -464,7 +480,7 @@ copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& ori
     if (array.ndim() != 4) {
         std::stringstream ss;
         ss << "Expected array with ndim = 4, found array with ndim = " << array.ndim();
-        throw openvdb::TypeError(ss.str());
+        throw nb::value_error(ss.str().c_str());
     }
 
     // Compute the bounding box of the region of the grid that is to be copied from or to.

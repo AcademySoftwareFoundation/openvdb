@@ -555,7 +555,7 @@ class TestOpenVDB(unittest.TestCase):
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyFromArray('abc'))
         arr = np.zeros((1, 2))
-        self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
+        self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
 
         # Verify that complex-valued arrays are not supported.
         arr = np.zeros((1, 2, 1), dtype = complex)
@@ -611,7 +611,7 @@ class TestOpenVDB(unittest.TestCase):
                 # Verify that scalar arrays can't be copied into vector grids
                 # and vector arrays can't be copied into scalar grids.
                 if isScalarGrid != isScalarArray:
-                    self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
+                    self.assertRaises(ValueError, lambda: grid.copyFromArray(arr))
                     continue
 
                 # Copy values from the NumPy array to the grid, marking
@@ -654,7 +654,7 @@ class TestOpenVDB(unittest.TestCase):
         grid = openvdb.FloatGrid()
         self.assertRaises(TypeError, lambda: grid.copyToArray('abc'))
         arr = np.zeros((1, 2))
-        self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
+        self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
 
         # Verify that complex-valued arrays are not supported.
         arr = np.zeros((1, 2, 1), dtype = complex)
@@ -708,7 +708,7 @@ class TestOpenVDB(unittest.TestCase):
                 # Verify that scalar grids can't be copied into vector arrays
                 # and vector grids can't be copied into scalar arrays.
                 if isScalarGrid != isScalarArray:
-                    self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
+                    self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
                     continue
 
                 # Copy values from the grid to the NumPy array.
