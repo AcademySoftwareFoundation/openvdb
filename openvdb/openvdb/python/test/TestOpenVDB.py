@@ -557,10 +557,10 @@ class TestOpenVDB(unittest.TestCase):
         arr = np.zeros((1, 2))
         self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
 
-        # # Verify that complex-valued arrays are not supported.
-        # arr = np.zeros((1, 2, 1), dtype = complex)
-        # grid = openvdb.FloatGrid()
-        # self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
+        # Verify that complex-valued arrays are not supported.
+        arr = np.zeros((1, 2, 1), dtype = complex)
+        grid = openvdb.FloatGrid()
+        self.assertRaises(TypeError, lambda: grid.copyFromArray(arr))
 
         ARRAY_DIM = 201
         BG, FG = 0, 1
@@ -656,10 +656,10 @@ class TestOpenVDB(unittest.TestCase):
         arr = np.zeros((1, 2))
         self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
 
-        # # Verify that complex-valued arrays are not supported.
-        # arr = np.zeros((1, 2, 1), dtype = complex)
-        # grid = openvdb.FloatGrid()
-        # self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
+        # Verify that complex-valued arrays are not supported.
+        arr = np.zeros((1, 2, 1), dtype = complex)
+        grid = openvdb.FloatGrid()
+        self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
 
         ARRAY_DIM = 201
         BG, FG = 0, 1
@@ -679,7 +679,7 @@ class TestOpenVDB(unittest.TestCase):
                 for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, bool):
                     # Return a new NumPy array.
                     arr = np.ndarray(shape, dtype)
-                    arr.fill(-100)
+                    arr.fill(999)
                     yield arr
 
         # Test copying from arrays of various types to grids of various types.
@@ -708,7 +708,7 @@ class TestOpenVDB(unittest.TestCase):
                 # Verify that scalar grids can't be copied into vector arrays
                 # and vector grids can't be copied into scalar arrays.
                 if isScalarGrid != isScalarArray:
-                    self.assertRaises(ValueError, lambda: grid.copyToArray(arr))
+                    self.assertRaises(TypeError, lambda: grid.copyToArray(arr))
                     continue
 
                 # Copy values from the grid to the NumPy array.
