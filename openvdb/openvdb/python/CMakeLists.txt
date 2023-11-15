@@ -14,7 +14,7 @@ include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
 
-option(USE_NUMPY "Build the python library with numpy support." ON)
+option(USE_NUMPY "Build the python library with numpy support." OFF)
 option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
