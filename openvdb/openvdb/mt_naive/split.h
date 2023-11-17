@@ -16,7 +16,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-using split = ::tbb::split; // TODO LT: Switch over to the below implementation
+using split = ::tbb::split; // TODO LT: Switch over to the below implementation, this can be switched once everything else is done
 
 #if 0
 //! Dummy type that distinguishes splitting constructor from copy constructor.

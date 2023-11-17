@@ -18,15 +18,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace mt {
 
-#if 0
-
-using split = ::tbb::split;
-
-template<typename Value>
-using blocked_range = ::tbb::blocked_range<Value>;
-
-#else
-
 template<typename Value>
 class blocked_range {
 public:
@@ -103,7 +94,6 @@ private:
     //template<typename DimValue, unsigned int N, typename>
     //friend class internal::blocked_rangeNd_impl;
 };
-#endif
 
 } // mt
 } // OPENVDB_VERSION_NAME
