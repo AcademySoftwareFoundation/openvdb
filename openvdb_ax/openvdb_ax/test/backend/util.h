@@ -11,6 +11,7 @@
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/Support/Host.h>
+#include <llvm-c/TargetMachine.h> // LLVMGetDefaultTargetTriple
 
 #include <memory>
 #include <string>
@@ -46,7 +47,7 @@ struct LLVMState
 
     inline std::unique_ptr<llvm::ExecutionEngine> EE()
     {
-        mModule->setTargetTriple(llvm::sys::getDefaultTargetTriple());
+        mModule->setTargetTriple(LLVMGetDefaultTargetTriple());
         llvm::StringMap<bool> HostFeatures;
         llvm::sys::getHostCPUFeatures(HostFeatures);
         std::vector<llvm::StringRef> features;

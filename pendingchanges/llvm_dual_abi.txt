@@ -1,0 +1,4 @@
+OpenVDB AX:
+    - Improvements:
+        Improved build support for using both GCCs old/new ABI which makes it
+        easier to use AX with Houdini.

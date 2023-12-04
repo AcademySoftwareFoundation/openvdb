@@ -38,6 +38,12 @@
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
 
+// @note  We use the C implementation of llvm::sys::getDefaultTargetTriple(),
+//   LLVMGetDefaultTargetTriple(), as the C++ version returns a std::string
+//   which causes issues with GCCs dual ABI (whereby most LLVM installations
+//   are on the newer ABI and the VFX platform, i.e. Houdini, is on the old ABI).
+#include <llvm-c/TargetMachine.h>
+
 // @note  As of adding support for LLVM 5.0 we not longer explicitly
 // perform standard compiler passes (-std-compile-opts) based on the changes
 // to the opt binary in the llvm codebase (tools/opt.cpp). We also no
@@ -66,13 +72,13 @@ namespace
 /// @brief  Initialize a target machine for the host platform. Returns a nullptr
 ///         if a target could not be created.
 /// @note   This logic is based off the Kaleidoscope tutorial below with extensions
-///         for CPU and CPU featrue set targetting
+///         for CPU and CPU feature set targeting
 ///         https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl08.html
 inline std::unique_ptr<llvm::ExecutionEngine>
 initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
 {
     // This handles MARCH (i.e. we don't need to set it on the EngineBuilder)
-    M->setTargetTriple(llvm::sys::getDefaultTargetTriple());
+    M->setTargetTriple(LLVMGetDefaultTargetTriple());
     llvm::Module* module = M.get();
 
     // stringref->bool map of features->enabled
