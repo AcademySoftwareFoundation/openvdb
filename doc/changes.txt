@@ -2,6 +2,105 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v11_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 11.0.0</B> - <I>November 1, 2023</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
+OpenEXR 2 and Python 2 are no longer supported.
+</BLOCKQUOTE>
+
+@par
+OpenVDB:
+- Improvements:
+  - Removed use of @c boost::any in favor of @c std::any.
+    <I>[Contributed&nbsp;by&nbsp;Brian&nbsp;McKinnon]</I>
+
+- Bug Fixes:
+  - Fix potential crash reading corrupt .vdb files with invalid blosc or zip
+    chunks.
+    <I>[Contributed&nbsp;by&nbsp;Matthias&nbsp;Ueberheide]</I>
+
+@par
+NanoVDB:
+- Highlights:
+  - Several new tools to generate and modify NanoVDB grids on the GPU.
+  - New file format that supports streaming of raw grid buffers.
+
+- New Features:
+  - New memory efficient @c GridClass::IndexGrid that separates values from tree
+  - 4 new GridTypes (@c Index, @c OnIndex, @c IndexMask, @c OnIndexMask) used by
+    IndexGrid
+  - Added @c createNanoGrid that replaces older conversion methods in
+    <TT>GridBuilder.h</TT>, <TT>IndexGridBuilder.h</TT> and
+    <TT>OpenToNanoVDB.h</TT>
+  - Added @c cudaPointsToGrid that constructs a point device grid from a list of
+    points.
+  - Added @c cudaVoxelsToGrid that constructs a voxel device grid from a list of
+    voxels.
+  - Added <TT>cuda/CudaUtils.h</TT> with several cuda utility functions.
+  - Added @c GpuTimer for timing of kernels in a specific cuda stream.
+  - Added @c cudaIndexToGrid that converts IndexGrids into regular Grids.
+  - Added @c cudaSignedFloodFill that performs signed-flood filling on the GPU.
+  - Added @c cudaAddBlindData that adds blind data to an existing grid on the
+    GPU.
+  - Added @c cudaGridChecksum that computes checksums of device grids.
+  - Added @c cudaGridHandle that handles grids on the GPU.
+  - Added @c cudaNodeManager that constructs a NodeManager on the GPU.
+  - Added build type @c Points and @c GridType::PointIndex for point grids.
+  - Added @c GridType::Vec3u16 and @c GridType::Vec3u8 for compressed
+    coordinates.
+  - Added <TT>PrefixSum.h</TT> for concurrent computation of prefix sum on the
+    CPU.
+
+- API Changes:
+  - Version 32.6.0 (ABI is unchanged).
+  - Transition from C++11 to C++17
+  - Vec3R is deprecated, please use Vec3d instead.
+  - nanoToOpenVDB now takes the index of a NanoVDB in a GridHandle.
+  - GridData, InternalData and LeafData are now public.
+  - GridMetaData can be copied.
+  - Improvements to <TT>GridBuilder.h</TT> that allows construction of grids on
+    CPU.
+  - GridHandle's move c-tor now requires the GridBuffer to contain a valid grid.
+  - Moved <TT>CudaDeviceBuffer.h</TT> to <TT>cuda/CudaDeviceBuffer.h</TT>.
+  - New API for acceleration of custom random-access with ValueAccessors.
+  - Added BitFlags class for convenient bit-mask operations.
+  - Added Vec2/3 min/maxComponentAtomic GPU methods.
+  - Added @c BBox::expandAtomic and @c BBox::intersectAtomic.
+  - Added @c Coord::expandAtomic.
+  - Added Map constructors.
+  - Added @c Mask::DenseIterator, @c Mask::setOnAtomic, and
+    @c Mask::setOffAtomic.
+  - @c InternalNode::ChildIterator is now const-correct.
+  - Added several new NanoVDB Build Traits.
+  - Syncing <TT>PNanoVDB.h</TT> with <TT>NanoVDB.h</TT>.
+
+@par
+Build:
+- Support for <TT>OpenEXR 2.X</TT> has been removed.
+- Better support for building with external package configurations with
+  <TT>CMAKE_FIND_PACKAGE_PREFER_CONFIG=ON</TT>.
+
+@par
+Python:
+- Removed Python 2 support.
+<I>[Contributed&nbsp;by&nbsp;Matthew&nbsp;Cong]</I>
+- Removed explicit bindings for Math types.
+<I>[Contributed&nbsp;by&nbsp;Matthew&nbsp;Cong]</I>
+- Improved type casting for TypedMetadata.
+<I>[Contributed&nbsp;by&nbsp;Matthew&nbsp;Cong]</I>
+
+
+
 @htmlonly <a name="v10_1_0_changes"></a>@endhtmlonly
 @par
 <B>Version 10.1.0</B> - <I>October 11, 2023</I>

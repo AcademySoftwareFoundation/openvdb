@@ -491,11 +491,37 @@ endif()
 # Add standard dependencies
 
 find_package(TBB REQUIRED COMPONENTS tbb)
+find_package(Boost REQUIRED COMPONENTS iostreams)
 
 # Add deps for pyopenvdb
+# @todo track for numpy
 
 if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
   find_package(Python REQUIRED)
+
+  # Boost python handling - try and find both python and pythonXx (version suffixed).
+  # Prioritize the version suffixed library, failing if neither exist.
+
+  find_package(Boost ${MINIMUM_BOOST_VERSION}
+    QUIET COMPONENTS python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}
+  )
+
+  if(TARGET Boost::python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR})
+    set(BOOST_PYTHON_LIB "python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}")
+    message(STATUS "Found boost_python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}")
+  else()
+    find_package(Boost ${MINIMUM_BOOST_VERSION} QUIET COMPONENTS python)
+    if(TARGET Boost::python)
+      set(BOOST_PYTHON_LIB "python")
+      message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+        "\"${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}\" compatible"
+      )
+    else()
+      message(FATAL_ERROR "Unable to find boost_python or "
+        "boost_python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}."
+      )
+    endif()
+  endif()
 endif()
 
 # Add deps for openvdb_ax
@@ -630,10 +656,6 @@ if(OpenVDB_USES_IMATH_HALF)
   find_package(Imath REQUIRED CONFIG)
 endif()
 
-if(OpenVDB_USES_DELAYED_LOADING)
-  find_package(Boost REQUIRED COMPONENTS iostreams)
-endif()
-
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
@@ -744,7 +766,7 @@ if(OpenVDB_pyopenvdb_LIBRARY)
     set_target_properties(OpenVDB::pyopenvdb PROPERTIES
       IMPORTED_LOCATION "${OpenVDB_pyopenvdb_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_pyopenvdb_INCLUDE_DIR};${PYTHON_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;${PYTHON_LIBRARIES}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::${BOOST_PYTHON_LIB};${PYTHON_LIBRARIES}"
       INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()
