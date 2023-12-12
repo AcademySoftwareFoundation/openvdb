@@ -1,0 +1,3 @@
+Houdini:
+    - When OPENVDB_ENABLE_RPATH is ON, the location of libopenvdb_houdini is now
+    added to the rpath of all Houdini dsos.
