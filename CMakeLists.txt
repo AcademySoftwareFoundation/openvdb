@@ -357,27 +357,16 @@ include(cmake/config/OpenVDBCXX.cmake)
 
 #########################################################################
 
-# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
-# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
-#     malloc: *** malloc_zone_unregister() failed for 0xaddress
-#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
-#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
-#   Jemalloc are thought to work, but haven't been tested.
-# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
-#   of injecting into the Windows runtime to replace the system allocator.
+# Configure malloc library. Use Jemalloc if available, tbbmalloc otherwise
 
-if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
-  if(WIN32 OR APPLE OR USE_MAYA)
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  find_package(Jemalloc QUIET)
+  if(NOT TARGET Jemalloc::jemalloc)
+    message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+      It is recommended to use Jemalloc for optimum performance.")
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    find_package(Jemalloc QUIET)
-    if(NOT TARGET Jemalloc::jemalloc)
-      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
-        It is recommended to use Jemalloc for optimum performance.")
-      set(CONCURRENT_MALLOC "Tbbmalloc")
-    else()
-      set(CONCURRENT_MALLOC "Jemalloc")
-    endif()
+    set(CONCURRENT_MALLOC "Jemalloc")
   endif()
 endif()
 
