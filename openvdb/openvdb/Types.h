@@ -58,6 +58,7 @@ using Int64   = int64_t;
 using Int     = Int32;
 using Byte    = unsigned char;
 using Real    = double;
+using Half    = math::half;
 
 // Two-dimensional vector types
 using Vec2R = math::Vec2<Real>;
@@ -444,6 +445,29 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
     using Type = const ToType;
 };
 /// @endcond
+
+
+////////////////////////////////////////
+template<class T>
+struct is_floating_point : std::is_floating_point<T> { };
+
+template<>
+struct is_floating_point<math::half> : std::is_floating_point<float> { };
+
+/// @brief Maps one type (e.g. the value types) to other types
+template<typename T>
+struct ValueToComputeMap
+{
+    using Type = T;
+    using type = T;
+};
+
+template<>
+struct ValueToComputeMap<math::half>
+{
+    using Type = float;
+    using type = float;
+};
 
 
 ////////////////////////////////////////

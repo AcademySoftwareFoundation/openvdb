@@ -40,14 +40,16 @@
 #ifndef OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h> // for OPENVDB_VERSION_NAME
+#include <openvdb/Grid.h>
 #include <openvdb/Platform.h> // for round()
+#include <openvdb/Types.h> // for ValueToComputeMap
 #include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
-#include <openvdb/Grid.h>
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/version.h> // for OPENVDB_VERSION_NAME
 #include <cmath>
 #include <type_traits>
+#include <iostream>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -313,7 +315,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer x-coordinate in index space
+    /// @param k Integer z-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -392,7 +394,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer x-coordinate in index space
+    /// @param k Integer z-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -744,17 +746,31 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ValueToComputeMap<ValueT>::Type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the eight voxels surrounding the
     // fractional source coordinates.
-    ValueT data[2][2][2];
+    ValueT probeData[2][2][2];
+    ComputeT computeData[2][2][2];
+    bool hasActiveValues;
 
-    const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
+    if constexpr(std::is_same<ValueT, ComputeT>::value) {
+        hasActiveValues = BoxSampler::probeValues(computeData, inTree, Coord(inIdx));
+    } else {
+        hasActiveValues = BoxSampler::probeValues(probeData, inTree, Coord(inIdx));
+        for (int dx = 0; dx < 2; ++dx) {
+            for (int dy = 0; dy < 2; ++dy) {
+                for (int dz = 0; dz < 2; ++dz) {
+                    computeData[dx][dy][dz] = probeData[dx][dy][dz];
+                }
+            }
+        }
+    }
 
-    result = BoxSampler::trilinearInterpolation(data, uvw);
+    result = BoxSampler::trilinearInterpolation(computeData, uvw);
 
     return hasActiveValues;
 }

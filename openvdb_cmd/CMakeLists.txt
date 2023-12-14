@@ -16,7 +16,7 @@ include(GNUInstallDirs)
 
 option(OPENVDB_BUILD_VDB_PRINT "Build vdb_print" ON)
 option(OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF)
-option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF)
+option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" ON)
 option(OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF)
 option(OPENVDB_BUILD_VDB_TOOL "Build vdb_tool" OFF)
 option(OPENVDB_BUILD_VDB_AX "Build the OpenVDB AX command line binary" OFF)
