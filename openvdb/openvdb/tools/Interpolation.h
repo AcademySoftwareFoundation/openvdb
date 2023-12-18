@@ -847,6 +847,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ValueToComputeMap<ValueT>::Type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -855,15 +856,17 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     // fractional source coordinates.
     bool active = false;
     ValueT data[3][3][3];
+    ComputeT computeData[3][3][3];
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
                 if (inTree.probeValue(Coord(ix, iy, iz), data[dx][dy][dz])) active = true;
+                computeData[dx][dy][dz] = data[dx][dy][dz];
             }
         }
     }
 
-    result = QuadraticSampler::triquadraticInterpolation(data, uvw);
+    result = QuadraticSampler::triquadraticInterpolation(computeData, uvw);
 
     return active;
 }

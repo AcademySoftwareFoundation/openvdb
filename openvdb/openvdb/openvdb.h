@@ -90,7 +90,7 @@ using VectorGrid   = Vec3fGrid;
 /// @name Lists of native Grid Types
 /// @{
 /// The floating point Grid types which OpenVDB will register by default.
-using RealGridTypes   = TypeList<FloatGrid, DoubleGrid>;
+using RealGridTypes   = TypeList<HalfGrid, FloatGrid, DoubleGrid>;
 /// The integer Grid types which OpenVDB will register by default.
 using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
@@ -206,6 +206,7 @@ using MetaTypes = TypeList<
     BoolMetadata,
     DoubleMetadata,
     FloatMetadata,
+    HalfMetadata,
     Int32Metadata,
     Int64Metadata,
     StringMetadata,

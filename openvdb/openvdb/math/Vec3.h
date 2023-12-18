@@ -10,8 +10,6 @@
 #include <algorithm>
 #include <cmath>
 #include <type_traits>
-#include "Half.h"
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -669,20 +667,6 @@ OPENVDB_IS_POD(Vec3ui)
 OPENVDB_IS_POD(Vec3s)
 OPENVDB_IS_POD(Vec3d)
 
-// Half WIP
-template<>
-inline auto cwiseAdd(const Vec3<math::internal::half>& v, const float s)
-{
-    Vec3<math::internal::half> out;
-    const math::internal::half* ip = v.asPointer();
-    math::internal::half* op = out.asPointer();
-    for (unsigned i = 0; i < 3; ++i, ++op, ++ip) {
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        *op = *ip + s;
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-    }
-    return out;
-}
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

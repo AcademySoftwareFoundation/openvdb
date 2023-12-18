@@ -712,6 +712,23 @@ class Steal {};
 /// @brief Tag dispatch class that distinguishes constructors during file input
 class PartialCreate {};
 
+// For half compilation
+namespace math {
+template<>
+inline auto cwiseAdd(const math::Vec3<math::half>& v, const float s)
+{
+    math::Vec3<math::half> out;
+    const math::half* ip = v.asPointer();
+    math::half* op = out.asPointer();
+    for (unsigned i = 0; i < 3; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
+}
+} // namespace math
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
