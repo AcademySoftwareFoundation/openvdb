@@ -59,7 +59,7 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'houdini')
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: linux-houdini:${{ matrix.config.houdini_version }}
+    name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
@@ -67,8 +67,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '19.5', houdini_version_str: '19_5' }
-          #- { houdini_version: '20.0', houdini_version_str: '20_0' }
+          - { houdini_version: '19.5', platform: 'linux_x86_64_gcc9.3',  hou_hash: '19_5' }
+          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc9.3',  hou_hash: '20_0-oldabi' }
+          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
       fail-fast: false
     container:
       image: aswf/ci-base:2023
@@ -88,7 +89,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh ${{ matrix.config.houdini_version }} ON
+      run: ./ci/download_houdini.sh ${{ matrix.config.houdini_version }} ${{ matrix.config.platform }} --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
@@ -98,7 +99,7 @@ jobs:
       uses: actions/cache/save@v3
       with:
         path: hou
-        key: vdb-v5-houdini${{ matrix.config.houdini_version_str }}-${{ steps.timestamp.outputs.timestamp }}
+        key: vdb-v5-houdini${{ matrix.config.hou_hash }}-${{ steps.timestamp.outputs.timestamp }}
 
   #############################################################################
   ########################### Core Library Extras #############################
