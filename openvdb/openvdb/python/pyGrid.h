@@ -1208,7 +1208,7 @@ exportGrid(nb::module_ m)
 
     // Define the Grid wrapper class and make it the current scope.
     nb::class_<GridType, GridBase> typedGridClass(m,
-        /*classname=*/pyGridTypeName.c_str(),
+        /*classname=*/(Traits::name()),
         /*docstring=*/(Traits::descr()).c_str());
     typedGridClass
         .def(nb::init<>(), docstring.c_str())
@@ -1312,7 +1312,6 @@ exportGrid(nb::module_ m)
         .def("convertToQuads",
             &pyGrid::volumeToQuadMesh<GridType>,
             nb::arg("isovalue")=0,
-            "convertToQuads(isovalue=0) -> points, quads\n\n"
             "Uniformly mesh a scalar grid that has a continuous isosurface\n"
             "at the given isovalue.  Return a NumPy array of world-space\n"
             "points and a NumPy array of 4-tuples of point indices, which\n"
@@ -1320,7 +1319,6 @@ exportGrid(nb::module_ m)
         .def("convertToPolygons",
             &pyGrid::volumeToMesh<GridType>,
             nb::arg("isovalue")=0, nb::arg("adaptivity")=0,
-            "convertToPolygons(isovalue=0, adaptivity=0) -> points, triangles, quads\n\n"
             "Adaptively mesh a scalar grid that has a continuous isosurface\n"
             "at the given isovalue.  Return a NumPy array of world-space\n"
             "points and NumPy arrays of 3- and 4-tuples of point indices,\n"
@@ -1341,10 +1339,6 @@ exportGrid(nb::module_ m)
 #endif
             nb::arg("transform")=openvdb::math::Transform(),
             nb::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
-             ("createLevelSetFromPolygons(points, triangles=None, quads=None,\n"
-              "    transform=None, halfWidth="
-              + std::to_string(openvdb::LEVEL_SET_HALF_WIDTH) + ") -> "
-              + pyGridTypeName + "\n\n"
              "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
              "The mesh must form a closed surface, but the surface need not be\n"
              "manifold and may have self intersections and degenerate faces.\n"
@@ -1354,7 +1348,7 @@ exportGrid(nb::module_ m)
              "Either the triangle or the quad array may be empty or None.\n"
              "The resulting volume will have the given transform (or the identity\n"
              "transform if no transform is given) and a narrow band width of\n"
-             "2 x halfWidth voxels.").c_str())
+             "2 x halfWidth voxels.")
 
         .def("prune", &pyGrid::prune<GridType>,
             nb::arg("tolerance") = 0,
@@ -1442,7 +1436,7 @@ exportGrid(nb::module_ m)
     IterWrap<GridType, ValueAllIterT>::wrap(m);
 
     // Add the Python type object for this grid type to the module-level list.
-    nb::cast<nb::list>(m.attr("GridTypes")).append(m.attr(pyGridTypeName.c_str()));
+    nb::cast<nb::list>(m.attr("GridTypes")).append(m.attr(Traits::name()));
 
     return typedGridClass;
 }
