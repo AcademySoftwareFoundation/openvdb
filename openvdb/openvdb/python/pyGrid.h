@@ -1076,8 +1076,8 @@ public:
             .def_prop_ro("parent", &IterWrap::parent,
                 ("the " + gridClassName + " over which to iterate").c_str())
 
-            .def("next", &IterWrap::next, ("next() -> " + valueClassName).c_str())
-            .def("__next__", &IterWrap::next, ("__next__() -> " + valueClassName).c_str())
+            .def("next", &IterWrap::next)
+            .def("__next__", &IterWrap::next)
             .def("__iter__", &returnSelf);
 
         nb::class_<IterValueProxyT>(m,
@@ -1085,9 +1085,7 @@ public:
             /*docstring=*/("Proxy for a tile or voxel value in a " + gridClassName).c_str())
 
             .def("copy", &IterValueProxyT::copy,
-                ("copy() -> " + valueClassName + "\n\n"
-                "Return a shallow copy of this value, i.e., one that shares\n"
-                "its data with the original.").c_str())
+                "Return a shallow copy of this value, i.e., one that shares its data with the original.")
 
             .def_prop_ro("parent", &IterValueProxyT::parent,
                 ("the " + gridClassName + " to which this value belongs").c_str())
@@ -1112,16 +1110,12 @@ public:
                 "number of voxels spanned by this value")
 
             .def_static("keys", &IterValueProxyT::getKeys,
-                "keys() -> list\n\n"
                 "Return a list of keys for this tile or voxel.")
             .def_static("__contains__", &IterValueProxyT::hasKey,
-                "__contains__(key) -> bool\n\n"
                 "Return True if the given key exists.")
             .def("__getitem__", &IterValueProxyT::getItem,
-                "__getitem__(key) -> value\n\n"
                 "Return the value of the item with the given key.")
             .def("__setitem__", &IterValueProxyT::setItem,
-                "__setitem__(key, value)\n\n"
                 "Set the value of the item with the given key.");
     }
 
@@ -1216,85 +1210,59 @@ exportGrid(nb::module_ m)
             "Initialize with the given background value.")
 
         .def("copy", &pyGrid::copyGrid<GridType>,
-            ("copy() -> " + pyGridTypeName + "\n\n"
-            "Return a shallow copy of this grid, i.e., a grid\n"
-            "that shares its voxel data with this grid.").c_str())
+            "Return a shallow copy of this grid, i.e., a grid that shares its voxel data with this grid.")
         .def("deepCopy", &GridType::deepCopy,
-            ("deepCopy() -> " + pyGridTypeName + "\n\n"
-            "Return a deep copy of this grid.\n").c_str())
+            "Return a deep copy of this grid.")
 
         .def("__getstate__", &PickleSuite<GridType>::getState)
         .def("__setstate__", &PickleSuite<GridType>::setState)
 
         .def("sharesWith", &pyGrid::sharesWith<GridType>,
-            ("sharesWith(" + pyGridTypeName + ") -> bool\n\n"
-            "Return True if this grid shares its voxel data with the given grid.").c_str())
+            "Return whether or not this grid shares its voxel data with the given grid.")
 
-        /// @todo Any way to set a docstring for a class property?
-        .def_prop_ro_static("valueTypeName", [](const nb::object&) { return pyGrid::getValueType<GridType>(); })
-            /// @todo docstring = "name of this grid's value type"
-        .def_prop_ro_static("zeroValue", [](const nb::object&) { return pyGrid::getZeroValue<GridType>(); })
-            /// @todo docstring = "zero, as expressed in this grid's value type"
-        .def_prop_ro_static("oneValue", [](const nb::object&) { return pyGrid::getOneValue<GridType>(); })
-            /// @todo docstring = "one, as expressed in this grid's value type"
+        .def_prop_ro_static("valueTypeName", [](const nb::object&) { return pyGrid::getValueType<GridType>(); }, "Name of this grid's value type")
+        .def_prop_ro_static("zeroValue", [](const nb::object&) { return pyGrid::getZeroValue<GridType>(); }, "Zero, as expressed in this grid's value type")
+        .def_prop_ro_static("oneValue", [](const nb::object&) { return pyGrid::getOneValue<GridType>(); }, "One, as expressed in this grid's value type")
         /// @todo Is Grid.typeName ever needed?
-        //.def_prop_rw_static("typeName", &GridType::gridType)
-            /// @todo docstring = to "name of this grid's type"
+        //.def_prop_rw_static("typeName", &GridType::gridType, "Name of this grid's type")
 
         .def_prop_rw("background",
             &pyGrid::getGridBackground<GridType>, &pyGrid::setGridBackground<GridType>,
             "value of this grid's background voxels")
 
         .def("getAccessor", &pyGrid::getAccessor<GridType>,
-            ("getAccessor() -> " + pyGridTypeName + "Accessor\n\n"
-            "Return an accessor that provides random read and write access\n"
-            "to this grid's voxels.").c_str())
+            "Return an accessor that provides random read and write access to this grid's voxels.")
         .def("getConstAccessor", &pyGrid::getConstAccessor<GridType>,
-            ("getConstAccessor() -> " + pyGridTypeName + "Accessor\n\n"
-            "Return an accessor that provides random read-only access\n"
-            "to this grid's voxels.").c_str())
+            "Return an accessor that provides random read-only access to this grid's voxels.")
 
         //
         // Statistics
         //
         .def("evalLeafBoundingBox", &pyGrid::evalLeafBoundingBox<GridType>,
-            "evalLeafBoundingBox() -> xyzMin, xyzMax\n\n"
-            "Return the coordinates of opposite corners of the axis-aligned\n"
-            "bounding box of all leaf nodes.")
+            "Return the coordinates of opposite corners of the axis-aligned bounding box of all leaf nodes.")
         .def("evalLeafDim", &pyGrid::evalLeafDim<GridType>,
-            "evalLeafDim() -> x, y, z\n\n"
-            "Return the dimensions of the axis-aligned bounding box\n"
-            "of all leaf nodes.")
+            "Return the dimensions of the axis-aligned bounding box of all leaf nodes.")
 
         .def_prop_ro("treeDepth", &pyGrid::treeDepth<GridType>,
             "depth of this grid's tree from root node to leaf node")
         .def("nodeLog2Dims", &pyGrid::getNodeLog2Dims<GridType>,
-            "list of Log2Dims of the nodes of this grid's tree\n"
-            "in order from root to leaf")
+            "list of Log2Dims of the nodes of this grid's tree in order from root to leaf")
 
         .def("leafCount", &pyGrid::leafCount<GridType>,
-            "leafCount() -> int\n\n"
             "Return the number of leaf nodes in this grid's tree.")
         .def("nonLeafCount", &pyGrid::nonLeafCount<GridType>,
-            "nonLeafCount() -> int\n\n"
             "Return the number of non-leaf nodes in this grid's tree.")
 
         .def("activeLeafVoxelCount", &pyGrid::activeLeafVoxelCount<GridType>,
-            "activeLeafVoxelCount() -> int\n\n"
-            "Return the number of active voxels that are stored\n"
-            "in the leaf nodes of this grid's tree.")
+            "Return the number of active voxels that are stored in the leaf nodes of this grid's tree.")
 
         .def("evalMinMax", &pyGrid::evalMinMax<GridType>,
-            "evalMinMax() -> min, max\n\n"
             "Return the minimum and maximum active values in this grid.")
 
         .def("getIndexRange", &pyGrid::getIndexRange<GridType>,
-            "getIndexRange() -> min, max\n\n"
-            "Return the minimum and maximum coordinates that are represented\n"
-            "in this grid.  These might include background voxels.")
+            "Return the minimum and maximum coordinates that are represented in this grid.  These might include background voxels.")
         //.def("expand", &pyGrid::expandIndexRange<GridType>,
         //    nb::arg("xyz"),
-        //    "expand(xyz)\n\n"
         //    "Expand this grid's index range to include the given coordinates.")
 
         //
@@ -1302,13 +1270,9 @@ exportGrid(nb::module_ m)
         //
         .def("fill", &pyGrid::fill<GridType>,
             nb::arg("min"), nb::arg("max"), nb::arg("value"), nb::arg("active")=true,
-            "fill(min, max, value, active=True)\n\n"
-            "Set all voxels within a given axis-aligned box to\n"
-            "a constant value (either active or inactive).")
+            "Set all voxels within a given axis-aligned box to a constant value (either active or inactive).")
         .def("signedFloodFill", &pyGrid::signedFloodFill<GridType>,
-            "signedFloodFill()\n\n"
-            "Propagate the sign from a narrow-band level set into inactive\n"
-            "voxels and tiles.")
+            "Propagate the sign from a narrow-band level set into inactive voxels and tiles.")
         .def("convertToQuads",
             &pyGrid::volumeToQuadMesh<GridType>,
             nb::arg("isovalue")=0,
@@ -1352,47 +1316,38 @@ exportGrid(nb::module_ m)
 
         .def("prune", &pyGrid::prune<GridType>,
             nb::arg("tolerance") = 0,
-            "prune(tolerance=0)\n\n"
-            "Remove nodes whose values all have the same active state\n"
-            "and are equal to within a given tolerance.")
+            "Remove nodes whose values all have the same active state and are equal to within a given tolerance.")
         .def("pruneInactive", &pyGrid::pruneInactive<GridType>,
             nb::arg("value") = nb::none(),
-            "pruneInactive()\n\n"
-            "Remove nodes whose values are all inactive and replace them\n"
-            "with background tiles.")
+            "Remove nodes whose values are all inactive and replace them with background tiles.")
 
         .def("merge", &GridType::merge,
-            ("merge(" + pyGridTypeName + ")\n\n"
             "Move child nodes from the other grid into this grid wherever\n"
             "those nodes correspond to constant-value tiles in this grid,\n"
             "and replace leaf-level inactive voxels in this grid with\n"
             "corresponding voxels in the other grid that are active.\n\n"
-            "Note: this operation always empties the other grid.").c_str())
+            "Note: this operation always empties the other grid.")
 
         .def("mapOn", &pyGrid::mapOn<GridType>,
             nb::arg("function"),
-            "mapOn(function)\n\n"
             "Iterate over all the active (\"on\") values (tile and voxel)\n"
             "of this grid and replace each value with function(value).\n\n"
             "Example: grid.mapOn(lambda x: x * 2 if x < 0.5 else x)")
 
         .def("mapOff", &pyGrid::mapOff<GridType>,
             nb::arg("function"),
-            "mapOff(function)\n\n"
             "Iterate over all the inactive (\"off\") values (tile and voxel)\n"
             "of this grid and replace each value with function(value).\n\n"
             "Example: grid.mapOff(lambda x: x * 2 if x < 0.5 else x)")
 
         .def("mapAll", &pyGrid::mapAll<GridType>,
             nb::arg("function"),
-            "mapAll(function)\n\n"
             "Iterate over all values (tile and voxel) of this grid\n"
             "and replace each value with function(value).\n\n"
             "Example: grid.mapAll(lambda x: x * 2 if x < 0.5 else x)")
 
         .def("combine", &pyGrid::combine<GridType>,
             nb::arg("grid"), nb::arg("function"),
-            "combine(grid, function)\n\n"
             "Compute function(self, other) over all corresponding pairs\n"
             "of values (tile or voxel) of this grid and the other grid\n"
             "and store the result in this grid.\n\n"
@@ -1403,24 +1358,18 @@ exportGrid(nb::module_ m)
         // Iterators
         //
         .def("citerOnValues", &pyGrid::IterTraits<GridType, ValueOnCIterT>::begin,
-            "citerOnValues() -> iterator\n\n"
-            "Return a read-only iterator over this grid's active\ntile and voxel values.")
+            "Return a read-only iterator over this grid's active tile and voxel values.")
         .def("citerOffValues", &pyGrid::IterTraits<GridType, ValueOffCIterT>::begin,
-            "iterOffValues() -> iterator\n\n"
-            "Return a read-only iterator over this grid's inactive\ntile and voxel values.")
+            "Return a read-only iterator over this grid's inactive tile and voxel values.")
         .def("citerAllValues", &pyGrid::IterTraits<GridType, ValueAllCIterT>::begin,
-            "iterAllValues() -> iterator\n\n"
-            "Return a read-only iterator over all of this grid's\ntile and voxel values.")
+            "Return a read-only iterator over all of this grid's tile and voxel values.")
 
         .def("iterOnValues", &pyGrid::IterTraits<GridType, ValueOnIterT>::begin,
-            "iterOnValues() -> iterator\n\n"
-            "Return a read/write iterator over this grid's active\ntile and voxel values.")
+            "Return a read/write iterator over this grid's active tile and voxel values.")
         .def("iterOffValues", &pyGrid::IterTraits<GridType, ValueOffIterT>::begin,
-            "iterOffValues() -> iterator\n\n"
-            "Return a read/write iterator over this grid's inactive\ntile and voxel values.")
+            "Return a read/write iterator over this grid's inactive tile and voxel values.")
         .def("iterAllValues", &pyGrid::IterTraits<GridType, ValueAllIterT>::begin,
-            "iterAllValues() -> iterator\n\n"
-            "Return a read/write iterator over all of this grid's\ntile and voxel values.");
+            "Return a read/write iterator over all of this grid's tile and voxel values.");
 
     // Wrap const and non-const value accessors and expose them
     // as nested classes of the Grid class.
@@ -1449,14 +1398,12 @@ exportScalarGrid(nb::module_ m)
         .def("copyFromArray", &pyGrid::copyFromArrayScalar<GridType>,
            nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
                 nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
-           "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
            "Populate this grid, starting at voxel (i, j, k), with values\n"
            "from a three-dimensional array.  Mark voxels as inactive\n"
            "if and only if their values are equal to this grid's\n"
            "background value within the given tolerance.")
         .def("copyToArray", &pyGrid::copyToArrayScalar<GridType>,
             nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
-            "copyToArray(array, ijk=(0, 0, 0))\n\n"
             "Populate a three-dimensional array with values\n"
             "from this grid, starting at voxel (i, j, k).");
 }
@@ -1469,14 +1416,12 @@ exportVectorGrid(nb::module_ m)
         .def("copyFromArray", &pyGrid::copyFromArrayVector<GridType>,
            nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
                 nb::arg("tolerance")=pyGrid::getZeroValue<GridType>(),
-           "copyFromArray(array, ijk=(0, 0, 0), tolerance=0)\n\n"
            "Populate this grid, starting at voxel (i, j, k), with values\n"
            "from a four-dimensional array.  Mark voxels as inactive\n"
            "if and only if their values are equal to this grid's\n"
            "background value within the given tolerance.")
         .def("copyToArray", &pyGrid::copyToArrayVector<GridType>,
             nb::arg("array").noconvert(), nb::arg("ijk")=Coord(0,0,0),
-            "copyToArray(array, ijk=(0, 0, 0))\n\nPopulate a "
             "Populate a four-dimensional array with values\n"
             "from this grid, starting at voxel (i, j, k).");
 }

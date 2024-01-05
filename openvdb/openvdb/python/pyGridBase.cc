@@ -167,11 +167,9 @@ exportGridBase(nb::module_ m)
     // and expose the corresponding base-class properties.
     nb::class_<GridBase>(m, "GridBase")
         .def("empty", &GridBase::empty,
-            "empty() -> bool\n\n"
             "Return True if this grid contains only background voxels.")
         .def("__nonzero__", [](GridBase::ConstPtr grid) { return !grid->empty(); })
         .def("clear", &GridBase::clear,
-            "clear()\n\n"
             "Remove all tiles from this grid and all nodes other than the root node.")
         .def_prop_rw("name", &GridBase::getName, setName,
             "this grid's user-specified name")
@@ -185,31 +183,24 @@ exportGridBase(nb::module_ m)
         .def_prop_rw("transform", static_cast<math::Transform::Ptr (GridBase::*)()>(&GridBase::transformPtr),
             setGridTransform, "transform associated with this grid")
         .def("info", gridInfo, nb::arg("verbosity") = 1,
-            "info(verbosity=1) -> str\n\n"
             "Return a string containing information about this grid\n"
-            "with a specified level of verbosity.\n")
+            "with a specified level of verbosity.")
         .def("activeVoxelCount", &GridBase::activeVoxelCount,
-            "activeVoxelCount() -> int\n\n"
             "Return the number of active voxels in this grid.")
         .def("evalActiveVoxelBoundingBox", evalActiveVoxelBoundingBox,
-            "evalActiveVoxelBoundingBox() -> xyzMin, xyzMax\n\n"
             "Return the coordinates of opposite corners of the axis-aligned\n"
             "bounding box of all active voxels.")
         .def("evalActiveVoxelDim", &GridBase::evalActiveVoxelDim,
-            "evalActiveVoxelDim() -> x, y, z\n\n"
             "Return the dimensions of the axis-aligned bounding box of all\n"
             "active voxels.")
         .def("memUsage", &GridBase::memUsage,
-            "memUsage() -> int\n\n"
             "Return the memory usage of this grid in bytes.")
         .def("addStatsMetadata", &GridBase::addStatsMetadata,
-            "addStatsMetadata()\n\n"
             "Add metadata to this grid comprising the current values\n"
             "of statistics like the active voxel count and bounding box.\n"
             "(This metadata is not automatically kept up-to-date with\n"
             "changes to this grid.)")
         .def("getStatsMetadata", getStatsMetadata,
-            "getStatsMetadata() -> dict\n\n"
             "Return a (possibly empty) dict containing just the metadata\n"
             "that was added to this grid with addStatsMetadata().")
         .def_prop_rw("metadata", getAllMetadata, replaceAllMetadata,
@@ -219,27 +210,20 @@ exportGridBase(nb::module_ m)
             "the value of this attribute is a only a copy of the metadata.\n"
             "Use either indexing or updateMetadata() to mutate metadata in place.")
         .def("updateMetadata", updateMetadata,
-            "updateMetadata(dict)\n\n"
             "Add metadata to this grid, replacing any existing items\n"
             "having the same names as the new items.")
         .def("__getitem__", getMetadata,
-            "__getitem__(name) -> value\n\n"
             "Return the metadata value associated with the given name.")
         .def("__setitem__", setMetadata,
-            "__setitem__(name, value)\n\n"
             "Add metadata to this grid, replacing any existing item having\n"
             "the same name as the new item.")
         .def("__delitem__", removeMetadata,
-            "__delitem__(name)\n\n"
             "Remove the metadata with the given name.")
         .def("__contains__", hasMetadata,
-            "__contains__(name) -> bool\n\n"
             "Return True if this grid contains metadata with the given name.")
         .def("__iter__", getMetadataKeys,
-            "__iter__() -> iterator\n\n"
             "Return an iterator over this grid's metadata keys.")
         .def("iterkeys", getMetadataKeys,
-            "iterkeys() -> iterator\n\n"
             "Return an iterator over this grid's metadata keys.")
         .def_prop_rw("saveFloatAsHalf",
             &GridBase::saveFloatAsHalf, &GridBase::setSaveFloatAsHalf,

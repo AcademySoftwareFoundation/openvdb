@@ -48,13 +48,13 @@ exportMetadata(nb::module_ m)
             "Class that holds the value of a single item of metadata of a type\n"
             "for which no Python equivalent exists (typically a custom type)")
         .def("copy", static_cast<Metadata::Ptr (Metadata::*)() const>(&Metadata::copy),
-            "copy() -> Metadata\n\nReturn a copy of this value.")
+            "Return a copy of this value.")
         .def("copy", static_cast<void (Metadata::*)(const Metadata&)>(&Metadata::copy),
-            "copy() -> Metadata\n\nReturn a copy of this value.")
+            "Return a copy of this value.")
         .def("type", &Metadata::typeName,
-            "type() -> str\n\nReturn the name of this value's type.")
+            "Return the name of this value's type.")
         .def("size", &Metadata::size,
-            "size() -> int\n\nReturn the size of this value in bytes.")
+            "Return the size of this value in bytes.")
         .def("__nonzero__", &Metadata::asBool)
         .def("__str__", &Metadata::str);
 }

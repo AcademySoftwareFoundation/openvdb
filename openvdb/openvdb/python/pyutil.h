@@ -146,10 +146,10 @@ struct StringEnum
             m,
             /*classname=*/Descr::name(),
             /*docstring=*/Descr::doc());
-        cls.def_static("keys", &StringEnum::keys, "keys() -> list")
-            .def("__len__", &StringEnum::numItems, "__len__() -> int")
-            .def("__iter__", &StringEnum::iter, "__iter__() -> iterator")
-            .def("__getitem__", &StringEnum::getItem, "__getitem__(str) -> str")
+        cls.def_static("keys", &StringEnum::keys)
+            .def("__len__", &StringEnum::numItems)
+            .def("__iter__", &StringEnum::iter)
+            .def("__getitem__", &StringEnum::getItem)
             /*end*/;
         // Add a read-only, class-level attribute for each (key, value) pair.
         for (int i = 0; ; ++i) {
