@@ -384,78 +384,66 @@ NB_MODULE(PY_OPENVDB_MODULE_NAME, m)
 
     m.def("read",
         &_openvdbmodule::readFromFile,
-        "read(filename, gridname) -> Grid\n\n"
         "Read a single grid from a .vdb file.",
         nb::arg("filename"), nb::arg("gridname"));
 
 #ifdef PY_OPENVDB_USE_AX
     m.def("ax",
         nb::overload_cast<const std::string&, GridBase::Ptr>(&_openvdbmodule::axrun),
-        "ax(code, grids) -> Grid\n\n"
         "Run AX code on a VDB grid.",
         nb::arg("code"), nb::arg("grid"));
 
     m.def("ax",
         nb::overload_cast<const std::string&, GridPtrVec&>(&_openvdbmodule::axrun),
-        "ax(code, grids) -> Grid\n\n"
         "Run AX code on some VDB grids.",
         nb::arg("code"), nb::arg("grids"));
 #endif
 
     m.def("readAll",
         &_openvdbmodule::readAllFromFile,
-        "readAll(filename) -> list, dict\n\n"
-        "Read a .vdb file and return a list of grids and\n"
+        "Read a .vdb file and return a list of grids and "
         "a dict of file-level metadata.",
         nb::arg("filename"));
 
     m.def("readMetadata",
         &_openvdbmodule::readFileMetadata,
-        "readMetadata(filename) -> dict\n\n"
         "Read file-level metadata from a .vdb file.",
         nb::arg("filename"));
 
     m.def("readGridMetadata",
         &_openvdbmodule::readGridMetadataFromFile,
-        "readGridMetadata(filename, gridname) -> Grid\n\n"
-        "Read a single grid's metadata and transform (but not its tree)\n"
+        "Read a single grid's metadata and transform (but not its tree) "
         "from a .vdb file.",
         nb::arg("filename"), nb::arg("gridname"));
 
     m.def("readAllGridMetadata",
         &_openvdbmodule::readAllGridMetadataFromFile,
-        "readAllGridMetadata(filename) -> list\n\n"
-        "Read a .vdb file and return a list of grids populated with\n"
+        "Read a .vdb file and return a list of grids populated with "
         "their metadata and transforms, but not their trees.",
         nb::arg("filename"));
 
     m.def("write",
         nb::overload_cast<const std::string&, GridBase::ConstPtr, MetaMap>(&_openvdbmodule::writeToFile),
-        "write(filename, grids, metadata=None)\n\n"
-        "Write a grid and (optionally) a dict\n"
+        "Write a grid and (optionally) a dict "
         "of (name, value) metadata pairs to a .vdb file.",
         nb::arg("filename"), nb::arg("grid"), nb::arg("metadata") = nb::dict());
 
     m.def("write",
         nb::overload_cast<const std::string&, const GridCPtrVec&, MetaMap>(&_openvdbmodule::writeToFile),
-        "write(filename, grids, metadata=None)\n\n"
-        "Write a sequence of grids and (optionally) a dict\n"
+        "Write a sequence of grids and (optionally) a dict "
         "of (name, value) metadata pairs to a .vdb file.",
         nb::arg("filename"), nb::arg("grids"), nb::arg("metadata") = nb::dict());
 
     m.def("getLoggingLevel", &_openvdbmodule::getLoggingLevel,
-        "getLoggingLevel() -> str\n\n"
-        "Return the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
+        "Return the severity threshold (\"debug\", \"info\", \"warn\", \"error\", "
         "or \"fatal\") for error messages.");
     m.def("setLoggingLevel", &_openvdbmodule::setLoggingLevel,
-        "setLoggingLevel(level)\n\n"
-        "Specify the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
-        "or \"fatal\") for error messages.  Messages of lower severity\n"
+        "Specify the severity threshold (\"debug\", \"info\", \"warn\", \"error\", "
+        "or \"fatal\") for error messages.  Messages of lower severity "
         "will be suppressed.",
         nb::arg("level"));
     m.def("setProgramName", &_openvdbmodule::setProgramName,
-        "setProgramName(name, color=True)\n\n"
-        "Specify the program name to be displayed in error messages,\n"
+        "Specify the program name to be displayed in error messages, "
         "and optionally specify whether to print error messages in color.",
         nb::arg("name"), nb::arg("color") = true);
 

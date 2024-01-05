@@ -20,7 +20,6 @@ exportFloatGrid(nb::module_ m)
         &pyGrid::createLevelSetSphere<FloatGrid>,
         nb::arg("radius"), nb::arg("center")=openvdb::Coord(), nb::arg("voxelSize")=1.0,
              nb::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
-        "createLevelSetSphere(radius, center, voxelSize, halfWidth) -> FloatGrid\n\n"
         "Return a grid containing a narrow-band level set representation\n"
         "of a sphere.");
 }

@@ -177,7 +177,6 @@ public:
     {
         const std::string
             pyGridTypeName = pyutil::GridTraits<GridType>::name(),
-            pyValueTypeName = openvdb::typeNameAsString<typename GridType::ValueType>(),
             pyAccessorTypeName = Traits::typeName();
 
         nb::class_<AccessorWrap>(m,
@@ -186,11 +185,9 @@ public:
                 + " access by (i, j, k) index coordinates to the voxels\nof a "
                 + pyGridTypeName).c_str())
             .def("copy", &AccessorWrap::copy,
-                ("copy() -> " + pyAccessorTypeName + "\n\n"
-                 "Return a copy of this accessor.").c_str())
+                 "Return a copy of this accessor.")
 
             .def("clear", &AccessorWrap::clear,
-                "clear()\n\n"
                 "Clear this accessor of all cached data.")
 
             .def_prop_ro("parent", &AccessorWrap::parent,
@@ -201,58 +198,46 @@ public:
             //
             .def("getValue", &AccessorWrap::getValue,
                 nb::arg("ijk"),
-                ("getValue(ijk) -> " + pyValueTypeName + "\n\n"
-                 "Return the value of the voxel at coordinates (i, j, k).").c_str())
+                "Return the value of the voxel at coordinates (i, j, k).")
 
             .def("getValueDepth", &AccessorWrap::getValueDepth,
                 nb::arg("ijk"),
-                "getValueDepth(ijk) -> int\n\n"
                 "Return the tree depth (0 = root) at which the value of voxel\n"
                 "(i, j, k) resides.  If (i, j, k) isn't explicitly represented in\n"
                 "the tree (i.e., it is implicitly a background voxel), return -1.")
 
             .def("isVoxel", &AccessorWrap::isVoxel,
                 nb::arg("ijk"),
-                "isVoxel(ijk) -> bool\n\n"
                 "Return True if voxel (i, j, k) resides at the leaf level of the tree.")
 
             .def("probeValue", &AccessorWrap::probeValue,
                 nb::arg("ijk"),
-                "probeValue(ijk) -> value, bool\n\n"
                 "Return the value of the voxel at coordinates (i, j, k)\n"
                 "together with the voxel's active state.")
 
             .def("isValueOn", &AccessorWrap::isValueOn,
                 nb::arg("ijk"),
-                "isValueOn(ijk) -> bool\n\n"
                 "Return the active state of the voxel at coordinates (i, j, k).")
             .def("setActiveState", &AccessorWrap::setActiveState,
                 nb::arg("ijk"), nb::arg("on"),
-                "setActiveState(ijk, on)\n\n"
                 "Mark voxel (i, j, k) as either active or inactive (True or False),\n"
                 "but don't change its value.")
 
             .def("setValueOnly", &AccessorWrap::setValueOnly,
                 nb::arg("ijk"), nb::arg("value"),
-                "setValueOnly(ijk, value)\n\n"
                 "Set the value of voxel (i, j, k), but don't change its active state.")
 
             .def("setValueOn", &AccessorWrap::setValueOn,
                 nb::arg("ijk"), nb::arg("value") = nb::none(),
-                "setValueOn(ijk, value)\n\n"
-                "Mark voxel (i, j, k) as active and set the voxel's value if specified.\n")
+                "Mark voxel (i, j, k) as active and set the voxel's value if specified.")
 
             .def("setValueOff", &AccessorWrap::setValueOff,
                 nb::arg("ijk"), nb::arg("value") = nb::none(),
-                "setValueOff(ijk, value)\n\n"
                 "Mark voxel (i, j, k) as inactive and set the voxel's value if specified.")
 
             .def("isCached", &AccessorWrap::isCached,
                 nb::arg("ijk"),
-                "isCached(ijk) -> bool\n\n"
-                "Return True if this accessor has cached the path to voxel (i, j, k).")
-
-            ; // nb::class_<ValueAccessor>
+                "Return True if this accessor has cached the path to voxel (i, j, k).");
     }
 
 private:
