@@ -139,13 +139,11 @@ exportTransform(nb::module_ m)
         .def(nb::init<>())
 
         .def("deepCopy", &math::Transform::copy,
-            "deepCopy() -> Transform\n\n"
             "Return a copy of this transform.")
 
         /// @todo Should this also be __str__()?
         .def("info", &pyTransform::info,
-            "info() -> str\n\n"
-            "Return a string containing a description of this transform.\n")
+            "Return a string containing a description of this transform.")
 
         .def("__getstate__", &pyTransform::PickleSuite::getState)
         .def("__setstate__", &pyTransform::PickleSuite::setState)
@@ -157,70 +155,50 @@ exportTransform(nb::module_ m)
 
         .def("preRotate", &math::Transform::preRotate,
             nb::arg("radians"), nb::arg("axis") = math::X_AXIS,
-            "rotate(radians, axis)\n\n"
             "Prepend a rotation about either Axis.X, Axis.Y or Axis.Z.")
         .def("preTranslate", &math::Transform::preTranslate, nb::arg("xyz"),
-            "translate((x, y, z))\n\n"
             "Prepend a translation.")
         .def("preScale", nb::overload_cast<double>(&math::Transform::preScale), nb::arg("s"),
-            "scale(s)\n\n"
             "Prepend a uniform scale.")
         .def("preScale", nb::overload_cast<const Vec3d&>(&math::Transform::preScale), nb::arg("sxyz"),
-            "scale((sx, sy, sz))\n\n"
             "Prepend a nonuniform scale.")
         .def("preShear", &math::Transform::preShear,
             nb::arg("s"), nb::arg("axis0"), nb::arg("axis1"),
-            "shear(s, axis0, axis1)\n\n"
-            "Prepend a shear (axis0 and axis1 are either\n"
-            "Axis.X, Axis.Y or Axis.Z).")
+            "Prepend a shear (axis0 and axis1 are either Axis.X, Axis.Y or Axis.Z).")
 
         .def("postRotate", &math::Transform::postRotate,
             nb::arg("radians"), nb::arg("axis") = math::X_AXIS,
-            "rotate(radians, axis)\n\n"
             "Postfix a rotation about either Axis.X, Axis.Y or Axis.Z.")
         .def("postTranslate", &math::Transform::postTranslate, nb::arg("xyz"),
-            "translate((x, y, z))\n\n"
             "Postfix a translation.")
         .def("postScale", nb::overload_cast<double>(&math::Transform::postScale), nb::arg("s"),
-            "scale(s)\n\n"
             "Postfix a uniform scale.")
         .def("postScale", nb::overload_cast<const Vec3d&>(&math::Transform::postScale), nb::arg("sxyz"),
-            "scale((sx, sy, sz))\n\n"
             "Postfix a nonuniform scale.")
         .def("postShear", &math::Transform::postShear,
             nb::arg("s"), nb::arg("axis0"), nb::arg("axis1"),
-            "shear(s, axis0, axis1)\n\n"
-            "Postfix a shear (axis0 and axis1 are either\n"
-            "Axis.X, Axis.Y or Axis.Z).")
+            "Postfix a shear (axis0 and axis1 are either Axis.X, Axis.Y or Axis.Z).")
 
         .def("voxelSize", nb::overload_cast<>(&math::Transform::voxelSize, nb::const_),
-            "voxelSize() -> (dx, dy, dz)\n\n"
             "Return the size of voxels of the linear component of this transform.")
         .def("voxelSize", nb::overload_cast<const Vec3d&>(&math::Transform::voxelSize, nb::const_), nb::arg("xyz"),
-            "voxelSize((x, y, z)) -> (dx, dy, dz)\n\n"
             "Return the size of the voxel at position (x, y, z).")
 
         .def("voxelVolume", nb::overload_cast<>(&math::Transform::voxelVolume, nb::const_),
-            "voxelVolume() -> float\n\n"
             "Return the voxel volume of the linear component of this transform.")
         .def("voxelVolume", nb::overload_cast<const Vec3d&>(&math::Transform::voxelVolume, nb::const_), nb::arg("xyz"),
-            "voxelVolume((x, y, z)) -> float\n\n"
             "Return the voxel volume at position (x, y, z).")
 
         .def("indexToWorld", &pyTransform::indexToWorld, nb::arg("xyz"),
-            "indexToWorld((x, y, z)) -> (x', y', z')\n\n"
             "Apply this transformation to the given coordinates.")
         .def("worldToIndex", &pyTransform::worldToIndex, nb::arg("xyz"),
-            "worldToIndex((x, y, z)) -> (x', y', z')\n\n"
             "Apply the inverse of this transformation to the given coordinates.")
         .def("worldToIndexCellCentered", &pyTransform::worldToIndexCellCentered,
             nb::arg("xyz"),
-            "worldToIndexCellCentered((x, y, z)) -> (i, j, k)\n\n"
             "Apply the inverse of this transformation to the given coordinates\n"
             "and round the result to the nearest integer coordinates.")
         .def("worldToIndexNodeCentered", &pyTransform::worldToIndexNodeCentered,
             nb::arg("xyz"),
-            "worldToIndexNodeCentered((x, y, z)) -> (i, j, k)\n\n"
             "Apply the inverse of this transformation to the given coordinates\n"
             "and round the result down to the nearest integer coordinates.")
 
@@ -230,11 +208,9 @@ exportTransform(nb::module_ m)
 
     m.def("createLinearTransform", nb::overload_cast<double>(&pyTransform::createLinearTransform),
         nb::arg("voxelSize") = 1.0,
-        "createLinearTransform(voxelSize) -> Transform\n\n"
         "Create a new linear transform with the given uniform voxel size.");
 
     m.def("createLinearTransform", nb::overload_cast<const std::vector<std::vector<double> >&>(&pyTransform::createLinearTransform), nb::arg("matrix"),
-        "createLinearTransform(matrix) -> Transform\n\n"
         "Create a new linear transform from a 4 x 4 matrix given as a sequence\n"
         "of the form [[a, b, c, d], [e, f, g, h], [i, j, k, l], [m, n, o, p]],\n"
         "where [m, n, o, p] is the translation component.");
@@ -242,7 +218,6 @@ exportTransform(nb::module_ m)
     m.def("createFrustumTransform", &pyTransform::createFrustum,
         nb::arg("xyzMin"), nb::arg("xyzMax"),
          nb::arg("taper"), nb::arg("depth"), nb::arg("voxelSize") = 1.0,
-        "createFrustumTransform(xyzMin, xyzMax, taper, depth, voxelSize) -> Transform\n\n"
         "Create a new frustum transform with unit bounding box (xyzMin, xyzMax)\n"
         "and the given taper, depth and uniform voxel size.");
 }
