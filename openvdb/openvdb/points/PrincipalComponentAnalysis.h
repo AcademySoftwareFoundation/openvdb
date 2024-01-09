@@ -23,6 +23,7 @@
 #include <openvdb/math/Coord.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointTransfer.h>
@@ -31,6 +32,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <limits>
 #include <cmath> // std::cbrt
 
 namespace openvdb {
@@ -43,20 +45,20 @@ struct PcaAttributes;
 
 /// @brief  Calculate  Calculate ellipsoid transformations from the local point
 ///   distributions as described in Yu and Turk's 'Reconstructing Fluid Surfaces
-///   with Anisotropic Kernels'.
+///   with Anisotropic Kernels'. The results are stored on the attributes
+///   pointed to by the PcaAttributes. See the PcaSettings and PcaAttributes
+///   structs for more details.
+/// @warning  This method will throw if the 'strech', 'rotation' or 'pws'
+///   attributes already exist on this input point set.
 /// @param points   The point data grid to analyses
 /// @param settings The PCA settings for controlling the behavior of the
 ///   neighborhood searches and the resulting ellipsoidal values
 /// @param attrs    The PCA attributes to create
-/// @param interrupt An optional interrupter.
-template <typename PointDataGridT,
-    typename FilterT = NullFilter,
-    typename InterrupterT = util::NullInterrupter>
+template <typename PointDataGridT>
 inline void
 pca(PointDataGridT& points,
     const PcaSettings& settings,
-    const PcaAttributes& attrs,
-    InterrupterT* interrupt = nullptr);
+    const PcaAttributes& attrs);
 
 
 /// @brief  Various settings for the neighborhood analysis of point
@@ -69,7 +71,10 @@ struct PcaSettings
     ///   This may or may not be desirable depending on the point set's
     ///   distribution and can be tweaked as necessary. Note however that large
     ///   values will cause the PCA calculation to become exponentially more
-    ///   expensive. Values equal to or less than 0.0 have undefined results.
+    ///   expensive and should be used in conjunction with the max point per
+    ///   voxel settings below.
+    /// @warning  Valid range is [0, inf). Behaviour is undefined when outside
+    ///   this range.
     float searchRadius = 1.0f;
     /// @param allowedAnisotropyRatio  the maximum allowed ratio between the
     ///   components in each ellipse' stretch coefficients such that:
@@ -84,19 +89,52 @@ struct PcaSettings
     ///   principal axis and corresponding squashes along the others to
     ///   compensate.
     /// @note Very small values may cause very thing ellipses to be produced,
-    ///   so a reasonable minimum should be set. Values equal to or less than
-    ///   0.0, or values greater than 1.0 have undefined results.
+    ///   so a reasonable minimum should be set. Valid range is (0, 1].
+    ///   Behaviour is undefined when outside this range.
     float allowedAnisotropyRatio = 0.25f;
     /// @param nonAnisotropicStretch  The stretch coefficient that should be
     ///   used for points which have no anisotropic neighbourhood (due to
     ///   being isolated or not having enough neighbours to reach the
     ///   specified @sa neighbourThreshold).
     float nonAnisotropicStretch = 1.0;
-    /// @param neighbourThreshold  the number of neighbours a point must have
-    ///   to be classified as having an elliptical distribution. Points with
-    ///   less neighbours than this will end up with uniform stretch values of
-    ///   1.0 and an identity rotation matrix.
+    /// @param neighbourThreshold  number of points in a given neighbourhood
+    ///   that target points must have to be classified as having an elliptical
+    ///   distribution. Points with less neighbours than this will end up with
+    ///   uniform stretch values of nonAnisotropicStretch and an identity
+    ///   rotation matrix.
+    /// @note  This number can include the target point itself.
+    /// @warning  Changing this value does not change the size or number of
+    ///   point neighborhood lookups. As such, increasing this value only
+    ///   speeds up the number of calculated covariance matrices. Valid range
+    ///   is [0, inf], where 0 effectively disables all covariance calculations
+    ///   and 1 enables them for every point.
     size_t neighbourThreshold = 20;
+    /// @param The maximum number of source points to gather for contributions
+    ///   to each target point, per voxel. When a voxel contains more points
+    ///   than this value, source point are trivially stepped over, with the
+    ///   step size calculated as max(1, ppv / neighbourThreshold).
+    /// @note  There is no prioritisation of nearest points; for example, voxels
+    ///   which partially overlap the search radius may end up selecting point
+    ///   ids which all lie outside. This is rarely an issue in practice and
+    ///   choosing an appropriate value for this setting can significantly
+    ///   increase performance without a large impact to the results.
+    /// @warning  Valid range is [1, inf). Behaviour is undefined if this value
+    ///   is set to zero.
+    size_t maxSourcePointsPerVoxel = 8;
+    /// @param The maximum number of target points to write anisotropy values
+    ///   to. When a voxel contains more points than this value, target point
+    ///   are trivially stepped over, with the step size calculated as:
+    ///      max(1, ppv / maxTargetPointsPerVoxel).
+    ///   default behaviour is to compute for all points. Any points skipped
+    ///   will be treated as being isolated and receive an identity rotation
+    ///   and nonAnisotropicStretch.
+    /// @note  When using in conjuction with rasterizeSdf for ellipsoids,
+    ///   consider choosing a lower value (e.g. same value as
+    ///   maxSourcePointsPerVoxel) to speed up iterations and only
+    ///   increase if necessary.
+    /// @warning  Valid range is [1, inf). Behaviour is undefined if this value
+    ///   is set to zero.
+    size_t maxTargetPointsPerVoxel = std::numeric_limits<size_t>::max();
     /// @param averagePositions  the amount (between 0 and 1) to average out
     ///   positions. All points, whether they end up as ellipses or not,
     ///   can have their positions smoothed to account for their neighbourhood
@@ -104,7 +142,11 @@ struct PcaSettings
     /// @warning  This options does NOT modify the P attribute - instead, a
     ///   world space position attribute "pws" (default) is created and stores
     ///   the smoothed position.
+    /// @warning  Valid range is [0, 1]. Behaviour is undefined when outside
+    ///   this range.
     float averagePositions = 1.0f;
+    /// @param interrupter  optional interrupter
+    util::NullInterrupter* interrupter = nullptr;
 };
 
 /// @brief  The persistent attributes created by the PCA methods.

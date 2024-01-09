@@ -184,6 +184,77 @@ using PointDataIndex64 = PointIndex<Index64, 1>;
 
 ////////////////////////////////////////
 
+/// @brief  Macros to help determine whether or not a class has a particular
+///   member function.
+/// @details  These macros work by instantiating unique templated instances
+///   of helper structs for a particular member function signature and name
+///   which can then be queried.
+///     - The first macro, INVOKABLE, defines a helper struct which determines
+///       if a member function can be called with a given set of argument types.
+///       Note that the return type is not provided.
+///     - The second macro defines a helper struct which determines if the
+///       member function exists with the _exact_ same signature, including
+///       all argument and function attributes (const-ness, noexcept, etc)
+///
+///   Use the first solution if all you want to determine is whether a given
+///   method can be called, and the second if you need exact resolution.
+/// @code
+///   // example class
+///   struct MyClass { int test(double) { return 0; } };
+///
+///   // The following examples work from the struct type created by:
+///   OPENVDB_INIT_INVOKABLE_MEMBER_FUNCTION(test);
+///
+///   // Will assert true!
+///   static_assert(OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(MyClass, test, double));
+///   // Will assert true, int can be converted to double
+///   static_assert(OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(MyClass, test, int));
+///   // Will assert false, needs at least one argument
+///   static_assert(OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(MyClass, test);
+///
+///
+///   // The following examples work from the struct type created by:
+///   OPENVDB_INIT_MEMBER_FUNCTION(test);
+///
+///   // Will assert fail
+///   static_assert(OPENVDB_HAS_MEMBER_FUNCTION(MyClass, test, void(MyClass::*)(double)));
+///   // Only case where this assert true
+///   static_assert(OPENVDB_HAS_MEMBER_FUNCTION(MyClass, test, int(MyClass::*)(double)));
+///
+/// @endcode
+#define OPENVDB_INIT_INVOKABLE_MEMBER_FUNCTION(F)              \
+    template <typename ClassT, typename... Args>               \
+    struct HasInvokableMemberFunction_##F {                    \
+    private:                                                   \
+        template <typename T>                                  \
+        static auto check(T*) ->                               \
+            decltype(std::declval<T>().                        \
+                F(std::declval<Args>()...), std::true_type()); \
+        template <typename T>                                  \
+        static auto check(...) -> std::false_type;             \
+    public:                                                    \
+        static constexpr bool value =                          \
+            decltype(check<ClassT>(nullptr))::value;           \
+    };
+#define OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION(T, F, ...) \
+    HasInvokableMemberFunction_##F<T, __VA_ARGS__>::value
+
+#define OPENVDB_INIT_MEMBER_FUNCTION(F)                           \
+    template<typename ClassT, typename Signature>                 \
+    struct HasMemberFunction_##F {                                \
+        template <typename U, U> struct sigmatch;                 \
+        template <typename U> static std::true_type               \
+            check(sigmatch<Signature, &U::F>*);                   \
+        template <typename>   static std::false_type check(...);  \
+        static const bool value = std::is_same<std::true_type,    \
+            decltype(check<ClassT>(nullptr))>::value;             \
+    };
+#define OPENVDB_HAS_MEMBER_FUNCTION(T, F, S) \
+    HasMemberFunction_##F<T, S>::value
+
+
+////////////////////////////////////////
+
 
 /// @brief Helper metafunction used to determine if the first template
 /// parameter is a specialization of the class template given in the second

@@ -294,7 +294,7 @@ TEST_F(TestPCA, testPCA)
         points::dropGroup(points->tree(), a.ellipses);
 
         s.searchRadius = 0.001f;
-        s.neighbourThreshold = 1;
+        s.neighbourThreshold = 0;
         s.nonAnisotropicStretch = 1.0f;
 
         points::pca(*points, s, a);
@@ -323,7 +323,7 @@ TEST_F(TestPCA, testPCA)
         // each point is 0.01 distance away from the next, so setting to 0.01
         // should mean only the middle point gets classified
         s.searchRadius = std::nextafter(0.01f, 1.0f);
-        s.neighbourThreshold = 2; // only center point
+        s.neighbourThreshold = 3; // only center point
         s.averagePositions = 0.0f; // disable position smoothing
         s.nonAnisotropicStretch = 1.3f;
 
@@ -356,7 +356,7 @@ TEST_F(TestPCA, testPCA)
         // each point is 0.01 distance away from the next, so make sure
         // they all find each other i.e. min dist as 0.02
         s.searchRadius = std::nextafter(0.02f, 1.0f);
-        s.neighbourThreshold = 1; // make sure they get classified
+        s.neighbourThreshold = 2; // make sure they get classified
         s.averagePositions = 0.0f; // disable position smoothing
         s.allowedAnisotropyRatio = 0.25f;
         s.nonAnisotropicStretch = 1.0f;
