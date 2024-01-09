@@ -6,7 +6,7 @@
  *      Side Effects Software Inc.  All rights reserved.
  */
 
-#include "GU_PrimVDB.h"
+#include <GU/GU_PrimVDB.h>
 #include "Utils.h"
 
 #include <UT/UT_EnvControl.h>
