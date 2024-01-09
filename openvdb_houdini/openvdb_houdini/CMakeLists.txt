@@ -160,10 +160,8 @@ set(OPENVDB_HOUDINI_LOCAL_DIR ${PROJECT_BINARY_DIR}/openvdb_houdini)
 file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR})
 file(COPY
     AttributeTransferUtil.h
-    GEO_PrimVDB.h
     GeometryUtil.h
     GT_GEOPrimCollectVDB.h
-    GU_PrimVDB.h
     GU_VDBPointTools.h
     PointUtils.h
     SOP_NodeVDB.h
@@ -174,14 +172,21 @@ file(COPY
   DESTINATION
     ${OPENVDB_HOUDINI_LOCAL_DIR}
 )
+file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR}/reference)
+file(COPY
+    GEO_PrimVDB.h
+    GU_PrimVDB.h
+    GEO_PrimVDB.cc
+    GU_PrimVDB.cc
+  DESTINATION
+    ${OPENVDB_HOUDINI_LOCAL_DIR}/reference
+)
 
 add_library(openvdb_houdini SHARED
-  GEO_PrimVDB.cc
   GEO_VDBTranslator.cc
   geometry.cc
   GeometryUtil.cc
   GT_GEOPrimCollectVDB.cc
-  GU_PrimVDB.cc
   GU_VDBPointTools.cc
   ParmFactory.cc
   PointUtils.cc
