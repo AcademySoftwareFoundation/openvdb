@@ -174,10 +174,10 @@ file(COPY
 )
 file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR}/reference)
 file(COPY
-    GEO_PrimVDB.h
-    GU_PrimVDB.h
-    GEO_PrimVDB.cc
-    GU_PrimVDB.cc
+    reference/GEO_PrimVDB.h
+    reference/GU_PrimVDB.h
+    reference/GEO_PrimVDB.cc
+    reference/GU_PrimVDB.cc
   DESTINATION
     ${OPENVDB_HOUDINI_LOCAL_DIR}/reference
 )
