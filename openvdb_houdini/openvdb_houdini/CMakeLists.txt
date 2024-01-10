@@ -172,15 +172,6 @@ file(COPY
   DESTINATION
     ${OPENVDB_HOUDINI_LOCAL_DIR}
 )
-file(MAKE_DIRECTORY ${OPENVDB_HOUDINI_LOCAL_DIR}/reference)
-file(COPY
-    reference/GEO_PrimVDB.h
-    reference/GU_PrimVDB.h
-    reference/GEO_PrimVDB.cc
-    reference/GU_PrimVDB.cc
-  DESTINATION
-    ${OPENVDB_HOUDINI_LOCAL_DIR}/reference
-)
 
 add_library(openvdb_houdini SHARED
   GEO_VDBTranslator.cc
