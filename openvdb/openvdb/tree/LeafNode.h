@@ -1610,6 +1610,7 @@ LeafNode<T, Log2Dim>::resetBackground(const ValueType& oldBackground,
                                       const ValueType& newBackground)
 {
     if (!this->allocate()) return;
+    if (oldBackground == newBackground || math::negative(oldBackground) == newBackground) return;
 
     typename NodeMaskType::OffIterator iter;
     // For all inactive values...
