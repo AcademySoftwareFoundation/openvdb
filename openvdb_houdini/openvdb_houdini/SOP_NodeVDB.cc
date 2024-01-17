@@ -10,8 +10,8 @@
 #include <openvdb/points/PointDataGrid.h>
 #include "PointUtils.h"
 #include "Utils.h"
-#include "GEO_PrimVDB.h"
-#include "GU_PrimVDB.h"
+#include <GEO/GEO_PrimVDB.h>
+#include <GU/GU_PrimVDB.h>
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
 #include <OP/OP_NodeInfoParms.h>

@@ -615,7 +615,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
                     matchGroup(*refGeo, evalStdString("refvdb", time));
 
                 hvdb::VdbPrimCIterator it(refGeo, refGroup);
-                const hvdb::GU_PrimVDB* refPrim = *it;
+                const GU_PrimVDB* refPrim = *it;
 
                 if (!refPrim) {
                     addError(SOP_MESSAGE, "Second input has no VDB primitives.");
