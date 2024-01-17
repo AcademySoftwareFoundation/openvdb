@@ -109,8 +109,7 @@ jobs:
         restore-keys: vdb-v5-houdini${{ matrix.config.hou_hash }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
-      # Make sure the cache is copied, not moved, as the cache action always posts the cache.
-      # Also make sure that the unpacked install is NOT in the root of the OpenVDB checkout
+      # Make sure that the unpacked install is NOT in the root of the OpenVDB checkout
       # otherwise CMake's install RPATHs wil not work correctly.
     - name: install_houdini
       run: |
@@ -135,6 +134,48 @@ jobs:
     - name: ccache_clean
       if: matrix.config.build == 'Release'
       run: ccache --evict-older-than 1d
-      # Delete the houdini tarball so that this dummy cache occupies no space
-    - name: delete_hou
-      run: rm -f hou/hou.tar.gz
+
+  macos-houdini:
+    needs: [checksecret]
+    if: >
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+          github.repository_owner == 'AcademySoftwareFoundation' }}
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: fetch_houdini
+      uses: actions/cache/restore@v3
+      with:
+        path: hou
+        key: dummy-houdini
+        restore-keys: vdb-v5-houdini-macos-
+    - name: validate_houdini
+      run: test -f "hou/hou.tar.gz"
+      # Make sure that the unpacked install is NOT in the root of the OpenVDB checkout
+      # otherwise CMake's install RPATHs wil not work correctly.
+    - name: install_houdini
+      run: |
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
+    - name: install_deps
+      run: |
+        brew update
+        brew install bash gnu-getopt cmake boost glfw googletest openexr pybind11 llvm@15 cppunit
+        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+    - name: build
+      run: |
+        ./ci/build.sh -v \
+          --build-type=Release \
+          --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest" \
+          --cargs=\" \
+            -DHOUDINI_ROOT=$HOME/houdini_install/hou \
+            -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF \
+            -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
+            -DDISABLE_CMAKE_SEARCH_PATHS=ON \
+            -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
+            -DUSE_EXPLICIT_INSTANTIATION=OFF \
+            -DLLVM_DIR=/usr/local/opt/llvm@15/lib/cmake/llvm \
+            \"
+    - name: test
+      run: cd build && ctest -V
