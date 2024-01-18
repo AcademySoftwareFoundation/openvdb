@@ -18,10 +18,13 @@
 
 #include <UT/UT_Version.h>
 
-// Using the native OpenVDB Primitive shipped with Houdini is strongly recommended,
-// as there is no guarantee that this code will be kept in sync with Houdini.
-// However, for debugging it can be useful, so supply -DSESI_OPENVDB_PRIM to
-// the compiler to build this custom primitive.
+// Using the native OpenVDB Primitive shipped with Houdini is strongly
+// recommended, as there is no guarantee that this code will be kept in sync
+// with Houdini.
+// This code is provided to help ensure algorithms in the provided SOPs
+// can be re-implemented by revealing the otherwise the hidden implementations.
+// It is possible to replace Houdini's GU_PrimVDB with this, but no
+// official support for that remains.
 
 #if !defined(SESI_OPENVDB) && !defined(SESI_OPENVDB_PRIM)
 

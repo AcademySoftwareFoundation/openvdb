@@ -15,6 +15,7 @@
 #include <openvdb/MetaMap.h>
 
 #include <limits>
+#include <climits>
 #include <memory>
 #include <vector>
 

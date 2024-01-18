@@ -20,15 +20,9 @@
 #include <boost/interprocess/mapped_region.hpp>
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-#include <boost/version.hpp> // for BOOST_VERSION
 
 #ifdef _WIN32
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
-// boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
-// Ensure that both namespaces exist.
-namespace boost { namespace interprocess { namespace detail {} namespace ipcdetail {} } }
 #include <windows.h>
 #else
 #include <sys/types.h> // for struct stat
@@ -43,16 +37,6 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
-// A Blosc optimization introduced in 1.11.0 uses a slightly smaller block size for
-// HCR codecs (LZ4, ZLIB, ZSTD), which otherwise fails a few regression test cases
-#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR > 10)
-#define BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-#endif
-// Blosc 1.14+ writes backwards-compatible data by default.
-// http://blosc.org/posts/new-forward-compat-policy/
-#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 &&  BLOSC_VERSION_MINOR >= 14)
-#define BLOSC_BACKWARDS_COMPATIBLE
-#endif
 #endif
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
@@ -74,7 +58,6 @@ private:
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
 #ifdef _WIN32
-            using namespace boost::interprocess::detail;
             using namespace boost::interprocess::ipcdetail;
             using openvdb::Index64;
 

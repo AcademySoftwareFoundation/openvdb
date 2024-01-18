@@ -576,7 +576,6 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     using namespace openvdb::tools;
 
     using SamplerT = openvdb::tools::GridSampler<ExtGridT, openvdb::tools::BoxSampler>;
-    using ExtValueT = typename ExtGridT::ValueType;
 
     typename FSGridT::Ptr fsGrid = openvdb::gridPtrCast<FSGridT>(lsPrim->getGridPtr());
 

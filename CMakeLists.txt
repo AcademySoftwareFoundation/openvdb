@@ -54,7 +54,7 @@ endif()
 
 set(OpenVDB_MAJOR_VERSION 11)
 set(OpenVDB_MINOR_VERSION 0)
-set(OpenVDB_PATCH_VERSION 0)
+set(OpenVDB_PATCH_VERSION 1)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -141,9 +141,14 @@ option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 
-option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes and methods against a
-pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
-the compilation of all dependent code by bypassing the expensive template instantation." ON)
+# Disable this on Windows due to linker OOM issues:
+#  LNK1248: image size (XXX) exceeds maximum allowable size (FFFFFFFF)
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1718
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
+cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
+and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
+to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
+instantation." ON "NOT WIN32" OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -357,27 +362,16 @@ include(cmake/config/OpenVDBCXX.cmake)
 
 #########################################################################
 
-# Configure malloc library. Use Jemalloc for Linux and non-Maya, otherwise Tbbmalloc.
-# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
-#     malloc: *** malloc_zone_unregister() failed for 0xaddress
-#   Houdini 17.5 and older ships with Jemalloc 3.6.0, so we make Tbbmalloc the default
-#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420). Later versions of
-#   Jemalloc are thought to work, but haven't been tested.
-# * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
-#   of injecting into the Windows runtime to replace the system allocator.
+# Configure malloc library. Use Jemalloc if available, tbbmalloc otherwise
 
-if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
-  if(WIN32 OR APPLE OR USE_MAYA)
+if(CONCURRENT_MALLOC STREQUAL "Auto")
+  find_package(Jemalloc QUIET)
+  if(NOT TARGET Jemalloc::jemalloc)
+    message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+      It is recommended to use Jemalloc for optimum performance.")
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    find_package(Jemalloc QUIET)
-    if(NOT TARGET Jemalloc::jemalloc)
-      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
-        It is recommended to use Jemalloc for optimum performance.")
-      set(CONCURRENT_MALLOC "Tbbmalloc")
-    else()
-      set(CONCURRENT_MALLOC "Jemalloc")
-    endif()
+    set(CONCURRENT_MALLOC "Jemalloc")
   endif()
 endif()
 

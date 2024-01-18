@@ -8,7 +8,7 @@
 #ifndef OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
-#include "GU_PrimVDB.h"
+#include <GU/GU_PrimVDB.h>
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>

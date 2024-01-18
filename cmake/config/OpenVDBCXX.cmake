@@ -245,7 +245,7 @@ if(CMAKE_BUILD_TYPE EQUAL coverage)
 endif()
 
 # Note that the thread, address and memory sanitizers are incompatible with each other
-set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan)
+set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan abicheck)
 
 # Set all build flags to empty (unless they have been provided)
 
@@ -303,6 +303,13 @@ add_link_options("$<$<AND:$<CONFIG:MSAN>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleCl
 # UndefinedBehaviour
 add_compile_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
 add_link_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
+
+# ABI Check. This build type is expected to work with the abi-dumper/abi-compliance-checker
+# binaries which expect specific debug information. In particular, for GCC versions >= 11
+# we have to explicitly select dwarf versions < 5 as the abi-dumper doesn't support dwarf5
+# and will always incorrectly report successful ABI checks
+#   https://github.com/lvc/abi-dumper/issues/33
+add_compile_options("$<$<CONFIG:ABICHECK>:-gdwarf-4;-g3;-ggdb;-Og>")
 
 # CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
 
