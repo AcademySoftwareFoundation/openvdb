@@ -317,10 +317,7 @@ jobs:
     - name: llvm
       run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
     - name: install
-      run: |
-        vcpkg update
-        vcpkg install zlib tbb cppunit blosc python3 \
-          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm pybind11
+      run: ./ci/install_windows.sh
     - name: build
       run: >
         ./ci/build.sh -v

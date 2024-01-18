@@ -39,7 +39,18 @@ else()
   set(OPENVDBAX_LIB openvdb_ax)
 endif()
 
+set(OPENVDB_AX_TEST_DEPENDENT_LIBS ${OPENVDBAX_LIB})
+
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
+
 find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
+list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS CppUnit::cppunit)
 
 set(TEST_SOURCE_FILES
   ast/TestScanners.cc
@@ -99,9 +110,7 @@ set(TEST_SOURCE_FILES
   main.cc
   )
 
-add_executable(vdb_ax_test
-  ${TEST_SOURCE_FILES}
-)
+add_executable(vdb_ax_test ${TEST_SOURCE_FILES})
 
 # @note  From Clang 14, fp-contract has been switched to ON by default. Docs in
 #  Clang versions before 14 state that fp-contract is ON, but it is in fact off.
@@ -119,13 +128,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
       COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
-target_link_libraries(vdb_ax_test
-  ${OPENVDBAX_LIB}
-  CppUnit::cppunit
-)
-target_include_directories(vdb_ax_test
-  PRIVATE ../ .
-)
+target_link_libraries(vdb_ax_test ${OPENVDB_AX_TEST_DEPENDENT_LIBS})
+target_include_directories(vdb_ax_test PRIVATE ../ .)
 
 if(OPENVDB_AX_TEST_PROFILE)
   target_compile_definitions(vdb_ax_test PRIVATE "-DPROFILE")

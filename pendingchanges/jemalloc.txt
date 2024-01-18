@@ -1,0 +1,3 @@
+Build:
+    - Jemalloc is now the preferred allocator of choice on all platforms when 
+    CONCURRENT_MALLOC is set to Auto.

@@ -14,6 +14,7 @@ brew install openexr
 brew install pybind11 # also installs the dependent python version
 brew install tbb
 brew install zlib
+brew install jemalloc
 
 # Alias python version installed by pybind11 to path
 py_version=$(brew info pybind11 --json | \
