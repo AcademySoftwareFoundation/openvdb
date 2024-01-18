@@ -162,7 +162,8 @@ jobs:
       matrix:
         config:
           - { runson: ubuntu-latest, cxx: g++,     cmake: '' }
-          - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
+          # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
+          # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
           - { runson: macos-latest,  cxx: '',      cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/llvm@15/bin/clang++' }
       fail-fast: false
@@ -379,74 +380,69 @@ jobs:
   #############################################################################
 
   linux-abi-checker:
-    # v10.0.0 doesn't exist yet, so can't run this automatically.
     if: |
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'abi')
-    # abi-dumper version verified to work with 20.04/GCC9
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     env:
-      VDB_MAJOR_VERSION: 10
+      # The 'abicheck' build type sets these, but older versions of the library
+      # may not have this build type. See OpenVDBCXX.cmake
+      CXXFLAGS: "-gdwarf-4 -g3 -ggdb -Og"
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-    - name: install_deps
-      run: sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
-    # abi-compliance-checker and abi-dumper
-    #
-    # @note that abi-dumper is available through apt but at the time of writing this
-    # the version there (1.1) doesn't work correctly and maniftest by creating an
-    # invalid ABI report with missing headers. This then always reports 100% success
-    # rate when used with abi-compliance-checker.
-    # To fix, install both from source and checkout specific commits for both
-    # which have been verified to work on ubuntu 20.04.
-    #
-    # @warning  If you update these, test that they fail when expected!
-    #
-    # Also note that these are far superior to abigail/abidiff tools from redhat
-    - name: install_abi_checker
+        fetch-tags: true
+    # Compute the latest major version - that is used as our baseline
+    # note: For CI forks, make sure you have your tags synced
+    - name: get_major_version
       run: |
-        git clone https://github.com/lvc/abi-dumper.git abi-dumper
-        cd abi-dumper && git checkout 16bb467cd7d343dd3a16782b151b56cf15509594 && cd -
-        git clone https://github.com/lvc/abi-compliance-checker abi-compliance-checker
-        cd abi-compliance-checker && git checkout 7c175c45a8ba9ac41b8e47d8ebbab557b623b18e && cd -
-    - name: build_latest
+        LATEST_VERSION_TAG=$(git tag --merged | sort --version-sort | tail -n1)
+        echo "Computed latest VDB tag: ${LATEST_VERSION_TAG}"
+        VDB_MAJOR_VERSION=$(echo ${LATEST_VERSION_TAG} | cut -f1 -d '.' | tr -d -c 0-9)
+        echo "Using major version: ${VDB_MAJOR_VERSION}"
+        echo "VDB_MAJOR_VERSION=${VDB_MAJOR_VERSION}" >> "$GITHUB_ENV"
+    - name: install_deps
+      run: sudo apt-get -q install -y libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
+    - name: install_abi_checker
+      run: sudo apt-get -q install -y abi-dumper abi-compliance-checker
+    - name: build_new
       run: >
-        sudo ./ci/build.sh -v
-        --build-dir=build_latest
-        --build-type=Debug
+        ./ci/build.sh -v
+        --build-dir=build_new
+        --build-type=abicheck
         --target=openvdb_shared
         --components=\"core\"
         --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\'
     - name: checkout_baseline
       run: git checkout v${VDB_MAJOR_VERSION}.0.0
-    - name: build_baseline
+    - name: build_old
       run: >
-        sudo ./ci/build.sh -v
-        --build-type=Debug
+        ./ci/build.sh -v
+        --build-dir=build_old
+        --build-type=abicheck
         --target=openvdb_shared
         --components=\"core\"
         --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\'
     - name: abi_dump
       run: |
-        abi-dumper/abi-dumper.pl build_latest/openvdb/openvdb/libopenvdb.so -o ABI-1.dump -lver 1
-        abi-dumper/abi-dumper.pl        build/openvdb/openvdb/libopenvdb.so -o ABI-2.dump -lver 2
+        abi-dumper build_new/openvdb/openvdb/libopenvdb.so -o ABI-NEW.dump -lver 1
+        abi-dumper build_old/openvdb/openvdb/libopenvdb.so -o ABI-OLD.dump -lver 2
       # Replace the version namespace in the latest ABI dump with the baseline
       # version we're comparing against. We should probably instead build the
       # latest with the baseline version number but no CMake/defines allow us to
       # do this.
     - name: replace_symbols
-      run: sed -i -E 's/openvdb([^v]*)v'${VDB_MAJOR_VERSION}'_[0-9]/openvdb\1v'${VDB_MAJOR_VERSION}'_0/g' ABI-1.dump
+      run: sed -i -E 's/openvdb([^v]*)v[0-9]*_[0-9]/openvdb\1v'${VDB_MAJOR_VERSION}'_0/g' ABI-NEW.dump
     - name: abi_check
       # -strict treats warnings as errors
       # -extended checks all member data
       # we check everything _not_ in openvdb::**::internal namespace
       run: >
-        abi-compliance-checker/abi-compliance-checker.pl -l OPENVDB
-        -old ABI-2.dump
-        -new ABI-1.dump
+        abi-compliance-checker -l OPENVDB
+        -old ABI-OLD.dump
+        -new ABI-NEW.dump
         -skip-internal-symbols "\d(openvdb.*internal)"
         -skip-internal-types "(openvdb.*internal)::"
         -strict
