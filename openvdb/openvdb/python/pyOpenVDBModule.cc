@@ -337,11 +337,6 @@ extern "C" { void initpyopenvdb(); }
 
 NB_MODULE(PY_OPENVDB_MODULE_NAME, m)
 {
-    // // Don't auto-generate ugly, C++-style function signatures.
-    // nb::options docOptions;
-    // docOptions.disable_function_signatures();
-    // docOptions.enable_user_defined_docstrings();
-
     using namespace openvdb::OPENVDB_VERSION_NAME;
 
     // Initialize OpenVDB.
