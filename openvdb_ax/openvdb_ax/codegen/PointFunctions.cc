@@ -24,6 +24,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
+#include <openvdb/util/Assert.h>
 
 #include <unordered_map>
 
@@ -78,8 +79,8 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
            const void* const leafDataPtr,
            const void* const data) -> bool
     {
-        assert(name);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
+        OPENVDB_ASSERT(name);
+        OPENVDB_ASSERT(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
         if (name->size() == 0) return false;
         if (!groupHandles) return false;
@@ -134,10 +135,10 @@ inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
         llvm::Value* attribute_set = extractArgument(compute, "attribute_set");
-        assert(point_index);
-        assert(group_handles);
-        assert(leaf_data);
-        assert(attribute_set);
+        OPENVDB_ASSERT(point_index);
+        OPENVDB_ASSERT(group_handles);
+        OPENVDB_ASSERT(leaf_data);
+        OPENVDB_ASSERT(attribute_set);
 
         std::vector<llvm::Value*> input(args);
         input.emplace_back(point_index);
@@ -169,7 +170,7 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
            const void* const data,
            const bool flag)
     {
-        assert(name);
+        OPENVDB_ASSERT(name);
         if (name->size() == 0) return;
 
         // Get the group handle out of the pre-existing container of handles if they
@@ -189,7 +190,7 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
             // the set of new data thats being added
             if (!flag && !leafData->hasGroup(nameStr)) return;
             handle = leafData->getOrInsert(nameStr);
-            assert(handle);
+            OPENVDB_ASSERT(handle);
         }
 
         // set the group membership
@@ -248,10 +249,10 @@ inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
         llvm::Value* attribute_set = extractArgument(compute, "attribute_set");
-        assert(point_index);
-        assert(group_handles);
-        assert(leaf_data);
-        assert(attribute_set);
+        OPENVDB_ASSERT(point_index);
+        OPENVDB_ASSERT(group_handles);
+        OPENVDB_ASSERT(leaf_data);
+        OPENVDB_ASSERT(attribute_set);
 
         std::vector<llvm::Value*> input(args);
         input.emplace_back(point_index);
@@ -289,10 +290,10 @@ inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
         llvm::Value* attribute_set = extractArgument(compute, "attribute_set");
-        assert(point_index);
-        assert(group_handles);
-        assert(leaf_data);
-        assert(attribute_set);
+        OPENVDB_ASSERT(point_index);
+        OPENVDB_ASSERT(group_handles);
+        OPENVDB_ASSERT(leaf_data);
+        OPENVDB_ASSERT(attribute_set);
 
         std::vector<llvm::Value*> input(args);
         input.emplace_back(point_index);
@@ -350,9 +351,9 @@ inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
                 <decltype(value)>::type>::type;
         using AttributeHandleType = openvdb::points::AttributeWriteHandle<ValueType>;
 
-        assert(attributeHandle);
-        assert(value);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
+        OPENVDB_ASSERT(attributeHandle);
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
         AttributeHandleType* handle = static_cast<AttributeHandleType*>(attributeHandle);
         handle->set(static_cast<openvdb::Index>(index), *value);
@@ -366,10 +367,10 @@ inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
     {
         using AttributeHandleType = openvdb::points::StringAttributeWriteHandle;
 
-        assert(attributeHandle);
-        assert(value);
-        assert(leafDataPtr);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
+        OPENVDB_ASSERT(attributeHandle);
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(leafDataPtr);
+        OPENVDB_ASSERT(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
         const std::string s = value->str();
         AttributeHandleType* const handle =
@@ -468,9 +469,9 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
         // only being read!
         using AttributeHandleType = openvdb::points::AttributeHandle<ValueType>;
 
-        assert(value);
-        assert(attributeHandle);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(attributeHandle);
+        OPENVDB_ASSERT(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
         AttributeHandleType* handle = static_cast<AttributeHandleType*>(attributeHandle);
         (*value) = handle->get(static_cast<openvdb::Index>(index));
@@ -484,10 +485,10 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
     {
         using AttributeHandleType = openvdb::points::StringAttributeHandle;
 
-        assert(value);
-        assert(attributeHandle);
-        assert(leafDataPtr);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(attributeHandle);
+        OPENVDB_ASSERT(leafDataPtr);
+        OPENVDB_ASSERT(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);

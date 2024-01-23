@@ -23,6 +23,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 #include "Interpolation.h"
 
@@ -271,7 +272,7 @@ private:
 
         // do nothing for leaf nodes. They shouldn't even be cached as
         // part of the NodeManager used with this method.
-        void operator()(const LeafT&) const { assert(false); }
+        void operator()(const LeafT&) const { OPENVDB_ASSERT(false); }
 
         void operator()(const RootT& node) const
         {

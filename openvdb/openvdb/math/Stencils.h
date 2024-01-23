@@ -96,7 +96,7 @@ public:
     /// which is typically the center point of the stencil.
     inline const ValueType& getValue(unsigned int pos = 0) const
     {
-        assert(pos < mValues.size());
+        OPENVDB_ASSERT(pos < mValues.size());
         return mValues[pos];
     }
 
@@ -121,7 +121,7 @@ public:
     inline ValueType median() const
     {
         BufferType tmp(mValues);//local copy
-        assert(!tmp.empty());
+        OPENVDB_ASSERT(!tmp.empty());
         size_t midpoint = (tmp.size() - 1) >> 1;
         // Partially sort the vector until the median value is at the midpoint.
 #if !defined(_MSC_VER) || _MSC_VER < 1924
@@ -343,9 +343,9 @@ public:
         const ValueType w = xyz[2] - BaseType::mCenter[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
-        assert(u>=0 && u<=1);
-        assert(v>=0 && v<=1);
-        assert(w>=0 && w<=1);
+        OPENVDB_ASSERT(u>=0 && u<=1);
+        OPENVDB_ASSERT(v>=0 && v<=1);
+        OPENVDB_ASSERT(w>=0 && w<=1);
 
         ValueType V = BaseType::template getValue<0,0,0>();
         ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
@@ -377,9 +377,9 @@ public:
         const ValueType w = xyz[2] - BaseType::mCenter[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 
-        assert(u>=0 && u<=1);
-        assert(v>=0 && v<=1);
-        assert(w>=0 && w<=1);
+        OPENVDB_ASSERT(u>=0 && u<=1);
+        OPENVDB_ASSERT(v>=0 && v<=1);
+        OPENVDB_ASSERT(w>=0 && w<=1);
 
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
@@ -1774,7 +1774,7 @@ public:
         : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))
         , mHalfWidth(halfWidth)
     {
-        assert(halfWidth>0);
+        OPENVDB_ASSERT(halfWidth>0);
     }
 
     inline const ValueType& getCenterValue() const { return mValues[(mValues.size()-1)>>1]; }

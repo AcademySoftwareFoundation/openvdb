@@ -13,6 +13,7 @@
     #include "openvdb_ax/ast/Parse.h"
     #include "openvdb_ax/ast/Tokens.h"
     #include "openvdb_ax/compiler/Logger.h"
+    #include <openvdb/util/Assert.h>
     #include <vector>
 
     extern int axlex();
@@ -80,7 +81,7 @@
     template<typename T, typename... Args>
     T* newNode(AXLTYPE* loc, const Args&... args) {
         T* ptr = new T(args...);
-        assert(axlog);
+        OPENVDB_ASSERT(axlog);
         axlog->addNodeLocation(ptr, {loc->first_line, loc->first_column});
         return ptr;
     }
@@ -289,14 +290,14 @@ declaration_list:
                                                               free(const_cast<char*>($3));
                                                             }
     | declaration_list COMMA IDENTIFIER EQUALS expression   { const auto firstNode = $1->child(0);
-                                                              assert(firstNode);
+                                                              OPENVDB_ASSERT(firstNode);
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>(firstNode)->type();
                                                               $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3), $5));
                                                               $$ = $1;
                                                               free(const_cast<char*>($3));
                                                             }
     | declaration_list COMMA IDENTIFIER                     { const auto firstNode = $1->child(0);
-                                                              assert(firstNode);
+                                                              OPENVDB_ASSERT(firstNode);
                                                               const tokens::CoreType type =  static_cast<const DeclareLocal*>(firstNode)->type();
                                                               $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3)));
                                                               free(const_cast<char*>($3));

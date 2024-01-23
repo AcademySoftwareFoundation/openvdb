@@ -69,6 +69,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 
 #include "Composite.h" // for csgUnion()
@@ -566,7 +567,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     /// @brief Kick off the optionally multithreaded computation.
     void operator()(const tbb::blocked_range<size_t>& r)
     {
-        assert(mTask);
+        OPENVDB_ASSERT(mTask);
         mTask(this, r);
         mParent.mMinCount = mMinCount;
         mParent.mMaxCount = mMaxCount;

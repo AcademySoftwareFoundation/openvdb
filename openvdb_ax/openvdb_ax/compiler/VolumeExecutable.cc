@@ -22,6 +22,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/parallel_for.h>
 #include <tbb/task_group.h>
@@ -70,7 +71,7 @@ struct VolumeExecutable::Settings
 
     inline std::vector<cli::ParamBase*> optional()
     {
-        assert(IsCLI);
+        OPENVDB_ASSERT(IsCLI);
         std::vector<cli::ParamBase*> params {
             &this->mCreateMissing,
             &this->mTreeExecutionLevel,
@@ -275,7 +276,7 @@ inline openvdb::GridBase::Ptr
 createGrid(const ast::tokens::CoreType& type)
 {
     // assert so the executer can be marked as noexcept (assuming nothing throws in compute)
-    assert(supported(type) && "Could not retrieve accessor from unsupported type");
+    OPENVDB_ASSERT(supported(type) && "Could not retrieve accessor from unsupported type");
     switch (type) {
         case ast::tokens::BOOL    : return ConverterT<bool>::create();
         case ast::tokens::INT16   : return ConverterT<int16_t>::create();
@@ -426,9 +427,9 @@ private:
     inline void
     addAccessor(openvdb::GridBase* grid, const ast::tokens::CoreType& type)
     {
-        assert(grid);
+        OPENVDB_ASSERT(grid);
         // assert so the executer can be marked as noexcept (assuming nothing throws in compute)
-        assert(supported(type) && "Could not retrieve accessor from unsupported type");
+        OPENVDB_ASSERT(supported(type) && "Could not retrieve accessor from unsupported type");
         switch (type) {
             case ast::tokens::BOOL    : { this->addAccessor(static_cast<ConverterT<bool>*>(grid)->tree()); return; }
             case ast::tokens::INT16   : { this->addAccessor(static_cast<ConverterT<int16_t>*>(grid)->tree()); return; }
@@ -517,7 +518,7 @@ struct VolumeExecuterOp
     {
         // if the current node level does not match, skip
         const Index level = node.getLevel();
-        assert(level > 0);
+        OPENVDB_ASSERT(level > 0);
         if (level < mData.mTreeLevelMin) return;
         if (level > mData.mTreeLevelMax) return;
 
@@ -526,7 +527,7 @@ struct VolumeExecuterOp
             // streaming ACTIVE tiles (this is an artificial limitation to stop
             // typical VDBs memory exploding when things like inactive root
             // node tiles are streamed).
-            assert((!std::is_same<ValueOffIter, IterT>::value));
+            OPENVDB_ASSERT((!std::is_same<ValueOffIter, IterT>::value));
             // Process ACTIVE values
             this->process(node);
 
@@ -563,7 +564,7 @@ struct VolumeExecuterOp
                 // Manually skip child topology (not-skipped by the ValueOff iterator)
                 if (std::is_same<ValueOffIter, IterT>::value &&
                     this->isChildMaskOn(node, it.pos())) continue;
-                assert(!this->isChildMaskOn(node, it.pos()));
+                OPENVDB_ASSERT(!this->isChildMaskOn(node, it.pos()));
                 kernel(it.getCoord());
             }
         }
@@ -782,7 +783,7 @@ private:
     void process(NodeT& parent) const
     {
         using ChildNodeT = typename NodeT::ChildNodeType;
-        assert((!std::is_same<ValueOffIter, IterT>::value));
+        OPENVDB_ASSERT((!std::is_same<ValueOffIter, IterT>::value));
 
         // Explicitly use a ValueOn Iterator (only stream ON Values)
         for (auto it = ValueOnIter::IterTraitsT<NodeT>::begin(parent); it; ++it) {
@@ -791,9 +792,9 @@ private:
             // ValueIter should never point to a child node - only time this is
             // possible is with a ValueOff iter, but this code only ever invoked
             // with a ValueOnIter
-            assert(!this->isChildMaskOn(parent, it.pos()));
+            OPENVDB_ASSERT(!this->isChildMaskOn(parent, it.pos()));
             // only processes active tiles
-            assert(it.isValueOn());
+            OPENVDB_ASSERT(it.isValueOn());
 
             ValueT _value = value;
             bool _active = true;
@@ -816,7 +817,7 @@ private:
         static_assert(ChildNodeT::DIM == LeafNodeT::DIM,
             "Expected the parent node type of LeafNodeT to have a "
             "CHILD_DIM equal to the DIM of a LeafNodeT.");
-        assert((!std::is_same<ValueOffIter, IterT>::value));
+        OPENVDB_ASSERT((!std::is_same<ValueOffIter, IterT>::value));
 
         // only process active tiles when streaming
         if (parent.getValueMask().isOff()) return;
@@ -872,7 +873,7 @@ private:
         std::vector<Tile>& tiles) const
     {
         // ValueOff iterators should explicitly disable tile streaming
-        assert((!std::is_same<ValueOffIter, IterT>::value));
+        OPENVDB_ASSERT((!std::is_same<ValueOffIter, IterT>::value));
         // @todo update to new InternalNode API methods when available
         auto* const table = const_cast<typename NodeT::UnionType*>(parent.getTable());
         const auto& mask = parent.getValueMask();
@@ -887,7 +888,7 @@ private:
         for (Index n = range.begin(), N = range.end(); n < N; ++n) {
             // explicitly only process active tiles when streaming
             if (!mask.isOn(n)) continue;
-            assert(!this->isChildMaskOn(parent, n));
+            OPENVDB_ASSERT(!this->isChildMaskOn(parent, n));
 
             const Coord& ijk = parent.offsetToGlobalCoord(n);
             const ValueT& value = table[n].getValue();
@@ -938,7 +939,7 @@ private:
         std::vector<Tile>& tiles) const
     {
         // ValueOff iterators should explicitly disable tile streaming
-        assert((!std::is_same<ValueOffIter, IterT>::value));
+        OPENVDB_ASSERT((!std::is_same<ValueOffIter, IterT>::value));
         using TempBufferT = typename std::conditional<
             std::is_same<std::string, ValueT>::value,
                 ax::codegen::String, bool>::type;
@@ -960,7 +961,7 @@ private:
         for (Index n = range.begin(), N = range.end(); n < N; ++n) {
             // explicitly only process active tiles when streaming
             if (!mask.isOn(n)) continue;
-            assert(!this->isChildMaskOn(parent, n));
+            OPENVDB_ASSERT(!this->isChildMaskOn(parent, n));
 
             const Coord& ijk = parent.offsetToGlobalCoord(n);
             const TempBufferT value = table[n].getValue();
@@ -1029,7 +1030,7 @@ registerVolumes(GridPtrVec& grids,
         const std::string& iterName = iter.name();
         const std::string* volumeNamePtr = nullptr;
         volumeNamePtr = bindings.isBoundAXName(iterName) ?  bindings.dataNameBoundTo(iterName) : &iterName;
-        assert(volumeNamePtr);
+        OPENVDB_ASSERT(volumeNamePtr);
         const std::string& volumeName = *volumeNamePtr;
         for (const auto& grid : grids) {
             if (grid->getName() != volumeName) continue;
@@ -1080,7 +1081,7 @@ registerVolumes(GridPtrVec& grids,
 
         if (iter.writes() && iter.affectsothers()) {
             // if affectsothers(), it's also read from at some point
-            assert(iter.reads());
+            OPENVDB_ASSERT(iter.reads());
             cache->addReadGrid(*matchedGrid, /*copy=*/true);
             cache->addWriteGrid(*matchedGrid);
         }
@@ -1103,7 +1104,7 @@ inline void run(GridT& grid, OpData& data, const VolumeExecutable& E)
     // Get the active index of the grid being executed
     const ast::tokens::CoreType type =
         ast::tokens::tokenFromTypeString(grid.valueType());
-    assert(data.mActiveIndex >= 0);
+    OPENVDB_ASSERT(data.mActiveIndex >= 0);
 
     // Set the active tile streaming behaviour for this grid if
     // the behaviour is set to AUTO (otherwise it's assigned the
@@ -1120,7 +1121,7 @@ inline void run(GridT& grid, OpData& data, const VolumeExecutable& E)
     const size_t g1 = E.getGrainSize();
     const size_t g2 = E.getActiveTileStreamingGrainSize();
     const bool threadOtherOps = g1 > 0 || g2 > 0;
-    assert(data.mTreeLevelMin <= data.mTreeLevelMax);
+    OPENVDB_ASSERT(data.mTreeLevelMin <= data.mTreeLevelMax);
 
     // Cache any existing leaf node pointers before doing any execution
     std::unique_ptr<tree::LeafManager<TreeType>> leafManager;
@@ -1183,7 +1184,7 @@ inline void run(GridCache& cache,
                 const VolumeExecutable& E,
                 Logger& logger)
 {
-    assert(cache.mRead.size() == registry.data().size());
+    OPENVDB_ASSERT(cache.mRead.size() == registry.data().size());
 
     // Initialize the shared op data
 
@@ -1212,7 +1213,7 @@ inline void run(GridCache& cache,
     openvdb::GridBase** read = cache.mRead.data();
     data.mVoidTransforms.reserve(cache.mRead.size());
     for (size_t i = 0; i < registry.data().size(); ++i, ++read) {
-        assert(read);
+        OPENVDB_ASSERT(read);
         data.mVoidTransforms.emplace_back(static_cast<void*>(&(*read)->transform()));
     }
 
@@ -1250,9 +1251,9 @@ VolumeExecutable::VolumeExecutable(const std::shared_ptr<const llvm::LLVMContext
     , mFunctionAddresses(functionAddresses)
     , mSettings(new Settings<false>)
 {
-    assert(mContext);
-    assert(mExecutionEngine);
-    assert(mAttributeRegistry);
+    OPENVDB_ASSERT(mContext);
+    OPENVDB_ASSERT(mExecutionEngine);
+    OPENVDB_ASSERT(mAttributeRegistry);
 
     // Determine if this kernel needs automatic streaming
 
@@ -1322,7 +1323,7 @@ void VolumeExecutable::execute(openvdb::GridPtrVec& grids) const
         run<ValueAllIter>(*cache, mFunctionAddresses, *mAttributeRegistry, mCustomData.get(), *mSettings, *this, *logger);
     }
     else {
-        assert(false && "Unrecognised voxel iterator.");
+        OPENVDB_ASSERT(false && "Unrecognised voxel iterator.");
     }
 }
 
@@ -1386,7 +1387,7 @@ VolumeExecutable::Streaming
 VolumeExecutable::getActiveTileStreaming(const std::string& name,
                      const ast::tokens::CoreType& type) const
 {
-    assert(mAttributeRegistry);
+    OPENVDB_ASSERT(mAttributeRegistry);
     if (mSettings->mActiveTileStreaming.get() == VolumeExecutable::Streaming::AUTO) {
         const ax::AttributeRegistry::AccessData* accessData =
             mAttributeRegistry->get(name, type);

@@ -64,7 +64,7 @@ project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
 include(CMakeDependentOption)
 include(GNUInstallDirs)
 
-# todo epydoc and pdflatex
+# Components
 option(OPENVDB_BUILD_CORE "Enable the core OpenVDB library. Both static and shared versions are enabled by default" ON)
 option(OPENVDB_BUILD_BINARIES "Enable the vdb binaries. Only vdb_print is enabled by default" ON)
 option(OPENVDB_BUILD_PYTHON_MODULE "Build the pyopenvdb Python module" OFF)
@@ -72,21 +72,34 @@ option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
-
+option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_BUILD_AX "Build the OpenVDB AX library. Turns ON if USE_AX is ON." ${USE_AX})
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
-
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
-option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
-option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
+# Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
+option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
+option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
+option(USE_CCACHE "Build using Ccache if found on the path" ON)
+# Disable this on Windows due to linker OOM issues:
+#  LNK1248: image size (XXX) exceeds maximum allowable size (FFFFFFFF)
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1718
+#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
+cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
+and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
+to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
+instantation." ON "NOT WIN32" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
+option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
+option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
+# Component dependency options
+cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
@@ -121,7 +134,6 @@ option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BU
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
-option(USE_CCACHE "Build using Ccache if found on the path" ON)
 option(USE_STATIC_DEPENDENCIES [=[
 Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
@@ -135,20 +147,6 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-
-option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
-option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
-option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
-cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
-
-# Disable this on Windows due to linker OOM issues:
-#  LNK1248: image size (XXX) exceeds maximum allowable size (FFFFFFFF)
-#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1718
-#    https://github.com/AcademySoftwareFoundation/openvdb/issues/1624
-cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
-and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
-to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
-instantation." ON "NOT WIN32" OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])

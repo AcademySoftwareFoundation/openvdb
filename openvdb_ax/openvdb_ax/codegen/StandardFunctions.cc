@@ -20,6 +20,8 @@
 #include "../compiler/CompilerOptions.h"
 #include "../compiler/CustomData.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <tbb/enumerable_thread_specific.h>
 
 #include <llvm/IR/Intrinsics.h>
@@ -88,7 +90,7 @@ struct SimplexNoise
             llvm::Function* function =                                                      \
                 llvm::Intrinsic::getDeclaration(M,                                          \
                     llvm::Intrinsic::Identifier, args[0]->getType());                       \
-            assert(function);                                                               \
+            OPENVDB_ASSERT(function);                                                               \
             return B.CreateCall(function, args);                                            \
         };                                                                                  \
                                                                                             \
@@ -146,7 +148,7 @@ inline FunctionGroup::UniquePtr axmalloc(const FunctionOptions& op)
                 args[0], // size
                 nullptr,
                 nullptr);
-        assert(inst);
+        OPENVDB_ASSERT(inst);
         B.Insert(inst);
         return inst;
     };
@@ -169,7 +171,7 @@ inline FunctionGroup::UniquePtr axfree(const FunctionOptions& op)
     {
         llvm::BasicBlock* BB = B.GetInsertBlock();
         llvm::Instruction* inst = llvm::CallInst::CreateFree(args[0], BB);
-        assert(inst);
+        OPENVDB_ASSERT(inst);
         B.Insert(inst);
         return nullptr;
     };
@@ -355,9 +357,9 @@ inline FunctionGroup::UniquePtr axcross(const FunctionOptions& op)
         arrayUnpack(args[0], ptrs, B, /*load*/false);
         arrayUnpack(args[1], left, B, /*load*/true);
         arrayUnpack(args[2], right, B, /*load*/true);
-        assert(ptrs.size() == 3);
-        assert(left.size() == 3);
-        assert(right.size() == 3);
+        OPENVDB_ASSERT(ptrs.size() == 3);
+        OPENVDB_ASSERT(left.size() == 3);
+        OPENVDB_ASSERT(right.size() == 3);
 
         std::vector<llvm::Value*> results(3);
 
@@ -413,7 +415,7 @@ inline FunctionGroup::UniquePtr axlengthsq(const FunctionOptions& op)
     {
         std::vector<llvm::Value*> elements;
         arrayUnpack(args[0], elements, B, /*load*/true);
-        assert(elements.size() >= 2);
+        OPENVDB_ASSERT(elements.size() >= 2);
 
         llvm::Value* v1 = binaryOperator(elements[0], elements[0], ast::tokens::MULTIPLY, B);
         llvm::Value* v2 = binaryOperator(elements[1], elements[1], ast::tokens::MULTIPLY, B);
@@ -512,8 +514,8 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
         std::vector<llvm::Value*> ptrs, elements;
         arrayUnpack(args[0], ptrs, B, /*load*/false);
         arrayUnpack(args[1], elements, B, /*load*/true);
-        assert(ptrs.size() == 3 || ptrs.size() == 4);
-        assert(elements.size() == 3 || elements.size() == 4);
+        OPENVDB_ASSERT(ptrs.size() == 3 || ptrs.size() == 4);
+        OPENVDB_ASSERT(elements.size() == 3 || elements.size() == 4);
 
         if (elements[0]->getType()->isIntegerTy()) {
            arithmeticConversion(elements, LLVMType<double>::get(B.getContext()), B);
@@ -575,7 +577,7 @@ inline FunctionGroup::UniquePtr axlerp(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 3);
+        OPENVDB_ASSERT(args.size() == 3);
         llvm::Value* a = args[0], *b = args[1], *t = args[2];
         llvm::Value* zero = llvm::ConstantFP::get(a->getType(), 0.0);
         llvm::Value* one = llvm::ConstantFP::get(a->getType(), 1.0);
@@ -1022,7 +1024,7 @@ inline FunctionGroup::UniquePtr axsign(const FunctionOptions& op)
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
         // int r = (T(0) < val) - (val < T(0));
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args.front();
         llvm::Type* type = arg->getType();
         llvm::Value* zero;
@@ -1030,7 +1032,7 @@ inline FunctionGroup::UniquePtr axsign(const FunctionOptions& op)
             zero = llvm::ConstantInt::get(type, static_cast<uint64_t>(0), /*signed*/true);
         }
         else {
-            assert(type->isFloatingPointTy());
+            OPENVDB_ASSERT(type->isFloatingPointTy());
             zero = llvm::ConstantFP::get(type, static_cast<double>(0.0));
         }
 
@@ -1085,7 +1087,7 @@ inline FunctionGroup::UniquePtr axtruncatemod(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         return binaryOperator(args[0], args[1], ast::tokens::MODULO, B);
     };
 
@@ -1129,7 +1131,7 @@ inline FunctionGroup::UniquePtr axfloormod(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Value* D = args[0];
         llvm::Value* d = args[1];
         // tmod
@@ -1194,7 +1196,7 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Value* D = args[0], *d = args[1];
         llvm::Value* r = binaryOperator(D, d, ast::tokens::MODULO, B); // tmod
 
@@ -1234,7 +1236,7 @@ inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args[0];
         llvm::Type* etype = arg->getType();
         if (etype->isPointerTy()) {
@@ -1248,7 +1250,7 @@ inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
             inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
         }
         else {
-            assert(etype->isDoubleTy());
+            OPENVDB_ASSERT(etype->isDoubleTy());
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
             inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
@@ -1310,7 +1312,7 @@ inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args[0];
         llvm::Type* etype = arg->getType();
         if (etype->isPointerTy()) {
@@ -1324,7 +1326,7 @@ inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
             inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
         }
         else {
-            assert(etype->isDoubleTy());
+            OPENVDB_ASSERT(etype->isDoubleTy());
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
             inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
@@ -1388,7 +1390,7 @@ inline FunctionGroup::UniquePtr axisnan(const FunctionOptions& op)
     {
         // uno (unordered) comparison with self
         // https://llvm.org/docs/LangRef.html#fcmp-instruction
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args[0];
         if (!arg->getType()->isPointerTy()) {
             return B.CreateFCmpUNO(arg, arg);
@@ -1450,7 +1452,7 @@ inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
     {
         std::vector<llvm::Value*> m1;
         arrayUnpack(args[0], m1, B, /*load*/true);
-        assert(m1.size() == 9);
+        OPENVDB_ASSERT(m1.size() == 9);
 
         llvm::Value* e1 = binaryOperator(m1[4], m1[8], ast::tokens::MULTIPLY, B);
         llvm::Value* e2 = binaryOperator(m1[5], m1[7], ast::tokens::MULTIPLY, B);
@@ -1480,7 +1482,7 @@ inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
     {
         std::vector<llvm::Value*> m1;
         arrayUnpack(args[0], m1, B, /*load*/true);
-        assert(m1.size() == 16);
+        OPENVDB_ASSERT(m1.size() == 16);
 
         // @note  Okay to alloca here as long as embed IR is false
         llvm::Value* subMat = B.CreateAlloca(llvm::ArrayType::get(m1.front()->getType(), 9));
@@ -1547,7 +1549,7 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
         if (size == 3 || size == 4) {
             //vector - convert to diagonal matrix
             const size_t dim = size*size;
-            assert(ptrs.size() == dim);
+            OPENVDB_ASSERT(ptrs.size() == dim);
             llvm::Type* type = arg1.front()->getType();
             llvm::Value* zero = type->isFloatTy() ? LLVMType<float>::get(B.getContext(), 0.0f)
                                     : LLVMType<double>::get(B.getContext(), 0.0);
@@ -1563,9 +1565,9 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
         }
         else {
             // matrix - convert to vector
-            assert(size == 9 || size == 16);
+            OPENVDB_ASSERT(size == 9 || size == 16);
             const size_t dim = size == 9 ? 3 : 4;
-            assert(ptrs.size() == dim);
+            OPENVDB_ASSERT(ptrs.size() == dim);
             for (size_t i = 0; i < dim; ++i) {
                 B.CreateStore(arg1[i+(i*dim)], ptrs[i]);
             }
@@ -1590,7 +1592,7 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
             int element = 0;
             for (int i = 0; i < size; ++i) {
                 for (int j = 0; j < size; ++j) {
-                    assert(element < openvdb::ValueTraits<ResultType>::Elements);
+                    OPENVDB_ASSERT(element < openvdb::ValueTraits<ResultType>::Elements);
                     if (i == j) result->asPointer()[element] = (input->asPointer())[i];
                     else        result->asPointer()[element] = ElementT(0.0);
                     ++element;
@@ -1598,11 +1600,11 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
             }
         }
         else {
-            assert(openvdb::ValueTraits<ValueType>::IsMat);
+            OPENVDB_ASSERT(openvdb::ValueTraits<ValueType>::IsMat);
             // input is a matrix, result is a vec
             const int size = openvdb::ValueTraits<ValueType>::Size;
             for (int i = 0; i < size; ++i) {
-                assert(i < openvdb::ValueTraits<ResultType>::Size);
+                OPENVDB_ASSERT(i < openvdb::ValueTraits<ResultType>::Size);
                 result->asPointer()[i] = input->asPointer()[i+(i*size)];
             }
         }
@@ -1655,7 +1657,7 @@ inline FunctionGroup::UniquePtr axidentity3(const FunctionOptions& op)
     {
         std::vector<llvm::Value*> elements;
         arrayUnpack(args[0], elements, B, /*load elements*/false);
-        assert(elements.size() == 9);
+        OPENVDB_ASSERT(elements.size() == 9);
         llvm::Value* zero = LLVMType<float>::get(B.getContext(), 0.0f);
         llvm::Value* one = LLVMType<float>::get(B.getContext(), 1.0f);
         for (size_t i = 0; i < 9; ++i) {
@@ -1683,7 +1685,7 @@ inline FunctionGroup::UniquePtr axidentity4(const FunctionOptions& op)
     {
         std::vector<llvm::Value*> elements;
         arrayUnpack(args[0], elements, B, /*load elements*/false);
-        assert(elements.size() == 16);
+        OPENVDB_ASSERT(elements.size() == 16);
         llvm::Value* zero = LLVMType<float>::get(B.getContext(), 0.0f);
         llvm::Value* one = LLVMType<float>::get(B.getContext(), 1.0f);
         for (size_t i = 0; i < 16; ++i) {
@@ -1714,9 +1716,9 @@ inline FunctionGroup::UniquePtr axmmmult(const FunctionOptions& op)
         arrayUnpack(args[1], m1, B, /*load*/true);
         arrayUnpack(args[2], m2, B, /*load*/true);
 
-        assert(m1.size() == 9 || m1.size() == 16);
-        assert(ptrs.size() == m1.size());
-        assert(ptrs.size() == m2.size());
+        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(ptrs.size() == m1.size());
+        OPENVDB_ASSERT(ptrs.size() == m2.size());
         const size_t dim = m1.size() == 9 ? 3 : 4;
 
         llvm::Value* e3 = nullptr, *e4 = nullptr;
@@ -1809,14 +1811,14 @@ inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
         std::vector<llvm::Value*> m1, v1;
         arrayUnpack(args[0], m1, B, /*load*/false);
         arrayUnpack(args[1], v1, B, /*load*/true);
-        assert(m1.size() == 16);
-        assert(v1.size() == 3);
+        OPENVDB_ASSERT(m1.size() == 16);
+        OPENVDB_ASSERT(v1.size() == 3);
 
         // modify first 3 elements in all mat rows
         for (size_t row = 0; row < 4; ++row) {
             for (size_t col = 0; col < 3; ++col) {
                 const size_t idx = (row*4) + col;
-                assert(idx <= 14);
+                OPENVDB_ASSERT(idx <= 14);
                 llvm::Value* m1v = ir_load(B, m1[idx]);
                 m1v = binaryOperator(m1v, v1[col], ast::tokens::MULTIPLY, B);
                 B.CreateStore(m1v, m1[idx]);
@@ -1861,9 +1863,9 @@ inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
         const size_t vec = v1.size();
         const size_t dim = (m1.size() == 9 ? 3 : 4);
 
-        assert(m1.size() == 9 || m1.size() == 16);
-        assert(vec == 3 || vec == 4);
-        assert(ptrs.size() == vec);
+        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(vec == 3 || vec == 4);
+        OPENVDB_ASSERT(ptrs.size() == vec);
 
         // mat * vec
         llvm::Value* e3 = nullptr, *e4 = nullptr;
@@ -1925,14 +1927,14 @@ inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
         std::vector<llvm::Value*> m1, v1;
         arrayUnpack(args[0], m1, B, /*load*/false);
         arrayUnpack(args[1], v1, B, /*load*/true);
-        assert(m1.size() == 16);
-        assert(v1.size() == 3);
+        OPENVDB_ASSERT(m1.size() == 16);
+        OPENVDB_ASSERT(v1.size() == 3);
 
         // modify first 3 mat rows, all columns
         for (size_t row = 0; row < 3; ++row) {
             for (size_t col = 0; col < 4; ++col) {
                 const size_t idx = (row*4) + col;
-                assert(idx <= 11);
+                OPENVDB_ASSERT(idx <= 11);
                 llvm::Value* m1v = ir_load(B, m1[idx]);
                 m1v = binaryOperator(m1v, v1[row], ast::tokens::MULTIPLY, B);
                 B.CreateStore(m1v, m1[idx]);
@@ -1971,7 +1973,7 @@ inline FunctionGroup::UniquePtr axtrace(const FunctionOptions& op)
         std::vector<llvm::Value*> m1;
         arrayUnpack(args[0], m1, B, /*load*/true);
         const size_t dim = (m1.size() == 9 ? 3 : 4);
-        assert(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
 
         llvm::Value* result = binaryOperator(m1[0], m1[1+dim], ast::tokens::PLUS, B);
         result = binaryOperator(result, m1[2+(2*dim)], ast::tokens::PLUS, B);
@@ -2027,9 +2029,9 @@ inline FunctionGroup::UniquePtr axtransform(const FunctionOptions& op)
         const size_t vec = v1.size();
         const size_t dim = (m1.size() == 9 ? 3 : 4);
 
-        assert(m1.size() == 9 || m1.size() == 16);
-        assert(vec == 3 || vec == 4);
-        assert(ptrs.size() == vec);
+        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(vec == 3 || vec == 4);
+        OPENVDB_ASSERT(ptrs.size() == vec);
 
         // vec * mat
         llvm::Value* e3 = nullptr, *e4 = nullptr;
@@ -2091,8 +2093,8 @@ inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
         std::vector<llvm::Value*> ptrs, m1;
         arrayUnpack(args[0], ptrs, B, /*load*/false);
         arrayUnpack(args[1], m1, B, /*load*/true);
-        assert(m1.size() == 9 || m1.size() == 16);
-        assert(ptrs.size() == m1.size());
+        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(ptrs.size() == m1.size());
         const size_t dim = m1.size() == 9 ? 3 : 4;
 
         for (size_t i = 0; i < dim; ++i) {
@@ -2138,11 +2140,11 @@ inline FunctionGroup::UniquePtr axadjoint(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         std::vector<llvm::Value*> m1, m2;
         arrayUnpack(args[1], m1, B, /*load*/true);
         arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
-        assert(m1.size() == 9 && m2.size() == 9);
+        OPENVDB_ASSERT(m1.size() == 9 && m2.size() == 9);
 
         auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
             return binaryOperator(
@@ -2195,11 +2197,11 @@ inline FunctionGroup::UniquePtr axcofactor(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         std::vector<llvm::Value*> m1, m2;
         arrayUnpack(args[1], m1, B, /*load*/true);
         arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
-        assert(m1.size() == 9 && m2.size() == 9);
+        OPENVDB_ASSERT(m1.size() == 9 && m2.size() == 9);
 
         auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
             return binaryOperator(
@@ -2252,13 +2254,13 @@ inline FunctionGroup::UniquePtr axinverse(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
 
         llvm::Value* adj = axadjoint(op)->execute({args[1]}, B);
         std::vector<llvm::Value*> m1, madj;
         arrayUnpack(adj, madj, B, /*load*/true);
         arrayUnpack(args[0], m1, B, /*load*/false); // result
-        assert(madj.size() == 9 && m1.size() == 9);
+        OPENVDB_ASSERT(madj.size() == 9 && m1.size() == 9);
 
         // compute determinant of the input mat by reusing the adjoint's 0, 3 and 6 terms
         llvm::Value* m20 = ir_load(B, ir_constgep2_64(B, args[1], 0, 0));
@@ -2433,7 +2435,7 @@ inline FunctionGroup::UniquePtr axdegrees(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args.front();
         llvm::Value* pi180 = arg->getType()->isFloatTy() ?
             LLVMType<float>::get(B.getContext(), 180.f / openvdb::math::pi<float>()) :
@@ -2460,7 +2462,7 @@ inline FunctionGroup::UniquePtr axradians(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         llvm::Value* arg = args.front();
         llvm::Value* pi180 = arg->getType()->isFloatTy() ?
             LLVMType<float>::get(B.getContext(), openvdb::math::pi<float>() / 180.f) :
@@ -2735,7 +2737,7 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Function* base = B.GetInsertBlock()->getParent();
 
         std::vector<llvm::Value*> hsv, rgb;
@@ -2899,7 +2901,7 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::LLVMContext& C = B.getContext();
 
@@ -3095,11 +3097,11 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
     {
         // Pull out the custom data from the parent function
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(std::string(compute->getName()).rfind("ax.compute", 0) == 0);
+        OPENVDB_ASSERT(compute);
+        OPENVDB_ASSERT(std::string(compute->getName()).rfind("ax.compute", 0) == 0);
         llvm::Value* arg = extractArgument(compute, 0);
-        assert(arg);
-        assert(arg->getName() == "custom_data");
+        OPENVDB_ASSERT(arg);
+        OPENVDB_ASSERT(arg->getName() == "custom_data");
 
         std::vector<llvm::Value*> inputs;
         inputs.reserve(2 + args.size());
@@ -3134,11 +3136,11 @@ inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
     {
         // Pull out the custom data from the parent function
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        assert(compute);
-        assert(std::string(compute->getName()).rfind("ax.compute", 0) == 0);
+        OPENVDB_ASSERT(compute);
+        OPENVDB_ASSERT(std::string(compute->getName()).rfind("ax.compute", 0) == 0);
         llvm::Value* arg = extractArgument(compute, 0);
-        assert(arg);
-        assert(arg->getName() == "custom_data");
+        OPENVDB_ASSERT(arg);
+        OPENVDB_ASSERT(arg->getName() == "custom_data");
 
         std::vector<llvm::Value*> inputs;
         inputs.reserve(2 + args.size());

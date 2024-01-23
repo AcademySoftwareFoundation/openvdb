@@ -143,6 +143,11 @@
 #cmakedefine OPENVDB_USE_DELAYED_LOADING
 #endif
 
+/* Denotes whether VDB was built asserts enabled in VDB code */
+#ifndef OPENVDB_ENABLE_ASSERTS
+#cmakedefine OPENVDB_ENABLE_ASSERTS
+#endif
+
 /* Denotes whether VDB was built with explicit template instantiation */
 #ifndef OPENVDB_USE_EXPLICIT_INSTANTIATION
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION
@@ -159,6 +164,7 @@
 #define OPENVDB_VEC3_TREE_INSTANTIATE(Function)     @OPENVDB_VEC3_TREE_INSTANTIATIONS@
 #define OPENVDB_VOLUME_TREE_INSTANTIATE(Function)   @OPENVDB_VOLUME_TREE_INSTANTIATIONS@
 #define OPENVDB_ALL_TREE_INSTANTIATE(Function)      @OPENVDB_ALL_TREE_INSTANTIATIONS@
+
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

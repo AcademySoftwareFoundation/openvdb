@@ -14,6 +14,8 @@
 #include "../compiler/CustomData.h"
 #include "../Exceptions.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/Constants.h>
@@ -248,7 +250,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     if (conditionSuccess) {
         // get the condition
         trueValue = mValues.top(); mValues.pop();
-        assert(trueValue);
+        OPENVDB_ASSERT(trueValue);
 
         trueType = trueValue->getType();
         truePtr = trueType->isPointerTy();
@@ -295,7 +297,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
 
     llvm::Value* falseValue = mValues.top(); mValues.pop();
     llvm::Type* falseType = falseValue->getType();
-    assert(trueType);
+    OPENVDB_ASSERT(trueType);
     // if both variables of same type do no casting or loading
     if (trueType != falseType) {
         // get the (contained) types of the expressions
@@ -308,7 +310,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         // if same contained type but one needs loading
         // can only have one pointer, one not, for scalars right now, i.e. no loaded arrays or strings
         if (trueType == falseType) {
-            assert(!(truePtr && falsePtr));
+            OPENVDB_ASSERT(!(truePtr && falsePtr));
             if (truePtr) {
                 mBuilder.SetInsertPoint(trueBranch);
                 trueValue = ir_load(mBuilder, trueValue);
@@ -326,7 +328,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
             const bool trueScalar = (trueType->isIntegerTy() || trueType->isFloatingPointTy());
             if (trueScalar &&
                  (falseType->isIntegerTy() || falseType->isFloatingPointTy())) {
-                assert(trueType != falseType);
+                OPENVDB_ASSERT(trueType != falseType);
                 // SCALAR_SCALAR
                 returnType = typePrecedence(trueType, falseType);
                 // always load scalars here, even if they are the correct type
@@ -429,7 +431,7 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     llvm::BasicBlock* postBodyBlock = conditionBlock;
 
     const ast::tokens::LoopToken loopType = loop->loopType();
-    assert((loopType == ast::tokens::LoopToken::FOR ||
+    OPENVDB_ASSERT((loopType == ast::tokens::LoopToken::FOR ||
             loopType == ast::tokens::LoopToken::WHILE ||
             loopType == ast::tokens::LoopToken::DO) &&
             "Unsupported loop type");
@@ -512,7 +514,7 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
 bool ComputeGenerator::visit(const ast::Keyword* node)
 {
     const ast::tokens::KeywordToken keyw = node->keyword();
-    assert((keyw == ast::tokens::KeywordToken::RETURN ||
+    OPENVDB_ASSERT((keyw == ast::tokens::KeywordToken::RETURN ||
             keyw == ast::tokens::KeywordToken::BREAK  ||
             keyw == ast::tokens::KeywordToken::CONTINUE) &&
             "Unsupported keyword");
@@ -541,11 +543,11 @@ bool ComputeGenerator::visit(const ast::Keyword* node)
                 breakContinue = mBreakContinueStack.top();
 
             if (keyw == ast::tokens::KeywordToken::BREAK) {
-                assert(breakContinue.first);
+                OPENVDB_ASSERT(breakContinue.first);
                 mBuilder.CreateBr(breakContinue.first);
             }
             else if (keyw == ast::tokens::KeywordToken::CONTINUE) {
-                assert(breakContinue.second);
+                OPENVDB_ASSERT(breakContinue.second);
                 mBuilder.CreateBr(breakContinue.second);
             }
         }
@@ -611,7 +613,7 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
 
                 mBuilder.SetInsertPoint(returnBlock);
                 if (lhsBranch) {// i.e. lhs was successful
-                    assert(rhs && lhs);
+                    OPENVDB_ASSERT(rhs && lhs);
                     llvm::PHINode* result = mBuilder.CreatePHI(LLVMType<bool>::get(mContext), 2, "binary_op");
                     result->addIncoming(lhs, lhsBranch->getParent());
                     result->addIncoming(rhs, rhsBranch->getParent());
@@ -700,7 +702,7 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         type = type->getArrayElementType();
         std::vector<llvm::Value*> elements;
         arrayUnpack(value, elements, mBuilder, /*load*/true);
-        assert(elements.size() > 0);
+        OPENVDB_ASSERT(elements.size() > 0);
 
         if (type->isIntegerTy()) {
             if (token == ast::tokens::MINUS) {
@@ -744,7 +746,7 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         mLog.error("value is not a scalar or vector", node);
         return false;
     }
-    assert(result);
+    OPENVDB_ASSERT(result);
     mValues.pop();
     mValues.push(result);
     return true;
@@ -761,7 +763,7 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
     if (assign->isCompound()) {
         llvm::Value* rhsValue = nullptr;
         if (!this->binaryExpression(rhsValue, lhs, rhs, assign->operation(), assign)) return false;
-        assert(rhsValue);
+        OPENVDB_ASSERT(rhsValue);
         rhs = rhsValue;
         rhsType = rhs->getType();
     }
@@ -794,7 +796,7 @@ bool ComputeGenerator::visit(const ast::Crement* node)
     }
     else {
         llvm::Value* crement = nullptr;
-        assert((node->increment() || node->decrement()) && "unrecognised crement operation");
+        OPENVDB_ASSERT((node->increment() || node->decrement()) && "unrecognised crement operation");
         if (node->increment())      crement = LLVMType<int32_t>::get(mContext, 1);
         else if (node->decrement()) crement = LLVMType<int32_t>::get(mContext, -1);
 
@@ -823,7 +825,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
     }
     else {
         const size_t args = node->children();
-        assert(mValues.size() >= args);
+        OPENVDB_ASSERT(mValues.size() >= args);
 
         // initialize arguments. scalars are always passed by value, arrays
         // and strings always by pointer
@@ -843,7 +845,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
             }
             else {
                 // arrays should never be loaded
-                assert(!type->isArrayTy() && type != LLVMType<codegen::String>::get(mContext));
+                OPENVDB_ASSERT(!type->isArrayTy() && type != LLVMType<codegen::String>::get(mContext));
                 if (type->isIntegerTy() || type->isFloatingPointTy()) {
                     /*pass by value*/
                 }
@@ -858,7 +860,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
         const Function* target = function->match(inputTypes, mContext, &match);
 
         if (!target) {
-            assert(!function->list().empty()
+            OPENVDB_ASSERT(!function->list().empty()
                    && "FunctionGroup has no function declarations");
 
             std::ostringstream os;
@@ -896,7 +898,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
                 result = target->call(arguments, mBuilder, /*cast=*/false);
             }
 
-            assert(result && "Function has been invoked with no valid llvm Value return");
+            OPENVDB_ASSERT(result && "Function has been invoked with no valid llvm Value return");
             mValues.push(result);
         }
     }
@@ -929,7 +931,7 @@ bool ComputeGenerator::visit(const ast::Cast* node)
         if (targetType->isIntegerTy(1)) {
             // if target is bool, perform standard boolean conversion (*not* truncation).
             value = boolComparison(value, mBuilder);
-            assert(value->getType()->isIntegerTy(1));
+            OPENVDB_ASSERT(value->getType()->isIntegerTy(1));
         }
         else {
             value = arithmeticConversion(value, targetType, mBuilder);
@@ -965,7 +967,7 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
         value = insertStaticAlloca(mBuilder, type);
     }
 
-    assert(value);
+    OPENVDB_ASSERT(value);
     SymbolTable* current = mSymbolTables.getOrInsert(mScopeIndex);
 
     const std::string& name = node->local()->name();
@@ -1105,7 +1107,7 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     else {
         // component0 = row, component1 = column. Index into the matrix array
         // which is layed out in row major = (component0*dim + component1)
-        assert(size == 9 || size == 16);
+        OPENVDB_ASSERT(size == 9 || size == 16);
         const int32_t dim = size == 9 ? 3 : 4;
         llvm::Value* offset =
             LLVMType<int32_t>::get(mContext, static_cast<int32_t>(dim));
@@ -1190,7 +1192,7 @@ bool ComputeGenerator::visit(const ast::Value<double>* node)
 
 bool ComputeGenerator::visit(const ast::Value<std::string>* node)
 {
-    assert(node->value().size() < static_cast<size_t>(std::numeric_limits<size_t>::max()));
+    OPENVDB_ASSERT(node->value().size() < static_cast<size_t>(std::numeric_limits<size_t>::max()));
     const FunctionGroup* axstring = this->getFunction("string::string", /*internal*/true);
     llvm::Value* loc = mBuilder.CreateGlobalStringPtr(node->value()); // char*
     llvm::Value* result = axstring->execute({loc}, mBuilder);
@@ -1203,7 +1205,7 @@ const FunctionGroup* ComputeGenerator::getFunction(const std::string &identifier
 {
     const FunctionGroup* F =
         mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
-    assert(F);
+    OPENVDB_ASSERT(F);
     return F;
 }
 
@@ -1229,7 +1231,7 @@ template <typename ValueType>
 typename std::enable_if<std::is_floating_point<ValueType>::value, bool>::type
 ComputeGenerator::visit(const ast::Value<ValueType>* node)
 {
-    assert(std::isinf(node->value()) || node->value() >= 0.0);
+    OPENVDB_ASSERT(std::isinf(node->value()) || node->value() >= 0.0);
     llvm::Constant* value = LLVMType<ValueType>::get(mContext, node->value());
     mValues.push(value);
     return true;
@@ -1267,7 +1269,7 @@ bool ComputeGenerator::visit(const ast::Tree*)
 
 bool ComputeGenerator::visit(const ast::Attribute*)
 {
-    assert(false && "Base ComputeGenerator attempted to generate code for an Attribute. "
+    OPENVDB_ASSERT(false && "Base ComputeGenerator attempted to generate code for an Attribute. "
         "PointComputeGenerator or VolumeComputeGenerator should be used for "
         "attribute accesses.");
     return false;
@@ -1314,7 +1316,7 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
             return false;
         }
         else if (lsize == 1) {
-            assert(rsize > 1);
+            OPENVDB_ASSERT(rsize > 1);
             mLog.error("cannot assign a scalar value "
                 "from a vector or matrix. Consider using the [] operator to "
                 "get a particular element", node);
@@ -1332,7 +1334,7 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
         (ltype->isFloatingPointTy() || ltype->isIntegerTy() || ltype->isArrayTy());
 
     if (componentwise) {
-        assert(rsize == lsize || (rsize == 1 || lsize == 1));
+        OPENVDB_ASSERT(rsize == lsize || (rsize == 1 || lsize == 1));
         const size_t resultsize = std::max(lsize, rsize);
 
         if (ltype != rtype) {
@@ -1357,7 +1359,7 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
             if (!this->binaryExpression(newRhs, LLVMType<int32_t>::get(mContext, 0), rhs, ast::tokens::NOTEQUALS, node)) return false;
             if (!newRhs) return true;
             rhs = newRhs;
-            assert(newRhs->getType()->isIntegerTy(1));
+            OPENVDB_ASSERT(newRhs->getType()->isIntegerTy(1));
         }
 
         for (size_t i = 0; i < resultsize; ++i) {
@@ -1417,7 +1419,7 @@ void ComputeGenerator::createFreeSymbolStrings(llvm::IRBuilder<>& B)
 
     for (llvm::BasicBlock& BB : *F) {
         llvm::Instruction* TI = BB.getTerminator();
-        assert(TI);
+        OPENVDB_ASSERT(TI);
         if (llvm::isa<llvm::ReturnInst>(TI)) {
             B.SetInsertPoint(TI);
             for (auto ptr : ptrs) {
@@ -1576,9 +1578,9 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
 
     if (componentwise)
     {
-        assert(ltype->isArrayTy() || ltype->isFloatingPointTy() || ltype->isIntegerTy());
-        assert(rtype->isArrayTy() || rtype->isFloatingPointTy() || rtype->isIntegerTy());
-        assert(rsize == lsize || (rsize == 1 || lsize == 1));
+        OPENVDB_ASSERT(ltype->isArrayTy() || ltype->isFloatingPointTy() || ltype->isIntegerTy());
+        OPENVDB_ASSERT(rtype->isArrayTy() || rtype->isFloatingPointTy() || rtype->isIntegerTy());
+        OPENVDB_ASSERT(rsize == lsize || (rsize == 1 || lsize == 1));
 
         if (op == ast::tokens::DIVIDE || op == ast::tokens::MODULO) {
             if (llvm::Constant* c = llvm::dyn_cast<llvm::Constant>(rhs)) {
@@ -1641,9 +1643,9 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
 
         if (op == ast::tokens::MODULO) {
             const FunctionGroup* mod = this->getFunction("floormod");
-            assert(mod);
+            OPENVDB_ASSERT(mod);
             target = mod->match({opprec,opprec}, mContext);
-            assert(target);
+            OPENVDB_ASSERT(target);
         }
 
         // perform op
@@ -1661,7 +1663,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 const ast::tokens::OperatorToken reductionOp =
                     op == ast::tokens::EQUALSEQUALS ? ast::tokens::AND : ast::tokens::OR;
                 result = elements.front();
-                assert(result->getType() == LLVMType<bool>::get(mContext));
+                OPENVDB_ASSERT(result->getType() == LLVMType<bool>::get(mContext));
                 for (size_t i = 1; i < resultsize; ++i) {
                     result = binaryOperator(result, elements[i], reductionOp, mBuilder);
                 }

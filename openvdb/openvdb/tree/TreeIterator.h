@@ -10,6 +10,7 @@
 #include <tbb/parallel_for.h>
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -585,7 +586,7 @@ public:
 
     const NCValueT& getValue(Index lvl) const
     {
-        assert(lvl == Level);
+        OPENVDB_ASSERT(lvl == Level);
         (void)lvl; // avoid unused variable warning in optimized builds
         return mIter.getValue();
     }

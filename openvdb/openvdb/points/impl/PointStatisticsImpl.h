@@ -172,7 +172,7 @@ bool evalExtents(const PointDataTreeT& points,
                     const size_t size = handle.isUniform() ? 1 : handle.size();
                     ExtentOp op(handle.get(0));
                     for (size_t i = 1; i < size; ++i) {
-                        assert(i < size_t(std::numeric_limits<Index>::max()));
+                        OPENVDB_ASSERT(i < size_t(std::numeric_limits<Index>::max()));
                         op(handle.get(Index(i)));
                     }
                     if (!values.empty()) {
@@ -316,7 +316,7 @@ bool evalAverage(const PointDataTreeT& points,
 
         void add(const Sample& other)
         {
-            assert(other.size > 0);
+            OPENVDB_ASSERT(other.size > 0);
             const double denom = 1.0 / static_cast<double>(size + other.size);
             const ResultT delta = other.avg - avg;
             avg = avg + (denom * delta * static_cast<double>(other.size));
@@ -352,7 +352,7 @@ bool evalAverage(const PointDataTreeT& points,
                     }
                     else {
                         for (size_t i = 1; i < size; ++i) {
-                            assert(i < size_t(std::numeric_limits<Index>::max()));
+                            OPENVDB_ASSERT(i < size_t(std::numeric_limits<Index>::max()));
                             S->add(ResultT(handle.get(Index(i))));
                         }
                     }
@@ -374,7 +374,7 @@ bool evalAverage(const PointDataTreeT& points,
     auto iter = values.cbegin();
     while (iter != values.cend() && !(*iter)) ++iter;
     if (iter == values.cend()) return false;
-    assert(*iter);
+    OPENVDB_ASSERT(*iter);
 
     // serial deterministic reduction of floating point samples
     Sample S = **iter;
@@ -436,7 +436,7 @@ bool accumulate(const PointDataTreeT& points,
                     const size_t size = handle.isUniform() ? 1 : handle.size();
                     auto total = ResultT(handle.get(0));
                     for (size_t i = 1; i < size; ++i) {
-                        assert(i < size_t(std::numeric_limits<Index>::max()));
+                        OPENVDB_ASSERT(i < size_t(std::numeric_limits<Index>::max()));
                         total += ResultT(handle.get(Index(i)));
                     }
                     values[leaf.pos()].reset(new ResultT(total));
@@ -455,7 +455,7 @@ bool accumulate(const PointDataTreeT& points,
     auto iter = values.cbegin();
     while (iter != values.cend() && !(*iter)) ++iter;
     if (iter == values.cend()) return false;
-    assert(*iter);
+    OPENVDB_ASSERT(*iter);
     total = **iter; ++iter;
 
     if (std::is_integral<ElementT>::value) {

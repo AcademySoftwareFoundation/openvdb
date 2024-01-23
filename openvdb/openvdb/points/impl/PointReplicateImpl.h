@@ -58,8 +58,8 @@ replicate(const PointDataGridT& source,
             return *this;
         }
 
-        Index sourceIndex() const { assert(*this); return mSource; }
-        Index targetIndex() const { assert(*this); return mIt; }
+        Index sourceIndex() const { OPENVDB_ASSERT(*this); return mSource; }
+        Index targetIndex() const { OPENVDB_ASSERT(*this); return mIt; }
 
     private:
         Index mIt, mEnd, mSource;
@@ -82,7 +82,7 @@ replicate(const PointDataGridT& source,
     // verify position
 
     const size_t ppos = sourceDescriptor.find("P");
-    assert(ppos != AttributeSet::INVALID_POS);
+    OPENVDB_ASSERT(ppos != AttributeSet::INVALID_POS);
 
     // build new dummy attribute set
 
@@ -132,7 +132,7 @@ replicate(const PointDataGridT& source,
         const auto& sourceLeaf = sourceManager.leaf(pos);
         // @note  This really shoudn't return uint64_t as AttributeArray's size is
         //  limited to the max of a uint32_t...
-        assert(sourceLeaf.pointCount() < Index64(std::numeric_limits<Index>::max()));
+        OPENVDB_ASSERT(sourceLeaf.pointCount() < Index64(std::numeric_limits<Index>::max()));
         const Index sourceCount = static_cast<Index>(sourceLeaf.pointCount());
 
         Index uniformMultiplier = multiplier;
@@ -193,13 +193,13 @@ replicate(const PointDataGridT& source,
         auto copy = [&](const std::string& name)
         {
             const auto* sourceArray = sourceSet.getConst(name);
-            assert(sourceArray);
+            OPENVDB_ASSERT(sourceArray);
 
             // manually expand so that copyValues() doesn't expand and fill the array -
             // we don't want to unnecessarily zero initialize the target values as we know
             // we're going to write to all of them.
             auto* array = newSet->get(name);
-            assert(array);
+            OPENVDB_ASSERT(array);
             array->expand(/*fill*/false);
 
             if (useScale) {
@@ -225,7 +225,7 @@ replicate(const PointDataGridT& source,
             AttributeWriteHandle<int32_t>
                 idxHandle(*newSet->get(replicationIdx), /*expand*/false);
             idxHandle.expand(/*fill*/false);
-            assert(idxHandle.size() == total);
+            OPENVDB_ASSERT(idxHandle.size() == total);
 
 
             Index offset = 0;

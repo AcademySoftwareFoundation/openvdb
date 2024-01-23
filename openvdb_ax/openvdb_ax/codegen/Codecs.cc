@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/points/AttributeArray.h> // for native codec types
+#include <openvdb/util/Assert.h>
 
 #include "Codecs.h"
 
@@ -33,7 +34,7 @@ inline FunctionGroup::UniquePtr axtrncdecode()
         [](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Value* out = args[0];
         llvm::Value* in = args[1];
         llvm::Type* type = in->getType()->getPointerElementType();
@@ -42,7 +43,7 @@ inline FunctionGroup::UniquePtr axtrncdecode()
         {
             in = ir_load(B, in);
             const bool intconversion = type->isIntegerTy();
-            assert(intconversion || type->isHalfTy());
+            OPENVDB_ASSERT(intconversion || type->isHalfTy());
             llvm::Value* result = intconversion ?
                 arithmeticConversion(in, B.getInt32Ty(), B) :
                 arithmeticConversion(in, B.getFloatTy(), B);
@@ -52,9 +53,9 @@ inline FunctionGroup::UniquePtr axtrncdecode()
             std::vector<llvm::Value*> outelem, inelem;
             arrayUnpack(out, outelem, B, /*load*/false);
             arrayUnpack(in, inelem, B, /*load*/true);
-            assert(outelem.size() == inelem.size());
+            OPENVDB_ASSERT(outelem.size() == inelem.size());
             const bool intconversion = inelem.front()->getType()->isIntegerTy();
-            assert(intconversion || inelem.front()->getType()->isHalfTy());
+            OPENVDB_ASSERT(intconversion || inelem.front()->getType()->isHalfTy());
 
             if (intconversion) arithmeticConversion(inelem, B.getInt32Ty(), B);
             else               arithmeticConversion(inelem, B.getFloatTy(), B);
@@ -85,7 +86,7 @@ inline FunctionGroup::UniquePtr axtrncencode()
         [](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Value* out = args[0];
         llvm::Value* in = args[1];
         llvm::Type* type = in->getType()->getPointerElementType();
@@ -94,7 +95,7 @@ inline FunctionGroup::UniquePtr axtrncencode()
         {
             in = ir_load(B, in);
             const bool intconversion = in->getType()->isIntegerTy();
-            assert(intconversion || in->getType()->isFloatTy());
+            OPENVDB_ASSERT(intconversion || in->getType()->isFloatTy());
             llvm::Value* result = intconversion ?
                 arithmeticConversion(in, B.getInt16Ty(), B) :
                 arithmeticConversion(in, B.getHalfTy(), B);
@@ -104,9 +105,9 @@ inline FunctionGroup::UniquePtr axtrncencode()
             std::vector<llvm::Value*> outelem, inelem;
             arrayUnpack(out, outelem, B, /*load*/false);
             arrayUnpack(in, inelem, B, /*load*/true);
-            assert(outelem.size() == inelem.size());
+            OPENVDB_ASSERT(outelem.size() == inelem.size());
             const bool intconversion = inelem.front()->getType()->isIntegerTy();
-            assert(intconversion || inelem.front()->getType()->isFloatTy());
+            OPENVDB_ASSERT(intconversion || inelem.front()->getType()->isFloatTy());
 
             if (intconversion) arithmeticConversion(inelem, B.getInt16Ty(), B);
             else               arithmeticConversion(inelem, B.getHalfTy(), B);
@@ -137,7 +138,7 @@ inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPo
         [IsPositionRange](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Value* out = args[0]; // out
         llvm::Value* in = args[1]; // in
         llvm::Type* type = in->getType()->getPointerElementType();
@@ -147,7 +148,7 @@ inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPo
         if (type->isIntegerTy())
         {
             in = ir_load(B, in);
-            assert(type->isIntegerTy(8) || type->isIntegerTy(16));
+            OPENVDB_ASSERT(type->isIntegerTy(8) || type->isIntegerTy(16));
             llvm::Value* s = B.CreateUIToFP(in, B.getFloatTy());
             llvm::Value* d = type->isIntegerTy(8) ?
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint8_t>::max())) :
@@ -160,9 +161,9 @@ inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPo
             std::vector<llvm::Value*> outelem, inelem;
             arrayUnpack(out, outelem, B, /*load*/false);
             arrayUnpack(in, inelem, B, /*load*/true);
-            assert(inelem.size() >= 3);
-            assert(outelem.size() == inelem.size());
-            assert(inelem.front()->getType()->isIntegerTy(8) || inelem.front()->getType()->isIntegerTy(16));
+            OPENVDB_ASSERT(inelem.size() >= 3);
+            OPENVDB_ASSERT(outelem.size() == inelem.size());
+            OPENVDB_ASSERT(inelem.front()->getType()->isIntegerTy(8) || inelem.front()->getType()->isIntegerTy(16));
 
             llvm::Value* d = inelem.front()->getType()->isIntegerTy(8) ?
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint8_t>::max())) :
@@ -198,7 +199,7 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
         [IsPositionRange](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::LLVMContext& C = B.getContext();
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::Value* u = args[0]; // out
@@ -260,12 +261,12 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
         [OneByte, IsPositionRange](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         std::vector<llvm::Value*> out, in;
         arrayUnpack(args[0], out, B, /*load*/false);
         arrayUnpack(args[1], in, B, /*load*/false);
-        assert(in.size() >= 3);
-        assert(out.size() == in.size());
+        OPENVDB_ASSERT(in.size() >= 3);
+        OPENVDB_ASSERT(out.size() == in.size());
 
         auto F = axfxptencode(OneByte, IsPositionRange);
         for (size_t i = 0; i < in.size(); ++i) {
@@ -387,7 +388,7 @@ llvm::Type* Codec::findReturnTypeFromArg(const codegen::FunctionGroup* const gro
     for (const auto& F : functions) {
         types.clear();
         F->types(types, arg->getContext());
-        assert(types.size() == 2);
+        OPENVDB_ASSERT(types.size() == 2);
         if (types[1] != arg) continue;
         return types[0];
     }

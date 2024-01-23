@@ -33,6 +33,7 @@
 #define OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/util/Assert.h>
 
 #include "PointDataGrid.h"
 #include "PointMask.h"

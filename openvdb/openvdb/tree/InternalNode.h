@@ -10,6 +10,7 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc.
 #include <openvdb/math/Math.h> // for math::isExactlyEqual(), etc.
 #include <openvdb/version.h>
@@ -133,7 +134,7 @@ protected:
 
         ChildT& getItem(Index pos) const
         {
-            assert(this->parent().isChildMaskOn(pos));
+            OPENVDB_ASSERT(this->parent().isChildMaskOn(pos));
             return *(this->parent().getChildNode(pos));
         }
 
@@ -1002,7 +1003,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
 {
-    assert(vec.size() > ChildNodeType::LEVEL);
+    OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
     const auto count = mChildMask.countOn();
     if (ChildNodeType::LEVEL > 0 && count > 0) {
         for (auto iter = this->cbeginChildOn(); iter; ++iter) iter->nodeCount(vec);
@@ -1297,7 +1298,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::addLeaf(LeafNodeType* leaf)
 {
-    assert(leaf != nullptr);
+    OPENVDB_ASSERT(leaf != nullptr);
     const Coord& xyz = leaf->origin();
     const Index n = this->coordToOffset(xyz);
     ChildT* child = nullptr;
@@ -1326,7 +1327,7 @@ template<typename AccessorT>
 inline void
 InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
 {
-    assert(leaf != nullptr);
+    OPENVDB_ASSERT(leaf != nullptr);
     const Coord& xyz = leaf->origin();
     const Index n = this->coordToOffset(xyz);
     ChildT* child = nullptr;
@@ -1359,7 +1360,7 @@ template<typename ChildT, Index Log2Dim>
 inline bool
 InternalNode<ChildT, Log2Dim>::addChild(ChildT* child)
 {
-    assert(child);
+    OPENVDB_ASSERT(child);
     const Coord& xyz = child->origin();
     // verify that the child belongs in this internal node
     if (Coord((xyz & ~(DIM-1))) != this->origin())  return false;
@@ -1375,7 +1376,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::addTile(Index n, const ValueType& value, bool state)
 {
-    assert(n < NUM_VALUES);
+    OPENVDB_ASSERT(n < NUM_VALUES);
     this->makeChildNodeEmpty(n, value);
     mValueMask.set(n, state);
 }
@@ -2231,7 +2232,7 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
                 for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
                     mNodes[iter.pos()].setValue(values[n++]);
                 }
-                assert(n == numValues);
+                OPENVDB_ASSERT(n == numValues);
             } else {
                 for (ValueAllIter iter = this->beginValueAll(); iter; ++iter) {
                     mNodes[iter.pos()].setValue(values[iter.pos()]);
@@ -2494,7 +2495,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyUnion
 
         A op;
         t->mValueMask.foreach(s->mValueMask, t->mChildMask, op);
-        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+        OPENVDB_ASSERT((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
@@ -2545,7 +2546,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyIntersection
         t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op);
 
         t->mValueMask &= s->mValueMask;
-        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+        OPENVDB_ASSERT((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
@@ -2600,7 +2601,7 @@ struct InternalNode<ChildT, Log2Dim>::TopologyDifference
 
         B op2;
         t->mValueMask.foreach(t->mChildMask, s->mValueMask, oldChildMask, op2);
-        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+        OPENVDB_ASSERT((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
     }
     void operator()(const tbb::blocked_range<Index> &r) const {
         for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
@@ -2663,14 +2664,14 @@ InternalNode<ChildT, Log2Dim>::combine(InternalNode& other, CombineOp& op)
         } else if (this->isChildMaskOn(i) && other.isChildMaskOff(i)) {
             // Combine this node's child with the other node's constant value.
             ChildNodeType* child = mNodes[i].getChild();
-            assert(child);
+            OPENVDB_ASSERT(child);
             if (child) {
                 child->combine(other.mNodes[i].getValue(), other.isValueMaskOn(i), op);
             }
         } else if (this->isChildMaskOff(i) && other.isChildMaskOn(i)) {
             // Combine this node's constant value with the other node's child.
             ChildNodeType* child = other.mNodes[i].getChild();
-            assert(child);
+            OPENVDB_ASSERT(child);
             if (child) {
                 // Combine this node's constant value with the other node's child,
                 // but use a new functor in which the A and B values are swapped,
@@ -2689,8 +2690,8 @@ InternalNode<ChildT, Log2Dim>::combine(InternalNode& other, CombineOp& op)
             ChildNodeType
                 *child = mNodes[i].getChild(),
                 *otherChild = other.mNodes[i].getChild();
-            assert(child);
-            assert(otherChild);
+            OPENVDB_ASSERT(child);
+            OPENVDB_ASSERT(otherChild);
             if (child && otherChild) {
                 child->combine(*otherChild, op);
             }
@@ -2718,7 +2719,7 @@ InternalNode<ChildT, Log2Dim>::combine(const ValueType& value, bool valueIsActiv
         } else /*if (isChildMaskOn(i))*/ {
             // Combine this node's child with the given constant value.
             ChildNodeType* child = mNodes[i].getChild();
-            assert(child);
+            OPENVDB_ASSERT(child);
             if (child) child->combine(value, valueIsActive, op);
         }
     }
@@ -2794,7 +2795,7 @@ InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const OtherNodeT
             mValueMask.set(i, args.resultIsActive());
         } else {
             typename OtherNodeType::ChildNodeType* otherChild = other.mNodes[i].getChild();
-            assert(otherChild);
+            OPENVDB_ASSERT(otherChild);
             if (this->isChildMaskOff(i)) {
                 // Add a new child with the same coordinates, etc.
                 // as the other node's child.
@@ -2827,7 +2828,7 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const OtherVa
             mValueMask.set(i, args.resultIsActive());
         } else {
             ChildNodeType* otherChild = other.mNodes[i].getChild();
-            assert(otherChild);
+            OPENVDB_ASSERT(otherChild);
             if (this->isChildMaskOff(i)) {
                 // Add a new child with the same coordinates, etc. as the other node's child.
                 this->setChildNode(i,
@@ -2902,7 +2903,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::offsetToLocalCoord(Index n, Coord &xyz)
 {
-    assert(n<(1<<3*Log2Dim));
+    OPENVDB_ASSERT(n<(1<<3*Log2Dim));
     xyz.setX(n >> 2*Log2Dim);
     n &= ((1<<2*Log2Dim)-1);
     xyz.setY(n >> Log2Dim);
@@ -3044,7 +3045,7 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::resetChildNode(Index i, ChildNodeType* child)
 {
-    assert(child);
+    OPENVDB_ASSERT(child);
     if (this->isChildMaskOn(i)) {
         delete mNodes[i].getChild();
     } else {
@@ -3058,8 +3059,8 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::setChildNode(Index i, ChildNodeType* child)
 {
-    assert(child);
-    assert(mChildMask.isOff(i));
+    OPENVDB_ASSERT(child);
+    OPENVDB_ASSERT(mChildMask.isOff(i));
     mChildMask.setOn(i);
     mValueMask.setOff(i);
     mNodes[i].setChild(child);
@@ -3092,7 +3093,7 @@ template<typename ChildT, Index Log2Dim>
 inline ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n)
 {
-    assert(this->isChildMaskOn(n));
+    OPENVDB_ASSERT(this->isChildMaskOn(n));
     return mNodes[n].getChild();
 }
 
@@ -3101,7 +3102,7 @@ template<typename ChildT, Index Log2Dim>
 inline const ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 {
-    assert(this->isChildMaskOn(n));
+    OPENVDB_ASSERT(this->isChildMaskOn(n));
     return mNodes[n].getChild();
 }
 

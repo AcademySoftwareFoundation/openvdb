@@ -38,6 +38,7 @@
 #include <openvdb/math/Stencils.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 #include "Morphology.h"
 #include <iostream>
 #include <type_traits>
@@ -642,7 +643,7 @@ private:
 
     inline RealT interpTime()
     {
-        assert( math::isApproxLarger(mT[1], mT[0], RealT(1e-6) ) );
+        OPENVDB_ASSERT( math::isApproxLarger(mT[1], mT[0], RealT(1e-6) ) );
         return mT[0]+(mT[1]-mT[0])*mV[0]/(mV[0]-mV[1]);
     }
 

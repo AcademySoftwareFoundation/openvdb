@@ -5,10 +5,10 @@
 #define OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Assert.h>
 #include "Vec3.h"
 #include "Mat.h"
 #include <algorithm> // for std::copy()
-#include <cassert>
 #include <cmath>
 #include <iomanip>
 
@@ -140,7 +140,7 @@ public:
     /// Set ith row to vector v
     void setRow(int i, const Vec3<T> &v)
     {
-        // assert(i>=0 && i<3);
+        OPENVDB_ASSERT(i>=0 && i<3);
         int i3 = i * 3;
 
         MyBase::mm[i3+0] = v[0];
@@ -151,14 +151,14 @@ public:
     /// Get ith row, e.g.    Vec3d v = m.row(1);
     Vec3<T> row(int i) const
     {
-        // assert(i>=0 && i<3);
+        OPENVDB_ASSERT(i>=0 && i<3);
         return Vec3<T>((*this)(i,0), (*this)(i,1), (*this)(i,2));
     } // rowColumnTest
 
     /// Set jth column to vector v
     void setCol(int j, const Vec3<T>& v)
     {
-        // assert(j>=0 && j<3);
+        OPENVDB_ASSERT(j>=0 && j<3);
         MyBase::mm[0+j] = v[0];
         MyBase::mm[3+j] = v[1];
         MyBase::mm[6+j] = v[2];
@@ -167,7 +167,7 @@ public:
     /// Get jth column, e.g.    Vec3d v = m.col(0);
     Vec3<T> col(int j) const
     {
-        // assert(j>=0 && j<3);
+        OPENVDB_ASSERT(j>=0 && j<3);
         return Vec3<T>((*this)(0,j), (*this)(1,j), (*this)(2,j));
     } // rowColumnTest
 
@@ -176,8 +176,8 @@ public:
     /// e.g.    m(0,0) = 1;
     T& operator()(int i, int j)
     {
-        // assert(i>=0 && i<3);
-        // assert(j>=0 && j<3);
+        OPENVDB_ASSERT(i>=0 && i<3);
+        OPENVDB_ASSERT(j>=0 && j<3);
         return MyBase::mm[3*i+j];
     } // trivial
 
@@ -186,8 +186,8 @@ public:
     /// e.g.    float f = m(1,0);
     T operator()(int i, int j) const
     {
-        // assert(i>=0 && i<3);
-        // assert(j>=0 && j<3);
+        OPENVDB_ASSERT(i>=0 && i<3);
+        OPENVDB_ASSERT(j>=0 && j<3);
         return MyBase::mm[3*i+j];
     } // trivial
 

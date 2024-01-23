@@ -167,7 +167,7 @@ struct ConvertPointDataGridPositionOp {
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
 
-            assert(leaf.pos() < mPointOffsets.size());
+            OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 
@@ -255,7 +255,7 @@ struct ConvertPointDataGridAttributeOp {
 
         for (auto leaf = range.begin(); leaf; ++leaf) {
 
-            assert(leaf.pos() < mPointOffsets.size());
+            OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 
@@ -335,7 +335,7 @@ struct ConvertPointDataGridGroupOp {
     {
         for (auto leaf = range.begin(); leaf; ++leaf) {
 
-            assert(leaf.pos() < mPointOffsets.size());
+            OPENVDB_ASSERT(leaf.pos() < mPointOffsets.size());
 
             if (mInCoreOnly && leaf->buffer().isOutOfCore())    continue;
 
@@ -344,7 +344,7 @@ struct ConvertPointDataGridGroupOp {
             if (leaf.pos() > 0)     offset += mPointOffsets[leaf.pos() - 1];
 
             const AttributeArray& array = leaf->constAttributeArray(mIndex.first);
-            assert(isGroup(array));
+            OPENVDB_ASSERT(isGroup(array));
             const GroupAttributeArray& groupArray = GroupAttributeArray::cast(array);
 
             if (mFilter.state() == index::ALL) {
@@ -448,7 +448,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
     // retrieve position index
 
     const size_t positionIndex = descriptor->find("P");
-    assert(positionIndex != AttributeSet::INVALID_POS);
+    OPENVDB_ASSERT(positionIndex != AttributeSet::INVALID_POS);
 
     // acquire registry lock to avoid locking when appending attributes in parallel
 
@@ -463,7 +463,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
             // obtain the PointIndexLeafNode (using the origin of the current leaf)
 
             const auto* pointIndexLeaf = pointIndexTree.probeConstLeaf(leaf.origin());
-            assert(pointIndexLeaf);
+            OPENVDB_ASSERT(pointIndexLeaf);
 
             // initialise the attribute storage
 

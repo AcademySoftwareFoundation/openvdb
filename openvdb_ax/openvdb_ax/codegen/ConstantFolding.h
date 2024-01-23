@@ -14,6 +14,7 @@
 #include "Types.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/Constants.h>
 
@@ -57,18 +58,18 @@ struct ConstantFolder
          llvm::LLVMContext& C,
          Tys&&... ts)
     {
-        assert(I-1 < args.size());
+        OPENVDB_ASSERT(I-1 < args.size());
         llvm::Constant* constant = args[I-1];
         const llvm::Type* type = constant->getType();
         if (type->isIntegerTy()) {
-            assert(llvm::isa<llvm::ConstantInt>(constant));
+            OPENVDB_ASSERT(llvm::isa<llvm::ConstantInt>(constant));
             llvm::ConstantInt* cint =
                 llvm::cast<llvm::ConstantInt>(constant);
             const uint64_t val = cint->getLimitedValue();
             return call<uint64_t, ArgumentValueType>(args, function, C, val, ts...);
         }
         else if (type->isFloatTy() || type->isDoubleTy()) {
-            assert(llvm::isa<llvm::ConstantFP>(constant));
+            OPENVDB_ASSERT(llvm::isa<llvm::ConstantFP>(constant));
             llvm::ConstantFP* cfp =
                 llvm::cast<llvm::ConstantFP>(constant);
             const llvm::APFloat& apf = cfp->getValueAPF();

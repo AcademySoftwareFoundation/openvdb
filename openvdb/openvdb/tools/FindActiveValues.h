@@ -386,7 +386,7 @@ typename NodeT::NodeMaskType FindActiveValues<TreeT>::getBBoxMask(const CoordBBo
 {
     typename NodeT::NodeMaskType mask;// typically 32^3 or 16^3 bit mask
     auto b = node->getNodeBoundingBox();
-    assert( bbox.hasOverlap(b) );
+    OPENVDB_ASSERT( bbox.hasOverlap(b) );
     if ( bbox.isInside(b) ) {
         mask.setOn();//node is completely inside the bbox so early out
     } else {
@@ -396,7 +396,7 @@ typename NodeT::NodeMaskType FindActiveValues<TreeT>::getBBoxMask(const CoordBBo
         b.min() >>= NodeT::ChildNodeType::TOTAL;
         b.max() &=  NodeT::DIM-1u;
         b.max() >>= NodeT::ChildNodeType::TOTAL;
-        assert( b.hasVolume() );
+        OPENVDB_ASSERT( b.hasVolume() );
         auto it = b.begin();// iterates over all the child nodes or tiles that intersects bbox
         for (const Coord& ijk = *it; it; ++it) {
             mask.setOn(ijk[2] + (ijk[1] << NodeT::LOG2DIM) + (ijk[0] << 2*NodeT::LOG2DIM));
@@ -619,9 +619,9 @@ struct TileData
         , level(parent.getLevel())
         , state(true)
     {
-        assert(childIdx < ParentNodeT::NUM_VALUES);
-        assert(parent.isChildMaskOff(childIdx));
-        assert(parent.isValueMaskOn(childIdx));
+        OPENVDB_ASSERT(childIdx < ParentNodeT::NUM_VALUES);
+        OPENVDB_ASSERT(parent.isChildMaskOff(childIdx));
+        OPENVDB_ASSERT(parent.isValueMaskOn(childIdx));
         value = parent.getTable()[childIdx].getValue();
     }
 

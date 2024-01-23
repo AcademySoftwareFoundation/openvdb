@@ -20,6 +20,7 @@
 #include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <unordered_map>
 #include <cstdlib>
@@ -65,7 +66,7 @@ inline FunctionGroup::UniquePtr axcoordtooffset(const FunctionOptions& op)
     static auto generate = [](const std::vector<llvm::Value*>& args,
          llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 1);
+        OPENVDB_ASSERT(args.size() == 1);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         llvm::Value* x = ir_constgep2_64(B, args[0], 0, 0);
         llvm::Value* y = ir_constgep2_64(B, args[0], 0, 1);
@@ -132,7 +133,7 @@ inline FunctionGroup::UniquePtr axoffsettocoord(const FunctionOptions& op)
     static auto generate = [](const std::vector<llvm::Value*>& args,
          llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
 
         llvm::Value* ijk = args[0];
@@ -200,7 +201,7 @@ inline FunctionGroup::UniquePtr axoffsettoglobalcoord(const FunctionOptions& op)
     auto generate = [op](const std::vector<llvm::Value*>& args,
          llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 3);
+        OPENVDB_ASSERT(args.size() == 3);
         OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
 
         llvm::Value* result = args[0];
@@ -385,15 +386,15 @@ inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
         using RootNodeType = typename GridType::TreeType::RootNodeType;
         using AccessorType = typename GridType::Accessor;
 
-        assert(accessor);
-        assert(coord);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(coord);
 
         // set value only to avoid changing topology
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
         AccessorType* const accessorPtr = static_cast<AccessorType*>(accessor);
 
         if (level != -1) {
-            assert(level >= 0);
+            OPENVDB_ASSERT(level >= 0);
             accessorPtr->addTile(Index(level), *ijk, *value, ison);
         }
         else {
@@ -402,7 +403,7 @@ inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
             const int depth = accessorPtr->getValueDepth(*ijk);
             if (depth == static_cast<int>(RootNodeType::LEVEL)) {
                 // voxel/leaf level
-                assert(accessorPtr->probeConstLeaf(*ijk));
+                OPENVDB_ASSERT(accessorPtr->probeConstLeaf(*ijk));
                 if (ison) accessorPtr->setValueOn(*ijk, *value);
                 else      accessorPtr->setValueOff(*ijk, *value);
             }
@@ -420,12 +421,12 @@ inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
                 using NodeT2 = typename AccessorType::template NodeTypeAtLevel<2>;
                 if (NodeT1* node = accessorPtr->template getNode<NodeT1>()) {
                     const openvdb::Index index = node->coordToOffset(*ijk);
-                    assert(node->isChildMaskOff(index));
+                    OPENVDB_ASSERT(node->isChildMaskOff(index));
                     node->addTile(index, *value, ison);
                 }
                 else if (NodeT2* node = accessorPtr->template getNode<NodeT2>()) {
                     const openvdb::Index index = node->coordToOffset(*ijk);
-                    assert(node->isChildMaskOff(index));
+                    OPENVDB_ASSERT(node->isChildMaskOff(index));
                     node->addTile(index, *value, ison);
                 }
                 else {
@@ -533,9 +534,9 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
         using GridType = typename openvdb::BoolGrid::ValueConverter<ValueType>::Type;
         using AccessorType = typename GridType::Accessor;
 
-        assert(accessor);
-        assert(coord);
-        assert(value);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(coord);
+        OPENVDB_ASSERT(value);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
         (*value) = static_cast<const AccessorType*>(accessor)->getValue(*ijk);
@@ -549,9 +550,9 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
         using GridType = openvdb::BoolGrid::ValueConverter<std::string>::Type;
         using AccessorType = GridType::Accessor;
 
-        assert(accessor);
-        assert(coord);
-        assert(value);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(coord);
+        OPENVDB_ASSERT(value);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
         const std::string& str = static_cast<const AccessorType*>(accessor)->getValue(*ijk);
@@ -572,10 +573,10 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
         using LeafNodeT = typename GridType::TreeType::LeafNodeType;
         using AccessorType = typename GridType::Accessor;
 
-        assert(accessor);
-        assert(origin);
-        assert(sourceTransform);
-        assert(targetTransform);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(origin);
+        OPENVDB_ASSERT(sourceTransform);
+        OPENVDB_ASSERT(targetTransform);
 
         const AccessorType* const accessorPtr = static_cast<const AccessorType*>(accessor);
         const openvdb::math::Transform* const sourceTransformPtr =
@@ -601,10 +602,10 @@ inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
         using LeafNodeT = typename GridType::TreeType::LeafNodeType;
         using AccessorType = typename GridType::Accessor;
 
-        assert(accessor);
-        assert(origin);
-        assert(sourceTransform);
-        assert(targetTransform);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(origin);
+        OPENVDB_ASSERT(sourceTransform);
+        OPENVDB_ASSERT(targetTransform);
 
         const AccessorType* const accessorPtr = static_cast<const AccessorType*>(accessor);
         const openvdb::math::Transform* const sourceTransformPtr =
@@ -737,10 +738,10 @@ inline FunctionGroup::UniquePtr axprobevalue(const FunctionOptions& op)
         using GridType = typename openvdb::BoolGrid::ValueConverter<ValueType>::Type;
         using AccessorType = typename GridType::Accessor;
 
-        assert(accessor);
-        assert(coord);
-        assert(value);
-        assert(ison);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(coord);
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(ison);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
         *ison = static_cast<const AccessorType*>(accessor)->probeValue(*ijk, *value);
@@ -755,10 +756,10 @@ inline FunctionGroup::UniquePtr axprobevalue(const FunctionOptions& op)
         using GridType = openvdb::BoolGrid::ValueConverter<std::string>::Type;
         using AccessorType = GridType::Accessor;
 
-        assert(accessor);
-        assert(coord);
-        assert(value);
-        assert(ison);
+        OPENVDB_ASSERT(accessor);
+        OPENVDB_ASSERT(coord);
+        OPENVDB_ASSERT(value);
+        OPENVDB_ASSERT(ison);
 
         const openvdb::Coord* ijk = reinterpret_cast<const openvdb::Coord*>(coord);
 

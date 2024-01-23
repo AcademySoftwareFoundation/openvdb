@@ -15,6 +15,7 @@
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 
 #include "AttributeArrayString.h"
 #include "AttributeSet.h"

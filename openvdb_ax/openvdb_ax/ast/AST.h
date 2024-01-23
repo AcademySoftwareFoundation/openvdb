@@ -30,6 +30,7 @@
 #include "Tokens.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <memory>
 #include <utility>
@@ -278,7 +279,7 @@ struct Node
         bool hasChild = false;
         for (size_t i = 0; i < parent->children(); ++i)
             hasChild |= parent->child(i) == this;
-        assert(hasChild);
+        OPENVDB_ASSERT(hasChild);
 #endif
         mParent = parent;
     }
@@ -729,16 +730,16 @@ struct Loop : public Statement
         , mBody(body)
         , mInitial(init)
         , mIteration(iter) {
-            assert(mConditional);
-            assert(mBody);
+            OPENVDB_ASSERT(mConditional);
+            OPENVDB_ASSERT(mBody);
             mConditional->setParent(this);
             mBody->setParent(this);
             if (mInitial) {
-                assert(mLoopType == tokens::LoopToken::FOR);
+                OPENVDB_ASSERT(mLoopType == tokens::LoopToken::FOR);
                 mInitial->setParent(this);
             }
             if (mIteration) {
-                assert(mLoopType == tokens::LoopToken::FOR);
+                OPENVDB_ASSERT(mLoopType == tokens::LoopToken::FOR);
                  mIteration->setParent(this);
             }
         }
@@ -755,11 +756,11 @@ struct Loop : public Statement
             mConditional->setParent(this);
             mBody->setParent(this);
             if (mInitial) {
-                assert(mLoopType == tokens::LoopToken::FOR);
+                OPENVDB_ASSERT(mLoopType == tokens::LoopToken::FOR);
                 mInitial->setParent(this);
             }
             if (mIteration) {
-                assert(mLoopType == tokens::LoopToken::FOR);
+                OPENVDB_ASSERT(mLoopType == tokens::LoopToken::FOR);
                  mIteration->setParent(this);
             }
         }
@@ -880,8 +881,8 @@ struct ConditionalStatement : public Statement
         : mConditional(conditional)
         , mTrueBranch(trueBlock)
         , mFalseBranch(falseBlock) {
-            assert(mConditional);
-            assert(mTrueBranch);
+            OPENVDB_ASSERT(mConditional);
+            OPENVDB_ASSERT(mTrueBranch);
             mConditional->setParent(this);
             mTrueBranch->setParent(this);
             if (mFalseBranch) mFalseBranch->setParent(this);
@@ -1002,8 +1003,8 @@ struct BinaryOperator : public Expression
         : mLeft(left)
         , mRight(right)
         , mOperation(op) {
-            assert(mLeft);
-            assert(mRight);
+            OPENVDB_ASSERT(mLeft);
+            OPENVDB_ASSERT(mRight);
             mLeft->setParent(this);
             mRight->setParent(this);
         }
@@ -1107,8 +1108,8 @@ struct TernaryOperator : public Expression
         : mConditional(conditional)
         , mTrueBranch(trueExpression)
         , mFalseBranch(falseExpression) {
-            assert(mConditional);
-            assert(mFalseBranch);
+            OPENVDB_ASSERT(mConditional);
+            OPENVDB_ASSERT(mFalseBranch);
             mConditional->setParent(this);
             if (mTrueBranch) mTrueBranch->setParent(this);
             mFalseBranch->setParent(this);
@@ -1209,8 +1210,8 @@ struct AssignExpression : public Expression
         : mLHS(lhs)
         , mRHS(rhs)
         , mOperation(op) {
-            assert(mLHS);
-            assert(mRHS);
+            OPENVDB_ASSERT(mLHS);
+            OPENVDB_ASSERT(mRHS);
             mLHS->setParent(this);
             mRHS->setParent(this);
         }
@@ -1397,7 +1398,7 @@ struct UnaryOperator : public Expression
     UnaryOperator(Expression* expr, const tokens::OperatorToken op)
         : mExpression(expr)
         , mOperation(op) {
-            assert(mExpression);
+            OPENVDB_ASSERT(mExpression);
             mExpression->setParent(this);
         }
     /// @brief Construct a new UnaryOperator with a string, delegating
@@ -1473,7 +1474,7 @@ struct Cast : public Expression
         : Expression()
         , mType(type)
         , mExpression(expr) {
-            assert(mExpression);
+            OPENVDB_ASSERT(mExpression);
             mExpression->setParent(this);
         }
     /// @brief  Deep copy constructor for a Cast node, performing a deep copy on
@@ -1701,8 +1702,8 @@ struct ArrayUnpack : public Expression
         : mIdx0(component0)
         , mIdx1(component1)
         , mExpression(expr) {
-            assert(mIdx0);
-            assert(mExpression);
+            OPENVDB_ASSERT(mIdx0);
+            OPENVDB_ASSERT(mExpression);
             mIdx0->setParent(this);
             if(mIdx1) mIdx1->setParent(this);
             mExpression->setParent(this);
@@ -2147,7 +2148,7 @@ struct DeclareLocal : public Statement
         : mType(type)
         , mLocal(local)
         , mInit(init) {
-            assert(mLocal);
+            OPENVDB_ASSERT(mLocal);
             mLocal->setParent(this);
             if (mInit) mInit->setParent(this);
         }

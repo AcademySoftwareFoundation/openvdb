@@ -4,6 +4,7 @@
 #include "Compression.h"
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/util/logging.h>
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
@@ -101,7 +102,7 @@ zipToStream(std::ostream& os, const char* data, size_t numBytes)
     } else {
         // Write the size of the uncompressed data.
         // numBytes expected to be <= the max value + 1 of a signed int64
-        assert(numBytes < size_t(std::numeric_limits<Int64>::max()));
+        OPENVDB_ASSERT(numBytes < size_t(std::numeric_limits<Int64>::max()));
         Int64 negBytes = -Int64(numBytes);
         os.write(reinterpret_cast<char*>(&negBytes), 8);
         // Write the uncompressed data.
@@ -230,7 +231,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
 {
     const size_t inBytes = valSize * numVals;
     // inBytes expected to be <= the max value + 1 of a signed int64
-    assert(inBytes < size_t(std::numeric_limits<Int64>::max()));
+    OPENVDB_ASSERT(inBytes < size_t(std::numeric_limits<Int64>::max()));
 
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);

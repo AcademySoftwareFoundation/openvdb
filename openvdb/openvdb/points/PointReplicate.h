@@ -12,6 +12,7 @@
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/tools/Prune.h>
+#include <openvdb/util/Assert.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

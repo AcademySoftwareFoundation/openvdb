@@ -17,8 +17,8 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>// SharedPtr
+#include <openvdb/util/Assert.h>
 #include <deque>
-#include <cassert>
 #include <iostream>
 #include <iterator>
 #include <algorithm>// std::swap
@@ -215,7 +215,7 @@ public:
     /// @warning It is assumed that the i'th element is already allocated!
     ValueType& operator[](size_t i)
     {
-        assert(i<mCapacity);
+        OPENVDB_ASSERT(i<mCapacity);
         return (*mPageTable[i>>Log2PageSize])[i];
     }
 
@@ -228,7 +228,7 @@ public:
     /// @warning It is assumed that the i'th element is already allocated!
     const ValueType& operator[](size_t i) const
     {
-        assert(i<mCapacity);
+        OPENVDB_ASSERT(i<mCapacity);
         return (*mPageTable[i>>Log2PageSize])[i];
     }
 
@@ -500,7 +500,7 @@ void PagedArray<ValueT, Log2PageSize>::merge(PagedArray& other)
 template <typename ValueT, size_t Log2PageSize>
 void PagedArray<ValueT, Log2PageSize>::add_full(Page*& page, size_t size)
 {
-    assert(size == Page::Size);//page must be full
+    OPENVDB_ASSERT(size == Page::Size);//page must be full
     if (mSize & Page::Mask) {//page-table is partially full
         Page*& tmp = mPageTable.back();
         std::swap(tmp, page);//swap last table entry with page
@@ -514,7 +514,7 @@ void PagedArray<ValueT, Log2PageSize>::add_full(Page*& page, size_t size)
 template <typename ValueT, size_t Log2PageSize>
 void PagedArray<ValueT, Log2PageSize>::add_partially_full(Page*& page, size_t size)
 {
-    assert(size > 0 && size < Page::Size);//page must be partially full
+    OPENVDB_ASSERT(size > 0 && size < Page::Size);//page must be partially full
     if (size_t m = mSize & Page::Mask) {//page table is also partially full
         ValueT *s = page->data(), *t = mPageTable.back()->data() + m;
         for (size_t i=std::min(mSize+size, mCapacity)-mSize; i; --i) *t++ = *s++;
