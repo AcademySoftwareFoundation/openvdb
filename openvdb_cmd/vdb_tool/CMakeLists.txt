@@ -92,8 +92,13 @@ endif()
 
 if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
+  find_package(Imath REQUIRED)
   find_package(OpenEXR REQUIRED)
-  target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf)
+  target_link_libraries(vdb_tool_common INTERFACE
+  # For Imath/OpenEXR v3.X
+  $<TARGET_NAME_IF_EXISTS:Imath::Imath>
+  $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXR>
+)
 endif()
 
 if(OPENVDB_TOOL_USE_ABC)
