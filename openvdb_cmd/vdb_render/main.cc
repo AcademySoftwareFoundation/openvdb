@@ -9,8 +9,11 @@
 /// OpenVDB volumes.  It is not a production-quality renderer.
 
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Mat.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/RayTracer.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tree/LeafManager.h> // for LeafManager
 #include <openvdb/util/Name.h>
 
 #ifdef OPENVDB_USE_EXR
@@ -52,6 +55,32 @@ static const char* sExtensions = "ppm"
 ",png"
 #endif
 ;
+
+
+namespace internal {
+struct CopyValuesOp
+{
+    CopyValuesOp(openvdb::HalfGrid::Ptr hg,
+                 openvdb::FloatGrid::Ptr fg) :
+                 hg(hg),
+                 fg(fg) {}
+
+    template <typename T>
+    void operator()(T &node, size_t) const
+    {
+        auto halfAcc = hg->getAccessor();
+        auto floatAcc = fg->getAccessor();
+        for (typename T::ValueAllIter iter = node.beginValueAll(); iter; ++iter) {
+            auto ijk = iter.getCoord();
+            iter.setValue(floatAcc.getValue(ijk));
+        }
+    }
+
+    openvdb::HalfGrid::Ptr hg;
+    openvdb::FloatGrid::Ptr fg;
+};// CopyValuesOp
+} // namespace internal
+
 
 struct RenderOpts
 {
@@ -411,6 +440,49 @@ struct PngWriter {
     }
 };
 #endif
+
+template<typename GridType>
+void
+printData(const GridType& grid)
+{
+    using namespace openvdb;
+    std::cout << "printData::grid.getName() = " << grid.getName() << "\n";
+    std::cout << "printData::grid.activeVoxelCount() = " << grid.activeVoxelCount() << "\n";
+}
+
+template<typename NewGridT>
+void
+convertFloatToNewGrid(const openvdb::FloatGrid::Ptr fg, typename NewGridT::Ptr hg)
+{
+    using namespace openvdb;
+
+    hg->setName("half_grid");
+    hg->setTransform(fg->transform().copy());
+    hg->tree().topologyUnion(fg->tree());
+
+    tree::LeafManager<HalfTree> lm(hg->tree());
+    internal::CopyValuesOp op(hg, fg);
+    lm.foreach(op);
+
+    auto fAcc = fg->getAccessor();
+    auto hAcc = hg->getAccessor();
+    float maxDif = 0.f;
+    for (auto iter = fg->beginValueOn(); iter; ++iter) {
+        math::Coord const ijk = iter.getCoord();
+        auto const fv = fAcc.getValue(ijk);
+        auto const hv = hAcc.getValue(ijk);
+        float const dif = std::abs(fv - hv);
+        if (dif > maxDif) {
+            maxDif = dif;
+        }
+    }
+
+    if (fg->getGridClass() == GRID_LEVEL_SET) {
+        hg->setGridClass(GRID_LEVEL_SET);
+        openvdb::tools::changeLevelSetBackground(hg->tree(), 3.f);
+    }
+    std::cout << "convertFloatToHalfGrid::maxDif = " << maxDif << "\tactiveVoxelCount dif = " << (int)(fg->activeVoxelCount() - hg->activeVoxelCount()) << "\n";
+}
 
 template<typename GridType>
 void
@@ -812,10 +884,63 @@ main(int argc, char *argv[])
                 opts.target = grid->constTransform().indexToWorld(opts.target);
                 opts.lookat = true;
             }
-
+            {
+                grid->tree().voxelizeActiveTiles(/*threaded=*/true);
+            }
             if (opts.verbose) std::cout << opts << std::endl;
+            {
+                // Render float grid
+                printData<openvdb::FloatGrid>(*grid);
+                render<openvdb::FloatGrid>(*grid, imgFilename, opts);
+            }
+            {
+                // Render half grid
+                std::string imgFilenameHalf = imgFilename.erase(imgFilename.size() - 4) + "_half.ppm";
 
-            render<openvdb::FloatGrid>(*grid, imgFilename, opts);
+                auto const bgOrig = grid->background();
+                openvdb::HalfGrid::Ptr hg = openvdb::HalfGrid::create(bgOrig);
+                convertFloatToNewGrid<openvdb::HalfGrid>(grid, hg);
+                printData<openvdb::HalfGrid>(*hg);
+
+                render<openvdb::HalfGrid>(*hg, imgFilenameHalf, opts);
+            }
+        }
+
+        {
+            float TESTFLOAT = 65504.f + 100.f;
+            openvdb::math::half TESTHALF = 65504.f + 100.f;
+            std::string fileName = "testfloat.vdb";
+            openvdb::FloatGrid::Ptr floatGrid = openvdb::FloatGrid::create(2.f);
+            floatGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
+            floatGrid->setName("float_grid");
+            floatGrid->setSaveFloatAsHalf(true);
+            openvdb::FloatGrid::Accessor floatAcc = floatGrid->getAccessor();
+            openvdb::Coord xyz(1000, -200000000, 30000000);
+            floatAcc.setValue(xyz, TESTFLOAT);
+
+            openvdb::HalfGrid::Ptr halfGrid = openvdb::HalfGrid::create(2.f);
+            halfGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
+            halfGrid->setName("half_grid");
+            halfGrid->setSaveFloatAsHalf(true);
+            openvdb::HalfGrid::Accessor halfAcc = halfGrid->getAccessor();
+            halfAcc.setValue(xyz, TESTHALF);
+
+            openvdb::io::File writeFile(fileName);
+            openvdb::GridPtrVec grids;
+            grids.push_back(floatGrid);
+            grids.push_back(halfGrid);
+            writeFile.write(grids);
+            writeFile.close();
+
+            openvdb::io::File readFile(fileName);
+            readFile.open();
+            openvdb::FloatGrid::Ptr readFloatGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(readFile.readGrid("float_grid"));
+            openvdb::HalfGrid::Ptr readHalfGrid = openvdb::gridPtrCast<openvdb::HalfGrid>(readFile.readGrid("half_grid"));
+            openvdb::FloatGrid::Accessor readFloatAcc = readFloatGrid->getAccessor();
+            openvdb::HalfGrid::Accessor readHalfAcc = readHalfGrid->getAccessor();
+            std::cout << "readFloatGrid = " << readFloatGrid << "\treadHalfGrid = " << readHalfGrid << std::endl;
+            std::cout << "readFloatAcc.getValue(xyz) = " << readFloatAcc.getValue(xyz) << std::endl;
+            std::cout << "readHalfAcc.getValue(xyz) = " << readHalfAcc.getValue(xyz) << std::endl;
         }
     } catch (std::exception& e) {
         OPENVDB_LOG_FATAL(e.what());

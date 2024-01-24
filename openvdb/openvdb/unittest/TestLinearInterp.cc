@@ -10,6 +10,12 @@
 namespace {
 // Absolute tolerance for floating-point equality comparisons
 const double TOLERANCE = 1.e-6;
+
+template<typename T> inline const T Tolerance;
+template<> inline const float Tolerance<float> = 1.e-6f;
+template<> inline const double Tolerance<double> = 1.e-6f;
+template<> inline const typename openvdb::Half Tolerance<openvdb::Half> = 0.00097656;
+
 }
 
 class TestLinearInterp: public ::testing::Test
@@ -36,7 +42,8 @@ template<typename GridType>
 void
 TestLinearInterp::test()
 {
-    typename GridType::TreeType TreeType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
     float fillValue = 256.0f;
 
     GridType grid(fillValue);
@@ -82,43 +89,43 @@ TestLinearInterp::test()
 
         typename GridType::ValueType val =
             interpolator.sampleVoxel(10.5, 10.5, 10.5);
-        EXPECT_NEAR(2.375, val, TOLERANCE);
+        EXPECT_NEAR(2.375, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-        EXPECT_NEAR(1.0, val, TOLERANCE);
+        EXPECT_NEAR(1.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-        EXPECT_NEAR(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-        EXPECT_NEAR(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-        EXPECT_NEAR(3.0, val, TOLERANCE);
+        EXPECT_NEAR(3.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-        EXPECT_NEAR(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-        EXPECT_NEAR(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-        EXPECT_NEAR(1.1, val, TOLERANCE);
+        EXPECT_NEAR(1.1, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-        EXPECT_NEAR(2.792, val, TOLERANCE);
+        EXPECT_NEAR(2.792, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-        EXPECT_NEAR(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-        EXPECT_NEAR(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-        EXPECT_NEAR(2.71, val, TOLERANCE);
+        EXPECT_NEAR(2.71, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-        EXPECT_NEAR(2.01, val, TOLERANCE);
+        EXPECT_NEAR(2.01, val, Tolerance<ValueType>);
 
     }
     {//using Sampler<1>
@@ -130,47 +137,48 @@ TestLinearInterp::test()
 
         typename GridType::ValueType val =
             interpolator.sampleVoxel(10.5, 10.5, 10.5);
-        EXPECT_NEAR(2.375, val, TOLERANCE);
+        EXPECT_NEAR(2.375, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-        EXPECT_NEAR(1.0, val, TOLERANCE);
+        EXPECT_NEAR(1.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-        EXPECT_NEAR(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-        EXPECT_NEAR(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-        EXPECT_NEAR(3.0, val, TOLERANCE);
+        EXPECT_NEAR(3.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-        EXPECT_NEAR(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-        EXPECT_NEAR(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-        EXPECT_NEAR(1.1, val, TOLERANCE);
+        EXPECT_NEAR(1.1, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-        EXPECT_NEAR(2.792, val, TOLERANCE);
+        EXPECT_NEAR(2.792, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-        EXPECT_NEAR(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-        EXPECT_NEAR(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-        EXPECT_NEAR(2.71, val, TOLERANCE);
+        EXPECT_NEAR(2.71, val, Tolerance<ValueType>);
 
         val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-        EXPECT_NEAR(2.01, val, TOLERANCE);
+        EXPECT_NEAR(2.01, val, Tolerance<ValueType>);
     }
 }
 TEST_F(TestLinearInterp, testFloat) { test<openvdb::FloatGrid>(); }
 TEST_F(TestLinearInterp, testDouble) { test<openvdb::DoubleGrid>(); }
+TEST_F(TestLinearInterp, testHalf) { test<openvdb::HalfGrid>(); }
 
 TEST_F(TestLinearInterp, testVec3S)
 {
@@ -262,7 +270,8 @@ void
 TestLinearInterp::testTree()
 {
     float fillValue = 256.0f;
-    typedef typename GridType::TreeType TreeType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
     TreeType tree(fillValue);
 
     tree.setValue(openvdb::Coord(10, 10, 10), 1.0);
@@ -302,46 +311,47 @@ TestLinearInterp::testTree()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    EXPECT_NEAR(2.375, val, TOLERANCE);
+    EXPECT_NEAR(2.375, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    EXPECT_NEAR(1.0, val, TOLERANCE);
+    EXPECT_NEAR(1.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    EXPECT_NEAR(3.0, val, TOLERANCE);
+    EXPECT_NEAR(3.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    EXPECT_NEAR(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    EXPECT_NEAR(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    EXPECT_NEAR(1.1, val, TOLERANCE);
+    EXPECT_NEAR(1.1, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    EXPECT_NEAR(2.792, val, TOLERANCE);
+    EXPECT_NEAR(2.792, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    EXPECT_NEAR(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    EXPECT_NEAR(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    EXPECT_NEAR(2.71, val, TOLERANCE);
+    EXPECT_NEAR(2.71, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    EXPECT_NEAR(2.01, val, TOLERANCE);
+    EXPECT_NEAR(2.01, val, Tolerance<ValueType>);
 }
 TEST_F(TestLinearInterp, testTreeFloat) { testTree<openvdb::FloatGrid>(); }
 TEST_F(TestLinearInterp, testTreeDouble) { testTree<openvdb::DoubleGrid>(); }
+TEST_F(TestLinearInterp, testTreeHalf) { testTree<openvdb::HalfGrid>(); }
 
 TEST_F(TestLinearInterp, testTreeVec3S)
 {
@@ -431,10 +441,12 @@ template<typename GridType>
 void
 TestLinearInterp::testAccessor()
 {
+    using AccessorType = typename GridType::Accessor;
+    using ValueType = typename GridType::ValueType;
+
     float fillValue = 256.0f;
 
     GridType grid(fillValue);
-    typedef typename GridType::Accessor AccessorType;
 
     AccessorType acc = grid.getAccessor();
 
@@ -475,46 +487,47 @@ TestLinearInterp::testAccessor()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    EXPECT_NEAR(2.375, val, TOLERANCE);
+    EXPECT_NEAR(2.375, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    EXPECT_NEAR(1.0, val, TOLERANCE);
+    EXPECT_NEAR(1.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    EXPECT_NEAR(3.0, val, TOLERANCE);
+    EXPECT_NEAR(3.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    EXPECT_NEAR(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    EXPECT_NEAR(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    EXPECT_NEAR(1.1, val, TOLERANCE);
+    EXPECT_NEAR(1.1, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    EXPECT_NEAR(2.792, val, TOLERANCE);
+    EXPECT_NEAR(2.792, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    EXPECT_NEAR(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    EXPECT_NEAR(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    EXPECT_NEAR(2.71, val, TOLERANCE);
+    EXPECT_NEAR(2.71, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    EXPECT_NEAR(2.01, val, TOLERANCE);
+    EXPECT_NEAR(2.01, val, Tolerance<ValueType>);
 }
 TEST_F(TestLinearInterp, testAccessorFloat) { testAccessor<openvdb::FloatGrid>(); }
 TEST_F(TestLinearInterp, testAccessorDouble) { testAccessor<openvdb::DoubleGrid>(); }
+TEST_F(TestLinearInterp, testAccessorHalf) { testAccessor<openvdb::HalfGrid>(); }
 
 TEST_F(TestLinearInterp, testAccessorVec3S)
 {
@@ -604,7 +617,9 @@ template<typename GridType>
 void
 TestLinearInterp::testConstantValues()
 {
-    typedef typename GridType::TreeType TreeType;
+    using TreeType = typename GridType::TreeType;
+    using ValueType = typename GridType::ValueType;
+
     float fillValue = 256.0f;
 
     GridType grid(fillValue);
@@ -647,31 +662,32 @@ TestLinearInterp::testConstantValues()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    EXPECT_NEAR(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, Tolerance<ValueType>);
 }
 TEST_F(TestLinearInterp, testConstantValuesFloat) { testConstantValues<openvdb::FloatGrid>(); }
 TEST_F(TestLinearInterp, testConstantValuesDouble) { testConstantValues<openvdb::DoubleGrid>(); }
+TEST_F(TestLinearInterp, testConstantValuesHalf) { testConstantValues<openvdb::HalfGrid>(); }
 
 TEST_F(TestLinearInterp, testConstantValuesVec3S)
 {
@@ -747,6 +763,8 @@ template<typename GridType>
 void
 TestLinearInterp::testFillValues()
 {
+    using ValueType = typename GridType::ValueType;
+
     //typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
 
@@ -757,33 +775,34 @@ TestLinearInterp::testFillValues()
         interpolator(grid);
     //openvdb::tools::LinearInterp<GridType> interpolator(*tree);
 
-    typename GridType::ValueType val =
+    ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    EXPECT_NEAR(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, Tolerance<ValueType>);
 }
 TEST_F(TestLinearInterp, testFillValuesFloat) { testFillValues<openvdb::FloatGrid>(); }
 TEST_F(TestLinearInterp, testFillValuesDouble) { testFillValues<openvdb::DoubleGrid>(); }
+TEST_F(TestLinearInterp, testFillValuesHalf) { testFillValues<openvdb::HalfGrid>(); }
 
 TEST_F(TestLinearInterp, testFillValuesVec3S)
 {

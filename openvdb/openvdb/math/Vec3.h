@@ -11,7 +11,6 @@
 #include <cmath>
 #include <type_traits>
 
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -667,6 +666,7 @@ OPENVDB_IS_POD(Vec3i)
 OPENVDB_IS_POD(Vec3ui)
 OPENVDB_IS_POD(Vec3s)
 OPENVDB_IS_POD(Vec3d)
+
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

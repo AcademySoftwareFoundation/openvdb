@@ -58,6 +58,7 @@ using Int64   = int64_t;
 using Int     = Int32;
 using Byte    = unsigned char;
 using Real    = double;
+using Half    = math::half;
 
 // Two-dimensional vector types
 using Vec2R = math::Vec2<Real>;
@@ -447,6 +448,29 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
 
 
 ////////////////////////////////////////
+template<class T>
+struct is_floating_point : std::is_floating_point<T> { };
+
+template<>
+struct is_floating_point<math::half> : std::is_floating_point<float> { };
+
+/// @brief Maps one type (e.g. the value types) to other types
+template<typename T>
+struct ValueToComputeMap
+{
+    using Type = T;
+    using type = T;
+};
+
+template<>
+struct ValueToComputeMap<math::half>
+{
+    using Type = float;
+    using type = float;
+};
+
+
+////////////////////////////////////////
 
 
 // Add new items to the *end* of this list, and update NUM_GRID_CLASSES.
@@ -687,6 +711,23 @@ class DeepCopy {};
 class Steal {};
 /// @brief Tag dispatch class that distinguishes constructors during file input
 class PartialCreate {};
+
+// For half compilation
+namespace math {
+template<>
+inline auto cwiseAdd(const math::Vec3<math::half>& v, const float s)
+{
+    math::Vec3<math::half> out;
+    const math::half* ip = v.asPointer();
+    math::half* op = out.asPointer();
+    for (unsigned i = 0; i < 3; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
+}
+} // namespace math
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
