@@ -53,8 +53,8 @@
 
 #include <unordered_map>
 
-#include <tbb/task_group.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/task_group.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

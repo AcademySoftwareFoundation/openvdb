@@ -33,9 +33,9 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::sqrt()
 #include <deque>
@@ -257,14 +257,14 @@ struct ComputeExtremas
     {
     }
 
-    ComputeExtremas(ComputeExtremas& rhs, tbb::split)
+    ComputeExtremas(ComputeExtremas& rhs, mt::split)
         : particleArray(rhs.particleArray)
         , minRadius(std::numeric_limits<ScalarType>::max())
         , maxRadius(-std::numeric_limits<ScalarType>::max())
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) {
+    void operator()(const mt::blocked_range<size_t>& range) {
 
         ScalarType radius, tmpMin = minRadius, tmpMax = maxRadius;
 
@@ -333,7 +333,7 @@ struct SplittableParticleArray
 
         std::unique_ptr<bool[]> mask{new bool[mSize]};
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mSize),
+        mt::parallel_for(mt::blocked_range<size_t>(0, mSize),
             MaskParticles(*this, mask, maxRadiusLimit));
 
         Ptr output(new SplittableParticleArray(*this, mask));
@@ -387,7 +387,7 @@ private:
         {
         }
 
-        void operator()(const tbb::blocked_range<size_t>& range) const {
+        void operator()(const mt::blocked_range<size_t>& range) const {
             const ScalarType maxRadius = radiusLimit;
             ScalarType radius;
             for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
@@ -403,7 +403,7 @@ private:
 
     inline void updateExtremas() {
         ComputeExtremas<SplittableParticleArray> op(*this);
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mSize), op);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, mSize), op);
         mMinRadius = op.minRadius;
         mMaxRadius = op.maxRadius;
     }
@@ -444,7 +444,7 @@ struct RemapIndices {
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using PointIndexType = typename PointIndexLeafNodeType::ValueType;
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
@@ -698,7 +698,7 @@ ParticleAtlas<PointIndexGridType>::construct(
     /////
 
     particle_atlas_internal::ComputeExtremas<ParticleArrayType> extremas(particles);
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, particles.size()), extremas);
+    mt::parallel_reduce(mt::blocked_range<size_t>(0, particles.size()), extremas);
     const double firstMin = extremas.minRadius;
     const double firstMax = extremas.maxRadius;
     const double firstVoxelSize = std::max(minVoxelSize, firstMin);
@@ -748,7 +748,7 @@ ParticleAtlas<PointIndexGridType>::construct(
             nodes.clear();
             grid->tree().getNodes(nodes);
 
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+            mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
                 particle_atlas_internal::RemapIndices<SplittableParticleArray,
                     PointIndexLeafNodeType>(particleArray, nodes));
 

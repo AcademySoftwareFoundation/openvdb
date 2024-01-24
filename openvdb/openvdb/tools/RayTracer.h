@@ -124,9 +124,9 @@ public:
     /// @brief Perform the actual (potentially multithreaded) ray-tracing.
     void render(bool threaded = true) const;
 
-    /// @brief Public method required by tbb::parallel_for.
+    /// @brief Public method required by mt::parallel_for.
     /// @warning Never call it directly.
-    void operator()(const tbb::blocked_range<size_t>& range) const;
+    void operator()(const mt::blocked_range<size_t>& range) const;
 
 private:
     const bool                          mIsMaster;
@@ -205,9 +205,9 @@ public:
     ///                      statistics; 3: include memory usage
     void print(std::ostream& os = std::cout, int verboseLevel = 1);
 
-    /// @brief Public method required by tbb::parallel_for.
+    /// @brief Public method required by mt::parallel_for.
     /// @warning Never call it directly.
-    void operator()(const tbb::blocked_range<size_t>& range) const;
+    void operator()(const mt::blocked_range<size_t>& range) const;
 
 private:
 
@@ -883,13 +883,13 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 render(bool threaded) const
 {
-    tbb::blocked_range<size_t> range(0, mCamera->height());
-    threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+    mt::blocked_range<size_t> range(0, mCamera->height());
+    threaded ? mt::parallel_for(range, *this) : (*this)(range);
 }
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
-operator()(const tbb::blocked_range<size_t>& range) const
+operator()(const mt::blocked_range<size_t>& range) const
 {
     const BaseShader& shader = *mShader;
     Vec3Type xyz, nml;
@@ -975,13 +975,13 @@ template<typename IntersectorT, typename SampleT>
 inline void VolumeRender<IntersectorT, SampleT>::
 render(bool threaded) const
 {
-    tbb::blocked_range<size_t> range(0, mCamera->height());
-    threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+    mt::blocked_range<size_t> range(0, mCamera->height());
+    threaded ? mt::parallel_for(range, *this) : (*this)(range);
 }
 
 template<typename IntersectorT, typename SampleT>
 inline void VolumeRender<IntersectorT, SampleT>::
-operator()(const tbb::blocked_range<size_t>& range) const
+operator()(const mt::blocked_range<size_t>& range) const
 {
     SamplerType sampler(mAccessor, mShadow->grid().transform());//light-weight wrapper
 

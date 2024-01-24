@@ -30,8 +30,8 @@
 #define OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 
 #include <algorithm> // for std::min(), std::max()
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>
@@ -83,7 +83,7 @@ namespace tools {
 /// @endcode
 ///
 /// @note For more complex operations that require finer control over threading,
-/// consider using @c tbb::parallel_for() or @c tbb::parallel_reduce() in conjunction
+/// consider using @c mt::parallel_for() or @c mt::parallel_reduce() in conjunction
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename IterT, typename XformOp>
 inline void foreach(const IterT& iter, XformOp& op,
@@ -132,7 +132,7 @@ inline void foreach(const IterT& iter, const XformOp& op,
 /// @endcode
 ///
 /// @note For more complex operations that require finer control over threading,
-/// consider using @c tbb::parallel_for() or @c tbb::parallel_reduce() in conjunction
+/// consider using @c mt::parallel_for() or @c mt::parallel_reduce() in conjunction
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
@@ -187,7 +187,7 @@ inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
 /// @endcode
 ///
 /// @note For more complex operations that require finer control over threading,
-/// consider using @c tbb::parallel_for() or @c tbb::parallel_reduce() in conjunction
+/// consider using @c mt::parallel_for() or @c mt::parallel_reduce() in conjunction
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename IterT, typename XformOp>
 inline void accumulate(const IterT& iter, XformOp& op, bool threaded = true);
@@ -327,7 +327,7 @@ public:
     {
         IterRange range(mIter);
         if (threaded) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }
@@ -358,7 +358,7 @@ public:
     {
         IterRange range(mIter);
         if (threaded) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }
@@ -427,7 +427,7 @@ public:
     }
 
     /// Splitting constructor
-    SharedOpTransformer(SharedOpTransformer& other, tbb::split):
+    SharedOpTransformer(SharedOpTransformer& other, mt::split):
         mIsRoot(false),
         mInputIter(other.mInputIter),
         mInputTree(other.mInputTree),
@@ -455,7 +455,7 @@ public:
         // Independently transform elements in the iterator range,
         // either in parallel or serially.
         if (threaded) {
-            tbb::parallel_reduce(range, *this);
+            mt::parallel_reduce(range, *this);
         } else {
             (*this)(range);
         }
@@ -515,7 +515,7 @@ public:
 
     // When splitting this task, give the subtask a copy of the original functor,
     // not of this task's functor, which might have been modified arbitrarily.
-    CopyableOpTransformer(CopyableOpTransformer& other, tbb::split):
+    CopyableOpTransformer(CopyableOpTransformer& other, mt::split):
         mIsRoot(false),
         mInputIter(other.mInputIter),
         mInputTree(other.mInputTree),
@@ -544,7 +544,7 @@ public:
         // Independently transform elements in the iterator range,
         // either in parallel or serially.
         if (threaded) {
-            tbb::parallel_reduce(range, *this);
+            mt::parallel_reduce(range, *this);
         } else {
             (*this)(range);
         }
@@ -640,7 +640,7 @@ public:
 
     // When splitting this task, give the subtask a copy of the original functor,
     // not of this task's functor, which might have been modified arbitrarily.
-    OpAccumulator(OpAccumulator& other, tbb::split):
+    OpAccumulator(OpAccumulator& other, mt::split):
         mIsRoot(false),
         mIter(other.mIter),
         mOp(new OpT(*other.mOrigOp)),
@@ -653,7 +653,7 @@ public:
     {
         IterRange range(mIter);
         if (threaded) {
-            tbb::parallel_reduce(range, *this);
+            mt::parallel_reduce(range, *this);
         } else {
             (*this)(range);
         }

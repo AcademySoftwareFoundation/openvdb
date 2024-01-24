@@ -27,7 +27,7 @@
 #include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
 
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_for.h>
 
 #include <functional>
 #include <type_traits>
@@ -460,7 +460,7 @@ LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
         const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
         if (grainSize>0) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }
@@ -613,7 +613,7 @@ cook(const char* msg, int swapBuffer)
     const int grainSize   = mTracker.getGrainSize();
     const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
-    grainSize>0 ? tbb::parallel_for(range, *this) : (*this)(range);
+    grainSize>0 ? mt::parallel_for(range, *this) : (*this)(range);
 
     mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize==0);
 

@@ -29,13 +29,13 @@
 #include "Prune.h" // for pruneInactive and pruneLevelSet
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
-#include <tbb/blocked_range.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/partitioner.h>
-#include <tbb/task_group.h>
-#include <tbb/task_arena.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/partitioner.h>
+#include <openvdb/mt/task_group.h>
+#include <openvdb/mt/task_arena.h>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()
@@ -542,7 +542,7 @@ struct TransformPoints {
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         Vec3d pos;
 
@@ -598,7 +598,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         tree::ValueAccessor<TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<Int32TreeType> idxAcc(*mIdxTree);
@@ -665,7 +665,7 @@ struct StashOriginAndStoreOffset
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             Coord& origin = const_cast<Coord&>(mNodes[n]->origin());
             mCoordinates[n] = origin;
@@ -688,7 +688,7 @@ struct RestoreOrigin
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             Coord& origin = const_cast<Coord&>(mNodes[n]->origin());
             origin[0] = mCoordinates[n][0];
@@ -721,7 +721,7 @@ public:
     // Disallow assignment
     ComputeNodeConnectivity& operator=(const ComputeNodeConnectivity&) = delete;
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         size_t* offsetsNextX = mOffsets;
         size_t* offsetsPrevX = mOffsets + mNumNodes;
@@ -788,23 +788,23 @@ struct LeafNodeConnectivityTable
         CoordBBox bbox;
         tree.evalLeafBoundingBox(bbox);
 
-        const tbb::blocked_range<size_t> range(0, mLeafNodes.size());
+        const mt::blocked_range<size_t> range(0, mLeafNodes.size());
 
         // stash the leafnode origin coordinate and temporarily store the
         // linear offset in the origin.x variable.
         std::unique_ptr<Coord[]> coordinates{new Coord[mLeafNodes.size()]};
-        tbb::parallel_for(range,
+        mt::parallel_for(range,
             StashOriginAndStoreOffset<TreeType>(mLeafNodes, coordinates.get()));
 
         // build the leafnode offset table
         mOffsets.reset(new size_t[mLeafNodes.size() * 6]);
 
 
-        tbb::parallel_for(range, ComputeNodeConnectivity<TreeType>(
+        mt::parallel_for(range, ComputeNodeConnectivity<TreeType>(
             tree, coordinates.get(), mOffsets.get(), mLeafNodes.size(), bbox));
 
         // restore the leafnode origin coordinate
-        tbb::parallel_for(range, RestoreOrigin<TreeType>(mLeafNodes, coordinates.get()));
+        mt::parallel_for(range, RestoreOrigin<TreeType>(mLeafNodes, coordinates.get()));
     }
 
     size_t size() const { return mLeafNodes.size(); }
@@ -847,7 +847,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         constexpr Int32 DIM = static_cast<Int32>(LeafNodeType::DIM);
 
@@ -1119,7 +1119,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             if (mChangedNodeMask[n]) {
                 //seedFill(*mNodes[n]);
@@ -1142,7 +1142,7 @@ struct FillArray
 {
     FillArray(ValueType* array, const ValueType v) : mArray(array), mValue(v) { }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         const ValueType v = mValue;
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             mArray[n] = v;
@@ -1159,9 +1159,9 @@ inline void
 fillArray(ValueType* array, const ValueType val, const size_t length)
 {
     const auto grainSize = std::max<size_t>(
-        length / tbb::this_task_arena::max_concurrency(), 1024);
-    const tbb::blocked_range<size_t> range(0, length, grainSize);
-    tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
+        length / mt::this_task_arena::max_concurrency(), 1024);
+    const mt::blocked_range<size_t> range(0, length, grainSize);
+    mt::parallel_for(range, FillArray<ValueType>(array, val), mt::simple_partitioner());
 }
 
 
@@ -1180,7 +1180,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             if (mChangedNodeMask[n]) {
@@ -1221,7 +1221,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             bool changedValue = false;
@@ -1374,7 +1374,7 @@ struct ComputeIntersectingVoxelSign
     using PointArray = std::unique_ptr<Vec3d[]>;
     using MaskArray = std::unique_ptr<bool[]>;
     using LocalData = std::pair<PointArray, MaskArray>;
-    using LocalDataTable = tbb::enumerable_thread_specific<LocalData>;
+    using LocalDataTable = mt::enumerable_thread_specific<LocalData>;
 
     ComputeIntersectingVoxelSign(
         std::vector<LeafNodeType*>& distNodes,
@@ -1390,7 +1390,7 @@ struct ComputeIntersectingVoxelSign
     }
 
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<const Int32TreeType> idxAcc(*mIndexTree);
@@ -1716,7 +1716,7 @@ struct ValidateIntersectingVoxels
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         tree::ValueAccessor<const TreeType> acc(*mTree);
         bool neighbourMask[26];
@@ -1771,7 +1771,7 @@ struct RemoveSelfIntersectingSurface
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<Int32TreeType> idxAcc(*mIndexTree);
@@ -1821,7 +1821,7 @@ struct ReleaseChildNodes
 {
     ReleaseChildNodes(NodeType ** nodes) : mNodes(nodes) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         using NodeMaskType = typename NodeType::NodeMaskType;
 
@@ -1845,7 +1845,7 @@ releaseLeafNodes(TreeType& tree)
     std::vector<InternalNodeType*> nodes;
     tree.getNodes(nodes);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
         ReleaseChildNodes<InternalNodeType>(nodes.empty() ? nullptr : &nodes[0]));
 }
 
@@ -1902,14 +1902,14 @@ combineData(DistTreeType& lhsDist, IndexTreeType& lhsIdx,
     std::vector<IndexLeafNodeType*> overlappingIdxNodes;
 
     // Steal unique leafnodes
-    tbb::task_group tasks;
+    mt::task_group tasks;
     tasks.run(StealUniqueLeafNodes<DistTreeType>(lhsDist, rhsDist, overlappingDistNodes));
     tasks.run(StealUniqueLeafNodes<IndexTreeType>(lhsIdx, rhsIdx, overlappingIdxNodes));
     tasks.wait();
 
     // Combine overlapping leaf nodes
     if (!overlappingDistNodes.empty() && !overlappingIdxNodes.empty()) {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, overlappingDistNodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, overlappingDistNodes.size()),
             CombineLeafNodes<DistTreeType>(lhsDist, lhsIdx,
                 &overlappingDistNodes[0], &overlappingIdxNodes[0]));
     }
@@ -1995,7 +1995,7 @@ class VoxelizePolygons
 public:
 
     using VoxelizationDataType = VoxelizationData<TreeType>;
-    using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
+    using DataTable = mt::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
 
     VoxelizePolygons(DataTable& dataTable,
         const MeshDataAdapter& mesh,
@@ -2006,7 +2006,7 @@ public:
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         typename VoxelizationDataType::Ptr& dataPtr = mDataTable->local();
         if (!dataPtr) dataPtr.reset(new VoxelizationDataType());
@@ -2120,7 +2120,7 @@ private:
         subdivisionCount -= 1;
         polygonCount *= 4;
 
-        tbb::task_group tasks;
+        mt::task_group tasks;
 
         const Vec3d ac = (mainPrim.a + mainPrim.c) * 0.5;
         const Vec3d bc = (mainPrim.b + mainPrim.c) * 0.5;
@@ -2240,7 +2240,7 @@ struct DiffLeafNodeMask
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         tree::ValueAccessor<const TreeType> acc(*mRhsTree);
 
@@ -2268,7 +2268,7 @@ struct UnionValueMasks
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             mNodesA[n]->topologyUnion(*mNodesB[n]);
         }
@@ -2297,7 +2297,7 @@ struct ConstructVoxelMask
     {
     }
 
-    ConstructVoxelMask(ConstructVoxelMask& rhs, tbb::split)
+    ConstructVoxelMask(ConstructVoxelMask& rhs, mt::split)
         : mTree(rhs.mTree)
         , mNodes(rhs.mNodes)
         , mLocalMaskTree(false)
@@ -2305,7 +2305,7 @@ struct ConstructVoxelMask
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range)
+    void operator()(const mt::blocked_range<size_t>& range)
     {
         using Iterator = typename LeafNodeType::ValueOnCIter;
 
@@ -2446,7 +2446,7 @@ struct ExpandNarrowband
     {
     }
 
-    ExpandNarrowband(const ExpandNarrowband& rhs, tbb::split)
+    ExpandNarrowband(const ExpandNarrowband& rhs, mt::split)
         : mMaskNodes(rhs.mMaskNodes)
         , mMaskTree(rhs.mMaskTree)
         , mDistTree(rhs.mDistTree)
@@ -2477,7 +2477,7 @@ struct ExpandNarrowband
         mNewMaskTree.merge(rhs.mNewMaskTree);
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range)
+    void operator()(const mt::blocked_range<size_t>& range)
     {
         tree::ValueAccessor<BoolTreeType>   newMaskAcc(mNewMaskTree);
         tree::ValueAccessor<TreeType>       distAcc(*mDistTree);
@@ -2802,13 +2802,13 @@ expandNarrowband(
     ExpandNarrowband<TreeType, MeshDataAdapter> expandOp(maskNodes, maskTree,
         distTree, indexTree, mesh, exteriorBandWidth, interiorBandWidth, voxelSize);
 
-    tbb::parallel_reduce(tbb::blocked_range<size_t>(0, maskNodes.size()), expandOp);
+    mt::parallel_reduce(mt::blocked_range<size_t>(0, maskNodes.size()), expandOp);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, expandOp.updatedIndexNodes().size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, expandOp.updatedIndexNodes().size()),
         UnionValueMasks<typename TreeType::LeafNodeType, typename Int32TreeType::LeafNodeType>(
             expandOp.updatedDistNodes(), expandOp.updatedIndexNodes()));
 
-    tbb::task_group tasks;
+    mt::task_group tasks;
     tasks.run(AddNodes<TreeType>(distTree, expandOp.newDistNodes()));
     tasks.run(AddNodes<Int32TreeType>(indexTree, expandOp.newIndexNodes()));
     tasks.wait();
@@ -2836,7 +2836,7 @@ struct TransformValues
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         typename LeafNodeType::ValueOnIter iter;
 
@@ -2874,7 +2874,7 @@ struct InactivateValues
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         typename LeafNodeType::ValueOnIter iter;
         const ValueType exVal = mExBandWidth;
@@ -2916,7 +2916,7 @@ struct OffsetValues
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         const ValueType offset = mOffset;
 
@@ -2952,7 +2952,7 @@ struct Renormalize
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         using Vec3Type = math::Vec3<ValueType>;
 
@@ -3012,7 +3012,7 @@ struct MinCombine
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
@@ -3078,13 +3078,13 @@ traceExteriorBoundaries(FloatTreeT& tree)
     // Sweep the exterior value signs (make them negative) up until the voxel intersection
     // with the isosurface. Do this in both lowest -> + and largest -> - directions
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, zStartNodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, zStartNodes.size()),
         SweepingOp(SweepingOp::Z_AXIS, zStartNodes, nodeConnectivity));
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, yStartNodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, yStartNodes.size()),
         SweepingOp(SweepingOp::Y_AXIS, yStartNodes, nodeConnectivity));
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, xStartNodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, xStartNodes.size()),
         SweepingOp(SweepingOp::X_AXIS, xStartNodes, nodeConnectivity));
 
     const size_t numLeafNodes = nodeConnectivity.size();
@@ -3098,14 +3098,14 @@ traceExteriorBoundaries(FloatTreeT& tree)
     mesh_to_volume_internal::fillArray(changedNodeMaskB.get(), false, numLeafNodes);
     mesh_to_volume_internal::fillArray(changedVoxelMask.get(), false, numVoxels);
 
-    const tbb::blocked_range<size_t> nodeRange(0, numLeafNodes);
+    const mt::blocked_range<size_t> nodeRange(0, numLeafNodes);
 
     bool nodesUpdated = false;
     do {
         // Perform per leaf node localized propagation of signs by looping over
         // all voxels and checking to see if any of their neighbors (within the
         // same leaf) are negative
-        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedFillExteriorSign<FloatTreeT>(
+        mt::parallel_for(nodeRange, mesh_to_volume_internal::SeedFillExteriorSign<FloatTreeT>(
             nodeConnectivity.nodes(), changedNodeMaskA.get()));
 
         // For each leaf, check its axis aligned neighbors and propagate any changes
@@ -3114,7 +3114,7 @@ traceExteriorBoundaries(FloatTreeT& tree)
         // in a separate buffer (changedVoxelMask) to avoid writing to nodes being read
         // from other threads. Additionally mark any leaf nodes which will absorb any
         // changes from its neighbors in changedNodeMaskB
-        tbb::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(
+        mt::parallel_for(nodeRange, mesh_to_volume_internal::SeedPoints<FloatTreeT>(
             nodeConnectivity, changedNodeMaskA.get(), changedNodeMaskB.get(),
             changedVoxelMask.get()));
 
@@ -3131,7 +3131,7 @@ traceExteriorBoundaries(FloatTreeT& tree)
         // Use the voxel mask updates in ::SeedPoints to actually assign the new values
         // across leaf node faces
         if (nodesUpdated) {
-            tbb::parallel_for(nodeRange, mesh_to_volume_internal::SyncVoxelMask<FloatTreeT>(
+            mt::parallel_for(nodeRange, mesh_to_volume_internal::SyncVoxelMask<FloatTreeT>(
                 nodeConnectivity.nodes(), changedNodeMaskA.get(), changedVoxelMask.get()));
         }
     } while (nodesUpdated);
@@ -3408,15 +3408,15 @@ meshToVolume(
 
     {
         using VoxelizationDataType = mesh_to_volume_internal::VoxelizationData<TreeType>;
-        using DataTable = tbb::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
+        using DataTable = mt::enumerable_thread_specific<typename VoxelizationDataType::Ptr>;
 
         DataTable data;
         using Voxelizer =
             mesh_to_volume_internal::VoxelizePolygons<TreeType, MeshDataAdapter, Interrupter>;
 
-        const tbb::blocked_range<size_t> polygonRange(0, mesh.polygonCount());
+        const mt::blocked_range<size_t> polygonRange(0, mesh.polygonCount());
 
-        tbb::parallel_for(polygonRange, Voxelizer(data, mesh, &interrupter));
+        mt::parallel_for(polygonRange, Voxelizer(data, mesh, &interrupter));
 
         for (typename DataTable::iterator i = data.begin(); i != data.end(); ++i) {
             VoxelizationDataType& dataItem = **i;
@@ -3458,22 +3458,22 @@ meshToVolume(
             nodes.reserve(distTree.leafCount());
             distTree.getNodes(nodes);
 
-            const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
+            const mt::blocked_range<size_t> nodeRange(0, nodes.size());
 
             using SignOp =
                 mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
 
-            tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
+            mt::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
 
             if (interrupter.wasInterrupted(45)) return distGrid;
 
             // Remove voxels created by self intersecting portions of the mesh.
             if (removeIntersectingVoxels) {
 
-                tbb::parallel_for(nodeRange,
+                mt::parallel_for(nodeRange,
                     mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
 
-                tbb::parallel_for(nodeRange,
+                mt::parallel_for(nodeRange,
                     mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(
                         nodes, distTree, indexTree));
 
@@ -3497,7 +3497,7 @@ meshToVolume(
         nodes.reserve(distTree.leafCount());
         distTree.getNodes(nodes);
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::TransformValues<TreeType>(
                 nodes, voxelSize, !computeSignedDistanceField));
     }
@@ -3530,7 +3530,7 @@ meshToVolume(
             distTree.getNodes(nodes);
 
             mesh_to_volume_internal::ConstructVoxelMask<TreeType> op(maskTree, distTree, nodes);
-            tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
+            mt::parallel_reduce(mt::blocked_range<size_t>(0, nodes.size()), op);
         }
 
         // Progress estimation
@@ -3559,9 +3559,9 @@ meshToVolume(
             maskNodes.reserve(maskNodeCount);
             maskTree.getNodes(maskNodes);
 
-            const tbb::blocked_range<size_t> range(0, maskNodes.size());
+            const mt::blocked_range<size_t> range(0, maskNodes.size());
 
-            tbb::parallel_for(range,
+            mt::parallel_for(range,
                 mesh_to_volume_internal::DiffLeafNodeMask<TreeType>(distTree, maskNodes));
 
             mesh_to_volume_internal::expandNarrowband(distTree, indexTree, maskTree, maskNodes,
@@ -3592,17 +3592,17 @@ meshToVolume(
 
         const ValueType offset = ValueType(0.8 * voxelSize);
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::OffsetValues<TreeType>(nodes, -offset));
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::Renormalize<TreeType>(
                 distTree, nodes, buffer.get(), voxelSize));
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::MinCombine<TreeType>(nodes, buffer.get()));
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::OffsetValues<TreeType>(
                 nodes, offset - mesh_to_volume_internal::Tolerance<ValueType>::epsilon()));
     }
@@ -3620,7 +3620,7 @@ meshToVolume(
         nodes.reserve(distTree.leafCount());
         distTree.getNodes(nodes);
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
+        mt::parallel_for(mt::blocked_range<size_t>(0, nodes.size()),
             mesh_to_volume_internal::InactivateValues<TreeType>(
                 nodes, exteriorWidth, computeSignedDistanceField ? interiorWidth : exteriorWidth));
 
@@ -3678,7 +3678,7 @@ doMeshConversion(
     std::unique_ptr<Vec3s[]> indexSpacePoints{new Vec3s[numPoints]};
 
     // transform points to local grid index space
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, numPoints),
+    mt::parallel_for(mt::blocked_range<size_t>(0, numPoints),
         mesh_to_volume_internal::TransformPoints<Vec3s>(
                 &points[0], indexSpacePoints.get(), xform));
 
@@ -3936,8 +3936,8 @@ public:
 
     void run(bool threaded = true);
 
-    GenEdgeData(GenEdgeData& rhs, tbb::split);
-    inline void operator() (const tbb::blocked_range<size_t> &range);
+    GenEdgeData(GenEdgeData& rhs, mt::split);
+    inline void operator() (const mt::blocked_range<size_t> &range);
     inline void join(GenEdgeData& rhs);
 
     inline TreeType& tree() { return mTree; }
@@ -3985,7 +3985,7 @@ MeshToVoxelEdgeData::GenEdgeData::GenEdgeData(
 
 
 inline
-MeshToVoxelEdgeData::GenEdgeData::GenEdgeData(GenEdgeData& rhs, tbb::split)
+MeshToVoxelEdgeData::GenEdgeData::GenEdgeData(GenEdgeData& rhs, mt::split)
     : mTree(EdgeData())
     , mAccessor(mTree)
     , mPointList(rhs.mPointList)
@@ -4000,9 +4000,9 @@ inline void
 MeshToVoxelEdgeData::GenEdgeData::run(bool threaded)
 {
     if (threaded) {
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mPolygonList.size()), *this);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, mPolygonList.size()), *this);
     } else {
-        (*this)(tbb::blocked_range<size_t>(0, mPolygonList.size()));
+        (*this)(mt::blocked_range<size_t>(0, mPolygonList.size()));
     }
 }
 
@@ -4070,7 +4070,7 @@ MeshToVoxelEdgeData::GenEdgeData::join(GenEdgeData& rhs)
 
 
 inline void
-MeshToVoxelEdgeData::GenEdgeData::operator()(const tbb::blocked_range<size_t> &range)
+MeshToVoxelEdgeData::GenEdgeData::operator()(const mt::blocked_range<size_t> &range)
 {
     Primitive prim;
 

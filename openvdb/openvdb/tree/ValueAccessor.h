@@ -48,7 +48,7 @@
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 
-#include <tbb/spin_mutex.h>
+#include <openvdb/mt/spin_mutex.h>
 
 #include <cassert>
 #include <limits>
@@ -119,7 +119,7 @@ using ValueAccessor3 =
 template<typename TreeType, bool IsSafe = true,
     size_t CacheLevels = std::max(Index(1),TreeType::DEPTH)-1>
 using ValueAccessorRW =
-    ValueAccessorImpl<TreeType, IsSafe, tbb::spin_mutex,
+    ValueAccessorImpl<TreeType, IsSafe, mt::spin_mutex,
         openvdb::make_index_sequence<CacheLevels>>;
 
 

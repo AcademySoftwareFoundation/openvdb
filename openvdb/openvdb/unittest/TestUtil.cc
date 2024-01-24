@@ -9,9 +9,9 @@
 
 #include <gtest/gtest.h>
 
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
 
 #include <chrono>
 #include <iostream>
@@ -22,20 +22,20 @@
 #ifdef BENCHMARK_PAGED_ARRAY
 #include <deque> // for std::deque
 #include <vector> // for std::vector
-#include <tbb/tbb.h> // for tbb::concurrent_vector
+#include <openvdb/mt/concurrent_vector.h> // for mt::concurrent_vector
 #endif
 
 class TestUtil: public ::testing::Test
 {
 public:
-    using RangeT = tbb::blocked_range<size_t>;
+    using RangeT = mt::blocked_range<size_t>;
 
     // Multi-threading ArrayT::ValueBuffer::push_back
     template<typename ArrayT>
     struct BufferPushBack {
         BufferPushBack(ArrayT& array) : mBuffer(array) {}
         void parallel(size_t size) {
-            tbb::parallel_for(RangeT(size_t(0), size, 256*mBuffer.pageSize()), *this);
+            mt::parallel_for(RangeT(size_t(0), size, 256*mBuffer.pageSize()), *this);
         }
         void serial(size_t size) { (*this)(RangeT(size_t(0), size)); }
         void operator()(const RangeT& r) const {
@@ -47,12 +47,12 @@ public:
     // Thread Local Storage version of BufferPushBack
     template<typename ArrayT>
     struct TLS_BufferPushBack {
-        using PoolT = tbb::enumerable_thread_specific<typename ArrayT::ValueBuffer>;
+        using PoolT = mt::enumerable_thread_specific<typename ArrayT::ValueBuffer>;
         TLS_BufferPushBack(ArrayT &array) : mArray(&array), mPool(nullptr) {}
         void parallel(size_t size) {
             typename ArrayT::ValueBuffer exemplar(*mArray);//dummy used for initialization
             mPool = new PoolT(exemplar);//thread local storage pool of ValueBuffers
-            tbb::parallel_for(RangeT(size_t(0), size, 256*mArray->pageSize()), *this);
+            mt::parallel_for(RangeT(size_t(0), size, 256*mArray->pageSize()), *this);
             for (auto i=mPool->begin(); i!=mPool->end(); ++i) i->flush();
             delete mPool;
         }
@@ -220,22 +220,22 @@ TEST_F(TestUtil, testPagedArray)
         d2.resize(1234);
         EXPECT_EQ(size_t(1234), d2.size());
     }
-    {//benchmark against a tbb::concurrent_vector::push_back
-        timer.start("7: Serial tbb::concurrent_vector::push_back");
-        tbb::concurrent_vector<size_t> v;
+    {//benchmark against a mt::concurrent_vector::push_back
+        timer.start("7: Serial mt::concurrent_vector::push_back");
+        mt::concurrent_vector<size_t> v;
         for (size_t i=0; i<problemSize; ++i) v.push_back(i);
         timer.stop();
         EXPECT_EQ(problemSize, v.size());
         for (size_t i=0; i<problemSize; ++i) EXPECT_EQ(i, v[i]);
 
         v.clear();
-        timer.start("8: Parallel tbb::concurrent_vector::push_back");
+        timer.start("8: Parallel mt::concurrent_vector::push_back");
         using ArrayT = openvdb::util::PagedArray<size_t>;
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, problemSize, ArrayT::pageSize()),
-                          [&v](const tbb::blocked_range<size_t> &range){
+        mt::parallel_for(mt::blocked_range<size_t>(0, problemSize, ArrayT::pageSize()),
+                          [&v](const mt::blocked_range<size_t> &range){
                           for (size_t i=range.begin(); i!=range.end(); ++i) v.push_back(i);});
         timer.stop();
-        tbb::parallel_sort(v.begin(), v.end());
+        mt::parallel_sort(v.begin(), v.end());
         for (size_t i=0; i<problemSize; ++i) EXPECT_EQ(i, v[i]);
     }
 #endif
@@ -366,9 +366,9 @@ TEST_F(TestUtil, testPagedArray)
             tmp.parallel(problemSize);
         }// is faster than:
         //ArrayT::ValueBuffer exemplar(d);//dummy used for initialization
-        ///tbb::enumerable_thread_specific<ArrayT::ValueBuffer> pool(exemplar);//thread local storage pool of ValueBuffers
-        //tbb::parallel_for(tbb::blocked_range<size_t>(0, problemSize, d.pageSize()),
-        //                  [&pool](const tbb::blocked_range<size_t> &range){
+        ///mt::enumerable_thread_specific<ArrayT::ValueBuffer> pool(exemplar);//thread local storage pool of ValueBuffers
+        //mt::parallel_for(mt::blocked_range<size_t>(0, problemSize, d.pageSize()),
+        //                  [&pool](const mt::blocked_range<size_t> &range){
         //                  ArrayT::ValueBuffer &buffer = pool.local();
         //                  for (size_t i=range.begin(); i!=range.end(); ++i) buffer.push_back(i);});
         //for (auto i=pool.begin(); i!=pool.end(); ++i) i->flush();
@@ -400,8 +400,8 @@ TEST_F(TestUtil, testPagedArray)
         using ArrayT = openvdb::util::PagedArray<size_t>;
         ArrayT d, d2;
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, problemSize, d.pageSize()),
-                          [&d](const tbb::blocked_range<size_t> &range){
+        mt::parallel_for(mt::blocked_range<size_t>(0, problemSize, d.pageSize()),
+                          [&d](const mt::blocked_range<size_t> &range){
                           ArrayT::ValueBuffer buffer(d);
                           for (size_t i=range.begin(); i!=range.end(); ++i) buffer.push_back(i);});
         EXPECT_EQ(problemSize, d.size());
@@ -412,8 +412,8 @@ TEST_F(TestUtil, testPagedArray)
         d.push_back_unsafe(problemSize);
         EXPECT_TRUE(d.isPartiallyFull());
 
-        tbb::parallel_for(tbb::blocked_range<size_t>(problemSize+1, 2*problemSize+1, d2.pageSize()),
-                          [&d2](const tbb::blocked_range<size_t> &range){
+        mt::parallel_for(mt::blocked_range<size_t>(problemSize+1, 2*problemSize+1, d2.pageSize()),
+                          [&d2](const mt::blocked_range<size_t> &range){
                           ArrayT::ValueBuffer buffer(d2);
                           for (size_t i=range.begin(); i!=range.end(); ++i) buffer.push_back(i);});
         //for (size_t i=d.size(), n=i+problemSize; i<n; ++i) d2.push_back(i);

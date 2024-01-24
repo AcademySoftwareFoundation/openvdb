@@ -17,9 +17,9 @@
 
 #include <openvdb/Types.h>
 #include "RootNode.h" // for NodeChain
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <deque>
 #include <functional>
 #include <type_traits>
@@ -93,7 +93,7 @@ public:
     using LeafIterType = typename leafmgr::TreeTraits<TreeT>::LeafIterType;
     using NonConstBufferType = typename LeafType::Buffer;
     using BufferType = typename CopyConstness<TreeType, NonConstBufferType>::Type;
-    using RangeType = tbb::blocked_range<size_t>; // leaf index range
+    using RangeType = mt::blocked_range<size_t>; // leaf index range
     static const Index DEPTH = 2; // root + leaf nodes
 
     static const bool IsConstTree = leafmgr::TreeTraits<TreeT>::IsConstTree;
@@ -166,7 +166,7 @@ public:
 
         bool is_divisible() const {return mGrainSize < this->size();}
 
-        LeafRange(LeafRange& r, tbb::split)
+        LeafRange(LeafRange& r, mt::split)
             : mEnd(r.mEnd)
             , mBegin(doSplit(r))
             , mGrainSize(r.mGrainSize)
@@ -216,7 +216,7 @@ public:
         if (auxBuffersPerLeaf) this->initAuxBuffers(serial);
     }
 
-    /// Shallow copy constructor called by tbb::parallel_for() threads
+    /// Shallow copy constructor called by mt::parallel_for() threads
     ///
     /// @note This should never get called directly
     LeafManager(const LeafManager& other)
@@ -290,7 +290,7 @@ public:
     /// @note Multi-threaded for better performance than Tree::activeLeafVoxelCount
     Index64 activeLeafVoxelCount() const
     {
-        return tbb::parallel_reduce(this->leafRange(), Index64(0),
+        return mt::parallel_reduce(this->leafRange(), Index64(0),
             [] (const LeafRange& range, Index64 sum) -> Index64 {
                 for (const auto& leaf: range) { sum += leaf.onVoxelCount(); }
                 return sum;
@@ -335,7 +335,7 @@ public:
              : mAuxBuffers[leafIdx * mAuxBuffersPerLeaf + bufferIdx - 1];
     }
 
-    /// @brief Return a @c tbb::blocked_range of leaf array indices.
+    /// @brief Return a @c mt::blocked_range of leaf array indices.
     ///
     /// @note Consider using leafRange() instead, which provides access methods
     /// to leaf nodes and buffers.
@@ -421,7 +421,7 @@ public:
     ///          to each leaf node in the LeafManager.
     ///
     /// @details The user-supplied functor needs to define the methods
-    ///          required for tbb::parallel_for.
+    ///          required for mt::parallel_for.
     ///
     /// @param op        user-supplied functor, see examples for interface details.
     /// @param threaded  optional toggle to disable threading, on by default.
@@ -492,7 +492,7 @@ public:
     ///          all the leaf nodes.
     ///
     /// @details The user-supplied functor needs to define the methods
-    ///          required for tbb::parallel_reduce.
+    ///          required for mt::parallel_reduce.
     ///
     /// @param op        user-supplied functor, see examples for interface details.
     /// @param threaded  optional toggle to disable threading, on by default.
@@ -510,7 +510,7 @@ public:
     /// {
     ///     CountOp() : mCounter(0) {}
     ///     CountOp(const CountOp &other) : mCounter(other.mCounter) {}
-    ///     CountOp(const CountOp &other, tbb::split) : mCounter(0) {}
+    ///     CountOp(const CountOp &other, mt::split) : mCounter(0) {}
     ///     template <typename LeafNodeType>
     ///     void operator()(LeafNodeType &leaf, size_t)
     ///     {
@@ -568,7 +568,7 @@ public:
     ////////////////////////////////////////////////////////////////////////////////////
     // All methods below are for internal use only and should never be called directly
 
-    /// Used internally by tbb::parallel_for() - never call it directly!
+    /// Used internally by mt::parallel_for() - never call it directly!
     void operator()(const RangeType& r) const
     {
         if (mTask) mTask(const_cast<LeafManager*>(this), r);
@@ -603,12 +603,12 @@ private:
             }
         } else {
             leafCounts.resize(leafParents.size());
-            tbb::parallel_for(
+            mt::parallel_for(
                 // with typical node sizes and SSE enabled, there are only a handful
                 // of instructions executed per-operation with a default grainsize
                 // of 1, so increase to 64 to reduce parallel scheduling overhead
-                tbb::blocked_range<size_t>(0, leafParents.size(), /*grainsize=*/64),
-                [&](tbb::blocked_range<size_t>& range)
+                mt::blocked_range<size_t>(0, leafParents.size(), /*grainsize=*/64),
+                [&](mt::blocked_range<size_t>& range)
                 {
                     for (size_t i = range.begin(); i < range.end(); i++) {
                         leafCounts[i] = leafParents[i]->childCount();
@@ -650,9 +650,9 @@ private:
                 }
             }
         } else {
-            tbb::parallel_for(
-                tbb::blocked_range<size_t>(0, leafParents.size()),
-                [&](tbb::blocked_range<size_t>& range)
+            mt::parallel_for(
+                mt::blocked_range<size_t>(0, leafParents.size()),
+                [&](mt::blocked_range<size_t>& range)
                 {
                     size_t i = range.begin();
                     LeafType** leafPtr = mLeafs;
@@ -686,7 +686,7 @@ private:
     void cook(size_t grainsize)
     {
         if (grainsize>0) {
-            tbb::parallel_for(this->getRange(grainsize), *this);
+            mt::parallel_for(this->getRange(grainsize), *this);
         } else {
             (*this)(this->getRange());
         }
@@ -746,7 +746,7 @@ private:
         }
         void run(const LeafRange &range, bool threaded) const
         {
-            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+            threaded ? mt::parallel_for(range, *this) : (*this)(range);
         }
         void operator()(const LeafRange &range) const
         {
@@ -763,14 +763,14 @@ private:
         LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp)
         {
         }
-        LeafReducer(const LeafReducer &other, tbb::split)
-            : mLeafOpPtr(std::make_unique<LeafOp>(*(other.mLeafOp), tbb::split()))
+        LeafReducer(const LeafReducer &other, mt::split)
+            : mLeafOpPtr(std::make_unique<LeafOp>(*(other.mLeafOp), mt::split()))
             , mLeafOp(mLeafOpPtr.get())
         {
         }
         void run(const LeafRange& range, bool threaded)
         {
-            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+            threaded ? mt::parallel_reduce(range, *this) : (*this)(range);
         }
         void operator()(const LeafRange& range)
         {
@@ -788,7 +788,7 @@ private:
         PrefixSum(const LeafRange& r, size_t* offsets, size_t& prefix)
             : mOffsets(offsets)
         {
-            tbb::parallel_for( r, *this);
+            mt::parallel_for( r, *this);
             for (size_t i=0, leafCount = r.size(); i<leafCount; ++i) {
                 size_t tmp = offsets[i];
                 offsets[i] = prefix;

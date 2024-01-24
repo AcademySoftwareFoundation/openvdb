@@ -36,11 +36,11 @@ void voxelSum(PointDataLeafNode<T, Log2Dim>& leaf, const Index offset,
 
 
 /// @brief Combines multiple grids into one by stealing leaf nodes and summing voxel values
-/// This class is designed to work with thread local storage containers such as tbb::combinable
+/// This class is designed to work with thread local storage containers such as mt::combinable
 template<typename GridT>
 struct GridCombinerOp
 {
-    using CombinableT = typename tbb::combinable<GridT>;
+    using CombinableT = typename mt::combinable<GridT>;
 
     using TreeT = typename GridT::TreeType;
     using LeafT = typename TreeT::LeafNodeType;

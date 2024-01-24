@@ -19,7 +19,7 @@
 #include "LeafNode.h"
 #include "TreeIterator.h"
 #include "ValueAccessor.h"
-#include <tbb/concurrent_hash_map.h>
+#include <openvdb/mt/concurrent_hash_map.h>
 #include <cstdint>
 #include <iostream>
 #include <mutex>
@@ -1012,8 +1012,8 @@ public:
 
 
 protected:
-    using AccessorRegistry = tbb::concurrent_hash_map<ValueAccessorBase<Tree, true>*, bool>;
-    using ConstAccessorRegistry = tbb::concurrent_hash_map<ValueAccessorBase<const Tree, true>*, bool>;
+    using AccessorRegistry = mt::concurrent_hash_map<ValueAccessorBase<Tree, true>*, bool>;
+    using ConstAccessorRegistry = mt::concurrent_hash_map<ValueAccessorBase<const Tree, true>*, bool>;
 
     /// @brief Notify all registered accessors, by calling ValueAccessor::release(),
     /// that this tree is about to be deleted.
@@ -1024,7 +1024,7 @@ protected:
     struct DeallocateNodes {
         DeallocateNodes(std::vector<NodeType*>& nodes)
             : mNodes(nodes.empty() ? nullptr : &nodes.front()) { }
-        void operator()(const tbb::blocked_range<size_t>& range) const {
+        void operator()(const mt::blocked_range<size_t>& range) const {
             for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
                 delete mNodes[n]; mNodes[n] = nullptr;
             }
@@ -1299,13 +1299,13 @@ Tree<RootNodeType>::clear()
     std::vector<LeafNodeType*> leafnodes;
     this->stealNodes(leafnodes);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, leafnodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, leafnodes.size()),
         DeallocateNodes<LeafNodeType>(leafnodes));
 
     std::vector<typename RootNodeType::ChildNodeType*> internalNodes;
     this->stealNodes(internalNodes);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, internalNodes.size()),
+    mt::parallel_for(mt::blocked_range<size_t>(0, internalNodes.size()),
         DeallocateNodes<typename RootNodeType::ChildNodeType>(internalNodes));
 
     mRoot.clear();

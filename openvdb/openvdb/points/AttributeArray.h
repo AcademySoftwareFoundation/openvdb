@@ -20,7 +20,7 @@
 #include "IndexIterator.h"
 #include "StreamCompression.h"
 
-#include <tbb/spin_mutex.h>
+#include <openvdb/mt/spin_mutex.h>
 #include <atomic>
 
 #include <memory>
@@ -117,7 +117,7 @@ public:
     // Scoped Lock wrapper class that locks the AttributeArray registry mutex
     class OPENVDB_API ScopedRegistryLock
     {
-        tbb::spin_mutex::scoped_lock lock;
+        mt::spin_mutex::scoped_lock lock;
     public:
         ScopedRegistryLock();
     }; // class ScopedRegistryLock
@@ -380,7 +380,7 @@ private:
         bool rangeChecking = true);
 
 protected:
-    AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&);
+    AttributeArray(const AttributeArray& rhs, const mt::spin_mutex::scoped_lock&);
 
     /// @brief Specify whether this attribute has a constant stride or not.
     void setConstantStride(bool state);
@@ -396,7 +396,7 @@ protected:
         const ScopedRegistryLock* lock = nullptr);
 
     bool mIsUniform = true;
-    mutable tbb::spin_mutex mMutex;
+    mutable mt::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
     std::atomic<Index32> mOutOfCore; // interpreted as bool
@@ -783,7 +783,7 @@ protected:
 private:
     friend class ::TestAttributeArray;
 
-    TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
+    TypedAttributeArray(const TypedAttributeArray&, const mt::spin_mutex::scoped_lock&);
 
     /// Load data from memory-mapped file.
     inline void doLoad() const;
@@ -1153,14 +1153,14 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
-    : TypedAttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
+    : TypedAttributeArray(rhs, mt::spin_mutex::scoped_lock(rhs.mMutex))
 {
 }
 
 
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs,
-    const tbb::spin_mutex::scoped_lock& lock)
+    const mt::spin_mutex::scoped_lock& lock)
     : AttributeArray(rhs, lock)
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
@@ -1178,8 +1178,8 @@ TypedAttributeArray<ValueType_, Codec_>::operator=(const TypedAttributeArray& rh
 {
     if (&rhs != this) {
         // lock both the source and target arrays to ensure thread-safety
-        tbb::spin_mutex::scoped_lock lock(mMutex);
-        tbb::spin_mutex::scoped_lock rhsLock(rhs.mMutex);
+        mt::spin_mutex::scoped_lock lock(mMutex);
+        mt::spin_mutex::scoped_lock rhsLock(rhs.mMutex);
 
         this->deallocate();
 
@@ -1520,7 +1520,7 @@ TypedAttributeArray<ValueType_, Codec_>::expand(bool fill)
     const StorageType val = this->data()[0];
 
     {
-        tbb::spin_mutex::scoped_lock lock(mMutex);
+        mt::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
         mIsUniform = false;
         this->allocate();
@@ -1562,7 +1562,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::collapse(const ValueType& uniformValue)
 {
     if (!mIsUniform) {
-        tbb::spin_mutex::scoped_lock lock(mMutex);
+        mt::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
         mIsUniform = true;
         this->allocate();
@@ -1584,7 +1584,7 @@ void
 TypedAttributeArray<ValueType_, Codec_>::fill(const ValueType& value)
 {
     if (this->isOutOfCore()) {
-        tbb::spin_mutex::scoped_lock lock(mMutex);
+        mt::spin_mutex::scoped_lock lock(mMutex);
         this->deallocate();
         this->allocate();
     }
@@ -1657,7 +1657,7 @@ TypedAttributeArray<ValueType_, Codec_>::doLoad() const
 
     // This lock will be contended at most once, after which this buffer
     // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
+    mt::spin_mutex::scoped_lock lock(self->mMutex);
     this->doLoadUnsafe();
 }
 
@@ -1747,7 +1747,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
         OPENVDB_THROW(IoError, "Cannot read paged AttributeArray buffers.");
     }
 
-    tbb::spin_mutex::scoped_lock lock(mMutex);
+    mt::spin_mutex::scoped_lock lock(mMutex);
 
     this->deallocate();
 
@@ -1805,7 +1805,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     assert(mPageHandle);
 
-    tbb::spin_mutex::scoped_lock lock(mMutex);
+    mt::spin_mutex::scoped_lock lock(mMutex);
 
     this->deallocate();
 

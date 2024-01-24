@@ -20,9 +20,9 @@
 ///   called tbb/version.h. We include tbb/blocked_range.h here to indirectly
 ///   access the version defines in a consistent way so that downstream
 ///   software doesn't need to provide compile time defines.
-#include <tbb/blocked_range.h>
-#include <tbb/task.h>
-#include <tbb/task_group.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/task.h>
+#include <openvdb/mt/task_group.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -35,10 +35,10 @@ inline OPENVDB_UBSAN_SUPPRESS("vptr") bool cancelGroupExecution()
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
 #if TBB_INTERFACE_VERSION >= 12002
-    auto ctx = tbb::task::current_context();
+    auto ctx = mt::task::current_context();
     return ctx ? ctx->cancel_group_execution() : false;
 #else
-    return tbb::task::self().cancel_group_execution();
+    return mt::task::self().cancel_group_execution();
 #endif
 }
 
@@ -48,10 +48,10 @@ inline OPENVDB_UBSAN_SUPPRESS("vptr") bool isGroupExecutionCancelled()
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
 #if TBB_INTERFACE_VERSION >= 12002
-    auto ctx = tbb::task::current_context();
+    auto ctx = mt::task::current_context();
     return ctx ? ctx->is_group_execution_cancelled() : false;
 #else
-    return tbb::task::self().is_cancelled();
+    return mt::task::self().is_cancelled();
 #endif
 }
 

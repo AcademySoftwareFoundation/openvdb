@@ -679,7 +679,7 @@ struct FixedSurfaceMaskOp
             mMax += this->mVoxelOffset;
         }
 
-    FixedSurfaceMaskOp(const FixedSurfaceMaskOp& other, tbb::split)
+    FixedSurfaceMaskOp(const FixedSurfaceMaskOp& other, mt::split)
         : BaseT(other), mMin(other.mMin), mMax(other.mMax) {}
 
     void operator()(const typename LeafManagerT::LeafRange& range)
@@ -719,7 +719,7 @@ struct VariableSurfaceMaskOp
         : BaseT(pointsTransform, surfaceTransform, interrupter)
         , mMin(min), mMax(max), mScale(scale), mHalfband(halfband) {}
 
-    VariableSurfaceMaskOp(const VariableSurfaceMaskOp& other, tbb::split)
+    VariableSurfaceMaskOp(const VariableSurfaceMaskOp& other, mt::split)
         : BaseT(other), mMin(other.mMin), mMax(other.mMax)
         , mScale(other.mScale), mHalfband(other.mHalfband) {}
 
@@ -790,7 +790,7 @@ initFixedSdf(const PointDataGridT& points,
     if (interrupter) interrupter->start("Generating uniform surface topology");
 
     LeafManagerT leafManager(points.tree());
-    tbb::parallel_reduce(leafManager.leafRange(), op);
+    mt::parallel_reduce(leafManager.leafRange(), op);
     auto mask = op.mask();
 
     if (minBandRadius > 0.0) {
@@ -848,7 +848,7 @@ initVariableSdf(const PointDataGridT& points,
     if (interrupter) interrupter->start("Generating variable surface topology");
 
     LeafManagerT leafManager(points.tree());
-    tbb::parallel_reduce(leafManager.leafRange(), op);
+    mt::parallel_reduce(leafManager.leafRange(), op);
     auto mask = op.mask();
     auto maskoff = op.maskoff();
 
@@ -932,7 +932,7 @@ transferAttributes(const tree::LeafManager<const PointDataTreeT>& manager,
     GridPtrVec grids;
     grids.reserve(attributes.size());
     const auto& attrSet = manager.leaf(0).attributeSet();
-    tbb::task_group tasks;
+    mt::task_group tasks;
 
     for (const auto& name : attributes) {
         const size_t attrIdx = attrSet.find(name);

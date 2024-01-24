@@ -26,8 +26,8 @@
 #include <openvdb/thread/Threading.h>
 #include "Interpolation.h"
 
-#include <tbb/parallel_for.h>
-#include <tbb/concurrent_vector.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/concurrent_vector.h>
 
 #include <algorithm> // for std::max()
 #include <functional>
@@ -71,7 +71,7 @@ public:
         , mInvertMask(false)
         , mTiles(false) {}
 
-    /// @brief Shallow copy constructor called by tbb::parallel_for()
+    /// @brief Shallow copy constructor called by mt::parallel_for()
     /// threads during filtering.
     /// @param other The other Filter from which to copy.
     Filter(const Filter& other)
@@ -155,7 +155,7 @@ public:
     /// @param mask Optional alpha mask.
     void offset(ValueType offset, const MaskType* mask = nullptr);
 
-    /// @brief Used internally by tbb::parallel_for()
+    /// @brief Used internally by mt::parallel_for()
     /// @param range Range of LeafNodes over which to multi-thread.
     ///
     /// @warning Never call this method directly!
@@ -184,7 +184,7 @@ private:
         const float frac;
     };
 
-    // Private filter methods called by tbb::parallel_for threads
+    // Private filter methods called by mt::parallel_for threads
     template <typename AvgT>
     void doBox(const RangeType& r, Int32 w);
     void doBoxX(const RangeType& r, Int32 w) { this->doBox<Avg<0> >(r,w); }
@@ -386,8 +386,8 @@ private:
                 // a simpler way of tracking new topology
 
                 std::vector<char> flags(NodeT::NUM_VALUES, char(0));
-                tbb::parallel_for(tbb::blocked_range<size_t>(0, NodeT::NUM_VALUES),
-                    [&](const tbb::blocked_range<size_t>& range) {
+                mt::parallel_for(mt::blocked_range<size_t>(0, NodeT::NUM_VALUES),
+                    [&](const mt::blocked_range<size_t>& range) {
                     const Tester op(mTree, mNeighbors);
                     for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
                         if (node.isValueMaskOn(Index(n))) {
@@ -411,9 +411,9 @@ private:
                 // needs to be voxelized.
                 // @todo investigate better threaded impl
 
-                tbb::concurrent_vector<Coord> nodes;
-                tbb::parallel_for(tbb::blocked_range<size_t>(0, NodeT::NUM_VALUES),
-                    [&](const tbb::blocked_range<size_t>& range)
+                mt::concurrent_vector<Coord> nodes;
+                mt::parallel_for(mt::blocked_range<size_t>(0, NodeT::NUM_VALUES),
+                    [&](const mt::blocked_range<size_t>& range)
                 {
                     const Tester op(mTree, mNeighbors);
                     std::vector<Coord> coords;
@@ -733,7 +733,7 @@ void
 Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
 {
     if (mGrainSize>0) {
-        tbb::parallel_for(leafs.leafRange(mGrainSize), *this);
+        mt::parallel_for(leafs.leafRange(mGrainSize), *this);
     } else {
         (*this)(leafs.leafRange());
     }

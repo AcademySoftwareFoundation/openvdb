@@ -19,7 +19,7 @@
 #include "PointAttribute.h"
 #include "PointCount.h"
 
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 #include <algorithm>
 #include <random>

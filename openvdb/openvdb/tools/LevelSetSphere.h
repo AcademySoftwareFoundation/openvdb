@@ -22,10 +22,10 @@
 
 #include <type_traits>
 
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
 #include <thread>
 
 namespace openvdb {
@@ -148,9 +148,9 @@ private:
 
         if (mInterrupt) mInterrupt->start("Generating level set of sphere");
 
-        tbb::enumerable_thread_specific<TreeT> pool(mGrid->tree());
+        mt::enumerable_thread_specific<TreeT> pool(mGrid->tree());
 
-        auto kernel = [&](const tbb::blocked_range<int>& r) {
+        auto kernel = [&](const mt::blocked_range<int>& r) {
             openvdb::Coord ijk;
             int &i = ijk[0], &j = ijk[1], &k = ijk[2], m=1;
             TreeT &tree = pool.local();
@@ -178,24 +178,24 @@ private:
 
         if (threaded) {
             // The code blow is making use of a TLS container to minimize the number of concurrent trees
-            // initially populated by tbb::parallel_for and subsequently merged by tbb::parallel_reduce.
+            // initially populated by mt::parallel_for and subsequently merged by mt::parallel_reduce.
             // Experiments have demonstrated this approach to outperform others, including serial reduction
             // and a custom concurrent reduction implementation.
-            tbb::parallel_for(tbb::blocked_range<int>(imin, imax, 128), kernel);
-            using RangeT = tbb::blocked_range<typename tbb::enumerable_thread_specific<TreeT>::iterator>;
+            mt::parallel_for(mt::blocked_range<int>(imin, imax, 128), kernel);
+            using RangeT = mt::blocked_range<typename mt::enumerable_thread_specific<TreeT>::iterator>;
             struct Op {
                 const bool mDelete;
                 TreeT *mTree;
                 Op(TreeT &tree) : mDelete(false), mTree(&tree) {}
-                Op(const Op& other, tbb::split) : mDelete(true), mTree(new TreeT(other.mTree->background())) {}
+                Op(const Op& other, mt::split) : mDelete(true), mTree(new TreeT(other.mTree->background())) {}
                 ~Op() { if (mDelete) delete mTree; }
                 void operator()(const RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
                 void join(Op &other) { this->merge(*(other.mTree)); }
                 void merge(TreeT &tree) { mTree->merge(tree, openvdb::MERGE_ACTIVE_STATES); }
             } op( mGrid->tree() );
-            tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
+            mt::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
         } else {
-            kernel(tbb::blocked_range<int>(imin, imax));//serial
+            kernel(mt::blocked_range<int>(imin, imax));//serial
             mGrid->tree().merge(*pool.begin(), openvdb::MERGE_ACTIVE_STATES);
         }
 

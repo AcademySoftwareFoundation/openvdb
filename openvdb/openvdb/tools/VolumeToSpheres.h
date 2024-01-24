@@ -17,9 +17,9 @@
 #include "VolumeToMesh.h"
 #include <openvdb/openvdb.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::sqrt()
@@ -174,7 +174,7 @@ public:
     void run(bool threaded = true);
 
 
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
     std::vector<Vec4R>& mLeafBoundingSpheres;
@@ -201,15 +201,15 @@ void
 LeafOp<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mLeafNodes.size()), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mLeafNodes.size()), *this);
     } else {
-        (*this)(tbb::blocked_range<size_t>(0, mLeafNodes.size()));
+        (*this)(mt::blocked_range<size_t>(0, mLeafNodes.size()));
     }
 }
 
 template<typename Index32LeafT>
 void
-LeafOp<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+LeafOp<Index32LeafT>::operator()(const mt::blocked_range<size_t>& range) const
 {
     typename Index32LeafT::ValueOnCIter iter;
     Vec3s avg;
@@ -252,7 +252,7 @@ public:
 
     inline void run(bool threaded = true);
 
-    inline void operator()(const tbb::blocked_range<size_t>&) const;
+    inline void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
     std::vector<Vec4R>& mNodeBoundingSpheres;
@@ -274,14 +274,14 @@ inline void
 NodeOp::run(bool threaded)
 {
     if (threaded) {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mLeafRanges.size()), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mLeafRanges.size()), *this);
     } else {
-        (*this)(tbb::blocked_range<size_t>(0, mLeafRanges.size()));
+        (*this)(mt::blocked_range<size_t>(0, mLeafRanges.size()));
     }
 }
 
 inline void
-NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
+NodeOp::operator()(const mt::blocked_range<size_t>& range) const
 {
     Vec3d avg, pos;
 
@@ -348,7 +348,7 @@ public:
     void run(bool threaded = true);
 
 
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    void operator()(const mt::blocked_range<size_t>&) const;
 
 private:
 
@@ -404,9 +404,9 @@ void
 ClosestPointDist<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mInstancePoints.size()), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mInstancePoints.size()), *this);
     } else {
-        (*this)(tbb::blocked_range<size_t>(0, mInstancePoints.size()));
+        (*this)(mt::blocked_range<size_t>(0, mInstancePoints.size()));
     }
 }
 
@@ -478,7 +478,7 @@ ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) co
 
 template<typename Index32LeafT>
 void
-ClosestPointDist<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+ClosestPointDist<Index32LeafT>::operator()(const mt::blocked_range<size_t>& range) const
 {
     Vec3R center;
     for (size_t n = range.begin(); n != range.end(); ++n) {
@@ -534,8 +534,8 @@ public:
     inline void run(bool threaded = true);
 
 
-    UpdatePoints(UpdatePoints&, tbb::split);
-    inline void operator()(const tbb::blocked_range<size_t>& range);
+    UpdatePoints(UpdatePoints&, mt::split);
+    inline void operator()(const mt::blocked_range<size_t>& range);
     void join(const UpdatePoints& rhs)
     {
         if (rhs.mRadius > mRadius) {
@@ -572,7 +572,7 @@ UpdatePoints::UpdatePoints(
 }
 
 inline
-UpdatePoints::UpdatePoints(UpdatePoints& rhs, tbb::split)
+UpdatePoints::UpdatePoints(UpdatePoints& rhs, mt::split)
     : mSphere(rhs.mSphere)
     , mPoints(rhs.mPoints)
     , mDistances(rhs.mDistances)
@@ -587,14 +587,14 @@ inline void
 UpdatePoints::run(bool threaded)
 {
     if (threaded) {
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, mPoints.size()), *this);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, mPoints.size()), *this);
     } else {
-        (*this)(tbb::blocked_range<size_t>(0, mPoints.size()));
+        (*this)(mt::blocked_range<size_t>(0, mPoints.size()));
     }
 }
 
 inline void
-UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
+UpdatePoints::operator()(const mt::blocked_range<size_t>& range)
 {
     Vec3s pos;
     for (size_t n = range.begin(); n != range.end(); ++n) {
@@ -867,11 +867,11 @@ ClosestSurfacePoint<GridT>::initialize(
         std::vector<Int16LeafNodeType*> signFlagsLeafNodes;
         mSignTreePt->getNodes(signFlagsLeafNodes);
 
-        const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
+        const mt::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
 
         std::unique_ptr<Index32[]> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
 
-        tbb::parallel_for(auxiliaryLeafNodeRange,
+        mt::parallel_for(auxiliaryLeafNodeRange,
             volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
                 (signFlagsLeafNodes, leafNodeOffsets));
 
@@ -891,7 +891,7 @@ ClosestSurfacePoint<GridT>::initialize(
         std::vector<Index32LeafNodeType*> pointIndexLeafNodes;
         mIdxTreePt->getNodes(pointIndexLeafNodes);
 
-        tbb::parallel_for(auxiliaryLeafNodeRange, volume_to_mesh_internal::ComputePoints<TreeT>(
+        mt::parallel_for(auxiliaryLeafNodeRange, volume_to_mesh_internal::ComputePoints<TreeT>(
             mSurfacePointList.get(), tree, pointIndexLeafNodes,
             signFlagsLeafNodes, leafNodeOffsets, transform, ValueT(isovalue)));
     }

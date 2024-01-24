@@ -21,8 +21,8 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tree/LeafManager.h>
 
-#include <tbb/parallel_reduce.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/parallel_for.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

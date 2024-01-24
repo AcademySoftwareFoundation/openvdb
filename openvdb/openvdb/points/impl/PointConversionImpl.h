@@ -378,13 +378,13 @@ struct CalculatePositionBounds
         , mMin(std::numeric_limits<Real>::max())
         , mMax(-std::numeric_limits<Real>::max()) {}
 
-    CalculatePositionBounds(const CalculatePositionBounds& other, tbb::split)
+    CalculatePositionBounds(const CalculatePositionBounds& other, mt::split)
         : mPositions(other.mPositions)
         , mInverseMat(other.mInverseMat)
         , mMin(std::numeric_limits<Real>::max())
         , mMax(-std::numeric_limits<Real>::max()) {}
 
-    void operator()(const tbb::blocked_range<size_t>& range) {
+    void operator()(const mt::blocked_range<size_t>& range) {
         VecT pos;
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
             mPositions.getPos(n, pos);
@@ -569,7 +569,7 @@ populateAttribute(PointDataTreeT& tree, const PointIndexTreeT& pointIndexTree,
     PopulateAttributeOp<PointDataTreeT,
                         PointIndexTreeT,
                         PointArrayT> populate(pointIndexTree, data, index, stride);
-    tbb::parallel_for(leafManager.leafRange(), populate);
+    mt::parallel_for(leafManager.leafRange(), populate);
 }
 
 
@@ -602,7 +602,7 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
     ConvertPointDataGridPositionOp<TreeType, PositionAttribute, FilterT> convert(
                     positionAttribute, pointOffsets, startOffset, grid.transform(), positionIndex,
                     filter, inCoreOnly);
-    tbb::parallel_for(leafManager.leafRange(), convert);
+    mt::parallel_for(leafManager.leafRange(), convert);
     positionAttribute.compact();
 }
 
@@ -634,7 +634,7 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
     ConvertPointDataGridAttributeOp<PointDataTreeT, TypedAttribute, FilterT> convert(
                         attribute, pointOffsets, startOffset, arrayIndex, stride,
                         filter, inCoreOnly);
-        tbb::parallel_for(leafManager.leafRange(), convert);
+        mt::parallel_for(leafManager.leafRange(), convert);
     attribute.compact();
 }
 
@@ -663,7 +663,7 @@ convertPointDataGridGroup(  Group& group,
     ConvertPointDataGridGroupOp<PointDataTreeT, Group, FilterT> convert(
                     group, pointOffsets, startOffset, index,
                     filter, inCoreOnly);
-    tbb::parallel_for(leafManager.leafRange(), convert);
+    mt::parallel_for(leafManager.leafRange(), convert);
 
     // must call this after modifying point groups in parallel
 
@@ -740,9 +740,9 @@ computeVoxelSize(  const PositionWrapper& positions,
     math::Mat4d inverseTransform = transform.inverse();
     inverseTransform = math::unit(inverseTransform);
 
-    tbb::blocked_range<size_t> range(0, numPoints);
+    mt::blocked_range<size_t> range(0, numPoints);
     CalculatePositionBounds<PositionWrapper, VecT> calculateBounds(positions, inverseTransform);
-    tbb::parallel_reduce(range, calculateBounds);
+    mt::parallel_reduce(range, calculateBounds);
 
     BBoxd bbox = calculateBounds.getBoundingBox();
 

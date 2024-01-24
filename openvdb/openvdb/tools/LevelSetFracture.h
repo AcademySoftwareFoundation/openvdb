@@ -23,8 +23,8 @@
 #include <list>
 #include <vector>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 
 namespace openvdb {
@@ -114,14 +114,14 @@ struct FindMinMaxVoxelValue {
     {
     }
 
-    FindMinMaxVoxelValue(FindMinMaxVoxelValue& rhs, tbb::split)
+    FindMinMaxVoxelValue(FindMinMaxVoxelValue& rhs, mt::split)
         : minValue(std::numeric_limits<ValueType>::max())
         , maxValue(-minValue)
         , mNodes(rhs.mNodes)
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) {
+    void operator()(const mt::blocked_range<size_t>& range) {
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
             const ValueType* data = mNodes[n]->buffer().data();
             for (Index i = 0; i < LeafNodeType::SIZE; ++i) {
@@ -252,7 +252,7 @@ LevelSetFracture<GridType, InterruptType>::isValidFragment(GridType& grid) const
         if (activeVoxelCount < 27) return false;
 
         level_set_fracture_internal::FindMinMaxVoxelValue<LeafNodeType> op(nodes);
-        tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), op);
+        mt::parallel_reduce(mt::blocked_range<size_t>(0, nodes.size()), op);
 
         if ((op.minValue < 0) == (op.maxValue < 0)) return false;
     }

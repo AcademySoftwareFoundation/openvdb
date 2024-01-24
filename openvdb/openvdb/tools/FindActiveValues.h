@@ -30,9 +30,9 @@
 
 #include "Count.h" // tools::countActiveVoxels()
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -513,11 +513,11 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
 
     {// Check child nodes
         using ChildT = typename NodeT::ChildNodeType;
-        using RangeT = tbb::blocked_range<typename std::vector<const ChildT*>::iterator>;
+        using RangeT = mt::blocked_range<typename std::vector<const ChildT*>::iterator>;
         std::vector<const ChildT*> childNodes(childMask.countOn());
         int j=0;
         for (auto i = childMask.beginOn(); i; ++i, ++j) childNodes[j] = table[i.pos()].getChild();
-        count += tbb::parallel_reduce( RangeT(childNodes.begin(), childNodes.end()), 0,
+        count += mt::parallel_reduce( RangeT(childNodes.begin(), childNodes.end()), 0,
             [&](const RangeT& r, Index64 sum)->Index64 {
                 for ( auto i = r.begin(); i != r.end(); ++i ) sum += this->count(*i, bbox);
                 return sum;
@@ -527,10 +527,10 @@ Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox)
 
     {// Check active tiles
         std::vector<Coord> coords(mask.countOn());
-        using RangeT = tbb::blocked_range<typename std::vector<Coord>::iterator>;
+        using RangeT = mt::blocked_range<typename std::vector<Coord>::iterator>;
         int j=0;
         for (auto i = mask.beginOn(); i; ++i, ++j) coords[j] = node->offsetToGlobalCoord(i.pos());
-        count += tbb::parallel_reduce( RangeT(coords.begin(), coords.end()), 0,
+        count += mt::parallel_reduce( RangeT(coords.begin(), coords.end()), 0,
             [&bbox](const RangeT& r, Index64 sum)->Index64 {
                 for ( auto i = r.begin(); i != r.end(); ++i ) {
                     auto b = CoordBBox::createCube(*i, NodeT::ChildNodeType::DIM);
@@ -570,7 +570,7 @@ void FindActiveValues<TreeT>::activeTiles(const NodeT* node, const CoordBBox &bb
         std::vector<TileDataT> tmp( tileCount );// for temporary thread-safe processing
         int n = 0;
         for (auto iter = mask.beginOn(); iter; ++iter) tmp[n++].level = iter.pos();// placeholder to support multi-threading
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, tileCount, 8), [&](const tbb::blocked_range<size_t>& r) {
+        mt::parallel_for(mt::blocked_range<size_t>(0, tileCount, 8), [&](const mt::blocked_range<size_t>& r) {
             for ( size_t i = r.begin(); i != r.end(); ++i ) {
                 tmp[i] = TileDataT(*node, tmp[i].level);
                 tmp[i].bbox.intersect(bbox);

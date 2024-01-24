@@ -8,7 +8,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
 
-#include <tbb/parallel_sort.h>
+#include <openvdb/mt/parallel_sort.h>
 
 #include <string>
 
@@ -192,7 +192,7 @@ void StringMetaInserter::resetCache()
         stringIndices.emplace_back(index);
     }
 
-    tbb::parallel_sort(stringIndices.begin(), stringIndices.end());
+    mt::parallel_sort(stringIndices.begin(), stringIndices.end());
 
     // bucket string indices
 

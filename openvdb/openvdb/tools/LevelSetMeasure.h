@@ -20,9 +20,9 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_sort.h>
-#include <tbb/parallel_invoke.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_sort.h>
+#include <openvdb/mt/parallel_invoke.h>
 
 #include <type_traits>
 
@@ -201,11 +201,11 @@ private:
         {
             if (parent->mInterrupter) parent->mInterrupter->start("Measuring area and volume of level set");
             if (parent->mGrainSize>0) {
-                tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
+                mt::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
-            tbb::parallel_invoke([&](){parent->mArea   = parent->reduce(0);},
+            mt::parallel_invoke([&](){parent->mArea   = parent->reduce(0);},
                                  [&](){parent->mVolume = parent->reduce(1)/3.0;});
             parent->mUpdateArea = false;
             if (parent->mInterrupter) parent->mInterrupter->end();
@@ -222,11 +222,11 @@ private:
         {
             if (parent->mInterrupter) parent->mInterrupter->start("Measuring curvatures of level set");
             if (parent->mGrainSize>0) {
-                tbb::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
+                mt::parallel_for(parent->mLeafs->leafRange(parent->mGrainSize), *this);
             } else {
                 (*this)(parent->mLeafs->leafRange());
             }
-            tbb::parallel_invoke([&](){parent->mTotMeanCurvature = parent->reduce(0);},
+            mt::parallel_invoke([&](){parent->mTotMeanCurvature = parent->reduce(0);},
                                  [&](){parent->mTotGausCurvature = parent->reduce(1);});
             parent->mUpdateCurvature = false;
             if (parent->mInterrupter) parent->mInterrupter->end();
@@ -240,7 +240,7 @@ private:
     double reduce(int offset)
     {
         double *first = mBuffer.get() + offset*mLeafs->leafCount(), *last = first + mLeafs->leafCount();
-        tbb::parallel_sort(first, last);// mitigates catastrophic cancellation
+        mt::parallel_sort(first, last);// mitigates catastrophic cancellation
         Real sum = 0.0;
         while(first != last) sum += *first++;
         return sum;

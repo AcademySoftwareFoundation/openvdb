@@ -391,7 +391,7 @@ TEST_F(TestFastSweeping, testBenchmarks)
         auto grid2 = tools::dilateSdf(*grid, int(new_width - width), tools::NN_FACE_EDGE);
         //tools::FastSweeping<FloatGrid> fs(*grid);
         //EXPECT_TRUE(fs.sweepingVoxelCount() > 0);
-        //tbb::task_scheduler_init init(4);//thread count
+        //mt::task_scheduler_init init(4);//thread count
         //fs.sweep();
 #ifdef TIMING_FAST_SWEEPING
         timer.stop();

@@ -14,8 +14,8 @@
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
 #include <deque>
 
 
@@ -115,12 +115,12 @@ public:
             }
         } else {
             nodeCounts.resize(parents.nodeCount());
-            tbb::parallel_for(
+            mt::parallel_for(
                 // with typical node sizes and SSE enabled, there are only a handful
                 // of instructions executed per-operation with a default grainsize
                 // of 1, so increase to 64 to reduce parallel scheduling overhead
-                tbb::blocked_range<Index64>(0, parents.nodeCount(), /*grainsize=*/64),
-                [&](tbb::blocked_range<Index64>& range)
+                mt::blocked_range<Index64>(0, parents.nodeCount(), /*grainsize=*/64),
+                [&](mt::blocked_range<Index64>& range)
                 {
                     for (Index64 i = range.begin(); i < range.end(); i++) {
                         if (!nodeFilter.valid(i))   nodeCounts[i] = 0;
@@ -164,9 +164,9 @@ public:
                 }
             }
         } else {
-            tbb::parallel_for(
-                tbb::blocked_range<Index64>(0, parents.nodeCount()),
-                [&](tbb::blocked_range<Index64>& range)
+            mt::parallel_for(
+                mt::blocked_range<Index64>(0, parents.nodeCount()),
+                [&](mt::blocked_range<Index64>& range)
                 {
                     Index64 i = range.begin();
                     NodeT** nodePtr = mNodes;
@@ -191,7 +191,7 @@ public:
         NodeRange(size_t begin, size_t end, const NodeList& nodeList, size_t grainSize=1):
             mEnd(end), mBegin(begin), mGrainSize(grainSize), mNodeList(nodeList) {}
 
-        NodeRange(NodeRange& r, tbb::split):
+        NodeRange(NodeRange& r, mt::split):
             mEnd(r.mEnd), mBegin(doSplit(r)), mGrainSize(r.mGrainSize),
             mNodeList(r.mNodeList) {}
 
@@ -322,7 +322,7 @@ private:
         }
         void run(const NodeRange& range, bool threaded = true)
         {
-            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+            threaded ? mt::parallel_for(range, *this) : (*this)(range);
         }
         void operator()(const NodeRange& range) const
         {
@@ -342,7 +342,7 @@ private:
         }
         void run(const NodeRange& range, bool threaded = true)
         {
-            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+            threaded ? mt::parallel_for(range, *this) : (*this)(range);
         }
         void operator()(const NodeRange& range) const
         {
@@ -360,14 +360,14 @@ private:
         NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp)
         {
         }
-        NodeReducer(const NodeReducer& other, tbb::split)
-            : mNodeOpPtr(std::make_unique<NodeOp>(*(other.mNodeOp), tbb::split()))
+        NodeReducer(const NodeReducer& other, mt::split)
+            : mNodeOpPtr(std::make_unique<NodeOp>(*(other.mNodeOp), mt::split()))
             , mNodeOp(mNodeOpPtr.get())
         {
         }
         void run(const NodeRange& range, bool threaded = true)
         {
-            threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
+            threaded ? mt::parallel_reduce(range, *this) : (*this)(range);
         }
         void operator()(const NodeRange& range)
         {
@@ -655,7 +655,7 @@ public:
     ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
     ///      {
     ///      }
-    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///      NodeCountOp(const NodeCountOp& other, mt::split) :
     ///          nodeCount(TreeType::DEPTH, 0), totalCount(0)
     ///      {
     ///      }
@@ -763,8 +763,8 @@ struct ReduceFilterOp
         : mOp(other.mOp)
         , mValid(other.mValid) { }
 
-    ReduceFilterOp(const ReduceFilterOp& other, tbb::split)
-        : mOpPtr(std::make_unique<OpT>(*(other.mOp), tbb::split()))
+    ReduceFilterOp(const ReduceFilterOp& other, mt::split)
+        : mOpPtr(std::make_unique<OpT>(*(other.mOp), mt::split()))
         , mOp(mOpPtr.get())
         , mValid(other.mValid) { }
 
@@ -1005,7 +1005,7 @@ public:
     ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
     ///      {
     ///      }
-    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///      NodeCountOp(const NodeCountOp& other, mt::split) :
     ///          nodeCount(TreeType::DEPTH, 0), totalCount(0)
     ///      {
     ///      }

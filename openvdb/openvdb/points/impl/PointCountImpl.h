@@ -39,7 +39,7 @@ Index64 pointCount(const PointDataTreeT& tree,
 
     LeafManagerT leafManager(tree);
     if (threaded) {
-        return tbb::parallel_reduce(leafManager.leafRange(), Index64(0), countLambda,
+        return mt::parallel_reduce(leafManager.leafRange(), Index64(0), countLambda,
             [] (Index64 n, Index64 m) -> Index64 { return n + m; });
     }
     else {

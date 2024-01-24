@@ -53,10 +53,10 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/thread/Threading.h>
 
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
+#include <openvdb/mt/enumerable_thread_specific.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/parallel_reduce.h>
+#include <openvdb/mt/blocked_range.h>
 
 #include <vector>
 
@@ -162,7 +162,7 @@ private:
 
     // Private struct that implements concurrent thread-local
     // insersion of points into a grid
-    using PoolType = tbb::enumerable_thread_specific<GridT>;
+    using PoolType = mt::enumerable_thread_specific<GridT>;
     template<typename PointListT, typename VecT = Vec3R> struct AddPoints;
 
     // Private class that implements concurrent reduction of a thread-local pool
@@ -186,9 +186,9 @@ struct PointsToMask<GridT, InterrupterT>::AddPoints
         , mParent(&parent)
         , mPool(&pool)
     {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mPoints->size(), grainSize), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mPoints->size(), grainSize), *this);
     }
-    void operator()(const tbb::blocked_range<size_t>& range) const
+    void operator()(const mt::blocked_range<size_t>& range) const
     {
         if (mParent->interrupt()) return;
         GridT& grid = mPool->local();
@@ -212,7 +212,7 @@ struct PointsToMask<GridT, InterrupterT>::ReducePool
 {
     using VecT = std::vector<GridT*>;
     using IterT = typename VecT::iterator;
-    using RangeT = tbb::blocked_range<IterT>;
+    using RangeT = mt::blocked_range<IterT>;
 
     ReducePool(PoolType& pool, GridT* grid, size_t grainSize = 1)
         : mOwnsGrid(false)
@@ -226,11 +226,11 @@ struct PointsToMask<GridT, InterrupterT>::ReducePool
             VecT grids( pool.size() );
             typename PoolType::iterator i = pool.begin();
             for (size_t j=0; j != pool.size(); ++i, ++j) grids[j] = &(*i);
-            tbb::parallel_reduce( RangeT( grids.begin(), grids.end(), grainSize ), *this );
+            mt::parallel_reduce( RangeT( grids.begin(), grids.end(), grainSize ), *this );
         }
     }
 
-    ReducePool(const ReducePool&, tbb::split)
+    ReducePool(const ReducePool&, mt::split)
         : mOwnsGrid(true)
         , mGrid(new GridT())
     {

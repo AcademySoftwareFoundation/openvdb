@@ -5,7 +5,7 @@
 #include <openvdb/tools/Prune.h>
 
 #include <gtest/gtest.h>
-#include <tbb/task_group.h>
+#include <openvdb/mt/task_group.h>
 
 #include <type_traits>
 
@@ -408,7 +408,7 @@ TestValueAccessor::multithreadedAccessorTest()
         RootTask(AccessorT& c): acc(c) {}
         void execute()
         {
-            tbb::task_group tasks;
+            mt::task_group tasks;
             for (int i = 0; i < 3; ++i) {
                 tasks.run([&] { ReadTask r(acc); r.execute(); });
                 tasks.run([&] { WriteTask w(acc); w.execute(); });

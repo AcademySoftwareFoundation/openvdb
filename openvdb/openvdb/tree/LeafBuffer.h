@@ -7,7 +7,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
-#include <tbb/spin_mutex.h>
+#include <openvdb/mt/spin_mutex.h>
 #include <algorithm> // for std::swap
 #include <atomic>
 #include <cstddef> // for offsetof()
@@ -161,7 +161,7 @@ private:
     ValueType* mData;
 #endif
     FlagsType mOutOfCore; // interpreted as bool; extra bits reserved for future use
-    tbb::spin_mutex mMutex; // 1 byte
+    mt::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
 
     friend class ::TestLeaf;
@@ -350,7 +350,7 @@ LeafBuffer<T, Log2Dim>::data() const
         LeafBuffer* self = const_cast<LeafBuffer*>(this);
 #ifdef OPENVDB_USE_DELAYED_LOADING
         // This lock will be contended at most once.
-        tbb::spin_mutex::scoped_lock lock(self->mMutex);
+        mt::spin_mutex::scoped_lock lock(self->mMutex);
 #endif
         if (mData == nullptr) self->mData = new ValueType[SIZE];
     }
@@ -365,7 +365,7 @@ LeafBuffer<T, Log2Dim>::data()
     if (mData == nullptr) {
 #ifdef OPENVDB_USE_DELAYED_LOADING
         // This lock will be contended at most once.
-        tbb::spin_mutex::scoped_lock lock(mMutex);
+        mt::spin_mutex::scoped_lock lock(mMutex);
 #endif
         if (mData == nullptr) mData = new ValueType[SIZE];
     }
@@ -414,7 +414,7 @@ LeafBuffer<T, Log2Dim>::doLoad() const
 
     // This lock will be contended at most once, after which this buffer
     // will no longer be out-of-core.
-    tbb::spin_mutex::scoped_lock lock(self->mMutex);
+    mt::spin_mutex::scoped_lock lock(self->mMutex);
     if (!this->isOutOfCore()) return;
 
     std::unique_ptr<FileInfo> info(self->mFileInfo);

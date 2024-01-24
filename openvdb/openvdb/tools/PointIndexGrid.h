@@ -28,8 +28,8 @@
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/Tree.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
 #include <atomic>
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::sqrt()
@@ -413,7 +413,7 @@ struct PopulateLeafNodesOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         using VoxelOffsetT = typename Partitioner::VoxelOffsetType;
 
@@ -511,8 +511,8 @@ constructPointTree(TreeType& tree, const math::Transform& xform, const PointArra
         leafNodeCount = partitioner.size();
         leafNodes.reset(new LeafType*[leafNodeCount]);
 
-        const tbb::blocked_range<size_t> range(0, leafNodeCount);
-        tbb::parallel_for(range, PopulateLeafNodesOp<LeafType>(leafNodes, partitioner));
+        const mt::blocked_range<size_t> range(0, leafNodeCount);
+        mt::parallel_for(range, PopulateLeafNodesOp<LeafType>(leafNodes, partitioner));
     }
 
     tree::ValueAccessor<TreeType> acc(tree);

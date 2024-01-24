@@ -6,8 +6,8 @@
 #ifndef OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREEITERATOR_HAS_BEEN_INCLUDED
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include <algorithm>
@@ -1315,8 +1315,8 @@ public:
 
     /// @brief Split constructor used by tbb (should rarely be called directly)
     /// @param other IteratorRange to be split
-    /// @param  tbb::split Dummy class used to create a unique signature for this constructor
-    IteratorRange(IteratorRange& other, tbb::split):
+    /// @param  mt::split Dummy class used to create a unique signature for this constructor
+    IteratorRange(IteratorRange& other, mt::split):
         mIter(other.mIter),
         mGrainSize(other.mGrainSize),
         mSize(other.mSize >> 1)

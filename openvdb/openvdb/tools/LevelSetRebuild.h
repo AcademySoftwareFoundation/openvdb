@@ -30,8 +30,8 @@
 #include "VolumeToMesh.h"
 #include "MeshToVolume.h"
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
 #include <type_traits>
 
 
@@ -124,15 +124,15 @@ public:
 
     void runParallel()
     {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mPointsOut->size()), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mPointsOut->size()), *this);
     }
 
     void runSerial()
     {
-        (*this)(tbb::blocked_range<size_t>(0, mPointsOut->size()));
+        (*this)(mt::blocked_range<size_t>(0, mPointsOut->size()));
     }
 
-    inline void operator()(const tbb::blocked_range<size_t>& range) const
+    inline void operator()(const mt::blocked_range<size_t>& range) const
     {
         for (size_t n = range.begin(); n < range.end(); ++n) {
             (*mPointsOut)[n] = Vec3s(mXform.worldToIndex(mPointsIn[n]));
@@ -159,15 +159,15 @@ public:
 
     void runParallel()
     {
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, mIndexList.size()), *this);
+        mt::parallel_for(mt::blocked_range<size_t>(0, mIndexList.size()), *this);
     }
 
     void runSerial()
     {
-        (*this)(tbb::blocked_range<size_t>(0, mIndexList.size()));
+        (*this)(mt::blocked_range<size_t>(0, mIndexList.size()));
     }
 
-    inline void operator()(const tbb::blocked_range<size_t>& range) const
+    inline void operator()(const mt::blocked_range<size_t>& range) const
     {
         openvdb::Vec4I quad;
         quad[3] = openvdb::util::INVALID_IDX;

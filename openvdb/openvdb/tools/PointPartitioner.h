@@ -21,9 +21,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_for.h>
-#include <tbb/task_arena.h>
+#include <openvdb/mt/blocked_range.h>
+#include <openvdb/mt/parallel_for.h>
+#include <openvdb/mt/task_arena.h>
 
 #include <algorithm>
 #include <cmath> // for std::isfinite()
@@ -237,7 +237,7 @@ struct ComputePointOrderOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
             mPointOrder[n] += mBucketCounters[mBucketOffsets[n]];
         }
@@ -260,7 +260,7 @@ struct CreateOrderedPointIndexArrayOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
             mOrderedIndexArray[mPointOrder[n]] = mIndices[n];
         }
@@ -290,7 +290,7 @@ struct VoxelOrderOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         PointIndexType pointCount = 0;
         for (size_t n(range.begin()), N(range.end()); n != N; ++n) {
@@ -379,12 +379,12 @@ struct MoveSegmentDataOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
         for (size_t n(range.begin()), N(range.end()); n != N; ++n) {
             PointIndexType* indices = mIndexLists[n];
             SegmentPtr& segment = mSegments[n];
 
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, segment->size()),
+            mt::parallel_for(mt::blocked_range<size_t>(0, segment->size()),
                 CopyData(indices, segment->data()));
 
             segment.reset(); // clear data
@@ -397,7 +397,7 @@ private:
     {
         CopyData(PointIndexType* lhs, const PointIndexType* rhs) : mLhs(lhs), mRhs(rhs) { }
 
-        void operator()(const tbb::blocked_range<size_t>& range) const {
+        void operator()(const mt::blocked_range<size_t>& range) const {
             for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
                 mLhs[n] = mRhs[n];
             }
@@ -437,7 +437,7 @@ struct MergeBinsOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         std::vector<IndexPairListPtr*> data;
         std::vector<PointIndexType> arrayOffsets;
@@ -478,7 +478,7 @@ struct MergeBinsOp
                 count += (*data[i])->size();
             }
 
-            tbb::parallel_for(tbb::blocked_range<size_t>(0, data.size()),
+            mt::parallel_for(mt::blocked_range<size_t>(0, data.size()),
                 CopyData(&data[0], &arrayOffsets[0], indexSegment->data(), offsetSegment->data()));
         }
     }
@@ -498,7 +498,7 @@ private:
         {
         }
 
-        void operator()(const tbb::blocked_range<size_t>& range) const {
+        void operator()(const mt::blocked_range<size_t>& range) const {
 
             using CIter = typename IndexPairList::const_iterator;
 
@@ -563,7 +563,7 @@ struct BinPointIndicesOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         const Index log2dim = mBucketLog2Dim;
         const Index log2dim2 = 2 * log2dim;
@@ -670,7 +670,7 @@ struct OrderSegmentsOp
     {
     }
 
-    void operator()(const tbb::blocked_range<size_t>& range) const {
+    void operator()(const mt::blocked_range<size_t>& range) const {
 
         const size_t bucketCountersSize = size_t(mBinVolume);
         IndexArray bucketCounters(new PointIndexType[bucketCountersSize]);
@@ -721,14 +721,14 @@ struct OrderSegmentsOp
             }
 
             PointIndexType* indices = mIndexSegments[n]->data();
-            const tbb::blocked_range<size_t> segmentRange(0, segmentSize);
+            const mt::blocked_range<size_t> segmentRange(0, segmentSize);
 
             // Compute final point order by incrementing the local bucket point index
             // with the prefix sum offset.
-            tbb::parallel_for(segmentRange, ComputePointOrderOp<PointIndexType>(
+            mt::parallel_for(segmentRange, ComputePointOrderOp<PointIndexType>(
                 bucketIndices.get(), bucketCounters.get(), offsets));
 
-            tbb::parallel_for(segmentRange, CreateOrderedPointIndexArrayOp<PointIndexType>(
+            mt::parallel_for(segmentRange, CreateOrderedPointIndexArrayOp<PointIndexType>(
                 offsets, bucketIndices.get(), indices));
 
             mIndexSegments[n]->clear(); // clear data
@@ -765,7 +765,7 @@ inline void binAndSegment(
     using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
     using IndexPairListMapPtr = std::shared_ptr<IndexPairListMap>;
 
-    size_t numTasks = 1, numThreads = size_t(tbb::this_task_arena::max_concurrency());
+    size_t numTasks = 1, numThreads = size_t(mt::this_task_arena::max_concurrency());
     if (points.size() > (numThreads * 2)) numTasks = numThreads * 2;
     else if (points.size() > numThreads) numTasks = numThreads;
 
@@ -773,7 +773,7 @@ inline void binAndSegment(
 
     using BinOp = BinPointIndicesOp<PointArray, PointIndexType, VoxelOffsetType>;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, numTasks),
+    mt::parallel_for(mt::blocked_range<size_t>(0, numTasks),
         BinOp(bins.get(), points, voxelOffsets, xform, binLog2Dim, bucketLog2Dim,
             numTasks, cellCenteredTransform));
 
@@ -798,7 +798,7 @@ inline void binAndSegment(
 
     using MergeOp = MergeBinsOp<PointIndexType>;
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, segmentCount),
+    mt::parallel_for(mt::blocked_range<size_t>(0, segmentCount),
         MergeOp(bins.get(), indexSegments.get(), offsetSegments.get(), &coords[0], numTasks));
 }
 
@@ -838,7 +838,7 @@ inline void partition(
 
     size_t numSegments = segmentCoords.size();
 
-    const tbb::blocked_range<size_t> segmentRange(0, numSegments);
+    const mt::blocked_range<size_t> segmentRange(0, numSegments);
 
     using IndexArray = std::unique_ptr<PointIndexType[]>;
     std::unique_ptr<IndexArray[]> pageOffsetArrays(new IndexArray[numSegments]);
@@ -846,7 +846,7 @@ inline void partition(
 
     const Index binVolume = 1u << (3u * binLog2Dim);
 
-    tbb::parallel_for(segmentRange, OrderSegmentsOp<PointIndexType>
+    mt::parallel_for(segmentRange, OrderSegmentsOp<PointIndexType>
         (indexSegments.get(), offsetSegments.get(),
             pageOffsetArrays.get(), pageIndexArrays.get(), binVolume));
 
@@ -892,8 +892,8 @@ inline void partition(
 
     pageCoordinates.reset(new Coord[pageCount]);
 
-    tbb::parallel_for(segmentRange,
-        [&](tbb::blocked_range<size_t>& range)
+    mt::parallel_for(segmentRange,
+        [&](mt::blocked_range<size_t>& range)
         {
             for (size_t n = range.begin(); n < range.end(); n++)
             {
@@ -904,9 +904,9 @@ inline void partition(
 
                 // segment size stored in the first value of the offset array
                 const size_t segmentSize = pageOffsetArrays[n][0] - 1;
-                tbb::blocked_range<size_t> copyRange(0, segmentSize);
-                tbb::parallel_for(copyRange,
-                    [&](tbb::blocked_range<size_t>& r)
+                mt::blocked_range<size_t> copyRange(0, segmentSize);
+                mt::parallel_for(copyRange,
+                    [&](mt::blocked_range<size_t>& r)
                     {
                         for (size_t i = r.begin(); i < r.end(); i++)
                         {
@@ -928,7 +928,7 @@ inline void partition(
 
     // move segment data
 
-    tbb::parallel_for(segmentRange,
+    mt::parallel_for(segmentRange,
         MoveSegmentDataOp<PointIndexType>(indexArray, offsetSegments.get()));
 }
 
@@ -1011,10 +1011,10 @@ PointPartitioner<PointIndexType, BucketLog2Dim>::construct(
         mPointIndices, mPageOffsets, mPageCoordinates, mPageCount, mVoxelOffsets,
             (voxelOrder || recordVoxelOffsets), cellCenteredTransform);
 
-    const tbb::blocked_range<size_t> pageRange(0, mPageCount);
+    const mt::blocked_range<size_t> pageRange(0, mPageCount);
 
     if (mVoxelOffsets && voxelOrder) {
-        tbb::parallel_for(pageRange, point_partitioner_internal::VoxelOrderOp<
+        mt::parallel_for(pageRange, point_partitioner_internal::VoxelOrderOp<
             IndexType, BucketLog2Dim>(mPointIndices, mPageOffsets, mVoxelOffsets));
     }
 

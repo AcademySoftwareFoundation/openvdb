@@ -173,7 +173,7 @@ inline void deleteFromGroups(PointDataTreeT& pointTree,
         tree::LeafManager<PointDataTreeT> leafManager(pointTree);
         point_delete_internal::DeleteByFilterOp<PointDataTreeT, MultiGroupFilter> deleteOp(
             *filter, &lock);
-        tbb::parallel_for(leafManager.leafRange(), deleteOp);
+        mt::parallel_for(leafManager.leafRange(), deleteOp);
     }
 
     // remove empty leaf nodes

@@ -10,8 +10,8 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
 
-#include <tbb/concurrent_hash_map.h>
-#include <tbb/task_arena.h>
+#include <openvdb/mt/concurrent_hash_map.h>
+#include <openvdb/mt/task_arena.h>
 
 #include <thread>
 #include <algorithm> // for std::max()
@@ -93,7 +93,7 @@ struct Queue::Impl
 {
     using NotifierMap = std::map<Queue::Id, Queue::Notifier>;
     /// @todo Provide more information than just "succeeded" or "failed"?
-    using StatusMap = tbb::concurrent_hash_map<Queue::Id, Queue::Status>;
+    using StatusMap = mt::concurrent_hash_map<Queue::Id, Queue::Status>;
 
     Impl()
         : mTimeout(Queue::DEFAULT_TIMEOUT)
@@ -128,7 +128,7 @@ struct Queue::Impl
         // If the client registered any callbacks, call them now.
         bool didNotify = false;
         {
-            // tbb::concurrent_hash_map does not support concurrent iteration
+            // mt::concurrent_hash_map does not support concurrent iteration
             // (i.e., iteration concurrent with insertion or deletion),
             // so we use a mutex-protected STL map instead.  But if a callback
             // invokes a notifier method such as removeNotifier() on this queue,
@@ -178,7 +178,7 @@ struct Queue::Impl
         this->setStatus(task.id(), Queue::PENDING);
 
         // get the global task arena
-        tbb::task_arena arena(tbb::task_arena::attach{});
+        mt::task_arena arena(mt::task_arena::attach{});
         arena.enqueue([task = std::move(task)] { task.execute(); });
         ++mNumTasks;
     }
@@ -226,7 +226,7 @@ void Queue::setCapacity(Index32 n) { mImpl->mCapacity = std::max<Index32>(1, n);
 /// @todo void Queue::setCapacity(Index64 bytes);
 
 /// @todo Provide a way to limit the number of tasks in flight
-/// (e.g., by enqueueing tbb::tasks that pop Tasks off a concurrent_queue)?
+/// (e.g., by enqueueing mt::tasks that pop Tasks off a concurrent_queue)?
 
 /// @todo Remove any tasks from the queue that are not currently executing.
 //void clear() const;

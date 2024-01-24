@@ -23,7 +23,7 @@
 #include "Prune.h"// for prune
 #include "Statistics.h" // for extrema
 
-#include <tbb/parallel_for.h>
+#include <openvdb/mt/parallel_for.h>
 
 #include <functional>
 
@@ -381,7 +381,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     inline void cook(const LeafRangeT& range)
     {
         if (mParent->mGrainSize > 0) {
-            tbb::parallel_for(range, *this);
+            mt::parallel_for(range, *this);
         } else {
             (*this)(range);
         }

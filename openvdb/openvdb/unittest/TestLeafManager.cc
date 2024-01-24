@@ -203,7 +203,7 @@ struct ReduceOp
 {
     ReduceOp(float v) : mV(v), mN(0) {}
     ReduceOp(const ReduceOp &other) : mV(other.mV), mN(other.mN) {}
-    ReduceOp(const ReduceOp &other, tbb::split) : mV(other.mV), mN(0) {}
+    ReduceOp(const ReduceOp &other, mt::split) : mV(other.mV), mN(0) {}
     template <typename T>
     void operator()(T &leaf, size_t)
     {
