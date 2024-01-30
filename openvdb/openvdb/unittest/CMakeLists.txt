@@ -76,6 +76,7 @@ if(OPENVDB_TESTS)
 else()
   list(APPEND UNITTEST_SOURCE_FILES
     TestActivate.cc
+    TestAdaptive.cc
     TestAttributeArray.cc
     TestAttributeArrayString.cc
     TestAttributeGroup.cc
