@@ -182,9 +182,20 @@ if __name__ == "__main__":
 
     latest_release = service.download.get_daily_build_download(
             product='houdini', version=version, platform=platform, build=releases_list[0]['build'])
+    print(latest_release)
 
-    # Download the file as hou.tar.gz
-    local_filename = 'hou.tar.gz'
+    # Can't do this procedurally as latest_release['filename'] can contain
+    # multiple periods and may have multiple trailing extensions...
+    extension = ''
+    if   'linux' in platform: extension = 'tar.gz'
+    elif 'macos' in platform: extension = 'dmg'
+    elif 'win64' in platform: extension = 'exe'
+    assert(extension in latest_release['filename'])
+
+    # Download the file and save it as hou.extension
+    local_filename = 'hou.' + extension
+    print('Writing to "' + local_filename + '"')
+
     response = requests.get(latest_release['download_url'], stream=True)
     if response.status_code == 200:
         response.raw.decode_content = True
