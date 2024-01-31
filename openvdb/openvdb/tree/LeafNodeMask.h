@@ -9,6 +9,7 @@
 #include <openvdb/io/Compression.h> // for io::readData(), etc.
 #include <openvdb/math/Math.h> // for math::isZero()
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/util/Assert.h>
 #include "LeafNode.h"
 #include "Iterator.h"
 #include <iostream>
@@ -228,17 +229,17 @@ public:
     /// Set the active state of the voxel at the given coordinates but don't change its value.
     void setActiveState(const Coord& xyz, bool on);
     /// Set the active state of the voxel at the given offset but don't change its value.
-    void setActiveState(Index offset, bool on) { assert(offset<SIZE); mBuffer.mData.set(offset, on); }
+    void setActiveState(Index offset, bool on) { OPENVDB_ASSERT(offset<SIZE); mBuffer.mData.set(offset, on); }
 
     /// Set the value of the voxel at the given coordinates but don't change its active state.
     void setValueOnly(const Coord& xyz, bool val);
     /// Set the value of the voxel at the given offset but don't change its active state.
-    void setValueOnly(Index offset, bool val) { assert(offset<SIZE); mBuffer.setValue(offset,val); }
+    void setValueOnly(Index offset, bool val) { OPENVDB_ASSERT(offset<SIZE); mBuffer.setValue(offset,val); }
 
     /// Mark the voxel at the given coordinates as inactive but don't change its value.
     void setValueOff(const Coord& xyz) { mBuffer.mData.setOff(this->coordToOffset(xyz)); }
     /// Mark the voxel at the given offset as inactive but don't change its value.
-    void setValueOff(Index offset) { assert(offset < SIZE); mBuffer.mData.setOff(offset); }
+    void setValueOff(Index offset) { OPENVDB_ASSERT(offset < SIZE); mBuffer.mData.setOff(offset); }
 
     /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
     void setValueOff(const Coord& xyz, bool val);
@@ -248,7 +249,7 @@ public:
     /// Mark the voxel at the given coordinates as active but don't change its value.
     void setValueOn(const Coord& xyz) { mBuffer.mData.setOn(this->coordToOffset(xyz)); }
     /// Mark the voxel at the given offset as active but don't change its value.
-    void setValueOn(Index offset) { assert(offset < SIZE); mBuffer.mData.setOn(offset); }
+    void setValueOn(Index offset) { OPENVDB_ASSERT(offset < SIZE); mBuffer.mData.setOn(offset); }
 
     /// Set the value of the voxel at the given coordinates and mark the voxel as active.
     void setValueOn(const Coord& xyz, bool val);
@@ -278,7 +279,7 @@ public:
     /// Return @c true if the voxel at the given coordinates is active.
     bool isValueOn(const Coord& xyz) const { return mBuffer.mData.isOn(this->coordToOffset(xyz)); }
     /// Return @c true if the voxel at the given offset is active.
-    bool isValueOn(Index offset) const { assert(offset < SIZE); return mBuffer.mData.isOn(offset); }
+    bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mBuffer.mData.isOn(offset); }
 
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }
@@ -880,7 +881,7 @@ template<typename OtherType, Index OtherLog2Dim>
 inline bool
 LeafNode<ValueMask, Log2Dim>::hasSameTopology(const LeafNode<OtherType, OtherLog2Dim>* other) const
 {
-    assert(other);
+    OPENVDB_ASSERT(other);
     return (Log2Dim == OtherLog2Dim && mBuffer.mData == other->getValueMask());
 }
 
@@ -903,7 +904,7 @@ template<Index Log2Dim>
 inline Index
 LeafNode<ValueMask, Log2Dim>::coordToOffset(const Coord& xyz)
 {
-    assert ((xyz[0] & (DIM-1u)) < DIM && (xyz[1] & (DIM-1u)) < DIM && (xyz[2] & (DIM-1u)) < DIM);
+    OPENVDB_ASSERT((xyz[0] & (DIM-1u)) < DIM && (xyz[1] & (DIM-1u)) < DIM && (xyz[2] & (DIM-1u)) < DIM);
     return ((xyz[0] & (DIM-1u)) << 2*Log2Dim)
          + ((xyz[1] & (DIM-1u)) << Log2Dim)
          +  (xyz[2] & (DIM-1u));
@@ -914,7 +915,7 @@ template<Index Log2Dim>
 inline Coord
 LeafNode<ValueMask, Log2Dim>::offsetToLocalCoord(Index n)
 {
-    assert(n < (1 << 3*Log2Dim));
+    OPENVDB_ASSERT(n < (1 << 3*Log2Dim));
     Coord xyz;
     xyz.setX(n >> 2*Log2Dim);
     n &= ((1 << 2*Log2Dim) - 1);
@@ -1067,7 +1068,7 @@ template<Index Log2Dim>
 inline void
 LeafNode<ValueMask, Log2Dim>::addTile(Index offset, bool val, bool active)
 {
-    assert(offset < SIZE);
+    OPENVDB_ASSERT(offset < SIZE);
     this->setValueOnly(offset, val);
     this->setActiveState(offset, active);
 }
@@ -1098,7 +1099,7 @@ template<Index Log2Dim>
 inline const bool&
 LeafNode<ValueMask, Log2Dim>::getValue(Index offset) const
 {
-    assert(offset < SIZE);
+    OPENVDB_ASSERT(offset < SIZE);
     // This *CANNOT* use operator ? for Windows
     if (mBuffer.mData.isOn(offset)) return Buffer::sOn; else return Buffer::sOff;
 }
@@ -1126,7 +1127,7 @@ template<Index Log2Dim>
 inline void
 LeafNode<ValueMask, Log2Dim>::setValueOn(Index offset, bool val)
 {
-    assert(offset < SIZE);
+    OPENVDB_ASSERT(offset < SIZE);
     mBuffer.mData.set(offset, val);
 }
 
@@ -1159,7 +1160,7 @@ template<Index Log2Dim>
 inline void
 LeafNode<ValueMask, Log2Dim>::setValueOff(Index offset, bool val)
 {
-    assert(offset < SIZE);
+    OPENVDB_ASSERT(offset < SIZE);
     mBuffer.mData.set(offset, val);
 }
 

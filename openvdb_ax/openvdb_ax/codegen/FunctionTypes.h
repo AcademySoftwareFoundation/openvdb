@@ -71,6 +71,7 @@
 #include "ConstantFolding.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
@@ -274,7 +275,7 @@ struct OPENVDB_AX_API Function
         , mNames()
         , mDeps() {
             // symbol must be a valid string
-            assert(!symbol.empty());
+            OPENVDB_ASSERT(!symbol.empty());
         }
 
     virtual ~Function() = default;

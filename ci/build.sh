@@ -121,7 +121,15 @@ if HAS_PARM -v || HAS_PARM --verbose; then
     # support older versions of CMake.
     CMAKE_EXTRA+=("-DCMAKE_VERBOSE_MAKEFILE=ON")
 fi
-if HAS_PARM --build-type; then CMAKE_EXTRA+=("-DCMAKE_BUILD_TYPE=${PARMS[--build-type]}"); fi
+if HAS_PARM --build-type; then
+    CMAKE_EXTRA+=("-DCMAKE_BUILD_TYPE=${PARMS[--build-type]}")
+    build_type="${PARMS[--build-type]}"
+    debug="Debug"
+    # Ignore case - if the build-type is Debug, we enable asserts
+    if [ "${build_type,,}" = "${debug,,}" ]; then
+        CMAKE_EXTRA+=("-DOPENVDB_ENABLE_ASSERTS=ON")
+    fi
+fi
 
 # Available components. If a component is not provided it is
 # explicitly set to OFF.

@@ -17,6 +17,7 @@
 #include "openvdb_ax/codegen/Codecs.h"
 
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointAttribute.h>
@@ -55,7 +56,7 @@ struct PointExecutable::Settings
 
     inline std::vector<cli::ParamBase*> optional()
     {
-        assert(IsCLI);
+        OPENVDB_ASSERT(IsCLI);
         std::vector<cli::ParamBase*> params {
             &this->mCreateMissing,
             &this->mGroup,
@@ -331,7 +332,7 @@ struct PointFunctionArguments
         using FunctionTraitsT = codegen::PointKernelBufferRange::FunctionTraitsT;
         using ReturnT = FunctionTraitsT::ReturnType;
 
-        assert(mData.mUseBufferKernel);
+        OPENVDB_ASSERT(mData.mUseBufferKernel);
 
         return [&](const openvdb::Coord& origin, void* buffer, Index64* mask, const size_t size) -> ReturnT {
             mData.mKernelBufferRange(static_cast<FunctionTraitsT::Arg<0>::Type>(mData.mCustomData),
@@ -391,7 +392,7 @@ struct PointFunctionArguments
             const codegen::Codec* codec =
                 codegen::getCodec(ast::tokens::tokenFromTypeString(array.valueType()), array.codecType());
             if (codec) flag |= codec->flag();
-            assert(array.isDataLoaded() && !array.isUniform());
+            OPENVDB_ASSERT(array.isDataLoaded() && !array.isUniform());
         }
         else {
             typename WriteHandle<ValueT>::UniquePtr handle(new WriteHandle<ValueT>(leaf, Index(pos)));
@@ -404,14 +405,14 @@ struct PointFunctionArguments
 
     inline void addGroupHandle(const LeafT& leaf, const std::string& name)
     {
-        assert(leaf.attributeSet().descriptor().hasGroup(name));
+        OPENVDB_ASSERT(leaf.attributeSet().descriptor().hasGroup(name));
         mGroupHandles.emplace_back(new points::GroupHandle(leaf.groupHandle(name)));
         mVoidGroupHandles.emplace_back(static_cast<void*>(mGroupHandles.back().get()));
     }
 
     inline void addGroupWriteHandle(LeafT& leaf, const std::string& name)
     {
-        assert(leaf.attributeSet().descriptor().hasGroup(name));
+        OPENVDB_ASSERT(leaf.attributeSet().descriptor().hasGroup(name));
         mGroupHandles.emplace_back(new points::GroupWriteHandle(leaf.groupWriteHandle(name)));
         mVoidGroupHandles.emplace_back(static_cast<void*>(mGroupHandles.back().get()));
     }
@@ -422,7 +423,7 @@ struct PointFunctionArguments
     addAttributeHandle(LeafT& leaf, const std::string& name, const ast::tokens::CoreType type, const bool write)
     {
         // assert so the executer can be marked as noexcept (assuming nothing throws in compute)
-        assert(supported(type) && "Could not retrieve attribute handle from unsupported type");
+        OPENVDB_ASSERT(supported(type) && "Could not retrieve attribute handle from unsupported type");
         switch (type) {
             case ast::tokens::BOOL    : return this->addAttributeHandleTyped<bool>(leaf, name, write);
             case ast::tokens::CHAR    : return this->addAttributeHandleTyped<char>(leaf, name, write);
@@ -457,7 +458,7 @@ private:
     {
         const size_t pos = leaf.attributeSet().find(name);
         //assert(!leaf.attributeSet().isShared(pos));
-        assert(pos != openvdb::points::AttributeSet::INVALID_POS);
+        OPENVDB_ASSERT(pos != openvdb::points::AttributeSet::INVALID_POS);
         if (write) this->addWriteHandle<ValueType>(leaf, pos);
         else       this->addHandle<ValueType>(leaf, pos);
     }
@@ -503,7 +504,7 @@ struct PointExecuterDeformer
     void apply(Vec3d& position, const IterT& iter) const
     {
         if (mFilter.valid(iter)) {
-            assert(mPws);
+            OPENVDB_ASSERT(mPws);
             position = Vec3d(mPws->get(*iter));
         }
     }
@@ -647,7 +648,7 @@ void processAttributes(points::PointDataGrid& grid,
                        Logger& logger)
 {
     const auto leafIter = grid.tree().cbeginLeaf();
-    assert(leafIter);
+    OPENVDB_ASSERT(leafIter);
 
     attributeInfo.reserve(registry.data().size());
 
@@ -682,7 +683,7 @@ void processAttributes(points::PointDataGrid& grid,
 
         if (pos != points::AttributeSet::INVALID_POS) {
             const points::AttributeArray* const array = leafIter->attributeSet().getConst(pos);
-            assert(array);
+            OPENVDB_ASSERT(array);
             if (array->stride() > 1) {
                 logger.warning("Attribute \"" + name + (name != iter.name() ? "\" [bound to \"" + iter.name() + "\"]" : "\"")
                     + " on grid \"" + grid.getName() + "\"is a strided (array) attribute. "
@@ -704,7 +705,7 @@ void processAttributes(points::PointDataGrid& grid,
             continue;
         }
 
-        assert(supported(iter.type()));
+        OPENVDB_ASSERT(supported(iter.type()));
         const NamePair type = typePairFromToken(iter.type());
         points::appendAttribute(grid.tree(), name, type);
     }
@@ -755,9 +756,9 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
     , mFunctionAddresses(functions)
     , mSettings(new Settings<false>)
 {
-    assert(mContext);
-    assert(mExecutionEngine);
-    assert(mAttributeRegistry);
+    OPENVDB_ASSERT(mContext);
+    OPENVDB_ASSERT(mExecutionEngine);
+    OPENVDB_ASSERT(mAttributeRegistry);
 
     // parse the AST for known functions which require pre/post processing
     mSettings->mPostDelete = ast::callsFunction(ast, "deletepoint");

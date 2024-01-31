@@ -7,6 +7,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/util/Assert.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
 #include <atomic>
@@ -231,7 +232,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::setValue(Index i, const ValueType& val)
 {
-    assert(i < SIZE);
+    OPENVDB_ASSERT(i < SIZE);
     this->loadValues();
     if (mData) mData[i] = val;
 }
@@ -378,7 +379,7 @@ inline const typename LeafBuffer<T, Log2Dim>::ValueType&
 LeafBuffer<T, Log2Dim>::at(Index i) const
 {
     static const ValueType sZero = zeroVal<T>();
-    assert(i < SIZE);
+    OPENVDB_ASSERT(i < SIZE);
     this->loadValues();
     // We can't use the ternary operator here, otherwise Visual C++ returns
     // a reference to a temporary.
@@ -418,9 +419,9 @@ LeafBuffer<T, Log2Dim>::doLoad() const
     if (!this->isOutOfCore()) return;
 
     std::unique_ptr<FileInfo> info(self->mFileInfo);
-    assert(info.get() != nullptr);
-    assert(info->mapping.get() != nullptr);
-    assert(info->meta.get() != nullptr);
+    OPENVDB_ASSERT(info.get() != nullptr);
+    OPENVDB_ASSERT(info->mapping.get() != nullptr);
+    OPENVDB_ASSERT(info->meta.get() != nullptr);
 
     /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
     self->mData = nullptr;
@@ -488,7 +489,7 @@ public:
 
     const bool& getValue(Index i) const
     {
-        assert(i < SIZE);
+        OPENVDB_ASSERT(i < SIZE);
         // We can't use the ternary operator here, otherwise Visual C++ returns
         // a reference to a temporary.
         if (mData.isOn(i)) return sOn; else return sOff;
@@ -498,7 +499,7 @@ public:
     bool operator==(const LeafBuffer& other) const { return mData == other.mData; }
     bool operator!=(const LeafBuffer& other) const { return mData != other.mData; }
 
-    void setValue(Index i, bool val) { assert(i < SIZE); mData.set(i, val); }
+    void setValue(Index i, bool val) { OPENVDB_ASSERT(i < SIZE); mData.set(i, val); }
 
     void swap(LeafBuffer& other) { if (&other != this) std::swap(mData, other.mData); }
 

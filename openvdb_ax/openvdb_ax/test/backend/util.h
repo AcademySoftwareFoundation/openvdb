@@ -6,6 +6,8 @@
 
 #include <openvdb_ax/codegen/Types.h>
 
+#include <openvdb/util/Assert.h>
+
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
@@ -64,7 +66,7 @@ struct LLVMState
                 .setMAttrs(features)
                 .create());
 
-        assert(EE.get());
+        OPENVDB_ASSERT(EE.get());
         return EE;
     }
 

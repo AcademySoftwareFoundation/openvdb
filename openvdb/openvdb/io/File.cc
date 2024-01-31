@@ -8,6 +8,7 @@
 #include "TempFile.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <cstdint>
 
 #ifdef OPENVDB_USE_DELAYED_LOADING
@@ -20,7 +21,6 @@
 
 #include <sys/stat.h> // stat()
 
-#include <cassert>
 #include <cstdlib> // for getenv(), strtoul()
 #include <cstring> // for strerror_r()
 #include <fstream>
@@ -47,7 +47,7 @@ struct File::Impl
     static GridBase::Ptr readGrid(const File& file, const GridDescriptor& gd, const BoxType& bbox)
     {
         // This method should not be called for files that don't contain grid offsets.
-        assert(file.inputHasGridOffsets());
+        OPENVDB_ASSERT(file.inputHasGridOffsets());
 
         GridBase::Ptr grid = file.createGrid(gd);
         gd.seekToGrid(file.inputStream());
@@ -679,7 +679,7 @@ void
 File::readGridDescriptors(std::istream& is)
 {
     // This method should not be called for files that don't contain grid offsets.
-    assert(inputHasGridOffsets());
+    OPENVDB_ASSERT(inputHasGridOffsets());
 
     gridDescriptors().clear();
 
@@ -767,7 +767,7 @@ GridBase::ConstPtr
 File::readGridPartial(const GridDescriptor& gd, bool readTopology) const
 {
     // This method should not be called for files that don't contain grid offsets.
-    assert(inputHasGridOffsets());
+    OPENVDB_ASSERT(inputHasGridOffsets());
 
     GridBase::Ptr grid = createGrid(gd);
 
@@ -810,7 +810,7 @@ File::readGridPartial(GridBase::Ptr grid, std::istream& is,
     bool isInstance, bool readTopology) const
 {
     // This method should not be called for files that don't contain grid offsets.
-    assert(inputHasGridOffsets());
+    OPENVDB_ASSERT(inputHasGridOffsets());
 
     // This code needs to stay in sync with io::Archive::readGrid(), in terms of
     // the order of operations.

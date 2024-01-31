@@ -9,6 +9,8 @@
 #include "Types.h"
 #include "Utils.h"
 
+#include <openvdb/util/Assert.h>
+
 #include "../Exceptions.h"
 #include "../ast/Scanners.h"
 
@@ -91,15 +93,15 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         [&](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 9);
+        OPENVDB_ASSERT(args.size() == 9);
         llvm::Value* vbuff = args[2]; //extractArgument(rangeFunction, "value_buffer");
         llvm::Value* abuff = args[3]; //extractArgument(rangeFunction, "active_buffer");
         llvm::Value* buffSize = args[4]; //extractArgument(rangeFunction, "buffer_size");
         llvm::Value* mode = args[5]; //extractArgument(rangeFunction, "mode");
-        assert(buffSize);
-        assert(vbuff);
-        assert(abuff);
-        assert(mode);
+        OPENVDB_ASSERT(buffSize);
+        OPENVDB_ASSERT(vbuff);
+        OPENVDB_ASSERT(abuff);
+        OPENVDB_ASSERT(mode);
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::LLVMContext& C = B.getContext();
@@ -203,7 +205,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
         [&, this](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 6);
+        OPENVDB_ASSERT(args.size() == 6);
         llvm::Value* isc = args[1]; // index space coord
         llvm::Value* wi = args[4]; // write index
         llvm::Value* wa = args[5]; // write_accessor
@@ -219,7 +221,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
             type = type->getPointerElementType();
 
             llvm::Value* registeredIndex = this->mModule.getGlobalVariable(token);
-            assert(registeredIndex);
+            OPENVDB_ASSERT(registeredIndex);
             registeredIndex = ir_load(B, registeredIndex);
             llvm::Value* result = B.CreateICmpEQ(wi, registeredIndex);
 
@@ -337,13 +339,13 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
         {
             llvm::Value* vptr = mBuilder.CreateAlloca(type->getPointerTo(0));
             localTable->insert(data.tokenname() + "_vptr", vptr);
-            assert(llvm::cast<llvm::AllocaInst>(vptr)->isStaticAlloca());
+            OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(vptr)->isStaticAlloca());
         }
 
         // @warning This method will insert the alloc before the above alloc.
         //  This is fine, but is worth noting
         llvm::Value* value = insertStaticAlloca(mBuilder, type);
-        assert(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
+        OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
 
         // @note  this technically doesn't need to live in the local table
         //  (only the pointer to this value (_vptr) needs to) but it's
@@ -382,7 +384,7 @@ bool VolumeComputeGenerator::visit(const ast::Attribute* node)
     llvm::Value* value;
     value = localTable->get(globalName + "_vptr");
     value = ir_load(mBuilder, value);
-    assert(value);
+    OPENVDB_ASSERT(value);
     mValues.push(value);
     return true;
 }
@@ -417,8 +419,8 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
     {
         llvm::Value* valueptr = extractArgument(mFunction, "value");
         llvm::Value* offset = extractArgument(mFunction, "offset");
-        assert(valueptr);
-        assert(offset);
+        OPENVDB_ASSERT(valueptr);
+        OPENVDB_ASSERT(offset);
 
         llvm::Type* type = location->getType(); // ValueType*
         valueptr = mBuilder.CreatePointerCast(valueptr, type);
@@ -436,10 +438,10 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
         llvm::Value* transformPtr = extractArgument(mFunction, "transforms");
         llvm::Value* origin = extractArgument(mFunction, "origin");
         llvm::Value* offset = extractArgument(mFunction, "offset");
-        assert(accessorPtr);
-        assert(transformPtr);
-        assert(origin);
-        assert(offset);
+        OPENVDB_ASSERT(accessorPtr);
+        OPENVDB_ASSERT(transformPtr);
+        OPENVDB_ASSERT(origin);
+        OPENVDB_ASSERT(offset);
 
         accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
         llvm::Value* targetTransform = ir_gep(mBuilder, transformPtr, registeredIndex);
@@ -473,7 +475,7 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
     // The result is a loaded void* value
 
     llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
-    assert(accessorPtr);
+    OPENVDB_ASSERT(accessorPtr);
     accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
 
     // return loaded void** = void*

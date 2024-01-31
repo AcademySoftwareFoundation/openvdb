@@ -317,6 +317,9 @@ get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT _isMultiConfig)
   message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
 endif()
+if(OPENVDB_ENABLE_ASSERTS)
+  message(STATUS "OpenVDB asserts are ENABLED")
+endif()
 
 # Intialize extra build type targets where possible
 

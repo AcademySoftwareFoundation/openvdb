@@ -24,6 +24,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 
 #include "AttributeArray.h"
 #include "PointCount.h"

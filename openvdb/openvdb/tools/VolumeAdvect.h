@@ -16,6 +16,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 #include "Interpolation.h"// for Sampler
 #include "VelocityFields.h" // for VelocityIntegrator
@@ -388,7 +389,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     }
     void operator()(const LeafRangeT& range) const
     {
-        assert(mTask);
+        OPENVDB_ASSERT(mTask);
         mTask(const_cast<Advect*>(this), range);
     }
     void cook(VolumeGridT& outGrid, double time_step)
@@ -432,7 +433,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     void mac(const LeafRangeT& range) const
     {
         if (mParent->interrupt()) return;
-        assert( mParent->mIntegrator == Scheme::MAC );
+        OPENVDB_ASSERT( mParent->mIntegrator == Scheme::MAC );
         AccT acc = mInGrid->getAccessor();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* out0 = leafIter.buffer( 0 ).data();// forward
@@ -456,7 +457,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     void bfecc(const LeafRangeT& range) const
     {
         if (mParent->interrupt()) return;
-        assert( mParent->mIntegrator == Scheme::BFECC );
+        OPENVDB_ASSERT( mParent->mIntegrator == Scheme::BFECC );
         AccT acc = mInGrid->getAccessor();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* out0 = leafIter.buffer( 0 ).data();// forward
@@ -507,7 +508,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                 ValueT& value = phi[voxelIter.pos()];
 
                 if ( doLimiter ) {
-                    assert(OrderRK == 1);
+                    OPENVDB_ASSERT(OrderRK == 1);
                     Vec3d wPos = xform.indexToWorld(voxelIter.getCoord());
                     mVelocityInt.template rungeKutta<1, Vec3d>(dt, wPos);// Explicit Euler
                     Vec3d iPos = xform.worldToIndex(wPos);

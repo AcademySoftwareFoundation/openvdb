@@ -9,11 +9,11 @@
 #define OPENVDB_UTIL_NODEMASKS_HAS_BEEN_INCLUDED
 
 #include <algorithm> // for std::min()
-#include <cassert>
 #include <cstring>
 #include <iostream>// for cout
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 //#include <strings.h> // for ffs
 
 
@@ -84,7 +84,7 @@ inline Index32 CountOff(Index64 v) { return CountOn(~v); }
 inline Index32
 FindLowestOn(Byte v)
 {
-    assert(v);
+    OPENVDB_ASSERT(v);
 #if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER)
     unsigned long index;
     _BitScanForward(&index, static_cast<Index32>(v));
@@ -102,7 +102,7 @@ FindLowestOn(Byte v)
 inline Index32
 FindLowestOn(Index32 v)
 {
-    assert(v);
+    OPENVDB_ASSERT(v);
     //return ffs(v);
     static const Byte DeBruijn[32] = {
         0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
@@ -124,7 +124,7 @@ FindLowestOn(Index32 v)
 inline Index32
 FindLowestOn(Index64 v)
 {
-    assert(v);
+    OPENVDB_ASSERT(v);
 #if defined(OPENVDB_USE_SSE42) && defined(_MSC_VER)
     unsigned long index;
     _BitScanForward64(&index, v);
@@ -187,7 +187,7 @@ public:
     BaseMaskIterator(const BaseMaskIterator&) = default;
     BaseMaskIterator(Index32 pos, const NodeMask* parent): mPos(pos), mParent(parent)
     {
-        assert((parent == nullptr && pos == 0) || (parent != nullptr && pos <= NodeMask::SIZE));
+        OPENVDB_ASSERT((parent == nullptr && pos == 0) || (parent != nullptr && pos <= NodeMask::SIZE));
     }
     bool operator==(const BaseMaskIterator &iter) const {return mPos == iter.mPos;}
     bool operator!=(const BaseMaskIterator &iter) const {return mPos != iter.mPos;}
@@ -198,7 +198,7 @@ public:
     }
     Index32 offset() const { return mPos; }
     Index32 pos() const { return mPos; }
-    bool test() const { assert(mPos <= NodeMask::SIZE); return (mPos != NodeMask::SIZE); }
+    bool test() const { OPENVDB_ASSERT(mPos <= NodeMask::SIZE); return (mPos != NodeMask::SIZE); }
     operator bool() const { return this->test(); }
 }; // class BaseMaskIterator
 
@@ -216,9 +216,9 @@ public:
     OnMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != nullptr);
+        OPENVDB_ASSERT(mParent != nullptr);
         mPos = mParent->findNextOn(mPos+1);
-        assert(mPos <= NodeMask::SIZE);
+        OPENVDB_ASSERT(mPos <= NodeMask::SIZE);
     }
     void increment(Index n) { while(n-- && this->next()) ; }
     bool next()
@@ -247,9 +247,9 @@ public:
     OffMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != nullptr);
+        OPENVDB_ASSERT(mParent != nullptr);
         mPos=mParent->findNextOff(mPos+1);
-        assert(mPos <= NodeMask::SIZE);
+        OPENVDB_ASSERT(mPos <= NodeMask::SIZE);
     }
     void increment(Index n) { while(n-- && this->next()) ; }
     bool next()
@@ -279,9 +279,9 @@ public:
     DenseMaskIterator(Index32 pos,const NodeMask *parent) : BaseType(pos,parent) {}
     void increment()
     {
-        assert(mParent != nullptr);
+        OPENVDB_ASSERT(mParent != nullptr);
         mPos += 1;//careful - the increment might go beyond the end
-        assert(mPos<= NodeMask::SIZE);
+        OPENVDB_ASSERT(mPos<= NodeMask::SIZE);
     }
     void increment(Index n) { while(n-- && this->next()) ; }
     bool next()
@@ -450,12 +450,12 @@ public:
     Index32 countOff() const { return SIZE-this->countOn(); }
     /// Set the <i>n</i>th  bit on
     void setOn(Index32 n) {
-        assert( (n >> 6) < WORD_COUNT );
+        OPENVDB_ASSERT( (n >> 6) < WORD_COUNT );
         mWords[n >> 6] |=  Word(1) << (n & 63);
     }
     /// Set the <i>n</i>th bit off
     void setOff(Index32 n) {
-        assert( (n >> 6) < WORD_COUNT );
+        OPENVDB_ASSERT( (n >> 6) < WORD_COUNT );
         mWords[n >> 6] &=  ~(Word(1) << (n & 63));
     }
     /// Set the <i>n</i>th bit to the specified state
@@ -481,7 +481,7 @@ public:
     }
     /// Toggle the state of the <i>n</i>th bit
     void toggle(Index32 n) {
-        assert( (n >> 6) < WORD_COUNT );
+        OPENVDB_ASSERT( (n >> 6) < WORD_COUNT );
         mWords[n >> 6] ^= Word(1) << (n & 63);
     }
     /// Toggle the state of all bits in the mask
@@ -501,7 +501,7 @@ public:
     /// Return @c true if the <i>n</i>th bit is on
     bool isOn(Index32 n) const
     {
-        assert( (n >> 6) < WORD_COUNT );
+        OPENVDB_ASSERT( (n >> 6) < WORD_COUNT );
         return 0 != (mWords[n >> 6] & (Word(1) << (n & 63)));
     }
     /// Return @c true if the <i>n</i>th bit is off
@@ -551,13 +551,13 @@ public:
     template<typename WordT>
     WordT getWord(Index n) const
     {
-        assert(n*8*sizeof(WordT) < SIZE);
+        OPENVDB_ASSERT(n*8*sizeof(WordT) < SIZE);
         return reinterpret_cast<const WordT*>(mWords)[n];
     }
     template<typename WordT>
     WordT& getWord(Index n)
     {
-        assert(n*8*sizeof(WordT) < SIZE);
+        OPENVDB_ASSERT(n*8*sizeof(WordT) < SIZE);
         return reinterpret_cast<WordT*>(mWords)[n];
     }
     //@}
@@ -726,12 +726,12 @@ public:
     Index32 countOff() const { return CountOff(mByte); }
     /// Set the <i>n</i>th  bit on
     void setOn(Index32 n) {
-        assert( n  < 8 );
+        OPENVDB_ASSERT( n  < 8 );
         mByte = static_cast<Byte>(mByte | 0x01U << (n & 7));
     }
     /// Set the <i>n</i>th bit off
     void setOff(Index32 n) {
-        assert( n  < 8 );
+        OPENVDB_ASSERT( n  < 8 );
         mByte = static_cast<Byte>(mByte & ~(0x01U << (n & 7)));
     }
     /// Set the <i>n</i>th bit to the specified state
@@ -744,7 +744,7 @@ public:
     void setOff() { mByte = 0x00U; }
     /// Toggle the state of the <i>n</i>th bit
     void toggle(Index32 n) {
-        assert( n  < 8 );
+        OPENVDB_ASSERT( n  < 8 );
         mByte = static_cast<Byte>(mByte ^ 0x01U << (n & 7));
     }
     /// Toggle the state of all bits in the mask
@@ -760,7 +760,7 @@ public:
     /// Return true if the <i>n</i>th bit is on
     bool isOn(Index32 n) const
     {
-        assert( n  < 8 );
+        OPENVDB_ASSERT( n  < 8 );
         return mByte & (0x01U << (n & 7));
     }
     /// Return true if the <i>n</i>th bit is off
@@ -791,14 +791,14 @@ public:
     WordT getWord(Index n) const
     {
         static_assert(sizeof(WordT) == sizeof(Byte), "expected word size to be one byte");
-        assert(n == 0);
+        OPENVDB_ASSERT(n == 0);
         return reinterpret_cast<WordT>(mByte);
     }
     template<typename WordT>
     WordT& getWord(Index n)
     {
         static_assert(sizeof(WordT) == sizeof(Byte), "expected word size to be one byte");
-        assert(n == 0);
+        OPENVDB_ASSERT(n == 0);
         return reinterpret_cast<WordT&>(mByte);
     }
     //@}
@@ -948,12 +948,12 @@ public:
     Index32 countOff() const { return CountOff(mWord); }
     /// Set the <i>n</i>th  bit on
     void setOn(Index32 n) {
-        assert( n  < 64 );
+        OPENVDB_ASSERT( n  < 64 );
         mWord |= UINT64_C(0x01) << (n & 63);
     }
     /// Set the <i>n</i>th bit off
     void setOff(Index32 n) {
-        assert( n  < 64 );
+        OPENVDB_ASSERT( n  < 64 );
         mWord &= ~(UINT64_C(0x01) << (n & 63));
     }
     /// Set the <i>n</i>th bit to the specified state
@@ -966,7 +966,7 @@ public:
     void setOff() { mWord = UINT64_C(0x00); }
     /// Toggle the state of the <i>n</i>th bit
     void toggle(Index32 n) {
-        assert( n  < 64 );
+        OPENVDB_ASSERT( n  < 64 );
         mWord ^= UINT64_C(0x01) << (n & 63);
     }
     /// Toggle the state of all bits in the mask
@@ -982,7 +982,7 @@ public:
     /// Return true if the <i>n</i>th bit is on
     bool isOn(Index32 n) const
     {
-        assert( n  < 64 );
+        OPENVDB_ASSERT( n  < 64 );
         return 0 != (mWord & (UINT64_C(0x01) << (n & 63)));
     }
     /// Return true if the <i>n</i>th bit is off
@@ -1009,13 +1009,13 @@ public:
     template<typename WordT>
     WordT getWord(Index n) const
     {
-        assert(n*8*sizeof(WordT) < SIZE);
+        OPENVDB_ASSERT(n*8*sizeof(WordT) < SIZE);
         return reinterpret_cast<const WordT*>(&mWord)[n];
     }
     template<typename WordT>
     WordT& getWord(Index n)
     {
-        assert(n*8*sizeof(WordT) < SIZE);
+        OPENVDB_ASSERT(n*8*sizeof(WordT) < SIZE);
         return reinterpret_cast<WordT*>(mWord)[n];
     }
     //@}
@@ -1116,7 +1116,7 @@ public:
         BaseIterator() : mPos(0), mBitSize(0), mParent(nullptr) {}
         BaseIterator(const BaseIterator&) = default;
         BaseIterator(Index32 pos, const RootNodeMask* parent):
-            mPos(pos), mBitSize(parent->getBitSize()), mParent(parent) { assert(pos <= mBitSize); }
+            mPos(pos), mBitSize(parent->getBitSize()), mParent(parent) { OPENVDB_ASSERT(pos <= mBitSize); }
         bool operator==(const BaseIterator &iter) const {return mPos == iter.mPos;}
         bool operator!=(const BaseIterator &iter) const {return mPos != iter.mPos;}
         bool operator< (const BaseIterator &iter) const {return mPos <  iter.mPos;}
@@ -1132,7 +1132,7 @@ public:
         Index32 pos() const {return mPos;}
 
         bool test() const {
-            assert(mPos  <= mBitSize);
+            OPENVDB_ASSERT(mPos  <= mBitSize);
             return (mPos != mBitSize);
         }
 
@@ -1150,9 +1150,9 @@ public:
         OnIterator() : BaseIterator() {}
         OnIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent != nullptr);
+            OPENVDB_ASSERT(mParent != nullptr);
             mPos=mParent->findNextOn(mPos+1);
-            assert(mPos <= mBitSize);
+            OPENVDB_ASSERT(mPos <= mBitSize);
         }
         void increment(Index n) {
             for (Index i=0; i<n && this->next(); ++i) {}
@@ -1178,9 +1178,9 @@ public:
         OffIterator() : BaseIterator()  {}
         OffIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent != nullptr);
+            OPENVDB_ASSERT(mParent != nullptr);
             mPos=mParent->findNextOff(mPos+1);
-            assert(mPos <= mBitSize);
+            OPENVDB_ASSERT(mPos <= mBitSize);
         }
         void increment(Index n) {
             for (Index i=0; i<n && this->next(); ++i) {}
@@ -1206,9 +1206,9 @@ public:
         DenseIterator() : BaseIterator() {}
         DenseIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
-            assert(mParent != nullptr);
+            OPENVDB_ASSERT(mParent != nullptr);
             mPos += 1;//carefull - the increament might go beyond the end
-            assert(mPos<= mBitSize);
+            OPENVDB_ASSERT(mPos<= mBitSize);
         }
         void increment(Index n) {
             for (Index i=0; i<n && this->next(); ++i) {}
@@ -1248,7 +1248,7 @@ public:
     //
     RootNodeMask operator!() const { RootNodeMask m = *this; m.toggle(); return m; }
     const RootNodeMask& operator&=(const RootNodeMask& other) {
-        assert(mIntSize == other.mIntSize);
+        OPENVDB_ASSERT(mIntSize == other.mIntSize);
         for (Index32 i = 0, N = std::min(mIntSize, other.mIntSize); i < N; ++i) {
             mBits[i] &= other.mBits[i];
         }
@@ -1256,14 +1256,14 @@ public:
         return *this;
     }
     const RootNodeMask& operator|=(const RootNodeMask& other) {
-        assert(mIntSize == other.mIntSize);
+        OPENVDB_ASSERT(mIntSize == other.mIntSize);
         for (Index32 i = 0, N = std::min(mIntSize, other.mIntSize); i < N; ++i) {
             mBits[i] |= other.mBits[i];
         }
         return *this;
     }
     const RootNodeMask& operator^=(const RootNodeMask& other) {
-        assert(mIntSize == other.mIntSize);
+        OPENVDB_ASSERT(mIntSize == other.mIntSize);
         for (Index32 i = 0, N = std::min(mIntSize, other.mIntSize); i < N; ++i) {
             mBits[i] ^= other.mBits[i];
         }
@@ -1285,7 +1285,7 @@ public:
     }
 
     Index32 countOn() const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         Index32 n=0;
         for (Index32 i=0; i< mIntSize; ++i) n += CountOn(mBits[i]);
         return n;
@@ -1294,34 +1294,34 @@ public:
     Index32 countOff() const { return mBitSize-this->countOn(); }
 
     void setOn(Index32 i) {
-        assert(mBits);
-        assert( (i>>5) < mIntSize);
+        OPENVDB_ASSERT(mBits);
+        OPENVDB_ASSERT( (i>>5) < mIntSize);
         mBits[i>>5] |=  1<<(i&31);
     }
 
     void setOff(Index32 i) {
-        assert(mBits);
-        assert( (i>>5) < mIntSize);
+        OPENVDB_ASSERT(mBits);
+        OPENVDB_ASSERT( (i>>5) < mIntSize);
         mBits[i>>5] &=  ~(1<<(i&31));
     }
 
     void set(Index32 i, bool On) { On ? this->setOn(i) : this->setOff(i); }
 
     void setOn() {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         for (Index32 i=0; i<mIntSize; ++i) mBits[i]=0xFFFFFFFF;
     }
     void setOff() {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         for (Index32 i=0; i<mIntSize; ++i) mBits[i]=0x00000000;
     }
     void toggle(Index32 i) {
-        assert(mBits);
-        assert( (i>>5) < mIntSize);
+        OPENVDB_ASSERT(mBits);
+        OPENVDB_ASSERT( (i>>5) < mIntSize);
         mBits[i>>5] ^= 1<<(i&31);
     }
     void toggle() {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         for (Index32 i=0; i<mIntSize; ++i) mBits[i]=~mBits[i];
     }
     void setFirstOn()  { this->setOn(0); }
@@ -1329,13 +1329,13 @@ public:
     void setFirstOff() { this->setOff(0); }
     void setLastOff()  { this->setOff(mBitSize-1); }
     bool isOn(Index32 i) const {
-        assert(mBits);
-        assert( (i>>5) < mIntSize);
+        OPENVDB_ASSERT(mBits);
+        OPENVDB_ASSERT( (i>>5) < mIntSize);
         return ( mBits[i >> 5] & (1<<(i&31)) );
     }
     bool isOff(Index32 i) const {
-        assert(mBits);
-        assert( (i>>5) < mIntSize);
+        OPENVDB_ASSERT(mBits);
+        OPENVDB_ASSERT( (i>>5) < mIntSize);
         return ( ~mBits[i >> 5] & (1<<(i&31)) );
     }
 
@@ -1352,29 +1352,29 @@ public:
     }
 
     Index32 findFirstOn() const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         Index32 i=0;
         while(!mBits[i]) if (++i == mIntSize) return mBitSize;//reached end
         return 32*i + FindLowestOn(mBits[i]);
     }
 
     Index32 findFirstOff() const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         Index32 i=0;
         while(!(~mBits[i])) if (++i == mIntSize) return mBitSize;//reached end
         return 32*i + FindLowestOn(~mBits[i]);
     }
 
     void save(std::ostream& os) const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         os.write(reinterpret_cast<const char*>(mBits), mIntSize * sizeof(Index32));
     }
     void load(std::istream& is) {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         is.read(reinterpret_cast<char*>(mBits), mIntSize * sizeof(Index32));
     }
     void seek(std::istream& is) const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         is.seekg(mIntSize * sizeof(Index32), std::ios_base::cur);
     }
     /// @brief simple print method for debugging
@@ -1400,7 +1400,7 @@ public:
     }
 
     Index32 findNextOn(Index32 start) const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         Index32 n = start >> 5, m = start & 31;//initiate
         if (n>=mIntSize) return mBitSize; // check for out of bounds
         Index32 b = mBits[n];
@@ -1411,7 +1411,7 @@ public:
     }
 
     Index32 findNextOff(Index32 start) const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         Index32 n = start >> 5, m = start & 31;//initiate
         if (n>=mIntSize) return mBitSize; // check for out of bounds
         Index32 b = ~mBits[n];
@@ -1422,7 +1422,7 @@ public:
     }
 
     Index32 memUsage() const {
-        assert(mBits);
+        OPENVDB_ASSERT(mBits);
         return static_cast<Index32>(sizeof(Index32*)+(2+mIntSize)*sizeof(Index32));//in bytes
     }
 }; // class RootNodeMask

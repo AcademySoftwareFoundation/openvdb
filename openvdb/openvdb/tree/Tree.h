@@ -13,6 +13,7 @@
 #include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/Platform.h>
 #include "RootNode.h"
 #include "InternalNode.h"
@@ -515,7 +516,7 @@ public:
     ///
     /// @warning Ownership of the leaf is transferred to the tree so
     /// the client code should not attempt to delete the leaf pointer!
-    void addLeaf(LeafNodeType* leaf) { assert(leaf); mRoot.addLeaf(leaf); }
+    void addLeaf(LeafNodeType* leaf) { OPENVDB_ASSERT(leaf); mRoot.addLeaf(leaf); }
 
     /// @brief Add a tile containing voxel (x, y, z) at the specified tree level,
     /// creating a new branch if necessary.  Delete any existing lower-level nodes
@@ -1971,7 +1972,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 
     const auto nodeCount = this->nodeCount();//fast
     const Index32 leafCount = nodeCount.front();// leaf is the first element
-    assert(dims.size() == nodeCount.size());
+    OPENVDB_ASSERT(dims.size() == nodeCount.size());
 
     Index64 totalNodeCount = 0;
     for (size_t i = 0; i < nodeCount.size(); ++i) totalNodeCount += nodeCount[i];

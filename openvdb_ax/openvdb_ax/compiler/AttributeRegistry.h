@@ -23,6 +23,7 @@
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/Name.h>
+#include <openvdb/util/Assert.h>
 
 #include <unordered_map>
 
@@ -69,7 +70,7 @@ public:
         const std::vector<const AccessData*>& uses() const { return mUses; }
 
         bool dependson(const AccessData* data) const {
-            assert(data);
+            OPENVDB_ASSERT(data);
             for (auto& dep : mDependencies) {
                 if (dep == data) return true;
             }
@@ -227,11 +228,11 @@ inline AttributeRegistry::Ptr AttributeRegistry::create(const ast::Tree& tree)
             ast::attributeDependencyTokens(tree, name, typetoken, deps);
             if (deps.empty()) continue;
 
-            assert(indexmap.find(attrib) != indexmap.cend());
+            OPENVDB_ASSERT(indexmap.find(attrib) != indexmap.cend());
             const size_t index = indexmap.at(attrib);
             AccessData& access = registry->mAccesses[index];
             for (const std::string& dep : deps) {
-                assert(indexmap.find(dep) != indexmap.cend());
+                OPENVDB_ASSERT(indexmap.find(dep) != indexmap.cend());
                 const size_t depindex = indexmap.at(dep);
                 access.mDependencies.emplace_back(&registry->mAccesses[depindex]);
             }

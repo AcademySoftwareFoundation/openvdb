@@ -25,6 +25,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 
 #include <type_traits>
@@ -285,7 +286,7 @@ struct VolumeTransfer<TreeT>
         : mTree(tree)
         , mBuffer(nullptr)
         , mMask(nullptr) {
-        assert(tree);
+        OPENVDB_ASSERT(tree);
     }
 
     VolumeTransfer(TreeType& tree)
@@ -300,7 +301,7 @@ struct VolumeTransfer<TreeT>
 
     inline void initialize(const Coord& origin, const size_t, const CoordBBox&)
     {
-        assert(mTree);
+        OPENVDB_ASSERT(mTree);
         if (auto leaf = mTree->probeLeaf(origin)) {
             mBuffer = leaf->buffer().data();
             mMask = &(leaf->getValueMask());
@@ -367,7 +368,7 @@ VolumeTransfer<TreeTypes...>::VolumeTransfer(TreeTypes*... trees)
         static_assert(std::is_base_of<TreeBase, TreeT>::value,
             "One or more template arguments to VolumeTransfer "
             "are not a valid openvdb::Tree type.");
-        assert(tree);
+        OPENVDB_ASSERT(tree);
     }, std::make_integer_sequence<size_t, Size>());
 
     mBuffers.fill(nullptr);
@@ -379,7 +380,7 @@ inline void VolumeTransfer<TreeTypes...>::initialize(const Coord& origin, const 
 {
     transfer_internal::foreach(mTreeArray,
         [&](auto&& tree, const size_t i) {
-            assert(tree);
+            OPENVDB_ASSERT(tree);
             if (auto leaf = tree->probeLeaf(origin)) {
                 mBuffers[i] = static_cast<void*>(leaf->buffer().data());
                 mMasks[i] = &(leaf->getValueMask());
@@ -444,7 +445,7 @@ struct RasterizePoints
             // Use evalActiveBoundingBox over getNodeBoundingBox()
             // to get a better approximation
             leaf.evalActiveBoundingBox(bounds);
-            assert(!bounds.empty());
+            OPENVDB_ASSERT(!bounds.empty());
         }
 
         mTransfer.initialize(origin, idx, bounds);
@@ -483,7 +484,7 @@ struct RasterizePoints
                             const Index ij = i + ((ijk.y() & (DIM-1u)) << LOG2DIM);
                             for (ijk.z() = pmin.z(); ijk.z() <= pmax.z(); ++ijk.z()) {
                                 // voxel should be in this points leaf
-                                assert((ijk & ~(DIM-1u)) == leafOrigin);
+                                OPENVDB_ASSERT((ijk & ~(DIM-1u)) == leafOrigin);
                                 const Index index = ij + /*k*/(ijk.z() & (DIM-1u));
                                 const Index end = pointLeaf->getValue(index);
                                 Index id = (index == 0) ? 0 : Index(pointLeaf->getValue(index - 1));

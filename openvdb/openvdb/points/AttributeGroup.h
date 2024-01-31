@@ -12,6 +12,7 @@
 
 #include "AttributeArray.h"
 #include "AttributeSet.h"
+#include <openvdb/util/Assert.h>
 #include <memory>
 
 namespace openvdb {
@@ -153,7 +154,7 @@ public:
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mHandle);
+        OPENVDB_ASSERT(mHandle);
         return mHandle->getUnsafe(*iter);
     }
 

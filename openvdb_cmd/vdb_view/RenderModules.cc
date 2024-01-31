@@ -11,6 +11,7 @@
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <algorithm> // for std::min()
 #include <cmath> // for std::abs(), std::fabs(), std::floor()
 #include <limits>
@@ -332,7 +333,7 @@ BufferObject::genIndexBuffer(const std::vector<GLuint>& v, GLenum primType)
 void
 BufferObject::genVertexBuffer(const std::vector<GLfloat>& v)
 {
-    assert((v.size() % 3) == 0);
+    OPENVDB_ASSERT((v.size() % 3) == 0);
     if (glIsBuffer(mVertexBuffer) == GL_TRUE) glDeleteBuffers(1, &mVertexBuffer);
 
     glGenBuffers(1, &mVertexBuffer);

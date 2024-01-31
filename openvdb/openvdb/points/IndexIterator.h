@@ -12,6 +12,7 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -147,7 +148,7 @@ public:
             : mIter(iter), mParent(&mIter.parent())
         {
             if (mIter) {
-                assert(mParent);
+                OPENVDB_ASSERT(mParent);
                 Index32 start = (mIter.offset() > 0 ?
                     Index32(mParent->getValue(mIter.offset() - 1)) : Index32(0));
                 this->reset(start, *mIter);
@@ -157,7 +158,7 @@ public:
         ValueIndexIter(const ValueIndexIter& other)
             : mEnd(other.mEnd), mItem(other.mItem), mIter(other.mIter), mParent(other.mParent)
         {
-            assert(mParent);
+            OPENVDB_ASSERT(mParent);
         }
         ValueIndexIter& operator=(const ValueIndexIter&) = default;
 
@@ -169,8 +170,8 @@ public:
         }
 
         /// @brief  Returns the item to which this iterator is currently pointing.
-        inline Index32 operator*() { assert(mIter); return mItem; }
-        inline Index32 operator*() const { assert(mIter); return mItem; }
+        inline Index32 operator*() { OPENVDB_ASSERT(mIter); return mItem; }
+        inline Index32 operator*() const { OPENVDB_ASSERT(mIter); return mItem; }
 
         /// @brief  Return @c true if this iterator is not yet exhausted.
         inline operator bool() const { return mIter; }
@@ -180,7 +181,7 @@ public:
         inline ValueIndexIter& operator++() {
             ++mItem;
             while (mItem >= mEnd && mIter.next()) {
-                assert(mParent);
+                OPENVDB_ASSERT(mParent);
                 this->reset(mParent->getValue(mIter.offset() - 1), *mIter);
             }
             return *this;
@@ -191,12 +192,12 @@ public:
         inline bool increment() { this->next(); return this->test(); }
 
         /// Return the coordinates of the item to which the value iterator is pointing.
-        inline Coord getCoord() const { assert(mIter); return mIter.getCoord(); }
+        inline Coord getCoord() const { OPENVDB_ASSERT(mIter); return mIter.getCoord(); }
         /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
-        inline void getCoord(Coord& xyz) const { assert(mIter); xyz = mIter.getCoord(); }
+        inline void getCoord(Coord& xyz) const { OPENVDB_ASSERT(mIter); xyz = mIter.getCoord(); }
 
         /// @brief Return @c true if this iterator is pointing to an active value.
-        inline bool isValueOn() const { assert(mIter); return mIter.isValueOn(); }
+        inline bool isValueOn() const { OPENVDB_ASSERT(mIter); return mIter.isValueOn(); }
 
         /// Return the const value iterator
         inline const IteratorT& valueIter() const { return mIter; }
@@ -257,8 +258,8 @@ public:
     }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    Index32 operator*() { assert(mIterator); return *mIterator; }
-    Index32 operator*() const { assert(mIterator); return *mIterator; }
+    Index32 operator*() { OPENVDB_ASSERT(mIterator); return *mIterator; }
+    Index32 operator*() const { OPENVDB_ASSERT(mIterator); return *mIterator; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     operator bool() const { return mIterator.test(); }
@@ -290,12 +291,12 @@ public:
     inline const FilterT& filter() const { return mFilter; }
 
     /// Return the coordinates of the item to which the value iterator is pointing.
-    inline Coord getCoord() const { assert(mIterator); return mIterator.getCoord(); }
+    inline Coord getCoord() const { OPENVDB_ASSERT(mIterator); return mIterator.getCoord(); }
     /// Return in @a xyz the coordinates of the item to which the value iterator is pointing.
-    inline void getCoord(Coord& xyz) const { assert(mIterator); xyz = mIterator.getCoord(); }
+    inline void getCoord(Coord& xyz) const { OPENVDB_ASSERT(mIterator); xyz = mIterator.getCoord(); }
 
     /// @brief Return @c true if the value iterator is pointing to an active value.
-    inline bool isValueOn() const { assert(mIterator); return mIterator.valueIter().isValueOn(); }
+    inline bool isValueOn() const { OPENVDB_ASSERT(mIterator); return mIterator.valueIter().isValueOn(); }
 
     /// @brief Equality operators
     bool operator==(const IndexIter& other) const { return mIterator == other.mIterator; }

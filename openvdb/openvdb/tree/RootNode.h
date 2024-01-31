@@ -14,6 +14,7 @@
 #include <openvdb/math/Math.h> // for isZero(), isExactlyEqual(), etc.
 #include <openvdb/math/BBox.h>
 #include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
+#include <openvdb/util/Assert.h>
 #include <openvdb/version.h>
 #include <tbb/parallel_for.h>
 #include <map>
@@ -224,7 +225,7 @@ private:
             return *mParentNode;
         }
 
-        bool test() const { assert(mParentNode); return mIter != mParentNode->mTable.end(); }
+        bool test() const { OPENVDB_ASSERT(mParentNode); return mIter != mParentNode->mTable.end(); }
         operator bool() const { return this->test(); }
 
         void increment() { if (this->test()) { ++mIter; } this->skip(); }
@@ -301,12 +302,12 @@ private:
         ValueT& operator*() const { return this->getValue(); }
         ValueT* operator->() const { return &(this->getValue()); }
 
-        void setValue(const ValueT& v) const { assert(isTile(mIter)); getTile(mIter).value = v; }
+        void setValue(const ValueT& v) const { OPENVDB_ASSERT(isTile(mIter)); getTile(mIter).value = v; }
 
         template<typename ModifyOp>
         void modifyValue(const ModifyOp& op) const
         {
-            assert(isTile(mIter));
+            OPENVDB_ASSERT(isTile(mIter));
             op(getTile(mIter).value);
         }
     }; // ValueIter
@@ -345,7 +346,7 @@ private:
         bool probeValue(NonConstValueType& value) const { return !this->probeChild(value); }
 
         void setChild(ChildNodeT& c) const { RootNodeT::setChild(mIter, c); }
-        void setChild(ChildNodeT* c) const { assert(c != nullptr); RootNodeT::setChild(mIter, *c); }
+        void setChild(ChildNodeT* c) const { OPENVDB_ASSERT(c != nullptr); RootNodeT::setChild(mIter, *c); }
         void setValue(const ValueT& v) const
         {
             if (isTile(mIter)) getTile(mIter).value = v;
@@ -1677,7 +1678,7 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
 {
-    assert(vec.size() > LEVEL);
+    OPENVDB_ASSERT(vec.size() > LEVEL);
     Index32 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {

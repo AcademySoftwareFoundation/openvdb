@@ -20,6 +20,7 @@
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Vec3.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
@@ -102,19 +103,19 @@ struct LLVMType
         llvm::Constant* constant = nullptr;
 
         if (std::is_floating_point<T>::value) {
-            assert(llvm::ConstantFP::isValueValidForType(type,
+            OPENVDB_ASSERT(llvm::ConstantFP::isValueValidForType(type,
                 llvm::APFloat(static_cast<typename std::conditional
                     <std::is_floating_point<T>::value, T, double>::type>(V))));
             constant = llvm::ConstantFP::get(type, static_cast<double>(V));
         }
         else if (std::is_integral<T>::value) {
             const constexpr bool isSigned = std::is_signed<T>::value;
-            assert((isSigned && llvm::ConstantInt::isValueValidForType(type, static_cast<int64_t>(V))) ||
+            OPENVDB_ASSERT((isSigned && llvm::ConstantInt::isValueValidForType(type, static_cast<int64_t>(V))) ||
                    (!isSigned && llvm::ConstantInt::isValueValidForType(type, static_cast<uint64_t>(V))));
             constant = llvm::ConstantInt::get(type, static_cast<uint64_t>(V), isSigned);
         }
 
-        assert(constant);
+        OPENVDB_ASSERT(constant);
         return constant;
     }
 
@@ -209,9 +210,9 @@ template <> struct LLVMType<openvdb::math::half>
     static inline llvm::Constant* get(llvm::LLVMContext& C, const openvdb::math::half V)
     {
         llvm::Type* type = LLVMType<openvdb::math::half>::get(C);
-        assert(llvm::ConstantFP::isValueValidForType(type, llvm::APFloat(V)));
+        OPENVDB_ASSERT(llvm::ConstantFP::isValueValidForType(type, llvm::APFloat(V)));
         llvm::Constant* constant = llvm::ConstantFP::get(type, static_cast<double>(V));
-        assert(constant);
+        OPENVDB_ASSERT(constant);
         return constant;
     }
     static inline llvm::Constant* get(llvm::LLVMContext& C, const openvdb::math::half* const V)
@@ -334,7 +335,7 @@ llvmConstant(const T t, llvm::Type* type)
         return llvm::ConstantInt::get(type, static_cast<uint64_t>(t), /*signed*/true);
     }
     else {
-        assert(type->isFloatingPointTy());
+        OPENVDB_ASSERT(type->isFloatingPointTy());
         return llvm::ConstantFP::get(type, static_cast<double>(t));
     }
 }

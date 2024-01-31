@@ -6,6 +6,8 @@
 #include "CompareGrids.h"
 
 #include <openvdb/points/PointDataGrid.h>
+#include <openvdb/util/Assert.h>
+
 #include <tbb/concurrent_vector.h>
 
 namespace unittest_util
@@ -131,7 +133,7 @@ struct NodeDD : public DiagnosticData
 
         const auto& l1 = g1.constTree().template probeConstNode<NodeT>(mOrigin);
         const auto& l2 = g2.constTree().template probeConstNode<NodeT>(mOrigin);
-        assert(l1 && l2);
+        OPENVDB_ASSERT(l1 && l2);
 
         os << "    Buffer Sizes : " <<  Local::fts(this->mBufferSizes) << std::endl;
 
@@ -232,7 +234,7 @@ inline bool compareNodes(const NodeT& firstLeaf,
 
     for (; iter; ++iter) {
         const openvdb::Index n = iter.pos();
-        assert(n < firstBuffer.size() && n < secondBuffer.size());
+        OPENVDB_ASSERT(n < firstBuffer.size() && n < secondBuffer.size());
 
         if (settings.mCheckActiveStates &&
             firstMask.isOn(n) ^ secondMask.isOn(n)) {
@@ -276,7 +278,7 @@ inline bool compareNodes(const NodeT& n1,
         }
 
         if (cmask1.isOn(n) && cmask2.isOn(n)) continue;
-        assert(vmask1.isOn(n) && vmask2.isOn(n));
+        OPENVDB_ASSERT(vmask1.isOn(n) && vmask2.isOn(n));
 
         if (settings.mCheckBufferValues &&
             !openvdb::math::isApproxEqual(t1[n].getValue(), t2[n].getValue(), tolerance)) {
@@ -483,7 +485,7 @@ struct CompareNodes
            data->mValid = false;
         }
         else {
-            assert(n1 && n2);
+            OPENVDB_ASSERT(n1 && n2);
             const typename MaskNodeT::NodeMaskType
                 mask(mUseVoxelMask ? node.getValueMask() : true);
             if (compareNodes(*n1, *n2, mask, *data, mSettings, mTolerance) &&
@@ -607,7 +609,7 @@ bool compareGrids(ComparisonResult& resultData,
     os << "[Diagnostic]: Leaf Node Diagnostics:\n"  << std::endl;
 
     for (const auto& diag : data) {
-        assert(diag);
+        OPENVDB_ASSERT(diag);
         diag->report(os, firstGrid, secondGrid, accessorTopology, accessorValues);
     }
 

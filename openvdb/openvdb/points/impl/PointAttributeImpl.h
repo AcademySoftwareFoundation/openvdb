@@ -222,7 +222,7 @@ inline void collapseAttribute(  PointDataTreeT& tree,
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
         [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
-            assert(leaf.hasAttribute(index));
+            OPENVDB_ASSERT(leaf.hasAttribute(index));
             AttributeArray& array = leaf.attributeArray(index);
             point_attribute_internal::collapseAttribute(
                 array, descriptor, uniformValue);
@@ -354,7 +354,7 @@ inline void renameAttributes(   PointDataTreeT& tree,
         }
 
         const AttributeArray* array = attributeSet.getConst(oldName);
-        assert(array);
+        OPENVDB_ASSERT(array);
 
         if (isGroup(*array)) {
             OPENVDB_THROW(KeyError, "Cannot rename group attribute - " << oldName << ".");

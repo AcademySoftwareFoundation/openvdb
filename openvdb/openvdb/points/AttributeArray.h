@@ -14,6 +14,7 @@
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/io/io.h> // MappedFile
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
@@ -774,8 +775,8 @@ protected:
     AccessorBasePtr getAccessor() const override;
 
     /// Return the raw data buffer
-    inline StorageType* data() { assert(validData()); return mData.get(); }
-    inline const StorageType* data() const { assert(validData()); return mData.get(); }
+    inline StorageType* data() { OPENVDB_ASSERT(validData()); return mData.get(); }
+    inline const StorageType* data() const { OPENVDB_ASSERT(validData()); return mData.get(); }
 
     /// Verify that data is not out-of-core or in a partially-read state
     inline bool validData() const { return !(isOutOfCore() || (flags() & PARTIALREAD)); }
@@ -1033,17 +1034,17 @@ void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT
     bool rangeChecking/*=true*/)
 {
     // ensure both arrays have float-float or integer-integer value types
-    assert(sourceArray.valueTypeIsFloatingPoint() == this->valueTypeIsFloatingPoint());
+    OPENVDB_ASSERT(sourceArray.valueTypeIsFloatingPoint() == this->valueTypeIsFloatingPoint());
     // ensure both arrays have been loaded from disk (if delay-loaded)
-    assert(sourceArray.isDataLoaded() && this->isDataLoaded());
+    OPENVDB_ASSERT(sourceArray.isDataLoaded() && this->isDataLoaded());
     // ensure storage size * stride matches on both arrays
-    assert(this->storageTypeSize()*this->stride() ==
+    OPENVDB_ASSERT(this->storageTypeSize()*this->stride() ==
         sourceArray.storageTypeSize()*sourceArray.stride());
 
     const size_t bytes(sourceArray.storageTypeSize()*sourceArray.stride());
     const char* const sourceBuffer = sourceArray.dataAsByteArray();
     char* const targetBuffer = this->dataAsByteArray();
-    assert(sourceBuffer && targetBuffer);
+    OPENVDB_ASSERT(sourceBuffer && targetBuffer);
 
     if (rangeChecking && this->isUniform()) {
         OPENVDB_THROW(IndexError, "Cannot copy array data as target array is uniform.");
@@ -1069,9 +1070,9 @@ void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT
             }
         } else {
             // range-checking asserts
-            assert(sourceIndex < sourceArray.dataSize());
-            assert(targetIndex < this->dataSize());
-            if (this->isUniform())  assert(targetIndex == Index(0));
+            OPENVDB_ASSERT(sourceIndex < sourceArray.dataSize());
+            OPENVDB_ASSERT(targetIndex < this->dataSize());
+            if (this->isUniform())  OPENVDB_ASSERT(targetIndex == Index(0));
         }
 
         const size_t targetOffset(targetIndex * bytes);
@@ -1297,13 +1298,13 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::allocate()
 {
-    assert(!mData);
+    OPENVDB_ASSERT(!mData);
     if (mIsUniform) {
         mData.reset(new StorageType[1]);
     }
     else {
         const size_t size(this->dataSize());
-        assert(size > 0);
+        OPENVDB_ASSERT(size > 0);
         mData.reset(new StorageType[size]);
     }
 }
@@ -1398,7 +1399,7 @@ template<typename ValueType_, typename Codec_>
 typename TypedAttributeArray<ValueType_, Codec_>::ValueType
 TypedAttributeArray<ValueType_, Codec_>::getUnsafe(Index n) const
 {
-    assert(n < this->dataSize());
+    OPENVDB_ASSERT(n < this->dataSize());
 
     ValueType val;
     Codec::decode(/*in=*/this->data()[mIsUniform ? 0 : n], /*out=*/val);
@@ -1447,9 +1448,9 @@ template<typename ValueType_, typename Codec_>
 void
 TypedAttributeArray<ValueType_, Codec_>::setUnsafe(Index n, const ValueType& val)
 {
-    assert(n < this->dataSize());
-    assert(!this->isOutOfCore());
-    assert(!this->isUniform());
+    OPENVDB_ASSERT(n < this->dataSize());
+    OPENVDB_ASSERT(!this->isOutOfCore());
+    OPENVDB_ASSERT(!this->isUniform());
 
     // this unsafe method assumes the data is not uniform, however if it is, this redirects the index
     // to zero, which is marginally less efficient but ensures not writing to an illegal address
@@ -1754,7 +1755,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
     uint8_t bloscCompressed(0);
     if (!mIsUniform)    is.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
 
-    assert(mFlags & PARTIALREAD);
+    OPENVDB_ASSERT(mFlags & PARTIALREAD);
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
     mCompressedBytes = 0;
@@ -1798,12 +1799,12 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
         size_t compressedBytes(mCompressedBytes);
         mCompressedBytes = 0; // if not set to zero, mPageHandle will attempt to destroy invalid memory
         mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD); // mark data read as having completed
-        assert(!mPageHandle);
+        OPENVDB_ASSERT(!mPageHandle);
         mPageHandle = is.createHandle(compressedBytes);
         return;
     }
 
-    assert(mPageHandle);
+    OPENVDB_ASSERT(mPageHandle);
 
     tbb::spin_mutex::scoped_lock lock(mMutex);
 
@@ -1987,8 +1988,8 @@ TypedAttributeArray<ValueType_, Codec_>::doLoadUnsafe(const bool /*compression*/
 
     auto* self = const_cast<TypedAttributeArray<ValueType_, Codec_>*>(this);
 
-    assert(self->mPageHandle);
-    assert(!(self->mFlags & PARTIALREAD));
+    OPENVDB_ASSERT(self->mPageHandle);
+    OPENVDB_ASSERT(!(self->mFlags & PARTIALREAD));
 
     std::unique_ptr<char[]> buffer = self->mPageHandle->read();
 
@@ -2129,7 +2130,7 @@ AttributeHandle<ValueType, CodecType>::AttributeHandle(const AttributeArray& arr
     // bind getter and setter methods
 
     AttributeArray::AccessorBasePtr accessor = mArray->getAccessor();
-    assert(accessor);
+    OPENVDB_ASSERT(accessor);
 
     AttributeArray::Accessor<ValueType>* typedAccessor = static_cast<AttributeArray::Accessor<ValueType>*>(accessor.get());
 
@@ -2169,7 +2170,7 @@ AttributeHandle<ValueType, CodecType>::compatibleType() const
 template <typename ValueType, typename CodecType>
 const AttributeArray& AttributeHandle<ValueType, CodecType>::array() const
 {
-    assert(mArray);
+    OPENVDB_ASSERT(mArray);
     return *mArray;
 }
 
@@ -2177,7 +2178,7 @@ template <typename ValueType, typename CodecType>
 Index AttributeHandle<ValueType, CodecType>::index(Index n, Index m) const
 {
     Index index = n * mStrideOrTotalSize + m;
-    assert(index < (mSize * mStrideOrTotalSize));
+    OPENVDB_ASSERT(index < (mSize * mStrideOrTotalSize));
     return index;
 }
 
@@ -2303,7 +2304,7 @@ AttributeWriteHandle<ValueType, CodecType>::set(Index index, const ValueType& va
 template <typename ValueType, typename CodecType>
 AttributeArray& AttributeWriteHandle<ValueType, CodecType>::array()
 {
-    assert(this->mArray);
+    OPENVDB_ASSERT(this->mArray);
     return *const_cast<AttributeArray*>(this->mArray);
 }
 

@@ -35,6 +35,7 @@
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h> // for PruneMinMaxFltKernel
+#include <openvdb/util/Assert.h>
 
 #include "LevelSetUtil.h"
 #include "Morphology.h"
@@ -756,7 +757,7 @@ void FastSweeping<SdfGridT, ExtValueT>::computeSweepMaskLeafOrigins()
     mSweepingVoxelCount = sweepingVoxelCount;
     if (mSdfGrid) {
         const size_t totalCount = mSdfGrid->constTree().activeVoxelCount();
-        assert( totalCount >= mSweepingVoxelCount );
+        OPENVDB_ASSERT( totalCount >= mSweepingVoxelCount );
         mBoundaryVoxelCount = totalCount - mSweepingVoxelCount;
     }
 }// FastSweeping::computeSweepMaskLeafOrigins
@@ -1061,7 +1062,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
             const SdfValueT background = mBackground;//local copy
             auto* maskLeaf = mParent->mSweepMask.probeLeaf(leaf.origin());
             SdfConstAccT sdfInputAcc(mSdfGridInput->tree());
-            assert(maskLeaf);
+            OPENVDB_ASSERT(maskLeaf);
             for (auto voxelIter = leaf.beginValueOn(); voxelIter; ++voxelIter) {
                 const SdfValueT value = *voxelIter;
                 SdfValueT inputValue;
@@ -1636,7 +1637,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         // If we are using an extension in one direction, we need a reference grid
         // for the default value of the extension for the voxels that are not
         // intended to be updated by the sweeping algorithm.
-        if (tree2 && mode != FastSweepingDomain::SWEEP_ALL) assert(tree3);
+        if (tree2 && mode != FastSweepingDomain::SWEEP_ALL) OPENVDB_ASSERT(tree3);
 
         const std::vector<Coord>& leafNodeOrigins = mParent->mSweepMaskLeafOrigins;
 

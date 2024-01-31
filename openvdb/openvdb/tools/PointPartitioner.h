@@ -20,6 +20,7 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -192,15 +193,15 @@ public:
     size_t size() const { return mEnd - mBegin; }
 
     /// @brief  Returns the item to which this iterator is currently pointing.
-    IndexType& operator*() { assert(mItem != nullptr); return *mItem; }
-    const IndexType& operator*() const { assert(mItem != nullptr); return *mItem; }
+    IndexType& operator*() { OPENVDB_ASSERT(mItem != nullptr); return *mItem; }
+    const IndexType& operator*() const { OPENVDB_ASSERT(mItem != nullptr); return *mItem; }
 
     /// @brief  Return @c true if this iterator is not yet exhausted.
     operator bool() const { return mItem < mEnd; }
     bool test() const { return mItem < mEnd; }
 
     /// @brief  Advance to the next item.
-    IndexIterator& operator++() { assert(this->test()); ++mItem; return *this; }
+    IndexIterator& operator++() { OPENVDB_ASSERT(this->test()); ++mItem; return *this; }
 
     /// @brief  Advance to the next item.
     bool next() { this->operator++(); return this->test(); }
@@ -988,7 +989,7 @@ template<typename PointIndexType, Index BucketLog2Dim>
 inline typename PointPartitioner<PointIndexType, BucketLog2Dim>::IndexIterator
 PointPartitioner<PointIndexType, BucketLog2Dim>::indices(size_t n) const
 {
-    assert(bool(mPointIndices) && bool(mPageCount));
+    OPENVDB_ASSERT(bool(mPointIndices) && bool(mPageCount));
     return IndexIterator(
         mPointIndices.get() + mPageOffsets[n],
         mPointIndices.get() + mPageOffsets[n + 1]);

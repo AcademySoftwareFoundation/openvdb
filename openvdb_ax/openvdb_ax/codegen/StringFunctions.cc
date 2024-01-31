@@ -14,6 +14,8 @@
 #include "Utils.h"
 #include "String.h"
 
+#include <openvdb/util/Assert.h>
+
 #include "openvdb_ax/compiler/CompilerOptions.h"
 
 namespace openvdb {
@@ -48,7 +50,7 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::LLVMContext& C = B.getContext();
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::Type* strType = LLVMType<codegen::String>::get(C);
@@ -69,7 +71,7 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         {
             llvm::BasicBlock* BB = B.GetInsertBlock();
             llvm::Instruction* inst = llvm::CallInst::CreateFree(cptr_load, BB);
-            assert(inst);
+            OPENVDB_ASSERT(inst);
             B.Insert(inst);
             B.CreateBr(post);
         }
@@ -92,7 +94,7 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
                     B.CreateAdd(size, B.getInt64(1)), // size
                     nullptr,
                     nullptr);
-            assert(inst);
+            OPENVDB_ASSERT(inst);
             B.Insert(inst);
             B.CreateStore(inst, cptr);
             B.CreateBr(post);
@@ -132,7 +134,7 @@ inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() >= 1);
+        OPENVDB_ASSERT(args.size() >= 1);
 
         llvm::LLVMContext& C = B.getContext();
         llvm::Type* strType = LLVMType<codegen::String>::get(C);
@@ -141,7 +143,7 @@ inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
         llvm::Value* carr;
         if (args.size() == 1) carr = B.CreateGlobalStringPtr("");
         else                  carr = args[1];
-        assert(carr);
+        OPENVDB_ASSERT(carr);
         llvm::Value* slen = axstrlen(op)->execute({carr}, B);
 
         llvm::Value* cptr = B.CreateStructGEP(strType, str, 0); // char**
@@ -196,7 +198,7 @@ inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 2);
+        OPENVDB_ASSERT(args.size() == 2);
         llvm::Type* strType = LLVMType<codegen::String>::get(B.getContext());
         llvm::Value* str0 = args[0];
         llvm::Value* str1 = args[1];

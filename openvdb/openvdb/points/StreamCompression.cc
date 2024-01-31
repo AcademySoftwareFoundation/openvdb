@@ -5,6 +5,7 @@
 
 #include "StreamCompression.h"
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <map>
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
@@ -288,7 +289,7 @@ Page::load() const
 long
 Page::uncompressedBytes() const
 {
-    assert(mInfo);
+    OPENVDB_ASSERT(mInfo);
     return mInfo->uncompressedBytes;
 }
 
@@ -307,7 +308,7 @@ Page::buffer(const int index) const
 void
 Page::readHeader(std::istream& is)
 {
-    assert(mInfo);
+    OPENVDB_ASSERT(mInfo);
 
     // read the (compressed) size of the page
     int compressedSize;
@@ -318,8 +319,8 @@ Page::readHeader(std::istream& is)
     if (compressedSize > 0)     is.read(reinterpret_cast<char*>(&uncompressedSize), sizeof(int));
     else                        uncompressedSize = -compressedSize;
 
-    assert(compressedSize != 0);
-    assert(uncompressedSize != 0);
+    OPENVDB_ASSERT(compressedSize != 0);
+    OPENVDB_ASSERT(uncompressedSize != 0);
 
     mInfo->compressedBytes = compressedSize;
     mInfo->uncompressedBytes = uncompressedSize;
@@ -331,7 +332,7 @@ Page::readBuffers(std::istream&is, bool delayed)
 {
     (void) delayed;
 
-    assert(mInfo);
+    OPENVDB_ASSERT(mInfo);
 
     bool isCompressed = mInfo->compressedBytes > 0;
 
@@ -340,7 +341,7 @@ Page::readBuffers(std::istream&is, bool delayed)
 
     if (delayed && mappedFile) {
         SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
-        assert(meta);
+        OPENVDB_ASSERT(meta);
 
         std::streamoff filepos = is.tellg();
 
@@ -352,7 +353,7 @@ Page::readBuffers(std::istream&is, bool delayed)
         mInfo->meta = meta;
         mInfo->filepos = filepos;
 
-        assert(mInfo->mappedFile);
+        OPENVDB_ASSERT(mInfo->mappedFile);
     }
     else {
 #endif
@@ -418,19 +419,19 @@ Page::doLoad() const
     tbb::spin_mutex::scoped_lock lock(self->mMutex);
     if (!this->isOutOfCore()) return;
 
-    assert(self->mInfo);
+    OPENVDB_ASSERT(self->mInfo);
 
     int compressedBytes = static_cast<int>(self->mInfo->compressedBytes);
     bool compressed = compressedBytes > 0;
     if (!compressed) compressedBytes = -compressedBytes;
 
-    assert(compressedBytes);
+    OPENVDB_ASSERT(compressedBytes);
 
     std::unique_ptr<char[]> temp(new char[compressedBytes]);
 
-    assert(self->mInfo->mappedFile);
+    OPENVDB_ASSERT(self->mInfo->mappedFile);
     SharedPtr<std::streambuf> buf = self->mInfo->mappedFile->createBuffer();
-    assert(buf);
+    OPENVDB_ASSERT(buf);
 
     std::istream is(buf.get());
     io::setStreamMetadataPtr(is, self->mInfo->meta, /*transfer=*/true);
@@ -460,7 +461,7 @@ PageHandle::PageHandle( const Page::Ptr& page, const int index, const int size)
 Page&
 PageHandle::page()
 {
-    assert(mPage);
+    OPENVDB_ASSERT(mPage);
     return *mPage;
 }
 
@@ -468,8 +469,8 @@ PageHandle::page()
 std::unique_ptr<char[]>
 PageHandle::read()
 {
-    assert(mIndex >= 0);
-    assert(mSize > 0);
+    OPENVDB_ASSERT(mIndex >= 0);
+    OPENVDB_ASSERT(mSize > 0);
     std::unique_ptr<char[]> buffer(new char[mSize]);
     std::memcpy(buffer.get(), mPage->buffer(mIndex), mSize);
     return buffer;
@@ -488,7 +489,7 @@ PagedInputStream::PagedInputStream(std::istream& is)
 PageHandle::Ptr
 PagedInputStream::createHandle(std::streamsize n)
 {
-    assert(mByteIndex <= mUncompressedBytes);
+    OPENVDB_ASSERT(mByteIndex <= mUncompressedBytes);
 
     if (mByteIndex == mUncompressedBytes) {
 
@@ -510,7 +511,7 @@ PagedInputStream::createHandle(std::streamsize n)
 void
 PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool delayed)
 {
-    assert(mByteIndex <= mUncompressedBytes);
+    OPENVDB_ASSERT(mByteIndex <= mUncompressedBytes);
 
     Page& page = pageHandle->page();
 
@@ -580,7 +581,7 @@ PagedOutputStream::compressAndWrite(const char* buffer, size_t size)
 {
     if (size == 0)  return;
 
-    assert(size < std::numeric_limits<int>::max());
+    OPENVDB_ASSERT(size < std::numeric_limits<int>::max());
 
     this->resize(size);
 

@@ -1,0 +1,6 @@
+OpenVDB:
+  Improvements:
+    - Added openvdb::assertAbort to replace cassert and a OPENVDB_ENABLE_ASSERTS
+    cmake argument/compile define to toggle assertions in OpenVDB code,
+    independantly of NDEBUG. Asserts are no longer enabled by default in
+    when NDEBUG is absent (e.g. Debug builds).

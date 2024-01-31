@@ -14,6 +14,7 @@
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Formats.h>
+#include <openvdb/util/Assert.h>
 #include "Prune.h"
 #include <tbb/parallel_for.h>
 #include <iostream>
@@ -326,7 +327,7 @@ public:
     /// layout of values as an OpenVDB grid, i.e., the fastest coordinate is @e z.
     inline size_t coordToOffset(const Coord& xyz) const
     {
-        assert(BaseT::mBBox.isInside(xyz));
+        OPENVDB_ASSERT(BaseT::mBBox.isInside(xyz));
         return BaseT::coordToOffset(size_t(xyz[0]-BaseT::mBBox.min()[0]),
                                     size_t(xyz[1]-BaseT::mBBox.min()[1]),
                                     size_t(xyz[2]-BaseT::mBBox.min()[2]));
@@ -514,7 +515,7 @@ public:
     /// @warning Never call this method directly!
     void operator()(const tbb::blocked_range<size_t> &r) const
     {
-        assert(mBlocks);
+        OPENVDB_ASSERT(mBlocks);
         LeafT* leaf = new LeafT();
 
         for (size_t m=r.begin(), n=0, end = r.end(); m != end; ++m, ++n) {

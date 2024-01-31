@@ -15,6 +15,7 @@
 #include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/ADT/Optional.h>
 #include <llvm/ADT/Triple.h>
@@ -450,7 +451,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
             getMangledName(llvm::cast<llvm::GlobalValue>(&F), engine);
         const uint64_t address =
             engine.getAddressToGlobalIfAvailable(mangled);
-        assert(address != 0 && "Unbound function!");
+        OPENVDB_ASSERT(address != 0 && "Unbound function!");
     }
 #endif
 
@@ -524,7 +525,7 @@ registerAccesses(const codegen::SymbolTable& globals, const AttributeRegistry& r
         const size_t index = registry.accessIndex(name, typetoken);
 
         // should always be a GlobalVariable.
-        assert(llvm::isa<llvm::GlobalVariable>(global.second));
+        OPENVDB_ASSERT(llvm::isa<llvm::GlobalVariable>(global.second));
 
         // Assign the attribute index global a valid index.
         // @note executionEngine->addGlobalMapping() can also be used if the indices
@@ -533,7 +534,7 @@ registerAccesses(const codegen::SymbolTable& globals, const AttributeRegistry& r
 
         llvm::GlobalVariable* variable =
             llvm::cast<llvm::GlobalVariable>(global.second);
-        assert(variable->getValueType()->isIntegerTy(64));
+        OPENVDB_ASSERT(variable->getValueType()->isIntegerTy(64));
 
         variable->setInitializer(llvm::ConstantInt::get(variable->getValueType(), index));
         variable->setConstant(true); // is not written to at runtime
@@ -583,7 +584,7 @@ registerExternalGlobals(const codegen::SymbolTable& globals,
             case ast::tokens::UNKNOWN :
             default      : {
                 // grammar guarantees this is unreachable as long as all types are supported
-                assert(false && "Attribute type unsupported or not recognised");
+                OPENVDB_ASSERT(false && "Attribute type unsupported or not recognised");
                 return nullptr;
             }
         }
@@ -604,10 +605,10 @@ registerExternalGlobals(const codegen::SymbolTable& globals,
         if (!dataPtr) dataPtr.reset(new CustomData);
 
         // should always be a GlobalVariable.
-        assert(llvm::isa<llvm::GlobalVariable>(global.second));
+        OPENVDB_ASSERT(llvm::isa<llvm::GlobalVariable>(global.second));
 
         llvm::GlobalVariable* variable = llvm::cast<llvm::GlobalVariable>(global.second);
-        assert(variable->getValueType() == codegen::LLVMType<uintptr_t>::get(C));
+        OPENVDB_ASSERT(variable->getValueType() == codegen::LLVMType<uintptr_t>::get(C));
 
         llvm::Constant* initializer = initializerFromToken(typetoken, name, *dataPtr);
 
@@ -704,7 +705,7 @@ Compiler::compile(const ast::Tree& tree,
 
     // if there has been a compilation error through user error, exit
     if (!attributes) {
-        assert(logger.hasError());
+        OPENVDB_ASSERT(logger.hasError());
         return nullptr;
     }
 

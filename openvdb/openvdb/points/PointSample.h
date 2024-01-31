@@ -13,6 +13,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tools/Interpolation.h>
+#include <openvdb/util/Assert.h>
 
 #include "PointDataGrid.h"
 #include "PointAttribute.h"

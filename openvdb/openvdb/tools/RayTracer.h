@@ -24,6 +24,7 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/Interpolation.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/openvdb.h>
 #include <deque>
 #include <iostream>
@@ -273,15 +274,15 @@ public:
 
     const RGBA& pixel(size_t w, size_t h) const
     {
-        assert(w < mWidth);
-        assert(h < mHeight);
+        OPENVDB_ASSERT(w < mWidth);
+        OPENVDB_ASSERT(h < mHeight);
         return mPixels[w + h*mWidth];
     }
 
     RGBA& pixel(size_t w, size_t h)
     {
-        assert(w < mWidth);
-        assert(h < mHeight);
+        OPENVDB_ASSERT(w < mWidth);
+        OPENVDB_ASSERT(h < mHeight);
         return mPixels[w + h*mWidth];
     }
 
@@ -356,7 +357,7 @@ public:
         , mScaleWidth(frameWidth)
         , mScaleHeight(frameWidth * double(film.height()) / double(film.width()))
     {
-        assert(nearPlane > 0 && farPlane > nearPlane);
+        OPENVDB_ASSERT(nearPlane > 0 && farPlane > nearPlane);
         mScreenToWorld.accumPostRotation(math::X_AXIS, rotation[0] * math::pi<double>() / 180.0);
         mScreenToWorld.accumPostRotation(math::Y_AXIS, rotation[1] * math::pi<double>() / 180.0);
         mScreenToWorld.accumPostRotation(math::Z_AXIS, rotation[2] * math::pi<double>() / 180.0);
@@ -832,7 +833,7 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 setGrid(const GridT& grid)
 {
-    assert(mIsMaster);
+    OPENVDB_ASSERT(mIsMaster);
     mInter = IntersectorT(grid);
 }
 
@@ -840,7 +841,7 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 setIntersector(const IntersectorT& inter)
 {
-    assert(mIsMaster);
+    OPENVDB_ASSERT(mIsMaster);
     mInter = inter;
 }
 
@@ -848,7 +849,7 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 setShader(const BaseShader& shader)
 {
-    assert(mIsMaster);
+    OPENVDB_ASSERT(mIsMaster);
     mShader.reset(shader.copy());
 }
 
@@ -856,7 +857,7 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 setCamera(BaseCamera& camera)
 {
-    assert(mIsMaster);
+    OPENVDB_ASSERT(mIsMaster);
     mCamera = &camera;
 }
 
@@ -864,7 +865,7 @@ template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
 setPixelSamples(size_t pixelSamples, unsigned int seed)
 {
-    assert(mIsMaster);
+    OPENVDB_ASSERT(mIsMaster);
     if (pixelSamples == 0) {
         OPENVDB_THROW(ValueError, "pixelSamples must be larger than zero!");
     }
