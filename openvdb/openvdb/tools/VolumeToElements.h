@@ -36,7 +36,7 @@ namespace tools {
 ////////////////////////////////////////
 
 
-// Wrapper functions for the VolumeToTet converter
+// Wrapper functions for the VolumeToElements converter
 
 
 /// @brief Uniformly process any scalar grid that has a continuous isosurface.
@@ -50,7 +50,7 @@ namespace tools {
 /// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
 void
-volumeToTet(
+volumeToElements(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec4I>& tets,
@@ -62,11 +62,11 @@ volumeToTet(
 
 
 /// @brief Process any scalar grid that has a continuous isosurface.
-struct VolumeToTet
+struct VolumeToElements
 {
 
     /// @param isovalue                   Determines which isosurface to process.
-    VolumeToTet(double isovalue = 0);
+    VolumeToElements(double isovalue = 0);
 
     //////////
 
@@ -78,15 +78,15 @@ struct VolumeToTet
 
 private:
     // Disallow copying
-    VolumeToTet(const VolumeToTet&);
-    VolumeToTet& operator=(const VolumeToTet&);
+    VolumeToElements(const VolumeToElements&);
+    VolumeToElements& operator=(const VolumeToElements&);
 
     PointList mPoints;
     ElementPoolList mElements;
 
     double mIsovalue;
 
-}; // struct VolumeToTet
+}; // struct VolumeToElements
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +102,7 @@ namespace volume_to_tet_internal {
 
 template<typename GridType>
 void
-doVolumeToTet(
+doVolumeToElements(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec4I>& tets,
@@ -124,7 +124,7 @@ doVolumeToTet(
 
 
 inline
-VolumeToTet::VolumeToTet(double isovalue)
+VolumeToElements::VolumeToElements(double isovalue)
     : mPoints(nullptr)
     , mElements()
     , mIsovalue(isovalue)
@@ -134,7 +134,7 @@ VolumeToTet::VolumeToTet(double isovalue)
 
 template<typename InputGridType>
 inline void
-VolumeToTet::operator()(const InputGridType& inputGrid)
+VolumeToElements::operator()(const InputGridType& inputGrid)
 {
 }
 
@@ -143,25 +143,25 @@ VolumeToTet::operator()(const InputGridType& inputGrid)
 
 
 template<typename GridType>
-void volumeToTet(
+void volumeToElements(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec4I>& tets,
     std::vector<Vec8I>& hexs,
     double isovalue)
 {
-    volume_to_tet_internal::doVolumeToTet(grid, points, tets, hexs, isovalue);
+    volume_to_tet_internal::doVolumeToElements(grid, points, tets, hexs, isovalue);
 }
 
 template<typename GridType>
-void volumeToTet(
+void volumeToElements(
     const GridType& grid,
     std::vector<Vec3s>& points,
     std::vector<Vec8I>& hexs,
     double isovalue)
 {
     std::vector<Vec4I> tets;
-    volumeToTet(grid, points, tets, hexs, isovalue);
+    volumeToElements(grid, points, tets, hexs, isovalue);
 }
 
 
@@ -172,17 +172,17 @@ void volumeToTet(
 
 #ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
 
-#ifdef OPENVDB_INSTANTIATE_VOLUMETOTET
+#ifdef OPENVDB_INSTANTIATE_VOLUMETOELEMENTS
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \
-    void volumeToTet(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec8I>&, double)
+    void volumeToElements(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec8I>&, double)
 OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void volumeToTet(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec4I>&, std::vector<Vec8I>&, double)
+    void volumeToElements(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec4I>&, std::vector<Vec8I>&, double)
 OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
