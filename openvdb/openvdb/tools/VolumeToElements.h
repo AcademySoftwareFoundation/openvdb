@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file   VolumeToTet.h
+/// @file   VolumeToElements.h
 ///
 /// @brief  Extract tetrahedral and hexahedral finite elements from scalar volumes.
 ///
