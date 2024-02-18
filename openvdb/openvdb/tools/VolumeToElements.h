@@ -61,6 +61,77 @@ volumeToElements(
 ////////////////////////////////////////
 
 
+/// @brief Element flags, used for reference based meshing.
+enum { ELEMFLAG_EXTERIOR = 0x1, ELEMFLAG_FRACTURE_SEAM = 0x2,  ELEMFLAG_SUBDIVIDED = 0x4 };
+
+
+/// @brief Collection of hexs and tets
+class ElementPool
+{
+public:
+
+    inline ElementPool();
+    inline ElementPool(const size_t numHexs, const size_t numTets);
+
+    inline void copy(const ElementPool& rhs);
+
+    inline void resetHexs(size_t size);
+    inline void clearHexs();
+
+    inline void resetTets(size_t size);
+    inline void clearTets();
+
+
+    // element accessor methods
+
+    const size_t& numHexs() const                      { return mNumHexs; }
+
+    openvdb::Vec8I& hex(size_t n)                      { return mHexs[n]; }
+    const openvdb::Vec8I& hex(size_t n) const          { return mHexs[n]; }
+
+
+    const size_t& numTets() const                  { return mNumTets; }
+
+    openvdb::Vec4I& tet(size_t n)                  { return mTets[n]; }
+    const openvdb::Vec4I& tet(size_t n) const      { return mTets[n]; }
+
+
+    // element flags accessor methods
+
+    char& hexFlags(size_t n)                           { return mHexFlags[n]; }
+    const char& hexFlags(size_t n) const               { return mHexFlags[n]; }
+
+    char& tetFlags(size_t n)                       { return mTetFlags[n]; }
+    const char& tetFlags(size_t n) const           { return mTetFlags[n]; }
+
+
+    // reduce the element containers, n has to
+    // be smaller than the current container size.
+
+    inline bool trimHexs(const size_t n, bool reallocate = false);
+    inline bool trimTrinagles(const size_t n, bool reallocate = false);
+
+private:
+    // disallow copy by assignment
+    void operator=(const ElementPool&) {}
+
+    size_t mNumHexs, mNumTets;
+    std::unique_ptr<openvdb::Vec8I[]> mHexs;
+    std::unique_ptr<openvdb::Vec4I[]> mTets;
+    std::unique_ptr<char[]> mHexFlags, mTetFlags;
+};
+
+
+/// @{
+/// @brief Point and primitive list types.
+using PointList = std::unique_ptr<openvdb::Vec3s[]>;
+using ElementPoolList = std::unique_ptr<ElementPool[]>;
+/// @}
+
+
+////////////////////////////////////////
+
+
 /// @brief Process any scalar grid that has a continuous isosurface.
 struct VolumeToElements
 {
