@@ -112,7 +112,10 @@ doVolumeToElements(
     static_assert(std::is_scalar<typename GridType::ValueType>::value,
         "volume to elements conversion is supported only for scalar grids");
 
-    // TODO.
+    VolumeToElements elementer(isovalue);
+    elementer(grid);
+
+    // TODO: copy points, tets, and hexs.
 }
 
 
