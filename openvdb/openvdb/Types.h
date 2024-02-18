@@ -93,7 +93,6 @@ using math::Vec4s;
 using math::Vec4d;
 
 // Eight-dimensional vector types. For hexahedral finite elements.
-// TODO: math::Vec8
 using Vec8I = math::Vec8<Index32>;
 
 // Three-dimensional matrix types
