@@ -97,7 +97,7 @@ private:
 
 /// @cond OPENVDB_DOCS_INTERNAL
 
-namespace volume_to_tet_internal {
+namespace volume_to_elements_internal {
 
 
 template<typename GridType>
@@ -110,13 +110,13 @@ doVolumeToElements(
     double isovalue)
 {
     static_assert(std::is_scalar<typename GridType::ValueType>::value,
-        "volume to tet conversion is supported only for scalar grids");
+        "volume to elements conversion is supported only for scalar grids");
 
     // TODO.
 }
 
 
-} // volume_to_tet_internal namespace
+} // volume_to_elements_internal namespace
 
 /// @endcond
 
@@ -150,7 +150,7 @@ void volumeToElements(
     std::vector<Vec8I>& hexs,
     double isovalue)
 {
-    volume_to_tet_internal::doVolumeToElements(grid, points, tets, hexs, isovalue);
+    volume_to_elements_internal::doVolumeToElements(grid, points, tets, hexs, isovalue);
 }
 
 template<typename GridType>
