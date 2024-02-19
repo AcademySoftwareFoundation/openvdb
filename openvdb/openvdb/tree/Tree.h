@@ -199,6 +199,7 @@ public:
 
     using RootNodeType = _RootNodeType;
     using ValueType = typename RootNodeType::ValueType;
+    using ComputeType = typename ValueToComputeMap<ValueType>::Type;
     using BuildType = typename RootNodeType::BuildType;
     using LeafNodeType = typename RootNodeType::LeafNodeType;
 

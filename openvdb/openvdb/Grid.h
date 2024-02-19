@@ -577,6 +577,7 @@ public:
     using TreePtrType         = typename _TreeType::Ptr;
     using ConstTreePtrType    = typename _TreeType::ConstPtr;
     using ValueType           = typename _TreeType::ValueType;
+    using ComputeType         = typename _TreeType::ComputeType;
     using BuildType           = typename _TreeType::BuildType;
 
     using ValueOnIter         = typename _TreeType::ValueOnIter;

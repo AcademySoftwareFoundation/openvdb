@@ -58,12 +58,13 @@ using Int64   = int64_t;
 using Int     = Int32;
 using Byte    = unsigned char;
 using Real    = double;
+using Half    = math::half;
 
 // Two-dimensional vector types
 using Vec2R = math::Vec2<Real>;
 using Vec2I = math::Vec2<Index32>;
 using Vec2f = math::Vec2<float>;
-using Vec2H = math::Vec2<math::half>;
+using Vec2H = math::Vec2<Half>;
 using math::Vec2i;
 using math::Vec2s;
 using math::Vec2d;
@@ -72,7 +73,7 @@ using math::Vec2d;
 using Vec3R = math::Vec3<Real>;
 using Vec3I = math::Vec3<Index32>;
 using Vec3f = math::Vec3<float>;
-using Vec3H = math::Vec3<math::half>;
+using Vec3H = math::Vec3<Half>;
 using Vec3U8 = math::Vec3<uint8_t>;
 using Vec3U16 = math::Vec3<uint16_t>;
 using math::Vec3i;
@@ -87,7 +88,7 @@ using BBoxd = math::BBox<Vec3d>;
 using Vec4R = math::Vec4<Real>;
 using Vec4I = math::Vec4<Index32>;
 using Vec4f = math::Vec4<float>;
-using Vec4H = math::Vec4<math::half>;
+using Vec4H = math::Vec4<Half>;
 using math::Vec4i;
 using math::Vec4s;
 using math::Vec4d;
@@ -518,6 +519,27 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
 
 
 ////////////////////////////////////////
+template<class T>
+struct is_floating_point : std::is_floating_point<T> { };
+
+template<>
+struct is_floating_point<Half> : std::is_floating_point<float> { };
+
+/// @brief Maps one type (e.g. the value types) to other types
+template<typename T>
+struct ValueToComputeMap
+{
+    using Type = T;
+};
+
+template<>
+struct ValueToComputeMap<Half>
+{
+    using Type = float;
+};
+
+
+////////////////////////////////////////
 
 
 // Add new items to the *end* of this list, and update NUM_GRID_CLASSES.
@@ -762,11 +784,11 @@ class PartialCreate {};
 // For half compilation
 namespace math {
 template<>
-inline auto cwiseAdd(const math::Vec3<math::half>& v, const float s)
+inline auto cwiseAdd(const Vec3H& v, const float s)
 {
-    math::Vec3<math::half> out;
-    const math::half* ip = v.asPointer();
-    math::half* op = out.asPointer();
+    Vec3H out;
+    const Half* ip = v.asPointer();
+    Half* op = out.asPointer();
     for (unsigned i = 0; i < 3; ++i, ++op, ++ip) {
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         *op = *ip + s;
