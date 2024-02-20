@@ -8,27 +8,7 @@
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
 
-#ifdef OPENVDB_USE_IMATH_HALF
-#ifdef OPENVDB_IMATH_VERSION
-#include <Imath/half.h>
-#else
-#include <OpenEXR/half.h>
-#endif
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-using half = half;
-}}}
-#else
-#include <openvdb/math/Half.h>
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-using half = internal::half;
-}}}
-#endif
+#include <openvdb/math/HalfDecl.h>
 
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
@@ -500,6 +480,35 @@ struct CanConvertType<ValueMask, T> { enum {value = CanConvertType<bool, T>::val
 ////////////////////////////////////////
 
 
+/// @brief Maps low precision floating point types to a floating-point type suitable for computation.
+///
+/// Selectively promotes low-precision types (e.g., `math::half`) to a higher-precision
+/// type (e.g., `float`) to balance numerical accuracy and performance in
+/// compute-intensive code.
+///
+/// Types already suitable for computation, float precision and higher, are left unchanged.
+///
+/// This trait is useful when intermediate compute precision must differ from storage
+/// precision to prevent precision loss or instability.
+///
+/// @tparam T The input type to be mapped to a compute-appropriate floating-point type.
+template <typename T>
+struct ComputeTypeFor
+{
+    using type = T;
+};
+
+// Specialization for half -> float
+template <>
+struct ComputeTypeFor<Half>
+{
+    using type = float;
+};
+
+
+////////////////////////////////////////
+
+
 /// @brief CopyConstness<T1, T2>::Type is either <tt>const T2</tt>
 /// or @c T2 with no @c const qualifier, depending on whether @c T1 is @c const.
 /// @details For example,
@@ -525,18 +534,12 @@ struct is_floating_point : std::is_floating_point<T> { };
 template<>
 struct is_floating_point<Half> : std::is_floating_point<float> { };
 
-/// @brief Maps one type (e.g. the value types) to other types
-template<typename T>
-struct ValueToComputeMap
-{
-    using Type = T;
-};
+
+template<class T>
+struct is_signed : std::is_signed<T> { };
 
 template<>
-struct ValueToComputeMap<Half>
-{
-    using Type = float;
-};
+struct is_signed<Half> : std::is_signed<float> { };
 
 
 ////////////////////////////////////////

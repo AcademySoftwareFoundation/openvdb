@@ -13,6 +13,7 @@
 
 #include "LevelSetTracker.h"
 #include "Interpolation.h" // for BoxSampler, etc.
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/math/FiniteDifference.h>
 #include <functional>
 #include <limits>
@@ -43,17 +44,19 @@ namespace tools {
 /// the util::NullInterrupter is used, which implies that all interrupter
 /// calls are no-ops (i.e., they incur no computational overhead).
 template<typename GridT,
-         typename InterruptT = util::NullInterrupter>
+         typename InterruptT = util::NullInterrupter,
+         typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
 class LevelSetMorphing
 {
 public:
     using GridType = GridT;
     using TreeType = typename GridT::TreeType;
-    using TrackerT = LevelSetTracker<GridT, InterruptT>;
+    using TrackerT = LevelSetTracker<GridT, InterruptT, ComputeT>;
     using LeafRange = typename TrackerT::LeafRange;
     using LeafType = typename TrackerT::LeafType;
     using BufferType = typename TrackerT::BufferType;
     using ValueType = typename TrackerT::ValueType;
+    using ComputeType = ComputeT;
 
     /// Main constructor
     LevelSetMorphing(GridT& sourceGrid, const GridT& targetGrid, InterruptT* interrupt = nullptr)
@@ -119,11 +122,11 @@ public:
 
     /// @brief Return the minimum value of the mask to be used for the
     /// derivation of a smooth alpha value.
-    ValueType minMask() const { return mMinMask; }
+    ComputeType minMask() const { return mMinMask; }
 
     /// @brief Return the maximum value of the mask to be used for the
     /// derivation of a smooth alpha value.
-    ValueType maxMask() const { return mDeltaMask + mMinMask; }
+    ComputeType maxMask() const { return mDeltaMask + mMinMask; }
 
     /// @brief Define the range for the (optional) scalar mask.
     /// @param min Minimum value of the range.
@@ -132,7 +135,7 @@ public:
     /// respectfully zero and one, and values inside the range maps
     /// smoothly to 0->1 (unless of course the mask is inverted).
     /// @throw ValueError if @a min is not smaller than @a max.
-    void setMaskRange(ValueType min, ValueType max)
+    void setMaskRange(ComputeType min, ComputeType max)
     {
         if (!(min < max)) OPENVDB_THROW(ValueError, "Invalid mask range (expects min < max)");
         mMinMask   = min;
@@ -150,7 +153,7 @@ public:
     /// final time, @a time1. If @a time0 > @a time1, perform backward advection.
     ///
     /// @return the number of CFL iterations used to advect from @a time0 to @a time1
-    size_t advect(ValueType time0, ValueType time1);
+    size_t advect(ComputeType time0, ComputeType time1);
 
 private:
 
@@ -159,22 +162,22 @@ private:
     LevelSetMorphing& operator=(const LevelSetMorphing&);// not implemented
 
     template<math::BiasedGradientScheme SpatialScheme>
-    size_t advect1(ValueType time0, ValueType time1);
+    size_t advect1(ComputeType time0, ComputeType time1);
 
     template<math::BiasedGradientScheme SpatialScheme,
              math::TemporalIntegrationScheme TemporalScheme>
-    size_t advect2(ValueType time0, ValueType time1);
+    size_t advect2(ComputeType time0, ComputeType time1);
 
     template<math::BiasedGradientScheme SpatialScheme,
              math::TemporalIntegrationScheme TemporalScheme,
              typename MapType>
-    size_t advect3(ValueType time0, ValueType time1);
+    size_t advect3(ComputeType time0, ComputeType time1);
 
     TrackerT                        mTracker;
     const GridT                    *mTarget, *mMask;
     math::BiasedGradientScheme      mSpatialScheme;
     math::TemporalIntegrationScheme mTemporalScheme;
-    ValueType                       mMinMask, mDeltaMask;
+    ComputeType                     mMinMask, mDeltaMask;
     bool                            mInvertMask;
 
     // This templated private class implements all the level set magic.
@@ -192,7 +195,7 @@ private:
         virtual ~Morph() {}
         /// Advect the level set from its current time, time0, to its final time, time1.
         /// @return number of CFL iterations
-        size_t advect(ValueType time0, ValueType time1);
+        size_t advect(ComputeType time0, ComputeType time1);
         /// Used internally by tbb::parallel_for()
         void operator()(const LeafRange& r) const
         {
@@ -214,31 +217,32 @@ private:
         void cook(ThreadingMode mode, size_t swapBuffer = 0);
 
         /// Sample field and return the CFT time step
-        typename GridT::ValueType sampleSpeed(ValueType time0, ValueType time1, Index speedBuffer);
+        ComputeType sampleSpeed(ComputeType time0,
+                                ComputeType time1, Index speedBuffer);
         void sampleXformedSpeed(const LeafRange& r, Index speedBuffer);
         void sampleAlignedSpeed(const LeafRange& r, Index speedBuffer);
 
         // Convex combination of Phi and a forward Euler advection steps:
         // Phi(result) = alpha * Phi(phi) + (1-alpha) * (Phi(0) - dt * Speed(speed)*|Grad[Phi(0)]|);
         template <int Nominator, int Denominator>
-        void euler(const LeafRange&, ValueType, Index, Index, Index);
-        inline void euler01(const LeafRange& r, ValueType t, Index s) {this->euler<0,1>(r,t,0,1,s);}
-        inline void euler12(const LeafRange& r, ValueType t) {this->euler<1,2>(r, t, 1, 1, 2);}
-        inline void euler34(const LeafRange& r, ValueType t) {this->euler<3,4>(r, t, 1, 2, 3);}
-        inline void euler13(const LeafRange& r, ValueType t) {this->euler<1,3>(r, t, 1, 2, 3);}
+        void euler(const LeafRange&, ComputeType, Index, Index, Index);
+        inline void euler01(const LeafRange& r, ComputeType t, Index s) {this->euler<0,1>(r,t,0,1,s);}
+        inline void euler12(const LeafRange& r, ComputeType t) {this->euler<1,2>(r, t, 1, 1, 2);}
+        inline void euler34(const LeafRange& r, ComputeType t) {this->euler<3,4>(r, t, 1, 2, 3);}
+        inline void euler13(const LeafRange& r, ComputeType t) {this->euler<1,3>(r, t, 1, 2, 3);}
 
         using FuncType = typename std::function<void (Morph*, const LeafRange&)>;
         LevelSetMorphing* mParent;
-        ValueType         mMinAbsS, mMaxAbsS;
+        ComputeType       mMinAbsS, mMaxAbsS;
         const MapT*       mMap;
         FuncType          mTask;
     }; // end of private Morph struct
 
 };//end of LevelSetMorphing
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 inline size_t
-LevelSetMorphing<GridT, InterruptT>::advect(ValueType time0, ValueType time1)
+LevelSetMorphing<GridT, InterruptT, ComputeT>::advect(ComputeType time0, ComputeType time1)
 {
     switch (mSpatialScheme) {
     case math::FIRST_BIAS:
@@ -261,10 +265,10 @@ LevelSetMorphing<GridT, InterruptT>::advect(ValueType time0, ValueType time1)
     return 0;
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT>::advect1(ValueType time0, ValueType time1)
+LevelSetMorphing<GridT, InterruptT, ComputeT>::advect1(ComputeType time0, ComputeType time1)
 {
     switch (mTemporalScheme) {
     case math::TVD_RK1:
@@ -280,11 +284,11 @@ LevelSetMorphing<GridT, InterruptT>::advect1(ValueType time0, ValueType time1)
     return 0;
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT>::advect2(ValueType time0, ValueType time1)
+LevelSetMorphing<GridT, InterruptT, ComputeT>::advect2(ComputeType time0, ComputeType time1)
 {
     const math::Transform& trans = mTracker.grid().transform();
     if (trans.mapType() == math::UniformScaleMap::mapType()) {
@@ -302,12 +306,12 @@ LevelSetMorphing<GridT, InterruptT>::advect2(ValueType time0, ValueType time1)
     return 0;
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MapT>
 inline size_t
-LevelSetMorphing<GridT, InterruptT>::advect3(ValueType time0, ValueType time1)
+LevelSetMorphing<GridT, InterruptT, ComputeT>::advect3(ComputeType time0, ComputeType time1)
 {
     Morph<MapT, SpatialScheme, TemporalScheme> tmp(*this);
     return tmp.advect(time0, time1);
@@ -316,25 +320,25 @@ LevelSetMorphing<GridT, InterruptT>::advect3(ValueType time0, ValueType time1)
 
 ///////////////////////////////////////////////////////////////////////
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(LevelSetMorphing<GridT, InterruptT>& parent)
     : mParent(&parent)
-    , mMinAbsS(ValueType(1e-6))
+    , mMinAbsS(ComputeType(1e-6))
     , mMap(parent.mTracker.grid().transform().template constMap<MapT>().get())
     , mTask(nullptr)
 {
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(const Morph& other)
     : mParent(other.mParent)
@@ -345,11 +349,11 @@ Morph(const Morph& other)
 {
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(Morph& other, tbb::split)
     : mParent(other.mParent)
@@ -360,13 +364,13 @@ Morph(Morph& other, tbb::split)
 {
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
-advect(ValueType time0, ValueType time1)
+advect(ComputeType time0, ComputeType time1)
 {
     namespace ph = std::placeholders;
 
@@ -377,7 +381,7 @@ advect(ValueType time0, ValueType time1)
     while (time0 < time1 && mParent->mTracker.checkInterrupter()) {
         mParent->mTracker.leafs().rebuildAuxBuffers(auxBuffers);
 
-        const ValueType dt = this->sampleSpeed(time0, time1, auxBuffers);
+        const ComputeType dt = this->sampleSpeed(time0, time1, auxBuffers);
         if ( math::isZero(dt) ) break;//V is essentially zero so terminate
 
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN //switch is resolved at compile-time
@@ -444,19 +448,19 @@ advect(ValueType time0, ValueType time1)
     return countCFL;//number of CLF propagation steps
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<typename MapT, math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
-inline typename GridT::ValueType
-LevelSetMorphing<GridT, InterruptT>::
+inline typename LevelSetMorphing<GridT, InterruptT, ComputeT>::ComputeType
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
-sampleSpeed(ValueType time0, ValueType time1, Index speedBuffer)
+sampleSpeed(ComputeType time0, ComputeType time1, Index speedBuffer)
 {
     namespace ph = std::placeholders;
 
     mMaxAbsS = mMinAbsS;
     const size_t leafCount = mParent->mTracker.leafs().leafCount();
-    if (leafCount==0 || time0 >= time1) return ValueType(0);
+    if (leafCount==0 || time0 >= time1) return ComputeType(0);
 
     const math::Transform& xform  = mParent->mTracker.grid().transform();
     if (mParent->mTarget->transform() == xform &&
@@ -466,19 +470,19 @@ sampleSpeed(ValueType time0, ValueType time1, Index speedBuffer)
         mTask = std::bind(&Morph::sampleXformedSpeed, ph::_1, ph::_2, speedBuffer);
     }
     this->cook(PARALLEL_REDUCE);
-    if (math::isApproxEqual(mMinAbsS, mMaxAbsS)) return ValueType(0);//speed is essentially zero
-    static const ValueType CFL = (TemporalScheme == math::TVD_RK1 ? ValueType(0.3) :
-                                  TemporalScheme == math::TVD_RK2 ? ValueType(0.9) :
-                                  ValueType(1.0))/math::Sqrt(ValueType(3.0));
-    const ValueType dt = math::Abs(time1 - time0), dx = mParent->mTracker.voxelSize();
-    return math::Min(dt, ValueType(CFL*dx/mMaxAbsS));
+    if (math::isApproxEqual(mMinAbsS, mMaxAbsS)) return ComputeType(0);//speed is essentially zero
+    static const ComputeType CFL = (TemporalScheme == math::TVD_RK1 ? ComputeType(0.3) :
+                                    TemporalScheme == math::TVD_RK2 ? ComputeType(0.9) :
+                                    ComputeType(1.0))/math::Sqrt(ComputeType(3.0));
+    const ComputeType dt = math::Abs(time1 - time0), dx = mParent->mTracker.voxelSize();
+    return math::Min(dt, ComputeType(CFL*dx/mMaxAbsS));
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
 {
@@ -498,12 +502,12 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.wsSample(map.applyMap(voxelIter.getCoord().asVec3d()));
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ComputeType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
     } else {
-        const ValueType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
+        const ComputeType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
         const bool invMask = mParent->isMaskInverted();
         typename GridT::ConstAccessor maskAcc = mParent->mMask->getAccessor();
         SamplerT mask(maskAcc,  mParent->mMask->transform());
@@ -512,23 +516,23 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
             bool isZero = true;
             for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 const Vec3R xyz = map.applyMap(voxelIter.getCoord().asVec3d());//world space
-                const ValueType a = math::SmoothUnitStep((mask.wsSample(xyz)-min)*invNorm);
+                const ComputeType a = math::SmoothUnitStep((mask.wsSample(xyz)-min)*invNorm);
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.wsSample(xyz);
-                s *= invMask ? 1 - a : a;
+                s *= invMask ? ValueType(1 - a) : ValueType(a);
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ComputeType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
 {
@@ -546,12 +550,12 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.getValue(voxelIter.getCoord());
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ComputeType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
     } else {
-        const ValueType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
+        const ComputeType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
         const bool invMask = mParent->isMaskInverted();
         typename GridT::ConstAccessor mask = mParent->mMask->getAccessor();
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
@@ -559,23 +563,23 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
             bool isZero = true;
             for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 const Coord ijk = voxelIter.getCoord();//index space
-                const ValueType a = math::SmoothUnitStep((mask.getValue(ijk)-min)*invNorm);
+                const ComputeType a = math::SmoothUnitStep((mask.getValue(ijk)-min)*invNorm);
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.getValue(ijk);
-                s *= invMask ? 1 - a : a;
+                s *= invMask ? ValueType(1 - a) : ValueType(a);
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ComputeType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 cook(ThreadingMode mode, size_t swapBuffer)
 {
@@ -600,14 +604,14 @@ cook(ThreadingMode mode, size_t swapBuffer)
     mParent->mTracker.endInterrupter();
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<typename MapT, math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
 template <int Nominator, int Denominator>
 inline void
-LevelSetMorphing<GridT,InterruptT>::
+LevelSetMorphing<GridT, InterruptT, ComputeT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
-euler(const LeafRange& range, ValueType dt,
+euler(const LeafRange& range, ComputeType dt,
       Index phiBuffer, Index resultBuffer, Index speedBuffer)
 {
     using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
@@ -615,8 +619,8 @@ euler(const LeafRange& range, ValueType dt,
     using VoxelIterT = typename LeafType::ValueOnCIter;
     using NumGrad = math::GradientNormSqrd<MapT, SpatialScheme>;
 
-    static const ValueType Alpha = ValueType(Nominator)/ValueType(Denominator);
-    static const ValueType Beta  = ValueType(1) - Alpha;
+    static const ComputeType Alpha = ComputeType(Nominator)/ComputeType(Denominator);
+    static const ComputeType Beta  = ComputeType(1) - Alpha;
 
     mParent->mTracker.checkInterrupter();
     const MapT& map = *mMap;
@@ -631,8 +635,9 @@ euler(const LeafRange& range, ValueType dt,
             const Index n = voxelIter.pos();
             if (math::isApproxZero(speed[n])) continue;
             stencil.moveTo(voxelIter);
-            const ValueType v = stencil.getValue() - dt * speed[n] * NumGrad::result(map, stencil);
-            result[n] = Nominator ? Alpha * phi[n] + Beta * v : v;
+            const ComputeType v = ComputeType(stencil.getValue()) -
+                dt * ComputeType(speed[n]) * ComputeType(NumGrad::result(map, stencil));
+            result[n] = Nominator ? ValueType(Alpha * phi[n] + Beta * v) : ValueType(v);
         }//loop over active voxels in the leaf of the mask
     }//loop over leafs of the level set
 }
@@ -649,8 +654,9 @@ euler(const LeafRange& range, ValueType dt,
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter>;
-OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<HalfGrid, util::NullInterrupter, float>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter, float>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter, double>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 

@@ -21,6 +21,7 @@
 #include <openvdb/tools/Prune.h>
 
 #include <openvdb/Grid.h>
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
 
@@ -44,19 +45,22 @@ namespace lvlset {
 /// Negative background tiles that fit inside the closed dilated triangle are also populated.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter>
+template <typename GridType, typename InterruptT = util::NullInterrupter,
+    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
 class OpenTriangularPrismVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          OpenTriangularPrismVoxelizer<GridType, InterruptT>,
-          InterruptT>
+          OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
+          InterruptT,
+          ComputeT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        OpenTriangularPrismVoxelizer<GridType, InterruptT>,
-        InterruptT
+        OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
+        InterruptT,
+        ComputeT
     >;
 
     using BaseT::mXYData;
@@ -69,8 +73,9 @@ public:
 
     friend class ConvexVoxelizer<
         GridType,
-        OpenTriangularPrismVoxelizer<GridType, InterruptT>,
-        InterruptT
+        OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
+        InterruptT,
+        ComputeT
     >;
 
     /// @brief Constructor
@@ -100,7 +105,7 @@ public:
     operator()(const math::Vec3<ScalarType>& pt1, const math::Vec3<ScalarType>& pt2,
                const math::Vec3<ScalarType>& pt3, const ScalarType& radius)
     {
-        static_assert(std::is_floating_point<ScalarType>::value);
+        static_assert(openvdb::is_floating_point<ScalarType>::value);
 
         if (initialize(pt1, pt2, pt3, radius))
             BaseT::iterate();
@@ -111,11 +116,11 @@ private:
     inline void
     setXYRangeData(const Index& step = 1)
     {
-        const ValueT &x1 = mPts[0].x(), &x2 = mPts[1].x(), &x3 = mPts[2].x(),
-                     &x4 = mPts[3].x(), &x5 = mPts[4].x(), &x6 = mPts[5].x();
+        const ComputeT &x1 = mPts[0].x(), &x2 = mPts[1].x(), &x3 = mPts[2].x(),
+                       &x4 = mPts[3].x(), &x5 = mPts[4].x(), &x6 = mPts[5].x();
 
-        const ValueT xmin = math::Min(x1, x2, x3, x4, x5, x6);
-        const ValueT xmax = math::Max(x1, x2, x3, x4, x5, x6);
+        const ComputeT xmin = math::Min(x1, x2, x3, x4, x5, x6);
+        const ComputeT xmax = math::Max(x1, x2, x3, x4, x5, x6);
         mXYData.reset(xmin, xmax, step);
 
         // TODO add logic to ignore edges in the interior of the projection
@@ -138,18 +143,18 @@ private:
     inline void
     setXYSegmentRangeData(const Index& step = 1)
     {
-        const ValueT &x1 = mPts[i].x(), &x2 = mPts[j].x();
+        const ComputeT &x1 = mPts[i].x(), &x2 = mPts[j].x();
 
         // nothing to do if segment does not span across more than on voxel in x
         // other segments will handle this segment's range
         if (tileCeil(x1, step) == tileCeil(x2, step))
             return;
 
-        const ValueT x_start = tileCeil(math::Min(x1, x2), step),
-                     x_end = math::Max(x1, x2),
-                     stepv = ValueT(step);
+        const ComputeT x_start = tileCeil(math::Min(x1, x2), step),
+                       x_end = math::Max(x1, x2),
+                       stepv = ValueT(step);
 
-        for (ValueT x = x_start; x <= x_end; x += stepv) {
+        for (ComputeT x = x_start; x <= x_end; x += stepv) {
             if constexpr (MinMax <= 0)
                 mXYData.expandYMin(x, line2D<i,j>(x));
             if constexpr (MinMax >= 0)
@@ -158,7 +163,7 @@ private:
     }
 
     // simply offset distance to the center plane, we may assume any CPQ falls in inside the prism
-    inline ValueT
+    inline ComputeT
     signedDistance(const Vec3T& p) const
     {
         return math::Abs(mTriNrml.dot(p - mA)) - mRad;
@@ -166,14 +171,14 @@ private:
 
     // allows for tiles to poke outside of the open prism into the tubes
     // adaptation of udTriangle at https://iquilezles.org/articles/distfunctions/
-    inline ValueT
+    inline ComputeT
     tilePointSignedDistance(const Vec3T& p) const
     {
         const Vec3T pa = p - mA,
                     pb = p - mB,
                     pc = p - mC;
 
-        const ValueT udist =
+        const ComputeT udist =
             math::Sign(mBAXNrml.dot(pa)) +
             math::Sign(mCBXNrml.dot(pb)) +
             math::Sign(mACXNrml.dot(pc)) < 2
@@ -192,14 +197,14 @@ private:
     inline bool
     tileCanFit(const Index& dim) const
     {
-        return mRad >= BaseT::halfWidth() + ValueT(0.5) * (ValueT(dim)-ValueT(1));
+        return mRad >= BaseT::halfWidth() + ComputeT(0.5) * (ComputeT(dim)-ComputeT(1));
     }
 
-    std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> prismBottomTop =
-    [this](ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
+    std::function<bool(ComputeT&, ComputeT&, const ComputeT&, const ComputeT&)> prismBottomTop =
+    [this](ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y)
     {
-        zb = std::numeric_limits<ValueT>::lowest();
-        zt = std::numeric_limits<ValueT>::max();
+        zb = std::numeric_limits<ComputeT>::lowest();
+        zt = std::numeric_limits<ComputeT>::max();
 
         // TODO with proper book keeping we can know apriori which 2 indexes will set zb & zt
         //      basically figure out a poor man's cylindrical decomposition...
@@ -214,12 +219,12 @@ private:
 
     template<Index i>
     inline void
-    setPlaneBottomTop(ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y) const
+    setPlaneBottomTop(ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y) const
     {
         if (math::isApproxZero(mFaceNrmls[i].z()))
             return;
 
-        const ValueT z = mPlaneXCoeffs[i]*x + mPlaneYCoeffs[i]*y + mPlaneOffsets[i];
+        const ComputeT z = mPlaneXCoeffs[i]*x + mPlaneYCoeffs[i]*y + mPlaneOffsets[i];
 
         if (mFaceNrmls[i].z() < 0) {
             if (zb < z)
@@ -237,8 +242,8 @@ private:
     initialize(const math::Vec3<ScalarType>& pt1, const math::Vec3<ScalarType>& pt2,
                const math::Vec3<ScalarType>& pt3, const ScalarType& r)
     {
-        const ValueT vx = BaseT::voxelSize(),
-                     hw = BaseT::halfWidth();
+        const ComputeT vx = BaseT::voxelSize(),
+                       hw = BaseT::halfWidth();
 
         mA = Vec3T(pt1)/vx;
         mB = Vec3T(pt2)/vx;
@@ -260,14 +265,14 @@ private:
         mCBNorm2 = math::isApproxZero(mCB.lengthSqr()) ? mCB : mCB/mCB.lengthSqr();
         mACNorm2 = math::isApproxZero(mAC.lengthSqr()) ? mAC : mAC/mAC.lengthSqr();
 
-        const ValueT len = mTriNrml.length();
+        const ComputeT len = mTriNrml.length();
         if (math::isApproxZero(len)) {
             return false; // nothing to voxelize, prism has no volume
         } else {
             mTriNrml /= len;
         }
 
-        const ValueT hwRad = mRad + hw;
+        const ComputeT hwRad = mRad + hw;
         if (math::isApproxZero(hwRad) || hwRad < 0)
             return false; // nothing to voxelize, prism has no volume
 
@@ -294,8 +299,8 @@ private:
 
             for (Index i = 0; i < 5; ++i) {
                 if (!math::isApproxZero(mFaceNrmls[i].z())) {
-                    const ValueT cx = mFaceNrmls[i].x()/mFaceNrmls[i].z(),
-                                 cy = mFaceNrmls[i].y()/mFaceNrmls[i].z();
+                    const ComputeT cx = mFaceNrmls[i].x()/mFaceNrmls[i].z(),
+                                   cy = mFaceNrmls[i].y()/mFaceNrmls[i].z();
                     const Vec3T p = mPts[p_ind[i]];
                     mPlaneXCoeffs[i] = -cx;
                     mPlaneYCoeffs[i] = -cy;
@@ -312,13 +317,13 @@ private:
     // ------------ general utilities ------------
 
     template <Index i, Index j>
-    ValueT
+    ComputeT
     line2D(const ValueT& x) const
     {
-        const ValueT &x1 = mPts[i].x(), &y1 = mPts[i].y(),
-                     &x2 = mPts[j].x(), &y2 = mPts[j].y();
+        const ComputeT &x1 = mPts[i].x(), &y1 = mPts[i].y(),
+                       &x2 = mPts[j].x(), &y2 = mPts[j].y();
 
-        const ValueT m = (y2-y1)/(x2-x1);
+        const ComputeT m = (y2-y1)/(x2-x1);
 
         return y1 + m * (x-x1);
     }
@@ -326,7 +331,7 @@ private:
     // ------------ private members ------------
 
     Vec3T mA, mB, mC;
-    ValueT mRad;
+    ComputeT mRad;
 
     Vec3T mBA, mCB, mAC;
     Vec3T mBAXNrml, mCBXNrml, mACXNrml;
@@ -337,9 +342,9 @@ private:
     Vec3T mTriNrml;
     std::vector<Vec3T> mFaceNrmls = std::vector<Vec3T>(5);
 
-    std::vector<ValueT> mPlaneXCoeffs = std::vector<ValueT>(5),
-                        mPlaneYCoeffs = std::vector<ValueT>(5),
-                        mPlaneOffsets = std::vector<ValueT>(5);
+    std::vector<ComputeT> mPlaneXCoeffs = std::vector<ValueT>(5),
+                          mPlaneYCoeffs = std::vector<ValueT>(5),
+                          mPlaneOffsets = std::vector<ValueT>(5);
 
 }; // class OpenTriangularPrismVoxelizer
 
@@ -349,19 +354,22 @@ private:
 /// The sector is defined by the intersection of two half spaces.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter>
+template <typename GridType, typename InterruptT = util::NullInterrupter,
+    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
 class OpenCapsuleWedgeVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
-          InterruptT>
+          OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
+          InterruptT,
+          ComputeT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
-        InterruptT
+        OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
+        InterruptT,
+        ComputeT
     >;
 
     using BaseT::mXYData;
@@ -375,8 +383,9 @@ public:
 
     friend class ConvexVoxelizer<
         GridType,
-        OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
-        InterruptT
+        OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
+        InterruptT,
+        ComputeT
     >;
 
     /// @brief Constructor
@@ -410,7 +419,7 @@ public:
         const ScalarType& radius, const math::Vec3<ScalarType>& nrml1,
         const math::Vec3<ScalarType>& nrml2)
     {
-        static_assert(std::is_floating_point<ScalarType>::value);
+        static_assert(openvdb::is_floating_point<ScalarType>::value);
 
         if (initialize(pt1, pt2, radius, nrml1, nrml2))
             BaseT::iterate();
@@ -422,7 +431,7 @@ private:
     inline void
     setXYRangeData(const Index& step = 1)
     {
-        const ValueT stepv = ValueT(step);
+        const ComputeT stepv = ValueT(step);
 
         // degenerate
         if (mX1 - mORad > mX2 + mORad) {
@@ -434,67 +443,67 @@ private:
         if (mIsVertical) {
             mXYData.reset(mX1 - mORad, mX1 + mORad, step);
 
-            for (ValueT x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += stepv)
+            for (ComputeT x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += stepv)
                 mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
 
             intersectWithXYWedgeLines();
             return;
         }
 
-        const ValueT v = math::Min(mORad, mORad * math::Abs(mYdiff)/mXYNorm);
+        const ComputeT v = math::Min(mORad, mORad * math::Abs(mYdiff)/mXYNorm);
 
-        const ValueT a0 = mX1 - mORad,
-                     a1 = mX1 - v,
-                     a2 = mX1 + v,
-                     a3 = mX2 - v,
-                     a4 = mX2 + v,
-                     a5 = mX2 + mORad;
+        const ComputeT a0 = mX1 - mORad,
+                       a1 = mX1 - v,
+                       a2 = mX1 + v,
+                       a3 = mX2 - v,
+                       a4 = mX2 + v,
+                       a5 = mX2 + mORad;
 
-        const ValueT tc0 = tileCeil(a0, step),
-                     tc1 = tileCeil(a1, step),
-                     tc2 = tileCeil(a2, step),
-                     tc3 = tileCeil(a3, step),
-                     tc4 = tileCeil(a4, step);
+        const ComputeT tc0 = tileCeil(a0, step),
+                       tc1 = tileCeil(a1, step),
+                       tc2 = tileCeil(a2, step),
+                       tc3 = tileCeil(a3, step),
+                       tc4 = tileCeil(a4, step);
 
         mXYData.reset(a0, a5, step);
 
-        for (ValueT x = tc0; x <= a1; x += stepv)
+        for (ComputeT x = tc0; x <= a1; x += stepv)
             mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (ValueT x = tc1; x <= math::Min(a2, a3); x += stepv)
+                for (ComputeT x = tc1; x <= math::Min(a2, a3); x += stepv)
                     mXYData.expandYRange(x, lineBottom(x), circle1Top(x));
             } else {
-                for (ValueT x = tc1; x <= math::Min(a2, a3); x += stepv)
+                for (ComputeT x = tc1; x <= math::Min(a2, a3); x += stepv)
                     mXYData.expandYRange(x, circle1Bottom(x), lineTop(x));
             }
         }
 
         if (a2 < a3) {
-            for (ValueT x = tc2; x <= a3; x += stepv)
+            for (ComputeT x = tc2; x <= a3; x += stepv)
                 mXYData.expandYRange(x, lineBottom(x), lineTop(x));
         } else {
             if (mY2 <= mY1) {
-                for (ValueT x = tc3; x <= a2; x += stepv)
+                for (ComputeT x = tc3; x <= a2; x += stepv)
                     mXYData.expandYRange(x, circle2Bottom(x), circle1Top(x));
             } else {
-                for (ValueT x = tc3; x <= a2; x += stepv)
+                for (ComputeT x = tc3; x <= a2; x += stepv)
                     mXYData.expandYRange(x, circle1Bottom(x), circle2Top(x));
             }
         }
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (ValueT x = math::Max(tc2, tc3); x <= a4; x += stepv)
+                for (ComputeT x = math::Max(tc2, tc3); x <= a4; x += stepv)
                     mXYData.expandYRange(x, circle2Bottom(x), lineTop(x));
             } else {
-                for (ValueT x = math::Max(tc2, tc3); x <= a4; x += stepv)
+                for (ComputeT x = math::Max(tc2, tc3); x <= a4; x += stepv)
                     mXYData.expandYRange(x, lineBottom(x), circle2Top(x));
             }
         }
 
-        for (ValueT x = tc4; x <= a5; x += stepv)
+        for (ComputeT x = tc4; x <= a5; x += stepv)
             mXYData.expandYRange(x, circle2Bottom(x), circle2Top(x));
 
         intersectWithXYStrip();
@@ -509,7 +518,7 @@ private:
             return;
 
         const Vec3T &pp1 = mPlanePts[0], &pp2 = mPlanePts[1];
-        const ValueT &vx = mV.x(), &vy = mV.y();
+        const ComputeT &vx = mV.x(), &vy = mV.y();
 
         Vec2T n = Vec2T(-vy, vx).unitSafe();
         Vec3T cvec = mORad * Vec3T(-vy, vx, ValueT(0)).unitSafe();
@@ -522,9 +531,9 @@ private:
         const Vec3T cpmin(mPt1 - cvec), cpmax(mPt1 + cvec);
 
         if (math::isApproxZero(mXdiff)) {
-            const ValueT px = mPt1.x(),
-                         xmin = math::Min(px, pp1.x(), pp2.x()),
-                         xmax = math::Max(px, pp1.x(), pp2.x());
+            const ComputeT px = mPt1.x(),
+                           xmin = math::Min(px, pp1.x(), pp2.x()),
+                           xmax = math::Max(px, pp1.x(), pp2.x());
 
             if (!inWedge(cpmin))
                 intersectWithXYHalfSpace(n.x() < 0 ? n : -n, Vec2T(xmin, ValueT(0)));
@@ -532,12 +541,12 @@ private:
             if (!inWedge(cpmax))
                 intersectWithXYHalfSpace(n.x() > 0 ? n : -n, Vec2T(xmax, ValueT(0)));
         } else {
-            const ValueT m = mYdiff/mXdiff;
-            const ValueT y1 = mPt1.y() - m * mPt1.x(),
-                         y2 = pp1.y() - m * pp1.x(),
-                         y3 = pp2.y() - m * pp2.x();
-            const ValueT ymin = math::Min(y1, y2, y3),
-                         ymax = math::Max(y1, y2, y3);
+            const ComputeT m = mYdiff/mXdiff;
+            const ComputeT y1 = mPt1.y() - m * mPt1.x(),
+                           y2 = pp1.y() - m * pp1.x(),
+                           y3 = pp2.y() - m * pp2.x();
+            const ComputeT ymin = math::Min(y1, y2, y3),
+                           ymax = math::Max(y1, y2, y3);
 
             if (!inWedge(vy <= 0 ? cpmin : cpmax))
                 intersectWithXYHalfSpace(n.y() < 0 ? n : -n, Vec2T(ValueT(0), ymin));
@@ -581,11 +590,11 @@ private:
             return;
 
         if (math::isApproxZero(n.y())) {
-            const ValueT &px = p.x();
+            const ComputeT &px = p.x();
             if (n.x() < 0) {
                 const Index m = mXYData.size();
                 for (Index i = 0; i < m; ++i) {
-                    const ValueT x = mXYData.getX(i);
+                    const ComputeT x = mXYData.getX(i);
 
                     if (x < px) mXYData.clearYRange(x);
                     else break;
@@ -593,7 +602,7 @@ private:
             } else {
                 Index i = mXYData.size()-1;
                 while (true) {
-                    const ValueT x = mXYData.getX(i);
+                    const ComputeT x = mXYData.getX(i);
 
                     if (x > px) mXYData.clearYRange(x);
                     else break;
@@ -606,13 +615,13 @@ private:
             const bool set_min = n.y() < 0;
             const Index m = mXYData.size();
 
-            const ValueT b = -n.x()/n.y();
-            const ValueT a = p.y() - b * p.x();
+            const ComputeT b = -n.x()/n.y();
+            const ComputeT a = p.y() - b * p.x();
 
-            ValueT x, ymin, ymax;
+            ComputeT x, ymin, ymax;
             for (Index i = 0; i < m; ++i) {
                 mXYData.XYData(x, ymin, ymax, i);
-                const ValueT yint = a + b * x;
+                const ComputeT yint = a + b * x;
 
                 if (ymin <= yint && yint <= ymax) {
                     if (set_min) mXYData.setYMin(x, yint);
@@ -632,16 +641,16 @@ private:
     signedDistance(const Vec3T& p) const
     {
         const Vec3T w = p - mPt1;
-        const ValueT dot = w.dot(mV);
+        const ComputeT dot = w.dot(mV);
 
         // carefully short circuit with a fuzzy tolerance, which avoids division by small mVLenSqr
-        if (dot <= math::Tolerance<ValueT>::value())
+        if (dot <= math::Tolerance<ComputeT>::value())
             return w.length() - mRad;
 
         if (dot >= mVLenSqr)
             return (p - mPt2).length() - mRad;
 
-        const ValueT t = w.dot(mV)/mVLenSqr;
+        const ComputeT t = w.dot(mV)/mVLenSqr;
 
         return (w - t * mV).length() - mRad;
     }
@@ -649,27 +658,27 @@ private:
     inline bool
     tileCanFit(const Index& dim) const
     {
-        return mRad >= BaseT::halfWidth() + ValueT(0.5) * (ValueT(dim)-ValueT(1));
+        return mRad >= BaseT::halfWidth() + ComputeT(0.5) * (ComputeT(dim)-ComputeT(1));
     }
 
-    std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> capsuleBottomTopVertical =
-    [this](ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
+    std::function<bool(ComputeT&, ComputeT&, const ComputeT&, const ComputeT&)> capsuleBottomTopVertical =
+    [this](ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y)
     {
         zb = BaseT::sphereBottom(mX1, mY1, math::Min(mZ1, mZ2), mORad, x, y);
         zt = BaseT::sphereTop(mX2, mY2, math::Max(mZ1, mZ2), mORad, x, y);
 
-        return std::isfinite(zb) && std::isfinite(zt);
+        return math::isFinite(zb) && math::isFinite(zt);
     };
 
-    std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> capsuleBottomTop =
-    [this](ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
+    std::function<bool(ComputeT&, ComputeT&, const ComputeT&, const ComputeT&)> capsuleBottomTop =
+    [this](ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y)
     {
-        ValueT cylptb, cylptt;
+        ComputeT cylptb, cylptt;
         if (!infiniteCylinderBottomTop(cylptb, cylptt, x, y))
             return false;
 
-        const ValueT dotb = (Vec3T(x, y, cylptb) - mPt1).dot(mV);
-        const ValueT dott = (Vec3T(x, y, cylptt) - mPt1).dot(mV);
+        const ComputeT dotb = (Vec3T(x, y, cylptb) - mPt1).dot(mV);
+        const ComputeT dott = (Vec3T(x, y, cylptt) - mPt1).dot(mV);
 
         if (dotb < 0)
             zb = sphere1Bottom(x, y);
@@ -685,7 +694,7 @@ private:
         else
             zt = cylptt;
 
-        if (!std::isfinite(zb) || !std::isfinite(zt))
+        if (!math::isFinite(zb) || !math::isFinite(zt))
             return false;
 
         intersectWedge<0,1>(zb, zt, x, y);
@@ -696,14 +705,14 @@ private:
 
     template<Index i, Index j>
     inline void
-    intersectWedge(ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
+    intersectWedge(ComputeT& zb, ComputeT& zt, const ComputeT& x, const ComputeT& y)
     {
         const Vec3T& n0 = mPlaneNrmls[i];
 
         if (math::isApproxZero(n0.z()))
             return;
 
-        const ValueT zp = mPlaneXCoeffs[i]*x + mPlaneYCoeffs[i]*y + mPlaneOffsets[i];
+        const ComputeT zp = mPlaneXCoeffs[i]*x + mPlaneYCoeffs[i]*y + mPlaneOffsets[i];
 
         if (zb <= zp && zp <= zt && inHalfSpace<j>(Vec3T(x, y, zp))) {
             if (n0.z() < 0)
@@ -714,7 +723,7 @@ private:
     }
 
     inline bool
-    inWedge(const ValueT& x, const ValueT& y, const ValueT& z)
+    inWedge(const ComputeT& x, const ComputeT& y, const ComputeT& z)
     {
         return inWedge(Vec3T(x, y, z));
     }
@@ -732,31 +741,31 @@ private:
         // allow points within a fuzzy fractional (index space) distance to the halfspace
         // this ensures the seams between open wedges and open prisms are completely filled in
         // assumes mPlaneNrmls[i] is a unit vector
-        static const ValueT VOXFRAC = 0.125;
+        static const ComputeT VOXFRAC = 0.125;
 
         return mPlaneNrmls[i].dot(pt-mPt1) <= VOXFRAC;
     }
 
     // assumes tube is not vertical!
     inline bool
-    infiniteCylinderBottomTop(ValueT& cylptb, ValueT& cylptt,
-        const ValueT& x, const ValueT& y) const
+    infiniteCylinderBottomTop(ComputeT& cylptb, ComputeT& cylptt,
+        const ComputeT& x, const ComputeT& y) const
     {
         const Vec2T q(x, y);
 
         const Vec2T qproj = mPt12d + mV2d*((q - mPt12d).dot(mV2d))/mXYNorm2;
 
-        const ValueT t = mX1 != mX2 ? (qproj[0] - mX1)/mXdiff : (qproj[1] - mY1)/mYdiff;
+        const ComputeT t = mX1 != mX2 ? (qproj[0] - mX1)/mXdiff : (qproj[1] - mY1)/mYdiff;
 
         const Vec3T qproj3D = mPt1 + t * mV;
 
-        const ValueT d2 = (q - qproj).lengthSqr();
+        const ComputeT d2 = (q - qproj).lengthSqr();
 
         // outside of cylinder's 2D projection
         if (mORad2 < d2)
             return false;
 
-        const ValueT h = math::Sqrt((mORad2 - d2) * mVLenSqr/mXYNorm2);
+        const ComputeT h = math::Sqrt((mORad2 - d2) * mVLenSqr/mXYNorm2);
 
         cylptb = qproj3D[2] - h;
         cylptt = qproj3D[2] + h;
@@ -764,62 +773,62 @@ private:
         return true;
     }
 
-    inline ValueT
-    lineBottom(const ValueT& x) const
+    inline ComputeT
+    lineBottom(const ComputeT& x) const
     {
         return mY1 + (mYdiff*(x-mX1) - mORad * mXYNorm)/mXdiff;
     }
 
-    inline ValueT
-    lineTop(const ValueT& x) const
+    inline ComputeT
+    lineTop(const ComputeT& x) const
     {
         return mY1 + (mYdiff*(x-mX1) + mORad * mXYNorm)/mXdiff;
     }
 
-    inline ValueT
-    circle1Bottom(const ValueT& x) const
+    inline ComputeT
+    circle1Bottom(const ComputeT& x) const
     {
         return BaseT::circleBottom(mX1, mY1, mORad, x);
     }
 
-    inline ValueT
-    circle1Top(const ValueT& x) const
+    inline ComputeT
+    circle1Top(const ComputeT& x) const
     {
         return BaseT::circleTop(mX1, mY1, mORad, x);
     }
 
-    inline ValueT
-    circle2Bottom(const ValueT& x) const
+    inline ComputeT
+    circle2Bottom(const ComputeT& x) const
     {
         return BaseT::circleBottom(mX2, mY2, mORad, x);
     }
 
-    inline ValueT
-    circle2Top(const ValueT& x) const
+    inline ComputeT
+    circle2Top(const ComputeT& x) const
     {
         return BaseT::circleTop(mX2, mY2, mORad, x);
     }
 
-    inline ValueT
-    sphere1Bottom(const ValueT& x, const ValueT& y) const
+    inline ComputeT
+    sphere1Bottom(const ComputeT& x, const ComputeT& y) const
     {
         return BaseT::sphereBottom(mX1, mY1, mZ1, mORad, x, y);
     }
 
-    inline ValueT
-    sphere1Top(const ValueT& x, const ValueT& y) const
+    inline ComputeT
+    sphere1Top(const ComputeT& x, const ComputeT& y) const
     {
         return BaseT::sphereTop(mX1, mY1, mZ1, mORad, x, y);
     }
 
-    inline ValueT
-    sphere2Bottom(const ValueT& x, const ValueT& y) const
+    inline ComputeT
+    sphere2Bottom(const ComputeT& x, const ComputeT& y) const
     {
         return BaseT::sphereBottom(mX2, mY2, mZ2, mORad, x, y);
     }
 
-    inline ValueT
-    sphere2Top(const ValueT& x, const ValueT& y) const
+    inline ComputeT
+    sphere2Top(const ComputeT& x, const ComputeT& y) const
     {
         return BaseT::sphereTop(mX2, mY2, mZ2, mORad, x, y);
     }
@@ -832,8 +841,8 @@ private:
         const ScalarType& r, const math::Vec3<ScalarType>& nrml1,
         const math::Vec3<ScalarType>& nrml2)
     {
-        const ValueT vx = BaseT::voxelSize(),
-                     hw = BaseT::halfWidth();
+        const ComputeT vx = BaseT::voxelSize(),
+                       hw = BaseT::halfWidth();
 
         // forces x1 <= x2
         if (pt1[0] <= pt2[0]) {
@@ -844,7 +853,7 @@ private:
             mPt2 = Vec3T(pt1)/vx;
         }
 
-        mRad = ValueT(r)/vx;
+        mRad = ComputeT(r)/vx;
 
         // padded radius used to populate the outer halfwidth of the sdf
         mORad  = mRad + hw;
@@ -897,13 +906,13 @@ private:
                 mDirVectors[1] = -mDirVectors[0];
             } else {
                 if (mPlaneNrmls[1].dot(mDirVectors[0]) > 0)
-                    mDirVectors[0] *= ValueT(-1);
+                    mDirVectors[0] *= ComputeT(-1);
                 if (mPlaneNrmls[0].dot(mDirVectors[1]) > 0)
-                    mDirVectors[1] *= ValueT(-1);
+                    mDirVectors[1] *= ComputeT(-1);
             }
 
-            mPlanePts[0] = mPt1 + mDirVectors[0] + ValueT(0.025) * mPlaneNrmls[0];
-            mPlanePts[1] = mPt1 + mDirVectors[1] + ValueT(0.025) * mPlaneNrmls[1];
+            mPlanePts[0] = mPt1 + mDirVectors[0] + ComputeT(0.025) * mPlaneNrmls[0];
+            mPlanePts[1] = mPt1 + mDirVectors[1] + ComputeT(0.025) * mPlaneNrmls[1];
         }
 
         {
@@ -913,8 +922,8 @@ private:
 
             for (Index i = 0; i < 2; ++i) {
                 if (!math::isApproxZero(mPlaneNrmls[i].z())) {
-                    const ValueT cx = mPlaneNrmls[i].x()/mPlaneNrmls[i].z(),
-                                 cy = mPlaneNrmls[i].y()/mPlaneNrmls[i].z();
+                    const ComputeT cx = mPlaneNrmls[i].x()/mPlaneNrmls[i].z(),
+                                   cy = mPlaneNrmls[i].y()/mPlaneNrmls[i].z();
                     const Vec3T p = mPlanePts[i];
                     mPlaneXCoeffs[i] = -cx;
                     mPlaneYCoeffs[i] = -cy;
@@ -948,19 +957,19 @@ private:
 
     Vec2T mPt12d, mPt22d, mV2d;
 
-    ValueT mORad, mORad2, mRad, mVLenSqr, mXdiff, mYdiff, mZdiff, mXYNorm, mXYNorm2;
+    ComputeT mORad, mORad2, mRad, mVLenSqr, mXdiff, mYdiff, mZdiff, mXYNorm, mXYNorm2;
 
-    ValueT mX1, mY1, mZ1, mX2, mY2, mZ2;
+    ComputeT mX1, mY1, mZ1, mX2, mY2, mZ2;
 
     bool mIsVertical;
 
     std::vector<Vec3T> mPlaneNrmls = std::vector<Vec3T>(2),
-                  mDirVectors = std::vector<Vec3T>(2),
-                  mPlanePts   = std::vector<Vec3T>(2);
+                       mDirVectors = std::vector<Vec3T>(2),
+                       mPlanePts   = std::vector<Vec3T>(2);
 
-    std::vector<ValueT> mPlaneXCoeffs = std::vector<ValueT>(2),
-                  mPlaneYCoeffs = std::vector<ValueT>(2),
-                  mPlaneOffsets = std::vector<ValueT>(2);
+    std::vector<ComputeT> mPlaneXCoeffs = std::vector<ValueT>(2),
+                          mPlaneYCoeffs = std::vector<ValueT>(2),
+                          mPlaneOffsets = std::vector<ValueT>(2);
 
 }; // class OpenCapsuleWedgeVoxelizer
 
@@ -1208,16 +1217,20 @@ class DilatedMeshVoxelizer {
     using GridPtr = typename GridType::Ptr;
     using TreeT = typename GridType::TreeType;
     using LeafT = typename TreeT::LeafNodeType;
+    
+    using ValueT = typename GridType::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     using PartitionerT = tools::PointPartitioner<Index32, LeafT::LOG2DIM>;
 
-    using PrismVoxelizer = OpenTriangularPrismVoxelizer<GridType, InterruptT>;
-    using WedgeVoxelizer = OpenCapsuleWedgeVoxelizer<GridType, InterruptT>;
+    using PrismVoxelizer = OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>;
+    using WedgeVoxelizer = OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>;
 
     using MeshConnectivity = TriangleMeshEdgeConnectivity<ScalarType>;
 
     using Vec3T = math::Vec3<ScalarType>;
 
+    static_assert(openvdb::is_floating_point<ValueT>::value);
     static_assert(std::is_floating_point<ScalarType>::value);
 
 public:
@@ -1329,13 +1342,13 @@ private:
     inline void
     voxelizeCapsule(const Vec3T& p1, const Vec3T& p2, const Vec3T& p3)
     {
-        lvlset::CapsuleVoxelizer<GridType, InterruptT> voxelizer(mGrid, false);
+        lvlset::CapsuleVoxelizer<GridType, InterruptT, ComputeT> voxelizer(mGrid, false);
 
-        ScalarType d1 = (p2-p1).lengthSqr(),
-                   d2 = (p3-p2).lengthSqr(),
-                   d3 = (p1-p3).lengthSqr();
+        ComputeT d1 = ComputeT((p2-p1).lengthSqr()),
+                 d2 = ComputeT((p3-p2).lengthSqr()),
+                 d3 = ComputeT((p1-p3).lengthSqr());
 
-        ScalarType maxd = math::Max(d1, d2, d3);
+        ComputeT maxd = math::Max(d1, d2, d3);
 
         if (maxd == d1)
             voxelizer(p1, p2, mRad);
@@ -1528,7 +1541,7 @@ createLevelSetDilatedMesh(
 
     using Voxelizer = typename lvlset::DilatedMeshVoxelizer<GridType, ScalarType, InterruptT>;
 
-    static_assert(std::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value,
         "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
@@ -1555,7 +1568,7 @@ createLevelSetDilatedMesh(
 
     using ValueT = typename GridType::ValueType;
 
-    static_assert(std::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value,
         "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
@@ -1587,7 +1600,7 @@ createLevelSetDilatedMesh(const std::vector<math::Vec3<ScalarType>>& vertices,
 
     using ValueT = typename GridType::ValueType;
 
-    static_assert(std::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value,
         "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
