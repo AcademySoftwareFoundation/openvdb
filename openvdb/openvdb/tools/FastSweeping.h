@@ -30,6 +30,7 @@
 //#define BENCHMARK_FAST_SWEEPING
 
 #include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
 #include <openvdb/Platform.h>
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
@@ -460,7 +461,7 @@ maskSdf(const GridT &sdfGrid,
 template<typename SdfGridT, typename ExtValueT = typename SdfGridT::ValueType>
 class FastSweeping
 {
-    static_assert(std::is_floating_point<typename SdfGridT::ValueType>::value,
+    static_assert(openvdb::is_floating_point<typename SdfGridT::ValueType>::value,
                   "FastSweeping requires SdfGridT to have floating-point values");
     // Defined types related to the signed distance (or fog) grid
     using SdfValueT = typename SdfGridT::ValueType;

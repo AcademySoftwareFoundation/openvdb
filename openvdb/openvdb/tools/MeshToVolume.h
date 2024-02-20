@@ -19,6 +19,7 @@
 #include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
+#include <openvdb/math/Math.h> // for isFinite(), isNan()
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
@@ -39,7 +40,6 @@
 #include <tbb/task_arena.h>
 
 #include <algorithm> // for std::sort()
-#include <cmath> // for std::isfinite(), std::isnan()
 #include <deque>
 #include <limits>
 #include <memory>
@@ -3348,7 +3348,7 @@ meshToVolume(
 
     // Note: inf interior width is all right, this value makes the converter fill
     // interior regions with distance values.
-    if (!std::isfinite(exteriorWidth) || std::isnan(interiorWidth)) {
+    if (!math::isFinite(exteriorWidth) || math::isNan(interiorWidth)) {
         std::stringstream msg;
         msg << "Illegal narrow band width: exterior = " << exteriorWidth
             << ", interior = " << interiorWidth;
@@ -3358,7 +3358,7 @@ meshToVolume(
 
     const ValueType voxelSize = ValueType(transform.voxelSize()[0]);
 
-    if (!std::isfinite(voxelSize) || math::isZero(voxelSize)) {
+    if (!math::isFinite(voxelSize) || math::isZero(voxelSize)) {
         std::stringstream msg;
         msg << "Illegal transform, voxel size = " << voxelSize;
         OPENVDB_LOG_DEBUG(msg.str());

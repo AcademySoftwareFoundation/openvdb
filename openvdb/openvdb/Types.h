@@ -8,27 +8,7 @@
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
 
-#ifdef OPENVDB_USE_IMATH_HALF
-#ifdef OPENVDB_IMATH_VERSION
-#include <Imath/half.h>
-#else
-#include <OpenEXR/half.h>
-#endif
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-using half = half;
-}}}
-#else
-#include <openvdb/math/Half.h>
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-using half = internal::half;
-}}}
-#endif
+#include <openvdb/math/HalfDecl.h>
 
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
@@ -453,6 +433,14 @@ struct is_floating_point : std::is_floating_point<T> { };
 
 template<>
 struct is_floating_point<Half> : std::is_floating_point<float> { };
+
+
+template<class T>
+struct is_signed : std::is_signed<T> { };
+
+template<>
+struct is_signed<Half> : std::is_signed<float> { };
+
 
 /// @brief Maps one type (e.g. the value types) to other types
 template<typename T>

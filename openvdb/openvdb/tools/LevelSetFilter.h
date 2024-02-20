@@ -45,7 +45,7 @@ public:
     using TreeType = typename GridType::TreeType;
     using ValueType = typename TreeType::ValueType;
     using AlphaType = typename MaskType::ValueType;
-    static_assert(std::is_floating_point<AlphaType>::value,
+    static_assert(openvdb::is_floating_point<AlphaType>::value,
         "LevelSetFilter requires a mask grid with floating-point values");
 
     /// @brief Main constructor from a grid

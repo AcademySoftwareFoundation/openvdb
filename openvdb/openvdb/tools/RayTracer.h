@@ -155,7 +155,7 @@ public:
     using ValueType = typename GridType::ValueType;
     using AccessorType = typename GridType::ConstAccessor;
     using SamplerType = tools::GridSampler<AccessorType, SamplerT>;
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "VolumeRender requires a floating-point-valued grid");
 
     /// @brief Constructor taking an intersector and a base camera.

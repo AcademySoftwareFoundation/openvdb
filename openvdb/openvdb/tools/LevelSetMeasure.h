@@ -108,7 +108,7 @@ public:
     using ValueType = typename TreeType::ValueType;
     using ManagerType = typename tree::LeafManager<const TreeType>;
 
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "level set measure is supported only for scalar, floating-point grids");
 
     /// @brief Main constructor from a grid
@@ -408,7 +408,7 @@ MeasureCurvatures::operator()(const LeafRange& range) const
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT& grid, bool useWorldUnits)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -417,7 +417,7 @@ doLevelSetArea(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -441,7 +441,7 @@ levelSetArea(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -450,7 +450,7 @@ doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -474,7 +474,7 @@ levelSetVolume(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -483,7 +483,7 @@ doLevelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -508,7 +508,7 @@ levelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetEuler(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -518,7 +518,7 @@ doLevelSetEuler(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetGenus(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -527,7 +527,7 @@ doLevelSetGenus(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetGenus(const GridT&)
 {
     OPENVDB_THROW(TypeError,

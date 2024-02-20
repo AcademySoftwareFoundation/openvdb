@@ -1750,7 +1750,7 @@ createLevelSet(Real voxelSize, Real halfWidth)
     using ValueType = typename GridType::ValueType;
 
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "level-set grids must be floating-point-valued");
 
     typename GridType::Ptr grid = GridType::create(

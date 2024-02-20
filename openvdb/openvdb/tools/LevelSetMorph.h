@@ -498,7 +498,7 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.wsSample(map.applyMap(voxelIter.getCoord().asVec3d()));
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ValueType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
@@ -515,9 +515,9 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
                 const ValueType a = math::SmoothUnitStep((mask.wsSample(xyz)-min)*invNorm);
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.wsSample(xyz);
-                s *= invMask ? 1 - a : a;
+                s *= invMask ? ValueType(1 - a) : a;
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ValueType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
@@ -546,7 +546,7 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.getValue(voxelIter.getCoord());
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ValueType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
@@ -562,9 +562,9 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
                 const ValueType a = math::SmoothUnitStep((mask.getValue(ijk)-min)*invNorm);
                 ValueType& s = speed[voxelIter.pos()];
                 s -= target.getValue(ijk);
-                s *= invMask ? 1 - a : a;
+                s *= invMask ? ValueType(1 - a) : a;
                 if (!math::isApproxZero(s)) isZero = false;
-                mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
+                mMaxAbsS = math::Max(mMaxAbsS, ValueType(math::Abs(s)));
             }
             if (isZero) speed[0] = std::numeric_limits<ValueType>::max();//tag first voxel
         }
@@ -632,7 +632,7 @@ euler(const LeafRange& range, ValueType dt,
             if (math::isApproxZero(speed[n])) continue;
             stencil.moveTo(voxelIter);
             const ValueType v = stencil.getValue() - dt * speed[n] * NumGrad::result(map, stencil);
-            result[n] = Nominator ? Alpha * phi[n] + Beta * v : v;
+            result[n] = Nominator ? ValueType(Alpha * phi[n] + Beta * v) : v;
         }//loop over active voxels in the leaf of the mask
     }//loop over leafs of the level set
 }

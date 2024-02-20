@@ -67,7 +67,7 @@ public:
     using LeafRange = typename LeafManagerType::LeafRange;
     using BufferType = typename LeafManagerType::BufferType;
     using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "LevelSetTracker requires a level set grid with floating-point values");
 
     /// Lightweight struct that stores the state of the LevelSetTracker
@@ -638,8 +638,8 @@ eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
     const ValueType phi0 = stencil.getValue();
     ValueType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
                            math::Tolerance<ValueType>::value() );
-    v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - 1.0f);
-    result[n] = Nominator ? alpha * phi[n] + beta * v : v;
+    v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - ValueType(1));
+    result[n] = Nominator ? ValueType(alpha * phi[n] + beta * v) : v;
 }
 
 template<typename GridT, typename InterruptT>

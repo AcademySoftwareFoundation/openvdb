@@ -1545,7 +1545,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
+               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : ValueType(0);
     }
 
     /// @brief Return the Gaussian curvature at the previously buffered location.
@@ -1556,7 +1556,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
+               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : ValueType(0);
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1571,7 +1571,7 @@ public:
           mean  = ValueType(alphaM*mInv2Dx/math::Pow3(normGrad));
           gauss = ValueType(alphaG*mInvDx2/math::Pow4(normGrad));
         } else {
-          mean = gauss = 0;
+          mean = gauss = ValueType(0);
         }
     }
 
@@ -1585,7 +1585,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : 0;
+               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : ValueType(0);
     }
 
     /// Return the mean Gaussian multiplied by the norm of the
@@ -1597,7 +1597,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : 0;
+               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : ValueType(0);
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1627,7 +1627,7 @@ public:
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
           const Real mean = alphaM*mInv2Dx/math::Pow3(normGrad);
-          const Real tmp = std::sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
+          const Real tmp = math::Sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
           pair.first  = ValueType(mean - tmp);
           pair.second = ValueType(mean + tmp);
         }
