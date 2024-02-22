@@ -1083,6 +1083,7 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
+OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<HalfGrid>, tools::BoxSampler>;
 OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<FloatGrid>, tools::BoxSampler>;
 OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<DoubleGrid>, tools::BoxSampler>;
 

@@ -44,6 +44,7 @@ public:
     using MaskType = MaskT;
     using TreeType = typename GridType::TreeType;
     using ValueType = typename TreeType::ValueType;
+    using ComputeType = typename TreeType::ComputeType;
     using AlphaType = typename MaskType::ValueType;
     static_assert(openvdb::is_floating_point<AlphaType>::value,
         "LevelSetFilter requires a mask grid with floating-point values");
@@ -116,7 +117,7 @@ public:
     /// @brief Offset the level set by the specified (world) distance.
     /// @param offset Value of the offset.
     /// @param mask Optional alpha mask.
-    void offset(ValueType offset, const MaskType* mask = nullptr)
+    void offset(ComputeType offset, const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.offset(offset);
     }
@@ -168,7 +169,7 @@ private:
         void gaussian(int width);
         void laplacian();
         void meanCurvature();
-        void offset(ValueType value);
+        void offset(ComputeType value);
         void operator()(const LeafRange& r) const
         {
             if (mTask) mTask(const_cast<Filter*>(this), r);
@@ -188,17 +189,17 @@ private:
         template <size_t Axis>
         struct Avg {
             Avg(const GridT& grid, Int32 w) :
-                acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
-            inline ValueType operator()(Coord xyz)
+                acc(grid.tree()), width(w), frac(1/ComputeType(2*w+1)) {}
+            inline ComputeType operator()(Coord xyz)
             {
-                ValueType sum = zeroVal<ValueType>();
+                ComputeType sum = zeroVal<ComputeType>();
                 Int32& i = xyz[Axis], j = i + width;
-                for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
+                for (i -= width; i <= j; ++i) sum += ComputeType(acc.getValue(xyz));
                 return sum*frac;
             }
             typename GridT::ConstAccessor acc;
             const Int32 width;
-            const ValueType frac;
+            const ComputeType frac;
         };
 
         template<typename AvgT>
@@ -211,7 +212,7 @@ private:
         void medianImpl(const LeafRange&, int);
         void meanCurvatureImpl(const LeafRange&);
         void laplacianImpl(const LeafRange&);
-        void offsetImpl(const LeafRange&, ValueType);
+        void offsetImpl(const LeafRange&, ComputeType);
 
         LevelSetFilter* mParent;
         const MaskType* mMask;
@@ -319,16 +320,17 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacian()
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ValueType value)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ComputeType value)
 {
     mParent->startInterrupter("Offsetting level set");
 
     mParent->leafs().removeAuxBuffers();// no auxiliary buffers required
 
-    const ValueType CFL = ValueType(0.5) * mParent->voxelSize(), offset = openvdb::math::Abs(value);
-    ValueType dist = 0.0;
-    while (offset-dist > ValueType(0.001)*CFL && mParent->checkInterrupter()) {
-        const ValueType delta = openvdb::math::Min(offset-dist, CFL);
+    const ComputeType CFL = ComputeType(0.5) * mParent->voxelSize(),
+                      offset = openvdb::math::Abs(value);
+    ComputeType dist = 0.0;
+    while (offset-dist > ComputeType(0.001)*CFL && mParent->checkInterrupter()) {
+        const ComputeType delta = openvdb::math::Min(offset-dist, CFL);
         dist += delta;
 
         mTask = std::bind(&Filter::offsetImpl,
@@ -351,7 +353,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
-    const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(3.0);
+    const ComputeType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ComputeType(3.0);
     math::CurvatureStencil<GridType> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
@@ -362,7 +364,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    const ValueType phi0 = *iter, phi1 = phi0 + dt*stencil.meanCurvatureNormGrad();
+                    const ComputeType phi0 = ComputeType(*iter),
+                                      phi1 = phi0 + dt*stencil.meanCurvatureNormGrad();
                     buffer[iter.pos()] = b * phi0 + a * phi1;
                 }
             }
@@ -372,7 +375,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
             ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                buffer[iter.pos()] = *iter + dt*stencil.meanCurvatureNormGrad();
+                buffer[iter.pos()] = ComputeType(*iter) + dt*stencil.meanCurvatureNormGrad();
             }
         }
     }
@@ -391,7 +394,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange&
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
-    const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
+    const ComputeType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ComputeType(6.0);
     math::GradStencil<GridType> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
@@ -402,7 +405,8 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange&
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    const ValueType phi0 = *iter, phi1 = phi0 + dt*stencil.laplacian();
+                    const ComputeType phi0 = ComputeType(*iter),
+                                      phi1 = phi0 + dt*stencil.laplacian();
                     buffer[iter.pos()] = b * phi0 + a * phi1;
                 }
             }
@@ -412,7 +416,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange&
             ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
-                buffer[iter.pos()] = *iter + dt*stencil.laplacian();
+                buffer[iter.pos()] = ComputeType(*iter) + dt*stencil.laplacian();
             }
         }
     }
@@ -422,7 +426,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange&
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offsetImpl(
-    const LeafRange& range, ValueType offset)
+    const LeafRange& range, ComputeType offset)
 {
     mParent->checkInterrupter();
     if (mMask) {
@@ -431,13 +435,14 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offsetImpl(
                          mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) iter.setValue(*iter + a*offset);
+                if (alpha(iter.getCoord(), a, b)) 
+                    iter.setValue(ComputeType(*iter) + a*offset);
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                iter.setValue(*iter + offset);
+                iter.setValue(ComputeType(*iter) + offset);
             }
         }
     }
@@ -459,7 +464,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::medianImpl(const LeafRange& ra
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 if (alpha(iter.getCoord(), a, b)) {
                     stencil.moveTo(iter);
-                    buffer[iter.pos()] = b * (*iter) + a * stencil.median();
+                    buffer[iter.pos()] = b * ComputeType(*iter) + a * stencil.median();
                 }
             }
         }
@@ -490,7 +495,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
             ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
-                if (alpha(xyz, a, b)) buffer[iter.pos()] = b * (*iter)+ a * avg(xyz);
+                if (alpha(xyz, a, b)) buffer[iter.pos()] = b * ComputeType(*iter)+ a * avg(xyz);
             }
         }
     } else {
@@ -515,6 +520,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
+OPENVDB_INSTANTIATE_CLASS LevelSetFilter<HalfGrid, HalfGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetFilter<FloatGrid, FloatGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetFilter<DoubleGrid, FloatGrid, util::NullInterrupter>;
 

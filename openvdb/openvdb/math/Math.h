@@ -155,9 +155,10 @@ template<> struct Tolerance<double>     { static double value() { return 1e-15; 
 
 //@{
 /// Delta for small floating-point offsets
-template<typename T> struct Delta { static T value() { return zeroVal<T>(); } };
-template<> struct Delta<float>    { static float value() { return  1e-5f; } };
-template<> struct Delta<double>   { static double value() { return 1e-9; } };
+template<typename T> struct Delta   { static T value() { return zeroVal<T>(); } };
+template<> struct Delta<math::half> { static math::half value() { return 0.00390625; } };
+template<> struct Delta<float>      { static float value() { return  1e-5f; } };
+template<> struct Delta<double>     { static double value() { return 1e-9; } };
 //@}
 
 

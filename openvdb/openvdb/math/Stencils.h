@@ -37,7 +37,7 @@ class BaseStencil
 public:
     typedef GridT                                       GridType;
     typedef typename GridT::TreeType                    TreeType;
-    typedef typename GridT::ValueType                   ValueType;
+    typedef typename GridT::ComputeType                 ValueType;
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
 
@@ -250,7 +250,7 @@ class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, Gr
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
     static const int SIZE = 7;
 
@@ -304,7 +304,7 @@ class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
     static const int SIZE = 8;
 
@@ -475,7 +475,7 @@ class SecondOrderDenseStencil
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
-    typedef typename GridType::ValueType           ValueType;
+    typedef typename GridType::ComputeType         ValueType;
 
     static const int SIZE = 19;
 
@@ -555,7 +555,7 @@ class ThirteenPointStencil
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
-    typedef typename GridType::ValueType        ValueType;
+    typedef typename GridType::ComputeType      ValueType;
 
     static const int SIZE = 13;
 
@@ -686,7 +686,7 @@ class FourthOrderDenseStencil
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
-    typedef typename GridType::ValueType           ValueType;
+    typedef typename GridType::ComputeType         ValueType;
 
     static const int SIZE = 61;
 
@@ -825,7 +825,7 @@ class NineteenPointStencil
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
-    typedef typename GridType::ValueType        ValueType;
+    typedef typename GridType::ComputeType      ValueType;
 
     static const int SIZE = 19;
 
@@ -1041,7 +1041,7 @@ class SixthOrderDenseStencil
 public:
     typedef GridT                                 GridType;
     typedef typename GridT::TreeType              TreeType;
-    typedef typename GridType::ValueType          ValueType;
+    typedef typename GridType::ComputeType        ValueType;
 
     static const int SIZE = 127;
 
@@ -1235,7 +1235,7 @@ class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
-    typedef typename GridType::ValueType       ValueType;
+    typedef typename GridType::ComputeType     ValueType;
 
     static const int SIZE = 7;
 
@@ -1369,7 +1369,7 @@ class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
-    typedef typename GridType::ValueType       ValueType;
+    typedef typename GridType::ComputeType     ValueType;
 
     static const int SIZE = 19;
 
@@ -1519,7 +1519,7 @@ class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, Grid
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
      static const int SIZE = 19;
 
@@ -1768,7 +1768,7 @@ class DenseStencil: public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSaf
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridType::ValueType      ValueType;
+    typedef typename GridType::ComputeType    ValueType;
 
     DenseStencil(const GridType& grid, int halfWidth)
         : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))
