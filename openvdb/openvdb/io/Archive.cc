@@ -212,6 +212,8 @@ struct StreamMetadata::Impl
     bool mDelayedLoadMeta = DelayedLoadMetadata::isRegisteredType();
     uint64_t mLeaf = 0;
     uint32_t mTest = 0; // for testing only
+    std::string mDesiredScalarType = "";
+    SharedPtr<ConvertingReaderBase> mConvertingReader;
 }; // struct StreamMetadata
 
 
@@ -278,6 +280,12 @@ uint64_t        StreamMetadata::leaf() const            { return mImpl->mLeaf; }
 MetaMap&        StreamMetadata::gridMetadata()          { return mImpl->mGridMetadata; }
 const MetaMap&  StreamMetadata::gridMetadata() const    { return mImpl->mGridMetadata; }
 uint32_t        StreamMetadata::__test() const          { return mImpl->mTest; }
+
+const std::string&    StreamMetadata::desiredScalarType() const { return mImpl->mDesiredScalarType; }
+void StreamMetadata::setDesiredScalarType(std::string t) { mImpl->mDesiredScalarType = t; }
+
+const ConvertingReaderBase* StreamMetadata::convertingReader() const {return mImpl->mConvertingReader.get();}
+void StreamMetadata::setConvertingReader(SharedPtr<ConvertingReaderBase> t) {mImpl->mConvertingReader = t;}
 
 StreamMetadata::AuxDataMap& StreamMetadata::auxData() { return mImpl->mAuxData; }
 const StreamMetadata::AuxDataMap& StreamMetadata::auxData() const { return mImpl->mAuxData; }
@@ -1128,6 +1136,17 @@ Archive::isDelayedLoadingEnabled()
 }
 
 
+Name Archive::conversionToString(Archive::ScalarConversion conv)
+{
+    switch (conv)
+    {
+        case Archive::ScalarConversion::None:
+            return "";
+        case Archive::ScalarConversion::Half:
+            return typeNameAsString<math::half>();
+    }
+}
+
 namespace {
 
 struct NoBBox {};
@@ -1165,6 +1184,7 @@ doReadGrid(GridBase::Ptr grid, const GridDescriptor& gd, std::istream& is, const
         streamMetadata.reset(new StreamMetadata);
     }
     streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
+    streamMetadata->setConvertingReader(gd.convertingReader());
     io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
 
     io::setGridClass(is, GRID_UNKNOWN);

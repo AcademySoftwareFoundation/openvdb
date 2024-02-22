@@ -320,6 +320,197 @@ struct HalfReader</*IsReal=*/true, T> {
 };
 
 
+struct ConvertingReaderBase
+{
+    using Ptr = SharedPtr<ConvertingReaderBase>;
+
+    virtual ~ConvertingReaderBase() = default;
+};
+
+template<typename ValueT>
+struct ConvertingReader: ConvertingReaderBase
+{
+    virtual void read(
+        std::istream& is, ValueT* data, Index count, uint32_t compression,
+        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0),
+        bool fromHalf = false) const = 0;
+
+    virtual void read(std::istream& is, ValueT& data) const = 0;
+
+    virtual void seekElement(std::istream& is, int offset, std::ios_base::seekdir dir) const = 0;
+
+    static const ConvertingReader& get(std::istream& is);
+};
+
+template<typename ValueT, typename TValueFrom>
+struct TypedConvertingReader: ConvertingReader<ValueT>
+{
+    using HalfT = typename RealToHalf<TValueFrom>::HalfT;
+
+    static constexpr bool do_conversion                 = !std::is_same<ValueT, TValueFrom>::value;
+    static constexpr bool from_half_flag_is_relevant    = RealToHalf<TValueFrom>::isReal;
+    
+    template<typename TRead>
+    static void readHelper(
+        std::istream& is, ValueT* data, Index count, uint32_t compression,
+        DelayedLoadMetadata* metadata, size_t metadataOffset)
+    {
+        if constexpr (std::is_same<ValueT, TRead>::value)
+        {
+            // either reads or skips through compressed data (count == 0) or it
+            // is seeking (data == nullptr)
+            io::readData(is, data, count, compression, metadata, metadataOffset);
+        }
+        else
+        {
+            // reading
+            if (data && count > 0)
+            {
+                std::vector<TRead> buffer(count);
+                io::readData(is, buffer.data(), count, compression, metadata, metadataOffset);
+                std::copy(buffer.begin(), buffer.end(), data);
+            }
+            // either skips through compressed data (count == 0) or it is
+            // seeking (data == nullptr)
+            else
+            {
+                // reinterpret_cast<TRead*>(data) might produce not-aligned
+                // pointer, but io::readData will not write to it, so it should
+                // be safe. We must not skip this statement, nor we can pass
+                // nullptr instead of data, it causes failures in the testsuite.
+                // Now it behaves exactly as before.
+                io::readData(is, reinterpret_cast<TRead*>(data), count,
+                    compression, metadata, metadataOffset);
+            }
+        }
+    }
+
+    virtual void read(
+        std::istream& is, ValueT* data, Index count, uint32_t compression,
+        DelayedLoadMetadata* metadata = nullptr, size_t metadataOffset = size_t(0),
+        bool fromHalf = false) const override
+    {
+        // this if-statement is here to maintain the original logic when
+        // HalfReader<T> is being used. It can't be removed as it breaks bunch
+        // of tests in the testsuite.
+        if (fromHalf && from_half_flag_is_relevant && count < 1)
+            return;
+
+        // due to std::vector<bool> being weird and not fitting the overall
+        // templating idea here (it doesn't have data() method), the following
+        // will fail to do non-identity conversion for bool-typed data. But for
+        // bool-typed data there is just identity at the moment.
+        if constexpr (from_half_flag_is_relevant)
+        {
+            if (fromHalf)
+            {
+                readHelper<HalfT>(is, data, count, compression, metadata, metadataOffset);
+            }
+            else
+            {
+                readHelper<TValueFrom>(is, data, count, compression, metadata, metadataOffset);
+            }
+        }
+        else
+        {
+            readHelper<TValueFrom>(is, data, count, compression, metadata, metadataOffset);
+        }
+    }
+
+    virtual void read(std::istream& is, ValueT& data) const override
+    {
+        if constexpr (do_conversion)
+        {
+            TValueFrom buffer;
+            is.read(reinterpret_cast<char*>(&buffer), /*bytes=*/sizeof(TValueFrom));
+            data = buffer;
+        }
+        else
+        {
+            is.read(reinterpret_cast<char*>(&data), /*bytes=*/sizeof(ValueT));
+        }
+    }
+
+    virtual void seekElement(std::istream& is, int offset, std::ios_base::seekdir dir) const override
+    {
+        if constexpr (do_conversion)
+        {
+            is.seekg(/*bytes=*/sizeof(TValueFrom) * offset, dir);
+        }
+        else
+        {
+            is.seekg(/*bytes=*/sizeof(ValueT) * offset, dir);
+        }
+    }
+};
+
+template<typename ValueT>
+inline const ConvertingReader<ValueT>& ConvertingReader<ValueT>::get(std::istream& is)
+{
+    SharedPtr<io::StreamMetadata> meta = io::getStreamMetadataPtr(is);
+
+    auto ptr = static_cast<const ConvertingReader*>(meta->convertingReader());
+    if(ptr)
+    {
+        return *ptr;
+    }
+    auto ptr2 = new TypedConvertingReader<ValueT, ValueT>();
+    meta->setConvertingReader(Ptr(ptr2));
+    return *ptr2;
+}
+
+struct ConvertingReaderFactory
+{
+    using ReaderPtr = ConvertingReaderBase::Ptr;
+
+    struct FactoryEntry
+    {
+        ReaderPtr   reader;
+        Name        new_grid_value_type;
+    };
+
+private:
+    template<typename T1, typename T2>
+    static Name getTypeName()
+    {
+        return Name(typeNameAsString<T1>()) + Name(typeNameAsString<T2>());
+    }
+
+    template<typename T1, typename T2, typename T3>
+    static auto getMapEntry()
+    {
+        return std::pair
+        { 
+            getTypeName<T1, T2>(),
+            FactoryEntry { ReaderPtr(new TypedConvertingReader<T3, T1>()), typeNameAsString<T3>()}
+        };
+    }
+
+public:
+    static FactoryEntry create(const Name& grid_value_type, const Name& desired_scalar_type)
+    {
+        static std::unordered_map<Name, FactoryEntry> type_map =
+        {
+            getMapEntry<float, Half, Half>(),
+            getMapEntry<double, Half, Half>(),
+            getMapEntry<Vec2f, Half, Vec2H>(),
+            getMapEntry<Vec2d, Half, Vec2H>(),
+            getMapEntry<Vec3f, Half, Vec3H>(),
+            getMapEntry<Vec3d, Half, Vec3H>(),
+        };
+
+        if (auto it = type_map.find(grid_value_type + desired_scalar_type); it != type_map.end())
+        {
+            return it->second;
+        }
+        else
+        {
+            return {nullptr, ""};
+        }
+    }
+};
+
+
 template<typename T>
 inline size_t
 writeDataSize(const T *data, Index count, uint32_t compression)
@@ -476,6 +667,9 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const bool seek = (destBuf == nullptr);
     OPENVDB_ASSERT(!seek || (!meta || meta->seekable()));
 
+    // converting reader for reading grid values
+    auto& convertingReader = io::ConvertingReader<ValueT>::get(is);
+
     // Get delayed load metadata if it exists
 
     DelayedLoadMetadata::Ptr delayLoadMeta;
@@ -513,16 +707,16 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     {
         // Read one of at most two distinct inactive values.
         if (seek) {
-            is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+            convertingReader.seekElement(is, 1, std::ios_base::cur);
         } else {
-            is.read(reinterpret_cast<char*>(&inactiveVal0), /*bytes=*/sizeof(ValueT));
+            convertingReader.read(is, inactiveVal0);
         }
         if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
             // Read the second of two distinct inactive values.
             if (seek) {
-                is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+                convertingReader.seekElement(is, 1, std::ios_base::cur);
             } else {
-                is.read(reinterpret_cast<char*>(&inactiveVal1), /*bytes=*/sizeof(ValueT));
+                convertingReader.read(is, inactiveVal1);
             }
         }
     }
@@ -558,13 +752,8 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     }
 
     // Read in the buffer.
-    if (fromHalf) {
-        HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(
-            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
-    } else {
-        readData<ValueT>(
-            is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex);
-    }
+    convertingReader.read(
+        is, (seek ? nullptr : tempBuf), tempCount, compression, delayLoadMeta.get(), leafIndex, fromHalf);
 
     // If mask compression is enabled and the number of active values read into
     // the temp buffer is smaller than the size of the destination buffer,

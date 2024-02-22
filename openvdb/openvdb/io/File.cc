@@ -280,9 +280,9 @@ File::isOpen() const
 
 bool
 #ifdef OPENVDB_USE_DELAYED_LOADING
-File::open(bool delayLoad, const MappedFile::Notifier& notifier)
+File::open(bool delayLoad, const MappedFile::Notifier& notifier, ScalarConversion conversion)
 #else
-File::open(bool /*delayLoad = true*/)
+File::open(bool /*delayLoad = true*/, ScalarConversion conversion)
 #endif // OPENVDB_USE_DELAYED_LOADING
 {
     if (isOpen()) {
@@ -367,6 +367,7 @@ File::open(bool /*delayLoad = true*/)
     // and other metadata.
     mImpl->mStreamMetadata.reset(new StreamMetadata);
     mImpl->mStreamMetadata->setSeekable(true);
+    mImpl->mStreamMetadata->setDesiredScalarType(conversionToString(conversion));
     io::setStreamMetadataPtr(inputStream(), mImpl->mStreamMetadata, /*transfer=*/false);
     Archive::setFormatVersion(inputStream());
     Archive::setLibraryVersion(inputStream());

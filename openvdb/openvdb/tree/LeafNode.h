@@ -1428,16 +1428,13 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bo
     }
 
     if (numBuffers > 1) {
+        auto& convertingReader = io::ConvertingReader<T>::get(is);
         // Read in and discard auxiliary buffers that were created with earlier
         // versions of the library.  (Auxiliary buffers are not mask compressed.)
         const bool zipped = io::getDataCompression(is) & io::COMPRESS_ZIP;
         Buffer temp;
         for (int i = 1; i < numBuffers; ++i) {
-            if (fromHalf) {
-                io::HalfReader<io::RealToHalf<T>::isReal, T>::read(is, temp.mData, SIZE, zipped);
-            } else {
-                io::readData<T>(is, temp.mData, SIZE, zipped);
-            }
+            convertingReader.read(is, temp.mData, SIZE, zipped, nullptr, 0, fromHalf);
         }
     }
 

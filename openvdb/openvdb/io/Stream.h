@@ -26,7 +26,8 @@ public:
     /// into memory and enable delayed loading of grids.
     /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
     /// to disable delayed loading unconditionally.
-    explicit Stream(std::istream&, bool delayLoad = true);
+    explicit Stream(std::istream&, bool delayLoad = true,
+        ScalarConversion conversion = ScalarConversion::None);
 
     /// Construct an archive for stream output.
     Stream();
