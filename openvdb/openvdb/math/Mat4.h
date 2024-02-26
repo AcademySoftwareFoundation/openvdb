@@ -149,7 +149,7 @@ public:
     /// Get ith row, e.g.    Vec4f v = m.row(1);
     Vec4<T> row(int i) const
     {
-        OPENVDB_ASSERT(i>=0 && i<3);
+        OPENVDB_ASSERT(i>=0 && i<4);
         return Vec4<T>((*this)(i,0), (*this)(i,1), (*this)(i,2), (*this)(i,3));
     }
 
