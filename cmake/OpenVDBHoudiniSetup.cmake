@@ -288,7 +288,11 @@ endif()
 
 # Jemalloc
 
-if(NOT JEMALLOC_LIBRARYDIR)
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   As of Houdini 20, it still ships with Jemalloc 3.6.0, so don't expose it
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420).
+if(NOT APPLE AND NOT JEMALLOC_LIBRARYDIR)
   set(JEMALLOC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 

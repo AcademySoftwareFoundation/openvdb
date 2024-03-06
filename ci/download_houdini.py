@@ -94,7 +94,7 @@ def get_access_token_and_expiry_time(
             ),
         })
     if response.status_code != 200:
-        raise AuthorizationError(response.status_code, reponse.text)
+        raise AuthorizationError(response.status_code, response.text)
 
     response_json = response.json()
     access_token_expiry_time = time.time() - 2 + response_json["expires_in"]
