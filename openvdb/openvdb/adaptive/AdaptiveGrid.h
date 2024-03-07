@@ -19,6 +19,21 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace adaptive {
 
+template <typename TreeT>
+class AdaptiveAccessor
+{
+public:
+    using ValueType = typename TreeT::ValueType;
+
+    explicit AdaptiveAccessor(TreeT& tree):
+        mTree(tree) { }
+
+    TreeT& tree() const { return mTree; }
+
+private:
+    TreeT& mTree;
+};
+
 
 template<typename _ValueType>
 class AdaptiveTree final: public TreeBase
@@ -31,6 +46,11 @@ public:
     using BuildType = _ValueType;
 
     static const Index DEPTH = 1;
+
+    using Accessor            = AdaptiveAccessor<AdaptiveTree>;
+    using ConstAccessor       = AdaptiveAccessor<const AdaptiveTree>;
+    using UnsafeAccessor      = Accessor;
+    using ConstUnsafeAccessor = ConstAccessor;
 
     AdaptiveTree() = default;
 
@@ -145,6 +165,14 @@ public:
     /// Return the total number of active tiles.
     Index64 activeTileCount() const override { OPENVDB_THROW(NotImplementedError, ""); }
 
+    //
+    // Accessor methods
+    //
+    Accessor getAccessor() { return Accessor(*this); }
+    UnsafeAccessor getUnsafeAccessor() { return UnsafeAccessor(*this); }
+    ConstAccessor getAccessor() const { return ConstAccessor(*this); }
+    ConstAccessor getConstAccessor() const { return ConstAccessor(*this); }
+    ConstUnsafeAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(*this); }
 
     //
     // I/O methods
