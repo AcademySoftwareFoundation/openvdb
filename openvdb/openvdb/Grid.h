@@ -586,10 +586,10 @@ public:
     using ValueAllIter        = typename _TreeType::ValueAllIter;
     using ValueAllCIter       = typename _TreeType::ValueAllCIter;
 
-    using Accessor            = typename tree::ValueAccessor<_TreeType, true>;
-    using ConstAccessor       = typename tree::ValueAccessor<const _TreeType, true>;
-    using UnsafeAccessor      = typename tree::ValueAccessor<_TreeType, false>;
-    using ConstUnsafeAccessor = typename tree::ValueAccessor<const _TreeType, false>;
+    using Accessor            = typename _TreeType::Accessor;
+    using ConstAccessor       = typename _TreeType::ConstAccessor;
+    using UnsafeAccessor      = typename _TreeType::UnsafeAccessor;
+    using ConstUnsafeAccessor = typename _TreeType::ConstUnsafeAccessor;
 
     /// @brief ValueConverter<T>::Type is the type of a grid having the same
     /// hierarchy as this grid but a different value type, T.
@@ -729,7 +729,7 @@ public:
     /// @brief Return an accessor that provides random read and write access
     /// to this grid's voxels.
     /// @details The accessor is safe in the sense that it is registered with this grid's tree.
-    Accessor getAccessor() { return Accessor(tree()); }
+    Accessor getAccessor() { return mTree->getAccessor(); }
     /// @brief Return an unsafe accessor that provides random read and write access
     /// to this grid's voxels.
     /// @details The accessor is unsafe in the sense that it is not registered
@@ -737,11 +737,11 @@ public:
     /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    UnsafeAccessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
+    UnsafeAccessor getUnsafeAccessor() { return mTree->getUnsafeAccessor(); }
     /// Return an accessor that provides random read-only access to this grid's voxels.
-    ConstAccessor getAccessor() const { return ConstAccessor(tree()); }
+    ConstAccessor getAccessor() const { return mTree->getConstAccessor(); }
     /// Return an accessor that provides random read-only access to this grid's voxels.
-    ConstAccessor getConstAccessor() const { return ConstAccessor(tree()); }
+    ConstAccessor getConstAccessor() const { return mTree->getConstAccessor(); }
     /// @brief Return an unsafe accessor that provides random read-only access
     /// to this grid's voxels.
     /// @details The accessor is unsafe in the sense that it is not registered
@@ -749,7 +749,7 @@ public:
     /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    ConstUnsafeAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
+    ConstUnsafeAccessor getConstUnsafeAccessor() const { return mTree->getConstUnsafeAccessor(); }
 
     /// Return an iterator over all of this grid's active values (tile and voxel).
     ValueOnIter   beginValueOn()       { return tree().beginValueOn(); }
