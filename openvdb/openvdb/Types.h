@@ -448,6 +448,26 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
 
 ////////////////////////////////////////
 
+/// @brief A type-dependent expression that always evaluates to false.
+/// This is used as a work-around for the much discussed problem of wanting to do:
+/// if constexpr (expr) { }
+/// else { static_assert(false); }
+///
+/// At present, C++ evaluates static_assert(false) regardless of the outcome of the
+/// compile-time expression. By using a type-dependent expression, the static assert
+/// is only evaluated during instantiation:
+///
+/// static_assert(openvdb::AlwaysFalseValue<T>);
+///
+/// This results in the desired outcome of generating a compile-time static assert
+/// only if the first clause evaluates to false.
+
+template<class>
+inline constexpr bool AlwaysFalseValue = false;
+
+
+////////////////////////////////////////
+
 
 // Add new items to the *end* of this list, and update NUM_GRID_CLASSES.
 enum GridClass {
