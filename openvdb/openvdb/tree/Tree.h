@@ -2125,6 +2125,28 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 }
 
 } // namespace tree
+
+
+////////////////////////////////////////
+
+// Overload the TreeTraits struct to declare a const/non-const Tree as sparse
+
+template<typename NodeT>
+struct TreeTraits<tree::Tree<NodeT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Sparse;
+};
+
+template<typename NodeT>
+struct TreeTraits<const tree::Tree<NodeT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Sparse;
+};
+
+
+////////////////////////////////////////
+
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 

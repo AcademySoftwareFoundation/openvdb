@@ -284,6 +284,31 @@ struct TreeAdapter<adaptive::AdaptiveAccessor<_TreeType> >
 
 ////////////////////////////////////////
 
+// Overload the TreeTraits struct to declare a const/non-const AdaptiveTree as adaptive
+
+template<typename ValueT>
+struct TreeTraits<adaptive::AdaptiveTree<ValueT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Adaptive;
+};
+
+template<typename ValueT>
+struct TreeTraits<const adaptive::AdaptiveTree<ValueT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Adaptive;
+};
+
+// Overload the TreeTraits struct to declare an AdaptiveAccessor as adaptive
+
+template<typename TreeT>
+struct TreeTraits<adaptive::AdaptiveAccessor<TreeT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Adaptive;
+};
+
+
+////////////////////////////////////////
+
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
