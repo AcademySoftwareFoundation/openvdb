@@ -240,6 +240,51 @@ using FloatAdaptiveGrid = AdaptiveGrid<float>;
 using AdaptiveGridTypes = TypeList<FloatAdaptiveGrid>;
 
 } // namespace adaptive
+
+
+////////////////////////////////////////
+
+/// Partial specialization for AdaptiveAccessor types
+template<typename _TreeType>
+struct TreeAdapter<adaptive::AdaptiveAccessor<_TreeType> >
+{
+    using TreeType             = _TreeType;
+    using NonConstTreeType     = typename std::remove_const<TreeType>::type;
+    using TreePtrType          = typename TreeType::Ptr;
+    using ConstTreePtrType     = typename TreeType::ConstPtr;
+    using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
+    using GridType             = Grid<TreeType>;
+    using NonConstGridType     = Grid<NonConstTreeType>;
+    using GridPtrType          = typename GridType::Ptr;
+    using NonConstGridPtrType  = typename NonConstGridType::Ptr;
+    using ConstGridPtrType     = typename GridType::ConstPtr;
+    using ValueType            = typename TreeType::ValueType;
+    using AccessorType         = typename adaptive::AdaptiveAccessor<TreeType>;
+    using ConstAccessorType    = typename adaptive::AdaptiveAccessor<const NonConstTreeType>;
+    using NonConstAccessorType = typename adaptive::AdaptiveAccessor<NonConstTreeType>;
+
+    static NonConstTreeType& tree(NonConstTreeType& t) { return t; }
+    static NonConstTreeType& tree(NonConstGridType& g) { return g.tree(); }
+    static NonConstTreeType& tree(NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& tree(const NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& tree(const NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(const ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(const NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(const NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(const ConstAccessorType& a) { return a.tree(); }
+};
+
+
+////////////////////////////////////////
+
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
