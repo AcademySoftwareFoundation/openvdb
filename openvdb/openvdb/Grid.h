@@ -1063,7 +1063,7 @@ struct TreeAdapter
     using TreePtrType          = typename TreeType::Ptr;
     using ConstTreePtrType     = typename TreeType::ConstPtr;
     using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
-    using GridType             = Grid<TreeType>;
+    using GridType             = Grid<NonConstTreeType>;
     using NonConstGridType     = Grid<NonConstTreeType>;
     using GridPtrType          = typename GridType::Ptr;
     using NonConstGridPtrType  = typename NonConstGridType::Ptr;
@@ -1151,7 +1151,7 @@ struct TreeAdapter<tree::ValueAccessor<_TreeType> >
     using TreePtrType          = typename TreeType::Ptr;
     using ConstTreePtrType     = typename TreeType::ConstPtr;
     using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
-    using GridType             = Grid<TreeType>;
+    using GridType             = Grid<NonConstTreeType>;
     using NonConstGridType     = Grid<NonConstTreeType>;
     using GridPtrType          = typename GridType::Ptr;
     using NonConstGridPtrType  = typename NonConstGridType::Ptr;
