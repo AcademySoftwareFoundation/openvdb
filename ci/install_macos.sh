@@ -2,6 +2,13 @@
 
 set -x
 
+# Remove Python3 symlinks in /usr/local/bin as workaround to brew update issues
+# https://github.com/actions/setup-python/issues/577
+rm /usr/local/bin/2to3* || :
+rm /usr/local/bin/idle3* || :
+rm /usr/local/bin/pydoc* || :
+rm /usr/local/bin/python3* || :
+
 brew update
 brew install bash gnu-getopt # for CI scripts
 brew install boost
