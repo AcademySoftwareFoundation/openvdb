@@ -199,45 +199,66 @@ void
 TestGridIO::readWriteHalfGridTest()
 {
     using namespace openvdb;
-    float TESTFLOAT = 65504.f + 100.f;
-    openvdb::math::half TESTHALF = 65504.f + 100.f;
-    std::string fileName = "testfloat.vdb";
-    openvdb::FloatGrid::Ptr floatGrid = openvdb::FloatGrid::create(2.f);
-    floatGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
-    floatGrid->setName("float_grid");
-    floatGrid->setSaveFloatAsHalf(true);
-    openvdb::FloatGrid::Accessor floatAcc = floatGrid->getAccessor();
-    openvdb::Coord xyz(1000, -200000000, 30000000);
-    floatAcc.setValue(xyz, TESTFLOAT);
 
-    openvdb::HalfGrid::Ptr halfGrid = openvdb::HalfGrid::create(2.f);
-    halfGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
-    halfGrid->setName("half_grid");
-    halfGrid->setSaveFloatAsHalf(true);
-    openvdb::HalfGrid::Accessor halfAcc = halfGrid->getAccessor();
-    halfAcc.setValue(xyz, TESTHALF);
+    float TEST_FLOAT = 65504.f + 100.f;
+    openvdb::math::half TEST_HALF = 65504.f + 100.f;
+    openvdb::Coord xyz(1000, -200000000, 30000000);
+
+    std::string fileName = "testHalfAndFloat.vdb";
+    openvdb::FloatGrid::Ptr fgfd = openvdb::FloatGrid::create(2.f); // float grid stored as float on disk
+    fgfd->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
+    fgfd->setName("float_grid");
+
+    openvdb::HalfGrid::Ptr hghd = openvdb::HalfGrid::create(2.f); // half grid stored as half on disk
+    hghd->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
+    hghd->setName("half_grid");
+
+    openvdb::FloatGrid::Ptr fghd = openvdb::FloatGrid::create(2.f); // float grid stored as half on disk
+    fghd->setTransform(openvdb::math::Transform::createLinearTransform(/*voxel size=*/1.0));
+    fghd->setName("float_grid_as_half");
+    fghd->setSaveFloatAsHalf(true);
+
+    {
+        openvdb::FloatGrid::Accessor fgfdAcc = fgfd->getAccessor();
+        openvdb::HalfGrid::Accessor hghdAcc = hghd->getAccessor();
+        openvdb::FloatGrid::Accessor fghdAcc = fghd->getAccessor();
+        fgfdAcc.setValue(xyz, TEST_FLOAT);
+        hghdAcc.setValue(xyz, TEST_HALF);
+        fghdAcc.setValue(xyz, TEST_FLOAT);
+    }
 
     openvdb::io::File writeFile(fileName);
     openvdb::GridPtrVec grids;
-    grids.push_back(floatGrid);
-    grids.push_back(halfGrid);
+    grids.push_back(fgfd);
+    grids.push_back(hghd);
+    grids.push_back(fghd);
     writeFile.write(grids);
     writeFile.close();
 
     openvdb::io::File readFile(fileName);
     readFile.open();
-    openvdb::FloatGrid::Ptr readFloatGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(readFile.readGrid("float_grid"));
-    openvdb::HalfGrid::Ptr readHalfGrid = openvdb::gridPtrCast<openvdb::HalfGrid>(readFile.readGrid("half_grid"));
-    openvdb::FloatGrid::Accessor readFloatAcc = readFloatGrid->getAccessor();
-    openvdb::HalfGrid::Accessor readHalfAcc = readHalfGrid->getAccessor();
+    openvdb::FloatGrid::Ptr readFgfd = openvdb::gridPtrCast<openvdb::FloatGrid>(readFile.readGrid("float_grid"));
+    openvdb::HalfGrid::Ptr readHghd = openvdb::gridPtrCast<openvdb::HalfGrid>(readFile.readGrid("half_grid"));
+    openvdb::FloatGrid::Ptr readFghdFloat = openvdb::gridPtrCast<openvdb::FloatGrid>(readFile.readGrid("float_grid_as_half"));
+    openvdb::HalfGrid::Ptr readFghdHalf = openvdb::gridPtrCast<openvdb::HalfGrid>(readFile.readGrid("float_grid_as_half"));
 
-    EXPECT_EQ(math::half::posInf(), readFloatAcc.getValue(xyz));
-    EXPECT_EQ(math::half::posInf(), readHalfAcc.getValue(xyz));
-    
-    std::cout << "readFloatGrid = " << readFloatGrid << "\treadHalfGrid = " << readHalfGrid << std::endl;
-    std::cout << "readFloatAcc.getValue(xyz) = " << readFloatAcc.getValue(xyz) << std::endl;
-    std::cout << "readHalfAcc.getValue(xyz) = " << readHalfAcc.getValue(xyz) << std::endl;
+    EXPECT_TRUE(readFgfd != NULL);
+    EXPECT_TRUE(readHghd != NULL);
+    EXPECT_TRUE(readFghdFloat != NULL);
+    EXPECT_TRUE(readFghdHalf == NULL);
+
+    {
+        openvdb::FloatGrid::Accessor fgfdAcc = readFgfd->getAccessor();
+        openvdb::HalfGrid::Accessor hghdAcc = readHghd->getAccessor();
+        openvdb::FloatGrid::Accessor fghdAcc = readFghdFloat->getAccessor();
+
+        EXPECT_EQ(fgfdAcc.getValue(xyz), TEST_FLOAT);
+        EXPECT_EQ(hghdAcc.getValue(xyz), math::half::posInf());
+        EXPECT_EQ(fghdAcc.getValue(xyz), math::half::posInf());
+    }
+
     readFile.close();
+    ::remove(fileName.c_str());
 }
 
 
