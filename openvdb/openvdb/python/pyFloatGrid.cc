@@ -9,18 +9,17 @@
 
 /// Create a Python wrapper for each supported Grid type.
 void
-exportFloatGrid(py::module_ m)
+exportFloatGrid(nb::module_ m)
 {
-    pyGrid::exportGrid<FloatGrid>(m);
+    pyGrid::exportScalarGrid<FloatGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    pyGrid::exportGrid<DoubleGrid>(m);
+    pyGrid::exportScalarGrid<DoubleGrid>(m);
 #endif
 
     m.def("createLevelSetSphere",
         &pyGrid::createLevelSetSphere<FloatGrid>,
-        py::arg("radius"), py::arg("center")=openvdb::Coord(), py::arg("voxelSize")=1.0,
-             py::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
-        "createLevelSetSphere(radius, center, voxelSize, halfWidth) -> FloatGrid\n\n"
+        nb::arg("radius"), nb::arg("center")=openvdb::Coord(), nb::arg("voxelSize")=1.0,
+             nb::arg("halfWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
         "Return a grid containing a narrow-band level set representation\n"
         "of a sphere.");
 }
