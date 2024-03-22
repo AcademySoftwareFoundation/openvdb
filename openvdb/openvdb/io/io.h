@@ -24,6 +24,8 @@ class MetaMap;
 
 namespace io {
 
+struct ConvertingReaderBase;
+
 /// @brief Container for metadata describing how to unserialize grids from and/or
 /// serialize grids to a stream (which file format, compression scheme, etc. to use)
 /// @details This class is mainly for internal use.
@@ -100,6 +102,12 @@ public:
     uint32_t __test() const;
     /// @private
     void __setTest(uint32_t);
+
+    const std::string& desiredScalarType() const;
+    void setDesiredScalarType(std::string t);
+
+    const ConvertingReaderBase* convertingReader() const;
+    void setConvertingReader(SharedPtr<ConvertingReaderBase> t);
 
     /// Return a string describing this stream metadata.
     std::string str() const;

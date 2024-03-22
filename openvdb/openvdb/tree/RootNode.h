@@ -2345,14 +2345,17 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     // Delete the existing tree.
     this->clear();
 
+    // converting reader for reading grid values
+    auto& convertingReader = io::ConvertingReader<ValueType>::get(is);
+
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_ROOTNODE_MAP) {
         // Read and convert an older-format RootNode.
 
         // For backward compatibility with older file formats, read both
         // outside and inside background values.
-        is.read(reinterpret_cast<char*>(&mBackground), sizeof(ValueType));
+        convertingReader.read(is, mBackground);
         ValueType inside;
-        is.read(reinterpret_cast<char*>(&inside), sizeof(ValueType));
+        convertingReader.read(is, inside);
 
         io::setGridBackgroundValuePtr(is, &mBackground);
 
@@ -2399,7 +2402,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
                 // Read in a tile value and insert a tile, but only if the value
                 // is either active or non-background.
                 ValueType value;
-                is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
+                convertingReader.read(is, value);
                 if (valueMask.isOn(i) || (!math::isApproxEqual(value, mBackground))) {
                     mTable[origin] = NodeStruct(Tile(value, valueMask.isOn(i)));
                 }
@@ -2409,8 +2412,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     }
 
     // Read a RootNode that was stored in the current format.
-
-    is.read(reinterpret_cast<char*>(&mBackground), sizeof(ValueType));
+    convertingReader.read(is, mBackground);
     io::setGridBackgroundValuePtr(is, &mBackground);
 
     Index numTiles = 0, numChildren = 0;
@@ -2426,7 +2428,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
     // Read tiles.
     for (Index n = 0; n < numTiles; ++n) {
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
-        is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
+        convertingReader.read(is, value);
         is.read(reinterpret_cast<char*>(&active), sizeof(bool));
         mTable[Coord(vec)] = NodeStruct(Tile(value, active));
     }

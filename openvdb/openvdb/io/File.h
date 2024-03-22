@@ -64,9 +64,10 @@ public:
     /// @throw IoError if the file is not a valid VDB file.
     /// @return @c true if the file's UUID has changed since it was last read.
     /// @see setCopyMaxBytes
-    bool open(bool delayLoad = true, const MappedFile::Notifier& = MappedFile::Notifier());
+    bool open(bool delayLoad = true, const MappedFile::Notifier& = MappedFile::Notifier(),
+        ScalarConversion conversion = ScalarConversion::None);
 #else
-    bool open(bool /*delayLoad*/ = false);
+    bool open(bool /*delayLoad*/ = false, ScalarConversion conversion = ScalarConversion::None);
 #endif
 
     /// Return @c true if the file has been opened for reading.

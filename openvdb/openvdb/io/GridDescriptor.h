@@ -13,6 +13,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
+struct ConvertingReaderBase;
+
 /// This structure stores useful information that describes a grid on disk.
 /// It can be used to retrieve I/O information about the grid such as
 /// offsets into the file where the grid is located, its type, etc.
@@ -34,6 +36,7 @@ public:
     bool isInstance() const { return !mInstanceParentName.empty(); }
 
     bool saveFloatAsHalf() const { return mSaveFloatAsHalf; }
+    SharedPtr<ConvertingReaderBase> convertingReader() const { return mConvertingReader; }
 
     void setGridPos(int64_t pos) { mGridPos = pos; }
     int64_t getGridPos() const { return mGridPos; }
@@ -90,6 +93,8 @@ private:
     Name mGridType;
     /// Are floats quantized to 16 bits on disk?
     bool mSaveFloatAsHalf;
+    ///
+    SharedPtr<ConvertingReaderBase> mConvertingReader;
     /// Location in the stream where the grid data is stored
     int64_t mGridPos;
     /// Location in the stream where the grid blocks are stored
