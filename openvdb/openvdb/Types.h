@@ -236,6 +236,18 @@ using make_index_sequence =
 
 ////////////////////////////////////////
 
+/// @brief A Traits struct that can be used to query properties of an input T.
+
+template<typename T>
+struct TreeTraits
+{
+    static const bool IsSparse = false;
+    static const bool IsAdaptive = false;
+};
+
+
+////////////////////////////////////////
+
 
 template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
                             IsSpecializationOf<T, math::Vec3>::value ||
@@ -444,6 +456,26 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
     using Type = const ToType;
 };
 /// @endcond
+
+
+////////////////////////////////////////
+
+/// @brief A type-dependent expression that always evaluates to false.
+/// This is used as a work-around for the much discussed problem of wanting to do:
+/// if constexpr (expr) { }
+/// else { static_assert(false); }
+///
+/// At present, C++ evaluates static_assert(false) regardless of the outcome of the
+/// compile-time expression. By using a type-dependent expression, the static assert
+/// is only evaluated during instantiation:
+///
+/// static_assert(openvdb::AlwaysFalseValue<T>);
+///
+/// This results in the desired outcome of generating a compile-time static assert
+/// only if the first clause evaluates to false.
+
+template<class>
+inline constexpr bool AlwaysFalseValue = false;
 
 
 ////////////////////////////////////////
