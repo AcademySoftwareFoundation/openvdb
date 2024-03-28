@@ -239,11 +239,11 @@ public:
             } else if (inv[axis] > 0) {
                 mStep[axis] = Dim;
                 mNext[axis] = (mT0 + (mVoxel[axis] + Dim - pos[axis]) * inv[axis]);
-                mDelta[axis] = inv[axis];
+                mDelta[axis] = mStep[axis]* inv[axis];
             } else {
                 mStep[axis] = -Dim;
                 mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
-                mDelta[axis] = -inv[axis];
+                mDelta[axis] = mStep[axis] * inv[axis];
             }
         }
     }
