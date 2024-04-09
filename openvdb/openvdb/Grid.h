@@ -577,6 +577,7 @@ public:
     using TreePtrType         = typename _TreeType::Ptr;
     using ConstTreePtrType    = typename _TreeType::ConstPtr;
     using ValueType           = typename _TreeType::ValueType;
+    using ComputeType         = typename _TreeType::ComputeType;
     using BuildType           = typename _TreeType::BuildType;
 
     using ValueOnIter         = typename _TreeType::ValueOnIter;
@@ -1781,10 +1782,11 @@ template<typename GridType>
 typename GridType::Ptr
 createLevelSet(Real voxelSize, Real halfWidth)
 {
-    using ValueType = typename GridType::ValueType;
+    using ValueType   = typename GridType::ValueType;
+    using ComputeType = typename GridType::ComputeType;
 
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(std::is_floating_point<ComputeType>::value,
         "level-set grids must be floating-point-valued");
 
     typename GridType::Ptr grid = GridType::create(

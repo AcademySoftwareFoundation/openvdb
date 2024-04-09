@@ -90,8 +90,9 @@ class LevelSetSphere
 public:
     using TreeT  = typename GridT::TreeType;
     using ValueT = typename GridT::ValueType;
-    using Vec3T  = typename math::Vec3<ValueT>;
-    static_assert(std::is_floating_point<ValueT>::value,
+    using ComputeT = typename GridT::ComputeType;
+    using Vec3T  = typename math::Vec3<ComputeT>;
+    static_assert(std::is_floating_point<ComputeT>::value,
         "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor
@@ -104,7 +105,7 @@ public:
     /// @note If the radius of the sphere is smaller than
     /// 1.5*voxelSize, i.e. the sphere is smaller than the Nyquist
     /// frequency of the grid, it is ignored!
-    LevelSetSphere(ValueT radius, const Vec3T &center, InterruptT* interrupt = nullptr)
+    LevelSetSphere(ComputeT radius, const Vec3T &center, InterruptT* interrupt = nullptr)
         : mRadius(radius), mCenter(center), mInterrupt(interrupt)
     {
         if (mRadius<=0) OPENVDB_THROW(ValueError, "radius must be positive");
@@ -115,7 +116,7 @@ public:
     /// @param voxelSize  Size of voxels in world units
     /// @param halfWidth  Half-width of narrow-band in voxel units
     /// @param threaded   If true multi-threading is enabled (true by default)
-    typename GridT::Ptr getLevelSet(ValueT voxelSize, ValueT halfWidth, bool threaded = true)
+    typename GridT::Ptr getLevelSet(ComputeT voxelSize, ComputeT halfWidth, bool threaded = true)
     {
         mGrid = createLevelSet<GridT>(voxelSize, halfWidth);
         this->rasterSphere(voxelSize, halfWidth, threaded);
@@ -124,7 +125,7 @@ public:
     }
 
 private:
-    void rasterSphere(ValueT dx, ValueT w, bool threaded)
+    void rasterSphere(ComputeT dx, ComputeT w, bool threaded)
     {
         if (!(dx>0.0f)) OPENVDB_THROW(ValueError, "voxel size must be positive");
         if (!(w>1)) OPENVDB_THROW(ValueError, "half-width must be larger than one");
@@ -158,16 +159,16 @@ private:
             // Compute signed distances to sphere using leapfrogging in k
             for (i = r.begin(); i != r.end(); ++i) {
                 if (util::wasInterrupted(mInterrupt)) return;
-                const auto x2 = math::Pow2(ValueT(i) - c[0]);
+                const auto x2 = math::Pow2(ComputeT(i) - c[0]);
                 for (j = jmin; j <= jmax; ++j) {
-                    const auto x2y2 = math::Pow2(ValueT(j) - c[1]) + x2;
+                    const auto x2y2 = math::Pow2(ComputeT(j) - c[1]) + x2;
                     for (k = kmin; k <= kmax; k += m) {
                         m = 1;
                         // Distance in voxel units to sphere
-                        const auto v = math::Sqrt(x2y2 + math::Pow2(ValueT(k)-c[2]))-r0;
+                        const auto v = math::Sqrt(x2y2 + math::Pow2(ComputeT(k)-c[2]))-r0;
                         const auto d = math::Abs(v);
                         if (d < w) { // inside narrow band
-                            acc.setValue(ijk, dx*v);// distance in world units
+                            acc.setValue(ijk, ValueT(dx*v));// distance in world units
                         } else { // outside narrow band
                             m += math::Floor(d-w);// leapfrog
                         }
@@ -221,12 +222,12 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
     float halfWidth, InterruptT* interrupt, bool threaded)
 {
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(std::is_floating_point<typename GridType::ValueType>::value,
+    static_assert(std::is_floating_point<typename GridType::ComputeType>::value,
         "level set grids must have scalar, floating-point value types");
 
-    using ValueT = typename GridType::ValueType;
-    LevelSetSphere<GridType, InterruptT> factory(ValueT(radius), center, interrupt);
-    return factory.getLevelSet(ValueT(voxelSize), ValueT(halfWidth), threaded);
+    using ComputeT = typename GridType::ComputeType;
+    LevelSetSphere<GridType, InterruptT> factory(ComputeT(radius), center, interrupt);
+    return factory.getLevelSet(ComputeT(voxelSize), ComputeT(halfWidth), threaded);
 }
 
 

@@ -34,6 +34,7 @@ public:
     using LeafNodeType = LeafNode<ValueMask, Log2Dim>;
     using BuildType = ValueMask;// this is a rare case where
     using ValueType = bool;// value type != build type
+    using ComputeType = typename ValueToComputeMap<ValueType>::Type;
     using Buffer = LeafBuffer<ValueType, Log2Dim>;// buffer uses the bool specialization
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using Ptr = SharedPtr<LeafNodeType>;

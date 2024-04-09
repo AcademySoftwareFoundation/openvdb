@@ -32,6 +32,7 @@ public:
     using LeafNodeType = LeafNode<bool, Log2Dim>;
     using BuildType = bool;
     using ValueType = bool;
+    using ComputeType = typename ValueToComputeMap<ValueType>::Type;
     using Buffer = LeafBuffer<ValueType, Log2Dim>;
     using NodeMaskType = util::NodeMask<Log2Dim>;
     using Ptr = SharedPtr<LeafNodeType>;
