@@ -183,6 +183,7 @@ public:
 
     using RootNodeType = _RootNodeType;
     using ValueType = typename RootNodeType::ValueType;
+    using ComputeType = typename RootNodeType::ComputeType;
     using BuildType = typename RootNodeType::BuildType;
     using LeafNodeType = typename RootNodeType::LeafNodeType;
 

@@ -374,6 +374,7 @@ public:
 
     using TreeType = _TreeType;
     using ValueType = typename TreeType::ValueType;
+    using ComputeType = typename TreeType::ComputeType;
     using RootNodeT = typename TreeType::RootNodeType;
     using LeafNodeT = typename TreeType::LeafNodeType;
     using NodeChainT = typename RootNodeT::NodeChainType;
