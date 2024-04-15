@@ -44,6 +44,15 @@ Camera::Camera()
 }
 
 
+openvdb::Mat4s
+Camera::getTransformationMatrix()
+{
+    float matrix[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
+    return openvdb::Mat4s(matrix);
+}
+
+
 void
 Camera::lookAt(const openvdb::Vec3d& p, double dist)
 {

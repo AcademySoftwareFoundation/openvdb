@@ -58,6 +58,7 @@ public:
     void showNextGrid();
 
     bool needsDisplay();
+    void printCameraTransformationMatrix();
     void setNeedsDisplay();
 
     void toggleRenderModule(size_t n);
@@ -992,6 +993,9 @@ ViewerImpl::keyCallback(int key, int action)
         case 'i': case 'I':
             toggleInfoText();
             break;
+        case 'p': case 'P':
+            printCameraTransformationMatrix();
+            break;
         case GLFW_KEY_LEFT:
             showPrevGrid();
             break;
@@ -1081,6 +1085,13 @@ ViewerImpl::needsDisplay()
         return true;
     }
     return false;
+}
+
+
+void
+ViewerImpl::printCameraTransformationMatrix()
+{
+    std::cout << mCamera->getTransformationMatrix() << std::endl;
 }
 
 
