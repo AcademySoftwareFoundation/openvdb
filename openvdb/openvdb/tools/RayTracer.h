@@ -550,7 +550,7 @@ public:
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         using RealT = Film::RGBA::ValueT;
-        
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         return Film::RGBA(RealT(v[0]), RealT(v[1]), RealT(v[2]));
@@ -599,7 +599,7 @@ public:
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R&) const override
     {
         using RealT = Film::RGBA::ValueT;
-        
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         return Film::RGBA(RealT(v[0])*(normal[0]+1.0),
@@ -656,7 +656,7 @@ public:
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
         using RealT = Film::RGBA::ValueT;
-        
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         const Vec3R rgb = (xyz - mMin) * mInvDim;
@@ -713,7 +713,7 @@ public:
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R& rayDir) const override
     {
         using RealT = Film::RGBA::ValueT;
-        
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         // We take the abs of the dot product corresponding to having
