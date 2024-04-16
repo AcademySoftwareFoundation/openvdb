@@ -474,7 +474,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
             } else {
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
-                    out0[i] = RealT(0.5)*( 
+                    out0[i] = RealT(0.5)*(
                         RealT(3)*ComputeT(acc.getValue(voxelIter.getCoord())) - ComputeT(out1[i]));
                 }//loop over active voxels
             }
