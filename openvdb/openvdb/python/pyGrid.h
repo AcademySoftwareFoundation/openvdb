@@ -558,9 +558,9 @@ volumeToMesh(const GridType&, nb::object, nb::object)
 template<typename GridType>
 inline typename GridType::Ptr
 meshToLevelSet(
-        nb::ndarray<float, nb::shape<nb::any, 3>, nb::device::cpu> pointsObj,
-        std::optional<nb::ndarray<Index32, nb::shape<nb::any, 3>, nb::device::cpu>>& trianglesObj,
-        std::optional<nb::ndarray<Index32, nb::shape<nb::any, 4>, nb::device::cpu>>& quadsObj,
+        nb::ndarray<float, nb::shape<-1, 3>, nb::device::cpu> pointsObj,
+        std::optional<nb::ndarray<Index32, nb::shape<-1, 3>, nb::device::cpu>>& trianglesObj,
+        std::optional<nb::ndarray<Index32, nb::shape<-1, 4>, nb::device::cpu>>& quadsObj,
         math::Transform::Ptr xform, float halfWidth)
 {
     // Extract the list of mesh vertices from the arguments to this method.
