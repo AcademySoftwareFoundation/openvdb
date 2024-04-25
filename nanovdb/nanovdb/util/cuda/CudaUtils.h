@@ -55,7 +55,7 @@
 
 // cudaMallocAsync and cudaFreeAsync were introduced in CUDA 11.2, for older CUDA 
 // versions fall back to cudaMalloc and cudaFree. The fallback can also be forced 
-// using the USE_SYNC_CUDA_MALLOC flag. This may be useful when deploying nanoVDB
+// using the NANOVDB_USE_SYNC_CUDA_MALLOC flag. This may be useful when deploying nanoVDB
 // code in virtualized environments that share the GPU between instances by slicing
 // it up into vGPU's. In such environments GPU unified memory is usually disabled
 // out of security considerations, which means cudaMallocAsync can not be used.
