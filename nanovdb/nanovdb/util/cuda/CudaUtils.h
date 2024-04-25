@@ -53,20 +53,35 @@
         cudaCheck(cudaGetLastError()); \
     }
 
-#if CUDART_VERSION < 11020  // 11.2 introduced cudaMallocAsync and cudaFreeAsync
+// cudaMallocAsync and cudaFreeAsync were introduced in CUDA 11.2, for older CUDA 
+// versions fall back to cudaMalloc and cudaFree. The fallback can also be forced 
+// using the USE_SYNC_CUDA_MALLOC flag. This may be useful when deploying nanoVDB
+// code in virtualized environments that share the GPU between instances by slicing
+// it up into vGPU's. In such environments GPU unified memory is usually disabled
+// out of security considerations, which means cudaMallocAsync can not be used.
+#if (CUDART_VERSION < 11020) || defined(NANOVDB_USE_SYNC_CUDA_MALLOC)
 
-/// @brief Dummy implementation of cudaMallocAsync that calls cudaMalloc
-/// @param d_ptr Device pointer to allocated device memory
-/// @param size  Number of bytes to allocate
-/// @param dummy The stream establishing the stream ordering contract and the memory pool to allocate from (ignored)
-/// @return Cuda error code
-inline cudaError_t cudaMallocAsync(void** d_ptr, size_t size, cudaStream_t){return cudaMalloc(d_ptr, size);}
+#define CUDA_MALLOC(d_ptr, size, stream) \
+   { \ 
+     cudaMalloc((d_ptr), (size)); \
+   } 
 
-/// @brief Dummy implementation of cudaFreeAsync that calls cudaFree
-/// @param d_ptr Device pointer that will be freed
-/// @param dummy The stream establishing the stream ordering promise (ignored)
-/// @return Cuda error code
-inline cudaError_t cudaFreeAsync(void* d_ptr, cudaStream_t){return cudaFree(d_ptr);}
+#define CUDA_FREE(d_ptr, stream) \
+   { \ 
+     cudaFree((d_ptr)); \
+   }
+
+#else
+
+#define CUDA_MALLOC(d_ptr, size, stream) \
+   { \ 
+     cudaMallocAsync((d_ptr), (size), (stream)); \
+   }
+
+#define CUDA_FREE(d_ptr, stream) \
+   { \ 
+     cudaFreeAsync((d_ptr), (stream)); \
+   }
 
 #endif
 

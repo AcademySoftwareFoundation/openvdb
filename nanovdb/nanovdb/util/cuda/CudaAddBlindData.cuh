@@ -62,7 +62,7 @@ cudaAddBlindData(const NanoGrid<BuildT> *d_grid,
     // extract byte sizes of the grid, blind meta data and blind data
     enum {GRID=0, META=1, DATA=2, CHECKSUM=3};
     uint64_t tmp[4], *d_tmp;
-    cudaCheck(cudaMallocAsync((void**)&d_tmp, 4*sizeof(uint64_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_tmp, 4*sizeof(uint64_t), stream));
     cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         if (auto count = d_grid->blindDataCount()) {
             d_tmp[GRID] = PtrDiff(&d_grid->blindMetaData(0), d_grid);
@@ -114,7 +114,7 @@ cudaAddBlindData(const NanoGrid<BuildT> *d_grid,
         for (uint32_t i=0, n=grid.mBlindMetadataCount-1; i<n; ++i, ++meta) meta->mDataOffset += sizeof(GridBlindMetaData);
         grid.mGridSize += sizeof(GridBlindMetaData) + meta->blindDataSize();// expansion with 32 byte alignment
     }); cudaCheckError();
-    cudaCheck(cudaFreeAsync(d_tmp, stream));
+    cudaCheck(CUDA_FREE(d_tmp, stream));
 
     GridChecksum cs(tmp[CHECKSUM]);
     cudaGridChecksum(reinterpret_cast<GridData*>(d_data), cs.mode());

@@ -67,7 +67,7 @@ __global__ void checksumKernel(const T *d_data, uint32_t* d_blockCRC, uint32_t b
 inline uint32_t* cudaCreateLut(cudaStream_t stream = 0)
 {
     uint32_t *d_lut;
-    cudaCheck(cudaMallocAsync((void**)&d_lut, 256*sizeof(uint32_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_lut, 256*sizeof(uint32_t), stream));
     initLutKernel<<<1, 256, 0, stream>>>(d_lut);
     cudaCheckError();
     return d_lut;
@@ -93,10 +93,10 @@ inline ChecksumMode cudaGridChecksum(GridData *d_gridData, ChecksumMode mode = C
     uint8_t  *d_begin = reinterpret_cast<uint8_t*>(d_gridData);
     uint32_t *d_lut = crc32::cudaCreateLut(stream);// allocate and generate device LUT for CRC32
     uint64_t size[2], *d_size;// {total size of grid, partial size for first checksum}
-    cudaCheck(cudaMallocAsync((void**)&d_size, 2*sizeof(uint64_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_size, 2*sizeof(uint64_t), stream));
 
     // Compute CRC32 checksum of GridData, TreeData, RootData (+tiles), but exclude GridData::mMagic and GridData::mChecksum
-    cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
+    cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__ (size_t) {
         d_size[0] = d_gridData->mGridSize;
         uint8_t *d_mid = d_gridData->template nodePtr<2>();
         if (d_mid == nullptr) {// no upper nodes
@@ -112,7 +112,7 @@ inline ChecksumMode cudaGridChecksum(GridData *d_gridData, ChecksumMode mode = C
     });
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(size, d_size, 2*sizeof(uint64_t), cudaMemcpyDeviceToHost, stream));
-    cudaCheck(cudaFreeAsync(d_size, stream));
+    cudaCheck(CUDA_FREE(d_size, stream));
 
     if (mode != ChecksumMode::Full || size[0] == size[1]) return ChecksumMode::Partial;
 
@@ -120,7 +120,7 @@ inline ChecksumMode cudaGridChecksum(GridData *d_gridData, ChecksumMode mode = C
     const uint8_t *d_mid = d_begin + size[1], *d_end = d_begin + size[0];
     uint32_t *d_checksums;// 4096 byte chunks
     const uint64_t checksumCount = (d_end - d_mid) >> NANOVDB_CRC32_LOG2_BLOCK_SIZE;// 4 KB (4096 byte)
-    cudaCheck(cudaMallocAsync((void**)&d_checksums, checksumCount*sizeof(uint32_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_checksums, checksumCount*sizeof(uint32_t), stream));
     cudaLambdaKernel<<<numBlocks(checksumCount), mNumThreads, 0, stream>>>(checksumCount, [=] __device__(size_t tid) {
         uint32_t size = 1<<NANOVDB_CRC32_LOG2_BLOCK_SIZE;
         if (tid+1 == checksumCount) size += d_end - d_mid - (checksumCount<<NANOVDB_CRC32_LOG2_BLOCK_SIZE);
@@ -132,8 +132,8 @@ inline ChecksumMode cudaGridChecksum(GridData *d_gridData, ChecksumMode mode = C
         p[1] = crc32::checksum((const uint8_t*)d_checksums, checksumCount*sizeof(uint32_t), d_lut);
     });
     cudaCheckError();
-    cudaCheck(cudaFreeAsync(d_checksums, stream));
-    cudaCheck(cudaFreeAsync(d_lut, stream));
+    cudaCheck(CUDA_FREE(d_checksums, stream));
+    cudaCheck(CUDA_FREE(d_lut, stream));
 
     return ChecksumMode::Full;
 }// cudaGridChecksum
@@ -147,11 +147,11 @@ inline ChecksumMode cudaGridChecksum(NanoGrid<BuildT> *d_grid, ChecksumMode mode
 inline GridChecksum cudaGetGridChecksum(GridData *d_gridData, cudaStream_t stream = 0)
 {
     uint64_t checksum, *d_checksum;
-    cudaCheck(cudaMallocAsync((void**)&d_checksum, sizeof(uint64_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_checksum, sizeof(uint64_t), stream));
     cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {*d_checksum = d_gridData->mChecksum;});
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&checksum, d_checksum, sizeof(uint64_t), cudaMemcpyDeviceToHost, stream));
-    cudaCheck(cudaFreeAsync(d_checksum, stream));
+    cudaCheck(CUDA_FREE(d_checksum, stream));
     return GridChecksum(checksum);;
 }
 
@@ -172,7 +172,7 @@ void cudaGridChecksum(NanoGrid<ValueT> *d_grid, ChecksumMode mode = ChecksumMode
 
     uint32_t *d_lut = crc32::cudaCreateLut(stream);// allocate and generate device LUT for CRC32
     uint64_t size[2], *d_size;
-    cudaCheck(cudaMallocAsync((void**)&d_size, 2*sizeof(uint64_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_size, 2*sizeof(uint64_t), stream));
     cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         d_size[0] = d_grid->gridSize();
         d_size[1] = d_grid->memUsage() + d_grid->tree().memUsage() + d_grid->tree().root().memUsage();
@@ -188,15 +188,15 @@ void cudaGridChecksum(NanoGrid<ValueT> *d_grid, ChecksumMode mode = ChecksumMode
 
     // Get node counts
     uint32_t nodeCount[3], *d_nodeCount, *d_checksums, *d_ptr;
-    cudaCheck(cudaMallocAsync((void**)&d_nodeCount, 3*sizeof(uint32_t), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_nodeCount, 3*sizeof(uint32_t), stream));
     cudaLambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
         auto &tree = d_grid->tree();
         for (int i = 0; i < 3; ++i) d_nodeCount[i] = tree.nodeCount(i);
     });
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(nodeCount, d_nodeCount, 3*sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
-    cudaCheck(cudaFreeAsync(d_nodeCount, stream));
-    cudaCheck(cudaMallocAsync((void**)&d_checksums, (nodeCount[0]+nodeCount[1]+nodeCount[2])*sizeof(uint32_t), stream));
+    cudaCheck(CUDA_FREE(d_nodeCount, stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_checksums, (nodeCount[0]+nodeCount[1]+nodeCount[2])*sizeof(uint32_t), stream));
 
     auto nodeMgrHandle = cudaCreateNodeManager<ValueT, CudaDeviceBuffer>(d_grid, CudaDeviceBuffer(), stream);
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<ValueT>();
@@ -232,9 +232,9 @@ void cudaGridChecksum(NanoGrid<ValueT> *d_grid, ChecksumMode mode = ChecksumMode
     });
     cudaCheckError();
 
-    cudaCheck(cudaFreeAsync(d_size, stream));
-    cudaCheck(cudaFreeAsync(d_checksums, stream));
-    cudaCheck(cudaFreeAsync(d_lut, stream));
+    cudaCheck(CUDA_FREE(d_size, stream));
+    cudaCheck(CUDA_FREE(d_checksums, stream));
+    cudaCheck(CUDA_FREE(d_lut, stream));
 }// cudaGridChecksum
 
 #endif

@@ -210,7 +210,7 @@ void CudaGridStats<BuildT, StatsT>::operator()(NanoGrid<BuildT> *d_grid, cudaStr
 
     StatsT *d_stats = nullptr;
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(cudaMallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
+    if constexpr(StatsT::hasAverage()) cudaCheck(CUDA_MALLOC((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
 
     processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
@@ -220,7 +220,7 @@ void CudaGridStats<BuildT, StatsT>::operator()(NanoGrid<BuildT> *d_grid, cudaStr
 
     processRootAndGrid<BuildT><<<1, 1, 0, stream>>>(d_nodeMgr, d_stats);
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(cudaFreeAsync(d_stats, stream));
+    if constexpr(StatsT::hasAverage()) cudaCheck(CUDA_FREE(d_stats, stream));
 
 } // CudaGridStats::operator()( Grid )
 
