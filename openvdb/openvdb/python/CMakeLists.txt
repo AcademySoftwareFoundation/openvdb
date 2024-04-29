@@ -103,7 +103,11 @@ endif()
 
 # Make sure find_package(Python) is only ever invoked once with all required components
 find_package(Python 3.8 REQUIRED COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-find_package(nanobind REQUIRED)
+find_package(nanobind)
+if(NOT nanobind_FOUND)
+  message(FATAL_ERROR "Could NOT find nanobind. Please install nanobind "
+    "(via pip install nanobind) and set nanobind_DIR at build time.")
+endif()
 
 openvdb_check_python_version(Python::Module
   "${Python_VERSION}"
