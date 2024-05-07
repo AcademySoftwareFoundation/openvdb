@@ -27,6 +27,7 @@
 #include <openvdb/io/File.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/CpuTimer.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/points/PointDelete.h>
 
 #include <tbb/global_control.h>
@@ -248,7 +249,7 @@ struct ProgOptions
                 if (v) OPENVDB_LOG_WARN("multiple code snippets provided, only using last input.");
                 if (idx == 0) v.reset(new std::string(arg));
                 else {
-                    assert(idx == 1);
+                    OPENVDB_ASSERT(idx == 1);
                     v.reset(new std::string());
                     loadSnippetFile(arg, *v);
                 }
@@ -827,7 +828,7 @@ main(int argc, char *argv[])
 
         if (printing) {
             axlog("Querying available functions\n" << std::flush);
-            assert(opts.mFunctionNamesOnly.get() || initializer.isInitialized());
+            OPENVDB_ASSERT(opts.mFunctionNamesOnly.get() || initializer.isInitialized());
             printFunctions(opts.mFunctionNamesOnly.get(),
                 opts.mFunctionList.get().second,
                 std::cout);
@@ -883,7 +884,7 @@ main(int argc, char *argv[])
         }
     }
 
-    assert(initCompile);
+    OPENVDB_ASSERT(initCompile);
 
     std::ostringstream tmp;
     openvdb::ax::cli::ParamToStream(tmp, opts.mOptLevel.get());

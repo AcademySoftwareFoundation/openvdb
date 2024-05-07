@@ -49,8 +49,6 @@ overwrite user provided values.
 ``ZLIB_LIBRARY``
 ``OPENEXR_INCLUDEDIR``
 ``OPENEXR_LIBRARYDIR``
-``ILMBASE_INCLUDEDIR``
-``ILMBASE_LIBRARYDIR``
 ``TBB_INCLUDEDIR``
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
@@ -145,14 +143,6 @@ elseif(MINIMUM_HOUDINI_VERSION)
       "supported is ${MINIMUM_HOUDINI_VERSION}."
     )
   endif()
-endif()
-
-# Temporary change to support Houdini 19 which deploys with Blosc 1.5.
-# This allows VDB to continue to build using Blosc 1.5. This support
-# will be dropped in VDB 11
-if(Houdini_VERSION VERSION_LESS 19.5)
-  message(DEPRECATION "Setting MINIMUM_BLOSC_VERSION to 1.5.0 for Houdini 19.0 compatibility.")
-  set(MINIMUM_BLOSC_VERSION 1.5.0)
 endif()
 
 set(Houdini_VERSION_MAJOR_MINOR "${Houdini_VERSION_MAJOR}.${Houdini_VERSION_MINOR}")
@@ -298,7 +288,11 @@ endif()
 
 # Jemalloc
 
-if(NOT JEMALLOC_LIBRARYDIR)
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   As of Houdini 20, it still ships with Jemalloc 3.6.0, so don't expose it
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420).
+if(NOT APPLE AND NOT JEMALLOC_LIBRARYDIR)
   set(JEMALLOC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
@@ -311,21 +305,10 @@ if(NOT OPENEXR_LIBRARYDIR)
   set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
-# IlmBase
-
-if(NOT ILMBASE_INCLUDEDIR)
-  set(ILMBASE_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
-endif()
-if(NOT ILMBASE_LIBRARYDIR)
-  set(ILMBASE_LIBRARYDIR ${HOUDINI_LIB_DIR})
-endif()
-
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
 
-# Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
-
 if(APPLE)
   list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "_sidefx.dylib")
 elseif(UNIX)
@@ -356,68 +339,67 @@ if(NOT OPENVDB_HOUDINI_ABI)
 endif()
 
 # ------------------------------------------------------------------------
-#  Configure GCC CXX11 ABI
+#  Configure libstc++ CXX11 ABI
 # ------------------------------------------------------------------------
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  if((CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 5.1) OR
-     (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1))
-    message(STATUS "GCC >= 5.1 detected. Configuring GCC CXX11 ABI for Houdini compatibility...")
+if(UNIX AND NOT APPLE)
+  # Assume we're using libstdc++
+  message(STATUS "Configuring CXX11 ABI for Houdini compatibility...")
 
-    execute_process(COMMAND echo "#include <string>"
-      COMMAND ${CMAKE_CXX_COMPILER} "-x" "c++" "-E" "-dM" "-"
-      COMMAND grep "-F" "_GLIBCXX_USE_CXX11_ABI"
-      TIMEOUT 10
-      RESULT_VARIABLE QUERIED_GCC_CXX11_ABI_SUCCESS
-      OUTPUT_VARIABLE _GCC_CXX11_ABI)
+  execute_process(COMMAND echo "#include <string>"
+    COMMAND ${CMAKE_CXX_COMPILER} "-x" "c++" "-E" "-dM" "-"
+    COMMAND grep "-F" "_GLIBCXX_USE_CXX11_ABI"
+    TIMEOUT 10
+    RESULT_VARIABLE QUERIED_GCC_CXX11_ABI_SUCCESS
+    OUTPUT_VARIABLE _GCC_CXX11_ABI)
 
-    set(GLIBCXX_USE_CXX11_ABI "UNKNOWN")
+  set(GLIBCXX_USE_CXX11_ABI "UNKNOWN")
 
-    if(NOT QUERIED_GCC_CXX11_ABI_SUCCESS)
-      string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 0" GCC_OLD_CXX11_ABI)
-      string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 1" GCC_NEW_CXX11_ABI)
-      if(NOT (${GCC_OLD_CXX11_ABI} EQUAL -1))
-        set(GLIBCXX_USE_CXX11_ABI 0)
-      endif()
-      if(NOT (${GCC_NEW_CXX11_ABI} EQUAL -1))
-        set(GLIBCXX_USE_CXX11_ABI 1)
-      endif()
+  if(NOT QUERIED_GCC_CXX11_ABI_SUCCESS)
+    string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 0" GCC_OLD_CXX11_ABI)
+    string(FIND ${_GCC_CXX11_ABI} "_GLIBCXX_USE_CXX11_ABI 1" GCC_NEW_CXX11_ABI)
+    if(NOT (${GCC_OLD_CXX11_ABI} EQUAL -1))
+      set(GLIBCXX_USE_CXX11_ABI 0)
     endif()
-
-    # Try and query the Houdini CXX11 ABI. Allow it to be provided by users to
-    # override this logic should Houdini's CMake ever change
-
-    if(NOT DEFINED HOUDINI_CXX11_ABI)
-      get_target_property(houdini_interface_compile_options
-        Houdini INTERFACE_COMPILE_OPTIONS)
-      set(HOUDINI_CXX11_ABI "UNKNOWN")
-      if("-D_GLIBCXX_USE_CXX11_ABI=0" IN_LIST houdini_interface_compile_options)
-        set(HOUDINI_CXX11_ABI 0)
-      elseif("-D_GLIBCXX_USE_CXX11_ABI=1" IN_LIST houdini_interface_compile_options)
-        set(HOUDINI_CXX11_ABI 1)
-      endif()
+    if(NOT (${GCC_NEW_CXX11_ABI} EQUAL -1))
+      set(GLIBCXX_USE_CXX11_ABI 1)
     endif()
+  endif()
 
-    message(STATUS "  GCC CXX11 ABI     : ${GLIBCXX_USE_CXX11_ABI}")
-    message(STATUS "  Houdini CXX11 ABI : ${HOUDINI_CXX11_ABI}")
+  # Try and query the Houdini CXX11 ABI. Allow it to be provided by users to
+  # override this logic should Houdini's CMake ever change
 
-    if(${HOUDINI_CXX11_ABI} STREQUAL "UNKNOWN")
-      message(WARNING "Unable to determine Houdini CXX11 ABI. Assuming newer ABI "
-        "has been used.")
+  if(NOT DEFINED HOUDINI_CXX11_ABI)
+    get_target_property(houdini_interface_compile_options
+      Houdini INTERFACE_COMPILE_OPTIONS)
+    set(HOUDINI_CXX11_ABI "UNKNOWN")
+    if("-D_GLIBCXX_USE_CXX11_ABI=0" IN_LIST houdini_interface_compile_options)
+      set(HOUDINI_CXX11_ABI 0)
+    elseif("-D_GLIBCXX_USE_CXX11_ABI=1" IN_LIST houdini_interface_compile_options)
       set(HOUDINI_CXX11_ABI 1)
     endif()
-
-    if(${GLIBCXX_USE_CXX11_ABI} EQUAL ${HOUDINI_CXX11_ABI})
-      message(STATUS "  Current CXX11 ABI matches Houdini configuration "
-        "(_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}).")
-    else()
-      message(WARNING "A potential mismatch was detected between the CXX11 ABI "
-        "of GCC and Houdini. The following ABI configuration will be used: "
-        "-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}. See: "
-        "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
-        "https://vfxplatform.com/#footnote-gcc6 for more information.")
-    endif()
-
-    add_definitions(-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI})
   endif()
+
+  message(STATUS "  GNU CXX11 ABI     : ${GLIBCXX_USE_CXX11_ABI}")
+  message(STATUS "  Houdini CXX11 ABI : ${HOUDINI_CXX11_ABI}")
+
+  if(${HOUDINI_CXX11_ABI} STREQUAL "UNKNOWN")
+    message(WARNING "Unable to determine Houdini CXX11 ABI. Assuming newer ABI "
+      "has been used.")
+    set(HOUDINI_CXX11_ABI 1)
+  endif()
+
+  if(${GLIBCXX_USE_CXX11_ABI} EQUAL ${HOUDINI_CXX11_ABI})
+    message(STATUS "  Current CXX11 ABI matches Houdini configuration "
+      "(_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}).")
+  else()
+    message(WARNING "A potential mismatch was detected between the CXX11 ABI "
+      "of libstdc++ and Houdini. The following ABI configuration will be used: "
+      "-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI}. See: "
+      "https://gcc.gnu.org/onlinedocs/libstdc++/manual/using_dual_abi.html and "
+      "https://vfxplatform.com/#footnote-gcc6 for more information.")
+  endif()
+
+  add_definitions(-D_GLIBCXX_USE_CXX11_ABI=${HOUDINI_CXX11_ABI})
 endif()
+

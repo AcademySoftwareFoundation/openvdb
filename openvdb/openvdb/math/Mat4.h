@@ -6,12 +6,12 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Platform.h>
+#include <openvdb/util/Assert.h>
 #include "Math.h"
 #include "Mat3.h"
 #include "Vec3.h"
 #include "Vec4.h"
 #include <algorithm> // for std::copy(), std::swap()
-#include <cassert>
 #include <iomanip>
 #include <cmath>
 
@@ -138,7 +138,7 @@ public:
     /// Set ith row to vector v
     void setRow(int i, const Vec4<T> &v)
     {
-        // assert(i>=0 && i<4);
+        OPENVDB_ASSERT(i>=0 && i<4);
         int i4 = i * 4;
         MyBase::mm[i4+0] = v[0];
         MyBase::mm[i4+1] = v[1];
@@ -149,14 +149,14 @@ public:
     /// Get ith row, e.g.    Vec4f v = m.row(1);
     Vec4<T> row(int i) const
     {
-        // assert(i>=0 && i<3);
+        OPENVDB_ASSERT(i>=0 && i<4);
         return Vec4<T>((*this)(i,0), (*this)(i,1), (*this)(i,2), (*this)(i,3));
     }
 
     /// Set jth column to vector v
     void setCol(int j, const Vec4<T>& v)
     {
-        // assert(j>=0 && j<4);
+        OPENVDB_ASSERT(j>=0 && j<4);
         MyBase::mm[ 0+j] = v[0];
         MyBase::mm[ 4+j] = v[1];
         MyBase::mm[ 8+j] = v[2];
@@ -166,7 +166,7 @@ public:
     /// Get jth column, e.g.    Vec4f v = m.col(0);
     Vec4<T> col(int j) const
     {
-        // assert(j>=0 && j<4);
+        OPENVDB_ASSERT(j>=0 && j<4);
         return Vec4<T>((*this)(0,j), (*this)(1,j), (*this)(2,j), (*this)(3,j));
     }
 
@@ -175,8 +175,8 @@ public:
     /// e.g.    m(0,0) = 1;
     T& operator()(int i, int j)
     {
-        // assert(i>=0 && i<4);
-        // assert(j>=0 && j<4);
+        OPENVDB_ASSERT(i>=0 && i<4);
+        OPENVDB_ASSERT(j>=0 && j<4);
         return MyBase::mm[4*i+j];
     }
 
@@ -185,8 +185,8 @@ public:
     /// e.g.    float f = m(1,0);
     T operator()(int i, int j) const
     {
-        // assert(i>=0 && i<4);
-        // assert(j>=0 && j<4);
+        OPENVDB_ASSERT(i>=0 && i<4);
+        OPENVDB_ASSERT(j>=0 && j<4);
         return MyBase::mm[4*i+j];
     }
 
@@ -791,83 +791,85 @@ public:
     /// product of v1 and v2.
     void setToRotation(const Vec3<T>& v1, const Vec3<T>& v2) {*this = rotation<Mat4<T> >(v1, v2);}
 
-
     /// @brief Left multiplies by a rotation clock-wiseabout the given axis into this matrix.
     /// @param axis The axis (one of X, Y, Z) of rotation.
     /// @param angle The clock-wise rotation angle, in radians.
     void preRotate(Axis axis, T angle)
     {
+        OPENVDB_ASSERT(axis==X_AXIS || axis==Y_AXIS || axis==Z_AXIS);
+
         T c = static_cast<T>(cos(angle));
         T s = -static_cast<T>(sin(angle)); // the "-" makes it clockwise
 
-        switch (axis) {
-        case X_AXIS:
-            {
-                T a4, a5, a6, a7;
+        switch (axis)
+        {
+            case X_AXIS:
+                {
+                    T a4, a5, a6, a7;
 
-                a4 = c * MyBase::mm[ 4] - s * MyBase::mm[ 8];
-                a5 = c * MyBase::mm[ 5] - s * MyBase::mm[ 9];
-                a6 = c * MyBase::mm[ 6] - s * MyBase::mm[10];
-                a7 = c * MyBase::mm[ 7] - s * MyBase::mm[11];
-
-
-                MyBase::mm[ 8] = s * MyBase::mm[ 4] + c * MyBase::mm[ 8];
-                MyBase::mm[ 9] = s * MyBase::mm[ 5] + c * MyBase::mm[ 9];
-                MyBase::mm[10] = s * MyBase::mm[ 6] + c * MyBase::mm[10];
-                MyBase::mm[11] = s * MyBase::mm[ 7] + c * MyBase::mm[11];
-
-                MyBase::mm[ 4] = a4;
-                MyBase::mm[ 5] = a5;
-                MyBase::mm[ 6] = a6;
-                MyBase::mm[ 7] = a7;
-            }
-            break;
-
-        case Y_AXIS:
-            {
-                T a0, a1, a2, a3;
-
-                a0 = c * MyBase::mm[ 0] + s * MyBase::mm[ 8];
-                a1 = c * MyBase::mm[ 1] + s * MyBase::mm[ 9];
-                a2 = c * MyBase::mm[ 2] + s * MyBase::mm[10];
-                a3 = c * MyBase::mm[ 3] + s * MyBase::mm[11];
-
-                MyBase::mm[ 8] = -s * MyBase::mm[ 0] + c * MyBase::mm[ 8];
-                MyBase::mm[ 9] = -s * MyBase::mm[ 1] + c * MyBase::mm[ 9];
-                MyBase::mm[10] = -s * MyBase::mm[ 2] + c * MyBase::mm[10];
-                MyBase::mm[11] = -s * MyBase::mm[ 3] + c * MyBase::mm[11];
+                    a4 = c * MyBase::mm[ 4] - s * MyBase::mm[ 8];
+                    a5 = c * MyBase::mm[ 5] - s * MyBase::mm[ 9];
+                    a6 = c * MyBase::mm[ 6] - s * MyBase::mm[10];
+                    a7 = c * MyBase::mm[ 7] - s * MyBase::mm[11];
 
 
-                MyBase::mm[ 0] = a0;
-                MyBase::mm[ 1] = a1;
-                MyBase::mm[ 2] = a2;
-                MyBase::mm[ 3] = a3;
-            }
-            break;
+                    MyBase::mm[ 8] = s * MyBase::mm[ 4] + c * MyBase::mm[ 8];
+                    MyBase::mm[ 9] = s * MyBase::mm[ 5] + c * MyBase::mm[ 9];
+                    MyBase::mm[10] = s * MyBase::mm[ 6] + c * MyBase::mm[10];
+                    MyBase::mm[11] = s * MyBase::mm[ 7] + c * MyBase::mm[11];
 
-        case Z_AXIS:
-            {
-                T a0, a1, a2, a3;
+                    MyBase::mm[ 4] = a4;
+                    MyBase::mm[ 5] = a5;
+                    MyBase::mm[ 6] = a6;
+                    MyBase::mm[ 7] = a7;
+                }
+                break;
 
-                a0 = c * MyBase::mm[ 0] - s * MyBase::mm[ 4];
-                a1 = c * MyBase::mm[ 1] - s * MyBase::mm[ 5];
-                a2 = c * MyBase::mm[ 2] - s * MyBase::mm[ 6];
-                a3 = c * MyBase::mm[ 3] - s * MyBase::mm[ 7];
+            case Y_AXIS:
+                {
+                    T a0, a1, a2, a3;
 
-                MyBase::mm[ 4] = s * MyBase::mm[ 0] + c * MyBase::mm[ 4];
-                MyBase::mm[ 5] = s * MyBase::mm[ 1] + c * MyBase::mm[ 5];
-                MyBase::mm[ 6] = s * MyBase::mm[ 2] + c * MyBase::mm[ 6];
-                MyBase::mm[ 7] = s * MyBase::mm[ 3] + c * MyBase::mm[ 7];
+                    a0 = c * MyBase::mm[ 0] + s * MyBase::mm[ 8];
+                    a1 = c * MyBase::mm[ 1] + s * MyBase::mm[ 9];
+                    a2 = c * MyBase::mm[ 2] + s * MyBase::mm[10];
+                    a3 = c * MyBase::mm[ 3] + s * MyBase::mm[11];
 
-                MyBase::mm[ 0] = a0;
-                MyBase::mm[ 1] = a1;
-                MyBase::mm[ 2] = a2;
-                MyBase::mm[ 3] = a3;
-            }
-            break;
+                    MyBase::mm[ 8] = -s * MyBase::mm[ 0] + c * MyBase::mm[ 8];
+                    MyBase::mm[ 9] = -s * MyBase::mm[ 1] + c * MyBase::mm[ 9];
+                    MyBase::mm[10] = -s * MyBase::mm[ 2] + c * MyBase::mm[10];
+                    MyBase::mm[11] = -s * MyBase::mm[ 3] + c * MyBase::mm[11];
+
+
+                    MyBase::mm[ 0] = a0;
+                    MyBase::mm[ 1] = a1;
+                    MyBase::mm[ 2] = a2;
+                    MyBase::mm[ 3] = a3;
+                }
+                break;
+
+            case Z_AXIS:
+                {
+                    T a0, a1, a2, a3;
+
+                    a0 = c * MyBase::mm[ 0] - s * MyBase::mm[ 4];
+                    a1 = c * MyBase::mm[ 1] - s * MyBase::mm[ 5];
+                    a2 = c * MyBase::mm[ 2] - s * MyBase::mm[ 6];
+                    a3 = c * MyBase::mm[ 3] - s * MyBase::mm[ 7];
+
+                    MyBase::mm[ 4] = s * MyBase::mm[ 0] + c * MyBase::mm[ 4];
+                    MyBase::mm[ 5] = s * MyBase::mm[ 1] + c * MyBase::mm[ 5];
+                    MyBase::mm[ 6] = s * MyBase::mm[ 2] + c * MyBase::mm[ 6];
+                    MyBase::mm[ 7] = s * MyBase::mm[ 3] + c * MyBase::mm[ 7];
+
+                    MyBase::mm[ 0] = a0;
+                    MyBase::mm[ 1] = a1;
+                    MyBase::mm[ 2] = a2;
+                    MyBase::mm[ 3] = a3;
+                }
+                break;
 
         default:
-            assert(axis==X_AXIS || axis==Y_AXIS || axis==Z_AXIS);
+            OPENVDB_ASSERT(axis==X_AXIS || axis==Y_AXIS || axis==Z_AXIS);
         }
     }
 
@@ -880,10 +882,9 @@ public:
         T c = static_cast<T>(cos(angle));
         T s = -static_cast<T>(sin(angle)); // the "-" makes it clockwise
 
-
-
-        switch (axis) {
-        case X_AXIS:
+        switch (axis)
+        {
+            case X_AXIS:
             {
                 T a2, a6, a10, a14;
 
@@ -905,7 +906,7 @@ public:
             }
             break;
 
-        case Y_AXIS:
+            case Y_AXIS:
             {
                 T a2, a6, a10, a14;
 
@@ -926,7 +927,7 @@ public:
             }
             break;
 
-        case Z_AXIS:
+            case Z_AXIS:
             {
                 T a1, a5, a9, a13;
 
@@ -948,8 +949,8 @@ public:
             }
             break;
 
-        default:
-            assert(axis==X_AXIS || axis==Y_AXIS || axis==Z_AXIS);
+            default:
+                OPENVDB_ASSERT(axis==X_AXIS || axis==Y_AXIS || axis==Z_AXIS);
         }
     }
 

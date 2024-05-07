@@ -16,7 +16,7 @@
 #include <cctype>
 
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/util/OpenToNanoVDB.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
 
 void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAILURE)
@@ -201,36 +201,26 @@ int main(int argc, char* argv[])
 
     auto openToNano = [&](const openvdb::GridBase::Ptr& base)
     {
-        if (auto floatGrid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
+        using SrcGridT = openvdb::FloatGrid;
+        if (auto floatGrid = openvdb::GridBase::grid<SrcGridT>(base)) {
+            nanovdb::CreateNanoGrid<SrcGridT> s(*floatGrid);
+            s.setStats(sMode);
+            s.setChecksum(cMode);
+            s.enableDithering(dither);
+            s.setVerbose(verbose ? 1 : 0);
             switch (qMode) {
-            case nanovdb::GridType::Fp4: {
-                nanovdb::OpenToNanoVDB<float, nanovdb::Fp4> s;
-                s.enableDithering(dither);
-                return s(*floatGrid, sMode, cMode, verbose ? 1 : 0);
-            }
-            case nanovdb::GridType::Fp8: {
-                nanovdb::OpenToNanoVDB<float, nanovdb::Fp8> s;
-                s.enableDithering(dither);
-                return s(*floatGrid, sMode, cMode, verbose ? 1 : 0);
-            }
-            case nanovdb::GridType::Fp16: {
-                nanovdb::OpenToNanoVDB<float, nanovdb::Fp16> s;
-                s.enableDithering(dither);
-                return s(*floatGrid, sMode, cMode, verbose ? 1 : 0);
-            }
-            case nanovdb::GridType::FpN: {
+            case nanovdb::GridType::Fp4:
+                return s.getHandle<nanovdb::Fp4>();
+            case nanovdb::GridType::Fp8:
+                return s.getHandle<nanovdb::Fp8>();
+            case nanovdb::GridType::Fp16:
+                return s.getHandle<nanovdb::Fp16>();
+            case nanovdb::GridType::FpN:
                 if (absolute) {
-                    nanovdb::OpenToNanoVDB<float, nanovdb::FpN, nanovdb::AbsDiff> s;
-                    s.enableDithering(dither);
-                    s.oracle() = nanovdb::AbsDiff(tolerance);
-                    return s(*floatGrid, sMode, cMode, verbose ? 1 : 0);
+                    return s.getHandle<nanovdb::FpN>(nanovdb::AbsDiff(tolerance));
                 } else {
-                    nanovdb::OpenToNanoVDB<float, nanovdb::FpN, nanovdb::RelDiff> s;
-                    s.enableDithering(dither);
-                    s.oracle() = nanovdb::RelDiff(tolerance);
-                    return s(*floatGrid, sMode, cMode, verbose ? 1 : 0);
+                    return s.getHandle<nanovdb::FpN>(nanovdb::RelDiff(tolerance));
                 }
-            }
             default:
                 break;
             }// end of switch
@@ -251,13 +241,15 @@ int main(int argc, char* argv[])
                 file.open(false); //disable delayed loading
                 if (gridName.empty()) {// convert all grid in the file
                     auto grids = file.getGrids();
+                    std::vector<nanovdb::GridHandle<nanovdb::HostBuffer> > handles;
                     for (auto& grid : *grids) {
                         if (verbose) {
                             std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                         }
-                        auto handle = openToNano(grid);
-                        nanovdb::io::writeGrid(os, handle, codec);
+                        handles.push_back(openToNano(grid));
                     } // loop over OpenVDB grids in file
+                    auto handle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles);
+                    nanovdb::io::writeGrid(os, handle, codec);
                 } else {// convert only grid with matching name
                     auto grid = file.readGrid(gridName);
                     if (verbose) {
@@ -280,9 +272,11 @@ int main(int argc, char* argv[])
                 if (gridName.empty()) {
                     auto handles = nanovdb::io::readGrids(inputFile, verbose);
                     for (auto &h : handles) {
-                        if (verbose)
-                            std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData()->shortGridName() << "\" to OpenVDB" << std::endl;
-                        grids->push_back(nanoToOpenVDB(h));
+                        for (uint32_t i = 0; i < h.gridCount(); ++i) {
+                            if (verbose)
+                                std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
+                            grids->push_back(nanoToOpenVDB(h, 0, i));
+                        }
                     }
                 } else {
                     auto handle = nanovdb::io::readGrid(inputFile, gridName);

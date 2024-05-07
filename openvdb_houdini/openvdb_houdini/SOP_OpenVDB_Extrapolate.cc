@@ -576,14 +576,14 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     using namespace openvdb::tools;
 
     using SamplerT = openvdb::tools::GridSampler<ExtGridT, openvdb::tools::BoxSampler>;
-    using ExtValueT = typename ExtGridT::ValueType;
 
     typename FSGridT::Ptr fsGrid = openvdb::gridPtrCast<FSGridT>(lsPrim->getGridPtr());
 
     if (parms.mNeedExt) {
         typename ExtGridT::ConstPtr extGrid = openvdb::gridConstPtrCast<ExtGridT>(exPrim->getConstGridPtr());
         if (!extGrid) {
-            std::string msg = "Extension grid (" + extGrid->getName() + ") cannot be converted " +
+            auto grid = exPrim->getConstGridPtr();
+            std::string msg = "Extension grid (" + grid->getName() + ") cannot be converted " +
                               "to the explicit type specified.";
             throw std::runtime_error(msg);
         }

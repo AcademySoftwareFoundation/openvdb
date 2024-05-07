@@ -491,16 +491,6 @@ endif()
 # Add standard dependencies
 
 find_package(TBB REQUIRED COMPONENTS tbb)
-
-if(NOT OPENVDB_USE_STATIC_LIBS AND NOT Boost_USE_STATIC_LIBS)
-  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
-  #        boost shared libraries (more specifically libraries built with -fPIC).
-  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
-  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
-  set(BUILD_SHARED_LIBS ON)
-  set(Boost_USE_STATIC_LIBS OFF)
-endif()
-
 find_package(Boost REQUIRED COMPONENTS iostreams)
 
 # Add deps for pyopenvdb
@@ -663,19 +653,7 @@ if(OpenVDB_USES_LOG4CPLUS)
 endif()
 
 if(OpenVDB_USES_IMATH_HALF)
-  find_package(Imath CONFIG)
-  if (NOT TARGET Imath::Imath)
-    find_package(IlmBase REQUIRED COMPONENTS Half)
-  endif()
-
-  if(WIN32)
-    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(OPENEXR_USE_STATIC_LIBS OR
-        ("${ILMBASE_LIB_TYPE}" STREQUAL "STATIC_LIBRARY") OR
-        ("${IMATH_LIB_TYPE}" STREQUAL "STATIC_LIBRARY"))
-      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-    endif()
-  endif()
+  find_package(Imath REQUIRED CONFIG)
 endif()
 
 if(UNIX)
@@ -683,7 +661,7 @@ if(UNIX)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# Houdini we must include Imath deps first to ensure the users chosen
 # namespaced headers are correctly prioritized. Otherwise other include paths
 # from shared installs (including houdini) may pull in the wrong headers
 
@@ -695,7 +673,7 @@ if(OpenVDB_USES_DELAYED_LOADING)
 endif()
 
 if(OpenVDB_USES_IMATH_HALF)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Imath::Imath)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)

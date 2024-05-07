@@ -14,6 +14,7 @@
 #include <openvdb/math/Math.h> // for isZero(), isExactlyEqual(), etc.
 #include <openvdb/math/BBox.h>
 #include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
+#include <openvdb/util/Assert.h>
 #include <openvdb/version.h>
 #include <tbb/parallel_for.h>
 #include <map>
@@ -224,7 +225,7 @@ private:
             return *mParentNode;
         }
 
-        bool test() const { assert(mParentNode); return mIter != mParentNode->mTable.end(); }
+        bool test() const { OPENVDB_ASSERT(mParentNode); return mIter != mParentNode->mTable.end(); }
         operator bool() const { return this->test(); }
 
         void increment() { if (this->test()) { ++mIter; } this->skip(); }
@@ -301,12 +302,12 @@ private:
         ValueT& operator*() const { return this->getValue(); }
         ValueT* operator->() const { return &(this->getValue()); }
 
-        void setValue(const ValueT& v) const { assert(isTile(mIter)); getTile(mIter).value = v; }
+        void setValue(const ValueT& v) const { OPENVDB_ASSERT(isTile(mIter)); getTile(mIter).value = v; }
 
         template<typename ModifyOp>
         void modifyValue(const ModifyOp& op) const
         {
-            assert(isTile(mIter));
+            OPENVDB_ASSERT(isTile(mIter));
             op(getTile(mIter).value);
         }
     }; // ValueIter
@@ -345,7 +346,7 @@ private:
         bool probeValue(NonConstValueType& value) const { return !this->probeChild(value); }
 
         void setChild(ChildNodeT& c) const { RootNodeT::setChild(mIter, c); }
-        void setChild(ChildNodeT* c) const { assert(c != nullptr); RootNodeT::setChild(mIter, *c); }
+        void setChild(ChildNodeT* c) const { OPENVDB_ASSERT(c != nullptr); RootNodeT::setChild(mIter, *c); }
         void setValue(const ValueT& v) const
         {
             if (isTile(mIter)) getTile(mIter).value = v;
@@ -405,12 +406,10 @@ public:
     /// Return the bounding box of this RootNode, i.e., an infinite bounding box.
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the transient data value.
     Index32 transientData() const { return mTransientData; }
     /// Set the transient data value.
     void setTransientData(Index32 transientData) { mTransientData = transientData; }
-#endif
 
     /// @brief Change inactive tiles or voxels with a value equal to +/- the
     /// old background to the specified value (with the same sign). Active values
@@ -967,10 +966,8 @@ private:
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     Coord mOrigin;
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Transient Data (not serialized)
     Index32 mTransientData = 0;
-#endif
 }; // end of RootNode class
 
 
@@ -1064,9 +1061,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     , mOrigin(other.mOrigin)
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
-#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1098,9 +1093,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     , mOrigin(other.mOrigin)
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
-#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1171,9 +1164,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         }
         self.mOrigin = other.mOrigin;
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         self.mTransientData = other.mTransientData;
-#endif
 
         self.clear();
         self.initTable();
@@ -1206,9 +1197,7 @@ RootNode<ChildT>::operator=(const RootNode& other)
             OPENVDB_THROW(ValueError, "RootNode::operator=: non-zero offsets are currently not supported");
         }
 #endif
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
-#endif
 
         this->clear();
         this->initTable();
@@ -1689,7 +1678,7 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
 {
-    assert(vec.size() > LEVEL);
+    OPENVDB_ASSERT(vec.size() > LEVEL);
     Index32 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {

@@ -14,6 +14,7 @@
 #include "Math.h"
 #include "Vec3.h"
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 #include <iostream> // for std::ostream
 #include <limits> // for std::numeric_limits<Type>::max()
 
@@ -50,7 +51,7 @@ public:
 
     inline void init(const RayT& ray, RealT startTime, RealT maxTime)
     {
-        assert(startTime <= maxTime);
+        OPENVDB_ASSERT(startTime <= maxTime);
         static const int DIM = 1 << Log2Dim;
         mT0 = startTime;
         mT1 = maxTime;

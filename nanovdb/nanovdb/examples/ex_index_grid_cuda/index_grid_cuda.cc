@@ -1,35 +1,37 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/IndexGridBuilder.h>// nanovdb::IndexGridBuilder
+#include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/Primitives.h>      // for nanovdb::createLevelSetSphere
-#include <nanovdb/util/CudaDeviceBuffer.h>// for nanovdb::CudaDeviceBuffer
+#include <nanovdb/util/cuda/CudaDeviceBuffer.h>// for nanovdb::CudaDeviceBuffer
 
-extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueIndex>*,// device grid
-                               const nanovdb::NanoGrid<nanovdb::ValueIndex>*,// host grid
+extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// device grid
+                               const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// host grid
                                cudaStream_t stream);
 
 /// @brief This examples depends on  NanoVDB and CUDA.
-int main()
+int main(int, char**)
 {
+    using SrcGridT  = nanovdb::FloatGrid;
+    using DstBuildT = nanovdb::ValueOnIndex;
+    using BufferT   = nanovdb::CudaDeviceBuffer;
     try {
         // Create an NanoVDB grid of a sphere at the origin with radius 100 and voxel size 1.
         auto srcHandle = nanovdb::createLevelSetSphere<float>();
         auto *srcGrid = srcHandle.grid<float>();
 
         // Converts the FloatGrid to an IndexGrid using CUDA for memory management.
-        nanovdb::IndexGridBuilder<float> builder(*srcGrid, /*only active values*/true);
-        auto idxHandle = builder.getHandle<nanovdb::CudaDeviceBuffer>("IndexGrid_test", /*number of channels*/1u);
+        auto idxHandle = nanovdb::createNanoGrid<SrcGridT, DstBuildT, BufferT>(*srcGrid, 1u, false , false);// 1 channel, no tiles or stats
 
         cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
         cudaStreamCreate(&stream);
 
         idxHandle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
-        auto* cpuGrid = idxHandle.grid<nanovdb::ValueIndex>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
-        auto* gpuGrid = idxHandle.deviceGrid<nanovdb::ValueIndex>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
+        auto* cpuGrid = idxHandle.grid<DstBuildT>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
+        auto* gpuGrid = idxHandle.deviceGrid<DstBuildT>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
 
-        if (!gpuGrid || !cpuGrid)
-            throw std::runtime_error("GridHandle did not contain a grid with value type float");
+        if (!gpuGrid) throw std::runtime_error("GridHandle did not contain a device grid with value type float");
+        if (!cpuGrid) throw std::runtime_error("GridHandle did not contain a host grid with value type float");
 
         launch_kernels(cpuGrid, cpuGrid, stream); // Call a host method to print a grid value on both the CPU and GPU
 

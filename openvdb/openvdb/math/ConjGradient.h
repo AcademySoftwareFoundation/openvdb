@@ -12,12 +12,12 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <algorithm> // for std::lower_bound()
-#include <cassert>
 #include <cmath> // for std::isfinite()
 #include <limits>
 #include <sstream>
@@ -663,7 +663,7 @@ template<typename T>
 inline T
 Vector<T>::dot(const Vector<T>& other) const
 {
-    assert(this->size() == other.size());
+    OPENVDB_ASSERT(this->size() == other.size());
 
     const T* aData = this->data();
     const T* bData = other.data();
@@ -874,7 +874,7 @@ inline void
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::setValue(SizeType row, SizeType col,
     const ValueType& val)
 {
-    assert(row < mNumRows);
+    OPENVDB_ASSERT(row < mNumRows);
     this->getRowEditor(row).setValue(col, val);
 }
 
@@ -883,7 +883,7 @@ template<typename ValueType, SizeType STENCIL_SIZE>
 inline const ValueType&
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::getValue(SizeType row, SizeType col) const
 {
-    assert(row < mNumRows);
+    OPENVDB_ASSERT(row < mNumRows);
     return this->getConstRow(row).getValue(col);
 }
 
@@ -1064,7 +1064,7 @@ template<typename ValueType, SizeType STENCIL_SIZE>
 inline typename SparseStencilMatrix<ValueType, STENCIL_SIZE>::RowEditor
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::getRowEditor(SizeType i)
 {
-    assert(i < mNumRows);
+    OPENVDB_ASSERT(i < mNumRows);
     const SizeType head = i * STENCIL_SIZE;
     return RowEditor(&mValueArray[head], &mColumnIdxArray[head], mRowSizeArray[i], mNumRows);
 }
@@ -1074,7 +1074,7 @@ template<typename ValueType, SizeType STENCIL_SIZE>
 inline typename SparseStencilMatrix<ValueType, STENCIL_SIZE>::ConstRow
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::getConstRow(SizeType i) const
 {
-    assert(i < mNumRows);
+    OPENVDB_ASSERT(i < mNumRows);
     const SizeType head = i * STENCIL_SIZE; // index for this row into main storage
     return ConstRow(&mValueArray[head], &mColumnIdxArray[head], mRowSizeArray[i]);
 }
@@ -1221,7 +1221,7 @@ inline SizeType
 SparseStencilMatrix<ValueType, STENCIL_SIZE>::RowEditor::setValue(
     SizeType column, const ValueType& value)
 {
-    assert(column < mNumColumns);
+    OPENVDB_ASSERT(column < mNumColumns);
 
     RowData& data = RowBase<>::mData;
 
@@ -1236,7 +1236,7 @@ SparseStencilMatrix<ValueType, STENCIL_SIZE>::RowEditor::setValue(
     }
 
     // Check that it is safe to add a new column.
-    assert(data.mSize < this->capacity());
+    OPENVDB_ASSERT(data.mSize < this->capacity());
 
     if (offset >= data.mSize) {
         // The new column's index is larger than any existing index.  Append the new column.
@@ -1297,8 +1297,8 @@ public:
     {
         const SizeType size = mDiag.size();
 
-        assert(r.size() == z.size());
-        assert(r.size() == size);
+        OPENVDB_ASSERT(r.size() == z.size());
+        OPENVDB_ASSERT(r.size() == size);
 
         tbb::parallel_for(SizeRange(0, size), ApplyOp(mDiag.data(), r.data(), z.data()));
     }
@@ -1314,7 +1314,7 @@ private:
         void operator()(const SizeRange& range) const {
             for (SizeType n = range.begin(), N = range.end(); n < N; ++n) {
                 const ValueType val = mat->getValue(n, n);
-                assert(!isApproxZero(val, ValueType(0.0001)));
+                OPENVDB_ASSERT(!isApproxZero(val, ValueType(0.0001)));
                 vec[n] = static_cast<ValueType>(1.0 / val);
             }
         }
@@ -1466,8 +1466,8 @@ public:
 
         if (size == 0) return;
 
-        assert(rVec.size() == size);
-        assert(zVec.size() == size);
+        OPENVDB_ASSERT(rVec.size() == size);
+        OPENVDB_ASSERT(zVec.size() == size);
 
         // Allocate a temp vector
         mTempVec.fill(zeroVal<ValueType>());
@@ -1567,8 +1567,8 @@ template<typename T>
 inline void
 axpy(const T& a, const Vector<T>& xVec, const Vector<T>& yVec, Vector<T>& result)
 {
-    assert(xVec.size() == yVec.size());
-    assert(xVec.size() == result.size());
+    OPENVDB_ASSERT(xVec.size() == yVec.size());
+    OPENVDB_ASSERT(xVec.size() == result.size());
     axpy(a, xVec.data(), yVec.data(), result.data(), xVec.size());
 }
 
@@ -1590,9 +1590,9 @@ template<typename MatrixOperator, typename T>
 inline void
 computeResidual(const MatrixOperator& A, const Vector<T>& x, const Vector<T>& b, Vector<T>& r)
 {
-    assert(x.size() == b.size());
-    assert(x.size() == r.size());
-    assert(x.size() == A.numRows());
+    OPENVDB_ASSERT(x.size() == b.size());
+    OPENVDB_ASSERT(x.size() == r.size());
+    OPENVDB_ASSERT(x.size() == A.numRows());
 
     computeResidual(A, x.data(), b.data(), r.data());
 }
@@ -1664,7 +1664,7 @@ solve(
 
     internal::computeResidual(Amat, xVec, bVec, rVec);
 
-    assert(rVec.isFinite());
+    OPENVDB_ASSERT(rVec.isFinite());
 
     // Normalize the residual norm with the source norm and look for early out.
     result.absoluteError = static_cast<double>(rVec.infNorm());
@@ -1699,7 +1699,7 @@ solve(
 
         // <r,z>
         const ValueType rDotZ = rVec.dot(zVec);
-        assert(std::isfinite(rDotZ));
+        OPENVDB_ASSERT(std::isfinite(rDotZ));
 
         if (0 == iteration) {
             // Initialize
@@ -1715,7 +1715,7 @@ solve(
 
         // alpha = <r_{k-1}, z_{k-1}> / <p_{k},q_{k}>
         const ValueType pAp = pVec.dot(qVec);
-        assert(std::isfinite(pAp));
+        OPENVDB_ASSERT(std::isfinite(pAp));
 
         const ValueType alpha = rDotZ / pAp;
         rDotZPrev = rDotZ;

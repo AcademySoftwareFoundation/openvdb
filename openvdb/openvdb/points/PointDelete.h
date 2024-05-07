@@ -17,6 +17,7 @@
 
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/Assert.h>
 
 #include <memory>
 #include <string>

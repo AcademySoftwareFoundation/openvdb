@@ -5,6 +5,7 @@
 /// @author FX R&D OpenVDB team
 
 #include "OpenVDBPlugin.h"
+#include <openvdb/math/Math.h>
 #include <openvdb_maya/OpenVDBData.h>
 #include <openvdb_maya/OpenVDBUtil.h>
 
@@ -14,8 +15,6 @@
 #include <maya/MGlobal.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFloatVector.h>
-
-#include <boost/math/constants/constants.hpp> // boost::math::constants::pi
 
 
 namespace mvdb = openvdb_maya;
@@ -216,7 +215,7 @@ MStatus OpenVDBTransformNode::compute(const MPlug& plug, MDataBlock& data)
 
             mat.preTranslate(openvdb::Vec3R(p[0], p[1], p[2]));
 
-            const double deg2rad = boost::math::constants::pi<double>() / 180.0;
+            const double deg2rad = openvdb::math::pi<double>() / 180.0;
             mat.preRotate(openvdb::math::X_AXIS, deg2rad*r[0]);
             mat.preRotate(openvdb::math::Y_AXIS, deg2rad*r[1]);
             mat.preRotate(openvdb::math::Z_AXIS, deg2rad*r[2]);

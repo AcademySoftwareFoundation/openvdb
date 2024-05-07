@@ -1,3 +1,0 @@
-OpenVDB
- - API Changes
-    - PagedArray iterators no longer derives from std::iterator (but remains standard compliant)

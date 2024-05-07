@@ -17,22 +17,11 @@ if(USE_PNG)
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(Imath CONFIG)
-  if (NOT TARGET Imath::Imath)
-    if(USE_EXR)
-      find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
-    else()
-      find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-    endif()
-  endif()
+  find_package(Imath CONFIG REQUIRED)
 endif()
 
 if(USE_EXR)
-  if (NOT TARGET Imath::Imath)
-    find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
-  else()
-    find_package(OpenEXR CONFIG REQUIRED)
-  endif()
+  find_package(OpenEXR CONFIG REQUIRED)
 endif()
 
 set(SOURCE_FILES main.cc)
@@ -58,27 +47,8 @@ target_link_libraries(vdb_render
   $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXRUtil>
   $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmThread>
   $<TARGET_NAME_IF_EXISTS:OpenEXR::Iex>
-  # For IlmBase/OpenEXR v2.X
-  $<TARGET_NAME_IF_EXISTS:IlmBase::Half>
-  $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImf>
-  $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImfUtil>
-  $<TARGET_NAME_IF_EXISTS:IlmBase::IlmThread>
-  $<TARGET_NAME_IF_EXISTS:IlmBase::Iex>
-  $<TARGET_NAME_IF_EXISTS:IlmBase::Imath>
   ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   $<TARGET_NAME_IF_EXISTS:PNG::PNG>
 )
-
-if(WIN32)
-  # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-  if (TARGET Imath::Imath)
-    get_target_property(ILMBASE_LIB_TYPE Imath::Imath TYPE)
-  else()
-    get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-  endif()
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    target_compile_definitions(vdb_render PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
-  endif()
-endif()
 
 install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -83,11 +83,12 @@ endfunction()
 
 # -----------------------------------------------------------------------
 
-if(NANOVDB_BUILD_BENCHMARK)
-  add_subdirectory(benchmark)
-endif()
+#if(NANOVDB_BUILD_BENCHMARK)
+#  add_subdirectory(benchmark)
+#endif()
 
 nanovdb_example(NAME "ex_make_custom_nanovdb")
+nanovdb_example(NAME "ex_make_custom_nanovdb_cuda")
 nanovdb_example(NAME "ex_make_funny_nanovdb")
 nanovdb_example(NAME "ex_make_typed_grids")
 nanovdb_example(NAME "ex_make_nanovdb_sphere")
@@ -100,6 +101,7 @@ nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor")
 nanovdb_example(NAME "ex_read_nanovdb_sphere_accessor_cuda")
 nanovdb_example(NAME "ex_index_grid_cuda")
 nanovdb_example(NAME "ex_nodemanager_cuda")
+nanovdb_example(NAME "ex_voxels_to_grid_cuda")
 nanovdb_example(NAME "ex_modify_nanovdb_thrust")
 nanovdb_example(NAME "ex_map_pool_buffer")
 nanovdb_example(NAME "ex_bump_pool_buffer")

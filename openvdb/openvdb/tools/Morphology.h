@@ -26,6 +26,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -299,7 +300,7 @@ public:
                 case NN_FACE_EDGE_VERTEX : { this->dilate26(mask); return; }
                 case NN_FACE             : { this->dilate6(mask);  return; }
                 default                  : {
-                    assert(false && "Unknown op during dilation."); return;
+                    OPENVDB_ASSERT(false && "Unknown op during dilation."); return;
                 }
             }
         }
@@ -345,7 +346,7 @@ public:
                 case NN_FACE_EDGE_VERTEX : { this->erode26(mask); return; }
                 case NN_FACE             : { this->erode6(mask);  return; }
                 default                  : {
-                    assert(false && "Unknown op during erosion."); return;
+                    OPENVDB_ASSERT(false && "Unknown op during erosion."); return;
                 }
             }
         }
@@ -378,30 +379,30 @@ public:
 
         inline void scatter(size_t n, int indx)
         {
-            assert(n < mNeighbors.size());
-            assert(mNeighbors[n]);
+            OPENVDB_ASSERT(n < mNeighbors.size());
+            OPENVDB_ASSERT(mNeighbors[n]);
             mNeighbors[n]->template getWord<Word>(indx) |= mWord;
 
         }
         template<int DX, int DY, int DZ>
         inline void scatter(size_t n, int indx)
         {
-            assert(n < mNeighbors.size());
+            OPENVDB_ASSERT(n < mNeighbors.size());
             if (!mNeighbors[n]) {
                 mNeighbors[n] = this->getNeighbor<DX,DY,DZ,true>();
             }
-            assert(mNeighbors[n]);
+            OPENVDB_ASSERT(mNeighbors[n]);
             this->scatter(n, indx - (DIM - 1)*(DY + DX*DIM));
         }
         inline Word gather(size_t n, int indx)
         {
-            assert(n < mNeighbors.size());
+            OPENVDB_ASSERT(n < mNeighbors.size());
             return mNeighbors[n]->template getWord<Word>(indx);
         }
         template<int DX, int DY, int DZ>
         inline Word gather(size_t n, int indx)
         {
-            assert(n < mNeighbors.size());
+            OPENVDB_ASSERT(n < mNeighbors.size());
             if (!mNeighbors[n]) {
                 mNeighbors[n] = this->getNeighbor<DX,DY,DZ,false>();
             }
@@ -502,7 +503,7 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
                 // original tree (it was previous possible when dilateVoxels()
                 // called topologyUnion without the preservation of active
                 // tiles)
-                assert(!nodemask.isOn());
+                OPENVDB_ASSERT(!nodemask.isOn());
             }
         };
 
@@ -527,7 +528,7 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         auto subtractTopology = [&](const size_t idx) {
             auto& leaf = mManager.leaf(idx);
             const auto* maskleaf = mask.probeConstLeaf(leaf.origin());
-            assert(maskleaf);
+            OPENVDB_ASSERT(maskleaf);
             leaf.getValueMask() -= maskleaf->getValueMask();
         };
 
@@ -1093,7 +1094,7 @@ void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
             morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/true);
         }
         else {
-            assert(mode == EXPAND_TILES);
+            OPENVDB_ASSERT(mode == EXPAND_TILES);
             morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
         }
         return;
@@ -1108,7 +1109,7 @@ void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
     // Note that we also always use a mask if the tile policy is PRESERVE_TILES
     // due to the way the underlying dilation only works on voxels.
     // @todo Investigate tile based dilation
-    assert(mode == PRESERVE_TILES);
+    OPENVDB_ASSERT(mode == PRESERVE_TILES);
 
     MaskT topology;
     topology.topologyUnion(tree);

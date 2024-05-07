@@ -531,7 +531,7 @@ SOP_OpenVDB_Fracture::Cache::process(
                 residuals.push_back(residual);
 
             } else {
-                badTypeList.push_back(residual->getName());
+                badTypeList.push_back((*it)->getName());
                 continue;
             }
 

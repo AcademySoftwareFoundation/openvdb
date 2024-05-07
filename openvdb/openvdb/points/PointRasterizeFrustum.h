@@ -13,6 +13,7 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tools/GridTransformer.h> // for tools::resampleToMatch()
 #include <openvdb/tools/Interpolation.h>

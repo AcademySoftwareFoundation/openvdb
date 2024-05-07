@@ -10,6 +10,7 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 #include <boost/numeric/conversion/conversion_traits.hpp>
 #include <algorithm> // for std::max()
 #include <cassert>
@@ -260,7 +261,7 @@ template<typename Type>
 inline Type
 Clamp(Type x, Type min, Type max)
 {
-    assert( !(min>max) );
+    OPENVDB_ASSERT( !(min>max) );
     return x > min ? x < max ? x : max : min;
 }
 
@@ -295,7 +296,7 @@ template<typename Type>
 inline Type
 SmoothUnitStep(Type x, Type min, Type max)
 {
-    assert(min < max);
+    OPENVDB_ASSERT(min < max);
     return SmoothUnitStep((x-min)/(max-min));
 }
 
@@ -574,14 +575,14 @@ Pow(Type x, int n)
 inline float
 Pow(float b, float e)
 {
-    assert( b >= 0.0f && "Pow(float,float): base is negative" );
+    OPENVDB_ASSERT( b >= 0.0f && "Pow(float,float): base is negative" );
     return powf(b,e);
 }
 
 inline double
 Pow(double b, double e)
 {
-    assert( b >= 0.0 && "Pow(double,double): base is negative" );
+    OPENVDB_ASSERT( b >= 0.0 && "Pow(double,double): base is negative" );
     return std::pow(b,e);
 }
 //@}
@@ -893,7 +894,7 @@ template<typename Type>
 inline Type
 Inv(Type x)
 {
-    assert(x);
+    OPENVDB_ASSERT(x);
     return Type(1)/x;
 }
 

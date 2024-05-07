@@ -14,8 +14,8 @@
 
 #include <openvdb/version.h>
 #include <openvdb_ax/Exceptions.h>
+#include <openvdb/util/Assert.h>
 
-#include <cassert>
 #include <cstring>
 #include <functional>
 #include <limits>
@@ -153,7 +153,7 @@ inline void usage(std::ostream& os,
         oswrap(os, doc, doclen, maxWidth, [&](size_t) { return indent; });
     }
     else {
-        assert(whitespace >= argGap);
+        OPENVDB_ASSERT(whitespace >= argGap);
         // space between name and docs
         for (int32_t i = 0; i < whitespace; ++i) os << ' ';
 
@@ -167,7 +167,7 @@ inline void usage(std::ostream& os,
             // skip space break (if found)
             if (*doc == ' ') { ++doc; --doclen; }
             os << '\n';
-            assert(doclen >= remain);
+            OPENVDB_ASSERT(doclen >= remain);
             doclen -= remain;
             oswrap(os, doc, doclen, maxWidth, [&](size_t) { return indent; });
         }
@@ -239,13 +239,13 @@ struct Param : public BasicParam<T>, ParamBase
     inline bool isInit() const override { return mInit; }
     inline void init(const char* arg, const uint32_t idx = 0) override
     {
-        assert((!arg && mCb1) || (arg && mCb2) || (arg && mCb3));
+        OPENVDB_ASSERT((!arg && mCb1) || (arg && mCb2) || (arg && mCb3));
         if (!arg) mCb1(BasicParam<T>::mValue);
         else if (mCb3 && this->acceptsIndex()) {
             mCb3(BasicParam<T>::mValue, arg, idx);
         }
         else {
-            assert(mCb2);
+            OPENVDB_ASSERT(mCb2);
             mCb2(BasicParam<T>::mValue, arg);
         }
         mInit = true;
@@ -329,8 +329,8 @@ struct ParamBuilder
         mParam.ParamBase::mOpts.clear();
     }
     ParamBuilder& addOpt(const char* opt) {
-        assert(opt);
-        assert(opt[0] == '-' || std::strchr(opt, ' ') == nullptr);
+        OPENVDB_ASSERT(opt);
+        OPENVDB_ASSERT(opt[0] == '-' || std::strchr(opt, ' ') == nullptr);
         mParam.ParamBase::mOpts.emplace_back(opt);
         return *this;
     }
@@ -340,7 +340,7 @@ struct ParamBuilder
     ParamBuilder& setCB(const typename ParamT::CB2 cb) { mParam.mCb2 = cb; return *this; }
     ParamBuilder& setCB(const typename ParamT::CB3 cb) { mParam.mCb3 = cb; return *this; }
     ParamT&& get() {
-        assert(!mParam.ParamBase::mOpts.empty());
+        OPENVDB_ASSERT(!mParam.ParamBase::mOpts.empty());
         if (!(mParam.mCb1 || mParam.mCb2 || mParam.mCb3)) {
             this->setCB(DefaultCallback<T>::get());
         }

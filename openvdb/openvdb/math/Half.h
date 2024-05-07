@@ -200,6 +200,15 @@ namespace OPENVDB_VERSION_NAME {
 namespace math {
 namespace internal {
 
+// Use of lookup table is explicitly suppressed and the generation of
+// a lookup table is suppressed.  This is required because we namespace
+// our type, but the lookup table is extern "C" and lacks a namespace.
+// Thus any attempt to link two versions of OpenVDB with different
+// namespaces will clash due to redefinition with a new type.
+// The default was not to use a lookup table.
+#undef  IMATH_HALF_USE_LOOKUP_TABLE
+#define IMATH_HALF_NO_LOOKUP_TABLE
+
 //-------------------------------------------------------------------------
 // Limits
 //
@@ -333,8 +342,14 @@ imath_half_to_float (imath_half_bits_t h)
         // other compilers may provide count-leading-zeros primitives,
         // but we need the community to inform us of the variants
         uint32_t lc;
-#    if defined(_MSC_VER) && (_M_IX86 || _M_X64)
-        lc = __lzcnt (hexpmant);
+#    if defined(_MSC_VER)
+        // The direct intrinsic for this is __lznct, but that is not supported
+        // on older x86_64 hardware or ARM. Instead uses the bsr instruction
+        // and one additional subtraction. This assumes hexpmant != 0, for 0
+        // bsr and lznct would behave differently.
+        unsigned long bsr;
+        _BitScanReverse (&bsr, hexpmant);
+        lc = (31 - bsr);
 #    elif defined(__GNUC__) || defined(__clang__)
         lc = (uint32_t) __builtin_clz (hexpmant);
 #    else

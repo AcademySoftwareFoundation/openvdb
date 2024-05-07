@@ -11,7 +11,7 @@
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/PointUtils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb_houdini/GEO_PrimVDB.h>
+#include <GEO/GEO_PrimVDB.h>
 
 #include <openvdb/points/PointDataGrid.h> // points::PointDataGrid
 #include <openvdb/tools/GridTransformer.h> // tools::replaceToMatch()
@@ -391,12 +391,7 @@ struct MergeOp
 
         auto hasUniqueTree = [&](GU_PrimVDB* vdbPrim)
         {
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
             return vdbPrim->getConstGridPtr()->isTreeUnique();
-#else
-            const TreeBase::ConstPtr treeBaseConstPtr = vdbPrim->getConstGridPtr()->constBaseTreePtr();
-            return treeBaseConstPtr.use_count() <= 2;
-#endif
         };
 
         auto stealTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)
@@ -480,12 +475,7 @@ struct MergeOp
 
         auto hasUniqueTree = [&](GU_PrimVDB* vdbPrim)
         {
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
             return vdbPrim->getConstGridPtr()->isTreeUnique();
-#else
-            const TreeBase::ConstPtr treeBaseConstPtr = vdbPrim->getConstGridPtr()->constBaseTreePtr();
-            return treeBaseConstPtr.use_count() <= 2;
-#endif
         };
 
         auto stealTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)

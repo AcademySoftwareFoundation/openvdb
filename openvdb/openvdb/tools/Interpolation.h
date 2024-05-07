@@ -46,6 +46,7 @@
 #include <openvdb/math/Transform.h> // for Transform
 #include <openvdb/Grid.h>
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/util/Assert.h>
 #include <cmath>
 #include <type_traits>
 
@@ -557,7 +558,7 @@ public:
         , mInvNorm(1/(max-min))
         , mInvert(invert)
     {
-        assert(min < max);
+        OPENVDB_ASSERT(min < max);
     }
 
     inline bool operator()(const Coord& xyz, FloatT& a, FloatT& b) const

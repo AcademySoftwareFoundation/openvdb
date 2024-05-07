@@ -4,6 +4,7 @@
 #include "Compression.h"
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/util/logging.h>
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>
@@ -101,7 +102,7 @@ zipToStream(std::ostream& os, const char* data, size_t numBytes)
     } else {
         // Write the size of the uncompressed data.
         // numBytes expected to be <= the max value + 1 of a signed int64
-        assert(numBytes < size_t(std::numeric_limits<Int64>::max()));
+        OPENVDB_ASSERT(numBytes < size_t(std::numeric_limits<Int64>::max()));
         Int64 negBytes = -Int64(numBytes);
         os.write(reinterpret_cast<char*>(&negBytes), 8);
         // Write the uncompressed data.
@@ -123,19 +124,22 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
 {
     // Read the size of the compressed data.
     // A negative size indicates uncompressed data.
-    Int64 numZippedBytes;
+    Int64 numZippedBytes{0};
     is.read(reinterpret_cast<char*>(&numZippedBytes), 8);
+    if (!is.good())
+        OPENVDB_THROW(RuntimeError, "Stream failure reading the size of a zip chunk");
 
     if (numZippedBytes <= 0) {
+        // Check for an error
+        if (size_t(-numZippedBytes) != numBytes) {
+            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
+                << "-byte chunk, got a " << -numZippedBytes << "-byte chunk");
+        }
         // Read the uncompressed data.
         if (data == nullptr) {
             is.seekg(-numZippedBytes, std::ios_base::cur);
         } else {
             is.read(data, -numZippedBytes);
-        }
-        if (size_t(-numZippedBytes) != numBytes) {
-            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
-                << "-byte chunk, got a " << -numZippedBytes << "-byte chunk");
         }
     } else {
         if (data == nullptr) {
@@ -227,7 +231,7 @@ bloscToStream(std::ostream& os, const char* data, size_t valSize, size_t numVals
 {
     const size_t inBytes = valSize * numVals;
     // inBytes expected to be <= the max value + 1 of a signed int64
-    assert(inBytes < size_t(std::numeric_limits<Int64>::max()));
+    OPENVDB_ASSERT(inBytes < size_t(std::numeric_limits<Int64>::max()));
 
     int outBytes = int(inBytes) + BLOSC_MAX_OVERHEAD;
     std::unique_ptr<char[]> compressedData(new char[outBytes]);
@@ -268,19 +272,23 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
 {
     // Read the size of the compressed data.
     // A negative size indicates uncompressed data.
-    Int64 numCompressedBytes;
+    Int64 numCompressedBytes{0};
     is.read(reinterpret_cast<char*>(&numCompressedBytes), 8);
 
+    if (!is.good())
+        OPENVDB_THROW(RuntimeError, "Stream failure reading the size of a blosc chunk");
+
     if (numCompressedBytes <= 0) {
+        // Check for an error
+        if (size_t(-numCompressedBytes) != numBytes) {
+            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
+                << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
+        }
         // Read the uncompressed data.
         if (data == nullptr) {
             is.seekg(-numCompressedBytes, std::ios_base::cur);
         } else {
             is.read(data, -numCompressedBytes);
-        }
-        if (size_t(-numCompressedBytes) != numBytes) {
-            OPENVDB_THROW(RuntimeError, "Expected to read a " << numBytes
-                << "-byte uncompressed chunk, got a " << -numCompressedBytes << "-byte chunk");
         }
     } else {
         if (data == nullptr) {

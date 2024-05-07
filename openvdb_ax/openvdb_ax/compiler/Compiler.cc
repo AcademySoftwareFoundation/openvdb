@@ -15,6 +15,7 @@
 #include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/Exceptions.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/ADT/Optional.h>
 #include <llvm/ADT/Triple.h>
@@ -113,6 +114,7 @@ initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
 
 #ifndef USE_NEW_PASS_MANAGER
 
+#if LLVM_VERSION_MAJOR < 15
 void addStandardLinkPasses(llvm::legacy::PassManagerBase& passes)
 {
     llvm::PassManagerBuilder builder;
@@ -120,6 +122,7 @@ void addStandardLinkPasses(llvm::legacy::PassManagerBase& passes)
     builder.Inliner = llvm::createFunctionInliningPass();
     builder.populateLTOPassManager(passes);
 }
+#endif
 
 /// This routine adds optimization passes based on selected optimization level
 ///
@@ -129,7 +132,6 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
                            const unsigned optLevel,
                            const unsigned sizeLevel,
                            const bool disableInline = false,
-                           const bool disableUnitAtATime = false,
                            const bool disableLoopUnrolling = false,
                            const bool disableLoopVectorization = false,
                            const bool disableSLPVectorization = false)
@@ -147,14 +149,6 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
     } else {
         builder.Inliner = llvm::createAlwaysInlinerLegacyPass();
     }
-
-#if LLVM_VERSION_MAJOR < 9
-    // Enable IPO. This corresponds to gcc's -funit-at-a-time
-    builder.DisableUnitAtATime = disableUnitAtATime;
-#else
-    // unused from llvm 9
-    (void)(disableUnitAtATime);
-#endif
 
     // Disable loop unrolling in all relevant passes
     builder.DisableUnrollLoops =
@@ -198,7 +192,9 @@ void LLVMoptimise(llvm::Module& module,
     else    functionPasses.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
 
 
+#if LLVM_VERSION_MAJOR < 15
     addStandardLinkPasses(passes);
+#endif
     addOptimizationPasses(passes, functionPasses, TM, optLevel, sizeLevel);
 
     functionPasses.doInitialization();
@@ -455,7 +451,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
             getMangledName(llvm::cast<llvm::GlobalValue>(&F), engine);
         const uint64_t address =
             engine.getAddressToGlobalIfAvailable(mangled);
-        assert(address != 0 && "Unbound function!");
+        OPENVDB_ASSERT(address != 0 && "Unbound function!");
     }
 #endif
 
@@ -529,7 +525,7 @@ registerAccesses(const codegen::SymbolTable& globals, const AttributeRegistry& r
         const size_t index = registry.accessIndex(name, typetoken);
 
         // should always be a GlobalVariable.
-        assert(llvm::isa<llvm::GlobalVariable>(global.second));
+        OPENVDB_ASSERT(llvm::isa<llvm::GlobalVariable>(global.second));
 
         // Assign the attribute index global a valid index.
         // @note executionEngine->addGlobalMapping() can also be used if the indices
@@ -538,7 +534,7 @@ registerAccesses(const codegen::SymbolTable& globals, const AttributeRegistry& r
 
         llvm::GlobalVariable* variable =
             llvm::cast<llvm::GlobalVariable>(global.second);
-        assert(variable->getValueType()->isIntegerTy(64));
+        OPENVDB_ASSERT(variable->getValueType()->isIntegerTy(64));
 
         variable->setInitializer(llvm::ConstantInt::get(variable->getValueType(), index));
         variable->setConstant(true); // is not written to at runtime
@@ -588,7 +584,7 @@ registerExternalGlobals(const codegen::SymbolTable& globals,
             case ast::tokens::UNKNOWN :
             default      : {
                 // grammar guarantees this is unreachable as long as all types are supported
-                assert(false && "Attribute type unsupported or not recognised");
+                OPENVDB_ASSERT(false && "Attribute type unsupported or not recognised");
                 return nullptr;
             }
         }
@@ -609,10 +605,10 @@ registerExternalGlobals(const codegen::SymbolTable& globals,
         if (!dataPtr) dataPtr.reset(new CustomData);
 
         // should always be a GlobalVariable.
-        assert(llvm::isa<llvm::GlobalVariable>(global.second));
+        OPENVDB_ASSERT(llvm::isa<llvm::GlobalVariable>(global.second));
 
         llvm::GlobalVariable* variable = llvm::cast<llvm::GlobalVariable>(global.second);
-        assert(variable->getValueType() == codegen::LLVMType<uintptr_t>::get(C));
+        OPENVDB_ASSERT(variable->getValueType() == codegen::LLVMType<uintptr_t>::get(C));
 
         llvm::Constant* initializer = initializerFromToken(typetoken, name, *dataPtr);
 
@@ -663,6 +659,11 @@ Compiler::Compiler(const CompilerOptions& options)
     , mFunctionRegistry()
 {
     mContext.reset(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    mContext->setOpaquePointers(false);
+#endif
     mFunctionRegistry = codegen::createDefaultRegistry(&options.mFunctionOptions);
 }
 
@@ -704,7 +705,7 @@ Compiler::compile(const ast::Tree& tree,
 
     // if there has been a compilation error through user error, exit
     if (!attributes) {
-        assert(logger.hasError());
+        OPENVDB_ASSERT(logger.hasError());
         return nullptr;
     }
 

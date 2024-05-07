@@ -34,7 +34,7 @@ This will define the following variables:
 
 ``Tbb_FOUND``
   True if the system has the Tbb library.
-``Tbb_VERSION``
+``Tbb_VERSION`` ``TBB_VERSION``
   The version of the Tbb library which was found.
 ``Tbb_INCLUDE_DIRS``
   Include directories needed to use Tbb.
@@ -220,7 +220,9 @@ if(EXISTS ${_tbb_version_file})
   unset(_tbb_version_minor_string)
   unset(_tbb_binary_version_string)
 
+  # Set both for compatibility reasons, TBB's CONFIG files only set the latter
   set(Tbb_VERSION ${Tbb_VERSION_MAJOR}.${Tbb_VERSION_MINOR})
+  set(TBB_VERSION ${Tbb_VERSION})
 endif()
 
 unset(_tbb_version_file)
@@ -459,7 +461,9 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
         IMPORTED_CONFIGURATIONS RELEASE)
       set_target_properties(TBB::${COMPONENT} PROPERTIES
         IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
-        IMPORTED_LOCATION_RELEASE "${Tbb_${COMPONENT}_LIBRARY_RELEASE}")
+        IMPORTED_LOCATION_RELEASE "${Tbb_${COMPONENT}_LIBRARY_RELEASE}"
+        MAP_IMPORTED_CONFIG_MINSIZEREL Release
+        MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release)
     endif()
 
     # Debug location

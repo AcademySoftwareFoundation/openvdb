@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
-#include <nanovdb/util/OpenToNanoVDB.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
+#include <nanovdb/util/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
 #include <nanovdb/util/IO.h>
 
 // Convert an openvdb level set sphere into a nanovdb, use accessors to print out multiple values from both
@@ -15,7 +15,7 @@ int main()
         auto srcGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(100.0f, openvdb::Vec3f(0.0f), 1.0f);
 
         // Convert the OpenVDB grid, srcGrid, into a NanoVDB grid handle.
-        auto handle = nanovdb::openToNanoVDB(*srcGrid);
+        auto handle = nanovdb::createNanoGrid(*srcGrid);
 
         // Define a (raw) pointer to the NanoVDB grid on the host. Note we match the value type of the srcGrid!
         auto* dstGrid = handle.grid<float>();

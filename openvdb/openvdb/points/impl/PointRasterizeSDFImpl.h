@@ -74,7 +74,7 @@ struct VaryingRadius
     /// @brief  Compute a fixed radius for a specific point
     inline const FixedRadius<ValueT> eval(const Index id) const
     {
-        assert(mRHandle);
+        OPENVDB_ASSERT(mRHandle);
         return FixedRadius<ValueT>(mRHandle->get(id) * mScale);
     }
 
@@ -163,7 +163,7 @@ protected:
         , mDx(surface.voxelSize()[0])
         , mIds(ids)
         , mPLeafMask(0) {
-            assert(cpg && ids);
+            OPENVDB_ASSERT(cpg && ids);
         }
 
     /// @brief Constructor to use when a closet point grid is in use
@@ -487,7 +487,7 @@ struct AveragePositionTransfer :
                     // k(s) = max(0,(1−s^2)^3). note that the max is unecessary
                     // as we early terminate above with x2y2z2 >= mMaxSearchSqIS
                     x2y2z2 = math::Pow3(1.0 - x2y2z2);
-                    assert(x2y2z2 >= 0.0);
+                    OPENVDB_ASSERT(x2y2z2 >= 0.0);
                     // @todo The surface buffer may not be at RealT precision. Should we
                     //  enforce this by storing the weights in another vector?
                     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
@@ -886,11 +886,11 @@ transferAttributes(const tree::LeafManager<const PointDataTreeT>& manager,
                    const Int64Tree& cpg,
                    const math::Transform::Ptr transform)
 {
-    assert(manager.leafCount() != 0);
+    OPENVDB_ASSERT(manager.leafCount() != 0);
     // masking uses upper 32 bits for leaf node id
     // @note we can use a point list impl to support larger counts
     // if necessary but this is far faster
-    assert(manager.leafCount() <
+    OPENVDB_ASSERT(manager.leafCount() <
         size_t(std::numeric_limits<Index>::max()));
 
     // linearise cpg to avoid having to probe data

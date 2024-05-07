@@ -7,6 +7,7 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/points/PointRasterizeTrilinear.h>
+#include <openvdb/util/Assert.h>
 
 #include <gtest/gtest.h>
 
@@ -244,7 +245,7 @@ TEST_F(TestPointRasterize, tetsSingleTreeRasterize)
                 for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
                     const Index j = ((c.y() & (DIM-1u)) << LOG2DIM);
                     for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        assert(bounds.isInside(c));
+                        OPENVDB_ASSERT(bounds.isInside(c));
                         const Index offset = i + j + /*k*/(c.z() & (DIM-1u));
                         if (!mask.isOn(offset)) continue;
                         data[offset] += 1;
@@ -340,7 +341,7 @@ TEST_F(TestPointRasterize, testMultiTreeRasterize)
                 for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
                     const Index j = ((c.y() & (DIM-1u)) << LOG2DIM);
                     for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                        assert(bounds.isInside(c));
+                        OPENVDB_ASSERT(bounds.isInside(c));
                         const Index offset = i + j + /*k*/(c.z() & (DIM-1u));
                         if (!mask.isOn(offset)) continue;
                         data1[offset] += static_cast<int>(vec.length());

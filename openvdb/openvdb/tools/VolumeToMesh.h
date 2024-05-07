@@ -14,6 +14,7 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
+#include <openvdb/util/Assert.h>
 #include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>
@@ -575,8 +576,8 @@ packPoint(const Vec3d& v)
     uint32_t data = 0;
 
     // values are expected to be in the [0.0 to 1.0] range.
-    assert(!(v.x() > 1.0) && !(v.y() > 1.0) && !(v.z() > 1.0));
-    assert(!(v.x() < 0.0) && !(v.y() < 0.0) && !(v.z() < 0.0));
+    OPENVDB_ASSERT(!(v.x() > 1.0) && !(v.y() > 1.0) && !(v.z() > 1.0));
+    OPENVDB_ASSERT(!(v.x() < 0.0) && !(v.y() < 0.0) && !(v.z() < 0.0));
 
     data |= (uint32_t(v.x() * 1023.0) & MASK_FIRST_10_BITS) << 20;
     data |= (uint32_t(v.y() * 1023.0) & MASK_FIRST_10_BITS) << 10;
@@ -1318,7 +1319,7 @@ computeWeightedPoint(const Vec3d& p,
         samples.push_back(avg);
     }
 
-    assert(!samples.empty());
+    OPENVDB_ASSERT(!samples.empty());
     if (samples.size() == 1) {
         return samples.front();
     }
@@ -1367,7 +1368,7 @@ computeCellPoints(std::array<Vec3d, 4>& points,
 {
     size_t offset = 0;
     for (size_t n = 1, N = sEdgeGroupTable[signs][0] + 1; n < N; ++n, ++offset) {
-        assert(offset < 4);
+        OPENVDB_ASSERT(offset < 4);
         points[offset] = computePoint(values, signs, uint8_t(n), iso);
     }
     return offset;
@@ -1409,7 +1410,7 @@ computeCellPoints(std::array<Vec3d, 4>& points,
     size_t offset = 0;
     for (size_t n = 1, N = sEdgeGroupTable[lhsSigns][0] + 1; n < N; ++n, ++offset)
     {
-        assert(offset < 4);
+        OPENVDB_ASSERT(offset < 4);
         const int id = matchEdgeGroup(uint8_t(n), lhsSigns, rhsSigns);
 
         if (id != -1) {

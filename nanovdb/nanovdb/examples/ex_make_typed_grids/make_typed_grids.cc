@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/IO.h>
 
 // Helper struct to create a default value for the type.
@@ -36,11 +37,9 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
 
     try {
 
-        nanovdb::GridBuilder<ValueT> builder(bgValue);
-        auto                         acc = builder.getAccessor();
-
+        nanovdb::build::Grid<ValueT> grid(bgValue, typeNameStr);
+        auto acc = grid.getAccessor();
         const int radius = 16;
-
         for (int z = -radius; z <= radius; ++z) {
             for (int y = -radius; y <= radius; ++y) {
                 for (int x = -radius; x <= radius; ++x) {
@@ -50,8 +49,7 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
                 }
             }
         }
-
-        gridHandles.push_back(builder.template getHandle<>(1.0, nanovdb::Vec3d(0), typeNameStr));
+        gridHandles.push_back(nanovdb::createNanoGrid(grid));
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
@@ -83,8 +81,11 @@ int main()
                                  */
 
         buildGridForType(gridHandles, float(0), double(0), int16_t(0), int32_t(0), int64_t(0), uint32_t(0), nanovdb::Vec3f(0) /*, nanovdb::Vec3d(0)*/ /*, bool(false)*/ /*, uint16_t(0)*/);
-
-        nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/custom_types.nvdb", gridHandles);
+#if 0
+        nanovdb::io::writeGrids("data/custom_types.nvdb", gridHandles);
+#else
+        nanovdb::io::writeUncompressedGrids("data/custom_types.nvdb", gridHandles);
+#endif
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

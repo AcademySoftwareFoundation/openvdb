@@ -113,9 +113,9 @@ else()
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
-if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 16.0.0)
   # https://llvm.org/docs/OpaquePointers.html
-  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to \
+  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 16 due to \
     opaque pointer changes in LLVM. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
 endif()
 
@@ -267,18 +267,6 @@ if(NOT LLVM_ENABLE_RTTI)
     "$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-sanitize=vptr>")
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  # TBB can't determine libstdc++ version if Clang is in use. This causes issues
-  # with any TBB container using features from C++11 and greater (such as
-  # tbb::concurrent_vector::emplace_back, used in the VolumeExecutable)
-  # https://github.com/01org/tbb/issues/22
-  # https://www.threadingbuildingblocks.org/docs/help/reference/appendices/known_issues/linux_os.html
-  # https://www.threadingbuildingblocks.org/docs/help/reference/environment/feature_macros.html
-  string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-  list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-    -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
-endif()
-
 if(WIN32)
   # Silence deprecation warnings coming from MSVC/LLVM about deriving from std::iterator
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
@@ -318,7 +306,16 @@ if(OPENVDB_AX_STATIC)
     PROPERTIES OUTPUT_NAME openvdb_ax
   )
 
+  if(WIN32)
+    set_target_properties(openvdb_ax_static PROPERTIES PREFIX "lib")
+  endif()
+
   target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
+
+  # @todo fix opaque pointer requirements
+  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+    target_compile_options(openvdb_ax_static PUBLIC "-Wno-error=deprecated-declarations")
+  endif()
 endif()
 
 # Configure shared build
@@ -351,6 +348,10 @@ if(OPENVDB_AX_SHARED)
     )
 
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
+  # @todo fix opaque pointer requirements
+  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+    target_compile_options(openvdb_ax_shared PUBLIC "-Wno-error=deprecated-declarations")
+  endif()
 endif()
 
 install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)

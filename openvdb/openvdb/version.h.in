@@ -143,6 +143,11 @@
 #cmakedefine OPENVDB_USE_DELAYED_LOADING
 #endif
 
+/* Denotes whether VDB was built asserts enabled in VDB code */
+#ifndef OPENVDB_ENABLE_ASSERTS
+#cmakedefine OPENVDB_ENABLE_ASSERTS
+#endif
+
 /* Denotes whether VDB was built with explicit template instantiation */
 #ifndef OPENVDB_USE_EXPLICIT_INSTANTIATION
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION
@@ -160,6 +165,7 @@
 #define OPENVDB_VOLUME_TREE_INSTANTIATE(Function)   @OPENVDB_VOLUME_TREE_INSTANTIATIONS@
 #define OPENVDB_ALL_TREE_INSTANTIATE(Function)      @OPENVDB_ALL_TREE_INSTANTIATIONS@
 
+
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -169,9 +175,9 @@
     // This can be suppressed by defining OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
     // Note that, whilst the VDB CMake does not allow this option to be hit,
     // it exists to propagate this message to downstream targets
-    #if OPENVDB_ABI_VERSION_NUMBER == 11
-        #ifndef OPENVDB_USE_FUTURE_ABI_11
-            PRAGMA(message("NOTE: ABI = 11 is still in active development and has not been finalized, "
+    #if OPENVDB_ABI_VERSION_NUMBER == 12
+        #ifndef OPENVDB_USE_FUTURE_ABI_12
+            PRAGMA(message("NOTE: ABI = 12 is still in active development and has not been finalized, "
                 "define OPENVDB_USE_FUTURE_ABI_11 to suppress this message"))
         #endif
     #else
@@ -183,15 +189,15 @@
 // directive. This can be suppressed by defining OPENVDB_USE_DEPRECATED_ABI_<VERSION>.
 // Note that, whilst the VDB CMake does not allow this option to be hit,
 // it exists to propagate this message to downstream targets
-#ifndef OPENVDB_USE_DEPRECATED_ABI_8
-    #if OPENVDB_ABI_VERSION_NUMBER == 8
-        PRAGMA(message("NOTE: ABI = 8 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_7 "
+#ifndef OPENVDB_USE_DEPRECATED_ABI_9
+    #if OPENVDB_ABI_VERSION_NUMBER == 9
+        PRAGMA(message("NOTE: ABI = 9 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_9 "
             "to suppress this message"))
     #endif
 #endif
-#ifndef OPENVDB_USE_DEPRECATED_ABI_9
-    #if OPENVDB_ABI_VERSION_NUMBER == 9
-        PRAGMA(message("NOTE: ABI = 9 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_8 "
+#ifndef OPENVDB_USE_DEPRECATED_ABI_10
+    #if OPENVDB_ABI_VERSION_NUMBER == 10
+        PRAGMA(message("NOTE: ABI = 10 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_10 "
             "to suppress this message"))
     #endif
 #endif

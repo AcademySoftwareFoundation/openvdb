@@ -169,7 +169,7 @@ struct BuildMoveMapsOp
             // determine target leaf node origin and offset in the target leaf vector
 
             Coord targetLeafOrigin = targetVoxel & ~(LeafT::DIM - 1);
-            assert(mTargetLeafMap.find(targetLeafOrigin) != mTargetLeafMap.end());
+            OPENVDB_ASSERT(mTargetLeafMap.find(targetLeafOrigin) != mTargetLeafMap.end());
             const LeafIndex targetLeafOffset(mTargetLeafMap.at(targetLeafOrigin));
 
             // insert into move map based on whether point ends up in a new leaf node or not
@@ -265,13 +265,13 @@ struct GlobalMovePointsOp
 
         Index sourceIndex() const
         {
-            assert(mIt);
+            OPENVDB_ASSERT(mIt);
             return std::get<2>(*mIt);
         }
 
         Index targetIndex() const
         {
-            assert(mIt);
+            OPENVDB_ASSERT(mIt);
             return indexOffsetFromVoxel(std::get<1>(*mIt), mLeaf, mOffsets);
         }
 
@@ -419,7 +419,7 @@ struct LocalMovePointsOp
 
         // extract source array that has the same origin as the target leaf
 
-        assert(idx < mSourceIndices.size());
+        OPENVDB_ASSERT(idx < mSourceIndices.size());
         const Index sourceLeafOffset(mSourceIndices[idx]);
         LeafT& sourceLeaf = mSourceLeafManager.leaf(sourceLeafOffset);
         const auto& sourceArray = sourceLeaf.constAttributeArray(mAttributeIndex);
@@ -468,7 +468,7 @@ inline void movePoints( PointDataGridT& points,
     using namespace point_move_internal;
 
     // this object is for future use only
-    assert(!objectNotInUse);
+    OPENVDB_ASSERT(!objectNotInUse);
     (void)objectNotInUse;
 
     PointDataTreeT& tree = points.tree();
@@ -742,7 +742,7 @@ template <typename T>
 template <typename IndexIterT>
 void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
 {
-    assert(*iter >= 0);
+    OPENVDB_ASSERT(*iter >= 0);
 
     if (mLeafMap) {
         auto it = mLeafMap->find(*iter);
@@ -750,10 +750,10 @@ void CachedDeformer<T>::apply(Vec3d& position, const IndexIterT& iter) const
         position = static_cast<openvdb::Vec3d>(it->second);
     }
     else {
-        assert(mLeafVec);
+        OPENVDB_ASSERT(mLeafVec);
 
         if (mLeafVec->empty())          return;
-        assert(*iter < mLeafVec->size());
+        OPENVDB_ASSERT(*iter < mLeafVec->size());
         position = static_cast<openvdb::Vec3d>((*mLeafVec)[*iter]);
     }
 }

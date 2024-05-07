@@ -1,4 +1,4 @@
-#!/usr/local/bin/python
+#!/usr/bin/env python3
 #
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: MPL-2.0
@@ -19,16 +19,16 @@ import base64
 import requests
 import hashlib
 import os
+import argparse
+import copy
 
-# this argument is for the major.minor version of Houdini to download (such as 15.0, 15.5, 16.0)
-version = sys.argv[1]
-only_production = True if sys.argv[2] == 'ON' else False
-user_client_id = os.getenv('HOUDINI_CLIENT_ID')
-user_client_secret_key = os.getenv('HOUDINI_SECRET_KEY')
-
-if not re.match('[0-9][0-9]\.[0-9]$', version):
-    raise IOError('Invalid Houdini Version "%s", expecting in the form "major.minor" such as "16.0"' % version)
-
+# For progress bar printing
+try:
+    from tqdm import tqdm
+    has_tqdm = True
+except:
+    has_tqdm = False
+    pass
 
 # Code that provides convenient Python wrappers to call into the API:
 
@@ -94,7 +94,7 @@ def get_access_token_and_expiry_time(
             ),
         })
     if response.status_code != 200:
-        raise AuthorizationError(response.status_code, reponse.text)
+        raise AuthorizationError(response.status_code, response.text)
 
     response_json = response.json()
     access_token_expiry_time = time.time() - 2 + response_json["expires_in"]
@@ -138,33 +138,83 @@ class APIError(Exception):
         self.http_code = http_code
 
 
-service = service(
-        access_token_url="https://www.sidefx.com/oauth2/application_token",
-        client_id=user_client_id,
-        client_secret_key=user_client_secret_key,
-        endpoint_url="https://www.sidefx.com/api/",
-    )
+if __name__ == "__main__":
 
-releases_list = service.download.get_daily_builds_list(
-        product='houdini', version=version, platform='linux', only_production=only_production)
+    parser = argparse.ArgumentParser(description='Download a Houdini Installation')
+    parser.add_argument('version', type=str, help='Major.Minor version of Houdini to download')
+    parser.add_argument('platform', type=str, help='Platform target')
+    parser.add_argument('--prod', action='store_true', help='Only download production builds')
+    parser.add_argument('--list', action='store_true', help='Just list the available builds and exit.')
+    args = parser.parse_args()
 
-latest_release = service.download.get_daily_build_download(
-        product='houdini', version=version, platform='linux', build=releases_list[0]['build'])
+    version = args.version
+    platform = args.platform
+    only_production = args.prod
 
-# Download the file as hou.tar.gz
-local_filename = 'hou.tar.gz'
-response = requests.get(latest_release['download_url'], stream=True)
-if response.status_code == 200:
-    with open(local_filename, 'wb') as f:
+    user_client_id = os.getenv('HOUDINI_CLIENT_ID')
+    user_client_secret_key = os.getenv('HOUDINI_SECRET_KEY')
+
+    if not re.match('[0-9][0-9]\.[0-9]$', version):
+        raise IOError('Invalid Houdini Version "%s", expecting in the form "major.minor" such as "16.0"' % version)
+
+    service = service(
+            access_token_url="https://www.sidefx.com/oauth2/application_token",
+            client_id=user_client_id,
+            client_secret_key=user_client_secret_key,
+            endpoint_url="https://www.sidefx.com/api/",
+        )
+
+    releases_list = service.download.get_daily_builds_list(
+            product='houdini', version=version, platform=platform, only_production=only_production)
+
+    print('Available builds:')
+    for rel in releases_list:
+        rel = copy.deepcopy(rel)
+        if 'third_party_libraries' in rel:
+            # Don't print these
+            del rel['third_party_libraries']
+        print(rel)
+
+    if args.list:
+        sys.exit(0)
+
+    print('Selecting build: ' + releases_list[0]['build'])
+
+    latest_release = service.download.get_daily_build_download(
+            product='houdini', version=version, platform=platform, build=releases_list[0]['build'])
+    print(latest_release)
+
+    # Can't do this procedurally as latest_release['filename'] can contain
+    # multiple periods and may have multiple trailing extensions...
+    extension = ''
+    if   'linux' in platform: extension = 'tar.gz'
+    elif 'macos' in platform: extension = 'dmg'
+    elif 'win64' in platform: extension = 'exe'
+    assert(extension in latest_release['filename'])
+
+    # Download the file and save it as hou.extension
+    local_filename = 'hou.' + extension
+    print('Writing to "' + local_filename + '"')
+
+    response = requests.get(latest_release['download_url'], stream=True)
+    if response.status_code == 200:
         response.raw.decode_content = True
-        shutil.copyfileobj(response.raw, f)
-else:
-    raise Exception('Error downloading file!')
+        if has_tqdm:
+            file_size = int(response.headers.get('Content-Length', 0))
+            desc = "(Unknown total file size)" if file_size == 0 else ""
+            with tqdm.wrapattr(response.raw, "read", total=file_size, desc=desc) as r_raw:
+                with open(local_filename, 'wb') as f:
+                    shutil.copyfileobj(r_raw, f)
+        else:
+            with open(local_filename, 'wb') as f:
+                shutil.copyfileobj(response.raw, f)
+    else:
+        raise Exception('Error downloading file!')
 
-# Verify the file checksum is matching
-file_hash = hashlib.md5()
-with open(local_filename, 'rb') as f:
-    for chunk in iter(lambda: f.read(4096), b''):
-        file_hash.update(chunk)
-if file_hash.hexdigest() != latest_release['hash']:
-    raise Exception('Checksum does not match!')
+    # Verify the file checksum is matching
+    file_hash = hashlib.md5()
+    with open(local_filename, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b''):
+            file_hash.update(chunk)
+    if file_hash.hexdigest() != latest_release['hash']:
+        raise Exception('Checksum does not match!')

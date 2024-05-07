@@ -9,7 +9,6 @@
 - @ref depInstallingDependencies
   - @ref depUsingAptGet
   - @ref depUsingHomebrew
-  - @ref depManInstall
 <!-- - @ref depContents -->
 
 ------------------------------------------------------------------------------
@@ -37,10 +36,10 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                    | Optional
 ----------------------- | ----------------------------------------------- | --------
-OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb, Boost::headers | Blosc, ZLib, Log4cplus, IlmBase::Half, Boost::iostream
+OpenVDB Core Library    | CMake, C++17 compiler, TBB::tbb, Boost::headers | Blosc, ZLib, Log4cplus, Imath::Imath, Boost::iostream
 OpenVDB Print           | Core Library dependencies                       | -
 OpenVDB LOD             | Core Library dependencies                       | -
-OpenVDB Render          | Core Library dependencies                       | OpenEXR, IlmBase, libpng
+OpenVDB Render          | Core Library dependencies                       | OpenEXR, Imath::Imath, libpng
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW* | -
 OpenVDB Python          | Core Library dependencies, Python, PyBind11     | NumPy
 OpenVDB AX              | Core Library dependencies, LLVM                 | Bison, Flex
@@ -58,27 +57,27 @@ OpenVDB Documentation   | Doxygen                                         | -
 Package        | Minimum | Recommended | Description                                                       | apt-get | Homebrew | Source
 -------------- | ------- | ----------- | ----------------------------------------------------------------- | ------- | -------- | ------
 CMake          | 3.18    | Latest      | Cross-platform family of tools designed to help build software    | Y       | Y        | https://cmake.org
-GCC            | 9.3.1   | 9.3.1       | C++ 17 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
+GCC            | 9.3.1   | 11.2.1      | C++ 17 Compiler: The GNU Compiler Collection                      | Y       | Y        | https://www.gnu.org/software/gcc
 Clang          | 5.0     | Latest      | C++ 17 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
 Intel ICC      | 19      | Latest      | C++ 17 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
-MSVC           | 19.28   | Latest      | C++ 17 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
-IlmBase        | 2.4     | Removed     | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
-OpenEXR        | 2.4     | 3.1         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
+MSVC           | 19.28   | 19.30       | C++ 17 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
+Imath          | 3.1     | Latest      | Half precision floating points                                    | Y       | Y        | http://www.openexr.com
+OpenEXR        | 3.1     | Latest      | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 2020.2  | 2020.3      | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.73    | 1.76        | Components: headers, iostreams                                    | Y       | Y        | https://www.boost.org
-LLVM           | 10.0.0  | 10.0.0*     | Target-independent code generation                                | Y       | Y        | https://llvm.org/
+Boost          | 1.73    | 1.80        | Components: headers, iostreams                                    | Y       | Y        | https://www.boost.org
+LLVM           | 10.0.0  | 13.0.0*     | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison          | 3.0.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.0   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
-Python         | 3.7     | 3.7         | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
+Python         | 3.9.1   | 3.10        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
 PyBind11       | 2.9.1   | Latest      | C++/python bindings                                               | Y       | Y        | https://pybind11.readthedocs.io
-NumPy          | 1.19.0  | 1.20.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
+NumPy          | 1.20.0  | 1.23.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
-GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
+GLFW           | 3.1     | > 3.3       | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
 CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
@@ -97,8 +96,8 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
  segfault on closure. Fixed in GLFW 3.3
 
  - @b Blosc: OpenVDB has historically used an old version of blosc (1.5.0) to
- serialize .vdb files. OpenVDB has recently moved to a new blosc version minimum
- of 1.17.0. We have tested a range of blosc versions and found that the following
+ serialize .vdb files. OpenVDB has moved to a new blosc version minimum of
+ 1.17.0. We have tested a range of blosc versions and found that the following
  versions are NOT compatible with OpenVDB caches written using blosc 1.5.0.
  Additionally these versions of blosc may generally not be compatible with OpenVDB
  itself. Avoid using these versions and upgrade to the new minimum of 1.17.0 where
@@ -137,9 +136,6 @@ Pin-Priority: 990
 Alternatively you can install any missing dependencies manually or through
 other package managers.
 
-@b Note:CppUnit is unavailable using apt-get. See the other package manager
-methods or the [manual installation](@ref depManInstall) options.
-
 @code{.sh}
 #!/bin/bash
 # Core library
@@ -149,17 +145,17 @@ apt-get install zlibc                   # zlib
 apt-get install libboost-iostreams-dev  # Boost::iostream
 apt-get install libblosc-dev            # Blosc
 # AX
-apt-get install llvm-10-dev              # LLVM
+apt-get install llvm-10-dev             # LLVM
 # Python
 apt-get install pybind11-dev            # Python
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 # Optional
 apt-get install libpng-dev              # libpng
-apt-get install libilmbase-dev          # IlmBase
 apt-get install libopenexr-dev          # OpenEXR
 apt-get install liblog4cplus-dev        # Log4cplus
 apt-get install googletest              # GoogleTest
+apt-get install libcppunit-dev          # CppUnit
 # vdb_view
 apt-get install libglfw3-dev            # GLFW
 # Documentation
@@ -193,32 +189,10 @@ brew install cppunit                   # CppUnit
 # vdb_view
 brew install glfw                      # GLFW
 # vdb_render
-brew install ilmbase                   # IlmBase
 brew install openexr                   # OpenEXR
 brew install libpng                    # libpng
 # Documentation
 brew install doxygen                   # Doxygen
-@endcode
-
-@subsection depManInstall UNIX Manual Installations
-
-Some dependencies may be unavailable using the above package manager methods.
-Below are manual installation methods for these packages. Note that you will
-have to provide your chosen installation locations to the OpenVDB CMake build
-system when building OpenVDB.
-
-@b CppUnit (for AX Unit Tests)
-
-@code{.sh}
-#!/bin/bash
-wget http://dev-www.libreoffice.org/src/cppunit-1.13.2.tar.gz
-tar -xvzf cppunit-1.13.2.tar.gz
-cd cppunit-1.13.2
-# Install to users home directory - you may customise this location
-mkdir -p $HOME/cppunit
-./configure --prefix=$HOME/cppunit
-make
-make install
 @endcode
 
 */

@@ -207,7 +207,7 @@ struct RasterizeOp
     static void rasterVoxelSphere(const Vec3d& position, const double scale,
         const AttributeT& attributeScale, const float radius, util::NullInterrupter* interrupter, SphereOpT& op)
     {
-        assert(radius > 0.0f);
+        OPENVDB_ASSERT(radius > 0.0f);
         Coord ijk = Coord::round(position);
         int &i = ijk[0], &j = ijk[1], &k = ijk[2];
         const int imin=math::Floor(position[0]-radius), imax=math::Ceil(position[0]+radius);
@@ -1119,7 +1119,7 @@ void RasterCamera::simplify()
 bool RasterCamera::hasWeight(Index i) const
 {
     if (mWeights.empty())  return false;
-    assert(i < mWeights.size());
+    OPENVDB_ASSERT(i < mWeights.size());
     return !openvdb::math::isApproxEqual(mWeights[i], 1.0f, 1e-3f);
 }
 
@@ -1128,7 +1128,7 @@ float RasterCamera::weight(Index i) const
     if (mWeights.empty()) {
         return 1.0f;
     } else {
-        assert(i < mWeights.size());
+        OPENVDB_ASSERT(i < mWeights.size());
         return mWeights[i];
     }
 }
@@ -1138,20 +1138,20 @@ const math::Transform& RasterCamera::transform(Index i) const
     if (mTransforms.size() == 1) {
         return mTransforms.front();
     } else {
-        assert(i < mTransforms.size());
+        OPENVDB_ASSERT(i < mTransforms.size());
         return mTransforms[i];
     }
 }
 
 const math::Transform& RasterCamera::firstTransform() const
 {
-    assert(!mTransforms.empty());
+    OPENVDB_ASSERT(!mTransforms.empty());
     return mTransforms.front();
 }
 
 const math::Transform& RasterCamera::lastTransform() const
 {
-    assert(!mTransforms.empty());
+    OPENVDB_ASSERT(!mTransforms.empty());
     return mTransforms.back();
 }
 

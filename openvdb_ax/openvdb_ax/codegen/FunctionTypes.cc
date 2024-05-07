@@ -10,6 +10,7 @@
 #include "../Exceptions.h"
 
 #include <openvdb/util/Name.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/LLVMContext.h>
@@ -139,11 +140,11 @@ Function::call(const std::vector<llvm::Value*>& args,
      const bool cast) const
 {
     llvm::BasicBlock* block = B.GetInsertBlock();
-    assert(block);
+    OPENVDB_ASSERT(block);
     llvm::Function* currentFunction = block->getParent();
-    assert(currentFunction);
+    OPENVDB_ASSERT(currentFunction);
     llvm::Module* M = currentFunction->getParent();
-    assert(M);
+    OPENVDB_ASSERT(M);
     llvm::Function* function = this->create(B.getContext(), M);
     std::vector<llvm::Value*> inputs(args);
     if (cast) {
@@ -163,7 +164,7 @@ Function::match(const std::vector<llvm::Type*>& inputs, llvm::LLVMContext& C) co
     if (inputs.size() != this->size()) return None;
     if (inputs.empty() && this->size() == 0) return Explicit;
 
-    assert(!inputs.empty());
+    OPENVDB_ASSERT(!inputs.empty());
     //llvm::LLVMContext& C = inputs.front()->getContext();
 
     std::vector<llvm::Type*> signature;
@@ -296,7 +297,7 @@ IRFunctionBase::create(llvm::LLVMContext& C, llvm::Module* M) const
     if (this->hasEmbedIR()) return nullptr;
 
     llvm::Function* F = this->Function::create(C, M);
-    assert(F);
+    OPENVDB_ASSERT(F);
     // return if the function has already been generated or if no
     // module has been provided (just the function prototype requested)
     if (!F->empty() || !M) return F;
@@ -331,7 +332,7 @@ IRFunctionBase::create(llvm::LLVMContext& C, llvm::Module* M) const
         lastInstruction = B.CreateRetVoid();
     }
     else if (!llvm::isa<llvm::ReturnInst>(lastInstruction)) {
-        assert(lastInstruction);
+        OPENVDB_ASSERT(lastInstruction);
         if (lastInstruction->getType()->isVoidTy()) {
             lastInstruction = B.CreateRetVoid();
         }
@@ -339,8 +340,8 @@ IRFunctionBase::create(llvm::LLVMContext& C, llvm::Module* M) const
             lastInstruction = B.CreateRet(lastInstruction);
         }
     }
-    assert(lastInstruction);
-    assert(llvm::isa<llvm::ReturnInst>(lastInstruction));
+    OPENVDB_ASSERT(lastInstruction);
+    OPENVDB_ASSERT(llvm::isa<llvm::ReturnInst>(lastInstruction));
 
     // pull out the ret type - is null if void
     llvm::Value* rvalue =
@@ -419,14 +420,14 @@ FunctionGroup::execute(const std::vector<llvm::Value*>& args,
 
     Function::SignatureMatch match;
     const Function* target = this->match(inputTypes, B.getContext(), &match);
-    assert(target);
+    OPENVDB_ASSERT(target);
     llvm::Value* result =
         target->call(args, B, /*cast=*/match == Function::SignatureMatch::Implicit);
 
 #ifndef NDEBUG
     std::vector<llvm::Type*> unused;
     llvm::Type* ret = target->types(unused, B.getContext());
-    assert(result || ret->isVoidTy());
+    OPENVDB_ASSERT(result || ret->isVoidTy());
 #endif
     return result;
 }
@@ -448,7 +449,7 @@ FunctionGroup::execute(const std::vector<llvm::Value*>& args,
 #ifndef NDEBUG
     std::vector<llvm::Type*> unused;
     llvm::Type* ret = target->types(unused, B.getContext());
-    assert(result || ret->isVoidTy());
+    OPENVDB_ASSERT(result || ret->isVoidTy());
 #endif
 
     return target;

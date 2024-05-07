@@ -4,6 +4,7 @@
 #include "DelayedLoadMetadata.h"
 
 #include <openvdb/points/StreamCompression.h>
+#include <openvdb/util/Assert.h>
 
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
@@ -120,27 +121,27 @@ void DelayedLoadMetadata::resizeCompressedSize(size_t size)
 
 DelayedLoadMetadata::MaskType DelayedLoadMetadata::getMask(size_t index) const
 {
-    assert(DelayedLoadMetadata::isRegisteredType());
-    assert(index < mMask.size());
+    OPENVDB_ASSERT(DelayedLoadMetadata::isRegisteredType());
+    OPENVDB_ASSERT(index < mMask.size());
     return mMask[index];
 }
 
 void DelayedLoadMetadata::setMask(size_t index, const MaskType& value)
 {
-    assert(index < mMask.size());
+    OPENVDB_ASSERT(index < mMask.size());
     mMask[index] = value;
 }
 
 DelayedLoadMetadata::CompressedSizeType DelayedLoadMetadata::getCompressedSize(size_t index) const
 {
-    assert(DelayedLoadMetadata::isRegisteredType());
-    assert(index < mCompressedSize.size());
+    OPENVDB_ASSERT(DelayedLoadMetadata::isRegisteredType());
+    OPENVDB_ASSERT(index < mCompressedSize.size());
     return mCompressedSize[index];
 }
 
 void DelayedLoadMetadata::setCompressedSize(size_t index, const CompressedSizeType& value)
 {
-    assert(index < mCompressedSize.size());
+    OPENVDB_ASSERT(index < mCompressedSize.size());
     mCompressedSize[index] = value;
 }
 
@@ -174,7 +175,7 @@ void DelayedLoadMetadata::readValue(std::istream& is, Index32 numBytes)
         mMask.resize(count);
 
         // resize should never modify capacity for smaller vector sizes
-        assert(mMask.capacity() >= paddedCount);
+        OPENVDB_ASSERT(mMask.capacity() >= paddedCount);
 
         compression::bloscDecompress(reinterpret_cast<char*>(mMask.data()), count*sizeof(MaskType), mMask.capacity()*sizeof(MaskType), compressedBuffer.get());
 #endif
@@ -202,7 +203,7 @@ void DelayedLoadMetadata::readValue(std::istream& is, Index32 numBytes)
             mCompressedSize.resize(count);
 
             // resize should never modify capacity for smaller vector sizes
-            assert(mCompressedSize.capacity() >= paddedCount);
+            OPENVDB_ASSERT(mCompressedSize.capacity() >= paddedCount);
 
             compression::bloscDecompress(reinterpret_cast<char*>(mCompressedSize.data()), count*sizeof(CompressedSizeType), mCompressedSize.capacity()*sizeof(CompressedSizeType), compressedBuffer.get());
 #endif
@@ -231,12 +232,12 @@ void DelayedLoadMetadata::readValue(std::istream& is, Index32 numBytes)
 void DelayedLoadMetadata::writeValue(std::ostream& os) const
 {
     // metadata has a limit of 2^32 bytes
-    assert(mMask.size() < std::numeric_limits<Index32>::max());
-    assert(mCompressedSize.size() < std::numeric_limits<Index32>::max());
+    OPENVDB_ASSERT(mMask.size() < std::numeric_limits<Index32>::max());
+    OPENVDB_ASSERT(mCompressedSize.size() < std::numeric_limits<Index32>::max());
 
     if (mMask.empty() && mCompressedSize.empty())     return;
 
-    assert(mCompressedSize.empty() || (mMask.size() == mCompressedSize.size()));
+    OPENVDB_ASSERT(mCompressedSize.empty() || (mMask.size() == mCompressedSize.size()));
 
     Index32 count = static_cast<Index32>(mMask.size());
     os.write(reinterpret_cast<const char*>(&count), sizeof(Index32));
@@ -254,7 +255,7 @@ void DelayedLoadMetadata::writeValue(std::ostream& os) const
         }
 
         if (compressedBuffer) {
-            assert(compressedBytes < std::numeric_limits<Index32>::max());
+            OPENVDB_ASSERT(compressedBytes < std::numeric_limits<Index32>::max());
             Index32 bytes(static_cast<Index32>(compressedBytes));
             os.write(reinterpret_cast<const char*>(&bytes), sizeof(Index32));
             os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);
@@ -281,7 +282,7 @@ void DelayedLoadMetadata::writeValue(std::ostream& os) const
         }
 
         if (compressedBuffer) {
-            assert(compressedBytes < std::numeric_limits<Index32>::max());
+            OPENVDB_ASSERT(compressedBytes < std::numeric_limits<Index32>::max());
             Index32 bytes(static_cast<Index32>(compressedBytes));
             os.write(reinterpret_cast<const char*>(&bytes), sizeof(Index32));
             os.write(reinterpret_cast<const char*>(compressedBuffer.get()), compressedBytes);

@@ -7,6 +7,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/MetaMap.h>
 #include <openvdb/math/Math.h> // for negative()
+#include <openvdb/util/Assert.h>
 #include "io.h" // for getDataCompression(), etc.
 #include "DelayedLoadMetadata.h"
 #include <algorithm>
@@ -249,7 +250,7 @@ readData(std::istream& is, T* data, Index count, uint32_t compression,
 {
     const bool seek = data == nullptr;
     if (seek) {
-        assert(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
+        OPENVDB_ASSERT(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
     }
     const bool hasCompression = compression & (COMPRESS_BLOSC | COMPRESS_ZIP);
 
@@ -471,7 +472,7 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const bool maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
     const bool seek = (destBuf == nullptr);
-    assert(!seek || (!meta || meta->seekable()));
+    OPENVDB_ASSERT(!seek || (!meta || meta->seekable()));
 
     // Get delayed load metadata if it exists
 
@@ -732,7 +733,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                         } // else inactive value 0
                     }
                 }
-                assert(tempCount == valueMask.countOn());
+                OPENVDB_ASSERT(tempCount == valueMask.countOn());
 
                 // Write out the mask that selects between two inactive values.
                 selectionMask.save(os);

@@ -7,7 +7,7 @@
 #include <openvdb/Platform.h>
 #include <openvdb/Types.h> // for SharedPtr
 #include <openvdb/version.h>
-#include <boost/any.hpp>
+#include <any>
 #include <functional>
 #include <iosfwd> // for std::ios_base
 #include <map>
@@ -89,7 +89,7 @@ public:
     const MetaMap& gridMetadata() const;
     //@}
 
-    using AuxDataMap = std::map<std::string, boost::any>;
+    using AuxDataMap = std::map<std::string, std::any>;
     //@{
     /// @brief Return a map that can be populated with arbitrary user data.
     AuxDataMap& auxData();

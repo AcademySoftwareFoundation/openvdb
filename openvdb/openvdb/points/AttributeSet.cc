@@ -5,6 +5,7 @@
 
 #include "AttributeSet.h"
 #include "AttributeGroup.h"
+#include <openvdb/util/Assert.h>
 
 #include <algorithm> // std::equal
 #include <string>
@@ -170,8 +171,8 @@ AttributeSet::replace(const std::string& name, const AttributeArray::Ptr& attr)
 size_t
 AttributeSet::replace(size_t pos, const AttributeArray::Ptr& attr)
 {
-    assert(pos != INVALID_POS);
-    assert(pos < mAttrs.size());
+    OPENVDB_ASSERT(pos != INVALID_POS);
+    OPENVDB_ASSERT(pos < mAttrs.size());
 
     if (attr->type() != mDescr->type(pos)) {
         return INVALID_POS;
@@ -210,8 +211,8 @@ AttributeSet::get(const std::string& name)
 const AttributeArray*
 AttributeSet::getConst(size_t pos) const
 {
-    assert(pos != INVALID_POS);
-    assert(pos < mAttrs.size());
+    OPENVDB_ASSERT(pos != INVALID_POS);
+    OPENVDB_ASSERT(pos < mAttrs.size());
     return mAttrs[pos].get();
 }
 
@@ -219,8 +220,8 @@ AttributeSet::getConst(size_t pos) const
 const AttributeArray*
 AttributeSet::get(size_t pos) const
 {
-    assert(pos != INVALID_POS);
-    assert(pos < mAttrs.size());
+    OPENVDB_ASSERT(pos != INVALID_POS);
+    OPENVDB_ASSERT(pos < mAttrs.size());
     return this->getConst(pos);
 }
 
@@ -278,18 +279,20 @@ AttributeSet::groupAttributeIndices() const
 bool
 AttributeSet::isShared(size_t pos) const
 {
-    assert(pos != INVALID_POS);
-    assert(pos < mAttrs.size());
-    return !mAttrs[pos].unique();
+    OPENVDB_ASSERT(pos != INVALID_POS);
+    OPENVDB_ASSERT(pos < mAttrs.size());
+    // Warning: In multithreaded environment, the value returned by use_count is approximate.
+    return mAttrs[pos].use_count() != 1;
 }
 
 
 void
 AttributeSet::makeUnique(size_t pos)
 {
-    assert(pos != INVALID_POS);
-    assert(pos < mAttrs.size());
-    if (!mAttrs[pos].unique()) {
+    OPENVDB_ASSERT(pos != INVALID_POS);
+    OPENVDB_ASSERT(pos < mAttrs.size());
+    // Warning: In multithreaded environment, the value returned by use_count is approximate.
+    if (mAttrs[pos].use_count() != 1) {
         mAttrs[pos] = mAttrs[pos]->copy();
     }
 }
@@ -325,7 +328,7 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
         OPENVDB_THROW(LookupError, "Cannot append attributes as descriptors do not match.")
     }
 
-    assert(replacement->size() >= mDescr->size());
+    OPENVDB_ASSERT(replacement->size() >= mDescr->size());
 
     const size_t offset = mDescr->size();
 
@@ -367,10 +370,10 @@ AttributeSet::removeAttribute(const size_t pos)
 {
     if (pos >= mAttrs.size())     return AttributeArray::Ptr();
 
-    assert(mAttrs[pos]);
+    OPENVDB_ASSERT(mAttrs[pos]);
     AttributeArray::Ptr array;
     std::swap(array, mAttrs[pos]);
-    assert(array);
+    OPENVDB_ASSERT(array);
 
     // safely drop the attribute and update the descriptor
     std::vector<size_t> toDrop{pos};
@@ -385,7 +388,7 @@ AttributeSet::removeAttributeUnsafe(const size_t pos)
 {
     if (pos >= mAttrs.size())     return AttributeArray::Ptr();
 
-    assert(mAttrs[pos]);
+    OPENVDB_ASSERT(mAttrs[pos]);
     AttributeArray::Ptr array;
     std::swap(array, mAttrs[pos]);
 
@@ -750,8 +753,8 @@ AttributeSet::Descriptor::type(size_t pos) const
 {
     // assert that pos is valid and in-range
 
-    assert(pos != AttributeSet::INVALID_POS);
-    assert(pos < mTypes.size());
+    OPENVDB_ASSERT(pos != AttributeSet::INVALID_POS);
+    OPENVDB_ASSERT(pos < mTypes.size());
 
     return mTypes[pos];
 }
@@ -849,7 +852,7 @@ AttributeSet::Descriptor::insert(const std::string& name, const NamePair& typeNa
     size_t pos = INVALID_POS;
     auto it = mNameMap.find(name);
     if (it != mNameMap.end()) {
-        assert(it->second < mTypes.size());
+        OPENVDB_ASSERT(it->second < mTypes.size());
         if (mTypes[it->second] != typeName) {
             OPENVDB_THROW(KeyError,
                 "Cannot insert into a Descriptor with a duplicate name, but different type.")

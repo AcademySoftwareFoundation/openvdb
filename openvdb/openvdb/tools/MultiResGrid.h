@@ -34,6 +34,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/util/Assert.h>
 
 #include "Interpolation.h"
 #include "Morphology.h"
@@ -396,7 +397,7 @@ template<typename TreeType>
 inline TreeType& MultiResGrid<TreeType>::
 tree(size_t level)
 {
-    assert( level < mTrees.size() );
+    OPENVDB_ASSERT( level < mTrees.size() );
     return *mTrees[level];
 }
 
@@ -404,7 +405,7 @@ template<typename TreeType>
 inline const TreeType& MultiResGrid<TreeType>::
 constTree(size_t level) const
 {
-    assert( level < mTrees.size() );
+    OPENVDB_ASSERT( level < mTrees.size() );
     return *mTrees[level];
 }
 
@@ -412,7 +413,7 @@ template<typename TreeType>
 inline typename TreeType::Ptr MultiResGrid<TreeType>::
 treePtr(size_t level)
 {
-    assert( level < mTrees.size() );
+    OPENVDB_ASSERT( level < mTrees.size() );
     return mTrees[level];
 }
 
@@ -420,7 +421,7 @@ template<typename TreeType>
 inline typename TreeType::ConstPtr MultiResGrid<TreeType>::
 constTreePtr(size_t level) const
 {
-    assert( level < mTrees.size() );
+    OPENVDB_ASSERT( level < mTrees.size() );
     return mTrees[level];
 }
 
@@ -452,7 +453,7 @@ template<Index Order>
 typename Grid<TreeType>::Ptr MultiResGrid<TreeType>::
 createGrid(float level, size_t grainSize) const
 {
-    assert( level >= 0.0f && level <= float(mTrees.size()-1) );
+    OPENVDB_ASSERT( level >= 0.0f && level <= float(mTrees.size()-1) );
 
     typename Grid<TreeType>::Ptr grid(new Grid<TreeType>(this->constTree(0).background()));
     math::Transform::Ptr xform = mTransform->copy();
@@ -522,8 +523,8 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Coord& in_ijk, size_t in_level, size_t out_level) const
 {
-    assert( in_level  >= 0 && in_level  < mTrees.size() );
-    assert( out_level >= 0 && out_level < mTrees.size() );
+    OPENVDB_ASSERT( in_level  < mTrees.size() );
+    OPENVDB_ASSERT( out_level < mTrees.size() );
     const ConstAccessor acc(*mTrees[out_level]);// has disabled registration!
     return tools::Sampler<Order>::sample( acc, this->xyz(in_ijk, in_level, out_level) );
 }
@@ -533,8 +534,8 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Vec3R& in_xyz, size_t in_level, size_t out_level) const
 {
-    assert( in_level  >= 0 && in_level  < mTrees.size() );
-    assert( out_level >= 0 && out_level < mTrees.size() );
+    OPENVDB_ASSERT( in_level  < mTrees.size() );
+    OPENVDB_ASSERT( out_level < mTrees.size() );
     const ConstAccessor acc(*mTrees[out_level]);// has disabled registration!
     return tools::Sampler<Order>::sample( acc, this->xyz(in_xyz, in_level, out_level) );
 }
@@ -544,11 +545,11 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Coord& ijk, double level) const
 {
-    assert( level >= 0.0 && level <= double(mTrees.size()-1) );
+    OPENVDB_ASSERT( level >= 0.0 && level <= double(mTrees.size()-1) );
     const size_t level0 = size_t(floor(level)), level1 = size_t(ceil(level));
     const ValueType v0 = this->template sampleValue<Order>( ijk, 0, level0 );
     if ( level0 == level1 ) return v0;
-    assert( level1 - level0 == 1 );
+    OPENVDB_ASSERT( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( ijk, 0, level1 );
     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
@@ -561,11 +562,11 @@ template<Index Order>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 sampleValue(const Vec3R& xyz, double level) const
 {
-    assert( level >= 0.0 && level <= double(mTrees.size()-1) );
+    OPENVDB_ASSERT( level >= 0.0 && level <= double(mTrees.size()-1) );
     const size_t level0 = size_t(floor(level)), level1 = size_t(ceil(level));
     const ValueType v0 = this->template sampleValue<Order>( xyz, 0, level0 );
     if ( level0 == level1 ) return v0;
-    assert( level1 - level0 == 1 );
+    OPENVDB_ASSERT( level1 - level0 == 1 );
     const ValueType v1 = this->template sampleValue<Order>( xyz, 0, level1 );
     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     const ValueType a = ValueType(level1 - level);
@@ -577,7 +578,7 @@ template<typename TreeType>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 prolongateVoxel(const Coord& ijk, const size_t level) const
 {
-    assert( level+1 < mTrees.size() );
+    OPENVDB_ASSERT( level+1 < mTrees.size() );
     const ConstAccessor acc(*mTrees[level + 1]);// has disabled registration!
     return ProlongateOp::run(ijk, acc);
 }
@@ -586,7 +587,7 @@ template<typename TreeType>
 void MultiResGrid<TreeType>::
 prolongateActiveVoxels(size_t destlevel, size_t grainSize)
 {
-    assert( destlevel < mTrees.size()-1 );
+    OPENVDB_ASSERT( destlevel < mTrees.size()-1 );
     TreeType &fineTree = *mTrees[ destlevel ];
     const TreeType &coarseTree = *mTrees[ destlevel+1 ];
     CookOp<ProlongateOp> tmp( coarseTree, fineTree, grainSize );
@@ -596,7 +597,7 @@ template<typename TreeType>
 typename TreeType::ValueType MultiResGrid<TreeType>::
 restrictVoxel(Coord ijk, const size_t destlevel, bool useInjection) const
 {
-    assert( destlevel > 0 && destlevel < mTrees.size() );
+    OPENVDB_ASSERT( destlevel > 0 && destlevel < mTrees.size() );
     const TreeType &fineTree = *mTrees[ destlevel-1 ];
     if ( useInjection ) return fineTree.getValue(ijk<<1);
     const ConstAccessor acc( fineTree );// has disabled registration!
@@ -607,7 +608,7 @@ template<typename TreeType>
 void MultiResGrid<TreeType>::
 restrictActiveVoxels(size_t destlevel, size_t grainSize)
 {
-    assert( destlevel > 0 && destlevel < mTrees.size() );
+    OPENVDB_ASSERT( destlevel > 0 && destlevel < mTrees.size() );
     const TreeType &fineTree = *mTrees[ destlevel-1 ];
     TreeType &coarseTree = *mTrees[ destlevel ];
     CookOp<RestrictOp> tmp( fineTree, coarseTree, grainSize );
@@ -689,7 +690,7 @@ struct MultiResGrid<TreeType>::MaskOp
     MaskOp(const TreeType& fineTree, TreeType& coarseTree, size_t grainSize = 1)
         : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as examplar
     {
-        assert( coarseTree.empty() );
+        OPENVDB_ASSERT( coarseTree.empty() );
 
         // Create Mask of restruction performed on fineTree
         MaskT mask(fineTree, false, true, TopologyCopy() );
@@ -741,8 +742,8 @@ struct MultiResGrid<TreeType>::FractionOp
         , mTree0( &*(parent.mTrees[size_t(floorf(level))]) )//high-resolution
         , mTree1( &*(parent.mTrees[size_t(ceilf(level))]) ) //low-resolution
     {
-        assert( midTree.empty() );
-        assert( mTree0 != mTree1 );
+        OPENVDB_ASSERT( midTree.empty() );
+        OPENVDB_ASSERT( mTree0 != mTree1 );
 
         // Create a pool of  thread-local masks
         MaskT examplar( false );

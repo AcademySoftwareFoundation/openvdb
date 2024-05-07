@@ -100,12 +100,8 @@ exportGridBase(py::module_ m)
 
 
     auto getMetadataKeys = [](GridBase::ConstPtr grid) {
-#if PY_MAJOR_VERSION >= 3
         // Return an iterator over the "keys" view of a dict.
         return py::make_key_iterator(static_cast<const MetaMap&>(*grid).beginMeta(), static_cast<const MetaMap&>(*grid).endMeta());
-#else
-        return py::dict(py::cast(static_cast<const MetaMap&>(*grid))).iterkeys();
-#endif
     };
 
 
@@ -118,7 +114,7 @@ exportGridBase(py::module_ m)
         MetaMap metamap;
         metamap.insertMeta(name, *metadata);
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
-        return py::dict(py::cast(metamap))[py::str(name)].cast<py::object>();
+        return py::cast<py::object>(py::dict(py::cast(metamap))[py::str(name)]);
     };
 
 
@@ -135,7 +131,7 @@ exportGridBase(py::module_ m)
         // todo: Add/refactor out type_casters for each TypedMetadata from MetaMap's type_caster
         py::dict dictObj;
         dictObj[py::str(name)] = value;
-        MetaMap metamap = dictObj.cast<MetaMap>();
+        MetaMap metamap = py::cast<MetaMap>(dictObj);
 
         if (Metadata::Ptr metadata = metamap[name]) {
             grid->removeMeta(name);

@@ -6,6 +6,8 @@
 
 #include <openvdb_ax/codegen/Types.h>
 
+#include <openvdb/util/Assert.h>
+
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
@@ -21,7 +23,13 @@ namespace unittest_util
 struct LLVMState
 {
     LLVMState(const std::string& name = "__test_module")
-        : mCtx(new llvm::LLVMContext), mModule(new llvm::Module(name, *mCtx)) {}
+        : mCtx(new llvm::LLVMContext), mModule(new llvm::Module(name, *mCtx)) {
+#if LLVM_VERSION_MAJOR >= 15
+    // This will not work from LLVM 16. We'll need to fix this
+    // https://llvm.org/docs/OpaquePointers.html
+    mCtx->setOpaquePointers(false);
+#endif
+        }
 
     llvm::LLVMContext& context() { return *mCtx; }
     llvm::Module& module() { return *mModule; }
@@ -58,7 +66,7 @@ struct LLVMState
                 .setMAttrs(features)
                 .create());
 
-        assert(EE.get());
+        OPENVDB_ASSERT(EE.get());
         return EE;
     }
 

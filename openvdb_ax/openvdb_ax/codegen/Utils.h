@@ -18,6 +18,7 @@
 #include "../Exceptions.h"
 
 #include <openvdb/version.h>
+#include <openvdb/util/Assert.h>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -53,8 +54,8 @@ using BinaryFunction = std::function<llvm::Value*
 /// @brief  Alias around IR load inst.
 inline auto ir_load(llvm::IRBuilder<>& B, llvm::Value* ptr, const char* Name = "")
 {
-    assert(ptr);
-    assert(ptr->getType()->isPointerTy());
+    OPENVDB_ASSERT(ptr);
+    OPENVDB_ASSERT(ptr->getType()->isPointerTy());
 #if LLVM_VERSION_MAJOR <= 7
     return B.CreateLoad(ptr, Name);
 #else
@@ -66,9 +67,9 @@ inline auto ir_load(llvm::IRBuilder<>& B, llvm::Value* ptr, const char* Name = "
 inline auto ir_gep(llvm::IRBuilder<>& B,
     llvm::Value* ptr, llvm::ArrayRef<llvm::Value*> IdxList, const char* Name = "")
 {
-    assert(ptr);
-    assert(ptr->getType()->getScalarType());
-    assert(ptr->getType()->getScalarType()->isPointerTy());
+    OPENVDB_ASSERT(ptr);
+    OPENVDB_ASSERT(ptr->getType()->getScalarType());
+    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
 #if LLVM_VERSION_MAJOR <= 7
     return B.CreateGEP(ptr, IdxList, Name);
 #else
@@ -81,9 +82,9 @@ inline auto ir_gep(llvm::IRBuilder<>& B,
 inline auto ir_constgep2_64(llvm::IRBuilder<>& B,
     llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
 {
-    assert(ptr);
-    assert(ptr->getType()->getScalarType());
-    assert(ptr->getType()->getScalarType()->isPointerTy());
+    OPENVDB_ASSERT(ptr);
+    OPENVDB_ASSERT(ptr->getType()->getScalarType());
+    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
 #if LLVM_VERSION_MAJOR <= 7
     return B.CreateConstGEP2_64(ptr, Idx0, Idx1, Name);
 #else
@@ -97,9 +98,9 @@ inline auto ir_constgep2_64(llvm::IRBuilder<>& B,
 inline auto ir_constinboundsgep2_64(llvm::IRBuilder<>& B,
     llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
 {
-    assert(ptr);
-    assert(ptr->getType()->getScalarType());
-    assert(ptr->getType()->getScalarType()->isPointerTy());
+    OPENVDB_ASSERT(ptr);
+    OPENVDB_ASSERT(ptr->getType()->getScalarType());
+    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
 #if LLVM_VERSION_MAJOR <= 7
     return B.CreateConstInBoundsGEP2_64(ptr, Idx0, Idx1, Name);
 #else
@@ -190,7 +191,7 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
     llvm::Type* strtype = LLVMType<codegen::String>::get(B.getContext());
     // Create the allocation at the start of the function block
     llvm::Function* parent = B.GetInsertBlock()->getParent();
-    assert(parent && !parent->empty());
+    OPENVDB_ASSERT(parent && !parent->empty());
     auto IP = B.saveIP();
     llvm::BasicBlock& block = parent->front();
     if (block.empty()) B.SetInsertPoint(&block);
@@ -242,9 +243,9 @@ inline llvm::Type*
 typePrecedence(llvm::Type* const typeA,
                llvm::Type* const typeB)
 {
-    assert(typeA && (typeA->isIntegerTy() || typeA->isFloatingPointTy()) &&
+    OPENVDB_ASSERT(typeA && (typeA->isIntegerTy() || typeA->isFloatingPointTy()) &&
         "First Type in typePrecedence is not a scalar type");
-    assert(typeB && (typeB->isIntegerTy() || typeB->isFloatingPointTy()) &&
+    OPENVDB_ASSERT(typeB && (typeB->isIntegerTy() || typeB->isFloatingPointTy()) &&
         "Second Type in typePrecedence is not a scalar type");
 
     // handle implicit arithmetic conversion
@@ -271,7 +272,7 @@ typePrecedence(llvm::Type* const typeA,
     if (typeA->isIntegerTy(1)) return typeA;
     if (typeB->isIntegerTy(1)) return typeB;
 
-    assert(false && "invalid LLVM type precedence");
+    OPENVDB_ASSERT(false && "invalid LLVM type precedence");
     return nullptr;
 }
 
@@ -371,7 +372,7 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
     }
 
 #undef BIND_ARITHMETIC_CAST_OP
-    assert(false && "invalid LLVM type conversion");
+    OPENVDB_ASSERT(false && "invalid LLVM type conversion");
     return CastFunction();
 }
 
@@ -404,7 +405,7 @@ llvmBinaryConversion(const llvm::Type* const type,
     // a%b in AX is implemented as a floored modulo op and is handled explicitly in binaryExpression
 
     if (type->isFloatingPointTy()) {
-        assert(!(ast::tokens::operatorType(token) == ast::tokens::LOGICAL ||
+        OPENVDB_ASSERT(!(ast::tokens::operatorType(token) == ast::tokens::LOGICAL ||
             ast::tokens::operatorType(token) == ast::tokens::BITWISE)
                 && "unable to perform logical or bitwise operation on floating point values");
 
@@ -419,7 +420,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::LESSTHAN)        return BIND_BINARY_OP(CreateFCmpOLT);
         else if (token == ast::tokens::MORETHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOGE);
         else if (token == ast::tokens::LESSTHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOLE);
-        assert(false && "unrecognised binary operator");
+        OPENVDB_ASSERT(false && "unrecognised binary operator");
     }
     else if (type->isIntegerTy()) {
         if (token == ast::tokens::PLUS)                  return BIND_BINARY_OP(CreateAdd); // No Unsigned/Signed Wrap
@@ -440,11 +441,11 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::BITAND)           return BIND_BINARY_OP(CreateAnd);
         else if (token == ast::tokens::BITOR)            return BIND_BINARY_OP(CreateOr);
         else if (token == ast::tokens::BITXOR)           return BIND_BINARY_OP(CreateXor);
-        assert(false && "unrecognised binary operator");
+        OPENVDB_ASSERT(false && "unrecognised binary operator");
     }
 
 #undef BIND_BINARY_OP
-    assert(false && "invalid LLVM type for binary operation");
+    OPENVDB_ASSERT(false && "invalid LLVM type for binary operation");
     return BinaryFunction();
 }
 
@@ -452,8 +453,8 @@ llvmBinaryConversion(const llvm::Type* const type,
 ///         Type 'to'.
 inline bool isValidCast(llvm::Type* from, llvm::Type* to)
 {
-    assert(from && "llvm Type 'from' is null in isValidCast");
-    assert(to && "llvm Type 'to' is null in isValidCast");
+    OPENVDB_ASSERT(from && "llvm Type 'from' is null in isValidCast");
+    OPENVDB_ASSERT(to && "llvm Type 'to' is null in isValidCast");
 
     if ((from->isIntegerTy() || from->isFloatingPointTy()) &&
         (to->isIntegerTy() || to->isFloatingPointTy())) {
@@ -481,9 +482,9 @@ arithmeticConversion(llvm::Value* value,
                      llvm::Type* targetType,
                      llvm::IRBuilder<>& builder)
 {
-    assert(value && (value->getType()->isIntegerTy() || value->getType()->isFloatingPointTy()) &&
+    OPENVDB_ASSERT(value && (value->getType()->isIntegerTy() || value->getType()->isFloatingPointTy()) &&
         "First Value in arithmeticConversion is not a scalar type");
-    assert(targetType && (targetType->isIntegerTy() || targetType->isFloatingPointTy()) &&
+    OPENVDB_ASSERT(targetType && (targetType->isIntegerTy() || targetType->isFloatingPointTy()) &&
         "Target Type in arithmeticConversion is not a scalar type");
 
     const llvm::Type* const valueType = value->getType();
@@ -507,18 +508,18 @@ arrayCast(llvm::Value* ptrToArray,
           llvm::Type* targetElementType,
           llvm::IRBuilder<>& builder)
 {
-    assert(targetElementType && (targetElementType->isIntegerTy() ||
+    OPENVDB_ASSERT(targetElementType && (targetElementType->isIntegerTy() ||
         targetElementType->isFloatingPointTy()) &&
         "Target element type is not a scalar type");
-    assert(ptrToArray && ptrToArray->getType()->isPointerTy() &&
+    OPENVDB_ASSERT(ptrToArray && ptrToArray->getType()->isPointerTy() &&
         "Input to arrayCast is not a pointer type.");
 
     llvm::Type* arrayType = ptrToArray->getType()->getContainedType(0);
-    assert(arrayType && llvm::isa<llvm::ArrayType>(arrayType));
+    OPENVDB_ASSERT(arrayType && llvm::isa<llvm::ArrayType>(arrayType));
 
     // getArrayElementType() calls getContainedType(0)
     llvm::Type* sourceElementType = arrayType->getArrayElementType();
-    assert(sourceElementType && (sourceElementType->isIntegerTy() ||
+    OPENVDB_ASSERT(sourceElementType && (sourceElementType->isIntegerTy() ||
         sourceElementType->isFloatingPointTy()) &&
         "Source element type is not a scalar type");
 
@@ -555,12 +556,12 @@ arithmeticConversion(std::vector<llvm::Value*>& values,
                      llvm::Type* targetElementType,
                      llvm::IRBuilder<>& builder)
 {
-    assert(targetElementType && (targetElementType->isIntegerTy() ||
+    OPENVDB_ASSERT(targetElementType && (targetElementType->isIntegerTy() ||
         targetElementType->isFloatingPointTy()) &&
         "Target element type is not a scalar type");
 
     llvm::Type* sourceElementType = values.front()->getType();
-    assert(sourceElementType && (sourceElementType->isIntegerTy() ||
+    OPENVDB_ASSERT(sourceElementType && (sourceElementType->isIntegerTy() ||
         sourceElementType->isFloatingPointTy()) &&
         "Source element type is not a scalar type");
 
@@ -625,7 +626,7 @@ boolComparison(llvm::Value* value,
     if (type->isFloatingPointTy())  return builder.CreateFCmpONE(value, llvm::ConstantFP::get(type, 0.0));
     else if (type->isIntegerTy(1))  return builder.CreateICmpNE(value, llvm::ConstantInt::get(type, 0));
     else if (type->isIntegerTy())   return builder.CreateICmpNE(value, llvm::ConstantInt::getSigned(type, 0));
-    assert(false && "Invalid type for bool conversion");
+    OPENVDB_ASSERT(false && "Invalid type for bool conversion");
     return nullptr;
 }
 
@@ -643,7 +644,7 @@ binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
                llvm::IRBuilder<>& builder)
 {
     llvm::Type* lhsType = lhs->getType();
-    assert(lhsType == rhs->getType() ||
+    OPENVDB_ASSERT(lhsType == rhs->getType() ||
         (token == ast::tokens::SHIFTLEFT ||
          token == ast::tokens::SHIFTRIGHT));
 
@@ -718,7 +719,7 @@ array3Unpack(llvm::Value* ptrToArray,
              llvm::Value*& value3,
              llvm::IRBuilder<>& builder)
 {
-    assert(ptrToArray && ptrToArray->getType()->isPointerTy() &&
+    OPENVDB_ASSERT(ptrToArray && ptrToArray->getType()->isPointerTy() &&
         "Input to array3Unpack is not a pointer type.");
 
     value1 = ir_constgep2_64(builder, ptrToArray, 0, 0);
@@ -776,7 +777,7 @@ arrayPack(llvm::Value* value,
           llvm::IRBuilder<>& builder,
           const size_t size = 3)
 {
-    assert(value && (value->getType()->isIntegerTy() ||
+    OPENVDB_ASSERT(value && (value->getType()->isIntegerTy() ||
         value->getType()->isFloatingPointTy()) &&
         "value type is not a scalar type");
 
@@ -850,7 +851,7 @@ scalarToMatrix(llvm::Value* scalar,
      llvm::IRBuilder<>& builder,
      const size_t dim = 3)
 {
-    assert(scalar && (scalar->getType()->isIntegerTy() ||
+    OPENVDB_ASSERT(scalar && (scalar->getType()->isIntegerTy() ||
         scalar->getType()->isFloatingPointTy()) &&
         "value type is not a scalar type");
 

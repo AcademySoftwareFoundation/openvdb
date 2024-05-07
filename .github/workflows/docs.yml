@@ -45,6 +45,9 @@ jobs:
     - uses: actions/checkout@v3
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
+    - name: pybind11
+      #if: contains(matrix.config.image, '2023') == false
+      run: ./ci/install_pybind11.sh 2.10.0
     # - name: install_epydoc
     #   run: pip install epydoc
     - name: install_latex
@@ -102,13 +105,11 @@ jobs:
       github.event.inputs.deploy == 'coverage'
     runs-on: ubuntu-latest
     container:
-      image: aswf/ci-openvdb:2022
+      image: aswf/ci-openvdb:2023
     env:
       CXX: g++
     steps:
     - uses: actions/checkout@v3
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: install_gcovr
       run: pip install gcovr
     - name: build

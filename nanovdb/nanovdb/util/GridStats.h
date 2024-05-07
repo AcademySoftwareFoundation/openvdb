@@ -15,12 +15,18 @@
 #ifndef NANOVDB_GRIDSTATS_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRIDSTATS_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"
+#include <nanovdb/NanoVDB.h>
 #include "Range.h"
 #include "ForEach.h"
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_reduce.h>
+#endif
+
+#if defined(__CUDACC__)
+#include <cuda/std/limits>// for cuda::std::numeric_limits
+#else
+#include <limits.h>// for std::numeric_limits
 #endif
 
 #include <atomic>
@@ -59,55 +65,64 @@ protected:
 
 public:
     using ValueType = ValueT;
-    Extrema()
+    __hostdev__ Extrema()
+#if defined(__CUDACC__)
+        : mMin(cuda::std::numeric_limits<ValueT>::max())
+        , mMax(cuda::std::numeric_limits<ValueT>::lowest())
+#else
         : mMin(std::numeric_limits<ValueT>::max())
         , mMax(std::numeric_limits<ValueT>::lowest())
+#endif
     {
     }
-    Extrema(const ValueT& v)
+    __hostdev__ Extrema(const ValueT& v)
         : mMin(v)
         , mMax(v)
     {
     }
-    Extrema(const ValueT& a, const ValueT& b)
+    __hostdev__ Extrema(const ValueT& a, const ValueT& b)
         : mMin(a)
         , mMax(b)
     {
     }
-    Extrema& min(const ValueT& v)
+    __hostdev__ Extrema& min(const ValueT& v)
     {
-        if (v < mMin) {
-            mMin = v;
-        }
+        if (v < mMin) mMin = v;
         return *this;
     }
-    Extrema& max(const ValueT& v)
+    __hostdev__ Extrema& max(const ValueT& v)
     {
-        if (v > mMax) {
-            mMax = v;
-        }
+        if (v > mMax) mMax = v;
         return *this;
     }
-    Extrema& add(const ValueT& v)
+    __hostdev__ Extrema& add(const ValueT& v)
     {
         this->min(v);
         this->max(v);
         return *this;
     }
-    Extrema& add(const ValueT& v, uint64_t) { return this->add(v); }
-    Extrema& add(const Extrema& other)
+    __hostdev__ Extrema& add(const ValueT& v, uint64_t) { return this->add(v); }
+    __hostdev__ Extrema& add(const Extrema& other)
     {
         this->min(other.mMin);
         this->max(other.mMax);
         return *this;
     }
-    const ValueT& min() const { return mMin; }
-    const ValueT& max() const { return mMax; }
-    operator bool() const { return mMin <= mMax; }
-    static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
-    static constexpr bool hasAverage() { return false; }
-    static constexpr bool hasStdDeviation() { return false; }
-    static constexpr size_t size() { return 0; }
+    __hostdev__ const ValueT& min() const { return mMin; }
+    __hostdev__ const ValueT& max() const { return mMax; }
+    __hostdev__ operator bool() const { return mMin <= mMax; }
+    __hostdev__ static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return false; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return false; }
+    __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr size_t size() { return 0; }
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+    }
 }; // Extrema<T, 0>
 
 /// @brief Template specialization of Extrema on vector value types, i.e. rank = 1
@@ -121,81 +136,82 @@ protected:
         Real scalar;
         VecT vector;
 
-        Pair(Real s)// is only used by Extrema() default c-tor
+        __hostdev__ Pair(Real s)// is only used by Extrema() default c-tor
             : scalar(s)
             , vector(s)
         {
         }
-        Pair(const VecT& v)
+        __hostdev__ Pair(const VecT& v)
             : scalar(v.lengthSqr())
             , vector(v)
         {
         }
-        bool  operator<(const Pair& rhs) const { return scalar < rhs.scalar; }
+        __hostdev__ bool  operator<(const Pair& rhs) const { return scalar < rhs.scalar; }
     } mMin, mMax;
-    Extrema& add(const Pair& p)
+    __hostdev__ Extrema& add(const Pair& p)
     {
-        if (p < mMin) {
-            mMin = p;
-        }
-        if (mMax < p) {
-            mMax = p;
-        }
+        if (p < mMin) mMin = p;
+        if (mMax < p) mMax = p;
         return *this;
     }
 
 public:
     using ValueType = VecT;
-    Extrema()
+    __hostdev__ Extrema()
+#if defined(__CUDACC__)
+        : mMin(cuda::std::numeric_limits<Real>::max())
+        , mMax(cuda::std::numeric_limits<Real>::lowest())
+#else
         : mMin(std::numeric_limits<Real>::max())
         , mMax(std::numeric_limits<Real>::lowest())
+#endif
     {
     }
-    Extrema(const VecT& v)
+    __hostdev__ Extrema(const VecT& v)
         : mMin(v)
         , mMax(v)
     {
     }
-    Extrema(const VecT& a, const VecT& b)
+    __hostdev__ Extrema(const VecT& a, const VecT& b)
         : mMin(a)
         , mMax(b)
     {
     }
-    Extrema& min(const VecT& v)
+    __hostdev__ Extrema& min(const VecT& v)
     {
         Pair tmp(v);
-        if (tmp < mMin) {
-            mMin = tmp;
-        }
+        if (tmp < mMin) mMin = tmp;
         return *this;
     }
-    Extrema& max(const VecT& v)
+    __hostdev__ Extrema& max(const VecT& v)
     {
         Pair tmp(v);
-        if (mMax < tmp) {
-            mMax = tmp;
-        }
+        if (mMax < tmp) mMax = tmp;
         return *this;
     }
-    Extrema& add(const VecT& v) { return this->add(Pair(v)); }
-    Extrema& add(const VecT& v, uint64_t) { return this->add(Pair(v)); }
-    Extrema& add(const Extrema& other)
+    __hostdev__ Extrema& add(const VecT& v) { return this->add(Pair(v)); }
+    __hostdev__ Extrema& add(const VecT& v, uint64_t) { return this->add(Pair(v)); }
+    __hostdev__ Extrema& add(const Extrema& other)
     {
-        if (other.mMin < mMin) {
-            mMin = other.mMin;
-        }
-        if (mMax < other.mMax) {
-            mMax = other.mMax;
-        }
+        if (other.mMin < mMin) mMin = other.mMin;
+        if (mMax < other.mMax) mMax = other.mMax;
         return *this;
     }
-    const VecT& min() const { return mMin.vector; }
-    const VecT& max() const { return mMax.vector; }
-    operator bool() const { return !(mMax < mMin); }
-    static constexpr bool hasMinMax() { return !std::is_same<bool, Real>::value; }
-    static constexpr bool hasAverage() { return false; }
-    static constexpr bool hasStdDeviation() { return false; }
-    static constexpr size_t size() { return 0; }
+    __hostdev__ const VecT& min() const { return mMin.vector; }
+    __hostdev__ const VecT& max() const { return mMax.vector; }
+    __hostdev__ operator bool() const { return !(mMax < mMin); }
+    __hostdev__ static constexpr bool hasMinMax() { return !std::is_same<bool, Real>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return false; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return false; }
+    __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, Real>::value; }
+    __hostdev__ static constexpr size_t size() { return 0; }
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+    }
 }; // Extrema<T, 1>
 
 //================================================================================================
@@ -222,14 +238,14 @@ protected:
 
 public:
     using ValueType = ValueT;
-    Stats()
+    __hostdev__ Stats()
         : BaseT()
         , mSize(0)
         , mAvg(0.0)
         , mAux(0.0)
     {
     }
-    Stats(const ValueT& val)
+    __hostdev__ Stats(const ValueT& val)
         : BaseT(val)
         , mSize(1)
         , mAvg(RealT(val))
@@ -237,7 +253,7 @@ public:
     {
     }
     /// @brief Add a single sample
-    Stats& add(const ValueT& val)
+    __hostdev__ Stats& add(const ValueT& val)
     {
         BaseT::add(val);
         mSize += 1;
@@ -247,7 +263,7 @@ public:
         return *this;
     }
     /// @brief Add @a n samples with constant value @a val.
-    Stats& add(const ValueT& val, uint64_t n)
+    __hostdev__ Stats& add(const ValueT& val, uint64_t n)
     {
         const double denom = 1.0 / double(mSize + n);
         const double delta = double(val) - mAvg;
@@ -259,7 +275,7 @@ public:
     }
 
     /// Add the samples from the other Stats instance.
-    Stats& add(const Stats& other)
+    __hostdev__ Stats& add(const Stats& other)
     {
         if (other.mSize > 0) {
             const double denom = 1.0 / double(mSize + other.mSize);
@@ -272,32 +288,42 @@ public:
         return *this;
     }
 
-    static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
-    static constexpr bool hasAverage() { return !std::is_same<bool, ValueT>::value; }
-    static constexpr bool hasStdDeviation() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, ValueT>::value; }
 
-    size_t size() const { return mSize; }
+    __hostdev__ size_t size() const { return mSize; }
 
     //@{
     /// Return the  arithmetic mean, i.e. average, value.
-    double avg() const { return mAvg; }
-    double mean() const { return mAvg; }
+    __hostdev__ double avg() const { return mAvg; }
+    __hostdev__ double mean() const { return mAvg; }
     //@}
 
     //@{
     /// @brief Return the population variance.
     ///
     /// @note The unbiased sample variance = population variance * num/(num-1)
-    double var() const { return mSize < 2 ? 0.0 : mAux / double(mSize); }
-    double variance() const { return this->var(); }
+    __hostdev__ double var() const { return mSize < 2 ? 0.0 : mAux / double(mSize); }
+    __hostdev__ double variance() const { return this->var(); }
     //@}
 
     //@{
     /// @brief Return the standard deviation (=Sqrt(variance)) as
     ///        defined from the (biased) population variance.
-    double std() const { return sqrt(this->var()); }
-    double stdDev() const { return this->std(); }
+    __hostdev__ double std() const { return sqrt(this->var()); }
+    __hostdev__ double stdDev() const { return this->std(); }
     //@}
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+        node.setAvg(this->avg());
+        node.setDev(this->std());
+    }
 }; // end Stats<T, 0>
 
 /// @brief This class computes statistics (minimum value, maximum
@@ -319,7 +345,7 @@ protected:
 
 public:
     using ValueType = ValueT;
-    Stats()
+    __hostdev__ Stats()
         : BaseT()
         , mSize(0)
         , mAvg(0.0)
@@ -327,7 +353,7 @@ public:
     {
     }
     /// @brief Add a single sample
-    Stats& add(const ValueT& val)
+    __hostdev__ Stats& add(const ValueT& val)
     {
         typename BaseT::Pair tmp(val);
         BaseT::add(tmp);
@@ -338,7 +364,7 @@ public:
         return *this;
     }
     /// @brief Add @a n samples with constant value @a val.
-    Stats& add(const ValueT& val, uint64_t n)
+    __hostdev__ Stats& add(const ValueT& val, uint64_t n)
     {
         typename BaseT::Pair tmp(val);
         const double         denom = 1.0 / double(mSize + n);
@@ -351,7 +377,7 @@ public:
     }
 
     /// Add the samples from the other Stats instance.
-    Stats& add(const Stats& other)
+    __hostdev__ Stats& add(const Stats& other)
     {
         if (other.mSize > 0) {
             const double denom = 1.0 / double(mSize + other.mSize);
@@ -364,32 +390,42 @@ public:
         return *this;
     }
 
-    static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
-    static constexpr bool hasAverage() { return !std::is_same<bool, ValueT>::value; }
-    static constexpr bool hasStdDeviation() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasAverage() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return !std::is_same<bool, ValueT>::value; }
+    __hostdev__ static constexpr bool hasStats() { return !std::is_same<bool, ValueT>::value; }
 
-    size_t size() const { return mSize; }
+    __hostdev__ size_t size() const { return mSize; }
 
     //@{
     /// Return the  arithmetic mean, i.e. average, value.
-    double avg() const { return mAvg; }
-    double mean() const { return mAvg; }
+    __hostdev__ double avg() const { return mAvg; }
+    __hostdev__ double mean() const { return mAvg; }
     //@}
 
     //@{
     /// @brief Return the population variance.
     ///
     /// @note The unbiased sample variance = population variance * num/(num-1)
-    double var() const { return mSize < 2 ? 0.0 : mAux / double(mSize); }
-    double variance() const { return this->var(); }
+    __hostdev__ double var() const { return mSize < 2 ? 0.0 : mAux / double(mSize); }
+    __hostdev__ double variance() const { return this->var(); }
     //@}
 
     //@{
     /// @brief Return the standard deviation (=Sqrt(variance)) as
     ///        defined from the (biased) population variance.
-    double std() const { return sqrt(this->var()); }
-    double stdDev() const { return this->std(); }
+    __hostdev__ double std() const { return sqrt(this->var()); }
+    __hostdev__ double stdDev() const { return this->std(); }
     //@}
+
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT &node) const
+    {
+        node.setMin(this->min());
+        node.setMax(this->max());
+        node.setAvg(this->avg());
+        node.setDev(this->std());
+    }
 }; // end Stats<T, 1>
 
 /// @brief No-op Stats class
@@ -397,20 +433,23 @@ template<typename ValueT>
 struct NoopStats
 {
     using ValueType = ValueT;
-    NoopStats() {}
-    NoopStats(const ValueT&) {}
-    NoopStats& add(const ValueT&) { return *this; }
-    NoopStats& add(const ValueT&, uint64_t) { return *this; }
-    NoopStats& add(const NoopStats&) { return *this; }
-    static constexpr size_t size() { return 0; }
-    static constexpr bool hasMinMax() { return false; }
-    static constexpr bool hasAverage() { return false; }
-    static constexpr bool hasStdDeviation() { return false; }
+    __hostdev__ NoopStats() {}
+    __hostdev__ NoopStats(const ValueT&) {}
+    __hostdev__ NoopStats& add(const ValueT&) { return *this; }
+    __hostdev__ NoopStats& add(const ValueT&, uint64_t) { return *this; }
+    __hostdev__ NoopStats& add(const NoopStats&) { return *this; }
+    __hostdev__ static constexpr size_t size() { return 0; }
+    __hostdev__ static constexpr bool hasMinMax() { return false; }
+    __hostdev__ static constexpr bool hasAverage() { return false; }
+    __hostdev__ static constexpr bool hasStdDeviation() { return false; }
+    __hostdev__ static constexpr bool hasStats() { return false; }
+    template <typename NodeT>
+    __hostdev__ void setStats(NodeT&) const{}
 }; // end NoopStats<T>
 
 //================================================================================================
 
-/// @brief Allows for the construction of NanoVDB grids without any dependecy
+/// @brief Allows for the construction of NanoVDB grids without any dependency
 template<typename GridT, typename StatsT = Stats<typename GridT::ValueType>>
 class GridStats
 {
@@ -423,7 +462,6 @@ class GridStats
     using Node2  = typename TreeT::Node2; // upper
     using RootT  = typename TreeT::Node3; // root
     static_assert(std::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
-    static constexpr bool DO_STATS = StatsT::hasMinMax() ||  StatsT::hasAverage() || StatsT::hasStdDeviation();
 
     ValueT mDelta; // skip rendering of node if: node.max < -mDelta || node.min > mDelta
 
@@ -461,7 +499,6 @@ template<typename GridT, typename StatsT>
 struct GridStats<GridT, StatsT>::NodeStats
 {
     StatsT    stats;
-    //uint64_t  activeCount;
     CoordBBox bbox;
 
     NodeStats(): stats(), bbox() {}//activeCount(0), bbox() {};
@@ -469,7 +506,6 @@ struct GridStats<GridT, StatsT>::NodeStats
     NodeStats& add(const NodeStats &other)
     {
         stats.add( other.stats );// no-op for NoopStats?!
-        //activeCount += other.activeCount;
         bbox[0].minComponent(other.bbox[0]);
         bbox[1].maxComponent(other.bbox[1]);
         return *this;
@@ -533,31 +569,19 @@ void GridStats<GridT, StatsT>::process( GridT &grid )
     auto& data = *grid.data();
     const auto& indexBBox = grid.tree().root().bbox();
     if (indexBBox.empty()) {
-        data.mWorldBBox = BBox<Vec3R>();
+        data.mWorldBBox = BBox<Vec3d>();
         data.setBBoxOn(false);
     } else {
         // Note that below max is offset by one since CoordBBox.max is inclusive
-        // while bbox<Vec3R>.max is exclusive. However, min is inclusive in both
-        // CoordBBox and BBox<Vec3R>. This also guarantees that a grid with a single
+        // while bbox<Vec3d>.max is exclusive. However, min is inclusive in both
+        // CoordBBox and BBox<Vec3d>. This also guarantees that a grid with a single
         // active voxel, does not have an empty world bbox! E.g. if a grid with a
         // unit index-to-world transformation only contains the active voxel (0,0,0)
         // then indeBBox = (0,0,0) -> (0,0,0) and then worldBBox = (0.0, 0.0, 0.0)
         // -> (1.0, 1.0, 1.0). This is a consequence of the different definitions
         // of index and world bounding boxes inherited from OpenVDB!
-        const Coord min = indexBBox[0];
-        const Coord max = indexBBox[1] + Coord(1);
-
-        auto& worldBBox = data.mWorldBBox;
-        const auto& map = grid.map();
-        worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
-        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
-        data.setBBoxOn(true);
+        grid.mWorldBBox = CoordBBox(indexBBox[0], indexBBox[1].offsetBy(1)).transform(grid.map());
+        grid.setBBoxOn(true);
     }
 
     // set bit flags
@@ -584,7 +608,6 @@ void GridStats<GridT, StatsT>::process(RootT &root)
     if (data.mTableSize == 0) { // empty root node
         data.mMinimum = data.mMaximum = data.mBackground;
         data.mAverage = data.mStdDevi = 0;
-        //data.mActiveVoxelCount = 0;
         data.mBBox = CoordBBox();
     } else {
         NodeStats total;
@@ -593,21 +616,19 @@ void GridStats<GridT, StatsT>::process(RootT &root)
             if (tile->isChild()) { // process child node
                 total.add( this->process( *data.getChild(tile) ) );
             } else if (tile->state) { // active tile
-                //total.activeCount += ChildT::NUM_VALUES;
                 const Coord ijk = tile->origin();
                 total.bbox[0].minComponent(ijk);
                 total.bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-                if (DO_STATS) { // resolved at compile time
+                if (StatsT::hasStats()) { // resolved at compile time
                     total.stats.add(tile->value, ChildT::NUM_VALUES);
                 }
             }
         }
         this->setStats(&data, total.stats);
         if (total.bbox.empty()) {
-            std::cerr << "\nWarning: input tree only contained inactive root tiles!"
+            std::cerr << "\nWarning in GridStats: input tree only contained inactive root tiles!"
                       << "\nWhile not strictly an error it's rather suspicious!\n";
         }
-        //data.mActiveVoxelCount = total.activeCount;
         data.mBBox = total.bbox;
     }
 } // GridStats::process( RootNode )
@@ -629,7 +650,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
     if (const auto tileCount = data->mValueMask.countOn()) {
         //total.activeCount = tileCount * ChildT::NUM_VALUES; // active tiles
         for (auto it = data->mValueMask.beginOn(); it; ++it) {
-            if (DO_STATS) { // resolved at compile time
+            if (StatsT::hasStats()) { // resolved at compile time
                 total.stats.add( data->mTable[*it].value, ChildT::NUM_VALUES );
             }
             const Coord ijk = node.offsetToGlobalCoord(*it);
@@ -668,7 +689,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
         data->mFlags &= ~uint32_t(2); // set 2nd bit off since node does not contain active values
     } else {
         data->mFlags |=  uint32_t(2); // set 2nd bit on since node contains active values
-        if (DO_STATS) { // resolved at compile time
+        if (StatsT::hasStats()) { // resolved at compile time
             this->setStats(data, total.stats);
             this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
         }
@@ -682,24 +703,15 @@ template<typename GridT, typename StatsT>
 typename GridStats<GridT, StatsT>::NodeStats
 GridStats<GridT, StatsT>::process(Node0 &leaf)
 {
-    static_assert(Node0::SIZE == 512u, "Invalid size of leaf nodes");
     NodeStats local;
-    auto *data = leaf.data();
-    if (auto activeCount = data->mValueMask.countOn()) {
-        //data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
-        //local.activeCount += activeCount;
-        leaf.updateBBox(); // optionally update active bounding box (updates data->mFlags)
-        local.bbox[0] = local.bbox[1] = data->mBBoxMin;
-        local.bbox[1] += Coord(data->mBBoxDif[0], data->mBBoxDif[1], data->mBBoxDif[2]);
-        if (DO_STATS) { // resolved at compile time
-            for (auto it = data->mValueMask.beginOn(); it; ++it) {
-                local.stats.add(data->getValue(*it));
-            }
-            this->setStats(data, local.stats);
-            this->setFlag(data->getMin(), data->getMax(), data->mFlags);
+    if (leaf.updateBBox()) {// optionally update active bounding box (updates data->mFlags)
+        local.bbox[0] = local.bbox[1] = leaf.mBBoxMin;
+        local.bbox[1] += Coord(leaf.mBBoxDif[0], leaf.mBBoxDif[1], leaf.mBBoxDif[2]);
+        if (StatsT::hasStats()) {// resolved at compile time
+            for (auto it = leaf.cbeginValueOn(); it; ++it) local.stats.add(*it);
+            this->setStats(&leaf, local.stats);
+            this->setFlag(leaf.getMin(), leaf.getMax(), leaf.mFlags);
         }
-    } else {
-        data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf has no bbox of active active values
     }
     return local;
 } // GridStats::process( LeafNode )
@@ -725,7 +737,7 @@ void gridStats(NanoGrid<BuildT>& grid, StatsMode mode)
     } else {
         throw std::runtime_error("gridStats: Unsupported statistics mode.");
     }
-}
+}// gridStats
 
 //================================================================================================
 
@@ -755,7 +767,8 @@ Mask<NodeT::LOG2DIM> getBBoxMask(const CoordBBox &bbox, const NodeT* node)
         }
     }
     return mask;
-}
+}// getBBoxMask
+
 }// end of unnamed namespace
 
 /// @brief return the extrema of all the values in a grid that
@@ -836,7 +849,6 @@ getExtrema(const NanoGrid<BuildT>& grid, const CoordBBox &bbox)
     }
     return extrema;
 }// getExtrema
-
 
 } // namespace nanovdb
 

@@ -255,7 +255,7 @@ inline void appendGroup(PointDataTreeT& tree, const Name& group)
 
     // ensure that there are now available groups
 
-    assert(descriptor->unusedGroups() > 0);
+    OPENVDB_ASSERT(descriptor->unusedGroups() > 0);
 
     // find next unused offset
 
@@ -422,7 +422,7 @@ inline void compactGroups(PointDataTreeT& tree)
 
     const size_t totalAttributesToDrop = descriptor->unusedGroups() / descriptor->groupBits();
 
-    assert(totalAttributesToDrop <= indices.size());
+    OPENVDB_ASSERT(totalAttributesToDrop <= indices.size());
 
     const std::vector<size_t> indicesToDrop(indices.end() - totalAttributesToDrop,
         indices.end());

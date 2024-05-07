@@ -8,16 +8,17 @@
 #include <cmath>
 
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/OpenToNanoVDB.h>
+#include <nanovdb/util/CreateNanoGrid.h>
 #include <nanovdb/util/NanoToOpenVDB.h>
 #include <nanovdb/util/GridValidator.h>
 #include <nanovdb/util/SampleFromVoxels.h>
+#include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/NodeManager.h>
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/IndexGridBuilder.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/GridStats.h>
 #include <nanovdb/util/HDDA.h>
+#include <nanovdb/util/CpuTimer.h>
+#include <nanovdb/util/GridBuilder.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
@@ -38,31 +39,6 @@
 #include <tbb/parallel_invoke.h>
 
 #include <gtest/gtest.h>
-
-namespace nanovdb {// this namespace is required by gtest
-inline std::ostream&
-operator<<(std::ostream& os, const CoordBBox& b)
-{
-    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
-       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
-    return os;
-}
-
-inline std::ostream&
-operator<<(std::ostream& os, const Coord& ijk)
-{
-    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
-    return os;
-}
-
-template<typename T>
-inline std::ostream&
-operator<<(std::ostream& os, const Vec3<T>& v)
-{
-    os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
-    return os;
-}
-}// namespace nanovdb
 
 // define the environment variable VDB_DATA_PATH to use models from the web
 // e.g. setenv VDB_DATA_PATH /home/kmu/dev/data/vdb
@@ -214,7 +190,7 @@ TEST_F(TestOpenVDB, getExtrema)
 {
     using wBBoxT = openvdb::math::BBox<openvdb::Vec3d>;
     auto srcGrid = this->getSrcGrid(false, 0, 3);// level set of a bunny if available, else an octahedron
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All);
+    auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::All);
     EXPECT_TRUE(handle);
     auto* dstGrid = handle.grid<float>();
     EXPECT_TRUE(dstGrid);
@@ -256,11 +232,9 @@ TEST_F(TestOpenVDB, Basic)
     }
 }
 
-TEST_F(TestOpenVDB, OpenToNanoType)
+TEST_F(TestOpenVDB, MapToNano)
 {
     {// Coord
-        constexpr bool test = std::is_same<nanovdb::Coord, nanovdb::OpenToNanoType<openvdb::Coord>::Type>::value;
-        EXPECT_TRUE(test);
         const openvdb::Coord ijk1(1, 2, -4);
         nanovdb::Coord ijk2(-2, 7, 9);
         EXPECT_NE(ijk2, nanovdb::Coord(1, 2, -4));
@@ -268,9 +242,9 @@ TEST_F(TestOpenVDB, OpenToNanoType)
         EXPECT_EQ(ijk2, nanovdb::Coord(1, 2, -4));
     }
     {// Vec3f
-        constexpr bool test1 = std::is_same<nanovdb::Vec3f, nanovdb::OpenToNanoType<openvdb::Vec3f>::Type>::value;
+        constexpr bool test1 = nanovdb::is_same<nanovdb::Vec3f, nanovdb::MapToNano<openvdb::Vec3f>::type>::value;
         EXPECT_TRUE(test1);
-        constexpr bool test2 = std::is_same<nanovdb::Vec3d, nanovdb::OpenToNanoType<openvdb::Vec3f>::Type>::value;
+        constexpr bool test2 = nanovdb::is_same<nanovdb::Vec3d, nanovdb::MapToNano<openvdb::Vec3f>::type>::value;
         EXPECT_FALSE(test2);
         const openvdb::Vec3f xyz1(1, 2, -4);
         nanovdb::Vec3f xyz2(-2, 7, 9);
@@ -279,9 +253,9 @@ TEST_F(TestOpenVDB, OpenToNanoType)
         EXPECT_EQ(xyz2, nanovdb::Vec3f(1, 2, -4));
     }
     {// Vec4d
-        constexpr bool test1 = std::is_same<nanovdb::Vec4d, nanovdb::OpenToNanoType<openvdb::Vec4d>::Type>::value;
+        constexpr bool test1 = nanovdb::is_same<nanovdb::Vec4d, nanovdb::MapToNano<openvdb::Vec4d>::type>::value;
         EXPECT_TRUE(test1);
-        constexpr bool test2 = std::is_same<nanovdb::Vec4f, nanovdb::OpenToNanoType<openvdb::Vec4d>::Type>::value;
+        constexpr bool test2 = nanovdb::is_same<nanovdb::Vec4f, nanovdb::MapToNano<openvdb::Vec4d>::type>::value;
         EXPECT_FALSE(test2);
         const openvdb::Vec4d xyz1(1, 2, -4, 7);
         nanovdb::Vec4d xyz2(-2, 7, 9, -4);
@@ -290,9 +264,9 @@ TEST_F(TestOpenVDB, OpenToNanoType)
         EXPECT_EQ(xyz2, nanovdb::Vec4d(1, 2, -4, 7));
     }
     {// MaskValue
-        constexpr bool test1 = std::is_same<nanovdb::ValueMask, nanovdb::OpenToNanoType<openvdb::ValueMask>::Type>::value;
+        constexpr bool test1 = nanovdb::is_same<nanovdb::ValueMask, nanovdb::MapToNano<openvdb::ValueMask>::type>::value;
         EXPECT_TRUE(test1);
-        constexpr bool test2 = std::is_same<nanovdb::Vec3f, nanovdb::OpenToNanoType<openvdb::ValueMask>::Type>::value;
+        constexpr bool test2 = nanovdb::is_same<nanovdb::Vec3f, nanovdb::MapToNano<openvdb::ValueMask>::type>::value;
         EXPECT_FALSE(test2);
         EXPECT_EQ(sizeof(nanovdb::ValueMask), sizeof(openvdb::ValueMask));
     }
@@ -416,13 +390,18 @@ TEST_F(TestOpenVDB, BasicGrid)
     { // init Grid
         auto* data = grid->data();
         {
-            openvdb::math::UniformScaleTranslateMap map(2.0, openvdb::Vec3R(0.0, 0.0, 0.0));
-            auto                                    affineMap = map.getAffineMap();
-            data->mVoxelSize = affineMap->voxelSize();
+            openvdb::math::UniformScaleTranslateMap map(2.0, openvdb::Vec3d(0.0, 0.0, 0.0));
+            auto affineMap = map.getAffineMap();
             const auto mat = affineMap->getMat4(), invMat = mat.inverse();
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<mat[i][0]<<", "<<mat[i][1]<<", "<<mat[i][2]<<", "<<mat[i][3]<<"]\n";
             //for (int i=0; i<4; ++i) std::cout << "Row("<<i<<"): ["<<invMat[i][0]<<", "<<invMat[i][1]<<", "<<invMat[i][2]<<", "<<invMat[i][3]<<"]\n";
+#if 1
+            nanovdb::Map dstMap;
+            dstMap.set(mat, invMat);
+            data->init({nanovdb::GridFlags::HasMinMax}, bytes[8], dstMap, nanovdb::GridType::Float);
+#else
             data->mMap.set(mat, invMat, 1.0);
+            data->mVoxelSize = affineMap->voxelSize();
             data->setFlagsOff();
             data->setMinMaxOn();
             data->mGridIndex = 0;
@@ -433,12 +412,13 @@ TEST_F(TestOpenVDB, BasicGrid)
             data->mGridType = nanovdb::GridType::Float;
             data->mMagic = NANOVDB_MAGIC_NUMBER;
             data->mVersion = nanovdb::Version();
+#endif
             memcpy(data->mGridName, name.c_str(), name.size() + 1);
         }
         EXPECT_EQ(tree, &grid->tree());
-        const openvdb::Vec3R p1(1.0, 2.0, 3.0);
+        const openvdb::Vec3d p1(1.0, 2.0, 3.0);
         const auto           p2 = grid->worldToIndex(p1);
-        EXPECT_EQ(openvdb::Vec3R(0.5, 1.0, 1.5), p2);
+        EXPECT_EQ(openvdb::Vec3d(0.5, 1.0, 1.5), p2);
         const auto p3 = grid->indexToWorld(p2);
         EXPECT_EQ(p1, p3);
         {
@@ -452,7 +432,7 @@ TEST_F(TestOpenVDB, BasicGrid)
         }
 
         auto const p4 = grid->worldToIndex(p3);
-        EXPECT_EQ(openvdb::Vec3R(0.0, 0.0, 0.0), p4);
+        EXPECT_EQ(openvdb::Vec3d(0.0, 0.0, 0.0), p4);
         const auto p5 = grid->indexToWorld(p4);
         EXPECT_EQ(p1, p5);
     }
@@ -578,7 +558,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Empty)
     { // empty grid
         openvdb::FloatGrid srcGrid(0.0f);
         auto srcAcc = srcGrid.getAccessor();
-        auto handle = nanovdb::openToNanoVDB(srcGrid);
+        auto handle = nanovdb::createNanoGrid(srcGrid);
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
         EXPECT_TRUE(meta);
@@ -613,7 +593,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Basic1)
         srcAcc.setValue(openvdb::Coord(1, 2, 3), 1.0f);
         EXPECT_TRUE(srcAcc.isValueOn(openvdb::Coord(1, 2, 3)));
         EXPECT_EQ(1.0f, srcAcc.getValue(openvdb::Coord(1, 2, 3)));
-        auto handle = nanovdb::openToNanoVDB(srcGrid, nanovdb::StatsMode::All);
+        auto handle = nanovdb::createNanoGrid(srcGrid, nanovdb::StatsMode::All);
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
         EXPECT_TRUE(meta);
@@ -633,7 +613,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Basic1)
         EXPECT_EQ(sizeof(nanovdb::NanoGrid<float>) +
                   sizeof(nanovdb::NanoTree<float>) +
                   (const char*)handle.data(), (const char*)&dstGrid->tree().root());
-        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3d(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(1, 2, 3)));
@@ -652,8 +632,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Model)
 {
     auto srcGrid = this->getSrcGrid(false);
     //mTimer.start("Generating NanoVDB grid");
-    //auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::Default, nanovdb::ChecksumMode::Default, 2);
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.start("Writing NanoVDB grid");
     nanovdb::io::writeGrid("data/test.nvdb", handle, this->getCodec());
     //mTimer.stop();
@@ -700,10 +679,10 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp4)
         EXPECT_EQ(2.0f, srcAcc.getValue(openvdb::Coord(-10, 20,-50)));
         EXPECT_EQ(3.0f, srcAcc.getValue(openvdb::Coord( 50,-12, 30)));
 
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp4, nanovdb::HostBuffer> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(srcGrid);
         //converter.setVerbose();
         converter.setStats(nanovdb::StatsMode::All);
-        auto handle = converter(srcGrid);
+        auto handle = converter.getHandle<nanovdb::Fp4>();// (srcGrid);
 
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
@@ -731,7 +710,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp4)
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_TRUE(dstGrid->isSequential<0>());
 
-        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3d(1.0), dstGrid->voxelSize());
         auto *leaf = dstGrid->tree().root().probeLeaf(nanovdb::Coord(1, 2, 3));
         EXPECT_TRUE(leaf);
         //std::cerr << leaf->origin() << ", " << leaf->data()->mBBoxMin << std::endl;
@@ -754,10 +733,10 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp4)
     {// Model
         auto openGrid = this->getSrcGrid(false);
         const float tolerance = 0.5f*openGrid->voxelSize()[0];
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp4> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         converter.enableDithering();
         //converter.setVerbose(2);
-        auto handle = converter(*openGrid);
+        auto handle = converter.getHandle<nanovdb::Fp4>();
         auto* nanoGrid = handle.grid<nanovdb::Fp4>();
         EXPECT_TRUE(nanoGrid);
 
@@ -795,9 +774,9 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
         EXPECT_EQ(2.0f, srcAcc.getValue(openvdb::Coord(-10, 20,-50)));
         EXPECT_EQ(3.0f, srcAcc.getValue(openvdb::Coord( 50,-12, 30)));
 
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp8, nanovdb::HostBuffer> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(srcGrid);
         converter.setStats(nanovdb::StatsMode::All);
-        auto handle = converter(srcGrid);
+        auto handle = converter.getHandle<nanovdb::Fp8>();
 
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
@@ -812,7 +791,6 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
         auto* dstGrid = handle.grid<nanovdb::Fp8>();
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ("", std::string(dstGrid->gridName()));
-        EXPECT_EQ((const char*)handle.data(), (const char*)dstGrid);
         EXPECT_EQ(1.0f, dstGrid->tree().root().minimum());
         EXPECT_EQ(3.0f, dstGrid->tree().root().maximum());
         EXPECT_EQ(2.0f, dstGrid->tree().root().average());
@@ -825,7 +803,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_TRUE(dstGrid->isSequential<0>());
 
-        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3d(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(1, 2, 3)));
@@ -837,9 +815,9 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
     }
     {// Model
         auto openGrid = this->getSrcGrid(false);
-         const float tolerance = 0.05f*openGrid->voxelSize()[0];
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp8> converter;
-        auto handle = converter(*openGrid);
+        const float tolerance = 0.05f*openGrid->voxelSize()[0];
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
+        auto handle = converter.getHandle<nanovdb::Fp8>();
         converter.enableDithering();
         //converter.setVerbose(2);
         auto* nanoGrid = handle.grid<nanovdb::Fp8>();
@@ -880,10 +858,10 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
         EXPECT_EQ(2.0f, srcAcc.getValue(openvdb::Coord(-10, 20,-50)));
         EXPECT_EQ(3.0f, srcAcc.getValue(openvdb::Coord( 50,-12, 30)));
 
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp16> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(srcGrid);
         //converter.setVerbose(2);
         converter.setStats(nanovdb::StatsMode::All);
-        auto handle = converter(srcGrid);
+        auto handle = converter.getHandle<nanovdb::Fp16>();
 
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
@@ -911,7 +889,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_TRUE(dstGrid->isSequential<0>());
 
-        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3d(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(1, 2, 3)));
@@ -924,9 +902,9 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
     {// Model
         auto openGrid = this->getSrcGrid(false);
         const float tolerance = 0.005f*openGrid->voxelSize()[0];
-        nanovdb::OpenToNanoVDB<float, nanovdb::Fp16> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         converter.enableDithering();
-        auto handle = converter(*openGrid);
+        auto handle = converter.getHandle<nanovdb::Fp16>();
         //converter.setVerbose(2);
         auto* nanoGrid = handle.grid<nanovdb::Fp16>();
         EXPECT_TRUE(nanoGrid);
@@ -966,9 +944,9 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
         EXPECT_EQ(2.0f, srcAcc.getValue(openvdb::Coord(-10, 20,-50)));
         EXPECT_EQ(3.0f, srcAcc.getValue(openvdb::Coord( 50,-12, 30)));
 
-        nanovdb::OpenToNanoVDB<float, nanovdb::FpN> converter;
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(srcGrid);
         converter.setStats(nanovdb::StatsMode::All);
-        auto handle = converter(srcGrid);
+        auto handle = converter.getHandle<nanovdb::FpN>();
 
         EXPECT_TRUE(handle);
         auto* meta = handle.gridMetaData();
@@ -996,7 +974,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_FALSE(dstGrid->isSequential<0>());
 
-        EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
+        EXPECT_EQ(nanovdb::Vec3d(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
         EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(1, 2, 3)));
@@ -1012,14 +990,15 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
 #else
         auto openGrid = this->getSrcGrid(true, 1, 1);// FOG volume of Disney cloud or cube
 #endif
-        nanovdb::OpenToNanoVDB<float, nanovdb::FpN> converter;
-        converter.oracle() = nanovdb::AbsDiff( 0.05f );
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         //converter.setVerbose(2);
-        auto handle = converter(*openGrid);
+
+        const float tolerance = 0.05f;
+        nanovdb::AbsDiff oracle(tolerance);
+
+        auto handle = converter.getHandle<nanovdb::FpN>(oracle);
         auto* nanoGrid = handle.grid<nanovdb::FpN>();
         EXPECT_TRUE(nanoGrid);
-        const nanovdb::AbsDiff oracle = converter.oracle();
-        const float tolerance = oracle.getTolerance();
 
         nanovdb::io::writeGrid("data/test_fpN.nvdb", handle, this->getCodec());
 
@@ -1047,7 +1026,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
 
 // Generate random points by uniformly distributing points
 // on a unit-sphere.
-inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
+inline void genPoints(const int numPoints, std::vector<openvdb::Vec3d>& points)
 {
     openvdb::math::Random01 randNumber(0);
     const int               n = int(std::sqrt(double(numPoints)));
@@ -1055,7 +1034,7 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
     const double            yScale = openvdb::math::pi<double>() / double(n);
 
     double         x, y, theta, phi;
-    openvdb::Vec3R pos;
+    openvdb::Vec3d pos;
 
     points.reserve(n * n);
 
@@ -1082,10 +1061,10 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
 } // genPoints
 class PointList
 {
-    std::vector<openvdb::Vec3R> const* const mPoints;
+    std::vector<openvdb::Vec3d> const* const mPoints;
 
 public:
-    using PosType = openvdb::Vec3R;
+    using PosType = openvdb::Vec3d;
     PointList(const std::vector<PosType>& points)
         : mPoints(&points)
     {
@@ -1094,13 +1073,14 @@ public:
     void   getPos(size_t n, PosType& xyz) const { xyz = (*mPoints)[n]; }
 }; // PointList
 
+// make testOpenVDB && ./unittest/testOpenVDB --gtest_filter="*PointIndexGrid" --gtest_break_on_failure
 TEST_F(TestOpenVDB, PointIndexGrid)
 {
     const uint64_t pointCount = 40000;
     const float    voxelSize = 0.01f;
     const auto     transform = openvdb::math::Transform::createLinearTransform(voxelSize);
 
-    std::vector<openvdb::Vec3R> points;
+    std::vector<openvdb::Vec3d> points;
     genPoints(pointCount, points);
     PointList pointList(points);
     EXPECT_EQ(pointCount, points.size());
@@ -1109,16 +1089,16 @@ TEST_F(TestOpenVDB, PointIndexGrid)
     auto srcGrid = openvdb::tools::createPointIndexGrid<SrcGridT>(pointList, *transform);
 
     using MgrT = openvdb::tree::LeafManager<const SrcGridT::TreeType>;
-    MgrT leafs(srcGrid->tree());
+    MgrT leafMgr(srcGrid->tree());
 
     size_t count = 0;
-    for (size_t n = 0, N = leafs.leafCount(); n < N; ++n) {
-        count += leafs.leaf(n).indices().size();
+    for (size_t n = 0, N = leafMgr.leafCount(); n < N; ++n) {
+        count += leafMgr.leaf(n).indices().size();
     }
     EXPECT_EQ(pointCount, count);
 
     //mTimer.start("Generating NanoVDB grid from PointIndexGrid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full);
+    auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full);
     //mTimer.stop();
     EXPECT_TRUE(handle);
     auto* meta = handle.gridMetaData();
@@ -1128,9 +1108,9 @@ TEST_F(TestOpenVDB, PointIndexGrid)
     auto dstGrid = handle.grid<uint32_t>();
     EXPECT_TRUE(dstGrid);
     EXPECT_EQ(1u, dstGrid->blindDataCount());
-    auto metaData = dstGrid->blindMetaData(0);
-    EXPECT_EQ(pointCount, metaData.mElementCount);
-    EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, metaData.mSemantic);
+    const auto &metaData = dstGrid->blindMetaData(0);
+    EXPECT_EQ(pointCount, metaData.mValueCount);
+    EXPECT_EQ(nanovdb::GridBlindDataSemantic::PointId, metaData.mSemantic);
     EXPECT_EQ(nanovdb::GridBlindDataClass::IndexArray, metaData.mDataClass);
     EXPECT_EQ(nanovdb::GridType::UInt32, metaData.mDataType);
 
@@ -1147,12 +1127,14 @@ TEST_F(TestOpenVDB, PointIndexGrid)
     tbb::parallel_for(srcGrid->evalActiveVoxelBoundingBox(), kernel1);
     //mTimer.stop();
 
-    EXPECT_EQ(pointCount, dstGrid->blindMetaData(0).mElementCount);
+    EXPECT_EQ(pointCount, dstGrid->blindMetaData(0).mValueCount);
+    //std::cerr << ""
 
     auto kernel = [&](const MgrT::LeafRange& r) {
         using CoordT = const nanovdb::Coord;
         auto                             dstAcc = dstGrid->getAccessor();
         nanovdb::PointAccessor<uint32_t> pointAcc(*dstGrid);
+        EXPECT_TRUE(pointAcc);
         const uint32_t *                 begin2 = nullptr, *end2 = nullptr;
         EXPECT_EQ(pointCount, pointAcc.gridPoints(begin2, end2));
         for (auto leaf = r.begin(); leaf; ++leaf) {
@@ -1167,14 +1149,13 @@ TEST_F(TestOpenVDB, PointIndexGrid)
                 EXPECT_TRUE(leaf->getIndices(ijk, begin1, end1));
                 EXPECT_TRUE(pointAcc.voxelPoints(*abc, begin2, end2));
                 EXPECT_EQ(end1 - begin1, end2 - begin2);
-                for (auto* i = begin1; i != end1; ++i)
-                    EXPECT_EQ(*i, *begin2++);
+                for (auto* i = begin1; i != end1; ++i) EXPECT_EQ(*i, *begin2++);
             }
         }
     };
 
     //mTimer.start("Parallel unit test");
-    tbb::parallel_for(leafs.leafRange(), kernel);
+    tbb::parallel_for(leafMgr.leafRange(), kernel);
     //mTimer.stop();
 
     //mTimer.start("Testing bounding box");
@@ -1195,17 +1176,17 @@ TEST_F(TestOpenVDB, PointIndexGrid)
 TEST_F(TestOpenVDB, PointDataGridBasic)
 {
     // Create a vector with three point positions.
-    std::vector<openvdb::Vec3R> positions;
-    positions.push_back(openvdb::Vec3R(0.0, 0.0, 0.0));
-    positions.push_back(openvdb::Vec3R(0.0, 0.0, 1.0));
-    positions.push_back(openvdb::Vec3R(1.34, -56.1, 5.7));
+    std::vector<openvdb::Vec3d> positions;
+    positions.push_back(openvdb::Vec3d(0.0, 0.0, 0.0));
+    positions.push_back(openvdb::Vec3d(0.0, 0.0, 1.0));
+    positions.push_back(openvdb::Vec3d(1.34, -56.1, 5.7));
     EXPECT_EQ( 3UL, positions.size() );
 
     // We need to define a custom search lambda function
     // to account for floating-point roundoffs!
     auto search = [&positions](const openvdb::Vec3f &p) {
         for (auto it = positions.begin(); it != positions.end(); ++it) {
-            const openvdb::Vec3R delta = *it - p;
+            const openvdb::Vec3d delta = *it - p;
             if ( delta.length() < 1e-5 ) return it;
         }
         return positions.end();
@@ -1216,7 +1197,7 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
     // wrapper around an stl vector wrapper here, however it is also possible to
     // write one for a custom data structure in order to match the interface
     // required.
-    openvdb::points::PointAttributeVector<openvdb::Vec3R> positionsWrapper(positions);
+    openvdb::points::PointAttributeVector<openvdb::Vec3d> positionsWrapper(positions);
     // This method computes a voxel-size to match the number of
     // points / voxel requested. Although it won't be exact, it typically offers
     // a good balance of memory against performance.
@@ -1229,7 +1210,7 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
     srcGrid->setName("PointDataGrid");
 
     //mTimer.start("Generating NanoVDB grid from PointDataGrid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.stop();
 
     EXPECT_TRUE(handle);
@@ -1237,13 +1218,22 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
     EXPECT_TRUE(meta);
     EXPECT_EQ(nanovdb::GridType::UInt32, meta->gridType());
     EXPECT_EQ(nanovdb::GridClass::PointData, meta->gridClass());
-    auto dstGrid = handle.grid<uint32_t>();
+
+    auto *dstGrid = handle.grid<uint32_t>();
     EXPECT_TRUE(dstGrid);
     for (int i=0; i<3; ++i) {
         EXPECT_EQ(srcGrid->voxelSize()[i], dstGrid->voxelSize()[i]);
     }
+    EXPECT_EQ(1u, dstGrid->blindDataCount());// only point positions
+    auto &metaData = dstGrid->blindMetaData(0u);
+    EXPECT_EQ(metaData.mValueCount, positions.size());
+    EXPECT_EQ(strcmp("P", metaData.mName), 0);
+    EXPECT_EQ(metaData.mDataClass, nanovdb::GridBlindDataClass::AttributeArray);
+    EXPECT_EQ(metaData.mSemantic, nanovdb::GridBlindDataSemantic::PointPosition);
+    EXPECT_EQ(metaData.mDataType, nanovdb::GridType::Vec3f);
 
     nanovdb::PointAccessor<nanovdb::Vec3f> acc(*dstGrid);
+    EXPECT_TRUE(acc);
     const nanovdb::Vec3f *begin = nullptr, *end = nullptr; // iterators over points in a given voxel
     EXPECT_EQ(positions.size(), openvdb::points::pointCount(srcGrid->tree()));
     EXPECT_EQ(acc.gridPoints(begin, end), positions.size());
@@ -1268,7 +1258,7 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
             const nanovdb::Vec3f vxlDst = *begin++;// local voxel coordinates
             for (int i=0; i<3; ++i) {
                 EXPECT_EQ( ijkSrc[i], ijkDst[i] );
-                EXPECT_EQ( vxlSrc[i], vxlDst[i] );
+                //EXPECT_EQ( vxlSrc[i], vxlDst[i] );
             }
             // A PointDataGrid encodes local voxel coordinates
             // so transform those to global index coordinates!
@@ -1285,7 +1275,7 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
                 EXPECT_EQ( wldSrc[i], wldDst[i] );
             }
 
-            // compair to original input points
+            // compare to original input points
             auto it = search( wldSrc );
             EXPECT_TRUE( it != positions.end() );
             positions.erase( it );
@@ -1296,18 +1286,18 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
 
 TEST_F(TestOpenVDB, PointDataGridRandom)
 {
-    std::vector<openvdb::Vec3R> positions;
+    std::vector<openvdb::Vec3d> positions;
     const size_t pointCount = 2000;
-    const openvdb::Vec3R wldMin(-234.3, -135.6, -503.7);
-    const openvdb::Vec3R wldMax(  57.8,  289.1,    0.2);
-    const openvdb::Vec3R wldDim = wldMax - wldMin;
+    const openvdb::Vec3d wldMin(-234.3, -135.6, -503.7);
+    const openvdb::Vec3d wldMax(  57.8,  289.1,    0.2);
+    const openvdb::Vec3d wldDim = wldMax - wldMin;
     openvdb::math::Random01 randNumber(0);
 
     // We need to define a custom search lambda function
     // to account for floating-point roundoffs!
     auto search = [&positions](const openvdb::Vec3f &p) {
         for (auto it = positions.begin(); it != positions.end(); ++it) {
-            const openvdb::Vec3R delta = *it - p;
+            const openvdb::Vec3d delta = *it - p;
             if ( delta.length() < 1e-3 ) return it;
         }
         return positions.end();
@@ -1315,8 +1305,8 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
 
     // Create a vector with random point positions.
     for (size_t i=0; i<pointCount; ++i) {
-        const openvdb::Vec3R d(randNumber(), randNumber(), randNumber());
-        const openvdb::Vec3R p = wldMin + d * wldDim;
+        const openvdb::Vec3d d(randNumber(), randNumber(), randNumber());
+        const openvdb::Vec3d p = wldMin + d * wldDim;
         if (search(p) != positions.end()) continue;// avoid duplicates!
         positions.push_back(p);
     }
@@ -1327,7 +1317,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
     // wrapper around an stl vector wrapper here, however it is also possible to
     // write one for a custom data structure in order to match the interface
     // required.
-    openvdb::points::PointAttributeVector<openvdb::Vec3R> positionsWrapper(positions);
+    openvdb::points::PointAttributeVector<openvdb::Vec3d> positionsWrapper(positions);
     // This method computes a voxel-size to match the number of
     // points / voxel requested. Although it won't be exact, it typically offers
     // a good balance of memory against performance.
@@ -1340,7 +1330,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
     srcGrid->setName("PointDataGrid");
 
     //mTimer.start("Generating NanoVDB grid from PointDataGrid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.stop();
 
     EXPECT_TRUE(handle);
@@ -1355,6 +1345,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
     }
 
     nanovdb::PointAccessor<nanovdb::Vec3f> acc(*dstGrid);
+    EXPECT_TRUE(acc);
     const nanovdb::Vec3f *begin = nullptr, *end = nullptr; // iterators over points in a given voxel
     EXPECT_EQ(positions.size(), openvdb::points::pointCount(srcGrid->tree()));
     EXPECT_EQ(acc.gridPoints(begin, end), positions.size());
@@ -1438,7 +1429,7 @@ TEST_F(TestOpenVDB, CNanoVDB)
 {
     auto srcGrid = this->getSrcGrid();
     //mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.stop();
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
@@ -1469,7 +1460,7 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinear)
 {
     auto srcGrid = this->getSrcGrid();
     //mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.stop();
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
@@ -1511,7 +1502,7 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinearStencil)
 {
     auto srcGrid = this->getSrcGrid();
     //mTimer.start("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.stop();
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
@@ -1550,15 +1541,15 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinearStencil)
 
 #endif
 
-TEST_F(TestOpenVDB, NanoToOpenVDB_GridBuilder)
-{// test GridBuilder -> NanoVDB -> OpenVDB
-    nanovdb::GridBuilder<float> builder(0.0f, nanovdb::GridClass::LevelSet);
-    auto buildAcc = builder.getAccessor();
+TEST_F(TestOpenVDB, NanoToOpenVDB_BuildGrid)
+{// test build::Grid -> NanoVDB -> OpenVDB
+    nanovdb::build::Grid<float> buildGrid(0.0f, "test", nanovdb::GridClass::LevelSet);
+    auto buildAcc = buildGrid.getAccessor();
     buildAcc.setValue(nanovdb::Coord(1,  2, 3), 1.0f);
     buildAcc.setValue(nanovdb::Coord(2, -2, 9), 2.0f);
     EXPECT_EQ(1.0f, buildAcc.getValue(nanovdb::Coord(1,  2, 3)));
     EXPECT_EQ(2.0f, buildAcc.getValue(nanovdb::Coord(2, -2, 9)));
-    auto handle = builder.getHandle<>(1.0, nanovdb::Vec3d(0.0), "test");
+    auto handle = nanovdb::createNanoGrid(buildGrid);
     EXPECT_TRUE(handle);
     auto* meta = handle.gridMetaData();
     EXPECT_TRUE(meta);
@@ -1638,10 +1629,6 @@ TEST_F(TestOpenVDB, NanoToOpenVDB)
 
 TEST_F(TestOpenVDB, File)
 {
-    { // check nanovdb::io::stringHash
-        EXPECT_EQ(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_0"));
-        EXPECT_NE(nanovdb::io::stringHash("generated_id_0"), nanovdb::io::stringHash("generated_id_1"));
-    }
     auto srcGrid = this->getSrcGrid();
 
     //mTimer.start("Reading NanoVDB grids from file");
@@ -1691,13 +1678,13 @@ TEST_F(TestOpenVDB, MultiFile)
         grid.setName("Int32 grid");
         grid.tree().setValue(openvdb::Coord(-256), 10);
         EXPECT_EQ(1u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     { // 2: add an empty int32_t grid
         openvdb::Int32Grid grid(-4);
         grid.setName("Int32 grid, empty");
         EXPECT_EQ(0u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     { // 3: add a ValueMask grid
         openvdb::MaskGrid grid(false);
@@ -1711,7 +1698,7 @@ TEST_F(TestOpenVDB, MultiFile)
         grid.tree().evalActiveVoxelBoundingBox(bbox);
         //std::cerr << bbox << std::endl;
         EXPECT_EQ(openvdb::CoordBBox(min, max), bbox);
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     { // 4: add a bool grid
         openvdb::BoolGrid grid(false);
@@ -1720,7 +1707,7 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(1u, grid.activeVoxelCount());
         grid.tree().setValue(openvdb::Coord( 10, 450, 90), true);
         EXPECT_EQ(2u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     { // 5: add a Vec3f grid
         openvdb::Vec3fGrid grid(openvdb::Vec3f(0.0f, 0.0f, -1.0f));
@@ -1729,7 +1716,7 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(0u, grid.activeVoxelCount());
         grid.tree().setValue(openvdb::Coord(-256), openvdb::Vec3f(1.0f, 0.0f, 0.0f));
         EXPECT_EQ(1u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     { // 6: add a Vec4f grid
         using OpenVDBVec4fGrid = openvdb::Grid<openvdb::tree::Tree4<openvdb::Vec4f, 5, 4, 3>::Type>;
@@ -1740,7 +1727,7 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(0u, grid.activeVoxelCount());
         grid.tree().setValue(openvdb::Coord(-256), openvdb::Vec4f(1.0f, 0.0f, 0.0f, 0.0f));
         EXPECT_EQ(1u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
         OpenVDBVec4fGrid::unregisterGrid();
     }
     { // 7: add an int64_t grid
@@ -1748,7 +1735,7 @@ TEST_F(TestOpenVDB, MultiFile)
         grid.setName("Int64 grid");
         grid.tree().setValue(openvdb::Coord(0), 10);
         EXPECT_EQ(1u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
     for (int i = 0; i < 10; ++i) {// 8 -> 17
         const float          radius = 100.0f;
@@ -1756,7 +1743,7 @@ TEST_F(TestOpenVDB, MultiFile)
         const openvdb::Vec3f center(i * 10.0f, 0.0f, 0.0f);
         auto                 srcGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize, width);
         srcGrid->setName("Level set sphere at (" + std::to_string(i * 10) + ",0,0)");
-        handles.push_back(nanovdb::openToNanoVDB(*srcGrid));
+        handles.push_back(nanovdb::createNanoGrid(*srcGrid));
     }
     { // 18: add a double grid
         openvdb::DoubleGrid grid(0.0);
@@ -1764,7 +1751,7 @@ TEST_F(TestOpenVDB, MultiFile)
         grid.setGridClass(openvdb::GRID_FOG_VOLUME);
         grid.tree().setValue(openvdb::Coord(6000), 1.0);
         EXPECT_EQ(1u, grid.activeVoxelCount());
-        handles.push_back(nanovdb::openToNanoVDB(grid));
+        handles.push_back(nanovdb::createNanoGrid(grid));
     }
 
     nanovdb::io::writeGrids<nanovdb::HostBuffer, std::vector>("data/multi.nvdb", handles, this->getCodec());
@@ -2062,7 +2049,12 @@ TEST_F(TestOpenVDB, LongGridName)
         srcGrid.tree().setValue(openvdb::Coord(-256), 10.0f);
         EXPECT_EQ(1u, srcGrid.activeVoxelCount());
         const bool isLong = length > limit;
-        auto handle = nanovdb::openToNanoVDB(srcGrid);
+#if 1
+        auto handle = nanovdb::createNanoGrid(srcGrid);
+#else
+        nanovdb::CreateNanoGrid<openvdb::FloatGrid> converter(srcGrid);
+        auto handle = converter.getHandle<float>();
+#endif
         auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ(1u, dstGrid->activeVoxelCount());
@@ -2090,7 +2082,7 @@ TEST_F(TestOpenVDB, LevelSetFiles)
     std::vector<std::string> foundModels;
     std::ofstream            os("data/ls.nvdb", std::ios::out | std::ios::binary);
     for (const auto& fileName : fileNames) {
-        //mTimer.start("Reading grid from the file \"" + fileName + "\"");
+        //mTimer.start("\nReading grid from the file \"" + fileName + "\"");
         try {
             openvdb::io::File file(fileName);
             file.open(false); //disable delayed loading
@@ -2100,8 +2092,8 @@ TEST_F(TestOpenVDB, LevelSetFiles)
             foundModels.push_back(fileName.substr(pos, fileName.size() - pos - 4 ));
 
             //mTimer.restart("Generating NanoVDB grid");
-            auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Partial);
-            //auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::Disable, nanovdb::ChecksumMode::Disable, false, 1);
+            //auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Partial);
+            auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Disable);
             //mTimer.restart("Writing NanoVDB grid");
 
             nanovdb::io::writeGrid(os, handle, this->getCodec());
@@ -2138,8 +2130,8 @@ TEST_F(TestOpenVDB, LevelSetFiles)
     // test reading from non-existing file
     EXPECT_THROW(nanovdb::io::readGrid("data/ls.vdb", getGridName(foundModels[0])), std::runtime_error);
 
-    // test reading non-existing grid from an existing file
-    EXPECT_FALSE(nanovdb::io::readGrid("data/ls.nvdb", "bunny"));
+    // test reading of non-existing grid from an existing file
+    EXPECT_THROW(nanovdb::io::readGrid("data/ls.nvdb", "bunny"), std::runtime_error);
 
     // test reading existing grid from an existing file
     {
@@ -2178,8 +2170,7 @@ TEST_F(TestOpenVDB, FogFiles)
             foundModels.push_back(fileName.substr(pos, fileName.size() - pos - 4 ));
 
             //mTimer.restart("Generating NanoVDB grid");
-            auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Partial);
-            //auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::Disable, nanovdb::ChecksumMode::Disable, false, 1);
+            auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Partial);
             //mTimer.restart("Writing NanoVDB grid");
             nanovdb::io::writeGrid(os, handle, this->getCodec());
 
@@ -2209,8 +2200,8 @@ TEST_F(TestOpenVDB, FogFiles)
     // test reading from non-existing file
     EXPECT_THROW(nanovdb::io::readGrid("data/fog.vdb", getGridName(foundModels[0])), std::runtime_error);
 
-    // test reading non-existing grid from an existing file
-    EXPECT_FALSE(nanovdb::io::readGrid("data/fog.nvdb", "bunny"));
+    // test reading of non-existing grid from an existing file
+    EXPECT_THROW(nanovdb::io::readGrid("data/fog.nvdb", "bunny"), std::runtime_error);
 
     // test reading existing grid from an existing file
     {
@@ -2254,7 +2245,7 @@ TEST_F(TestOpenVDB, PointFiles)
             EXPECT_TRUE(positionIndex != openvdb::points::AttributeSet::INVALID_POS);
 
             //mTimer.restart("Generating NanoVDB grid from PointDataGrid");
-            auto handle = nanovdb::openToNanoVDB(*srcGrid);
+            auto handle = nanovdb::createNanoGrid(*srcGrid);
             //mTimer.restart("Writing NanoVDB grid");
             nanovdb::io::writeGrid(os, handle, this->getCodec());
 
@@ -2268,6 +2259,7 @@ TEST_F(TestOpenVDB, PointFiles)
             EXPECT_TRUE(dstGrid);
 
             nanovdb::PointAccessor<nanovdb::Vec3f> acc(*dstGrid);
+            EXPECT_TRUE(acc);
             const nanovdb::Vec3f *                 begin = nullptr, *end = nullptr; // iterators over points in a given voxel
             EXPECT_EQ(acc.gridPoints(begin, end), openvdb::points::pointCount(srcGrid->tree()));
             //std::cerr << "Point count = " << acc.gridPoints(begin, end) << ", attribute count = " << attributeSet.size() << std::endl;
@@ -2319,7 +2311,7 @@ TEST_F(TestOpenVDB, PointFiles)
 TEST_F(TestOpenVDB, Trilinear)
 {
     // create a grid so sample from
-    auto trilinear = [](const openvdb::Vec3R& xyz) -> float {
+    auto trilinear = [](const openvdb::Vec3d& xyz) -> float {
         return 0.34 + 1.6 * xyz[0] + 6.7 * xyz[1] - 3.5 * xyz[2]; // world coordinates
     };
 
@@ -2334,7 +2326,7 @@ TEST_F(TestOpenVDB, Trilinear)
         acc.setValue(ijk, trilinear(srcGrid->indexToWorld(ijk)));
     }
     //mTimer.restart("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.restart("Writing NanoVDB grid");
     nanovdb::io::writeGrid("data/tmp.nvdb", handle);
     //mTimer.stop();
@@ -2351,7 +2343,7 @@ TEST_F(TestOpenVDB, Trilinear)
     EXPECT_FALSE(handles[0].grid<double>());
     EXPECT_EQ(voxelSize, dstGrid->voxelSize()[0]);
 
-    const openvdb::Vec3R ijk(13.4, 24.67, 5.23); // in index space
+    const openvdb::Vec3d ijk(13.4, 24.67, 5.23); // in index space
     const float          exact = trilinear(srcGrid->indexToWorld(ijk));
     const float          approx = trilinear(srcGrid->indexToWorld(openvdb::Coord(13, 25, 5)));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
@@ -2384,7 +2376,7 @@ TEST_F(TestOpenVDB, Trilinear)
 TEST_F(TestOpenVDB, Triquadratic)
 {
     // create a grid so sample from
-    auto triquadratic = [](const openvdb::Vec3R& xyz) -> double {
+    auto triquadratic = [](const openvdb::Vec3d& xyz) -> double {
         return 0.34 + 1.6 * xyz[0] + 2.7 * xyz[1] + 1.5 * xyz[2] +
                0.025 * xyz[0] * xyz[1] * xyz[2] - 0.013 * xyz[0] * xyz[0]; // world coordinates
     };
@@ -2400,7 +2392,7 @@ TEST_F(TestOpenVDB, Triquadratic)
         acc.setValue(ijk, triquadratic(srcGrid->indexToWorld(ijk)));
     }
     //mTimer.restart("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.restart("Writing NanoVDB grid");
     nanovdb::io::writeGrid("data/tmp.nvdb", handle);
     //mTimer.stop();
@@ -2416,7 +2408,7 @@ TEST_F(TestOpenVDB, Triquadratic)
     auto* dstGrid = handles[0].grid<double>();
     EXPECT_TRUE(dstGrid);
 
-    const openvdb::Vec3R ijk(3.4, 4.67, 5.23); // in index space
+    const openvdb::Vec3d ijk(3.4, 4.67, 5.23); // in index space
     const float          exact = triquadratic(srcGrid->indexToWorld(ijk));
     const float          approx = triquadratic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
@@ -2444,7 +2436,7 @@ TEST_F(TestOpenVDB, Triquadratic)
 TEST_F(TestOpenVDB, Tricubic)
 {
     // create a grid so sample from
-    auto tricubic = [](const openvdb::Vec3R& xyz) -> double {
+    auto tricubic = [](const openvdb::Vec3d& xyz) -> double {
         return 0.34 + 1.6 * xyz[0] + 2.7 * xyz[1] + 1.5 * xyz[2] + 0.025 * xyz[0] * xyz[1] * xyz[2] - 0.013 * xyz[0] * xyz[0] * xyz[0]; // world coordinates
     };
 
@@ -2459,7 +2451,7 @@ TEST_F(TestOpenVDB, Tricubic)
         acc.setValue(ijk, tricubic(srcGrid->indexToWorld(ijk)));
     }
     //mTimer.restart("Generating NanoVDB grid");
-    auto handle = nanovdb::openToNanoVDB(*srcGrid);
+    auto handle = nanovdb::createNanoGrid(*srcGrid);
     //mTimer.restart("Writing NanoVDB grid");
     nanovdb::io::writeGrid("data/tmp.nvdb", handle);
     //mTimer.stop();
@@ -2475,7 +2467,7 @@ TEST_F(TestOpenVDB, Tricubic)
     auto* dstGrid = handles[0].grid<double>();
     EXPECT_TRUE(dstGrid);
 
-    const openvdb::Vec3R ijk(3.4, 4.67, 5.23); // in index space
+    const openvdb::Vec3d ijk(3.4, 4.67, 5.23); // in index space
     const float          exact = tricubic(srcGrid->indexToWorld(ijk));
     const float          approx = tricubic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
@@ -2503,7 +2495,7 @@ TEST_F(TestOpenVDB, Tricubic)
 TEST_F(TestOpenVDB, GridValidator)
 {
     auto srcGrid = this->getSrcGrid();
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full, 0);
+    auto handle = nanovdb::createNanoGrid(*srcGrid, nanovdb::StatsMode::All, nanovdb::ChecksumMode::Full);
     //mTimer.stop();
     EXPECT_TRUE(handle);
     EXPECT_TRUE(handle.data());
@@ -2572,17 +2564,18 @@ TEST_F(TestOpenVDB, DenseIndexGrid)
     // read openvdb::FloatGrid
     auto srcGrid = this->getSrcGrid(false, 0, 0);// level set of a dragon if available, else an octahedron
     auto& srcTree = srcGrid->tree();
-
+    nanovdb::CreateNanoGrid<openvdb::FloatGrid> builder(*srcGrid);
+    builder.setStats(nanovdb::StatsMode::All);
     // openvdb::FloatGrid -> nanovdb::FloatGrid
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All);
+    auto handle = builder.getHandle();
     EXPECT_TRUE(handle);
     auto* fltGrid = handle.grid<float>();
+    builder.setStats();// reset
     //std::cerr << "FloatGrid footprint: " << (fltGrid->gridSize()>>20) << "MB" << std::endl;
 
-    // nanovdb::FloatGrid -> nanovdb::IndexGrid
-    nanovdb::IndexGridBuilder<float> builder(*fltGrid, true, true);
+    // openvdb::FloatGrid -> nanovdb::IndexGrid
     //mTimer.start("Create IndexGrid");
-    auto handle2 = builder.getHandle();
+    auto handle2 = builder.getHandle<nanovdb::ValueIndex>(1u, true, true);
     //mTimer.stop();
     auto *idxGrid = handle2.grid<nanovdb::ValueIndex>();
     auto idxAcc = idxGrid->getAccessor();
@@ -2593,8 +2586,8 @@ TEST_F(TestOpenVDB, DenseIndexGrid)
 
     // create external value buffer
     //mTimer.start("Create value buffer");
-    auto buffer = builder.getValues(1);// only allocate one channel
-    const float *values = reinterpret_cast<const float*>(buffer.data());
+    const float *values = idxGrid->getBlindData<float>(0);
+    EXPECT_TRUE(values);
     //mTimer.stop();
     //std::cerr << "Value buffer footprint: " << (buffer.size()>>20) << "MB" << std::endl;
 
@@ -2612,9 +2605,11 @@ TEST_F(TestOpenVDB, DenseIndexGrid)
         auto fltAcc = fltGrid->getAccessor();// NOT thread-safe!
         for (auto i=r.begin(); i!=r.end(); ++i){
             auto *idxLeaf = idxLeaf0 + i;
-            auto *srcLeaf = fltAcc.probeLeaf(idxLeaf->origin());
-            EXPECT_TRUE(srcLeaf);
-            EXPECT_EQ(values[idxLeaf->minimum()], srcLeaf->minimum());
+            auto *fltLeaf = fltAcc.probeLeaf(idxLeaf->origin());
+            EXPECT_TRUE(fltLeaf);
+            // since idxGrid was created from an OpenVDB Grid stats were not available
+            EXPECT_EQ(values[idxLeaf->minimum()], srcGrid->tree().root().background());
+            //EXPECT_EQ(values[idxLeaf->minimum()], fltLeaf->minimum());// only if idxGrid was created from fltGrid
             for (auto vox = idxLeaf->beginValueOn(); vox; ++vox) {
                 EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
             }
@@ -2626,34 +2621,22 @@ TEST_F(TestOpenVDB, SparseIndexGrid)
 {
     // read openvdb::FloatGrid
     auto srcGrid = this->getSrcGrid(false, 0, 0);// level set of a dragon if available, else an octahedron
-    //auto& srcTree = srcGrid->tree();
 
-    // openvdb::FloatGrid -> nanovdb::FloatGrid
-    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All);
-    EXPECT_TRUE(handle);
-    auto* fltGrid = handle.grid<float>();
-    //std::cerr << "FloatGrid footprint: " << (fltGrid->gridSize()>>20) << "MB" << std::endl;
-
-    // nanovdb::FloatGrid -> nanovdb::IndexGrid
-    nanovdb::IndexGridBuilder<float> builder(*fltGrid, false, false);
+    // openvdb::FloatGrid -> nanovdb::IndexGrid
+    nanovdb::CreateNanoGrid<openvdb::FloatGrid> builder(*srcGrid);
     //mTimer.start("Create IndexGrid");
-    auto handle2 = builder.getHandle();
+    auto handle2 = builder.getHandle<nanovdb::ValueIndex>(1u, false, false);
     //mTimer.stop();
     auto *idxGrid = handle2.grid<nanovdb::ValueIndex>();
     auto idxAcc = idxGrid->getAccessor();
     EXPECT_TRUE(idxGrid);
-    const uint64_t vCount = idxGrid->data()->mData1;
+    const uint64_t vCount = idxGrid->valueCount();
     //std::cerr << "IndexGrid value count = " << vCount << std::endl;
     //std::cerr << "IndexGrid footprint: " << (idxGrid->gridSize()>>20) << "MB" << std::endl;
 
-    // create external value buffer
-    //mTimer.start("Create value buffer");
-    auto buffer = builder.getValues(1);// only allocate one channel
-    const float *values = reinterpret_cast<const float*>(buffer.data());
-    //mTimer.stop();
-    //std::cerr << "Value buffer footprint: " << (buffer.size()>>20) << "MB" << std::endl;
-
     // unit-test sparse value buffer
+    const float *values = idxGrid->getBlindData<float>(0u);
+    EXPECT_TRUE(values);
     //mTimer.start("Testing sparse active values");
     for (auto it = srcGrid->tree().cbeginValueOn(); it; ++it) {
         const openvdb::Coord ijk = it.getCoord();
@@ -2664,6 +2647,116 @@ TEST_F(TestOpenVDB, SparseIndexGrid)
     //mTimer.stop();
 }// SparseIndexGrid
 
+
+TEST_F(TestOpenVDB, BuildNodeManager)
+{
+    {// test NodeManager with build::Grid
+        using GridT = nanovdb::build::Grid<float>;
+        GridT grid(0.0f);
+        nanovdb::build::NodeManager<GridT> mgr(grid);
+        using TreeT = GridT::TreeType;
+        static const bool test = nanovdb::is_same<nanovdb::NodeTrait<TreeT,0>::type, TreeT::LeafNodeType>::value;
+        EXPECT_TRUE(test);
+    }
+    {// test NodeManager with openvdb::Grid
+        using GridT = openvdb::FloatGrid;
+        GridT grid(0.0f);
+        nanovdb::build::NodeManager<GridT> mgr(grid);
+        using TreeT = GridT::TreeType;
+        static const bool test = nanovdb::is_same<nanovdb::NodeTrait<TreeT,0>::type, TreeT::LeafNodeType>::value;
+        EXPECT_TRUE(test);
+    }
+    {// test NodeTrait on nanovdb::Grid
+        using GridT = nanovdb::NanoGrid<float>;
+        using TreeT = GridT::TreeType;
+        static const bool test = nanovdb::is_same<nanovdb::NodeTrait<TreeT,0>::type, TreeT::LeafNodeType>::value;
+        EXPECT_TRUE(test);
+    }
+}// BuildNodeManager
+
+#if 0// toggle to enable benchmark tests
+
+class NanoPointList
+{
+    size_t mSize;
+    const openvdb::Vec3f *mPoints;
+public:
+    using PosType    = openvdb::Vec3f;
+    using value_type = openvdb::Vec3f;
+    NanoPointList(const nanovdb::Vec3f *points, size_t size) : mSize(size), mPoints(reinterpret_cast<const openvdb::Vec3f*>(points)) {}
+    size_t size() const {return mSize;}
+    void getPos(size_t n, PosType& xyz) const {xyz = mPoints[n];}
+}; // NanoPointList
+
+// make -j  && ./unittest/testNanoVDB --gtest_filter="*CudaPointsToGrid_PointID" --gtest_repeat=3 && ./unittest/testOpenVDB --gtest_filter="*PointIndexGrid*" --gtest_repeat=3
+TEST_F(TestOpenVDB, Benchmark_OpenVDB_PointIndexGrid)
+{
+    const double voxelSize = 0.5;
+
+    nanovdb::CpuTimer timer("Generate sphere with points");
+    auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), voxelSize);
+    timer.stop();
+
+    auto *pointGrid = pointsHandle.grid<uint32_t>();
+    EXPECT_TRUE(pointGrid);
+    std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
+
+    nanovdb::PointAccessor<nanovdb::Vec3f, uint32_t> acc2(*pointGrid);
+    EXPECT_TRUE(acc2);
+    const nanovdb::Vec3f *begin, *end;
+    const size_t pointCount = acc2.gridPoints(begin, end);
+    EXPECT_TRUE(begin);
+    EXPECT_TRUE(end);
+    EXPECT_LT(begin, end);
+
+    // construct data structure
+    timer.start("Building openvdb::PointIndexGrid on CPU from "+std::to_string(pointCount)+" points");
+    using PointIndexGrid = openvdb::tools::PointIndexGrid;
+    const openvdb::math::Transform::Ptr transform = openvdb::math::Transform::createLinearTransform(voxelSize);
+    NanoPointList pointList(begin, pointCount);
+    auto pointGridPtr = openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+    timer.stop();
+    openvdb::CoordBBox bbox;
+    pointGridPtr->tree().evalActiveVoxelBoundingBox(bbox);
+    std::cerr << "openvdb::bbox = " << bbox << " voxel count = " << pointGridPtr->tree().activeVoxelCount() << std::endl;
+
+}// Benchmark_OpenVDB_PointIndexGrid
+
+TEST_F(TestOpenVDB, Benchmark_OpenVDB_PointDataGrid)
+{
+    const double voxelSize = 0.5;
+
+    nanovdb::CpuTimer timer("Generate sphere with points");
+    auto pointsHandle = nanovdb::createPointSphere(8, 100.0, nanovdb::Vec3d(0.0), voxelSize);
+    timer.stop();
+
+    auto *pointGrid = pointsHandle.grid<uint32_t>();
+    EXPECT_TRUE(pointGrid);
+    std::cerr << "nanovdb::bbox = " << pointGrid->indexBBox() << " voxel count = " << pointGrid->activeVoxelCount() << std::endl;
+
+    nanovdb::PointAccessor<nanovdb::Vec3f, uint32_t> acc2(*pointGrid);
+    EXPECT_TRUE(acc2);
+    const nanovdb::Vec3f *begin, *end;
+    const size_t pointCount = acc2.gridPoints(begin, end);
+    EXPECT_TRUE(begin);
+    EXPECT_TRUE(end);
+    EXPECT_LT(begin, end);
+
+    // construct data structure
+    timer.start("Building openvdb::PointDataGrid on CPU from "+std::to_string(pointCount)+" points");
+    using PointIndexGrid = openvdb::tools::PointIndexGrid;
+    const auto transform = openvdb::math::Transform::createLinearTransform(voxelSize);
+    NanoPointList pointList(begin, pointCount);
+    auto pointIndexGridPtr = openvdb::tools::createPointIndexGrid<PointIndexGrid>(pointList, *transform);
+    auto pointDataGridPtr = openvdb::points::createPointDataGrid<openvdb::points::FixedPointCodec<true>,// corresponds to PointType::Voxel8
+                            openvdb::points::PointDataGrid, NanoPointList, PointIndexGrid>(*pointIndexGridPtr, pointList, *transform);
+    timer.stop();
+    openvdb::CoordBBox bbox;
+    pointDataGridPtr->tree().evalActiveVoxelBoundingBox(bbox);
+    std::cerr << "openvdb::bbox = " << bbox << " voxel count = " << pointDataGridPtr->tree().activeVoxelCount() << std::endl;
+
+}// Benchmark_OpenVDB_PointDataGrid
+#endif
 
 int main(int argc, char** argv)
 {

@@ -143,7 +143,7 @@ struct StaggeredTransfer :
                 macw.y() = value(P.y() - (y-RealT(0.5)));
 
                 for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                    assert(bounds.isInside(c));
+                    OPENVDB_ASSERT(bounds.isInside(c));
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue;
                     const RealT z = static_cast<RealT>(c.z()-ijk.z());
@@ -213,7 +213,7 @@ struct CellCenteredTransfer :
         else              intersectBox.max().y() += 1;
         if (P.z() < 0.0f) intersectBox.min().z() -= 1;
         else              intersectBox.max().z() += 1;
-        assert(intersectBox.volume() == 8);
+        OPENVDB_ASSERT(intersectBox.volume() == 8);
 
         intersectBox.intersect(bounds);
         if (intersectBox.empty()) return;
@@ -237,15 +237,15 @@ struct CellCenteredTransfer :
                 centerw[1] = value(P.y() - y);
 
                 for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
-                    assert(bounds.isInside(c));
+                    OPENVDB_ASSERT(bounds.isInside(c));
                     const Index offset = ij + /*k*/(c.z() & (DIM-1u));
                     if (!mask.isOn(offset)) continue;
                     const RealT z = static_cast<RealT>(c.z()-ijk.z());
                     centerw[2] = value(P.z() - z);
 
-                    assert(centerw[0] >= 0.0f && centerw[0] <= 1.0f);
-                    assert(centerw[1] >= 0.0f && centerw[1] <= 1.0f);
-                    assert(centerw[2] >= 0.0f && centerw[2] <= 1.0f);
+                    OPENVDB_ASSERT(centerw[0] >= 0.0f && centerw[0] <= 1.0f);
+                    OPENVDB_ASSERT(centerw[1] >= 0.0f && centerw[1] <= 1.0f);
+                    OPENVDB_ASSERT(centerw[2] >= 0.0f && centerw[2] <= 1.0f);
 
                     const RealT weight = centerw.product();
                     data[offset] += s * weight;

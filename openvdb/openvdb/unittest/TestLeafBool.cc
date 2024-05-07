@@ -307,30 +307,115 @@ TEST_F(TestLeafBool, testIO)
 }
 
 
-TEST_F(TestLeafBool, testTopologyCopy)
+TEST_F(TestLeafBool, testConstructors)
 {
     using openvdb::Coord;
 
-    // LeafNode<float, Log2Dim> having the same Log2Dim as LeafType
-    typedef LeafType::ValueConverter<float>::Type FloatLeafType;
+    { // Test constructor which takes a value mask and buffer accepts 2 value masks
+        LeafType a, b;
+        a.setValueOn(1, true);
+        a.setValueOn(2, false);
+        a.setValueOn(3, true);
+        a.setValueOn(4, false);
 
-    FloatLeafType fleaf(Coord(10, 20, 30), /*background=*/-1.0);
-    std::set<Coord> coords;
-    for (openvdb::Index n = 0; n < fleaf.numValues(); n += 10) {
-        Coord xyz = fleaf.offsetToGlobalCoord(n);
-        fleaf.setValueOn(xyz, float(n));
-        coords.insert(xyz);
+        b.setValueOn(1, false);
+        b.setValueOff(2, true);
+        b.setValueOn(3, false);
+        b.setValueOn(4, true);
+        b.setValueOff(5, true);
+        b.setValueOff(6, false);
+        const LeafType c(Coord(12,4,25), /*mask=*/a.getValueMask(), /*buff=*/b.getValueMask());
+        EXPECT_EQ(c.origin(), Coord(8,0,24));
+        EXPECT_EQ(c.getValueMask(), a.getValueMask());
+        EXPECT_EQ(c.buffer(), b.getValueMask());
+
+        EXPECT_TRUE(c.isValueOn(1));
+        EXPECT_TRUE(c.isValueOn(2));
+        EXPECT_TRUE(c.isValueOn(3));
+        EXPECT_TRUE(c.isValueOn(4));
+        EXPECT_TRUE(!c.isValueOn(5));
+        EXPECT_TRUE(!c.isValueOn(6));
+
+        EXPECT_EQ(c.getValue(1), true);
+        EXPECT_EQ(c.getValue(2), false);
+        EXPECT_EQ(c.getValue(3), true);
+        EXPECT_EQ(c.getValue(4), true);
+        EXPECT_EQ(c.getValue(5), false);
+        EXPECT_EQ(c.getValue(6), false);
     }
 
-    LeafType leaf(fleaf, openvdb::TopologyCopy());
-    EXPECT_EQ(fleaf.onVoxelCount(), leaf.onVoxelCount());
+    { // Test copy constructor with new buffer values
+        LeafType a;
+        a.setValueOn(1, true);
+        a.setValueOn(2, false);
+        a.setValueOn(3, true);
+        a.setValueOn(4, false);
+        a.setValueOff(5, true);
+        a.setValueOff(6, false);
 
-    EXPECT_TRUE(leaf.hasSameTopology(&fleaf));
-
-    for (LeafType::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
-        coords.erase(iter.getCoord());
+        const LeafType b(a, /*off=*/true, /*on=*/false, openvdb::TopologyCopy());
+        EXPECT_EQ(b.getValueMask(), a.getValueMask());
+        EXPECT_EQ(b.getValue(1), false);
+        EXPECT_EQ(b.getValue(2), false);
+        EXPECT_EQ(b.getValue(3), false);
+        EXPECT_EQ(b.getValue(4), false);
+        EXPECT_TRUE(b.isValueOn(1));
+        EXPECT_TRUE(b.isValueOn(2));
+        EXPECT_TRUE(b.isValueOn(3));
+        EXPECT_TRUE(b.isValueOn(4));
+        for (openvdb::Index i = 5; i < LeafType::SIZE; ++i) {
+            EXPECT_EQ(b.getValue(i), true);
+            EXPECT_TRUE(!b.isValueOn(i));
+        }
     }
-    EXPECT_TRUE(coords.empty());
+
+    { // Test copy constructor with background value
+        LeafType a;
+        a.setValueOn(1, true);
+        a.setValueOn(2, false);
+        a.setValueOn(3, true);
+        a.setValueOn(4, false);
+        a.setValueOff(5, true);
+        a.setValueOff(6, false);
+
+        const LeafType b(a, /*background*/true, openvdb::TopologyCopy());
+        EXPECT_EQ(b.getValueMask(), a.getValueMask());
+        EXPECT_TRUE(b.isValueOn(1));
+        EXPECT_TRUE(b.isValueOn(2));
+        EXPECT_TRUE(b.isValueOn(3));
+        EXPECT_TRUE(b.isValueOn(4));
+        // All values are background
+        for (openvdb::Index i = 0; i < LeafType::SIZE; ++i) {
+            EXPECT_EQ(b.getValue(i), true);
+        }
+    }
+
+    {
+        // LeafNode<float, Log2Dim> having the same Log2Dim as LeafType
+        typedef LeafType::ValueConverter<float>::Type FloatLeafType;
+
+        FloatLeafType fleaf(Coord(10, 20, 30), /*background=*/-1.0);
+        std::set<Coord> coords;
+        for (openvdb::Index n = 0; n < fleaf.numValues(); n += 10) {
+            Coord xyz = fleaf.offsetToGlobalCoord(n);
+            fleaf.setValueOn(xyz, float(n));
+            coords.insert(xyz);
+        }
+
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+        LeafType leaf(fleaf, openvdb::TopologyCopy());
+OPENVDB_NO_DEPRECATION_WARNING_END
+
+        EXPECT_EQ(fleaf.onVoxelCount(), leaf.onVoxelCount());
+        EXPECT_TRUE(leaf.hasSameTopology(&fleaf));
+
+        for (LeafType::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
+            coords.erase(iter.getCoord());
+        }
+        EXPECT_TRUE(coords.empty());
+    }
+
+
 }
 
 
@@ -556,7 +641,6 @@ TEST_F(TestLeafBool, testMedian)
 //     EXPECT_TRUE(tree->hasSameTopology(*copyOfTree));
 // }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
 TEST_F(TestLeafBool, testTransientData)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
@@ -569,4 +653,3 @@ TEST_F(TestLeafBool, testTransientData)
     LeafType leaf3 = leaf;
     EXPECT_EQ(openvdb::Index32(5), leaf3.transientData());
 }
-#endif

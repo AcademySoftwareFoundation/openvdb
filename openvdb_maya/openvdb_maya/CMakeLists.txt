@@ -10,6 +10,8 @@
 cmake_minimum_required(VERSION 3.18)
 project(OpenVDBMaya  LANGUAGES CXX)
 
+message(WARNING "The OpenVDB Maya plugin is currently unmaintained. The plugin "
+  "exists as a reference and may not compile or run correctly.")
 
 ###### OpenVDB Maya Options
 

@@ -77,16 +77,16 @@
 #ifndef NANOVDB_HOSTBUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_HOSTBUFFER_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"// for NANOVDB_DATA_ALIGNMENT;
-#include <stdint.h> //    for types like int32_t etc
-#include <cstdio> //      for fprintf
-#include <cstdlib> //     for std::malloc/std::realloc/std::free
-#include <memory>//       for std::make_shared
-#include <mutex>//        for std::mutex
-#include <unordered_set>//for std::unordered_set
-#include <cassert>//      for assert
-#include <sstream>//      for std::stringstream
-#include <cstring>//      for memcpy
+#include <nanovdb/NanoVDB.h>// for NANOVDB_DATA_ALIGNMENT;
+#include <stdint.h> //         for types like int32_t etc
+#include <cstdio> //           for fprintf
+#include <cstdlib> //          for std::malloc/std::realloc/std::free
+#include <memory>//            for std::make_shared
+#include <mutex>//             for std::mutex
+#include <unordered_set>//     for std::unordered_set
+#include <cassert>//           for assert
+#include <sstream>//           for std::stringstream
+#include <cstring>//           for memcpy
 
 #define checkPtr(ptr, msg) \
     { \
@@ -98,7 +98,7 @@ namespace nanovdb {
 template<typename BufferT>
 struct BufferTraits
 {
-    static const bool hasDeviceDual = false;
+    static constexpr bool hasDeviceDual = false;
 };
 
 // ----------------------------> HostBuffer <--------------------------------------

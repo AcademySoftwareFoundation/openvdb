@@ -14,7 +14,7 @@
 #ifndef NANOVDB_GRIDVALIDATOR_H_HAS_BEEN_INCLUDED
 #define NANOVDB_GRIDVALIDATOR_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"
+#include <nanovdb/NanoVDB.h>
 #include "GridChecksum.h"
 
 namespace nanovdb {
@@ -59,8 +59,16 @@ std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
     std::stringstream ss;
     if (!isValid(data)) {
         errorStr.assign("Grid is not 32B aligned");
-    } else if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
-        ss << "Incorrect magic number: Expected " << NANOVDB_MAGIC_NUMBER << ", but read " << data->mMagic;
+    } else if (data->mMagic != NANOVDB_MAGIC_NUMBER && data->mMagic != NANOVDB_MAGIC_GRID) {
+        const uint64_t magic1 = NANOVDB_MAGIC_NUMBER, magic2 = NANOVDB_MAGIC_GRID;
+        const char *c0 = (const char*)&(data->mMagic), *c1=(const char*)&magic1, *c2=(const char*)&magic2;
+        ss << "Incorrect magic number: Expected \"";
+        for (int i=0; i<8; ++i) ss << c1[i];
+        ss << "\" or \"";
+        for (int i=0; i<8; ++i) ss << c2[i];
+        ss << "\", but found \"";
+        for (int i=0; i<8; ++i) ss << c0[i];
+        ss << "\"";
         errorStr = ss.str();
     } else if (!validateChecksum(grid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
         errorStr.assign("Mis-matching checksum");
@@ -146,13 +154,13 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
         return errorStr.empty();
     };
 
-    for (auto it2 = grid.tree().root().beginChild(); it2; ++it2) {
+    for (auto it2 = grid.tree().root().cbeginChild(); it2; ++it2) {
         auto &node2 = *it2;
         if (!check(&node2, sizeof(node2))) return;
-        for (auto it1 = node2.beginChild(); it1; ++it1) {
+        for (auto it1 = node2.cbeginChild(); it1; ++it1) {
             auto &node1 = *it1;
             if (!check(&node1, sizeof(node1))) return;
-            for (auto it0 = node1.beginChild(); it0; ++it0) {
+            for (auto it0 = node1.cbeginChild(); it0; ++it0) {
                 auto &node0 = *it0;
                 if (!check(&node2, sizeof(node2))) return;
             }// loop over child nodes of the lower internal node

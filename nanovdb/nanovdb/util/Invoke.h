@@ -19,7 +19,7 @@
 #ifndef NANOVDB_INVOKE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_INVOKE_H_HAS_BEEN_INCLUDED
 
-#include "../NanoVDB.h"// for nanovdb::CoordBBox
+#include <nanovdb/NanoVDB.h>// for nanovdb::CoordBBox
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_invoke.h>

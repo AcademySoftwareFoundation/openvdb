@@ -22,6 +22,7 @@
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
@@ -78,6 +79,19 @@ enum MeshToVolumeFlags {
 };
 
 
+/// @brief Different staregies how to determine sign of an SDF when using
+/// interior test.
+enum InteriorTestStrategy {
+
+   /// Evaluates interior test at every voxel. This is usefull when we rebuild already
+   /// existing SDF where evaluating previous grid is cheap
+   EVAL_EVERY_VOXEL = 0,
+
+   /// Evaluates interior test at least once per tile and flood fills within the tile.
+   EVAL_EVERY_TILE = 1,
+};
+
+
 /// @brief  Convert polygonal meshes that consist of quads and/or triangles into
 ///         signed or unsigned distance field volumes.
 ///
@@ -108,7 +122,10 @@ enum MeshToVolumeFlags {
 /// @param flags              optional conversion flags defined in @c MeshToVolumeFlags
 /// @param polygonIndexGrid   optional grid output that will contain the closest-polygon
 ///                           index for each voxel in the narrow band region
-template <typename GridType, typename MeshDataAdapter>
+/// @param interiorTest       function `Coord -> Bool` that evaluates to true inside of the
+///                           mesh and false outside, for more see evaluateInteriortest
+/// @param interiorTestStrat  determines how the interiorTest is used, see InteriorTestStrategy
+template <typename GridType, typename MeshDataAdapter, typename InteriorTest = std::nullptr_t>
 typename GridType::Ptr
 meshToVolume(
   const MeshDataAdapter& mesh,
@@ -116,7 +133,9 @@ meshToVolume(
   float exteriorBandWidth = 3.0f,
   float interiorBandWidth = 3.0f,
   int flags = 0,
-  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr);
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr,
+  InteriorTest interiorTest = nullptr,
+  InteriorTestStrategy interiorTestStrat = EVAL_EVERY_VOXEL);
 
 
 /// @brief  Convert polygonal meshes that consist of quads and/or triangles into
@@ -134,7 +153,10 @@ meshToVolume(
 /// @param flags              optional conversion flags defined in @c MeshToVolumeFlags
 /// @param polygonIndexGrid   optional grid output that will contain the closest-polygon
 ///                           index for each voxel in the active narrow band region
-template <typename GridType, typename MeshDataAdapter, typename Interrupter>
+/// @param interiorTest       function `Coord -> Bool` that evaluates to true inside of the
+///                           mesh and false outside, for more see evaluatInteriorTest
+/// @param interiorTestStrat  determines how the interiorTest is used, see InteriorTestStrategy
+template <typename GridType, typename MeshDataAdapter, typename Interrupter, typename InteriorTest = std::nullptr_t>
 typename GridType::Ptr
 meshToVolume(
     Interrupter& interrupter,
@@ -143,7 +165,9 @@ meshToVolume(
     float exteriorBandWidth = 3.0f,
     float interiorBandWidth = 3.0f,
     int flags = 0,
-    typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr);
+    typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid = nullptr,
+    InteriorTest interiorTest = nullptr,
+    InteriorTestStrategy interiorTestStrategy = EVAL_EVERY_VOXEL);
 
 
 ////////////////////////////////////////
@@ -910,7 +934,7 @@ public:
 
         for (Index i = 0; i < LeafNodeType::DIM; ++i) {
 
-            assert(pos >= 0);
+            OPENVDB_ASSERT(pos >= 0);
             ValueType& dist = data[pos];
 
             if (dist < ValueType(0.0)) {
@@ -1952,7 +1976,7 @@ struct VoxelizationData {
             mPrimCount = 0;
             primIdTree.root().clear();
             primIdTree.clearAllAccessors();
-            assert(mPrimCount == 0);
+            OPENVDB_ASSERT(mPrimCount == 0);
         }
 
         return mPrimCount++;
@@ -2478,7 +2502,7 @@ struct ExpandNarrowband
             LeafNodeType      * distNodePt = distAcc.probeLeaf(origin);
             Int32LeafNodeType * indexNodePt = indexAcc.probeLeaf(origin);
 
-            assert(!distNodePt == !indexNodePt);
+            OPENVDB_ASSERT(!distNodePt == !indexNodePt);
 
             bool usingNewNodes = false;
 
@@ -3118,8 +3142,178 @@ traceExteriorBoundaries(FloatTreeT& tree)
 
 ////////////////////////////////////////
 
+template <typename T, Index Log2Dim, typename InteriorTest>
+void
+floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& interiorTest) {
 
-template <typename GridType, typename MeshDataAdapter, typename Interrupter>
+    // Floods fills a single leaf node.
+    // Starts with all voxels in NOT_VISITED.
+    // Final result is voxels in either POSITIVE, NEGATIVE, or NOT_ASSIGNED.
+    // Voxels that were categorized as NEGATIVE are negated.
+    // The NOT_ASSIGNED is all voxels within 0.75 of the zero-crossing.
+    //
+    // NOT_VISITED voxels, if outside the 0.75 band, will query the oracle
+    // to get a POSITIVE Or NEGATIVE sign (with interior being POSITIVE!)
+    //
+    // After setting a NOT_VISITED to either POSITIVE or NEGATIVE, an 8-way
+    // depth-first floodfill is done, stopping at either the 0.75 boundary
+    // or visited voxels.
+    enum VoxelState {
+        NOT_VISITED = 0,
+        POSITIVE = 1,
+        NEGATIVE = 2,
+        NOT_ASSIGNED = 3
+    };
+
+    const auto DIM = leafNode.DIM;
+    const auto SIZE = leafNode.SIZE;
+
+    std::vector<VoxelState> voxelState(SIZE, NOT_VISITED);
+
+    std::vector<std::pair<Index, VoxelState>> offsetStack;
+    offsetStack.reserve(SIZE);
+
+    for (Index offset=0; offset<SIZE; offset++) {
+        const auto value = leafNode.getValue(offset);
+
+        // We do not assign anything for voxel close to the mesh
+        // This condition is aligned with the condition in traceVoxelLine
+        if (std::abs(value) <= 0.75) {
+            voxelState[offset] = NOT_ASSIGNED;
+        } else if (voxelState[offset] == NOT_VISITED) {
+
+            auto coord = leafNode.offsetToGlobalCoord(offset);
+
+            if (interiorTest(coord)){
+                // Yes we assigne positive values to interior points
+                // this is aligned with how meshToVolume works internally
+                offsetStack.push_back({offset, POSITIVE});
+                voxelState[offset] = POSITIVE;
+            } else {
+                offsetStack.push_back({offset, NEGATIVE});
+                voxelState[offset] = NEGATIVE;
+            }
+
+            while(!offsetStack.empty()){
+
+                auto [off, state] = offsetStack[offsetStack.size()-1];
+                offsetStack.pop_back();
+
+                if (state == NEGATIVE) {
+                    leafNode.setValueOnly(off, -leafNode.getValue(off));
+                }
+
+                // iterate over all neighbours and assign identical state
+                // if they have not been visited and if they are far away
+                // from the mesh (the condition is same as in traceVoxelLine)
+                for (int dim=2; dim>=0; dim--){
+                    for (int i = -1; i <=1; ++(++i)){
+                        int dimIdx = (off >> dim * Log2Dim) % DIM;
+                        auto neighOff = off + (1 << dim * Log2Dim) * i;
+                        if ((0 < dimIdx) &&
+                            (dimIdx < (int)DIM - 1) &&
+                            (voxelState[neighOff] == NOT_VISITED)) {
+
+                            if (std::abs(leafNode.getValue(neighOff)) <= 0.75) {
+                                voxelState[neighOff] = NOT_ASSIGNED;
+                            } else {
+                                offsetStack.push_back({neighOff, state});
+                                voxelState[neighOff] = state;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+////////////////////////////////////////
+
+/// @brief Sets the sign of voxel values of `tree` based on the `interiorTest`
+///
+/// Inside is set to positive and outside to negative. This is in reverse to the usual
+/// level set convention, but `meshToVolume` uses the opposite convention at certain point.
+///
+/// InteriorTest has to be a function `Coord -> bool` which evaluates true
+/// inside of the mesh and false outside.
+///
+/// Furthermore, InteriorTest does not have to be thread-safe, but it has to be
+/// copy constructible and evaluating different coppy has to be thread-safe.
+///
+///  Example of a interior test
+///
+///  auto acc = tree->getAccessor();
+///
+///  auto test = [acc = grid.getConstAccessor()](const Cood& coord) -> bool {
+///     return acc->get(coord) <= 0 ? true : false;
+///  }
+template <typename FloatTreeT, typename InteriorTest>
+void
+evaluateInteriorTest(FloatTreeT& tree, InteriorTest interiorTest, InteriorTestStrategy interiorTestStrategy)
+{
+    static_assert(std::is_invocable_r<bool, InteriorTest, Coord>::value,
+                 "InteriorTest has to be a function `Coord -> bool`!");
+    static_assert(std::is_copy_constructible_v<InteriorTest>,
+                 "InteriorTest has to be copyable!");
+
+    using LeafT = typename FloatTreeT::LeafNodeType;
+
+    if (interiorTestStrategy == EVAL_EVERY_VOXEL) {
+
+        auto op = [interiorTest](auto& node) {
+            using Node = std::decay_t<decltype(node)>;
+
+            if constexpr (std::is_same_v<Node, LeafT>) {
+
+                for (auto iter = node.beginValueAll(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
+
+            } else {
+                for (auto iter = node.beginChildOff(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
+            }
+        };
+
+        openvdb::tree::NodeManager nodes(tree);
+        nodes.foreachBottomUp(op);
+    }
+
+    if (interiorTestStrategy == EVAL_EVERY_TILE) {
+
+        auto op = [interiorTest](auto& node) {
+            using Node = std::decay_t<decltype(node)>;
+
+            if constexpr (std::is_same_v<Node, LeafT>) {
+                // // leaf node
+                LeafT& leaf = static_cast<LeafT&>(node);
+
+                floodFillLeafNode(leaf, interiorTest);
+
+            } else {
+                for (auto iter = node.beginChildOff(); iter; ++iter) {
+                    if (!interiorTest(iter.getCoord())) {
+                        iter.setValue(-*iter);
+                    }
+                }
+            }
+        };
+
+        openvdb::tree::NodeManager nodes(tree);
+        nodes.foreachBottomUp(op);
+    }
+} // void evaluateInteriorTest()
+
+////////////////////////////////////////
+
+
+template <typename GridType, typename MeshDataAdapter, typename Interrupter, typename InteriorTest>
 typename GridType::Ptr
 meshToVolume(
   Interrupter& interrupter,
@@ -3128,7 +3322,9 @@ meshToVolume(
   float exteriorBandWidth,
   float interiorBandWidth,
   int flags,
-  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid)
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid,
+  InteriorTest interiorTest,
+  InteriorTestStrategy interiorTestStrat)
 {
     using GridTypePtr = typename GridType::Ptr;
     using TreeType = typename GridType::TreeType;
@@ -3241,34 +3437,50 @@ meshToVolume(
 
     if (computeSignedDistanceField) {
 
-        // Determines the inside/outside state for the narrow band of voxels.
-        traceExteriorBoundaries(distTree);
+        /// If interior test is not provided
+        if constexpr (std::is_same_v<InteriorTest, std::nullptr_t>) {
+            // Determines the inside/outside state for the narrow band of voxels.
+            (void) interiorTest;       // Trigger usage.
+            traceExteriorBoundaries(distTree);
+        } else {
+            evaluateInteriorTest(distTree, interiorTest, interiorTestStrat);
+        }
 
-        std::vector<LeafNodeType*> nodes;
-        nodes.reserve(distTree.leafCount());
-        distTree.getNodes(nodes);
+        /// Do not fix intersecting voxels if we have evaluated interior test for every voxel.
+        bool signInitializedForEveryVoxel =
+                /// interior test was provided i.e. not null
+                !std::is_same_v<InteriorTest, std::nullptr_t> &&
+                /// interior test was evaluated for every voxel
+                interiorTestStrat == EVAL_EVERY_VOXEL;
 
-        const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
+        if (!signInitializedForEveryVoxel) {
 
-        using SignOp =
-            mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
+            std::vector<LeafNodeType*> nodes;
+            nodes.reserve(distTree.leafCount());
+            distTree.getNodes(nodes);
 
-        tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
+            const tbb::blocked_range<size_t> nodeRange(0, nodes.size());
 
-        if (interrupter.wasInterrupted(45)) return distGrid;
+            using SignOp =
+                mesh_to_volume_internal::ComputeIntersectingVoxelSign<TreeType, MeshDataAdapter>;
 
-        // Remove voxels created by self intersecting portions of the mesh.
-        if (removeIntersectingVoxels) {
+            tbb::parallel_for(nodeRange, SignOp(nodes, distTree, indexTree, mesh));
 
-            tbb::parallel_for(nodeRange,
-                mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
+            if (interrupter.wasInterrupted(45)) return distGrid;
 
-            tbb::parallel_for(nodeRange,
-                mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(
-                    nodes, distTree, indexTree));
+            // Remove voxels created by self intersecting portions of the mesh.
+            if (removeIntersectingVoxels) {
 
-            tools::pruneInactive(distTree,  /*threading=*/true);
-            tools::pruneInactive(indexTree, /*threading=*/true);
+                tbb::parallel_for(nodeRange,
+                    mesh_to_volume_internal::ValidateIntersectingVoxels<TreeType>(distTree, nodes));
+
+                tbb::parallel_for(nodeRange,
+                    mesh_to_volume_internal::RemoveSelfIntersectingSurface<TreeType>(
+                        nodes, distTree, indexTree));
+
+                tools::pruneInactive(distTree,  /*threading=*/true);
+                tools::pruneInactive(indexTree, /*threading=*/true);
+            }
         }
     }
 
@@ -3421,7 +3633,7 @@ meshToVolume(
 }
 
 
-template <typename GridType, typename MeshDataAdapter>
+template <typename GridType, typename MeshDataAdapter, typename InteriorTest>
 typename GridType::Ptr
 meshToVolume(
   const MeshDataAdapter& mesh,
@@ -3429,7 +3641,9 @@ meshToVolume(
   float exteriorBandWidth,
   float interiorBandWidth,
   int flags,
-  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid)
+  typename GridType::template ValueConverter<Int32>::Type * polygonIndexGrid,
+  InteriorTest /*interiorTest*/,
+  InteriorTestStrategy /*interiorTestStrat*/)
 {
     util::NullInterrupter nullInterrupter;
     return meshToVolume<GridType>(nullInterrupter, mesh, transform,
@@ -4247,14 +4461,14 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
         const QuadAndTriangleDataAdapter<Vec3s, Vec4I>&, const openvdb::math::Transform&, \
-        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*, std::nullptr_t, InteriorTestStrategy)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

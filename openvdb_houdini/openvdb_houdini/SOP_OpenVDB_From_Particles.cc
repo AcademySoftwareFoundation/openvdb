@@ -1105,7 +1105,7 @@ SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
         if (refGeo && (0 != evalInt("usereferencevdb", 0, time))) {
             const auto refName = evalStdString("referencevdb", time);
             hvdb::VdbPrimCIterator it(refGeo, matchGroup(*refGeo, refName));
-            if (const hvdb::GU_PrimVDB* refPrim = (it ? *it : nullptr)) {
+            if (const GU_PrimVDB* refPrim = (it ? *it : nullptr)) {
                 refGrid = refPrim->getGridPtr();
             } else {
                 addError(SOP_MESSAGE,

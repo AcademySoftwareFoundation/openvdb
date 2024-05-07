@@ -7,6 +7,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
+#include <openvdb/util/Assert.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
 #include <atomic>
@@ -231,7 +232,7 @@ template<typename T, Index Log2Dim>
 inline void
 LeafBuffer<T, Log2Dim>::setValue(Index i, const ValueType& val)
 {
-    assert(i < SIZE);
+    OPENVDB_ASSERT(i < SIZE);
     this->loadValues();
     if (mData) mData[i] = val;
 }
@@ -378,7 +379,7 @@ inline const typename LeafBuffer<T, Log2Dim>::ValueType&
 LeafBuffer<T, Log2Dim>::at(Index i) const
 {
     static const ValueType sZero = zeroVal<T>();
-    assert(i < SIZE);
+    OPENVDB_ASSERT(i < SIZE);
     this->loadValues();
     // We can't use the ternary operator here, otherwise Visual C++ returns
     // a reference to a temporary.
@@ -418,9 +419,9 @@ LeafBuffer<T, Log2Dim>::doLoad() const
     if (!this->isOutOfCore()) return;
 
     std::unique_ptr<FileInfo> info(self->mFileInfo);
-    assert(info.get() != nullptr);
-    assert(info->mapping.get() != nullptr);
-    assert(info->meta.get() != nullptr);
+    OPENVDB_ASSERT(info.get() != nullptr);
+    OPENVDB_ASSERT(info->mapping.get() != nullptr);
+    OPENVDB_ASSERT(info->meta.get() != nullptr);
 
     /// @todo For now, we have to clear the mData pointer in order for allocate() to take effect.
     self->mData = nullptr;
@@ -475,9 +476,8 @@ public:
     static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
-    // These static declarations must be on separate lines to avoid VC9 compiler errors.
-    static const bool sOn;
-    static const bool sOff;
+    static inline const bool sOn = true;
+    static inline const bool sOff = false;
 
     LeafBuffer() {}
     LeafBuffer(bool on): mData(on) {}
@@ -489,7 +489,7 @@ public:
 
     const bool& getValue(Index i) const
     {
-        assert(i < SIZE);
+        OPENVDB_ASSERT(i < SIZE);
         // We can't use the ternary operator here, otherwise Visual C++ returns
         // a reference to a temporary.
         if (mData.isOn(i)) return sOn; else return sOff;
@@ -499,7 +499,7 @@ public:
     bool operator==(const LeafBuffer& other) const { return mData == other.mData; }
     bool operator!=(const LeafBuffer& other) const { return mData != other.mData; }
 
-    void setValue(Index i, bool val) { assert(i < SIZE); mData.set(i, val); }
+    void setValue(Index i, bool val) { OPENVDB_ASSERT(i < SIZE); mData.set(i, val); }
 
     void swap(LeafBuffer& other) { if (&other != this) std::swap(mData, other.mData); }
 
@@ -520,16 +520,6 @@ private:
 
     NodeMaskType mData;
 }; // class LeafBuffer
-
-
-/// @internal For consistency with other nodes and with iterators, methods like
-/// LeafNode::getValue() return a reference to a value.  Since it's not possible
-/// to return a reference to a bit in a node mask, we return a reference to one
-/// of the following static values instead.
-///
-/// @todo  Make these static inline with C++17
-template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOn = true;
-template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
