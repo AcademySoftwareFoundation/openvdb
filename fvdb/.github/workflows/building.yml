@@ -1,0 +1,113 @@
+name: Building Release Wheels
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+
+jobs:
+
+  wheel:
+    runs-on:
+      - self-hosted
+      - ${{ matrix.cuda-version }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # support version based on: https://download.pytorch.org/whl/torch/
+        python-version: ['3.10', '3.11']
+        torch-version: [2.1.0, 2.1.1, 2.1.2]
+        cuda-version: ['cu121']
+        # exclude:
+        #   - torch-version: 2.0.1
+        #     python-version: '3.10'
+        #   - torch-version: 2.0.0
+        #     python-version: '3.11'
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+
+      - name: Install PyTorch ${{ matrix.torch-version }}+${{ matrix.cuda-version }}
+        run: |
+          pip install torch==${{ matrix.torch-version }} --extra-index-url https://download.pytorch.org/whl/${{ matrix.cuda-version }}
+          python -c "import torch; print('PyTorch:', torch.__version__)"
+          python -c "import torch; print('CUDA:', torch.version.cuda)"
+
+      - name: Set version
+        run: |
+          VERSION=`sed -n "s/^__version__ = '\(.*\)'/\1/p" fvdb/__init__.py`
+          TORCH_VERSION=`echo "pt${{ matrix.torch-version }}" | sed "s/..$//" | sed "s/\.//g"`
+          CUDA_VERSION=`echo ${{ matrix.cuda-version }}`
+          echo "New version name: $VERSION+$TORCH_VERSION$CUDA_VERSION"
+          sed -i "s/$VERSION/$VERSION+$TORCH_VERSION$CUDA_VERSION/" fvdb/__init__.py
+        shell:
+          bash
+
+      - name: Install dependencies
+        run: |
+          pip install -r env/build_requirements.txt
+
+      - name: Build wheel
+        run: |
+          mkdir dist
+          TORCH_CUDA_ARCH_LIST="6.1;7.0;7.5;8.0;8.6+PTX" python setup.py bdist_wheel --dist-dir=dist
+        shell:
+          bash
+
+      - name: Rename wheel
+        run: |
+          python scripts/rename_wheels.py ${{ matrix.torch-version }} ${{ matrix.cuda-version }}
+        shell:
+          bash
+
+      # - name: Push wheel to fvdb-wheels
+      #   id: push_directory
+      #   uses: swahtz/github-action-push-to-another-repository@main
+      #   env:
+      #     SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_WHL_KEY }}
+      #   with:
+      #     source-directory: 'dist'
+      #     destination-github-username: 'voxel-foundation'
+      #     destination-repository-name: 'fvdb-wheels'
+      #     user-email: 2375296+swahtz@users.noreply.github.com
+      #     target-branch: main
+      #     target-directory: 'main'
+
+      # - name: Upload wheels to URM
+      #   run: |
+      #     pip install twine
+      #     twine upload -u jswartz -p ${{ secrets.URM_TOKEN }} --repository-url https://urm.nvidia.com/artifactory/api/pypi/nv-shared-pypi-local dist/*whl  --verbose
+      #   shell:
+      #     bash
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          token: ${{ secrets.RELEASE_ACTION_TOKEN }}
+          files: |
+            dist/*.whl
+
+      # - name: Upload to artifacts
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: wheels
+      #     path: |
+      #       dist/*.whl
+
+      # - name: Configure AWS
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ap-northeast-1
+
+      # - name: Upload wheel
+      #   run: |
+      #     aws s3 sync dist s3://nksr/whl/torch-${{ matrix.torch-version }}+${{ matrix.cuda-version }} --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers

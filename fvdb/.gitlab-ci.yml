@@ -1,0 +1,30 @@
+# Gitlab CI Pipeline for building and deploying the documentation
+default:
+  image: mambaorg/micromamba:focal-cuda-12.1.1
+  tags:
+    - os/linux
+    - type/docker
+
+before_script:
+    # - apt-get update
+    - export TORCH_CUDA_ARCH_LIST="Turing"
+    - export FORCE_CUDA=1
+    # install all required libraries using existing conda environment requirements file:
+    - micromamba env create -f env/build_environment.yml
+    - eval "$(micromamba shell hook --shell bash)"
+    - micromamba activate
+    - micromamba activate fvdb_build
+
+pages:
+  stage: deploy
+  script:
+    # build and publish automated documentation with Sphinx:
+    - export MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')
+    - python setup.py build_ext --inplace
+    - sphinx-build -E -a docs/ public/
+
+  artifacts:
+    paths:
+    - public
+  only:
+  - main # Documentation will only be generated on the main branch
