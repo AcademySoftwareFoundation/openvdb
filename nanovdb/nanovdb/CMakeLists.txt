@@ -216,7 +216,6 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
 set(NANOVDB_INCLUDE_UTIL_FILES
   util/CpuTimer.h
   util/CreateNanoGrid.h
-  util/CSampleFromVoxels.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
