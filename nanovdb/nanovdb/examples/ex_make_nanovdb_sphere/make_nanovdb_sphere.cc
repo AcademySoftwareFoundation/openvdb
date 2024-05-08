@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/Primitives.h>
+#include <nanovdb/tools/CreatePrimitives.h>
 
 #include <iostream>
 
@@ -11,7 +11,7 @@
 int main()
 {
     try {
-        auto handle = nanovdb::createLevelSetSphere(100.0f);
+        auto handle = nanovdb::tools::createLevelSetSphere(100.0f);
 
         auto* dstGrid = handle.grid<float>(); // Get a (raw) pointer to the NanoVDB grid form the GridManager.
         if (!dstGrid)
