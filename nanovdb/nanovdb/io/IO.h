@@ -93,7 +93,8 @@ template<typename BufferT = HostBuffer>
 GridHandle<BufferT> readGrid(const std::string& fileName, const std::string& gridName, int verbose = 0, const BufferT& buffer = BufferT());
 
 /// @brief Read all the grids in the file and return them as a vector of multiple GridHandles, each containing
-///        all grids encoded in the same segment of the file (i.e. they where written together)
+///        all grids encoded in the same segment of the file (i.e. they where written together). This method also
+///        works if the file contains a raw grid buffer in which case a single GridHandle is returned.
 /// @tparam BufferT Type of buffer used memory allocation
 /// @param fileName string name of file to be read from
 /// @param verbose specify verbosity level. Default value of zero means quiet.
@@ -611,20 +612,26 @@ template<typename BufferT = HostBuffer, template<typename...> class VecT = std::
 VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& pool = BufferT())
 {
     VecT<GridHandle<BufferT>> handles;
-    Segment seg;
-    while (seg.read(is)) {
-        uint64_t bufferSize = 0;
-        for (auto& m : seg.meta) bufferSize += m.gridSize;
-        auto buffer = BufferT::create(bufferSize, &pool);
-        uint64_t bufferOffset = 0;
-        for (uint16_t i = 0; i < seg.header.gridCount; ++i) {
-            auto *data = util::PtrAdd<GridData>(buffer.data(), bufferOffset);
-            Internal::read(is, (char*)data, seg.meta[i].gridSize, seg.header.codec);
-            tools::updateGridCount(data, uint32_t(i), uint32_t(seg.header.gridCount));
-            bufferOffset += seg.meta[i].gridSize;
-        }// loop over grids in segment
-        handles.emplace_back(std::move(buffer)); // force move copy assignment
-    }// loop over segments
+    try {//first try to read a raw grid buffer
+        GridHandle<BufferT> handle;
+        handle.read(is, pool);// will throw if stream does not contain a raw grid buffer
+        handles.push_back(std::move(handle)); // force move copy assignment
+    } catch(const std::logic_error&) {
+        Segment seg;
+        while (seg.read(is)) {
+            uint64_t bufferSize = 0;
+            for (auto& m : seg.meta) bufferSize += m.gridSize;
+            auto buffer = BufferT::create(bufferSize, &pool);
+            uint64_t bufferOffset = 0;
+            for (uint16_t i = 0; i < seg.header.gridCount; ++i) {
+                auto *data = util::PtrAdd<GridData>(buffer.data(), bufferOffset);
+                Internal::read(is, (char*)data, seg.meta[i].gridSize, seg.header.codec);
+                tools::updateGridCount(data, uint32_t(i), uint32_t(seg.header.gridCount));
+                bufferOffset += seg.meta[i].gridSize;
+            }// loop over grids in segment
+            handles.emplace_back(std::move(buffer)); // force move copy assignment
+        }// loop over segments
+    }
     return handles; // is converted to r-value and return value is move constructed.
 }// readGrids
 

@@ -13,7 +13,7 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,// GPU grid
                                const nanovdb::NanoGrid<float>*,// CPU grid
                                cudaStream_t stream);
 
-/// @brief Creates a NanoVDB grids with custom values and access them.
+/// @brief Creates a NanoVDB grid with custom values and access them.
 ///
 /// @note This example only depends on NanoVDB.
 int main()

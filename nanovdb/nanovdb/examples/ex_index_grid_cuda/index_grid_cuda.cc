@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <nanovdb/tools/CreateNanoGrid.h>
-#include <nanovdb/tools/CreatePrimitives.h>      // for nanovdb::tools::createLevelSetSphere
+#include <nanovdb/tools/CreatePrimitives.h>// for nanovdb::tools::createLevelSetSphere
 #include <nanovdb/cuda/DeviceBuffer.h>// for nanovdb::cuda::DeviceBuffer
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// device grid
                                const nanovdb::NanoGrid<nanovdb::ValueOnIndex>*,// host grid
                                cudaStream_t stream);
 
-/// @brief This examples depends on  NanoVDB and CUDA.
+/// @brief This examples depends on NanoVDB and CUDA.
 int main(int, char**)
 {
     using SrcGridT  = nanovdb::FloatGrid;

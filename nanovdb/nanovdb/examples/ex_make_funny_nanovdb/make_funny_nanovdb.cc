@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-/// @brief Creates a NanoVDB grids with custom values and access them.
+/// @brief Creates a NanoVDB grid with custom values and access them.
 ///
 /// @note This example only depends on NanoVDB.
 int main()

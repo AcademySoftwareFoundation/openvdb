@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-/// @brief Creates a NanoVDB grids of a level set sphere and accesses a value.
+/// @brief Creates a NanoVDB grid of a level set sphere and access a value.
 ///
 /// @note This example only depends on NanoVDB.
 int main()
