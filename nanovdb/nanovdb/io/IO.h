@@ -17,7 +17,7 @@
     \details NanoVDB files take on of two formats:
              1) multiple segments each with multiple grids (segments have easy to access metadata about its grids)
              2) starting with verion 32.6.0 nanovdb files also support a raw buffer with one or more grids (just a
-             dump of a raw grid buffer, so no new metadata).
+             dump of a raw grid buffer, so no new metadata in headers as when using segments mentioned above).
 
     // 1: Segment:  FileHeader, MetaData0, gridName0...MetaDataN, gridNameN, compressed Grid0, ... compressed GridN
     // 2: Raw: Grid0, ... GridN
@@ -59,10 +59,14 @@ namespace io {// ===============================================================
 // --------------------------> writeGrid(s) <------------------------------------
 
 /// @brief Write a single grid to file (over-writing existing content of the file)
+///
+/// @note The single grid is written into a single segment, i.e. header with metadata about its type and size.
 template<typename BufferT>
 void writeGrid(const std::string& fileName, const GridHandle<BufferT>& handle, io::Codec codec = io::Codec::NONE, int verbose = 0);
 
 /// @brief Write multiple grids to file (over-writing existing content of the file)
+///
+/// @note The multiple grids are written into the same segment, i.e. header with metadata about all grids
 template<typename BufferT = HostBuffer, template<typename...> class VecT = std::vector>
 void writeGrids(const std::string& fileName, const VecT<GridHandle<BufferT>>& handles, Codec codec = Codec::NONE, int verbose = 0);
 
