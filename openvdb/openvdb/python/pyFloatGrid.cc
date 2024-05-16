@@ -3,7 +3,7 @@
 //
 /// @file pyFloatGrid.cc
 /// @author Peter Cucka
-/// @brief pybind11 wrappers for scalar, floating-point openvdb::Grid types
+/// @brief nanobind wrappers for scalar, floating-point openvdb::Grid types
 
 #include "pyGrid.h"
 
