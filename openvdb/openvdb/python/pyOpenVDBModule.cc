@@ -455,4 +455,4 @@ NB_MODULE(PY_OPENVDB_MODULE_NAME, m)
     pyutil::StringEnum<_openvdbmodule::GridClassDescr>::wrap(m);
     pyutil::StringEnum<_openvdbmodule::VecTypeDescr>::wrap(m);
 
-} // PYBIND11_MODULE
+} // NB_MODULE
