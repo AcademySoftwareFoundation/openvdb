@@ -8,9 +8,9 @@
 * [GridHandle.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/GridHandle.h) defines a handler for the memory allocated to a NanoVDB grid.
 * [io/IO.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/io/IO.h) implements I/O support.
 * [tools/CreateNanoGrid.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/tools/CreateNanoGrid.h) defines the converter from OpenVDB to NanoVDB and obviously depends on the OpenVDB library (as the only header file).
-* [util/Ray.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/Ray.h) Ray class.
-* [util/HDDA.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/HDDA.h) HDDA related.
-* [util/SampleFromVoxels.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/SampleFromVoxels.h) interpolation.
+* [math/Ray.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/Ray.h) Ray class.
+* [math/HDDA.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/HDDA.h) HDDA related.
+* [math/SampleFromVoxels.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/SampleFromVoxels.h) interpolation.
 
 ```bash
 foo@bar:~$ tree
