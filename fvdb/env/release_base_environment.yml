@@ -1,0 +1,32 @@
+# This release_base_environment is used by the 'Building Release Wheels' (.github/workflows/building.yml) GitHub Action
+#   the cuda, python, and pytorch versions are configured and appended by the Action at runtime.
+name: fvdb_build_38
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - pybind11
+  - git
+  - gitpython
+  - ca-certificates
+  - certifi
+  - openssl
+  - gcc_linux-64=11
+  - gxx_linux-64=11
+  - setuptools
+  - cmake
+  - make
+  - ninja
+  - sphinx>=7.0.0
+  - sphinx_rtd_theme
+  - myst-parser
+  - linkify-it-py
+  - numpy
+  - tqdm
+  - requests
+  - python=3.8
+  - pytorch=2.1.2
+  - pytorch-cuda=12.1
+  - cuda>=12.1.0, <12.2.0
+  - cuda-nvcc>=12.1.0, <12.2.0

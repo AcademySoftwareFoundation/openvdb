@@ -11,4 +11,4 @@ TAG="${2:-latest}"
 
 set -x
 
-docker build --build-arg GIT_ACCESS_TOKEN=$GIT_ACCESS_TOKEN -t feature-vdb:$TAG .
+docker build --build-arg GIT_ACCESS_TOKEN=$GIT_ACCESS_TOKEN -t fvdb:$TAG .

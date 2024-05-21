@@ -31,14 +31,12 @@ dependencies:
   - pyg
   - sparsehash
   - pytorch-scatter
-  - sphinx
+  - sphinx>=7.0.0
   - sphinx_rtd_theme
   - myst-parser
   - pandas
   - pytest-benchmark
   - pip:
-    - point-cloud-utils
-    - polyscope
     - linkify-it-py
     - python-pycg
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/torchsparse-2.0.0b0-cp310-cp310-linux_x86_64.whl

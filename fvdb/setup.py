@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import requests
 from tqdm import tqdm
+from pathlib import Path
 
 import git
 import git.repo
@@ -92,15 +93,29 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
                 self.copy_file(regular_file, inplace_file, level=self.verbose) # type: ignore
 
     def run(self) -> None:
+        # Use PAT clone for github actions (no fingerprinting)
+        if os.getenv('GITHUB_ACTIONS') == 'true' or os.getenv('GITLAB_CI') == 'true':
+            token = os.getenv('GITHUB_ACCESS_TOKEN')
+            nanovdb_url = f"https://{token}@github.com/NVIDIA-Omniverse/NanoVDB.git"
+        else:
+            nanovdb_url = "git@github.com:NVIDIA-Omniverse/NanoVDB.git"
+
+        self.download_external_dep(
+            name='nanovdb',
+            git_url=nanovdb_url,
+            git_tag='bfdd01dfd4e555fcbb3d6b5a3d85e8290d1eaec9'
+        )
+
         _, cutlass_repo = self.download_external_dep(
             name='cutlass',
             git_url='https://github.com/NVIDIA/cutlass.git',
             git_tag='v3.4.0'
         )
         try:
-            cutlass_repo.git.apply(os.path.join(os.path.dirname(__file__), 'env/cutlass.patch'))
-        except GitCommandError:
-            print("Failed to apply cutlass patch, continuing without patching")
+            # NOTE:  In python <=3.8, __file__ will be a relative path and >3.8 it is an absolute path
+            cutlass_repo.git.apply(Path(__file__).resolve().parent / 'env' / 'cutlass.patch')
+        except GitCommandError as e:
+            print(f"Failed to apply cutlass patch: {str(e)}, continuing without patching")
 
         self.download_external_dep(
             name='cudnn_fe',
@@ -124,8 +139,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         # Find all the headers and copy them into the build directory.
         # This way extension modules of FVDB can include them.
         fvdb_headers = get_header_files_recursive('src', 'fvdb')
-        cwd = os.path.dirname(os.path.abspath(__file__))
-        nanovdb_headers = get_header_files_recursive(os.path.join(cwd, '..', 'nanovdb'), 'nanovdb')
+        nanovdb_headers = get_header_files_recursive('external/nanovdb/', 'nanovdb')
 
         for header_folder, header_files in fvdb_headers + nanovdb_headers:
             os.makedirs(os.path.join(self.build_lib, header_folder), exist_ok=True)
@@ -242,7 +256,7 @@ if __name__ == "__main__":
         name='fvdb.fvdblib',
         sources=get_source_files_recursive('src', include_bindings=False),
         include_dirs=[os.path.join(cwd, 'src'),
-                    os.path.join(cwd, '..', 'nanovdb'),
+                    os.path.join(cwd, 'external/nanovdb'),
                     os.path.join(cwd, 'external/cutlass/include'),
                     os.path.join(cwd, 'external/c-blosc/install/include'),
                     os.path.join(cwd, 'external/cudnn_fe/include')] + cudnn_include_dirs,
@@ -255,7 +269,7 @@ if __name__ == "__main__":
         name='fvdb._Cpp',
         sources=get_source_files_recursive('src/python/'),
         include_dirs=[os.path.join(cwd, 'src'),
-                    os.path.join(cwd, '..', 'nanovdb'),
+                    os.path.join(cwd, 'external/nanovdb'),
                     os.path.join(cwd, 'external/cutlass/include'),
                     os.path.join(cwd, 'external/c-blosc/install/include')],
         library_dirs=[os.path.join(cwd, 'fvdb')],
@@ -265,7 +279,15 @@ if __name__ == "__main__":
                             'nvcc': nvcc_flags},
         language='c++')
 
+    def retrieve_version(file_path = "fvdb/__init__.py"):
+        with open(file_path, "r") as f:
+            for line in f:
+                if line.startswith("__version__"):
+                    return line.split("=")[1].strip().strip("'").strip('"')
+        return "0.0.0"
+
     setup(name='fvdb',
+        version = retrieve_version(),
         ext_modules=[lib_ext, bind_ext],
         packages=['fvdb', 'fvdb.nn', 'fvdb.utils'],
         include_package_data=True,

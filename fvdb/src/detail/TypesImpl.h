@@ -222,7 +222,7 @@ public:
                 TORCH_CHECK_VALUE(mValue[i][0] > 0 && mValue[i][1] > 0 && mValue[i][2] > 0, "Expected all coordinates of " + name + " to be positive");
             }
         }
-        TORCH_CHECK_VALUE(batchSize == mValue.size(), "Expected " + name + "batch of 3D coordinates to have size [" + std::to_string(batchSize) + ", 3]");
+        TORCH_CHECK_VALUE(batchSize == mValue.size(), "Expected " + name + " batch of 3D coordinates to have size [" + std::to_string(batchSize) + ", 3]");
         return mValue;
     }
 

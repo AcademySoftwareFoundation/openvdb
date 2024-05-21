@@ -44,7 +44,7 @@ ENV TORCH_CUDA_ARCH_LIST "6.1;7.0;7.5;8.0;8.6+PTX"
 # used for cross-compilation in docker build
 ENV FORCE_CUDA=1
 
-WORKDIR /feature-vdb
+WORKDIR /fvdb
 COPY env/test_environment.yml .
 
 RUN /opt/conda/bin/conda env create -f test_environment.yml \

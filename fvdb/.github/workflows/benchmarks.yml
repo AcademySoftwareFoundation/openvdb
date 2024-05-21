@@ -31,7 +31,7 @@ jobs:
       - name: Run benchmarks
         run: |
           conda activate fvdb_test
-          MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') python setup.py develop
+          MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py develop
           pytest tests/benchmark --benchmark-json tests/benchmark/output.json
         shell:
           bash -el {0}
@@ -49,3 +49,9 @@ jobs:
             comment-on-alert: true
             fail-on-alert: true
             alert-comment-cc-users: '@swahtz'
+
+      - name: Clean Conda
+        run: |
+          conda clean -pty
+        shell:
+          bash -el {0}

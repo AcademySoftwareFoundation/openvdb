@@ -7,11 +7,11 @@ If you want to install the `fvdb` package into other python environments, we pro
 Note that only Linux is supported for now (Ubuntu >= 20.04 recommended).
 
 
-|                | Python     | `cu113` | `cu116` | `cu117` | `cu118` |
-| -------------- | ---------- | ------- | ------- | ------- | ------- |
-| PyTorch 2.0.0  | 3.8 - 3.11 |         |         | ✅       | ✅       |
-| PyTorch 1.13.0 | 3.7 - 3.11 |         | ✅       | ✅       |         |
-| PyTorch 1.12.0 | 3.7 - 3.10 | ✅       | ✅       |         |         |
+|   PyTorch      | Python     | `cu121` |
+| -------------- | ---------- | ------- |
+|  2.0.0-2.0.3  | 3.8 - 3.11 |   ✅     |
+|  2.1.0-2.1.3  | 3.8 - 3.12 |   ✅     |
+|  2.3.0        | 3.8 - 3.12 |   ✅     |
 
 Use the following command to install `fvdb`.
 
@@ -19,4 +19,4 @@ Use the following command to install `fvdb`.
 pip install -U fvdb -f https://fvdb.huangjh.tech/whl/torch-${TORCH_VERSION}+${CUDA_VERSION}.html
 ```
 
-An example combination would be `TORCH_VERSION=2.0.0` and `CUDA_VERSION=cu118`.
+An example combination would be `TORCH_VERSION=2.0.0` and `CUDA_VERSION=cu121`.

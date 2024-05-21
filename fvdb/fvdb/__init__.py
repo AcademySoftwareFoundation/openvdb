@@ -17,8 +17,8 @@ from ._Cpp import (cat, sparse_grid_from_ijk, sparse_grid_from_points,
 from . import nn
 
 
-__version__ = '0.0.0'
-__version_info__ = (0, 0, 0)
+__version__ = '0.0.1'
+__version_info__ = (0, 0, 1)
 
 __all__ = [
     "GridBatch",
