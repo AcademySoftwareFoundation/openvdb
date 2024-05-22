@@ -7,4 +7,4 @@ Ken Museth
 DreamWorks Animation
 Side Effects Software Inc.
 Blender Foundation
-
+NVIDIA Corporation
