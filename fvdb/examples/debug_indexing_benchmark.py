@@ -60,24 +60,3 @@ def main(args):
 
 if __name__ == "__main__":
     main(parse_args())
-
-'''
-~/projects/featurevdb (cuda_build) » python trash/benchmark_py.py                                                                    1 ↵ francis@fwilliams-dt
-fvdb: 0.1836395263671875
-(fvdb) -------------------------------------------------------------------------------------------------------------------------------------------------------
-~/projects/featurevdb (cuda_build) » python trash/benchmark_py.py --num-points 1_000_000                                                 francis@fwilliams-dt
-fvdb: 0.2339162826538086
-(fvdb) -------------------------------------------------------------------------------------------------------------------------------------------------------
-~/projects/featurevdb (cuda_build) » python trash/benchmark_py.py --num-points 1_000_000                                                 francis@fwilliams-dt
-Grid has 999940 voxels
-fvdb: 0.22064661979675293
-(fvdb) -------------------------------------------------------------------------------------------------------------------------------------------------------
-~/projects/featurevdb (cuda_build) » python trash/benchmark_py.py --num-points 1_000_000                                                 francis@fwilliams-dt
-Grid has 999933 voxels
-fvdb: 0.2492973804473877
-(fvdb) -------------------------------------------------------------------------------------------------------------------------------------------------------
-~/projects/featurevdb (cuda_build*) » python trash/benchmark_py.py --num-points 1_000_000 --load-points pts.pth                          francis@fwilliams-dt
-Grid has 999933 voxels
-fvdb: 0.25940680503845215
-(fvdb) -
-'''

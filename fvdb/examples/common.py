@@ -1,35 +1,35 @@
-import time
+import timeit
 
 import numpy as np
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
+from typing import Tuple, Union, List
+from pathlib import Path
+import logging
 
-from fvdb import CudaSparseFeatureIndexGrid, SparseFeatureIndexGrid
+from fvdb import GridBatch
 
+def make_grid_from_points(pts:torch.Tensor, padding, vox_size, vox_origin) -> GridBatch:
+    logging.info("Building GridBatch from points...")
+    start = timeit.default_timer()
+    grid = GridBatch(device=pts.device)
+    grid.set_from_points(pts, [-padding]*3, [padding]*3, voxel_sizes=vox_size, origins=vox_origin)
+    torch.cuda.synchronize()
+    logging.info(f"Done in {timeit.default_timer() - start}s")
+    logging.info(f"GridBatch has {grid.total_voxels} voxels")
 
-def make_vdb_from_points(pts, vox_size, vox_origin, padding):
-    print("Building vdb...")
-    start = time.time()
-    if pts.is_cuda:
-        print("Building CUDA Grid")
-        fvdb = CudaSparseFeatureIndexGrid(vox_size, vox_origin)
-    else:
-        print("Building CPU Grid")
-        fvdb = SparseFeatureIndexGrid(vox_size, vox_origin)
-    fvdb.build_from_padded_pointcloud(pts, [-padding]*3, [padding]*3)
-    print(f"Done in {time.time() - start}s")
-    print(f"VDB has {fvdb.num_voxels()} voxels and {fvdb.num_corners()} corners")
-
-    return fvdb
+    return grid
 
 
-def make_ray_grid(nrays, theta=0.0, r=0.0, minb=(-0.3, -0.3), maxb=(0.3, 0.3),
-                  device='cpu', dtype=torch.float32):
-    ray_o = torch.tensor([[0.3500, 0.1075, 1.1210]] * nrays**2)
-    offset = torch.tensor([[np.cos(theta), np.sin(theta), 0.0]]) * r
-    ray_o += offset
-    # ray_o = torch.tensor([[0.3500, 0.075, 1.1210]] * nrays**2) #+ p.mean(0, keepdim=True)
+def make_ray_grid(nrays: int,
+                  origin: Union[torch.Tensor, Tuple, List],
+                  minb=(-0.3, -0.3),
+                  maxb=(0.3, 0.3),
+                  device:Union[str, torch.device]='cpu',
+                  dtype=torch.float32) -> Tuple[torch.Tensor, torch.Tensor]:
+    ray_o = torch.tensor([origin] * nrays**2)
+
     ray_d = torch.from_numpy(
         np.stack([a.ravel() for a in
                   np.mgrid[minb[0]:maxb[0]:nrays*1j,
@@ -39,24 +39,36 @@ def make_ray_grid(nrays, theta=0.0, r=0.0, minb=(-0.3, -0.3), maxb=(0.3, 0.3),
 
     ray_o, ray_d = ray_o.to(device).to(dtype), ray_d.to(device).to(dtype)
 
-    return ray_o, -ray_d
+    return ray_o, ray_d
 
 
-def load_pointcloud(data_path, skip_every=1, shuffle=True, device='cuda', dtype=torch.float32):
-    print("Loading...")
-    start = time.time()
+def load_pointcloud(data_path, skip_every=1, shuffle=False, device=torch.device('cuda'), dtype=torch.float32) -> torch.Tensor:
+    logging.info(f"Loading pointlcoud {data_path}...")
+    start = timeit.default_timer()
     pts = pcu.load_mesh_v(data_path)
     if shuffle:
         pts = pts[np.random.permutation(pts.shape[0])]
     pts = pts[::skip_every]
-    print(f"Done in {time.time() - start}s")
+    logging.info(f"Done in {timeit.default_timer() - start}s")
     return torch.from_numpy(pts).to(device).to(dtype)
 
+def load_mesh(data_path, skip_every=1, device=torch.device('cuda'), dtype=torch.float32) -> Tuple[torch.Tensor, torch.Tensor] :
+    logging.info(f"Loading mesh {data_path}...")
+    start = timeit.default_timer()
+    pts, nms = pcu.load_mesh_vn(data_path)
+    p, n = torch.from_numpy(pts[::skip_every]).to(device).to(dtype), \
+           torch.from_numpy(nms[::skip_every]).to(device).to(dtype)
+    logging.info(f"Done in {timeit.default_timer() - start}s")
+    return p, n
 
-def plot_ray_segments(ray_o, ray_d, times, counts):
-    for i in range(0, times.shape[0]):
-        t0s = times[i][:counts[i]][:, 0].unsqueeze(-1)
-        t1s = times[i][:counts[i]][:, 1].unsqueeze(-1)
+def load_dragon_mesh(skip_every=1, device=torch.device('cuda'), dtype=torch.float32) -> Tuple[torch.Tensor, torch.Tensor]:
+    data_path = Path(__file__).resolve().parent.parent / "data/dragon.ply"
+    return load_mesh(data_path, skip_every=skip_every, device=device, dtype=dtype)
+
+def plot_ray_segments(ray_o, ray_d, times, pack_info):
+    for i in range(0, pack_info.shape[0]):
+        t0s = times[pack_info[i][0]:pack_info[i][0]+pack_info[i][1]][:, 0].unsqueeze(-1)
+        t1s = times[pack_info[i][0]:pack_info[i][0]+pack_info[i][1]][:, 1].unsqueeze(-1)
         roi = ray_o[i].unsqueeze(0)
         rdi = ray_d[i].unsqueeze(0)
         rp = torch.cat([roi + t0s * rdi, roi + t1s * rdi])
