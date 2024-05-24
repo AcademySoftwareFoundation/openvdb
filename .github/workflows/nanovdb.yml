@@ -161,8 +161,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -170,12 +170,12 @@ jobs:
         run: ./ci/install_macos.sh
       - name: build
         run: >
-          ./ci/build.sh -v
+          sudo ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
           --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
       - name: test
-        run: cd build && ctest -V -E ".*cuda.*"
+        run: cd build && sudo ctest -V -E ".*cuda.*"
 
   nanovdb-lite:
     if: |
