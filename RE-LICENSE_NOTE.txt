@@ -1,0 +1,11 @@
+The following copyright holders agree that all of their contributions
+originally submitted to this project under the Mozilla Public License
+Version 2.0, are hereby relicensed to the Apache License, Version 2.0,
+and are submitted pursuant to the Developer Certificate of Origin, version 1.1:
+
+Ken Museth
+DreamWorks Animation
+Side Effects Software Inc.
+Blender Foundation
+NVIDIA Corporation
+Digital Domain 3.0, Inc.
