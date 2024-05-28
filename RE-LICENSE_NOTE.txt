@@ -10,3 +10,5 @@ Blender Foundation
 NVIDIA Corporation
 Digital Domain 3.0, Inc.
 Ben FrantzDale
+Sebastian Gaida
+Alessio Quaglino
