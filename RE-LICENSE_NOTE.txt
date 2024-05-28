@@ -9,6 +9,7 @@ Side Effects Software Inc.
 Blender Foundation
 NVIDIA Corporation
 Digital Domain 3.0, Inc.
+Brecht Sanders
 Ignacio Vizzo
 Ben FrantzDale
 Sebastian Gaida
