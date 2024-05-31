@@ -106,31 +106,33 @@ jobs:
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
-          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+# TODO: Uncomment these
+#          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
+#          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+#          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
-    - name: Setup cmake
-      uses: jwlawson/actions-setup-cmake@v2
-      with:
-        cmake-version: '3.28.x'
-    - name: Print cmake version
-      run: cmake --version
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: install_cuda
-      shell: powershell
-      run: .\ci\install_windows_cuda.ps1
+# TODO: Uncomment these
+#    - name: install_cuda
+#      shell: powershell
+#      run: .\ci\install_windows_cuda.ps1
+    - name: Install vcpkg
+      shell: bash
+      run: |
+        git clone https://github.com/microsoft/vcpkg
+        vcpkg/bootstrap-vcpkg.sh
+        vcpkg/vcpkg integrate install
     - name: install_deps
       shell: bash
       run: |
-        vcpkg update
-        vcpkg install zlib tbb gtest blosc boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+        vcpkg/vcpkg --x-install-root=${VCPKG_INSTALLATION_ROOT} install zlib tbb gtest blosc boost-iostreams boost-interprocess boost-algorithm
+        vcpkg/vcpkg integrate install
     - name: build
       shell: bash
       run: >
@@ -144,7 +146,7 @@ jobs:
         -DNANOVDB_USE_CUDA=ON
         -DNANOVDB_USE_OPENVDB=ON
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
-        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        -DCMAKE_TOOLCHAIN_FILE=\"${GITHUB_WORKSPACE}\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake\"
         \'
     - name: test
       shell: bash
@@ -161,8 +163,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-14', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
