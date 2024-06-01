@@ -198,7 +198,7 @@ jobs:
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
-          - { runson: macos-latest,  cxx: '',      cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/llvm@15/bin/clang++' }
+          - { runson: macos-latest,  cxx: '',      cmake: '-D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -314,7 +314,8 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          -DLLVM_DIR=/opt/homebrew/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V

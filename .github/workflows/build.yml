@@ -198,5 +198,8 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,view,render,test\"
+        --cargs=\'
+        -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+        \'
     - name: test
       run: cd build && ctest -V

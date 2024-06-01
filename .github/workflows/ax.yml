@@ -123,7 +123,6 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
           - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
           - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
@@ -139,7 +138,8 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          -DLLVM_DIR=/opt/homebrew/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V
