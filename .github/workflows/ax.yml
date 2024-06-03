@@ -123,8 +123,9 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '13' }
+          # Last macos runner befor M1 (macos-14)
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3

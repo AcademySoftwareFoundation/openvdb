@@ -186,7 +186,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-latest
+    runs-on: macos-13 # Last macos runner befor M1 (macos-14)
     env:
       CXX: clang++
     steps:
