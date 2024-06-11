@@ -11,6 +11,7 @@ Blender Foundation
 NVIDIA Corporation
 United Therapeutics Corporation
 Digital Domain 3.0, Inc.
+Ubisoft Entertainment SA
 Mathieu Malaterre
 Brecht Sanders
 Ignacio Vizzo
