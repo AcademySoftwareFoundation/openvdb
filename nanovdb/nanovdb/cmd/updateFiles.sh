@@ -69,7 +69,6 @@ for file in $(find "$dir" -name '*.h' -or -name '*.cuh' -or -name '*.cc' -or -na
     func2 $file util GpuTimer "cuda::Timer"
     func2 $file util CountOn countOn
     func3 $file "util/GridHandle.h" "GridHandle.h"
-    func3 $file "util/GridHandle.h" "HostBuffer.h"
     func3 $file "util/BuildGrid.h"   "tools/GridBuilder.h"
     func3 $file "util/GridBuilder.h" "tools/GridBuilder.h"
     func3 $file "util/IO.h" "io/IO.h"
@@ -90,7 +89,7 @@ for file in $(find "$dir" -name '*.h' -or -name '*.cuh' -or -name '*.cc' -or -na
     func3 $file "util/cuda/CudaGridStats.cuh" "tools/cuda/CudaGridStats.cuh"
     func3 $file "util/cuda/CudaGridValidator.cuh" "tools/cuda/CudaGridValidator.cuh"
     func3 $file "util/cuda/CudaIndexToGrid.cuh" "tools/cuda/CudaIndexToGrid.cuh"
-    func3 $file "util/cuda/CudaPointsToGrid.cuh" "tools/GridChecksum.cuh"
+    func3 $file "util/cuda/CudaPointsToGrid.cuh" "tools/cuda/PointsToGrid.cuh"
     func3 $file "util/cuda/CudaSignedFloodFill.cuh" "tools/cuda/CudaSignedFloodFill.cuh"
     func3 $file "util/cuda/CudaDeviceBuffer.h" "cuda/DeviceBuffer.h"
     func3 $file "util/cuda/CudaGridHandle.cuh" "cuda/GridHandle.cuh"
