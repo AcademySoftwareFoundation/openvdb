@@ -9,6 +9,7 @@ DreamWorks Animation
 Side Effects Software Inc.
 Blender Foundation
 NVIDIA Corporation
+United Therapeutics Corporation
 Digital Domain 3.0, Inc.
 Mathieu Malaterre
 Brecht Sanders
@@ -18,3 +19,4 @@ Sebastian Gaida
 Alessio Quaglino
 Benedikt Mersch
 Kartik Shrivastava
+Michael Lackner
