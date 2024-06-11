@@ -18,5 +18,6 @@ Ben FrantzDale
 Sebastian Gaida
 Alessio Quaglino
 Benedikt Mersch
+Brian Sharpe
 Kartik Shrivastava
 Michael Lackner
