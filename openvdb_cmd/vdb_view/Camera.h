@@ -23,6 +23,8 @@ public:
 
     void aim();
 
+    openvdb::Mat4s getTransformationMatrix();
+
     void lookAt(const openvdb::Vec3d& p, double dist = 1.0);
     void lookAtTarget();
 
