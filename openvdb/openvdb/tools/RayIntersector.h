@@ -88,6 +88,7 @@ public:
     using RealType = typename RayT::RealType;
     using Vec3Type = typename RayT::Vec3T;
     using ValueT = typename GridT::ValueType;
+    using ComputeT = typename GridT::ComputeType;
     using TreeT = typename GridT::TreeType;
 
     static_assert(NodeLevel >= -1 && NodeLevel < int(TreeT::DEPTH)-1, "NodeLevel out of range");
@@ -97,7 +98,7 @@ public:
     /// @brief Constructor
     /// @param grid level set grid to intersect rays against.
     /// @param isoValue optional iso-value for the ray-intersection.
-    LevelSetRayIntersector(const GridT& grid, const ValueT& isoValue = zeroVal<ValueT>())
+    LevelSetRayIntersector(const GridT& grid, const ComputeT& isoValue = zeroVal<ComputeT>())
         : mTester(grid, isoValue)
     {
         if (!grid.hasUniformVoxels() ) {
@@ -112,7 +113,7 @@ public:
     }
 
     /// @brief Return the iso-value used for ray-intersections
-    const ValueT& getIsoValue() const { return mTester.getIsoValue(); }
+    const ComputeT& getIsoValue() const { return mTester.getIsoValue(); }
 
     /// @brief Return @c true if the index-space ray intersects the level set.
     /// @param iRay ray represented in index space.
@@ -516,17 +517,18 @@ public:
     using RayT = math::Ray<RealT>;
     using VecT = math::Vec3<RealT>;
     using ValueT = typename GridT::ValueType;
+    using ComputeT = typename GridT::ComputeType;
     using AccessorT = typename GridT::ConstAccessor;
     using StencilT = math::BoxStencil<GridT>;
 
     /// @brief Constructor from a grid.
     /// @throw RunTimeError if the grid is empty.
     /// @throw ValueError if the isoValue is not inside the narrow-band.
-    LinearSearchImpl(const GridT& grid, const ValueT& isoValue = zeroVal<ValueT>())
+    LinearSearchImpl(const GridT& grid, const ComputeT& isoValue = zeroVal<ComputeT>())
         : mStencil(grid),
           mIsoValue(isoValue),
-          mMinValue(isoValue - ValueT(2 * grid.voxelSize()[0])),
-          mMaxValue(isoValue + ValueT(2 * grid.voxelSize()[0]))
+          mMinValue(isoValue - ComputeT(2 * grid.voxelSize()[0])),
+          mMaxValue(isoValue + ComputeT(2 * grid.voxelSize()[0]))
       {
           if ( grid.empty() ) {
               OPENVDB_THROW(RuntimeError, "LinearSearchImpl does not supports empty grids");
@@ -539,7 +541,7 @@ public:
       }
 
     /// @brief Return the iso-value used for ray-intersections
-    const ValueT& getIsoValue() const { return mIsoValue; }
+    const ComputeT& getIsoValue() const { return mIsoValue; }
 
     /// @brief Return @c false if the ray misses the bbox of the grid.
     /// @param iRay Ray represented in index space.
@@ -595,7 +597,7 @@ private:
     inline void init(RealT t0)
     {
         mT[0] = t0;
-        mV[0] = static_cast<ValueT>(this->interpValue(t0));
+        mV[0] = static_cast<ComputeT>(this->interpValue(t0));
     }
 
     inline void setRange(RealT t0, RealT t1) { mRay.setTimes(t0, t1); }
@@ -617,26 +619,28 @@ private:
     /// call getIndexPos, getWorldPos and getWorldPosAndNml!
     inline bool operator()(const Coord& ijk, RealT time)
     {
-        ValueT V;
-        if (mStencil.accessor().probeValue(ijk, V) &&//within narrow band
-            V>mMinValue && V<mMaxValue) {// and close to iso-value?
-            mT[1] = time;
-            mV[1] = static_cast<ValueT>(this->interpValue(time));
-            if (math::ZeroCrossing(mV[0], mV[1])) {
-                mTime = this->interpTime();
-                OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-                for (int n=0; Iterations>0 && n<Iterations; ++n) {//resolved at compile-time
-                    V = static_cast<ValueT>(this->interpValue(mTime));
-                    const int m = math::ZeroCrossing(mV[0], V) ? 1 : 0;
-                    mV[m] = V;
-                    mT[m] = mTime;
+        ValueT V_raw;
+        if (mStencil.accessor().probeValue(ijk, V_raw)) {//within narrow band
+            ComputeT V = V_raw;
+            if (V>mMinValue && V<mMaxValue) {// and close to iso-value?
+                mT[1] = time;
+                mV[1] = static_cast<ComputeT>(this->interpValue(time));
+                if (math::ZeroCrossing(mV[0], mV[1])) {
                     mTime = this->interpTime();
+                    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+                    for (int n=0; Iterations>0 && n<Iterations; ++n) {//resolved at compile-time
+                        V = static_cast<ComputeT>(this->interpValue(mTime));
+                        const int m = math::ZeroCrossing(mV[0], V) ? 1 : 0;
+                        mV[m] = V;
+                        mT[m] = mTime;
+                        mTime = this->interpTime();
+                    }
+                    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+                    return true;
                 }
-                OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-                return true;
+                mT[0] = mT[1];
+                mV[0] = mV[1];
             }
-            mT[0] = mT[1];
-            mV[0] = mV[1];
         }
         return false;
     }
@@ -659,9 +663,9 @@ private:
     RayT            mRay;
     StencilT        mStencil;
     RealT           mTime;//time of intersection
-    ValueT          mV[2];
+    ComputeT        mV[2];
     RealT           mT[2];
-    const ValueT    mIsoValue, mMinValue, mMaxValue;
+    const ComputeT  mIsoValue, mMinValue, mMaxValue;
     math::CoordBBox mBBox;
 };// LinearSearchImpl
 

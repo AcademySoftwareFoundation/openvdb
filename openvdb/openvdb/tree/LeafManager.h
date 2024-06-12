@@ -87,6 +87,7 @@ class LeafManager
 public:
     using TreeType = TreeT;
     using ValueType = typename TreeT::ValueType;
+    using ComputeType = typename TreeT::ComputeType;
     using RootNodeType = typename TreeT::RootNodeType;
     using NonConstLeafType = typename TreeType::LeafNodeType;
     using LeafType = typename CopyConstness<TreeType, NonConstLeafType>::Type;

@@ -42,6 +42,7 @@ public:
     using ChildNodeType = ChildType;
     using LeafNodeType = typename ChildType::LeafNodeType;
     using ValueType = typename ChildType::ValueType;
+    using ComputeType = typename ChildType::ComputeType;
     using BuildType = typename ChildType::BuildType;
 
     static const Index LEVEL = 1 + ChildType::LEVEL; // level 0 = leaf

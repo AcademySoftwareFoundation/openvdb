@@ -53,6 +53,7 @@ namespace io { class DelayedLoadMetadata; }
 using BoolTree     = tree::Tree4<bool,        5, 4, 3>::Type;
 using DoubleTree   = tree::Tree4<double,      5, 4, 3>::Type;
 using FloatTree    = tree::Tree4<float,       5, 4, 3>::Type;
+using HalfTree     = tree::Tree4<Half,        5, 4, 3>::Type;
 using Int32Tree    = tree::Tree4<int32_t,     5, 4, 3>::Type;
 using Int64Tree    = tree::Tree4<int64_t,     5, 4, 3>::Type;
 using MaskTree     = tree::Tree4<ValueMask,   5, 4, 3>::Type;
@@ -73,6 +74,7 @@ using VectorTree   = Vec3fTree;
 using BoolGrid     = Grid<BoolTree>;
 using DoubleGrid   = Grid<DoubleTree>;
 using FloatGrid    = Grid<FloatTree>;
+using HalfGrid     = Grid<HalfTree>;
 using Int32Grid    = Grid<Int32Tree>;
 using Int64Grid    = Grid<Int64Tree>;
 using MaskGrid     = Grid<MaskTree>;
@@ -204,6 +206,7 @@ using MetaTypes = TypeList<
     BoolMetadata,
     DoubleMetadata,
     FloatMetadata,
+    HalfMetadata,
     Int32Metadata,
     Int64Metadata,
     StringMetadata,

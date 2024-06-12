@@ -152,10 +152,10 @@ public:
 
     using GridType = typename IntersectorT::GridType;
     using RayType = typename IntersectorT::RayType;
-    using ValueType = typename GridType::ValueType;
+    using ComputeType = typename GridType::ComputeType;
     using AccessorType = typename GridType::ConstAccessor;
     using SamplerType = tools::GridSampler<AccessorType, SamplerT>;
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(std::is_floating_point<ComputeType>::value,
         "VolumeRender requires a floating-point-valued grid");
 
     /// @brief Constructor taking an intersector and a base camera.
@@ -549,9 +549,11 @@ public:
     ~MatteShader() override = default;
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
+        using RealT = Film::RGBA::ValueT;
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
-        return Film::RGBA(v[0], v[1], v[2]);
+        return Film::RGBA(RealT(v[0]), RealT(v[1]), RealT(v[2]));
     }
     BaseShader* copy() const override { return new MatteShader<GridT, SamplerType>(*this); }
 
@@ -596,9 +598,13 @@ public:
     ~NormalShader() override = default;
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R&) const override
     {
+        using RealT = Film::RGBA::ValueT;
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
-        return Film::RGBA(v[0]*(normal[0]+1.0), v[1]*(normal[1]+1.0), v[2]*(normal[2]+1.0));
+        return Film::RGBA(RealT(v[0])*(normal[0]+1.0),
+                          RealT(v[1])*(normal[1]+1.0),
+                          RealT(v[2])*(normal[2]+1.0));
     }
     BaseShader* copy() const override { return new NormalShader<GridT, SamplerType>(*this); }
 
@@ -649,10 +655,13 @@ public:
     ~PositionShader() override = default;
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R&, const Vec3R&) const override
     {
+        using RealT = Film::RGBA::ValueT;
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         const Vec3R rgb = (xyz - mMin) * mInvDim;
-        return Film::RGBA(v[0],v[1],v[2]) * Film::RGBA(rgb[0], rgb[1], rgb[2]);
+        return Film::RGBA(RealT(v[0]), RealT(v[1]), RealT(v[2]))
+            * Film::RGBA(rgb[0], rgb[1], rgb[2]);
     }
     BaseShader* copy() const override { return new PositionShader<GridT, SamplerType>(*this); }
 
@@ -703,12 +712,14 @@ public:
     ~DiffuseShader() override = default;
     Film::RGBA operator()(const Vec3R& xyz, const Vec3R& normal, const Vec3R& rayDir) const override
     {
+        using RealT = Film::RGBA::ValueT;
+
         typename GridT::ValueType v = zeroVal<typename GridT::ValueType>();
         SamplerType::sample(mAcc, mXform->worldToIndex(xyz), v);
         // We take the abs of the dot product corresponding to having
         // light sources at +/- rayDir, i.e., two-sided shading.
-        return Film::RGBA(v[0],v[1],v[2])
-            * static_cast<Film::RGBA::ValueT>(math::Abs(normal.dot(rayDir)));
+        return Film::RGBA(RealT(v[0]), RealT(v[1]), RealT(v[2]))
+            * static_cast<RealT>(math::Abs(normal.dot(rayDir)));
     }
     BaseShader* copy() const override { return new DiffuseShader<GridT, SamplerType>(*this); }
 
