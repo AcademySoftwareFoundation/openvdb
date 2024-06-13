@@ -40,6 +40,11 @@ public:
     using Ptr = openvdb::SharedPtr<ProxyTree>;
     using ConstPtr = openvdb::SharedPtr<const ProxyTree>;
 
+    using Accessor = void;
+    using ConstAccessor = void;
+    using UnsafeAccessor = void;
+    using ConstUnsafeAccessor = void;
+
     static const openvdb::Index DEPTH;
     static const ValueType backg;
 
