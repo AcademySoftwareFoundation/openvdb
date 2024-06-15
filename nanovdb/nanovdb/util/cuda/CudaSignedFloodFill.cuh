@@ -153,11 +153,11 @@ void CudaSignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     static_assert(BuildTraits<BuildT>::is_float, "CudaSignedFloodFill only works on float grids");
     NANOVDB_ASSERT(d_grid);
     uint64_t count[4], *d_count = nullptr;
-    cudaCheck(cudaMallocAsync((void**)&d_count, 4*sizeof(uint64_t), mStream));
+    cudaCheck(CUDA_MALLOC((void**)&d_count, 4*sizeof(uint64_t), mStream));
     cudaCpyNodeCount<BuildT><<<1, 1, 0, mStream>>>(d_grid, d_count);
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&count, d_count, 4*sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaFreeAsync(d_count, mStream));
+    cudaCheck(CUDA_FREE(d_count, mStream));
 
     static const int threadsPerBlock = 128;
     auto blocksPerGrid = [&](size_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};

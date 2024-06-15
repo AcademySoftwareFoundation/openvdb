@@ -153,7 +153,7 @@ inline void CudaDeviceBuffer::init(uint64_t size, bool host, void* stream)
         cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
         checkPtr(mCpuData, "CudaDeviceBuffer::init: failed to allocate host buffer");
     } else {
-        cudaCheck(cudaMallocAsync((void**)&mGpuData, size, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(CUDA_MALLOC((void**)&mGpuData, size, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
         checkPtr(mGpuData, "CudaDeviceBuffer::init: failed to allocate device buffer");
     }
     mSize = size;
@@ -163,7 +163,7 @@ inline void CudaDeviceBuffer::deviceUpload(void* stream, bool sync) const
 {
     checkPtr(mCpuData, "uninitialized cpu data");
     if (mGpuData == nullptr) {
-        cudaCheck(cudaMallocAsync((void**)&mGpuData, mSize, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(CUDA_MALLOC((void**)&mGpuData, mSize, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
     }
     checkPtr(mGpuData, "uninitialized gpu data");
     cudaCheck(cudaMemcpyAsync(mGpuData, mCpuData, mSize, cudaMemcpyHostToDevice, reinterpret_cast<cudaStream_t>(stream)));
@@ -183,7 +183,7 @@ inline void CudaDeviceBuffer::deviceDownload(void* stream, bool sync) const
 
 inline void CudaDeviceBuffer::clear(void *stream)
 {
-    if (mGpuData) cudaCheck(cudaFreeAsync(mGpuData, reinterpret_cast<cudaStream_t>(stream)));
+    if (mGpuData) cudaCheck(CUDA_FREE(mGpuData, reinterpret_cast<cudaStream_t>(stream)));
     if (mCpuData) cudaCheck(cudaFreeHost(mCpuData));
     mCpuData = mGpuData = nullptr;
     mSize = 0;

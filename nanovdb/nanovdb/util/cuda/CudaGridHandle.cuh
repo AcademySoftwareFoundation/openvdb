@@ -71,7 +71,7 @@ cudaSplitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = n
     if (ptr == nullptr) return VectorT<GridHandle<BufferT>>();
     VectorT<GridHandle<BufferT>> handles(handle.gridCount());
     bool dirty, *d_dirty;// use this to check if the checksum needs to be recomputed
-    cudaCheck(cudaMallocAsync((void**)&d_dirty, sizeof(bool), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_dirty, sizeof(bool), stream));
     for (uint32_t n=0; n<handle.gridCount(); ++n) {
         auto buffer = BufferT::create(handle.gridSize(n), other, false, stream);
         GridData *dst = reinterpret_cast<GridData*>(buffer.deviceData());
@@ -84,7 +84,7 @@ cudaSplitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = n
         handles[n] = GridHandle<BufferT>(std::move(buffer));
         ptr += handle.gridSize(n);
     }
-    cudaCheck(cudaFreeAsync(d_dirty, stream));
+    cudaCheck(CUDA_FREE(d_dirty, stream));
     return std::move(handles);
 }// cudaSplitGridHandles
 
@@ -106,7 +106,7 @@ cudaMergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT*
     auto buffer = BufferT::create(size, other, false, stream);
     uint8_t *dst = buffer.deviceData();
     bool dirty, *d_dirty;// use this to check if the checksum needs to be recomputed
-    cudaCheck(cudaMallocAsync((void**)&d_dirty, sizeof(bool), stream));
+    cudaCheck(CUDA_MALLOC((void**)&d_dirty, sizeof(bool), stream));
     for (auto &h : handles) {
         const uint8_t *src = h.deviceData();
         for (uint32_t n=0; n<h.gridCount(); ++n) {
@@ -120,7 +120,7 @@ cudaMergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT*
             src += h.gridSize(n);
         }
     }
-    cudaCheck(cudaFreeAsync(d_dirty, stream));
+    cudaCheck(CUDA_FREE(d_dirty, stream));
     return GridHandle<BufferT>(std::move(buffer));
 }// cudaMergeGridHandles
 

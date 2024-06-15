@@ -64,7 +64,7 @@ public:
     /// @param srcGrid Device pointer to IndexGrid used as the source
     CudaIndexToGrid(const SrcGridT *d_srcGrid, cudaStream_t stream = 0);
 
-    ~CudaIndexToGrid() {cudaCheck(cudaFreeAsync(mDevNodeAcc, mStream));}
+    ~CudaIndexToGrid() {cudaCheck(CUDA_FREE(mDevNodeAcc, mStream));}
 
     /// @brief Toggle on and off verbose mode
     /// @param on if true verbose is turned on
@@ -295,7 +295,7 @@ CudaIndexToGrid<SrcBuildT>::CudaIndexToGrid(const SrcGridT *d_srcGrid, cudaStrea
     : mStream(stream), mTimer(stream)
 {
     NANOVDB_ASSERT(d_srcGrid);
-    cudaCheck(cudaMallocAsync((void**)&mDevNodeAcc, sizeof(NodeAccessor), mStream));
+    cudaCheck(CUDA_MALLOC((void**)&mDevNodeAcc, sizeof(NodeAccessor), mStream));
     cudaCpyNodeCount<SrcBuildT><<<1, 1, 0, mStream>>>(d_srcGrid, mDevNodeAcc);
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&mNodeAcc, mDevNodeAcc, sizeof(NodeAccessor), cudaMemcpyDeviceToHost, mStream));// mNodeAcc = *mDevNodeAcc
@@ -319,7 +319,7 @@ GridHandle<BufferT> CudaIndexToGrid<SrcBuildT>::getHandle(const typename BuildTo
     cudaProcessRootTiles<SrcBuildT,DstBuildT><<<mNodeAcc.nodeCount[3], 1, 0, mStream>>>(mDevNodeAcc, srcValues);
     cudaCheckError();
 
-    cudaCheck(cudaFreeAsync(mNodeAcc.d_gridName, mStream));
+    cudaCheck(CUDA_FREE(mNodeAcc.d_gridName, mStream));
 
     if (mVerbose) mTimer.restart("Process upper internal nodes");
     cudaProcessInternalNodes<SrcBuildT,DstBuildT,2><<<mNodeAcc.nodeCount[2], dim3(32,32), 0, mStream>>>(mDevNodeAcc, srcValues);
@@ -362,7 +362,7 @@ inline BufferT CudaIndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
 
     if (size_t size = mGridName.size()) {
-        cudaCheck(cudaMallocAsync((void**)&mNodeAcc.d_gridName, size, mStream));
+        cudaCheck(CUDA_MALLOC((void**)&mNodeAcc.d_gridName, size, mStream));
         cudaCheck(cudaMemcpyAsync(mNodeAcc.d_gridName, mGridName.data(), size, cudaMemcpyHostToDevice, mStream));
     } else {
         mNodeAcc.d_gridName = nullptr;

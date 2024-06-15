@@ -265,7 +265,7 @@ public:
     {
         mData.map = map;
         mData.flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
-        cudaCheck(cudaMallocAsync((void**)&mDeviceData, sizeof(Data), mStream));
+        cudaCheck(CUDA_MALLOC((void**)&mDeviceData, sizeof(Data), mStream));
     }
 
     /// @brief Default constructor
@@ -276,7 +276,7 @@ public:
         : CudaPointsToGrid(Map(scale, trans), stream) {}
 
     /// @brief Destructor
-    ~CudaPointsToGrid() {cudaCheck(cudaFreeAsync(mDeviceData, mStream));}
+    ~CudaPointsToGrid() {cudaCheck(CUDA_FREE(mDeviceData, mStream));}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
