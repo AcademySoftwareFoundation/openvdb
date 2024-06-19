@@ -1,0 +1,45 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${env:CONDA_PREFIX}/envs/fvdb/include",
+                "${env:CONDA_PREFIX}/envs/fvdb/include/cuda",
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/external/nanovdb",
+                "${workspaceFolder}/external/cudnn_fe/include",
+                "${env:CONDA_PREFIX}/envs/fvdb/include/python3.10",
+                "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.10/site-packages/torch/include",
+                "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.10/site-packages/torch/include/torch/csrc/api/include",
+                "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.10/site-packages/torch/include/THC",
+                "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.10/site-packages/torch/include/c10",
+                "${default}"
+            ],
+            "macFrameworkPath": [
+                "${default}"
+            ],
+            "defines": [
+                "${default}",
+                "NDEVELOP_IDE_ONLY",
+                "__CUDA_ARCH__=800"
+            ],
+            "forcedInclude": [
+                "${default}"
+            ],
+            "compileCommands": "${default}",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": "${default}",
+                "path": [
+                    "${default}"
+                ]
+            },
+            "intelliSenseMode": "${default}",
+            "cStandard": "${default}",
+            "cppStandard": "c++20",
+            "compilerPath": "${default}",
+            "configurationProvider": "ms-vscode.cpptools"
+        }
+    ],
+    "version": 4
+}

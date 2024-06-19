@@ -1,0 +1,58 @@
+{
+    "configurations": [
+        {
+            "name": "NGP",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-path", "/scratch/data/torch_ngp_data/replica/Sequence_1/ngp_configs/transforms_train.json", "ngp"]
+        },
+        {
+            "name": "featureVDB",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-path", "/scratch/data/torch_ngp_data/replica/Sequence_1/ngp_configs/transforms_train.json", "featurevdb", "--pts-path", "pts_acc.ply"]
+        },
+        {
+            "name": "featureVDBNGP",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": ["--config-path", "/scratch/data/torch_ngp_data/replica/Sequence_1/ngp_configs/transforms_train.json", "ngp",  "--feature-type", "torchgrid"]
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "(gdb) Attach",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/home/fwilliams/bin/miniconda3/envs/featurevdb/bin/python",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+    ]
+}

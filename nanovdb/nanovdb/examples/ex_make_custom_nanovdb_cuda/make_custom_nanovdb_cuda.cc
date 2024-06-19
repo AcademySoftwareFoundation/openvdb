@@ -3,9 +3,9 @@
 
 #undef NANOVDB_USE_OPENVDB // Prevents include/openvdb/points/AttributeArray.h:1841:25: error: ‘stride’ cannot be used as a function
 
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
+#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/cuda/DeviceBuffer.h>
 
 #include <iostream>
 
@@ -19,7 +19,7 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,// GPU grid
 int main()
 {
     try {
-        using GridT = nanovdb::build::Grid<float>;
+        using GridT = nanovdb::tools::build::Grid<float>;
         GridT grid(0.0f);// empty grid with a background value of zero
         auto acc = grid.getAccessor();
         acc.setValue(nanovdb::Coord(1, 2, 3), 1.0f);
@@ -27,7 +27,7 @@ int main()
         printf("build::Grid: (%i,%i,%i)=%4.2f\n", 1, 2, 3, acc.getValue(nanovdb::Coord(1, 2, 3)));
 
         // convert build::grid to a nanovdb::GridHandle using a Cuda buffer
-        auto handle = nanovdb::createNanoGrid<GridT, float, nanovdb::CudaDeviceBuffer>(grid);
+        auto handle = nanovdb::tools::createNanoGrid<GridT, float, nanovdb::cuda::DeviceBuffer>(grid);
 
         auto* cpuGrid = handle.grid<float>(); //get a (raw) pointer to a NanoVDB grid of value type float on the CPU
         if (!cpuGrid) throw std::runtime_error("GridHandle does not contain a grid with value type float");

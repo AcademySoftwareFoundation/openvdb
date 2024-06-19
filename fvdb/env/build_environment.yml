@@ -1,0 +1,29 @@
+name: fvdb_build
+channels:
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.1.2
+  - pytorch-cuda=12.1
+  - pybind11
+  - git
+  - gitpython
+  - ca-certificates
+  - certifi
+  - openssl
+  - cuda>=12.1.0, <12.2.0
+  - cuda-nvcc>=12.1.0, <12.2.0
+  - gcc_linux-64=11
+  - gxx_linux-64=11
+  - setuptools
+  - cmake
+  - make
+  - ninja
+  - sphinx>=7.0.0
+  - sphinx_rtd_theme
+  - myst-parser
+  - linkify-it-py
+  - numpy
+  - tqdm

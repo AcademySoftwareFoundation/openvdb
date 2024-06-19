@@ -2,22 +2,22 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
-#include <nanovdb/util/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-#include <nanovdb/util/NodeManager.h>
+#include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
+#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/NodeManager.h>
 
-extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,
-                               const nanovdb::NodeManager<float>*,
+extern "C" void launch_kernels(const nanovdb::NodeManager<float>*,// device NaodeManager
+                               const nanovdb::NodeManager<float>*,// host NodeManager
                                cudaStream_t stream);
 
-extern "C" void cudaCreateNodeManager(const nanovdb::NanoGrid<float>*,
-                                      nanovdb::NodeManagerHandle<nanovdb::CudaDeviceBuffer>*);
+extern "C" void cudaCreateNodeManager(const nanovdb::NanoGrid<float>*,// device grid
+                                      nanovdb::NodeManagerHandle<nanovdb::cuda::DeviceBuffer>*);// Handle to device NodeManager
 
 /// @brief This examples depends on OpenVDB, NanoVDB and CUDA.
 int main()
 {
     using SrcGridT = openvdb::FloatGrid;
-    using BufferT = nanovdb::CudaDeviceBuffer;
+    using BufferT = nanovdb::cuda::DeviceBuffer;
     try {
         cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
         cudaStreamCreate(&stream);
@@ -26,7 +26,7 @@ int main()
         auto srcGrid = openvdb::tools::createLevelSetSphere<SrcGridT>(100.0f, openvdb::Vec3f(0.0f), 1.0f);
 
         // Converts the OpenVDB to NanoVDB and returns a GridHandle that uses CUDA for memory management.
-        auto gridHandle = nanovdb::createNanoGrid<SrcGridT, float, BufferT>(*srcGrid);
+        auto gridHandle = nanovdb::tools::createNanoGrid<SrcGridT, float, BufferT>(*srcGrid);
         gridHandle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
         auto* grid = gridHandle.grid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the CPU
         auto* deviceGrid = gridHandle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU

@@ -1,0 +1,42 @@
+name: fvdb_test
+channels:
+  - pyg
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch=2.1.2
+  - pytorch-cuda=12.1
+  - tensorboard
+  - pybind11
+  - pip
+  - git
+  - gitpython
+  - ca-certificates
+  - certifi
+  - openssl
+  - cuda>=12.1.0, <12.2.0
+  - cuda-nvcc>=12.1.0, <12.2.0
+  - parameterized
+  - gcc_linux-64=11
+  - gxx_linux-64=11
+  - setuptools
+  - cmake
+  - make
+  - ninja
+  - ipython
+  - matplotlib
+  - tqdm
+  - pyg
+  - sparsehash
+  - pytorch-scatter
+  - sphinx>=7.0.0
+  - sphinx_rtd_theme
+  - myst-parser
+  - pandas
+  - pytest-benchmark
+  - pip:
+    - linkify-it-py
+    - python-pycg
+    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/torchsparse-2.0.0b0-cp310-cp310-linux_x86_64.whl

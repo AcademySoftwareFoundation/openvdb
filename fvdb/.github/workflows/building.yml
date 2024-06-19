@@ -1,0 +1,125 @@
+name: Building Release Wheels
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+
+jobs:
+
+  wheel:
+    runs-on:
+      - self-hosted
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # support version based on: https://download.pytorch.org/whl/torch/
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        torch-version: [2.1.0, 2.1.1, 2.1.2, 2.2.0, 2.2.1, 2.2.2, 2.3.0]
+        cuda-version: ['12.1.1']
+        exclude:
+          - torch-version: 2.1.2
+            python-version: '3.12'
+          - torch-version: 2.1.1
+            python-version: '3.12'
+          - torch-version: 2.1.0
+            python-version: '3.12'
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Generate release_environment.yml
+        run: |
+          echo "cp env/release_base_environment.yml release_environment.yml"
+          cp env/release_base_environment.yml release_environment.yml
+          echo "  - python=${{ matrix.python-version }}" >> release_environment.yml
+          echo "  - pytorch=${{ matrix.torch-version }}" >> release_environment.yml
+          perl -E '"${{ matrix.cuda-version }}" =~ /^(\d+\.\d+)/; say "  - pytorch-cuda=$1"' >> release_environment.yml
+          perl -E '"${{ matrix.cuda-version }}" =~ /^(\d+)\.(\d+)/; say "  - cuda>=$1.$2.0, <$1." . ($2+1) . ".0"' >> release_environment.yml
+          perl -E '"${{ matrix.cuda-version }}" =~ /^(\d+)\.(\d+)/; say "  - cuda-nvcc>=$1.$2.0, <$1." . ($2+1) . ".0"' >> release_environment.yml
+
+      - name: Set up fvdb_release Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          mamba-version: "*"
+          channels: nvidia,pytorch,conda-forge,defaults
+          channel-priority: true
+          activate-environment: fvdb_release
+          environment-file: release_environment.yml
+
+      - name: Set version
+        run: |
+          VERSION=`sed -n "s/^__version__ = '\(.*\)'/\1/p" fvdb/__init__.py`
+          TORCH_VERSION=`echo "pt${{ matrix.torch-version }}" | sed "s/..$//" | sed "s/\.//g"`
+          CUDA_VERSION=`perl -E '"${{ matrix.cuda-version }}" =~ /^(\d+)\.(\d+)/; say "cu$1$2"'`
+          echo "New version name: $VERSION+$TORCH_VERSION$CUDA_VERSION"
+          sed -i "s/$VERSION/$VERSION+$TORCH_VERSION$CUDA_VERSION/" fvdb/__init__.py
+        shell:
+          bash -el {0}
+
+      - name: Build wheel
+        run: |
+          conda activate fvdb_release
+          mkdir dist
+          TORCH_CUDA_ARCH_LIST="6.1;7.0;7.5;8.0;8.6+PTX" python setup.py bdist_wheel --dist-dir=dist
+        shell:
+          bash -el {0}
+
+      - name: Rename wheel
+        run: |
+          python scripts/rename_wheels.py ${{ matrix.torch-version }} `perl -E '"${{ matrix.cuda-version }}" =~ /^(\d+)\.(\d+)/; say "cu$1$2"'`
+        shell:
+          bash -el {0}
+
+      # - name: Push wheel to fvdb-wheels
+      #   id: push_directory
+      #   uses: swahtz/github-action-push-to-another-repository@main
+      #   env:
+      #     SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_WHL_KEY }}
+      #   with:
+      #     source-directory: 'dist'
+      #     destination-github-username: 'voxel-foundation'
+      #     destination-repository-name: 'fvdb-wheels'
+      #     user-email: 2375296+swahtz@users.noreply.github.com
+      #     target-branch: main
+      #     target-directory: 'main'
+
+      # - name: Upload wheels to URM
+      #   run: |
+      #     pip install twine
+      #     twine upload -u jswartz -p ${{ secrets.URM_TOKEN }} --repository-url https://urm.nvidia.com/artifactory/api/pypi/nv-shared-pypi-local dist/*whl  --verbose
+      #   shell:
+      #     bash
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          token: ${{ secrets.RELEASE_ACTION_TOKEN }}
+          files: |
+            dist/*.whl
+
+      # - name: Upload to artifacts
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: wheels
+      #     path: |
+      #       dist/*.whl
+
+      # - name: Configure AWS
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ap-northeast-1
+
+      # - name: Upload wheel
+      #   run: |
+      #     aws s3 sync dist s3://nksr/whl/torch-${{ matrix.torch-version }}+${{ matrix.cuda-version }} --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+
+      - name: Clean Conda
+        run: |
+          conda clean -pty
+        shell:
+          bash -el {0}
