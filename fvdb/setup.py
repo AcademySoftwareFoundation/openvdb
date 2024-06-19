@@ -257,7 +257,7 @@ if __name__ == "__main__":
         name='fvdb.fvdblib',
         sources=get_source_files_recursive('src', include_bindings=False),
         include_dirs=[os.path.join(cwd, 'src'),
-                    os.path.join(cwd, 'external/nanovdb'),
+                    os.path.join(cwd, '..', '/nanovdb'),
                     os.path.join(cwd, 'external/cutlass/include'),
                     os.path.join(cwd, 'external/c-blosc/install/include'),
                     os.path.join(cwd, 'external/cudnn_fe/include')] + cudnn_include_dirs,
