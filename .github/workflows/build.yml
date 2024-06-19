@@ -151,6 +151,12 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
+    - name: Setup cmake
+      uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: '3.28.x'
+    - name: Print cmake version
+      run: cmake --version
     - name: path
       shell: pwsh
       run: |
