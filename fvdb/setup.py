@@ -94,17 +94,17 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
 
     def run(self) -> None:
         # Use PAT clone for github actions (no fingerprinting)
-        if os.getenv('GITHUB_ACTIONS') == 'true' or os.getenv('GITLAB_CI') == 'true':
-            token = os.getenv('GITHUB_ACCESS_TOKEN')
-            nanovdb_url = f"https://{token}@github.com/NVIDIA-Omniverse/NanoVDB.git"
-        else:
-            nanovdb_url = "git@github.com:NVIDIA-Omniverse/NanoVDB.git"
+        # if os.getenv('GITHUB_ACTIONS') == 'true' or os.getenv('GITLAB_CI') == 'true':
+        #     token = os.getenv('GITHUB_ACCESS_TOKEN')
+        #     nanovdb_url = f"https://{token}@github.com/NVIDIA-Omniverse/NanoVDB.git"
+        # else:
+        #     nanovdb_url = "git@github.com:NVIDIA-Omniverse/NanoVDB.git"
 
-        self.download_external_dep(
-            name='nanovdb',
-            git_url=nanovdb_url,
-            git_tag='bfdd01dfd4e555fcbb3d6b5a3d85e8290d1eaec9'
-        )
+        # self.download_external_dep(
+        #     name='nanovdb',
+        #     git_url=nanovdb_url,
+        #     git_tag='bfdd01dfd4e555fcbb3d6b5a3d85e8290d1eaec9'
+        # )
 
         _, cutlass_repo = self.download_external_dep(
             name='cutlass',
@@ -138,8 +138,9 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
 
         # Find all the headers and copy them into the build directory.
         # This way extension modules of FVDB can include them.
+        nanopath = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'nanovdb')
         fvdb_headers = get_header_files_recursive('src', 'fvdb')
-        nanovdb_headers = get_header_files_recursive('external/nanovdb/', 'nanovdb')
+        nanovdb_headers = get_header_files_recursive(nanopath, 'nanovdb')
 
         for header_folder, header_files in fvdb_headers + nanovdb_headers:
             os.makedirs(os.path.join(self.build_lib, header_folder), exist_ok=True)
