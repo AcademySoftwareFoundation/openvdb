@@ -596,7 +596,7 @@ private:
 
         // Compute the leaf counts for each node
 
-        std::vector<Index32> leafCounts;
+        std::vector<Index64> leafCounts;
         if (serial) {
             leafCounts.reserve(leafParents.size());
             for (LeafParentT* leafParent : leafParents) {
