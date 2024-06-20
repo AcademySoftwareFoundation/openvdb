@@ -238,6 +238,7 @@ if(NOT OPENVDB_DSO_NAMES)
     SOP_OpenVDB_Diagnostics
     SOP_OpenVDB_Extrapolate
     SOP_OpenVDB_Fill
+    SOP_OpenVDB_Fillet
     SOP_OpenVDB_Filter
     SOP_OpenVDB_Filter_Level_Set
     SOP_OpenVDB_Fracture
