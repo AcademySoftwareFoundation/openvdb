@@ -9,6 +9,6 @@ A lightweight GPU friendly version of VDB initially targeting rendering applicat
 * [Examples](../../doc/nanovdb/HelloWorld.md)
 
 ### Copyright Contributors to the OpenVDB Project
-### SPDX-License-Identifier: MPL-2.0
+### SPDX-License-Identifier: Apache-2.0
 
 [![CircleCI](https://circleci.com/gh/NVIDIA-Omniverse/NanoVDB.svg?style=svg&circle-token=6c3b9bb166841033a0e0c1a9ee5ac49f73d89152)](https://circleci.com/gh/NVIDIA-Omniverse/NanoVDB)

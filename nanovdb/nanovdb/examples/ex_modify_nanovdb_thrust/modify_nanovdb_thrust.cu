@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @brief This examples demonstrates how values in a NanpVDB grid can be
 ///        modified on the device. It depends on NanoVDB and CUDA thrust.

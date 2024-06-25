@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 // Uncomment to temporarily disable testing of PNanoVDB
 //#define DISABLE_PNANOVDB
