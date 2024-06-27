@@ -11,7 +11,9 @@ Blender Foundation
 NVIDIA Corporation
 United Therapeutics Corporation
 Digital Domain 3.0, Inc.
+Double Negative
 Ubisoft Entertainment SA
+Adobe Inc.
 Mathieu Malaterre
 Brecht Sanders
 Ignacio Vizzo
@@ -24,3 +26,6 @@ Brian Sharpe
 Kartik Shrivastava
 Michael Lackner
 Kuba Roth
+Tom Cnops
+Walt Disney Pictures (Walt Disney Animation Studios)
+The Linux Foundation
