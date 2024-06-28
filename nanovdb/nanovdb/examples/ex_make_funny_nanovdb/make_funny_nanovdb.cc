@@ -1,13 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/IO.h>
+#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/io/IO.h>
 
 #include <iostream>
 
-/// @brief Creates a NanoVDB grids with custom values and access them.
+/// @brief Creates a NanoVDB grid with custom values and access them.
 ///
 /// @note This example only depends on NanoVDB.
 int main()
@@ -20,12 +20,12 @@ int main()
             float v = 40.0f + 50.0f*(cos(ijk[0]*0.1f)*sin(ijk[1]*0.1f) +
                                      cos(ijk[1]*0.1f)*sin(ijk[2]*0.1f) +
                                      cos(ijk[2]*0.1f)*sin(ijk[0]*0.1f));
-            v = Max(v, Vec3f(ijk).length() - size);// CSG intersection with a sphere
+            v = math::Max(v, Vec3f(ijk).length() - size);// CSG intersection with a sphere
             return v > background ? background : v < -background ? -background : v;// clamp value
         };
-        build::Grid<float> grid(background, "funny", GridClass::LevelSet);
+        tools::build::Grid<float> grid(background, "funny", GridClass::LevelSet);
         grid(func, CoordBBox(Coord(-size), Coord(size)));
-        io::writeGrid("data/funny.nvdb", createNanoGrid(grid), io::Codec::BLOSC);
+        io::writeGrid("data/funny.nvdb", tools::createNanoGrid(grid), io::Codec::BLOSC);
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

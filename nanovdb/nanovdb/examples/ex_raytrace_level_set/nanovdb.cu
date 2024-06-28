@@ -6,15 +6,15 @@
 #include <chrono>
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-using BufferT = nanovdb::CudaDeviceBuffer;
+#include <nanovdb/cuda/DeviceBuffer.h>
+using BufferT = nanovdb::cuda::DeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
 #endif
-#include <nanovdb/util/GridHandle.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/Ray.h>
-#include <nanovdb/util/HDDA.h>
+#include <nanovdb/GridHandle.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/math/Ray.h>
+#include <nanovdb/math/HDDA.h>
 
 #include "common.h"
 
@@ -23,10 +23,10 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     using GridT = nanovdb::FloatGrid;
     using CoordT = nanovdb::Coord;
     using RealT = float;
-    using Vec3T = nanovdb::Vec3<RealT>;
-    using RayT = nanovdb::Ray<RealT>;
+    using Vec3T = nanovdb::math::Vec3<RealT>;
+    using RayT = nanovdb::math::Ray<RealT>;
 
-    auto* h_grid = handle.grid<float>();
+    auto *h_grid = handle.grid<float>();
     if (!h_grid)
         throw std::runtime_error("GridHandle does not contain a valid host grid");
 
@@ -58,7 +58,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
             float  t0;
             CoordT ijk;
             float  v;
-            if (nanovdb::ZeroCrossing(iRay, acc, ijk, v, t0)) {
+            if (nanovdb::math::ZeroCrossing(iRay, acc, ijk, v, t0)) {
                 // write distance to surface. (we assume it is a uniform voxel)
                 float wT0 = t0 * float(grid->voxelSize()[0]);
                 compositeOp(image, i, width, height, wT0 / (wBBoxDimZ * 2), 1.0f);

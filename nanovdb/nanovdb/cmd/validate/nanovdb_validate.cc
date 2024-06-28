@@ -11,8 +11,8 @@
     \brief  Command-line tool that validates Grids in nanovdb files
 */
 
-#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/util/GridValidator.h>
+#include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <nanovdb/tools/GridValidator.h>
 #include <iomanip>
 #include <sstream>
 
@@ -23,6 +23,7 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "Options:\n"
               << "-g,--grid name\tOnly validate grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
+              << "-p,--partial\tPerform partial (i.e. fast) validation tests\n"
               << "-v,--verbose\tPrint verbose information information useful for debugging\n"
               << "--version\tPrint version information to the terminal\n";
     exit(exitStatus);
@@ -30,17 +31,18 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
 
 void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
+    char str[8];
+    nanovdb::toStr(str, nanovdb::Version());
+    printf("\n%s was build against NanoVDB version %s\n", progName, str);
     exit(exitStatus);
 }
 
 int main(int argc, char* argv[])
 {
-    int exitStatus = EXIT_SUCCESS;
-
-    bool                     verbose = false;
-    bool                     detailed = true;
-    std::string              gridName;
+    int                exitStatus = EXIT_SUCCESS;
+    bool               verbose = false;
+    nanovdb::CheckMode mode = nanovdb::CheckMode::Full;
+    std::string        gridName;
     std::vector<std::string> fileNames;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -51,6 +53,8 @@ int main(int argc, char* argv[])
                 version(argv[0]);
             } else if (arg == "-v" || arg == "--verbose") {
                 verbose = true;
+            } else if (arg == "-p" || arg == "--partial") {
+                mode = nanovdb::CheckMode::Partial;
             } else if (arg == "-g" || arg == "--grid") {
                 if (i + 1 == argc) {
                     std::cerr << "\nExpected a grid name to follow the -g,--grid option\n";
@@ -79,62 +83,17 @@ int main(int argc, char* argv[])
             if (!gridName.empty()) {
                 std::vector<nanovdb::io::FileGridMetaData> tmp;
                 for (auto& m : list) {
-                    if (nameKey == m.nameKey && gridName == m.gridName)
-                        tmp.emplace_back(m);
+                    if (nameKey == m.nameKey && gridName == m.gridName) tmp.emplace_back(m);
                 }
-                list = tmp;
+                list = std::move(tmp);
             }
-            if (list.size() == 0) {
-                continue;
-            }
+            if (list.size() == 0) continue;
 
-            if (verbose) {
-                std::cout << "\nThe file \"" << file << "\" contains the following matching " << list.size() << " grid(s):\n";
-            }
+            if (verbose) std::cout << "\nThe file \"" << file << "\" contains the following matching " << list.size() << " grid(s):\n";
 
             for (auto& m : list) {
                 auto handle = nanovdb::io::readGrid(file, m.gridName);
-                auto gridType = handle.gridType();
-                bool test = false;
-                if (gridType == nanovdb::GridType::End) {
-                    std::cerr << "GridHandle was empty\n" << std::endl;
-                    usage(argv[0]);
-                } else if (auto* grid = handle.grid<float>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Vec3f>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<uint32_t>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<int32_t>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<int16_t>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<int64_t>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<int16_t>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<double>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Vec3d>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::ValueMask>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Rgba8>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Fp4>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Fp8>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::Fp16>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::FpN>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<bool>()) {
-                    test = isValid(*grid, detailed, verbose);
-                } else {
-                    std::cerr << "Unsupported GridType: \"" << nanovdb::toStr(gridType) << "\"\n" << std::endl;
-                    usage(argv[0]);
-                }
+                const bool test = nanovdb::tools::validateGrids(handle, mode, verbose);
                 if (verbose) {
                     std::cout << "Grid named \"" << m.gridName << "\": " << (test ? "passed" : "failed") << std::endl;
                 } else if (!test) {

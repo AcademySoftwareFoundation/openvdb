@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file   PNanoVDB.h
+    \file   nanovdb/PNanoVDB.h
 
     \author Andrew Reidmeyer
 
@@ -291,7 +291,11 @@ void pnanovdb_buf_write_uint64(pnanovdb_buf_t buf, uint byte_offset, uvec2 value
 // struct typedef, static const, inout
 #if defined(PNANOVDB_C)
 #define PNANOVDB_STRUCT_TYPEDEF(X) typedef struct X X;
+#if defined(__CUDA_ARCH__)
+#define PNANOVDB_STATIC_CONST constexpr __constant__
+#else
 #define PNANOVDB_STATIC_CONST static const
+#endif
 #define PNANOVDB_INOUT(X) X*
 #define PNANOVDB_IN(X) const X*
 #define PNANOVDB_DEREF(X) (*X)
@@ -929,7 +933,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_MAGIC_FILE   0x324244566f6e614eUL// "NanoVDB2" in hex - little endian (uint64_t)
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
-#define PNANOVDB_MINOR_VERSION_NUMBER  6// reflects changes to the API but not ABI
+#define PNANOVDB_MINOR_VERSION_NUMBER  7// reflects changes to the API but not ABI
 #define PNANOVDB_PATCH_VERSION_NUMBER  0// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
@@ -958,7 +962,8 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 #define PNANOVDB_GRID_TYPE_POINTINDEX 23
 #define PNANOVDB_GRID_TYPE_VEC3U8 24
 #define PNANOVDB_GRID_TYPE_VEC3U16 25
-#define PNANOVDB_GRID_TYPE_END 26
+#define PNANOVDB_GRID_TYPE_UINT8 26
+#define PNANOVDB_GRID_TYPE_END 27
 
 #define PNANOVDB_GRID_CLASS_UNKNOWN 0
 #define PNANOVDB_GRID_CLASS_LEVEL_SET 1     // narrow band level set, e.g. SDF
@@ -989,17 +994,17 @@ PNANOVDB_FORCE_INLINE void pnanovdb_write_vec3(pnanovdb_buf_t buf, pnanovdb_addr
 
 // BuildType = Unknown, float, double, int16_t, int32_t, int64_t, Vec3f, Vec3d, Mask, ...
 // bit count of values in leaf nodes, i.e. 8*sizeof(*nanovdb::LeafNode<BuildType>::mValues) or zero if no values are stored
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_value_strides_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64,  96, 192,  0, 16, 32,  1, 32,  4,  8, 16,  0, 128, 256,  0,  0,  0,  0, 16, 24, 48 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_value_strides_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64,  96, 192,  0, 16, 32,  1, 32,  4,  8, 16,  0, 128, 256,  0,  0,  0,  0, 16, 24, 48,  8 };
 // bit count of the Tile union in InternalNodes, i.e. 8*sizeof(nanovdb::InternalData::Tile)
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_table_strides_bits[PNANOVDB_GRID_TYPE_END]  = { 64, 64, 64, 64, 64, 64, 128, 192, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 256, 64, 64, 64, 64, 64, 64, 64 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_table_strides_bits[PNANOVDB_GRID_TYPE_END]  = { 64, 64, 64, 64, 64, 64, 128, 192, 64, 64, 64, 64, 64, 64, 64, 64, 64, 128, 256, 64, 64, 64, 64, 64, 64, 64, 64 };
 // bit count of min/max values, i.e. 8*sizeof(nanovdb::LeafData::mMinimum) or zero if no min/max exists
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_END] = {  0, 32, 64, 16, 32, 64,  96, 192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256, 64, 64, 64, 64, 64, 24, 48 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_strides_bits[PNANOVDB_GRID_TYPE_END] = {  0, 32, 64, 16, 32, 64,  96, 192,  8, 16, 32,  8, 32, 32, 32, 32, 32, 128, 256, 64, 64, 64, 64, 64, 24, 48,  8 };
 // bit alignment of the value type, controlled by the smallest native type, which is why it is always 0, 8, 16, 32, or 64, e.g. for Vec3f it is 32
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64,  32,  64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64,  8, 16 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_minmax_aligns_bits[PNANOVDB_GRID_TYPE_END]  = {  0, 32, 64, 16, 32, 64,  32,  64,  8, 16, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64,  8, 16,  8 };
 // bit alignment of the stats (avg/std-dev) types, e.g. 8*sizeof(nanovdb::LeafData::mAverage)
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_END]   = {  0, 32, 64, 32, 32, 64,  32,  64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64, 32, 32 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_stat_strides_bits[PNANOVDB_GRID_TYPE_END]   = {  0, 32, 64, 32, 32, 64,  32,  64,  8, 32, 32,  8, 32, 32, 32, 32, 32,  32,  64, 64, 64, 64, 64, 64, 32, 32, 32 };
 // one of the 4 leaf types defined above, e.g. PNANOVDB_LEAF_TYPE_INDEX = 3
-PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_END]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0,  3,  3,  4,  4,  5,  0,  0 };
+PNANOVDB_STATIC_CONST pnanovdb_uint32_t pnanovdb_grid_type_leaf_type[PNANOVDB_GRID_TYPE_END]           = {  0,  0,  0,  0,  0,  0,  0,    0,  1,  0,  0,  1,  0,  2,  2,  2,  2,   0,   0,  3,  3,  4,  4,  5,  0,  0,  0 };
 
 struct pnanovdb_map_t
 {
@@ -1229,9 +1234,9 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_version_get_patch(pnanovdb_uint
 
 struct pnanovdb_gridblindmetadata_t
 {
-    pnanovdb_int64_t byte_offset;       // 8 bytes,     0
-    pnanovdb_uint64_t element_count;    // 8 bytes,     8
-    pnanovdb_uint32_t flags;            // 4 bytes,     16
+    pnanovdb_int64_t data_offset;       // 8 bytes,     0
+    pnanovdb_uint64_t value_count;      // 8 bytes,     8
+    pnanovdb_uint32_t value_size;       // 4 bytes,     16
     pnanovdb_uint32_t semantic;         // 4 bytes,     20
     pnanovdb_uint32_t data_class;       // 4 bytes,     24
     pnanovdb_uint32_t data_type;        // 4 bytes,     28
@@ -1243,22 +1248,22 @@ PNANOVDB_STRUCT_TYPEDEF(pnanovdb_gridblindmetadata_handle_t)
 
 #define PNANOVDB_GRIDBLINDMETADATA_SIZE 288
 
-#define PNANOVDB_GRIDBLINDMETADATA_OFF_BYTE_OFFSET 0
-#define PNANOVDB_GRIDBLINDMETADATA_OFF_ELEMENT_COUNT 8
-#define PNANOVDB_GRIDBLINDMETADATA_OFF_FLAGS 16
+#define PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_OFFSET 0
+#define PNANOVDB_GRIDBLINDMETADATA_OFF_VALUE_COUNT 8
+#define PNANOVDB_GRIDBLINDMETADATA_OFF_VALUE_SIZE 16
 #define PNANOVDB_GRIDBLINDMETADATA_OFF_SEMANTIC 20
 #define PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_CLASS 24
 #define PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_TYPE 28
 #define PNANOVDB_GRIDBLINDMETADATA_OFF_NAME 32
 
-PNANOVDB_FORCE_INLINE pnanovdb_int64_t pnanovdb_gridblindmetadata_get_byte_offset(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
-    return pnanovdb_read_int64(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_BYTE_OFFSET));
+PNANOVDB_FORCE_INLINE pnanovdb_int64_t pnanovdb_gridblindmetadata_get_data_offset(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
+    return pnanovdb_read_int64(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_OFFSET));
 }
-PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_gridblindmetadata_get_element_count(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
-    return pnanovdb_read_uint64(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_ELEMENT_COUNT));
+PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_gridblindmetadata_get_value_count(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
+    return pnanovdb_read_uint64(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_VALUE_COUNT));
 }
-PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_gridblindmetadata_get_flags(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
-    return pnanovdb_read_uint32(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_FLAGS));
+PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_gridblindmetadata_get_value_size(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
+    return pnanovdb_read_uint32(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_VALUE_SIZE));
 }
 PNANOVDB_FORCE_INLINE pnanovdb_uint32_t pnanovdb_gridblindmetadata_get_semantic(pnanovdb_buf_t buf, pnanovdb_gridblindmetadata_handle_t p) {
     return pnanovdb_read_uint32(buf, pnanovdb_address_offset(p.address, PNANOVDB_GRIDBLINDMETADATA_OFF_SEMANTIC));
@@ -1662,6 +1667,7 @@ PNANOVDB_STATIC_CONST pnanovdb_grid_type_constants_t pnanovdb_grid_type_constant
 {32, 40, 48, 56, 64, 96,  16, 8, 24, 32,  8224, 8232, 8240, 8248, 8256, 270400,  1056, 1064, 1072, 1080, 1088, 33856,  80, 88, 96, 96, 96, 1120},
 {28, 31, 34, 40, 44, 64,  24, 8, 20, 32,  8224, 8227, 8232, 8236, 8256, 270400,  1056, 1059, 1064, 1068, 1088, 33856,  80, 83, 88, 92, 96, 1632},
 {28, 34, 40, 48, 52, 64,  48, 8, 20, 32,  8224, 8230, 8236, 8240, 8256, 270400,  1056, 1062, 1068, 1072, 1088, 33856,  80, 86, 92, 96, 128, 3200},
+{28, 29, 30, 32, 36, 64,  8, 8, 20, 32,  8224, 8225, 8228, 8232, 8256, 270400,  1056, 1057, 1060, 1064, 1088, 33856,  80, 81, 84, 88, 96, 608},
 };
 
 // ------------------------------------------------ Basic Lookup -----------------------------------------------------------
@@ -1678,7 +1684,7 @@ PNANOVDB_FORCE_INLINE pnanovdb_gridblindmetadata_handle_t pnanovdb_grid_get_grid
 PNANOVDB_FORCE_INLINE pnanovdb_address_t pnanovdb_grid_get_gridblindmetadata_value_address(pnanovdb_buf_t buf, pnanovdb_grid_handle_t grid, pnanovdb_uint32_t index)
 {
     pnanovdb_gridblindmetadata_handle_t meta = pnanovdb_grid_get_gridblindmetadata(buf, grid, index);
-    pnanovdb_int64_t byte_offset = pnanovdb_gridblindmetadata_get_byte_offset(buf, meta);
+    pnanovdb_int64_t byte_offset = pnanovdb_gridblindmetadata_get_data_offset(buf, meta);
     pnanovdb_address_t address = pnanovdb_address_offset64(meta.address, pnanovdb_int64_as_uint64(byte_offset));
     return address;
 }

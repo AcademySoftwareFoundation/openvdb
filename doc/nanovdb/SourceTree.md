@@ -5,12 +5,12 @@
 * [NanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/NanoVDB.h) C++11 implementation of the core data structure and its access methods.
 * [CNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/CNanoVDB.h) Incomplete but useable C99 implementation of the core data structure and its access methods.  Designed in particular for use in OpenCL kernels.  Note that this relies on zero-sized arrays for the _reserved padding, so will not work on all compilers (with MSVC being a particular example)
 * [PNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/PNanoVDB.h) C99 implementation of the core data structure and its access methods. More complete coverage than CNanoVDB.  This version is pointer-less and supports virtually all graphics APIs.
-* [util/GridHandle.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/GridHandle.h) defines a handler for the memory allocated to a NanoVDB grid.
-* [util/IO.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/IO.h) implements I/O support.
-* [util/OpenToNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/OpenToNanoVDB.h) defines the converter from OpenVDB to NanoVDB and obviously depends on the OpenVDB library (as the only header file).
-* [Ray.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/Ray.h) Ray class.
-* [HDDA.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/HDDA.h) HDDA related.
-* [SampleFromVoxels.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/SampleFromVoxels.h) interpolation.
+* [GridHandle.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/GridHandle.h) defines a handler for the memory allocated to a NanoVDB grid.
+* [io/IO.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/io/IO.h) implements I/O support.
+* [tools/CreateNanoGrid.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/tools/CreateNanoGrid.h) defines the converter from OpenVDB to NanoVDB and obviously depends on the OpenVDB library (as the only header file).
+* [math/Ray.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/Ray.h) Ray class.
+* [math/HDDA.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/HDDA.h) HDDA related.
+* [math/SampleFromVoxels.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/math/SampleFromVoxels.h) interpolation.
 
 ```bash
 foo@bar:~$ tree
@@ -22,25 +22,19 @@ foo@bar:~$ tree
 │   │   └── nanovdb_convert.cc
 │   ├── print
 │   │   └── nanovdb_print.cc
+│   ├── updateFiles.sh
 │   └── validate
 │       └── nanovdb_validate.cc
 ├── CNanoVDB.h
+├── cuda
+│   ├── DeviceBuffer.h
+│   ├── GridHandle.cuh
+│   └── NodeManager.cuh
 ├── docs
 │   ├── CMakeLists.txt
 │   ├── codingstyle.txt
 │   └── doxygen-config
 ├── examples
-│   ├── benchmark
-│   │   ├── BenchKernels_dense.cu
-│   │   ├── BenchKernels_nano.cu
-│   │   ├── Benchmark_dense.cu
-│   │   ├── Benchmark_nano.cu
-│   │   ├── Camera.h
-│   │   ├── CMakeLists.txt
-│   │   ├── DenseGrid.h
-│   │   ├── Image.h
-│   │   ├── TestBenchmark.cc
-│   │   └── TestBenchmark.cu
 │   ├── CMakeLists.txt
 │   ├── ex_bump_pool_buffer
 │   │   └── bump_pool_buffer.cc
@@ -50,7 +44,7 @@ foo@bar:~$ tree
 │   │   ├── nanovdb.cu
 │   │   └── openvdb.cc
 │   ├── ex_index_grid_cuda
-│   │   ├── index_grid_cuda.cu
+│   │   ├── index_grid_cuda.cc
 │   │   └── index_grid_cuda_kernel.cu
 │   ├── ex_make_custom_nanovdb
 │   │   └── make_custom_nanovdb.cc
@@ -66,6 +60,7 @@ foo@bar:~$ tree
 │   ├── ex_map_pool_buffer
 │   │   └── map_pool_buffer.cc
 │   ├── ex_modify_nanovdb_thrust
+│   │   ├── modify_nanovdb_thrust.cc
 │   │   └── modify_nanovdb_thrust.cu
 │   ├── ex_nodemanager_cuda
 │   │   ├── nodemanager_cuda.cc
@@ -103,9 +98,38 @@ foo@bar:~$ tree
 │   │   └── VoxToNanoVDB.h
 │   └── ex_write_nanovdb_grids
 │       └── write_nanovdb_grids.cc
+├── GridHandle.h
+├── HostBuffer.h
+├── io
+│   └── IO.h
+├── math
+│   ├── CSampleFromVoxels.h
+│   ├── DitherLUT.h
+│   ├── HDDA.h
+│   ├── Math.h
+│   ├── Ray.h
+│   ├── SampleFromVoxels.h
+│   └── Stencils.h
 ├── NanoVDB.h
+├── NodeManager.h
 ├── PNanoVDB.h
 ├── Readme.md
+├── tools
+│   ├── CreateNanoGrid.h
+│   ├── CreatePrimitives.h
+│   ├── cuda
+│   │   ├── AddBlindData.cuh
+│   │   ├── GridChecksum.cuh
+│   │   ├── GridStats.cuh
+│   │   ├── GridValidator.cuh
+│   │   ├── IndexToGrid.cuh
+│   │   ├── PointsToGrid.cuh
+│   │   └── SignedFloodFill.cuh
+│   ├── GridBuilder.h
+│   ├── GridChecksum.h
+│   ├── GridStats.h
+│   ├── GridValidator.h
+│   └── NanoToOpenVDB.h
 ├── unittest
 │   ├── CMakeLists.txt
 │   ├── pnanovdb_validate_strides.h
@@ -115,21 +139,25 @@ foo@bar:~$ tree
 └── util
     ├── CpuTimer.h
     ├── CreateNanoGrid.h
-    ├── CSampleFromVoxels.h
     ├── cuda
     │   ├── CudaAddBlindData.cuh
     │   ├── CudaDeviceBuffer.h
+    │   ├── CudaGridChecksum.cuh
     │   ├── CudaGridHandle.cuh
+    │   ├── CudaGridStats.cuh
+    │   ├── CudaGridValidator.cuh
     │   ├── CudaIndexToGrid.cuh
+    │   ├── CudaNodeManager.cuh
     │   ├── CudaPointsToGrid.cuh
     │   ├── CudaSignedFloodFill.cuh
     │   ├── CudaUtils.h
-    │   └── GpuTimer.cuh
+    │   ├── GpuTimer.h
+    │   ├── Timer.h
+    │   └── Util.h
     ├── DitherLUT.h
     ├── ForEach.h
     ├── GridBuilder.h
     ├── GridChecksum.h
-    ├── GridHandle.h
     ├── GridStats.h
     ├── GridValidator.h
     ├── HDDA.h
@@ -145,5 +173,6 @@ foo@bar:~$ tree
     ├── Ray.h
     ├── Reduce.h
     ├── SampleFromVoxels.h
-    └── Stencils.h
-```
+    ├── Stencils.h
+    ├── Timer.h
+    └── Util.h
