@@ -169,17 +169,6 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/CpuTimer.h
   util/CreateNanoGrid.h
   util/CSampleFromVoxels.h
-  util/cuda/CudaAddBlindData.cuh
-  util/cuda/CudaDeviceBuffer.h
-  util/cuda/CudaGridChecksum.cuh
-  util/cuda/CudaGridHandle.cuh
-  util/cuda/CudaGridStats.cuh
-  util/cuda/CudaIndexToGrid.cuh
-  util/cuda/CudaNodeManager.cuh
-  util/cuda/CudaPointsToGrid.cuh
-  util/cuda/CudaSignedFloodFill.cuh
-  util/cuda/CudaUtils.h
-  util/cuda/GpuTimer.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
@@ -201,6 +190,19 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/Reduce.h
   util/SampleFromVoxels.h
   util/Stencils.h
+)
+set(NANOVDB_INCLUDE_UTILFILES_CUDA
+  util/cuda/CudaAddBlindData.cuh
+  util/cuda/CudaDeviceBuffer.h
+  util/cuda/CudaGridChecksum.cuh
+  util/cuda/CudaGridHandle.cuh
+  util/cuda/CudaGridStats.cuh
+  util/cuda/CudaIndexToGrid.cuh
+  util/cuda/CudaNodeManager.cuh
+  util/cuda/CudaPointsToGrid.cuh
+  util/cuda/CudaSignedFloodFill.cuh
+  util/cuda/CudaUtils.h
+  util/cuda/GpuTimer.h
 )
 
 add_library(nanovdb INTERFACE)
@@ -268,9 +270,11 @@ endif()
 
 set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
 set(NANOVDB_INSTALL_UTILDIR ${NANOVDB_INSTALL_INCLUDEDIR}/util)
+set(NANOVDB_INSTALL_UTILDIR_CUDA ${NANOVDB_INSTALL_UTILDIR}/cuda)
 
 install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR})
 install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_INSTALL_UTILDIR})
+install(FILES ${NANOVDB_INCLUDE_UTILFILES_CUDA} DESTINATION ${NANOVDB_INSTALL_UTILDIR_CUDA})
 
 ###############################################################################
 # Options
