@@ -159,16 +159,7 @@ jobs:
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_deps
-      run: |
-        # Remove Python3 symlinks in /usr/local/bin as workaround to brew update issues
-        # https://github.com/actions/setup-python/issues/577
-        rm /usr/local/bin/2to3* || :
-        rm /usr/local/bin/idle3* || :
-        rm /usr/local/bin/pydoc* || :
-        rm /usr/local/bin/python3* || :
-        brew update
-        brew install bash gnu-getopt cmake boost glfw googletest openexr pybind11 llvm@15 cppunit
-        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+      run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
     - name: build
       run: |
         ./ci/build.sh -v \
@@ -182,6 +173,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
             -DLLVM_DIR=/usr/local/opt/llvm@15/lib/cmake/llvm \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
             \"
     - name: test
       run: cd build && ctest -V

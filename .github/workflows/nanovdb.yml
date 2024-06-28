@@ -122,9 +122,7 @@ jobs:
       run: .\ci\install_windows_cuda.ps1
     - name: install_deps
       shell: bash
-      run: |
-        vcpkg update
-        vcpkg install zlib tbb gtest blosc boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+      run: ./ci/install_windows.sh
     - name: build
       shell: bash
       run: >
