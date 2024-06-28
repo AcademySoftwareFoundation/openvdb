@@ -218,7 +218,7 @@ inline void DeviceBuffer::clear(void *stream)
 
 }// namespace cuda
 
-using CudaDeviceBuffer [[deprecated("Use nanovdb::cuda::DeviceBudder instead")]] = cuda::DeviceBuffer;
+using CudaDeviceBuffer [[deprecated("Use nanovdb::cuda::DeviceBuffer instead")]] = cuda::DeviceBuffer;
 
 template<>
 struct BufferTraits<cuda::DeviceBuffer>
