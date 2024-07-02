@@ -629,29 +629,35 @@ template<class ValueT, class TreeT, size_t N>
 inline void
 BoxSampler::getValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk)
 {
-    data[0][0][0] = inTree.getValue(ijk); // i, j, k
+    // This algorithm is only defined for sparse grids
 
-    ijk[2] += 1;
-    data[0][0][1] = inTree.getValue(ijk); // i, j, k + 1
+    if constexpr (isSparseTree<TreeT>()) {
+        data[0][0][0] = inTree.getValue(ijk); // i, j, k
 
-    ijk[1] += 1;
-    data[0][1][1] = inTree.getValue(ijk); // i, j+1, k + 1
+        ijk[2] += 1;
+        data[0][0][1] = inTree.getValue(ijk); // i, j, k + 1
 
-    ijk[2] -= 1;
-    data[0][1][0] = inTree.getValue(ijk); // i, j+1, k
+        ijk[1] += 1;
+        data[0][1][1] = inTree.getValue(ijk); // i, j+1, k + 1
 
-    ijk[0] += 1;
-    ijk[1] -= 1;
-    data[1][0][0] = inTree.getValue(ijk); // i+1, j, k
+        ijk[2] -= 1;
+        data[0][1][0] = inTree.getValue(ijk); // i, j+1, k
 
-    ijk[2] += 1;
-    data[1][0][1] = inTree.getValue(ijk); // i+1, j, k + 1
+        ijk[0] += 1;
+        ijk[1] -= 1;
+        data[1][0][0] = inTree.getValue(ijk); // i+1, j, k
 
-    ijk[1] += 1;
-    data[1][1][1] = inTree.getValue(ijk); // i+1, j+1, k + 1
+        ijk[2] += 1;
+        data[1][0][1] = inTree.getValue(ijk); // i+1, j, k + 1
 
-    ijk[2] -= 1;
-    data[1][1][0] = inTree.getValue(ijk); // i+1, j+1, k
+        ijk[1] += 1;
+        data[1][1][1] = inTree.getValue(ijk); // i+1, j+1, k + 1
+
+        ijk[2] -= 1;
+        data[1][1][0] = inTree.getValue(ijk); // i+1, j+1, k
+    } else {
+        static_assert(AlwaysFalseValue<TreeT>, "Not Implemented");
+    }
 }
 
 template<class ValueT, class TreeT, size_t N>
@@ -744,20 +750,32 @@ inline bool
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
-    using ValueT = typename TreeT::ValueType;
+    if constexpr (isSparseTree<TreeT>()) {
+        using ValueT = typename TreeT::ValueType;
 
-    const Vec3i inIdx = local_util::floorVec3(inCoord);
-    const Vec3R uvw = inCoord - inIdx;
+        const Vec3i inIdx = local_util::floorVec3(inCoord);
+        const Vec3R uvw = inCoord - inIdx;
 
-    // Retrieve the values of the eight voxels surrounding the
-    // fractional source coordinates.
-    ValueT data[2][2][2];
+        // Retrieve the values of the eight voxels surrounding the
+        // fractional source coordinates.
+        ValueT data[2][2][2];
 
-    const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
+        const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
 
-    result = BoxSampler::trilinearInterpolation(data, uvw);
+        result = BoxSampler::trilinearInterpolation(data, uvw);
 
-    return hasActiveValues;
+        return hasActiveValues;
+    } else if constexpr (isAdaptiveTree<TreeT>()) {
+        // As an example, return the background value.
+        // This is where the logic that could sample against an adaptive tree would live.
+        // Extract the tree from the Tree or ValueAccessor
+        auto& tree = TreeAdapter<TreeT>::tree(inTree);
+        result = tree.background();
+        return true;
+    } else {
+        static_assert(AlwaysFalseValue<TreeT>, "Not Implemented");
+    }
+    std::abort(); // unreachable
 }
 
 
@@ -765,18 +783,30 @@ template<class TreeT>
 inline typename TreeT::ValueType
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
-    using ValueT = typename TreeT::ValueType;
+    if constexpr (isSparseTree<TreeT>()) {
 
-    const Vec3i inIdx = local_util::floorVec3(inCoord);
-    const Vec3R uvw = inCoord - inIdx;
+        using ValueT = typename TreeT::ValueType;
 
-    // Retrieve the values of the eight voxels surrounding the
-    // fractional source coordinates.
-    ValueT data[2][2][2];
+        const Vec3i inIdx = local_util::floorVec3(inCoord);
+        const Vec3R uvw = inCoord - inIdx;
 
-    BoxSampler::getValues(data, inTree, Coord(inIdx));
+        // Retrieve the values of the eight voxels surrounding the
+        // fractional source coordinates.
+        ValueT data[2][2][2];
 
-    return BoxSampler::trilinearInterpolation(data, uvw);
+        BoxSampler::getValues(data, inTree, Coord(inIdx));
+
+        return BoxSampler::trilinearInterpolation(data, uvw);
+    } else if constexpr (isAdaptiveTree<TreeT>()) {
+        // As an example, return the background value.
+        // This is where the logic that could sample against an adaptive tree would live.
+        // Extract the tree from the Tree or ValueAccessor
+        auto& tree = TreeAdapter<TreeT>::tree(inTree);
+        return tree.background();
+    } else {
+        static_assert(AlwaysFalseValue<TreeT>, "Not Implemented");
+    }
+    std::abort(); // unreachable
 }
 
 

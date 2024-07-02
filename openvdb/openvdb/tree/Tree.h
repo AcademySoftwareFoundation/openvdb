@@ -188,6 +188,11 @@ public:
 
     static const Index DEPTH = RootNodeType::LEVEL + 1;
 
+    using Accessor            = ValueAccessor<Tree, true>;
+    using ConstAccessor       = ValueAccessor<const Tree, true>;
+    using UnsafeAccessor      = ValueAccessor<Tree, false>;
+    using ConstUnsafeAccessor = ValueAccessor<const Tree, false>;
+
     /// @brief ValueConverter<T>::Type is the type of a tree having the same
     /// hierarchy as this tree but a different value type, T.
     ///
@@ -622,6 +627,31 @@ public:
 
     /// Remove all tiles from this tree and all nodes other than the root node.
     void clear();
+
+    /// @brief Return an accessor that provides random read and write access
+    /// to this tree's voxels.
+    /// @details The accessor is safe in the sense that it is registered with this tree.
+    Accessor getAccessor();
+    /// @brief Return an unsafe accessor that provides random read and write access
+    /// to this tree's voxels.
+    /// @details The accessor is unsafe in the sense that it is not registered
+    /// with this tree's tree.  In some rare cases this can give a performance advantage
+    /// over a registered accessor, but it is unsafe if the tree topology is modified.
+    /// @warning Only use this method if you're an expert and know the
+    /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
+    UnsafeAccessor getUnsafeAccessor();
+    /// Return an accessor that provides random read-only access to this tree's voxels.
+    ConstAccessor getAccessor() const;
+    /// Return an accessor that provides random read-only access to this tree's voxels.
+    ConstAccessor getConstAccessor() const;
+    /// @brief Return an unsafe accessor that provides random read-only access
+    /// to this tree's voxels.
+    /// @details The accessor is unsafe in the sense that it is not registered
+    /// with this tree.  In some rare cases this can give a performance advantage
+    /// over a registered accessor, but it is unsafe if the tree topology is modified.
+    /// @warning Only use this method if you're an expert and know the
+    /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
+    ConstUnsafeAccessor getConstUnsafeAccessor();
 
     /// Clear all registered accessors.
     void clearAllAccessors();
@@ -1317,6 +1347,41 @@ Tree<RootNodeType>::clear()
 
 ////////////////////////////////////////
 
+
+template<typename RootNodeType>
+typename Tree<RootNodeType>::Accessor
+Tree<RootNodeType>::getAccessor()
+{
+    return Accessor(*this);
+}
+
+template<typename RootNodeType>
+typename Tree<RootNodeType>::UnsafeAccessor
+Tree<RootNodeType>::getUnsafeAccessor()
+{
+    return UnsafeAccessor(*this);
+}
+
+template<typename RootNodeType>
+typename Tree<RootNodeType>::ConstAccessor
+Tree<RootNodeType>::getAccessor() const
+{
+    return ConstAccessor(*this);
+}
+
+template<typename RootNodeType>
+typename Tree<RootNodeType>::ConstAccessor
+Tree<RootNodeType>::getConstAccessor() const
+{
+    return ConstAccessor(*this);
+}
+
+template<typename RootNodeType>
+typename Tree<RootNodeType>::ConstUnsafeAccessor
+Tree<RootNodeType>::getConstUnsafeAccessor()
+{
+    return ConstUnsafeAccessor(*this);
+}
 
 template<typename RootNodeType>
 inline void
@@ -2060,6 +2125,28 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 }
 
 } // namespace tree
+
+
+////////////////////////////////////////
+
+// Overload the TreeTraits struct to declare a const/non-const Tree as sparse
+
+template<typename NodeT>
+struct TreeTraits<tree::Tree<NodeT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Sparse;
+};
+
+template<typename NodeT>
+struct TreeTraits<const tree::Tree<NodeT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Sparse;
+};
+
+
+////////////////////////////////////////
+
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
