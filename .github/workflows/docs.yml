@@ -42,6 +42,9 @@ jobs:
       # need to re-write the python docs to use sphinx
       image: aswf/ci-openvdb:2022
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
@@ -51,7 +54,10 @@ jobs:
     # - name: install_epydoc
     #   run: pip install epydoc
     - name: install_latex
-      run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+      run: |
+        sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+        yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
     - name: build
       run: >
         ./ci/build.sh -v

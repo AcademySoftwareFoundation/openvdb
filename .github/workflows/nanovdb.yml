@@ -65,9 +65,14 @@ jobs:
           - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
       fail-fast: false
     steps:
+      - name: Enable Node 16
+        run: |
+          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: install_cuda_11
         run: |
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
           yum -y install yum-utils
           yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
           echo "Installing cuda toolkit"
@@ -98,7 +103,7 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 17 2022"
-      cuda: "11.6.2"
+      cuda: "12.4.0"
     strategy:
       matrix:
         config:
@@ -153,8 +158,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -162,12 +167,12 @@ jobs:
         run: ./ci/install_macos.sh
       - name: build
         run: >
-          ./ci/build.sh -v
+          sudo ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
           --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
       - name: test
-        run: cd build && ctest -V -E ".*cuda.*"
+        run: cd build && sudo ctest -V -E ".*cuda.*"
 
   nanovdb-lite:
     if: |
@@ -186,6 +191,6 @@ jobs:
           cd nanovdb/nanovdb
           sudo mkdir .build
           cd .build
-          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON ../
+          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
           sudo make -j8 install
           sudo ctest -V
