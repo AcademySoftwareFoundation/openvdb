@@ -491,6 +491,10 @@ endif()
 # Add standard dependencies
 
 find_package(TBB REQUIRED COMPONENTS tbb)
+
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
 find_package(Boost REQUIRED COMPONENTS iostreams)
 
 # Add deps for pyopenvdb
