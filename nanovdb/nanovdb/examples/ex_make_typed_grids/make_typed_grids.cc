@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/IO.h>
+#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/io/IO.h>
 
 // Helper struct to create a default value for the type.
 // We use a helper struct so we can specialize it for different types.
@@ -37,7 +37,7 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
 
     try {
 
-        nanovdb::build::Grid<ValueT> grid(bgValue, typeNameStr);
+        nanovdb::tools::build::Grid<ValueT> grid(bgValue, typeNameStr);
         auto acc = grid.getAccessor();
         const int radius = 16;
         for (int z = -radius; z <= radius; ++z) {
@@ -49,7 +49,7 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
                 }
             }
         }
-        gridHandles.push_back(nanovdb::createNanoGrid(grid));
+        gridHandles.push_back(nanovdb::tools::createNanoGrid(grid));
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
