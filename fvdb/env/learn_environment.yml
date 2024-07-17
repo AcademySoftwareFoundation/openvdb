@@ -1,0 +1,34 @@
+name: fvdb_learn
+channels:
+  - pyg
+  - nvidia
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - jswartz::fvdb
+  - jupyterlab
+  - pytorch-cuda=12.1
+  - pytorch
+  - tensorboard
+  - pip
+  - git
+  - gitpython
+  - ca-certificates
+  - certifi
+  - openssl
+  - parameterized
+  - ipython
+  - matplotlib
+  - tqdm
+  - pyg
+  - sparsehash
+  - pytorch-scatter
+  - pandas
+  - pytest-benchmark
+  - polyscope
+  - numpy<2
+  - pip:
+    - point-cloud-utils
+    - linkify-it-py
+    - python-pycg

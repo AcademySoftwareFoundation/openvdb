@@ -1,0 +1,39 @@
+name: Running Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  tests:
+    name: Unit Tests
+    runs-on:
+      - self-hosted
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniconda-version: "latest"
+          mamba-version: "*"
+          channels: conda-forge,defaults
+          channel-priority: true
+          activate-environment: fvdb_test
+          environment-file: env/test_environment.yml
+
+
+      - name: Run tests
+        run: |
+          conda activate fvdb_test
+          MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py test
+        shell:
+          bash -el {0}
+
+      - name: Clean Conda
+        run: |
+          conda clean -pty
+        shell:
+          bash -el {0}
