@@ -101,13 +101,13 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-if(USE_NUMPY)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS NumPy)
-endif()
-
 # Make sure find_package(Python) is only ever invoked once with all required components
-find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-find_package(pybind11 ${MINIMUM_PYBIND_VERSION} CONFIG REQUIRED)
+find_package(Python 3.8 REQUIRED COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+find_package(nanobind)
+if(NOT nanobind_FOUND)
+  message(FATAL_ERROR "Could NOT find nanobind. Please install nanobind "
+    "(via pip install nanobind) and set nanobind_DIR at build time.")
+endif()
 
 openvdb_check_python_version(Python::Module
   "${Python_VERSION}"
@@ -115,15 +115,6 @@ openvdb_check_python_version(Python::Module
   "${MINIMUM_PYTHON_VERSION}"
   "${FUTURE_MINIMUM_PYTHON_VERSION}")
 list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
-
-if(USE_NUMPY)
-  openvdb_check_python_version(Python::NumPy
-    "${Python_NumPy_VERSION}"
-    "${Python_NumPy_INCLUDE_DIRS}"
-    "${MINIMUM_NUMPY_VERSION}"
-    "${FUTURE_MINIMUM_NUMPY_VERSION}")
-  list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-endif()
 
 ##########################################################################
 
@@ -146,7 +137,7 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   )
 endif()
 
-pybind11_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
+nanobind_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
 
 target_link_libraries(pyopenvdb PUBLIC
   ${OPENVDB_LIB}
