@@ -1,0 +1,24 @@
+diff --git a/include/cutlass/half.h b/include/cutlass/half.h
+index e22c8be3..a29e6067 100644
+--- a/include/cutlass/half.h
++++ b/include/cutlass/half.h
+@@ -374,7 +374,7 @@ struct alignas(2) half_t {
+     #if defined(__CUDA_ARCH__)
+     storage = reinterpret_cast<uint16_t const &>(x);
+     #else
+-    __half_raw raw(x);
++    __half_raw raw(*(reinterpret_cast<const unsigned short*>(&x)));
+     std::memcpy(&storage, &raw.x, sizeof(storage));
+     #endif
+   }
+@@ -421,7 +421,7 @@ struct alignas(2) half_t {
+     #if defined(__CUDA_ARCH__)
+     storage = reinterpret_cast<uint16_t const &>(x);
+     #else
+-    __half_raw raw(x);
++    __half_raw raw(*(reinterpret_cast<const unsigned short*>(&x)));
+     std::memcpy(&storage, &raw.x, sizeof(storage));
+     #endif
+     return *this;
+ ///////////////////////////////////////////////////////////////////////////////////////////////////
+ //
