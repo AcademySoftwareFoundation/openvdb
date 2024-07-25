@@ -33,7 +33,7 @@ void
 drawFrustum(
     GU_Detail& geo, const openvdb::math::Transform& transform,
     const UT_Vector3* boxColor, const UT_Vector3* tickColor,
-    bool shaded, bool drawTicks)
+    bool shaded, bool drawTicks, const openvdb::Vec4d& padding)
 {
     if (transform.mapType() != openvdb::math::NonlinearFrustumMap::mapType()) {
         return;
@@ -41,7 +41,12 @@ drawFrustum(
 
     const openvdb::math::NonlinearFrustumMap& frustum =
         *transform.map<openvdb::math::NonlinearFrustumMap>();
-    const openvdb::BBoxd bbox = frustum.getBBox();
+    openvdb::BBoxd bbox = frustum.getBBox();
+    if (!padding.isZero()) {
+        const openvdb::Vec2d extentsXY(bbox.extents().asPointer());
+        bbox.min() -= openvdb::Vec3d(padding[0]*extentsXY.x(), padding[1]*extentsXY.y(), 0.0);
+        bbox.max() += openvdb::Vec3d(padding[2]*extentsXY.x(), padding[3]*extentsXY.y(), 0.0);
+    }
 
     UT_Vector3 corners[8];
 
