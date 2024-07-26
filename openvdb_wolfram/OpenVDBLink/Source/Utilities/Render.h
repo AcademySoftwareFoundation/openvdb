@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDBLINK_UTILITIES_RENDER_HAS_BEEN_INCLUDED
 #define OPENVDBLINK_UTILITIES_RENDER_HAS_BEEN_INCLUDED
