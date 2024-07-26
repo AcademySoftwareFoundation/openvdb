@@ -33,6 +33,7 @@ echo "/usr/local/opt/$py_version/bin" >> $GITHUB_PATH
 
 # use gnu-getopt
 echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+echo "/opt/homebrew/opt/gnu-getopt/bin" >> $GITHUB_PATH
 
 LLVM_VERSION=$1
 if [ ! -z "$LLVM_VERSION" ]; then
