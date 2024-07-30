@@ -40,6 +40,7 @@ class LeafNode
 public:
     using BuildType = T;
     using ValueType = T;
+    using ComputeType = typename ValueToComputeMap<ValueType>::Type;
     using Buffer = LeafBuffer<ValueType, Log2Dim>;
     using LeafNodeType = LeafNode<ValueType, Log2Dim>;
     using NodeMaskType = util::NodeMask<Log2Dim>;

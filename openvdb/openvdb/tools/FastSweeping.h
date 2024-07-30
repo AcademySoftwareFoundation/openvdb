@@ -460,18 +460,20 @@ maskSdf(const GridT &sdfGrid,
 template<typename SdfGridT, typename ExtValueT = typename SdfGridT::ValueType>
 class FastSweeping
 {
-    static_assert(std::is_floating_point<typename SdfGridT::ValueType>::value,
+    static_assert(std::is_floating_point<typename SdfGridT::ComputeType>::value,
                   "FastSweeping requires SdfGridT to have floating-point values");
     // Defined types related to the signed distance (or fog) grid
     using SdfValueT = typename SdfGridT::ValueType;
+    using SdfComputeT = typename SdfGridT::ComputeType;
     using SdfTreeT = typename SdfGridT::TreeType;
     using SdfAccT  = tree::ValueAccessor<SdfTreeT, false>;//don't register accessors
     using SdfConstAccT  = typename tree::ValueAccessor<const SdfTreeT, false>;//don't register accessors
 
     // define types related to the extension field
-    using ExtGridT = typename SdfGridT::template ValueConverter<ExtValueT>::Type;
-    using ExtTreeT = typename ExtGridT::TreeType;
-    using ExtAccT  = tree::ValueAccessor<ExtTreeT, false>;
+    using ExtGridT    = typename SdfGridT::template ValueConverter<ExtValueT>::Type;
+    using ExtTreeT    = typename ExtGridT::TreeType;
+    using ExtComputeT = typename ExtGridT::ComputeType;
+    using ExtAccT     = tree::ValueAccessor<ExtTreeT, false>;
 
     // define types related to the tree that masks out the active voxels to be solved for
     using SweepMaskTreeT = typename SdfTreeT::template ValueConverter<ValueMask>::Type;
@@ -1073,7 +1075,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
                 } else {
                     switch (mode) {
                         case FastSweepingDomain::SWEEP_ALL :
-                            voxelIter.setValue(value > 0 ? Unknown : -Unknown);
+                            voxelIter.setValue(math::isNegative(value) ? -Unknown : Unknown);
                             break;
                         case FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE :
                             if (value > 0) voxelIter.setValue(Unknown);
@@ -1085,7 +1087,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
                             }
                             break;
                         case FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE :
-                            if (value < 0) voxelIter.setValue(-Unknown);
+                            if (math::isNegative(value)) voxelIter.setValue(-Unknown);
                             else {
                                 maskLeaf->setValueOff(voxelIter.pos());
                                 bool isInputOn = sdfInputAcc.probeValue(ijk, inputValue);
@@ -1127,8 +1129,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
 
     void run(SdfValueT isoValue)
     {
-        mIsoValue   = isoValue;
-        mAboveSign  = mParent->mIsInputSdf ? SdfValueT(1) : SdfValueT(-1);
+        mIsoValue   = SdfComputeT(isoValue);
+        mAboveSign  = mParent->mIsInputSdf ? SdfComputeT(1) : SdfComputeT(-1);
         SdfTreeT &tree = mSdfGrid->tree();//sdf
         const bool hasActiveTiles = tree.hasActiveTiles();
 
@@ -1166,12 +1168,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
     {
         SweepMaskAccT sweepMaskAcc(mParent->mSweepMask);
         math::GradStencil<SdfGridT, false> stencil(*mSdfGrid);
-        const SdfValueT isoValue = mIsoValue, above = mAboveSign*std::numeric_limits<SdfValueT>::max();//local copy
-        const SdfValueT h = mAboveSign*static_cast<SdfValueT>(mSdfGrid->voxelSize()[0]);//Voxel size
+        const SdfComputeT isoValue = mIsoValue;
+        const SdfValueT above = mAboveSign*std::numeric_limits<SdfValueT>::max();//local copy
+        const SdfComputeT h = mAboveSign*static_cast<SdfComputeT>(mSdfGrid->voxelSize()[0]);//Voxel size
         for (auto leafIter = r.begin(); leafIter; ++leafIter) {
             SdfValueT* sdf = leafIter.buffer(1).data();
             for (auto voxelIter = leafIter->beginValueAll(); voxelIter; ++voxelIter) {
-                const SdfValueT value = *voxelIter;
+                const SdfComputeT value = SdfComputeT(*voxelIter);
                 const bool isAbove = value > isoValue;
                 if (!voxelIter.isValueOn()) {// inactive voxels
                     sdf[voxelIter.pos()] = isAbove ? above : -above;
@@ -1184,21 +1187,21 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
                     } else {// compute distance to iso-surface
                         // disable boundary voxels from the mask tree
                         sweepMaskAcc.setValueOff(ijk);
-                        const SdfValueT delta = value - isoValue;//offset relative to iso-value
+                        const SdfComputeT delta = value - isoValue;//offset relative to iso-value
                         if (math::isApproxZero(delta)) {//voxel is on the iso-surface
                             sdf[voxelIter.pos()] = 0;
                         } else {//voxel is neighboring the iso-surface
-                            SdfValueT sum = 0;
+                            SdfComputeT sum = 0;
                             for (int i=0; i<6;) {
-                                SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
+                                SdfComputeT d = std::numeric_limits<SdfComputeT>::max(), d2;
                                 if (mask.test(i++)) d = math::Abs(delta/(value-stencil.getValue(i)));
                                 if (mask.test(i++)) {
                                     d2 = math::Abs(delta/(value-stencil.getValue(i)));
                                     if (d2 < d) d = d2;
                                 }
-                                if (d < std::numeric_limits<SdfValueT>::max()) sum += 1/(d*d);
+                                if (d < std::numeric_limits<SdfComputeT>::max()) sum += 1/(d*d);
                             }
-                            sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum) : -h / math::Sqrt(sum);
+                            sdf[voxelIter.pos()] = SdfValueT(isAbove ? h / math::Sqrt(sum) : -h / math::Sqrt(sum));
                         }// voxel is neighboring the iso-surface
                     }// intersecting voxels
                 }// active voxels
@@ -1209,18 +1212,19 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
     template<typename RootOrInternalNodeT>
     void operator()(const RootOrInternalNodeT& node) const
     {
-        const SdfValueT isoValue = mIsoValue, above = mAboveSign*std::numeric_limits<SdfValueT>::max();
+        const SdfComputeT isoValue = mIsoValue;
+        const SdfValueT above = mAboveSign*std::numeric_limits<SdfValueT>::max();
         for (auto it = node.cbeginValueAll(); it; ++it) {
           SdfValueT& v = const_cast<SdfValueT&>(*it);
-          v = v > isoValue ? above : -above;
+          v = SdfComputeT(v) > isoValue ? above : -above;
         }//loop over all tiles
     }// FastSweeping::InitSdf::operator()(const RootOrInternalNodeT&)
 
     // Public member data
     FastSweeping *mParent;
     SdfGridT     *mSdfGrid;//raw pointer, i.e. lock free
-    SdfValueT      mIsoValue;
-    SdfValueT      mAboveSign;//sign of distance values above the iso-value
+    SdfComputeT   mIsoValue;
+    SdfComputeT   mAboveSign;//sign of distance values above the iso-value
 };// FastSweeping::InitSdf
 
 
@@ -1244,7 +1248,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
         }
 
         mAboveSign  = mParent->mIsInputSdf ? SdfValueT(1) : SdfValueT(-1);
-        mIsoValue = isoValue;
+        mIsoValue = SdfComputeT(isoValue);
         auto &tree1 = mSdfGrid->tree();
         auto &tree2 = mExtGrid->tree();
         const bool hasActiveTiles = tree1.hasActiveTiles();//very fast
@@ -1296,17 +1300,17 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
     }// FastSweeping::InitExt::run
 
     // int implements an update if minD needs to be updated
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     void sumHelper(ExtT& sum2, ExtT ext, bool update, const SdfT& /* d2 */) const { if (update) sum2 = ext; }// int implementation
 
     // non-int implements a weighted sum
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
-    void sumHelper(ExtT& sum2, ExtT ext, bool /* update */, const SdfT&  d2) const { sum2 += static_cast<ExtValueT>(d2 * ext); }// non-int implementation
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    void sumHelper(ExtT& sum2, ExtT ext, bool /* update */, const SdfT& d2) const { sum2 += static_cast<ExtValueT>(d2 * ext); }// non-int implementation
 
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT extValHelper(ExtT extSum, const SdfT& /* sdfSum */) const { return extSum; }// int implementation
 
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT extValHelper(ExtT extSum, const SdfT& sdfSum) const {return ExtT((SdfT(1) / sdfSum) * extSum); }// non-int implementation
 
     void operator()(const LeafRange& r) const
@@ -1316,13 +1320,14 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
         math::GradStencil<SdfGridT, false> stencil(*mSdfGrid);
         const math::Transform& xform = mExtGrid->transform();
         typename OpPoolT::reference op = mOpPool->local();
-        const SdfValueT isoValue = mIsoValue, above = mAboveSign*std::numeric_limits<SdfValueT>::max();//local copy
-        const SdfValueT h = mAboveSign*static_cast<SdfValueT>(mSdfGrid->voxelSize()[0]);//Voxel size
+        const SdfComputeT isoValue = mIsoValue;
+        const SdfValueT above = mAboveSign*std::numeric_limits<SdfValueT>::max();//local copy
+        const SdfComputeT h = mAboveSign*static_cast<SdfComputeT>(mSdfGrid->voxelSize()[0]);//Voxel size
         for (auto leafIter = r.begin(); leafIter; ++leafIter) {
             SdfValueT *sdf = leafIter.buffer(1).data();
             ExtValueT *ext = acc.probeLeaf(leafIter->origin())->buffer().data();//should be safe!
             for (auto voxelIter = leafIter->beginValueAll(); voxelIter; ++voxelIter) {
-                const SdfValueT value = *voxelIter;
+                const SdfComputeT value = SdfComputeT(*voxelIter);
                 const bool isAbove = value > isoValue;
                 if (!voxelIter.isValueOn()) {// inactive voxels
                     sdf[voxelIter.pos()] = isAbove ? above : -above;
@@ -1336,20 +1341,20 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                     } else {// compute distance to iso-surface
                         // disable boundary voxels from the mask tree
                         sweepMaskAcc.setValueOff(ijk);
-                        const SdfValueT delta = value - isoValue;//offset relative to iso-value
+                        const SdfComputeT delta = value - isoValue;//offset relative to iso-value
                         if (math::isApproxZero(delta)) {//voxel is on the iso-surface
                             sdf[voxelIter.pos()] = 0;
                             ext[voxelIter.pos()] = ExtValueT(op(xform.indexToWorld(ijk)));
                         } else {//voxel is neighboring the iso-surface
-                            SdfValueT sum1 = 0;
-                            ExtValueT sum2 = zeroVal<ExtValueT>();
+                            SdfComputeT sum1 = 0;
+                            ExtComputeT sum2 = zeroVal<ExtComputeT>();
                             // minD is used to update sum2 in the integer case,
                             // where we choose the value of the extension grid corresponding to
                             // the smallest value of d in the 6 direction neighboring the current
                             // voxel.
-                            SdfValueT minD = std::numeric_limits<SdfValueT>::max();
+                            SdfComputeT minD = std::numeric_limits<SdfComputeT>::max();
                             for (int n=0, i=0; i<6;) {
-                                SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
+                                SdfComputeT d = std::numeric_limits<SdfComputeT>::max(), d2;
                                 if (mask.test(i++)) {
                                     d = math::Abs(delta/(value-stencil.getValue(i)));
                                     n = i - 1;
@@ -1361,19 +1366,19 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                                         n = i - 1;
                                     }
                                 }
-                                if (d < std::numeric_limits<SdfValueT>::max()) {
+                                if (d < std::numeric_limits<SdfComputeT>::max()) {
                                     d2 = 1/(d*d);
                                     sum1 += d2;
-                                    const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
-                                                    static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
-                                                    static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
+                                    const Vec3R xyz(static_cast<SdfComputeT>(ijk[0])+d*static_cast<SdfComputeT>(FastSweeping::mOffset[n][0]),
+                                                    static_cast<SdfComputeT>(ijk[1])+d*static_cast<SdfComputeT>(FastSweeping::mOffset[n][1]),
+                                                    static_cast<SdfComputeT>(ijk[2])+d*static_cast<SdfComputeT>(FastSweeping::mOffset[n][2]));
                                     // If current d is less than minD, update minD
-                                    sumHelper(sum2, ExtValueT(op(xform.indexToWorld(xyz))), d < minD, d2);
+                                    sumHelper(sum2, ExtComputeT(op(xform.indexToWorld(xyz))), d < minD, d2);
                                     if (d < minD) minD = d;
                                 }
                             }//look over six cases
-                            ext[voxelIter.pos()] = extValHelper(sum2, sum1);
-                            sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1);
+                            ext[voxelIter.pos()] = ExtValueT(extValHelper(sum2, sum1));
+                            sdf[voxelIter.pos()] = SdfValueT(isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1));
                         }// voxel is neighboring the iso-surface
                     }// intersecting voxels
                 }// active voxels
@@ -1384,10 +1389,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
     template<typename RootOrInternalNodeT>
     void operator()(const RootOrInternalNodeT& node) const
     {
-        const SdfValueT isoValue = mIsoValue, above = mAboveSign*std::numeric_limits<SdfValueT>::max();
+        const SdfComputeT isoValue = mIsoValue;
+        const SdfValueT above = mAboveSign*std::numeric_limits<SdfValueT>::max();
         for (auto it = node.cbeginValueAll(); it; ++it) {
           SdfValueT& v = const_cast<SdfValueT&>(*it);
-          v = v > isoValue ? above : -above;
+          v = SdfComputeT(v) > isoValue ? above : -above;
         }//loop over all tiles
     }
     // Public member data
@@ -1395,8 +1401,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
     OpPoolT      *mOpPool;
     SdfGridT     *mSdfGrid;
     ExtGridT     *mExtGrid;
-    SdfValueT      mIsoValue;
-    SdfValueT      mAboveSign;//sign of distance values above the iso-value
+    SdfComputeT   mIsoValue;
+    SdfValueT     mAboveSign;//sign of distance values above the iso-value
 };// FastSweeping::InitExt
 
 /// Private class of FastSweeping to perform multi-threaded initialization
@@ -1592,26 +1598,26 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
     // Private struct for nearest neighbor grid points (very memory light!)
     struct NN {
-        SdfValueT v;
+        SdfComputeT v;
         int    n;
         inline static Coord ijk(const Coord &p, int i) { return p + FastSweeping::mOffset[i]; }
         NN() : v(), n() {}
-        NN(const SdfAccT &a, const Coord &p, int i) : v(math::Abs(a.getValue(ijk(p,i)))), n(i) {}
+        NN(const SdfAccT &a, const Coord &p, int i) : v(math::Abs(SdfComputeT(a.getValue(ijk(p,i))))), n(i) {}
         inline Coord operator()(const Coord &p) const { return ijk(p, n); }
         inline bool operator<(const NN &rhs) const { return v < rhs.v; }
-        inline operator bool() const { return v < SdfValueT(1000); }
+        inline operator bool() const { return v < SdfComputeT(1000); }
     };// NN
 
     /// @note   Extending an integer field is based on the nearest-neighbor interpolation
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& /* w */, const ExtT& v1, const ExtT& v2) const { return d1.v < d2.v ? v1 : v2; }// int implementation
 
     /// @note   Extending a non-integer field is based on a weighted interpolation
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return ExtT(w*(d1.v*v1 + d2.v*v2)); }// non-int implementation
 
     /// @note   Extending an integer field is based on the nearest-neighbor interpolation
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& /* w */, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
         math::Vec3<SdfT> d(d1.v, d2.v, d3.v);
         math::Vec3<ExtT> v(v1, v2, v3);
@@ -1619,7 +1625,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
     }// int implementation
 
     /// @note   Extending a non-integer field is based on a weighted interpolation
-    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    template<typename ExtT = ExtComputeT, typename SdfT = SdfComputeT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& w, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
         return ExtT(w*(d1.v*v1 + d2.v*v2 + d3.v*v3));
     }// non-int implementation
@@ -1629,8 +1635,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         typename ExtGridT::TreeType *tree2 = mParent->mExtGrid ? &mParent->mExtGrid->tree() : nullptr;
         typename ExtGridT::TreeType *tree3 = mParent->mExtGridInput ? &mParent->mExtGridInput->tree() : nullptr;
 
-        const SdfValueT h = static_cast<SdfValueT>(mParent->mSdfGrid->voxelSize()[0]);
-        const SdfValueT sqrt2h = math::Sqrt(SdfValueT(2))*h;
+        const SdfComputeT h = static_cast<SdfComputeT>(mParent->mSdfGrid->voxelSize()[0]);
+        const SdfComputeT sqrt2h = math::Sqrt(SdfComputeT(2))*h;
         const FastSweepingDomain mode = mParent->mSweepDirection;
         const bool isInputSdf = mParent->mIsInputSdf;
 
@@ -1649,7 +1655,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
             SdfAccT acc1(mParent->mSdfGrid->tree());
             auto acc2 = std::unique_ptr<ExtAccT>(tree2 ? new ExtAccT(*tree2) : nullptr);
             auto acc3 = std::unique_ptr<ExtAccT>(tree3 ? new ExtAccT(*tree3) : nullptr);
-            SdfValueT absV, sign, update, D;
+            SdfComputeT absV, sign, update, D;
             NN d1, d2, d3;//distance values and coordinates of closest neighbor points
 
             const LeafSliceArray& leafSliceArray = mVoxelSliceMap[voxelSliceIndex];
@@ -1686,10 +1692,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                     SdfValueT &value = const_cast<SdfValueT&>(acc1.getValue(ijk));
 
                     // Extract the sign
-                    sign = value >= SdfValueT(0) ? SdfValueT(1) : SdfValueT(-1);
+                    sign = math::isNegative(value) ? SdfComputeT(-1) : SdfComputeT(1);
 
                     // Absolute value
-                    absV = math::Abs(value);
+                    absV = SdfComputeT(math::Abs(value));
 
                     // sort values so d1 <= d2 <= d3
                     if (d2 < d1) std::swap(d1, d2);
@@ -1707,12 +1713,12 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                 // There is an assert upstream to check if mExtGridInput exists if mode != SWEEP_ALL
                                 ExtValueT updateExt = acc2->getValue(d1(ijk));
                                 if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
-                                    if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
-                                    else updateExt = (value <= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
+                                    if (isInputSdf) updateExt = math::isNegative(value) ? acc3->getValue(ijk) : acc2->getValue(d1(ijk));
+                                    else updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : acc2->getValue(d1(ijk));
                                 } // SWEEP_GREATER_THAN_ISOVALUE
                                 else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
-                                    if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
-                                    else updateExt = (value >= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
+                                    if (isInputSdf) updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : acc2->getValue(d1(ijk));
+                                    else updateExt = math::isNegative(value) ? acc3->getValue(ijk) : acc2->getValue(d1(ijk));
                                 } // SWEEP_LESS_THAN_ISOVALUE
                                 acc2->setValue(ijk, updateExt);
                             }//update ext?
@@ -1725,8 +1731,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                     //D = SdfValueT(2) * h * h - math::Pow2(d1.v - d2.v);// = 2h^2-(d1-d2)^2
                     //if (D >= SdfValueT(0)) {// non-negative discriminant
                     if (d2.v <= sqrt2h + d1.v) {
-                        D = SdfValueT(2) * h * h - math::Pow2(d1.v - d2.v);// = 2h^2-(d1-d2)^2
-                        update = SdfValueT(0.5) * (d1.v + d2.v + std::sqrt(D));
+                        D = SdfComputeT(2) * h * h - math::Pow2(d1.v - d2.v);// = 2h^2-(d1-d2)^2
+                        update = SdfComputeT(0.5) * (d1.v + d2.v + math::Sqrt(D));
                         if (update > d2.v && update <= d3.v) {
                             if (update < absV) {
                                 value = sign * update;
@@ -1734,19 +1740,19 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                     d1.v -= update;
                                     d2.v -= update;
                                     // affine combination of two neighboring extension values
-                                    const SdfValueT w = SdfValueT(1)/(d1.v+d2.v);
-                                    const ExtValueT v1 = acc2->getValue(d1(ijk));
-                                    const ExtValueT v2 = acc2->getValue(d2(ijk));
-                                    const ExtValueT extVal = twoNghbr(d1, d2, w, v1, v2);
+                                    const SdfComputeT w = SdfComputeT(1)/(d1.v+d2.v);
+                                    const ExtComputeT v1 = ExtComputeT(acc2->getValue(d1(ijk)));
+                                    const ExtComputeT v2 = ExtComputeT(acc2->getValue(d2(ijk)));
+                                    const ExtValueT extVal = ExtValueT(twoNghbr(d1, d2, w, v1, v2));
 
                                     ExtValueT updateExt = extVal;
                                     if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
-                                        if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
-                                        else updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
+                                        if (isInputSdf) updateExt = math::isNegative(value) ? acc3->getValue(ijk) : extVal;
+                                        else updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : extVal;
                                     } // SWEEP_GREATER_THAN_ISOVALUE
                                     else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
-                                        if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
-                                        else updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
+                                        if (isInputSdf) updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : extVal;
+                                        else updateExt = math::isNegative(value) ? acc3->getValue(ijk) : extVal;
                                     } // SWEEP_LESS_THAN_ISOVALUE
                                     acc2->setValue(ijk, updateExt);
                                 }//update ext?
@@ -1759,10 +1765,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                     // (x-d1)^2 + (x-d2)^2  + (x-d3)^2 = h^2
                     // 3x^2 - 2(d1 + d2 + d3)x + d1^2 + d2^2 + d3^2 = h^2
                     // ax^2 + bx + c=0, a=3, b=-2(d1+d2+d3), c=d1^2 + d2^2 + d3^2 - h^2
-                    const SdfValueT d123 = d1.v + d2.v + d3.v;
-                    D = d123*d123 - SdfValueT(3)*(d1.v*d1.v + d2.v*d2.v + d3.v*d3.v - h * h);
-                    if (D >= SdfValueT(0)) {// non-negative discriminant
-                        update = SdfValueT(1.0/3.0) * (d123 + std::sqrt(D));//always passes test
+                    const SdfComputeT d123 = d1.v + d2.v + d3.v;
+                    D = d123*d123 - SdfComputeT(3)*(d1.v*d1.v + d2.v*d2.v + d3.v*d3.v - h * h);
+                    if (D >= SdfComputeT(0)) {// non-negative discriminant
+                        update = SdfComputeT(1.0/3.0) * (d123 + std::sqrt(D));//always passes test
                         //if (update > d3.v) {//disabled due to round-off errors
                         if (update < absV) {
                             value = sign * update;
@@ -1771,20 +1777,20 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                 d2.v -= update;
                                 d3.v -= update;
                                 // affine combination of three neighboring extension values
-                                const SdfValueT w = SdfValueT(1)/(d1.v+d2.v+d3.v);
-                                const ExtValueT v1 = acc2->getValue(d1(ijk));
-                                const ExtValueT v2 = acc2->getValue(d2(ijk));
-                                const ExtValueT v3 = acc2->getValue(d3(ijk));
-                                const ExtValueT extVal = threeNghbr(d1, d2, d3, w, v1, v2, v3);
+                                const SdfComputeT w = SdfComputeT(1)/(d1.v+d2.v+d3.v);
+                                const ExtComputeT v1 = ExtComputeT(acc2->getValue(d1(ijk)));
+                                const ExtComputeT v2 = ExtComputeT(acc2->getValue(d2(ijk)));
+                                const ExtComputeT v3 = ExtComputeT(acc2->getValue(d3(ijk)));
+                                const ExtValueT extVal = ExtValueT(threeNghbr(d1, d2, d3, w, v1, v2, v3));
 
                                 ExtValueT updateExt = extVal;
                                 if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
-                                    if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
-                                    else updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
+                                    if (isInputSdf) updateExt = math::isNegative(value) ? acc3->getValue(ijk) : extVal;
+                                    else updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : extVal;
                                 } // SWEEP_GREATER_THAN_ISOVALUE
                                 else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
-                                    if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
-                                    else updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
+                                    if (isInputSdf) updateExt = math::isNegative(-value) ? acc3->getValue(ijk) : extVal;
+                                    else updateExt = math::isNegative(value) ? acc3->getValue(ijk) : extVal;
                                 } // SWEEP_LESS_THAN_ISOVALUE
                                 acc2->setValue(ijk, updateExt);
                             }//update ext?

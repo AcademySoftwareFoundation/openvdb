@@ -365,6 +365,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     using TreeT = typename VolumeGridT::TreeType;
     using AccT = typename VolumeGridT::ConstAccessor;
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename TreeT::ComputeType;
     using LeafManagerT = typename tree::LeafManager<TreeT>;
     using LeafNodeT = typename LeafManagerT::LeafNodeType;
     using LeafRangeT = typename LeafManagerT::LeafRange;
@@ -443,12 +444,13 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                 const ValueT* in0 = leaf->buffer().data();
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
-                    out0[i] += RealT(0.5) * ( in0[i] - out1[i] );
+                    out0[i] += RealT(0.5) * ( ComputeT(in0[i]) - ComputeT(out1[i]) );
                 }
             } else {
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
-                    out0[i] += RealT(0.5) * ( acc.getValue(voxelIter.getCoord()) - out1[i] );
+                    out0[i] += RealT(0.5) *
+                        (ComputeT(acc.getValue(voxelIter.getCoord())) - ComputeT(out1[i]));
                 }//loop over active voxels
             }
         }//loop over leaf nodes
@@ -467,12 +469,13 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                 const ValueT* in0 = leaf->buffer().data();
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
-                    out0[i] = RealT(0.5)*( RealT(3)*in0[i] - out1[i] );
+                    out0[i] = RealT(0.5)*( RealT(3)*ComputeT(in0[i]) - ComputeT(out1[i]) );
                 }//loop over active voxels
             } else {
                 for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                     const Index i = voxelIter.pos();
-                    out0[i] = RealT(0.5)*( RealT(3)*acc.getValue(voxelIter.getCoord()) - out1[i] );
+                    out0[i] = RealT(0.5)*(
+                        RealT(3)*ComputeT(acc.getValue(voxelIter.getCoord())) - ComputeT(out1[i]));
                 }//loop over active voxels
             }
         }//loop over leaf nodes
@@ -498,7 +501,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         if (mParent->interrupt()) return;
         const bool doLimiter = mParent->isLimiterOn();
         const bool doClamp = mParent->mLimiter == Scheme::CLAMP;
-        ValueT data[2][2][2], vMin, vMax;
+        ComputeT data[2][2][2], vMin, vMax;
         const math::Transform& xform = mInGrid->transform();
         AccT acc = mInGrid->getAccessor();
         const ValueT backg = mInGrid->background();
@@ -516,14 +519,15 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
                     BoxSampler::getValues(data, acc, ijk);
                     BoxSampler::extrema(data, vMin, vMax);
                     if ( doClamp ) {
-                        value = math::Clamp( value, vMin, vMax);
-                    } else if (value < vMin || value > vMax ) {
+                        value = math::Clamp( ComputeT(value), vMin, vMax);
+                    } else if (ComputeT(value) < vMin || ComputeT(value) > vMax ) {
                         iPos -= Vec3R(ijk[0], ijk[1], ijk[2]);//unit coordinates
                         value = BoxSampler::trilinearInterpolation( data, iPos );
                     }
                 }
 
-                if (math::isApproxEqual(value, backg, math::Delta<ValueT>::value())) {
+                if (math::isApproxEqual(ComputeT(value), ComputeT(backg),
+                                        math::Delta<ComputeT>::value())) {
                     value = backg;
                     leafIter->setValueOff( voxelIter.pos() );
                 }
@@ -553,10 +557,12 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
 OPENVDB_INSTANTIATE_CLASS VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>;
 
+OPENVDB_INSTANTIATE HalfGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<HalfGrid, Sampler<1, false>>(const HalfGrid&, double);
 OPENVDB_INSTANTIATE FloatGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<FloatGrid, Sampler<1, false>>(const FloatGrid&, double);
 OPENVDB_INSTANTIATE DoubleGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<DoubleGrid, Sampler<1, false>>(const DoubleGrid&, double);
 OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<Vec3SGrid, Sampler<1, false>>(const Vec3SGrid&, double);
 
+OPENVDB_INSTANTIATE HalfGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<HalfGrid, Sampler<1, false>>(const HalfGrid&, double);
 OPENVDB_INSTANTIATE FloatGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<FloatGrid, Sampler<1, false>>(const FloatGrid&, double);
 OPENVDB_INSTANTIATE DoubleGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<DoubleGrid, Sampler<1, false>>(const DoubleGrid&, double);
 OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<Vec3SGrid, Sampler<1, false>>(const Vec3SGrid&, double);

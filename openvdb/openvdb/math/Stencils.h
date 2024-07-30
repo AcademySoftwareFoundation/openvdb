@@ -37,7 +37,7 @@ class BaseStencil
 public:
     typedef GridT                                       GridType;
     typedef typename GridT::TreeType                    TreeType;
-    typedef typename GridT::ValueType                   ValueType;
+    typedef typename GridT::ComputeType                 ValueType;
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
 
@@ -250,7 +250,7 @@ class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, Gr
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
     static const int SIZE = 7;
 
@@ -304,7 +304,7 @@ class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
     static const int SIZE = 8;
 
@@ -475,7 +475,7 @@ class SecondOrderDenseStencil
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
-    typedef typename GridType::ValueType           ValueType;
+    typedef typename GridType::ComputeType         ValueType;
 
     static const int SIZE = 19;
 
@@ -555,7 +555,7 @@ class ThirteenPointStencil
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
-    typedef typename GridType::ValueType        ValueType;
+    typedef typename GridType::ComputeType      ValueType;
 
     static const int SIZE = 13;
 
@@ -686,7 +686,7 @@ class FourthOrderDenseStencil
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
-    typedef typename GridType::ValueType           ValueType;
+    typedef typename GridType::ComputeType         ValueType;
 
     static const int SIZE = 61;
 
@@ -825,7 +825,7 @@ class NineteenPointStencil
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
-    typedef typename GridType::ValueType        ValueType;
+    typedef typename GridType::ComputeType      ValueType;
 
     static const int SIZE = 19;
 
@@ -1041,7 +1041,7 @@ class SixthOrderDenseStencil
 public:
     typedef GridT                                 GridType;
     typedef typename GridT::TreeType              TreeType;
-    typedef typename GridType::ValueType          ValueType;
+    typedef typename GridType::ComputeType        ValueType;
 
     static const int SIZE = 127;
 
@@ -1235,7 +1235,7 @@ class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
-    typedef typename GridType::ValueType       ValueType;
+    typedef typename GridType::ComputeType     ValueType;
 
     static const int SIZE = 7;
 
@@ -1369,7 +1369,7 @@ class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
-    typedef typename GridType::ValueType       ValueType;
+    typedef typename GridType::ComputeType     ValueType;
 
     static const int SIZE = 19;
 
@@ -1519,7 +1519,7 @@ class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, Grid
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridT::ValueType         ValueType;
+    typedef typename GridT::ComputeType       ValueType;
 
      static const int SIZE = 19;
 
@@ -1545,7 +1545,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : 0;
+               ValueType(alpha*mInv2Dx/math::Pow3(normGrad)) : ValueType(0);
     }
 
     /// @brief Return the Gaussian curvature at the previously buffered location.
@@ -1556,7 +1556,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : 0;
+               ValueType(alpha*mInvDx2/math::Pow4(normGrad)) : ValueType(0);
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1571,7 +1571,7 @@ public:
           mean  = ValueType(alphaM*mInv2Dx/math::Pow3(normGrad));
           gauss = ValueType(alphaG*mInvDx2/math::Pow4(normGrad));
         } else {
-          mean = gauss = 0;
+          mean = gauss = ValueType(0);
         }
     }
 
@@ -1585,7 +1585,7 @@ public:
     {
         Real alpha, normGrad;
         return this->meanCurvature(alpha, normGrad) ?
-               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : 0;
+               ValueType(alpha*mInvDx2/(2*math::Pow2(normGrad))) : ValueType(0);
     }
 
     /// Return the mean Gaussian multiplied by the norm of the
@@ -1597,7 +1597,7 @@ public:
     {
         Real alpha, normGrad;
         return this->gaussianCurvature(alpha, normGrad) ?
-               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : 0;
+               ValueType(2*alpha*mInv2Dx*mInvDx2/math::Pow3(normGrad)) : ValueType(0);
     }
 
     /// @brief Return both the mean and the Gaussian curvature at the
@@ -1627,7 +1627,7 @@ public:
         Real alphaM, alphaG, normGrad;
         if (this->curvatures(alphaM, alphaG, normGrad)) {
           const Real mean = alphaM*mInv2Dx/math::Pow3(normGrad);
-          const Real tmp = std::sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
+          const Real tmp = math::Sqrt(mean*mean - alphaG*mInvDx2/math::Pow4(normGrad));
           pair.first  = ValueType(mean - tmp);
           pair.second = ValueType(mean + tmp);
         }
@@ -1768,7 +1768,7 @@ class DenseStencil: public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSaf
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
-    typedef typename GridType::ValueType      ValueType;
+    typedef typename GridType::ComputeType    ValueType;
 
     DenseStencil(const GridType& grid, int halfWidth)
         : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))

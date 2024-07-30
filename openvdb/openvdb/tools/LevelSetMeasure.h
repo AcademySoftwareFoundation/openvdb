@@ -105,10 +105,10 @@ class LevelSetMeasure
 public:
     using GridType = GridT;
     using TreeType = typename GridType::TreeType;
-    using ValueType = typename TreeType::ValueType;
+    using ComputeType = typename TreeType::ComputeType;
     using ManagerType = typename tree::LeafManager<const TreeType>;
 
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(std::is_floating_point<ComputeType>::value,
         "level set measure is supported only for scalar, floating-point grids");
 
     /// @brief Main constructor from a grid
@@ -344,7 +344,7 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::
 MeasureArea::operator()(const LeafRange& range) const
 {
-    using Vec3T = math::Vec3<ValueType>;
+    using Vec3T = math::Vec3<ComputeType>;
     // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
     const Real invDx = 1.0/mParent->mDx;
@@ -374,12 +374,12 @@ inline void
 LevelSetMeasure<GridT, InterruptT>::
 MeasureCurvatures::operator()(const LeafRange& range) const
 {
-    using Vec3T = math::Vec3<ValueType>;
+    using Vec3T = math::Vec3<ComputeType>;
     // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
     const Real dx = mParent->mDx, dx2=dx*dx, invDx = 1.0/dx;
     const DiracDelta<Real> DD(1.5);// dirac delta function is 3 voxel units wide
-    ValueType mean, gauss;
+    ComputeType mean, gauss;
     const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         Real sumM = 0, sumG = 0;//reduce risk of catastrophic cancellation
@@ -408,7 +408,7 @@ MeasureCurvatures::operator()(const LeafRange& range) const
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<std::is_floating_point<typename GridT::ComputeType>::value, Real>::type
 doLevelSetArea(const GridT& grid, bool useWorldUnits)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -417,7 +417,7 @@ doLevelSetArea(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!std::is_floating_point<typename GridT::ComputeType>::value, Real>::type
 doLevelSetArea(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -441,7 +441,7 @@ levelSetArea(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<std::is_floating_point<typename GridT::ComputeType>::value, Real>::type
 doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -450,7 +450,7 @@ doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!std::is_floating_point<typename GridT::ComputeType>::value, Real>::type
 doLevelSetVolume(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -474,7 +474,7 @@ levelSetVolume(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<std::is_floating_point<typename GridT::ComputeType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -483,7 +483,7 @@ doLevelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<!std::is_floating_point<typename GridT::ComputeType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -508,7 +508,7 @@ levelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<std::is_floating_point<typename GridT::ComputeType>::value, int>::type
 doLevelSetEuler(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -518,7 +518,7 @@ doLevelSetEuler(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<std::is_floating_point<typename GridT::ComputeType>::value, int>::type
 doLevelSetGenus(const GridT& grid)
 {
     LevelSetMeasure<GridT> m(grid);
@@ -527,7 +527,7 @@ doLevelSetGenus(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!std::is_floating_point<typename GridT::ValueType>::value, int>::type
+typename std::enable_if<!std::is_floating_point<typename GridT::ComputeType>::value, int>::type
 doLevelSetGenus(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -576,6 +576,7 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<HalfGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<FloatGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<DoubleGrid, util::NullInterrupter>;
 
