@@ -236,6 +236,30 @@ using make_index_sequence =
 
 ////////////////////////////////////////
 
+/// @brief An enum to distinguish between different types of Tree representation.
+enum class TreeRepresentation : uint32_t {Unknown = 0, Sparse = 1, Adaptive = 2, End = 3};
+
+/// @brief A TreeTraits struct that can be used to query properties of an input T.
+template<typename T>
+struct TreeTraits
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Unknown;
+};
+
+template <typename T>
+constexpr bool isSparseTree()
+{
+    return TreeTraits<T>::Representation == TreeRepresentation::Sparse;
+}
+
+template <typename T>
+constexpr bool isAdaptiveTree()
+{
+    return TreeTraits<T>::Representation == TreeRepresentation::Adaptive;
+}
+
+////////////////////////////////////////
+
 
 template<typename T, bool = IsSpecializationOf<T, math::Vec2>::value ||
                             IsSpecializationOf<T, math::Vec3>::value ||
@@ -444,6 +468,26 @@ template<typename FromType, typename ToType> struct CopyConstness<const FromType
     using Type = const ToType;
 };
 /// @endcond
+
+
+////////////////////////////////////////
+
+/// @brief A type-dependent expression that always evaluates to false.
+/// This is used as a work-around for the much discussed problem of wanting to do:
+/// if constexpr (expr) { }
+/// else { static_assert(false); }
+///
+/// At present, C++ evaluates static_assert(false) regardless of the outcome of the
+/// compile-time expression. By using a type-dependent expression, the static assert
+/// is only evaluated during instantiation:
+///
+/// static_assert(openvdb::AlwaysFalseValue<T>);
+///
+/// This results in the desired outcome of generating a compile-time static assert
+/// only if the first clause evaluates to false.
+
+template<class>
+inline constexpr bool AlwaysFalseValue = false;
 
 
 ////////////////////////////////////////
