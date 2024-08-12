@@ -40,9 +40,45 @@ void bind_jagged_tensor(py::module& m) {
                 return self.jidx();
             }
         }, "The indices indicating the batch index where the element belong to.")
-        .def_property_readonly("joffsets", &fvdb::JaggedTensor::joffsets, "A [batch_size, 2] array where each row contains the start and end row index in jdata.")
+        .def_property_readonly("joffsets", &fvdb::JaggedTensor::joffsets, "A [num_tensors + 1] array where each row contains the start and end row index in jdata.")
 
         .def_property_readonly("num_tensors", &fvdb::JaggedTensor::num_tensors, "The number of tensors in the JaggedTensor.")
+        .def_property_readonly("jlidx", &fvdb::JaggedTensor::jlidx, "The list index of the JaggedTensor with size [num_tensors, ldim].")
+
+        .def_static("from_data_and_indices", [](const torch::Tensor& data, const torch::Tensor& indices, int num_tensors) {
+            return fvdb::JaggedTensor::from_data_indices_and_list_ids(
+                data, indices,
+                torch::empty({0, 1}, torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(data.device())),
+                num_tensors
+            );
+        }, R"_FVDB_(
+            Initialize jagged tensor with ldim=1 from data and indices.
+
+            Args:
+                data (torch.Tensor): The data of the JaggedTensor.
+                indices (torch.Tensor): The indices indicating the batch index where the element belong to.
+                num_tensors (int): The batch size of the JaggedTensor.
+
+            Returns:
+                jt (JaggedTensor): The JaggedTensor with the given data and indices.)_FVDB_")
+
+        .def_static("from_data_and_offsets", [](const torch::Tensor& data, const torch::Tensor& offsets) {
+            return fvdb::JaggedTensor::from_data_offsets_and_list_ids(
+                data, offsets,
+                torch::empty({0, 1}, torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(data.device()))
+            );
+        }, R"_FVDB_(
+            Initialize jagged tensor with ldim=1 from data and offsets.
+
+            Args:
+                data (torch.Tensor): The data of the JaggedTensor.
+                offsets (torch.Tensor): The 1-dimensional offsets indicating the start and end of each tensor in data.
+
+            Returns:
+                jt (JaggedTensor): The JaggedTensor with the given data and offsets.)_FVDB_")
+
+        .def_static("from_data_indices_and_list_ids", &fvdb::JaggedTensor::from_data_indices_and_list_ids, py::arg("data"), py::arg("indices"), py::arg("list_ids"), py::arg("num_tensors"))
+        .def_static("from_data_offsets_and_list_ids", &fvdb::JaggedTensor::from_data_offsets_and_list_ids, py::arg("data"), py::arg("offsets"), py::arg("list_ids"))
 
         .def_property_readonly("is_cuda", &fvdb::JaggedTensor::is_cuda, "Whether the JaggedTensor is on a CUDA device.")
         .def_property_readonly("is_cpu", &fvdb::JaggedTensor::is_cpu, "Whether the JaggedTensor is on a CPU device.")
@@ -258,9 +294,6 @@ void bind_jagged_tensor(py::module& m) {
                     return fvdb::JaggedTensor::from_data_indices_and_list_ids(data, jidx, jlidx, batchSize);
                 }
 
-                if (t.size() > 0) {
-                    TORCH_CHECK(false, "Invalid pickle format");
-                }
                 int version = t[0].cast<int>();
                 if (version == 1 || version == 2) {
                     const torch::Tensor jdata = THPVariable_Unpack(t[1].ptr());
@@ -282,8 +315,10 @@ void bind_jagged_tensor(py::module& m) {
 
                     const torch::Tensor jlidx = THPVariable_Unpack(t[3].ptr());
                     const int64_t numOuterLists = t[4].cast<int64_t>();
-                    TORCH_CHECK(numOuterLists == joffsets.size(0), "Invalid pickle format: numOuterLists does not match joffsets size");
-                    TORCH_CHECK(jlidx.size(0) == 0 || jlidx.size(0) == joffsets.size(0), "Invalid pickle format: jlidx size does not match joffsets size");
+                    if (jlidx.numel() != 0 && jlidx.size(1) == 1) {
+                        TORCH_CHECK(numOuterLists == joffsets.size(0), "Invalid pickle format: numOuterLists does not match joffsets size");
+                    }
+                    TORCH_CHECK(jlidx.size(0) == 0 || jlidx.size(0) == (joffsets.size(0) - 1), "Invalid pickle format: jlidx size does not match joffsets size");
                     return fvdb::JaggedTensor::from_data_offsets_and_list_ids(jdata, joffsets, jlidx);
                 } else {
                     TORCH_CHECK(false, "Invalid JaggedTensor pickle version (got version = ", version, ")");

@@ -3,6 +3,7 @@
 #
 import itertools
 import os
+import tempfile
 import unittest
 from typing import List
 
@@ -27,13 +28,16 @@ class TestJaggedTensor(unittest.TestCase):
     def setUp(self):
         pass
 
-    def mklol(self, num_outer, num_inner_min, num_inner_max, device, dtype, last_dims=(3, 4)):
+    def mklol(self, num_outer, num_inner_min, num_inner_max, device, dtype, last_dims=(3, 4), base_num=1000, vary_num=10, empty_prob=0.0):
         pts_list = []
         for _ in range(num_outer):
             pts_list_i = []
             while len(pts_list_i) == 0:
+                size = base_num + (np.random.randint(vary_num) if vary_num > 0 else 0)
+                if np.random.rand() < empty_prob:
+                    size = 0
                 pts_list_i = [
-                    torch.rand(1000 + np.random.randint(10), *last_dims, device=device, dtype=dtype)
+                    torch.rand(size, *last_dims, device=device, dtype=dtype)
                     for _ in range(np.random.randint(num_inner_min, num_inner_max))]
             pts_list.append(pts_list_i)
         ret = fvdb.JaggedTensor(pts_list), pts_list
@@ -66,6 +70,41 @@ class TestJaggedTensor(unittest.TestCase):
                     self.assertEqual(jt.lshape[i][j], lt[i][j].shape[0])
         else:
             assert False, "jagged tensor ldim should be 1 or 2"
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_pickle(self, device, dtype):
+        jt, _ = self.mklol(7, 4, 8, device, dtype)
+        with tempfile.NamedTemporaryFile() as tmp:
+            torch.save(jt, tmp.name)
+            jt2: fvdb.JaggedTensor = torch.load(tmp.name)
+            self.assertTrue(torch.all(jt.jdata == jt2.jdata))
+            self.assertTrue(torch.all(jt.joffsets == jt2.joffsets))
+            self.assertTrue(torch.all(jt.jidx == jt2.jidx))
+            self.assertTrue(jt.device == jt2.device)
+            self.assertTrue(jt.dtype == jt2.dtype)
+            self.assertEqual(jt.lshape, jt2.lshape)
+
+        jt = fvdb.JaggedTensor([torch.randn(100 + np.random.randint(10), 3, 2).to(device).to(dtype) for _ in range(10)])
+        with tempfile.NamedTemporaryFile() as tmp:
+            torch.save(jt, tmp.name)
+            jt2: fvdb.JaggedTensor = torch.load(tmp.name)
+            self.assertTrue(torch.all(jt.jdata == jt2.jdata))
+            self.assertTrue(torch.all(jt.joffsets == jt2.joffsets))
+            self.assertTrue(torch.all(jt.jidx == jt2.jidx))
+            self.assertTrue(jt.device == jt2.device)
+            self.assertTrue(jt.dtype == jt2.dtype)
+            self.assertEqual(jt.lshape, jt2.lshape)
+
+        jt = fvdb.JaggedTensor([torch.rand(1024, 9, 9, 9)])
+        with tempfile.NamedTemporaryFile() as tmp:
+            torch.save(jt, tmp.name)
+            jt2: fvdb.JaggedTensor = torch.load(tmp.name)
+            self.assertTrue(torch.all(jt.jdata == jt2.jdata))
+            self.assertTrue(torch.all(jt.joffsets == jt2.joffsets))
+            self.assertTrue(torch.all(jt.jidx == jt2.jidx))
+            self.assertTrue(jt.device == jt2.device)
+            self.assertTrue(jt.dtype == jt2.dtype)
+            self.assertEqual(jt.lshape, jt2.lshape)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_jflatten_list_of_lists(self, device, dtype):
@@ -145,8 +184,8 @@ class TestJaggedTensor(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_concatenation(self, device, dtype):
-        jt1, l1 = self.mklol(7, 4, 8, device, dtype, last_dims=(3,))
-        jt2, _ = self.mklol(3, 7, 11, device, dtype, last_dims=(3,))
+        jt1, l1 = self.mklol(7, 2, 5, device, dtype, last_dims=(3,), base_num=1_000_000 if device == 'cuda' else 1000, vary_num=100, empty_prob=0.0)
+        jt2, _ = self.mklol(3, 3, 5, device, dtype, last_dims=(3,), base_num=1_000_000 if device == 'cuda' else 1000, vary_num=100, empty_prob=0.0)
         jt3, l3 = self.mklol_like(l1, vary_dim_1=True, vary_dim_2=False)
         jt4, l4 = self.mklol_like(l1, vary_dim_1=False, vary_dim_2=True)
 
@@ -169,6 +208,19 @@ class TestJaggedTensor(unittest.TestCase):
                     cat_ij = torch.cat([l1[i][j], l1[i][j]], dim=dim)  # meow
                     lcatted[-1].append(cat_ij)
                     self.assertTrue(torch.all(jtcatij.jdata == cat_ij))
+
+            jt_to_cat = jt3 if dim == 0 else jt4
+            jtcat = fvdb.jcat([jt1, jt1, jt_to_cat, jt1, jt_to_cat, jt1], dim=dim)
+            lcatted = []
+            for i, jtcati in enumerate(jtcat):
+                lcatted.append([])
+                for j, jtcatij in enumerate(jtcati):
+                    t_test = (l3 if dim == 0 else l4)[i][j]
+                    t1ij = l1[i][j]
+                    cat_ij = torch.cat([t1ij, t1ij, t_test, t1ij, t_test, t1ij], dim=dim)  # meow
+                    lcatted[-1].append(cat_ij)
+                    self.assertTrue(torch.all(jtcatij.jdata == cat_ij))
+
             jtcat = fvdb.jcat([jt1, jt3 if dim == 0 else jt4, jt1], dim=dim)
             lcatted = []
             for i, jtcati in enumerate(jtcat):
@@ -1015,7 +1067,7 @@ class TestJaggedTensor(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_jsum(self, device, dtype):
-        torch.random.manual_seed(0)
+        torch.random.manual_seed(111)
         if dtype == torch.float16:
             min_num = 100
         else:

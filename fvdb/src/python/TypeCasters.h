@@ -38,6 +38,9 @@ public:
 };
 
 
+// Already defined in upstream pytorch: https://github.com/pytorch/pytorch/pull/126865
+// (starting from version 2.4)
+#if (!defined(TORCH_VERSION_MAJOR) || (TORCH_VERSION_MAJOR < 2) || (TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR < 4))
 template <> struct type_caster<torch::ScalarType> : public type_caster_base<torch::ScalarType> {
     using base = type_caster_base<torch::ScalarType>;
 public:
@@ -59,6 +62,7 @@ public:
         return result;
     }
 };
+#endif
 
 
 template <> struct type_caster<fvdb::TorchDeviceOrString> : public type_caster_base<fvdb::TorchDeviceOrString> {

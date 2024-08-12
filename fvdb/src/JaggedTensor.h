@@ -129,13 +129,12 @@ class JaggedTensor : public torch::CustomClassHolder {
 
     void recompute_lsizes_if_dirty();
 
-    static torch::Tensor joffsets_from_jidx_and_jdata(torch::Tensor jidx, torch::Tensor jdata, int64_t num_tensors);
-    static torch::Tensor jidx_from_joffsets(torch::Tensor joffsets, int64_t num_elements);
-
 
     void binary_op_check(const JaggedTensor& other) const;
 
 public:
+    static torch::Tensor joffsets_from_jidx_and_jdata(torch::Tensor jidx, torch::Tensor jdata, int64_t num_tensors);
+    static torch::Tensor jidx_from_joffsets(torch::Tensor joffsets, int64_t num_elements);
     static JaggedTensor from_jdata_joffsets_jidx_and_lidx_unsafe(torch::Tensor jdata, torch::Tensor joffsets,
                                                                  torch::Tensor jidx, torch::Tensor jlidx,
                                                                  int64_t numOuterLists);
@@ -222,8 +221,8 @@ public:
     /// @return The indices of this JaggedTensor
     const torch::Tensor& jidx() const { return mBatchIdx; }
 
-    /// @brief Get the offsets of each tensor indexed by this JaggedTensor. i.e. a tensor of size (num_tensors, 2)
-    ///        where joffsets[i][0] is the start offset in jdata and joffsets[i][1] is the end offset in jdata
+    /// @brief Get the offsets of each tensor indexed by this JaggedTensor. i.e. a tensor of size (num_tensors + 1)
+    ///        where joffsets[i] is the start offset in jdata and joffsets[i+1] is the end offset in jdata
     /// @return The offsets of each tensor indexed by this JaggedTensor
     const torch::Tensor& joffsets() const { return mOffsets; }
 

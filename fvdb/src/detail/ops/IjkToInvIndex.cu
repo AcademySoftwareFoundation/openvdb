@@ -14,21 +14,23 @@ template <typename GridType, typename ScalarType, template <typename T, int32_t 
 __hostdev__ inline void ijkToInvIndexCallback(int32_t bidx, int32_t eidx,
                                               BatchGridAccessor<GridType> batchAccessor,
                                               const JaggedAccessor<ScalarType, 2> ijk,
-                                              TensorAccessor<int64_t, 1> outInvIndex) {
+                                              TensorAccessor<int64_t, 1> outInvIndex,
+                                              bool cumulative) {
 
     const nanovdb::NanoGrid<GridType>* grid = batchAccessor.grid(bidx);
     const auto acc = grid->getAccessor();
     const auto ijkCoord = ijk.data()[eidx];
     const nanovdb::Coord vox(ijkCoord[0], ijkCoord[1], ijkCoord[2]);
     if (acc.isActive(vox)) {
+        const int64_t baseOffset = cumulative ? 0 : batchAccessor.voxelOffset(bidx);
         const int64_t index = (int64_t) acc.getValue(vox) - 1 + batchAccessor.voxelOffset(bidx);
-        outInvIndex[index] = eidx;
+        outInvIndex[index] = eidx - baseOffset;
     }
 }
 
 
 template <c10::DeviceType DeviceTag>
-JaggedTensor IjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk) {
+JaggedTensor IjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk, bool cumulative) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(ijk);
     TORCH_CHECK_TYPE(at::isIntegralType(ijk.scalar_type(), false), "ijk must have an integer type");
@@ -50,12 +52,12 @@ JaggedTensor IjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ij
 
             if constexpr (DeviceTag == torch::kCUDA) {
                 auto cb = [=] __device__ (int32_t bidx, int32_t eidx, int32_t cidx, JaggedRAcc32<scalar_t, 2> ijkAcc) {
-                    ijkToInvIndexCallback<GridType, scalar_t, JaggedRAcc32, TorchRAcc32>(bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc);
+                    ijkToInvIndexCallback<GridType, scalar_t, JaggedRAcc32, TorchRAcc32>(bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
                 };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, ijk, cb);
             } else {
                 auto cb = [=] (int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ijkAcc) {
-                    ijkToInvIndexCallback<GridType, scalar_t, JaggedAcc, TorchAcc>(bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc);
+                    ijkToInvIndexCallback<GridType, scalar_t, JaggedAcc, TorchAcc>(bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
                 };
                 forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
             }
@@ -67,13 +69,13 @@ JaggedTensor IjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ij
 
 
 template <>
-JaggedTensor dispatchIjkToInvIndex<torch::kCUDA>(const GridBatchImpl& batchHdl, const JaggedTensor& ijk) {
-    return IjkToInvIndex<torch::kCUDA>(batchHdl, ijk);
+JaggedTensor dispatchIjkToInvIndex<torch::kCUDA>(const GridBatchImpl& batchHdl, const JaggedTensor& ijk, bool cumulative) {
+    return IjkToInvIndex<torch::kCUDA>(batchHdl, ijk, cumulative);
 }
 
 template <>
-JaggedTensor dispatchIjkToInvIndex<torch::kCPU>(const GridBatchImpl& batchHdl, const JaggedTensor& ijk) {
-    return IjkToInvIndex<torch::kCPU>(batchHdl, ijk);
+JaggedTensor dispatchIjkToInvIndex<torch::kCPU>(const GridBatchImpl& batchHdl, const JaggedTensor& ijk, bool cumulative) {
+    return IjkToInvIndex<torch::kCPU>(batchHdl, ijk, cumulative);
 }
 
 } // namespace ops

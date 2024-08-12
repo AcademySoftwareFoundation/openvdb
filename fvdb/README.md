@@ -93,7 +93,7 @@ pip install .
 
 To make sure that everything works by running tests:
 ```shell
-python setup.py test
+pytest tests/unit
 ```
 
 ### Building Documentation
@@ -118,7 +118,7 @@ docker run -it --gpus all --rm \
   --mount type=bind,source="$HOME/.ssh",target=/root/.ssh \
   --mount type=bind,source="$(pwd)",target=/fvdb \
   fvdb-dev:latest \
-  conda run -n fvdb_test --no-capture-output python setup.py test
+  conda run -n fvdb_test --no-capture-output python setup.py develop
 ```
 
 

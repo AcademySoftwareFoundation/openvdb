@@ -15,6 +15,12 @@ namespace detail {
 namespace ops {
 
 template <c10::DeviceType>
+JaggedTensor dispatchJaggedTensorIndex(const JaggedTensor& jt, int64_t idxVal);
+
+template <c10::DeviceType>
+JaggedTensor dispatchJCat0(const std::vector<JaggedTensor>& tensors);
+
+template <c10::DeviceType>
 torch::Tensor dispatchJOffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors);
 
 
@@ -74,7 +80,7 @@ void dispatchFillToGrid(const GridBatchImpl& fromGrid,
                         torch::Tensor& toFeatures);
 
 template <c10::DeviceType>
-JaggedTensor dispatchIjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk);
+JaggedTensor dispatchIjkToInvIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk, bool cumulative);
 
 
 template <c10::DeviceType>
@@ -180,7 +186,7 @@ JaggedTensor dispatchVoxelNeighborhood(const GridBatchImpl& batchHdl,
 
 
 template <c10::DeviceType>
-JaggedTensor dispatchIjkToIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk);
+JaggedTensor dispatchIjkToIndex(const GridBatchImpl& batchHdl, const JaggedTensor& ijk, bool cumulative);
 
 
 template <c10::DeviceType>
@@ -261,7 +267,8 @@ std::vector<JaggedTensor> dispatchVoxelsAlongRays(const GridBatchImpl& batchHdl,
                                                   const JaggedTensor& rayDirections,
                                                   int64_t maxVox,
                                                   float eps,
-                                                  bool returnIjk);
+                                                  bool returnIjk,
+                                                  bool cumulative);
 
 
 
