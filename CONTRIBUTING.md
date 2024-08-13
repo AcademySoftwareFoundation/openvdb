@@ -92,12 +92,13 @@ All meetings of the TSC are open to participation by any member of the OpenVDB c
 
 ## Current TSC members
 
-* Ken Museth, Chair / NVIDIA
-* Andre Pradhana, DreamWorks
+* Ken Museth (Chair), Nvidia
+* Andre Pradhana, Nvidia
 * Jeff Lait, SideFX
-* Nick Avramoussis, WETA
+* Nick Avramoussis, WETA FX
 * Dan Bailey, ILM
-* Richard Jones, DNEG
+* Richard Jones, ILM
+* Gregory Hurst, United Therapeutics
 
 # Release Process
 
