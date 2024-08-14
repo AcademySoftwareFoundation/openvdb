@@ -3,11 +3,10 @@ channels:
   - pyg
   - nvidia/label/cuda-12.1.0
   - pytorch
-  - conda-forge
 dependencies:
   - python=3.10
-  - pytorch=2.2
-  - pytorch-cuda=12.1
+  - pytorch::pytorch=2.2
+  - pytorch::pytorch-cuda=12.1
   - tensorboard
   - pip
   - git
@@ -15,8 +14,11 @@ dependencies:
   - ca-certificates
   - certifi
   - openssl
-  - cuda
-  - cuda-nvcc
+  - nvidia/label/cuda-12.1.0::cuda
+  - nvidia/label/cuda-12.1.0::cuda-tools
+  - nvidia/label/cuda-12.1.0::cuda-nvcc
+  - nvidia/label/cuda-12.1.0::cuda-cccl
+  - nvidia/label/cuda-12.1.0::cuda-libraries-static
   - parameterized
   - gcc_linux-64=11
   - gxx_linux-64=11

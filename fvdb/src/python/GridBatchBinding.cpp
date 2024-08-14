@@ -516,14 +516,14 @@ void bind_grid_batch(py::module& m) {
         )_FVDB_")
 
         // Indexing functions
-        .def("ijk_to_index", &fvdb::GridBatch::ijk_to_index, py::arg("ijk"))
-        .def("ijk_to_inv_index", &fvdb::GridBatch::ijk_to_inv_index, py::arg("ijk"))
+        .def("ijk_to_index", &fvdb::GridBatch::ijk_to_index, py::arg("ijk"), py::arg("cumulative") = false)
+        .def("ijk_to_inv_index", &fvdb::GridBatch::ijk_to_inv_index, py::arg("ijk"), py::arg("cumulative") = false)
         .def("neighbor_indexes", &fvdb::GridBatch::neighbor_indexes,
                 py::arg("ijk"), py::arg("extent"), py::arg("bitshift") = 0)
 
         // Ray tracing
         .def("voxels_along_rays", &fvdb::GridBatch::voxels_along_rays,
-                py::arg("ray_origins"), py::arg("ray_directions"), py::arg("max_voxels"), py::arg("eps") = 0.0, py::arg("return_ijk") = true)
+                py::arg("ray_origins"), py::arg("ray_directions"), py::arg("max_voxels"), py::arg("eps") = 0.0, py::arg("return_ijk") = true, py::arg("cumulative") = false)
         .def("segments_along_rays", &fvdb::GridBatch::segments_along_rays,
                 py::arg("ray_origins"), py::arg("ray_directions"), py::arg("max_segments"), py::arg("eps") = 0.0, py::arg("ignore_masked") = false)
         .def("uniform_ray_samples", &fvdb::GridBatch::uniform_ray_samples,

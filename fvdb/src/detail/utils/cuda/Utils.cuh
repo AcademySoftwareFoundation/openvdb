@@ -724,6 +724,7 @@ struct RAIIRawDeviceBuffer {
     /// @param device The device to allocate the buffer on
     RAIIRawDeviceBuffer(size_t size, torch::Device device) {
         TORCH_CHECK(device.has_index(), "Device must specify an index");
+        c10::cuda::CUDAGuard deviceGuard(device);
         stream = at::cuda::getCurrentCUDAStream(device.index()).stream();
         bufferSize = size * sizeof(T);
         devicePtr = reinterpret_cast<T*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(bufferSize, stream));

@@ -332,6 +332,43 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(didx == target_didx[dpmt]))
 
     @parameterized.expand(all_device_dtype_combos)
+    def test_ijk_to_index_batched(self, device, dtype, mutable):
+        gsize = 7
+
+        grid_p1, grid_d1, _ = make_dense_grid_and_point_data(gsize, device, dtype, mutable)
+        grid_p2, grid_d2, _ = make_dense_grid_and_point_data(gsize-2, device, dtype, mutable)
+
+        grid_p, grid_d = fvdb.jcat([grid_p1, grid_p2]), fvdb.jcat([grid_d1, grid_d2])
+
+        pijk = grid_p.ijk
+        dijk = grid_d.ijk
+
+        for in_dtype in [torch.int8, torch.int16, torch.int32, torch.int64]:
+            pijk, dijk = pijk.to(in_dtype), dijk.to(in_dtype)
+            pidx = grid_p.ijk_to_index(grid_p.ijk)
+            didx = grid_d.ijk_to_index(grid_d.ijk)
+
+            target_pidx = fvdb.JaggedTensor([torch.arange(n.item()).to(device=pidx.device, dtype=pidx.dtype) for n in grid_p.num_voxels])
+            target_didx = fvdb.JaggedTensor([torch.arange(n.item()).to(device=pidx.device, dtype=didx.dtype) for n in grid_d.num_voxels])
+
+            self.assertTrue(torch.all(pidx.jdata == target_pidx.jdata))
+            self.assertTrue(torch.all(didx.jdata == target_didx.jdata))
+
+            ppmt = fvdb.JaggedTensor([torch.randperm(pidx_i.rshape[0]).to(pidx.device) for pidx_i in pidx])
+            dpmt = fvdb.JaggedTensor([torch.randperm(didx_i.rshape[0]).to(pidx.device) for didx_i in didx])
+
+            pidx = grid_p.ijk_to_index(pijk[ppmt])
+            didx = grid_d.ijk_to_index(dijk[dpmt])
+            # target_pidx = torch.arange(pidx.shape[0]).to(pidx)
+            # target_didx = torch.arange(didx.shape[0]).to(didx)
+            target_pidx = fvdb.JaggedTensor([torch.arange(n.item()).to(device=pidx.device, dtype=pidx.dtype) for n in grid_p.num_voxels])
+            target_didx = fvdb.JaggedTensor([torch.arange(n.item()).to(device=pidx.device, dtype=didx.dtype) for n in grid_d.num_voxels])
+
+            self.assertTrue(torch.all(pidx.jdata == target_pidx[ppmt].jdata))
+            self.assertTrue(torch.all(didx.jdata == target_didx[dpmt].jdata))
+
+
+    @parameterized.expand(all_device_dtype_combos)
     def test_coords_in_grid(self, device, _, mutable):
         num_inside = 1000 if device == 'cpu' else 100_000
         random_coords = torch.randint(-1024, 1024, (num_inside, 3), dtype=torch.int32).to(device)
@@ -380,7 +417,7 @@ class TestBasicOps(unittest.TestCase):
     def test_cubes_intersect_grid(self, device, dtype, mutable):
         # TODO: (@Caenorst) tests are a bit too light, should test on more variety of range
         #import random
-        #torch.random.manual_seed(0)
+        torch.random.manual_seed(0)
         #random.seed(0)
         #np.random.seed(0)
 
@@ -1119,6 +1156,74 @@ class TestBasicOps(unittest.TestCase):
         inv_rand_ijk = grid.ijk.jdata[rand_ijk_inv_indices.jdata!= -1]
         assert(len(inv_rand_ijk) == len(rand_ijks.jdata))
         inv_rand_ijk = rand_ijks.jagged_like(inv_rand_ijk)
+
+        def check_order(t1: torch.Tensor, t2: torch.Tensor):
+            t1_list = t1.tolist()
+            t2_list = t2.tolist()
+
+            last_index = -1
+            for elem in t2_list:
+                try:
+                    current_index = t1_list.index(elem)
+                    # Check if the current index is greater than the last index
+                    if current_index > last_index:
+                        last_index = current_index
+                    else:
+                        return False
+                except ValueError:
+                    return False
+            return True
+
+        for i, (inv_ijks, ijks) in enumerate(zip(inv_rand_ijk, rand_ijks)):
+            # ensure output of ijk_to_inv_index is a permutation of the input
+            inv_ijks_sorted, _ = torch.sort(inv_ijks.jdata, dim=0)
+            ijks_sorted, _ = torch.sort(ijks.jdata, dim=0)
+            assert torch.equal(inv_ijks_sorted, ijks_sorted)
+
+            # ensure output of ijk_to_inv_index appears in ascending order in ijks
+            assert check_order(grid.ijk.jdata[grid.ijk.jidx == i], inv_ijks.jdata)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_ijk_to_inv_index_batched(self, device, dtype, mutable):
+        vox_size = 0.1
+
+        # Unique IJK since for duplicates the permutation is non-bijective
+        ijk = [list(
+            set(
+                [tuple([a for a in (np.random.randn(3) / vox_size).astype(np.int32)]) for _ in range(100 + np.random.randint(10))]
+            )
+        ) for _ in range(3)]
+        ijk = [torch.from_numpy(np.array([list(a) for a in ijk_i])).to(torch.int32).to(device) for ijk_i in ijk]
+        ijk = fvdb.JaggedTensor(ijk)
+
+        grid = GridBatch(mutable=mutable, device=device)
+        grid.set_from_ijk(ijk, voxel_sizes=vox_size, origins=[0.]*3)
+
+        inv_index = grid.ijk_to_inv_index(ijk).jdata
+
+        target_inv_index = torch.full_like(grid.ijk.jdata[:, 0], -1)
+        idx = grid.ijk_to_index(ijk, cumulative=True)
+
+        for i, ijk_i in enumerate(ijk):
+            for j in range(ijk_i.rshape[0]):
+                target_inv_index[idx[i].jdata[j]] = j
+
+        self.assertTrue(torch.all(inv_index == target_inv_index))
+
+        # Test functionality where size of ijk_to_inv_index's argument != len(grid.ijk)
+        # Pick random ijk subset
+        rand_ijks = []
+        for i in range(grid.grid_count):
+            ijks = grid[i].ijk.jdata
+            rand_ijks.append(torch.unique(ijks[torch.randint(len(ijks), (50,), device = ijks.device)], dim=0))
+
+        rand_ijks = fvdb.JaggedTensor(rand_ijks)
+
+        rand_ijk_inv_indices = grid.ijk_to_inv_index(rand_ijks)
+
+        # # valid ijk indices
+        inv_rand_ijk = grid.ijk[rand_ijk_inv_indices!= -1]
+        assert(len(inv_rand_ijk.jdata) == len(rand_ijks.jdata))
 
         def check_order(t1: torch.Tensor, t2: torch.Tensor):
             t1_list = t1.tolist()

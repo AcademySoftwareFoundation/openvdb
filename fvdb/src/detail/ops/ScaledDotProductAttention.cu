@@ -3,10 +3,12 @@
 //
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
-#include <ATen/cudnn/Handle.h>
 
+#if (defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 12)
+#include <ATen/cudnn/Handle.h>
 #define JSON_HAS_RANGES 0
 #include <cudnn_frontend.h>
+#endif
 
 #include "detail/utils/cuda/Utils.cuh"
 #include "detail/utils/BezierInterpolationIterator.h"
@@ -29,6 +31,7 @@ torch::Tensor dispatchScaledDotProductAttention<torch::kCUDA>(const torch::Tenso
                                                               bool training,
                                                               float scale) {
 
+#if (defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 12)
     // TODO: Cache built execution graph and plans!
     // Get dimensions: query (B*Sq, H, D), key (B*Skv, H, D), value (B*Skv, H, T)
     // https://github.com/NVIDIA/cudnn-frontend/blob/main/docs/operations/Attention.md
@@ -175,6 +178,11 @@ torch::Tensor dispatchScaledDotProductAttention<torch::kCUDA>(const torch::Tenso
     cudnnDestroy(handle);
 
     return output;
+
+#else
+    TORCH_CHECK(false, "CUDNN frontend not available for CUDA < 12.0");
+
+#endif
 }
 
 

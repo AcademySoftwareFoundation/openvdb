@@ -8,6 +8,7 @@
 
 #include <cuda_runtime_api.h> // for cudaMalloc/cudaMallocManaged/cudaFree
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
 
 namespace nanovdb {
 
@@ -164,16 +165,23 @@ void TorchDeviceBuffer::toCuda(torch::Device toDevice, bool blocking) {
 
     if (mDevice.is_cuda() && toDevice != mDevice) { // CUDA -> CUDA accross different devices
         std::unique_ptr<uint8_t[]> buf(new uint8_t[mSize]);
-        at::cuda::CUDAStream currentStream = at::cuda::getCurrentCUDAStream(mDevice.index());
-        at::cuda::CUDAStream toStream = at::cuda::getCurrentCUDAStream(toDevice.index());
-        cudaCheck(cudaMemcpyAsync(buf.get(), mGpuData, mSize, cudaMemcpyDeviceToHost, currentStream.stream()));
-        cudaCheck(cudaStreamSynchronize(currentStream.stream()));
-        c10::cuda::CUDACachingAllocator::raw_delete(mGpuData);
-        mGpuData = reinterpret_cast<uint8_t*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(mSize, toStream.stream()));
-        cudaCheck(cudaMemcpyAsync(mGpuData, buf.get(), mSize, cudaMemcpyHostToDevice, toStream.stream()));
+        {
+            c10::cuda::CUDAGuard deviceGuard(mDevice);
+            at::cuda::CUDAStream currentStream = at::cuda::getCurrentCUDAStream(mDevice.index());
+            cudaCheck(cudaMemcpyAsync(buf.get(), mGpuData, mSize, cudaMemcpyDeviceToHost, currentStream.stream()));
+            cudaCheck(cudaStreamSynchronize(currentStream.stream()));
+            c10::cuda::CUDACachingAllocator::raw_delete(mGpuData);
+        }
+        {
+            c10::cuda::CUDAGuard deviceGuard(toDevice);
+            at::cuda::CUDAStream toStream = at::cuda::getCurrentCUDAStream(toDevice.index());
+            mGpuData = reinterpret_cast<uint8_t*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(mSize, toStream.stream()));
+            cudaCheck(cudaMemcpyAsync(mGpuData, buf.get(), mSize, cudaMemcpyHostToDevice, toStream.stream()));
+        }
         mDevice = toDevice;
     } else if (mDevice.is_cpu()) {  // CPU -> CUDA
         TORCH_CHECK(toDevice.has_index(), "Invalid device must specify device index");
+        c10::cuda::CUDAGuard deviceGuard(toDevice);
         at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(toDevice.index());
         copyHostToDeviceAndFreeHost((void*) stream.stream(), blocking);
         mDevice = toDevice;
@@ -212,6 +220,7 @@ void TorchDeviceBuffer::init(uint64_t size, void* data /* = nullptr */, bool hos
         if (data) {
             mGpuData = (uint8_t*) data;
         } else {
+            c10::cuda::CUDAGuard deviceGuard(mDevice);
             at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(mDevice.index());
             mGpuData = reinterpret_cast<uint8_t*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(size, defaultStream.stream()));
             checkPtr(mGpuData, "failed to allocate device data");

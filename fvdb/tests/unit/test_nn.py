@@ -245,6 +245,9 @@ class TestNN(unittest.TestCase):
         v = v1 + v2
         self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + v2.feature.jdata))
 
+        v = v1 + v2.feature
+        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + v2.feature.jdata))
+
         v = v1 + 1.0
         self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + 1.0))
 

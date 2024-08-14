@@ -464,7 +464,8 @@ struct GridBatch : torch::CustomClassHolder {
     JaggedTensor disabled_mask() const;
 
     /// @brief Return whether each coordinate is in the grid batch or not
-    /// @param ijk A JaggedTensor of coordinates with shape [B, -1, 3] (one coordinate set per grid in the batch)
+    /// @param ijk A JaggedTensor of ijk coordinates with lshape [N_0, ..., N_B] and eshape (3,)
+    ///            (one coordinate set per grid in the batch)
     /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per coordinate)
     ///         where the [bi, i]^th entry is true if coords[bi, i] lies inside the bi^th grid in the batch
@@ -472,15 +473,19 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Return the integer offset of each ijk value in the grid batch
     /// @param ijk A JaggedTensor of ijk coordinates with shape [B, -1, 3] (one coordinate set per grid in the batch)
+    /// @param cumulative Whether to return cumulative offsets in the batch or offsets relative to each grid
     /// @return A JaggedTensor of integer offsets with shape [B, -1] into the grid batch (one offset per coordinate)
-    JaggedTensor ijk_to_index(const JaggedTensor& ijk) const;
+    JaggedTensor ijk_to_index(const JaggedTensor& ijk, bool cumulative = false) const;
 
     /// @brief Return a JaggedTensor of integers such that if it is used as a permutation of the input IJK coordinates,
     ///        it will re-order them to the indexing order of the grid batch. This effectively performs the inverse of
-    ///        ijkToIndex if you pass in the ijk coordinates in the grid.
-    /// @param ijk A JaggedTensor of ijk coordinates with shape [B, -1, 3] (one coordinate set per grid in the batch)
+    ///        ijk_to_index if you pass in the ijk coordinates in the grid.
+    ///        i.e. output[ijk_to_index(ijk[i])] = i
+    /// @param ijk A JaggedTensor of ijk coordinates with lshape [N_0, ..., N_B] and eshape (3,)
+    ///            (one coordinate set per grid in the batch)
+    /// @param cumulative Whether to return cumulative offsets in the batch or offsets relative to each grid
     /// @return A JaggedTensor of integers with shape [B, -1] (one integer per grids' ijk) which inverts ijkToIndex
-    JaggedTensor ijk_to_inv_index(const JaggedTensor& ijk) const;
+    JaggedTensor ijk_to_inv_index(const JaggedTensor& ijk, bool cumulative = false) const;
 
     /// @brief Return the set of active ijk coordinates indexed by this grid batch
     /// @return A JaggedTensor of voxel coordinates indexed by this grid batch (shape [B, -1, 3])
@@ -511,6 +516,8 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param max_voxels The maximum number of voxels to return per ray
     /// @param eps Skip voxels where the ray intersects by less than this distance
     /// @param return_ijk Whether to return the voxel coordinates in the grid or world coordinates or the voxel index
+    /// @param cumulative Whether to return cumulative indices in the batch or indices relative to each grid
+    ///                   (only applicable to return_ijk = false, otherwise ignored)
     /// @return A pair of JaggedTensors containing the voxels (or voxel indices) intersected by the rays. i.e.:
     ///             - voxels: A JaggedTensor with lshape [[V_{0,0}, ..., V_{0,N_0}], ..., [V_{B,0}, ..., V_{B,N_B}]]
     ///                       and eshape (3,) or (,) containing the ijk coordinates or indices of the voxels
@@ -519,7 +526,8 @@ struct GridBatch : torch::CustomClassHolder {
     std::vector<JaggedTensor> voxels_along_rays(const JaggedTensor& ray_origins,
                                                 const JaggedTensor& ray_directions,
                                                 int64_t max_voxels, double eps = 0.0,
-                                                bool return_ijk = true) const;
+                                                bool return_ijk = true,
+                                                bool cumulative = false) const;
 
     /// @brief Enumerate the continuous segments (regions which overlap active voxels) in this
     ///        grid batch (in-sorted order) intersected by a collection of rays

@@ -177,7 +177,7 @@ class TestConv(unittest.TestCase):
             out_ts_tensor.coords[out_ts_tensor.coords[:, -1] == b, :3]
             for b in range(batch_size)])
 
-        ts_features = out_ts_tensor.feats[grid.ijk_to_inv_index(ts_target_grid_ijk).jdata]
+        ts_features = out_ts_tensor.feats[grid.ijk_to_inv_index(ts_target_grid_ijk, cumulative=True).jdata]
         ts_features.backward(grad_out)
 
         ts_features_grad = torch.clone(vdb_features.jdata.grad)
@@ -228,12 +228,12 @@ class TestConv(unittest.TestCase):
         ts_target_grid_ijk = JaggedTensor([
             torch.div(out_ts_tensor.coords[out_ts_tensor.coords[:, -1] == b, :3], stride, rounding_mode='floor')
             for b in range(batch_size)])
-        idx_map = vdb_target_grid.ijk_to_index(ts_target_grid_ijk)
+        idx_map = vdb_target_grid.ijk_to_index(ts_target_grid_ijk, cumulative=True)
 
         assert idx_map.jdata.shape[0] == vdb_target_grid.total_voxels
         assert torch.all(torch.sort(idx_map.jdata).values == torch.arange(vdb_target_grid.total_voxels, device=device))
 
-        ts_features = out_ts_tensor.feats[vdb_target_grid.ijk_to_inv_index(ts_target_grid_ijk).jdata]
+        ts_features = out_ts_tensor.feats[vdb_target_grid.ijk_to_inv_index(ts_target_grid_ijk, cumulative=True).jdata]
         self.assertTrue(torch.allclose(out_vdb_features.jdata, ts_features, atol=0.1),
                         f"Max dist is {torch.max(out_vdb_features.jdata - ts_features)}")
 
@@ -299,7 +299,7 @@ class TestConv(unittest.TestCase):
             torch.div(out_ts_tensor.coords[out_ts_tensor.coords[:, -1] == b, :3], stride, rounding_mode='floor')
             for b in range(batch_size)
         ])
-        idx_map = vdb_target_grid.ijk_to_index(ts_target_grid_ijk)
+        idx_map = vdb_target_grid.ijk_to_index(ts_target_grid_ijk, cumulative=True)
 
         # (Optionally: visualize)
         # from pycg import vis
@@ -316,7 +316,7 @@ class TestConv(unittest.TestCase):
         assert idx_map.jdata.shape[0] == vdb_target_grid.total_voxels
         assert torch.all(torch.sort(idx_map.jdata).values == torch.arange(vdb_target_grid.total_voxels, device=device))
 
-        ts_features = out_ts_tensor.feats[vdb_target_grid.ijk_to_inv_index(ts_target_grid_ijk).jdata]
+        ts_features = out_ts_tensor.feats[vdb_target_grid.ijk_to_inv_index(ts_target_grid_ijk, cumulative=True).jdata]
         ts_features.backward(grad_out)
 
         dense_features_grad = torch.clone(vdb_features.jdata.grad)

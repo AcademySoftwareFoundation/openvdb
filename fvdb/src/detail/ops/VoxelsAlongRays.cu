@@ -23,7 +23,8 @@ __hostdev__ void voxelsAlongRaysCallback(int32_t bidx, int32_t rayIdx,
                                          TensorAccessor<ScalarType, 2> outTimes,              // [B*M*S, 2]
                                          GridBatchImpl::Accessor<GridType> batchAccessor,
                                          int64_t maxVox,
-                                         ScalarType eps) {
+                                         ScalarType eps,
+                                         bool cumulative) {
 
     const nanovdb::NanoGrid<GridType>* gpuGrid = batchAccessor.grid(bidx);
     const VoxelCoordTransform& transform = batchAccessor.dualTransform(bidx);
@@ -54,26 +55,29 @@ __hostdev__ void voxelsAlongRaysCallback(int32_t bidx, int32_t rayIdx,
 
         int32_t ijkIdx = -1;
         if constexpr (!returnIjk) {
-            ijkIdx = primalAcc.getValue(ijk) + batchAccessor.voxelOffset(bidx) - 1;
+            const int64_t baseOffset = cumulative ? batchAccessor.voxelOffset(bidx) : 0;
+            ijkIdx = primalAcc.getValue(ijk) - 1 + baseOffset;
         }
         if (deltaT < eps) {
             continue;
         }
 
         // This check handles numerical errors where we can accidentally add the same voxel twice
-        bool lastMatch = false;
-        if constexpr (returnIjk) {
-            lastMatch = (ijk[0] == outVoxels[startIdx + numVox - 1][0] &&
-                         ijk[1] == outVoxels[startIdx + numVox - 1][1] &&
-                         ijk[2] == outVoxels[startIdx + numVox - 1][2]);
-        } else {
-            lastMatch = (ijkIdx == outVoxels[startIdx + numVox - 1][0]);
-        }
-        if (numVox > 0 && lastMatch) {
-            outTimes[startIdx + numVox - 1][0] = c10::cuda::compat::min(t0, outTimes[startIdx + numVox - 1][0]);
-            outTimes[startIdx + numVox - 1][1] = c10::cuda::compat::max(t1, outTimes[startIdx + numVox - 1][1]);
-            outJIdx[startIdx + numVox - 1] = rayIdx;
-            continue;
+        if (numVox > 0) {
+            bool lastMatch = false;
+            if constexpr (returnIjk) {
+                lastMatch = (ijk[0] == outVoxels[startIdx + numVox - 1][0] &&
+                            ijk[1] == outVoxels[startIdx + numVox - 1][1] &&
+                            ijk[2] == outVoxels[startIdx + numVox - 1][2]);
+            } else {
+                lastMatch = (ijkIdx == outVoxels[startIdx + numVox - 1][0]);
+            }
+            if (lastMatch) {
+                outTimes[startIdx + numVox - 1][0] = c10::cuda::compat::min(t0, outTimes[startIdx + numVox - 1][0]);
+                outTimes[startIdx + numVox - 1][1] = c10::cuda::compat::max(t1, outTimes[startIdx + numVox - 1][1]);
+                outJIdx[startIdx + numVox - 1] = rayIdx;
+                continue;
+            }
         }
 
         if constexpr (returnIjk) {
@@ -146,7 +150,7 @@ std::vector<JaggedTensor> VoxelsAlongRays(const GridBatchImpl& batchHdl,
                                           const JaggedTensor& rayOrigins,
                                           const JaggedTensor& rayDirections,
                                           int64_t maxVox, float eps,
-                                          bool returnIjk) {
+                                          bool returnIjk, bool cumulative) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(rayOrigins);
     batchHdl.checkDevice(rayDirections);
@@ -228,7 +232,7 @@ std::vector<JaggedTensor> VoxelsAlongRays(const GridBatchImpl& batchHdl,
                         rayOriginsAcc, rayDirectionsAcc,
                         outJOffsetsAcc, outJIdxAcc, outJLIdxAcc,
                         outVoxelsAcc, outTimesAcc,
-                        batchAcc, maxVox, eps);
+                        batchAcc, maxVox, eps, cumulative);
                 };
                 auto cbIdx = [=] __device__ (int32_t bidx, int32_t eidx, int32_t cidx, JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
                     voxelsAlongRaysCallback<false, scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
@@ -236,7 +240,7 @@ std::vector<JaggedTensor> VoxelsAlongRays(const GridBatchImpl& batchHdl,
                         rayOriginsAcc, rayDirectionsAcc,
                         outJOffsetsAcc, outJIdxAcc, outJLIdxAcc,
                         outVoxelsAcc, outTimesAcc,
-                        batchAcc, maxVox, eps);
+                        batchAcc, maxVox, eps, cumulative);
                 };
 
                 if (returnIjk) {
@@ -251,7 +255,7 @@ std::vector<JaggedTensor> VoxelsAlongRays(const GridBatchImpl& batchHdl,
                         rayOriginsAcc, rayDirectionsAcc,
                         outJOffsetsAcc, outJIdxAcc, outJLIdxAcc,
                         outVoxelsAcc, outTimesAcc,
-                        batchAcc, maxVox, eps);
+                        batchAcc, maxVox, eps, cumulative);
                 };
                 auto cbIdx = [=] (int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> rayOriginsAcc) {
                     voxelsAlongRaysCallback<false, scalar_t, GridType, JaggedAcc, TorchAcc>(
@@ -259,7 +263,7 @@ std::vector<JaggedTensor> VoxelsAlongRays(const GridBatchImpl& batchHdl,
                         rayOriginsAcc, rayDirectionsAcc,
                         outJOffsetsAcc, outJIdxAcc, outJLIdxAcc,
                         outVoxelsAcc, outTimesAcc,
-                        batchAcc, maxVox, eps);
+                        batchAcc, maxVox, eps, cumulative);
                 };
                 if (returnIjk) {
                     forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cbIjk);
@@ -289,8 +293,9 @@ std::vector<JaggedTensor> dispatchVoxelsAlongRays<torch::kCUDA>(const GridBatchI
                                                               const JaggedTensor& rayDirections,
                                                               int64_t maxVox,
                                                               float eps,
-                                                              bool returnIjk) {
-    return VoxelsAlongRays<torch::kCUDA>(batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk);
+                                                              bool returnIjk,
+                                                              bool cumulative) {
+    return VoxelsAlongRays<torch::kCUDA>(batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk, cumulative);
 }
 
 template <>
@@ -299,8 +304,9 @@ std::vector<JaggedTensor> dispatchVoxelsAlongRays<torch::kCPU>(const GridBatchIm
                                                              const JaggedTensor& rayDirections,
                                                              int64_t maxVox,
                                                              float eps,
-                                                             bool returnIjk) {
-    return VoxelsAlongRays<torch::kCPU>(batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk);
+                                                             bool returnIjk,
+                                                             bool cumulative) {
+    return VoxelsAlongRays<torch::kCPU>(batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk, cumulative);
 }
 
 

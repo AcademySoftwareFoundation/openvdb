@@ -822,7 +822,8 @@ void GridBatch::buildDualFromPrimalGrid(const GridBatch& primalGrid, bool exclud
 
 std::vector<JaggedTensor> GridBatch::voxels_along_rays(const JaggedTensor& ray_origins,
                                                        const JaggedTensor& ray_directions,
-                                                       int64_t max_vox, double eps, bool return_ijk) const {
+                                                       int64_t max_vox, double eps,
+                                                       bool return_ijk, bool cumulative) const {
     TORCH_CHECK_VALUE(ray_origins.ldim() == 1,
         "Expected ray_origins to have 1 list dimension, i.e. be a single list of coordinate values, but got", ray_origins.ldim(), "list dimensions"
     );
@@ -830,7 +831,7 @@ std::vector<JaggedTensor> GridBatch::voxels_along_rays(const JaggedTensor& ray_o
         "Expected ray_directions to have 1 list dimension, i.e. be a single list of coordinate values, but got", ray_directions.ldim(), "list dimensions"
     );
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchVoxelsAlongRays<DeviceTag>(*impl(), ray_origins, ray_directions, max_vox, eps, return_ijk);
+        return fvdb::detail::ops::dispatchVoxelsAlongRays<DeviceTag>(*impl(), ray_origins, ray_directions, max_vox, eps, return_ijk, cumulative);
     });
 }
 
@@ -968,22 +969,22 @@ JaggedTensor GridBatch::coords_in_active_voxel(const JaggedTensor& ijk, bool ign
 }
 
 
-JaggedTensor GridBatch::ijk_to_index(const JaggedTensor& ijk) const {
+JaggedTensor GridBatch::ijk_to_index(const JaggedTensor& ijk, bool cumulative) const {
     TORCH_CHECK_VALUE(ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got", ijk.ldim(), "list dimensions"
     );
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchIjkToIndex<DeviceTag>(*impl(), ijk);
+        return fvdb::detail::ops::dispatchIjkToIndex<DeviceTag>(*impl(), ijk, cumulative);
     });
 }
 
 
-JaggedTensor GridBatch::ijk_to_inv_index(const JaggedTensor& ijk) const {
+JaggedTensor GridBatch::ijk_to_inv_index(const JaggedTensor& ijk, bool cumulative) const {
     TORCH_CHECK_VALUE(ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got", ijk.ldim(), "list dimensions"
     );
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchIjkToInvIndex<DeviceTag>(*impl(), ijk);
+        return fvdb::detail::ops::dispatchIjkToInvIndex<DeviceTag>(*impl(), ijk, cumulative);
     });
 }
 

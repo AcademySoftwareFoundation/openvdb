@@ -282,8 +282,8 @@ JaggedTensor UniformRaySamples(const GridBatchImpl& batchHdl,
 
     TORCH_CHECK_VALUE(batchHdl.batchSize() == rayOrigins.num_outer_lists(), "ray_origins must have the same batch size as the grid batch");
     TORCH_CHECK_VALUE(batchHdl.batchSize() == rayDirections.num_outer_lists(), "ray_directions must have the same batch size as the grid batch");
-    TORCH_CHECK_VALUE(batchHdl.batchSize() == tMin.num_outer_lists(), "ray_directions must have the same batch size as the grid batch");
-    TORCH_CHECK_VALUE(batchHdl.batchSize() == tMax.num_outer_lists(), "ray_directions must have the same batch size as the grid batch");
+    TORCH_CHECK_VALUE(batchHdl.batchSize() == tMin.num_outer_lists(), "t_min must have the same batch size as the grid batch");
+    TORCH_CHECK_VALUE(batchHdl.batchSize() == tMax.num_outer_lists(), "t_max must have the same batch size as the grid batch");
 
     TORCH_CHECK_TYPE(rayOrigins.dtype() == rayDirections.dtype(), "all tensors must have the same type");
     TORCH_CHECK_TYPE(tMin.dtype() == tMin.dtype(), "all tensors must have the same type");

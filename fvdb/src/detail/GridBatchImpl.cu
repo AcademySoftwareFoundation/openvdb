@@ -154,6 +154,7 @@ void GridBatchImpl::syncMetadataToDeviceIfCUDA(bool blocking) {
         // We haven't allocated the cuda memory yet, so we need to do that now
         if (mDeviceGridMetadata == nullptr) {
             // We need to allocate the memory on the device
+            c10::cuda::CUDAGuard deviceGuard(device());
             size_t metaDataByteSize = sizeof(GridMetadata) * mHostGridMetadata.size();
             at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(device().index());
             mDeviceGridMetadata = static_cast<GridMetadata*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(metaDataByteSize, defaultStream.stream()));
@@ -293,6 +294,7 @@ void GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer>&& gridHdl,
         // Allocate device memory for metadata
         GridBatchMetadata* deviceBatchMetadataPtr = nullptr;
         if constexpr (DeviceTag == torch::kCUDA) {
+            c10::cuda::CUDAGuard deviceGuard(device);
             const size_t metaDataByteSize = sizeof(GridMetadata) * gridHdl.gridCount();
             at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(device.index());
             mDeviceGridMetadata = static_cast<GridMetadata*>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(metaDataByteSize, defaultStream.stream()));

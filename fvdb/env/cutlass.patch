@@ -7,7 +7,7 @@ index e22c8be3..a29e6067 100644
      storage = reinterpret_cast<uint16_t const &>(x);
      #else
 -    __half_raw raw(x);
-+    __half_raw raw(*(reinterpret_cast<const unsigned short*>(&x)));
++    __half_raw raw(*(reinterpret_cast<const __half_raw*>(&x)));
      std::memcpy(&storage, &raw.x, sizeof(storage));
      #endif
    }
@@ -16,7 +16,7 @@ index e22c8be3..a29e6067 100644
      storage = reinterpret_cast<uint16_t const &>(x);
      #else
 -    __half_raw raw(x);
-+    __half_raw raw(*(reinterpret_cast<const unsigned short*>(&x)));
++    __half_raw raw(*(reinterpret_cast<const __half_raw*>(&x)));
      std::memcpy(&storage, &raw.x, sizeof(storage));
      #endif
      return *this;

@@ -21,6 +21,7 @@ __global__ void setZero(T* thingToSet) {
 template <>
 torch::Tensor dispatchJOffsetsForJIdx<torch::kCUDA>(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
     TORCH_CHECK_VALUE(jdata.device().is_cuda(), "Invalid device for jdata");
+    c10::cuda::CUDAGuard deviceGuard(jdata.device());
 
     if (jidx.size(0) == 0 && numTensors == 1) {
         torch::Tensor ret = torch::empty({2}, JOffsetsScalarType);

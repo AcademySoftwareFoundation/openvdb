@@ -71,7 +71,7 @@ class VDBTensor:
                 raw_features.append(o.feature.jdata)
             elif isinstance(o, JaggedTensor):
                 assert pivot_tensor.total_voxels == o.jdata.size(0), "All tensors should have the same voxels"
-                assert pivot_tensor.grid.grid_count == len(o.joffsets), "All tensors should have the same batch size"
+                assert pivot_tensor.grid.grid_count == o.num_tensors, "All tensors should have the same batch size"
                 raw_features.append(o.jdata)
             else:
                 raw_features.append(o)
