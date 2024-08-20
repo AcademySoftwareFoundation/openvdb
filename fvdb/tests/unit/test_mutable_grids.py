@@ -9,16 +9,16 @@ from parameterized import parameterized
 from fvdb import GridBatch
 
 all_device_dtype_combos = [
-    ['cuda', torch.float16],
-    ['cpu', torch.float32],
-    ['cuda', torch.float32],
-    ['cpu', torch.float64],
-    ['cuda', torch.float64]
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 all_device_combos = [
-    ['cpu'],
-    ['cuda'],
+    ["cpu"],
+    ["cuda"],
 ]
 
 
@@ -28,10 +28,10 @@ class TestUtils(unittest.TestCase):
         p = torch.rand(7777, 3).to(dtype).to(device)
 
         grid1 = GridBatch(mutable=False, device=device)
-        grid1.set_from_points(p, [-1]*3, [1]*3, 0.025, torch.zeros(3))
+        grid1.set_from_points(p, [-1] * 3, [1] * 3, 0.025, torch.zeros(3))
 
         grid2 = GridBatch(mutable=True, device=device)
-        grid2.set_from_points(p, [-1]*3, [1]*3, 0.025, torch.zeros(3))
+        grid2.set_from_points(p, [-1] * 3, [1] * 3, 0.025, torch.zeros(3))
 
         self.assertTrue(torch.all(grid1.ijk.jdata == grid2.ijk.jdata))
         self.assertEqual(grid1.total_voxels, grid2.total_voxels)
@@ -43,10 +43,8 @@ class TestUtils(unittest.TestCase):
 
         grid2.disable_ijk(drop_ijk)
 
-        self.assertNotEqual(grid1.ijk_enabled.jdata.shape[0],
-                            grid2.ijk_enabled.jdata.shape[0])
-        self.assertEqual(grid1.ijk.jdata.shape[0],
-                         grid2.ijk.jdata.shape[0])
+        self.assertNotEqual(grid1.ijk_enabled.jdata.shape[0], grid2.ijk_enabled.jdata.shape[0])
+        self.assertEqual(grid1.ijk.jdata.shape[0], grid2.ijk.jdata.shape[0])
         self.assertEqual(grid1.total_voxels, grid2.total_voxels)
         self.assertNotEqual(grid1.total_enabled_voxels, grid2.total_enabled_voxels)
         self.assertNotEqual(grid1.total_voxels, grid2.total_enabled_voxels)
@@ -65,7 +63,7 @@ class TestUtils(unittest.TestCase):
         p = torch.rand(7777, 3).to(dtype).to(device)
 
         grid_static = GridBatch(mutable=False, device=device)
-        grid_static.set_from_points(p, [-1]*3, [1]*3, 0.025, torch.zeros(3))
+        grid_static.set_from_points(p, [-1] * 3, [1] * 3, 0.025, torch.zeros(3))
 
         p_ijk = grid_static.ijk.jdata
 
@@ -102,7 +100,7 @@ class TestUtils(unittest.TestCase):
         p = torch.rand(7777, 3).to(dtype).to(device)
 
         grid_static = GridBatch(mutable=False, device=device)
-        grid_static.set_from_points(p, [-1]*3, [1]*3, voxel_sizes=0.025, origins=torch.zeros(3))
+        grid_static.set_from_points(p, [-1] * 3, [1] * 3, voxel_sizes=0.025, origins=torch.zeros(3))
 
         p_ijk = grid_static.ijk.jdata
 
@@ -134,5 +132,5 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(grid_static.total_voxels, grid_dynamic.total_enabled_voxels)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

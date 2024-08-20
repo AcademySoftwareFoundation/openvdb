@@ -11,14 +11,16 @@ from fvdb import GridBatch, sparse_grid_from_ijk
 
 
 class CoordsDataset(Dataset):
-    """ Loading coordinates from the dataset """
+    """Loading coordinates from the dataset"""
 
-    def __init__(self,
-                 paths: List[str],
-                 in_channels: int = 32,
-                 pad_level: int = 0,
-                 max_files: int = -1,
-                 positive_only: bool = True):
+    def __init__(
+        self,
+        paths: List[str],
+        in_channels: int = 32,
+        pad_level: int = 0,
+        max_files: int = -1,
+        positive_only: bool = True,
+    ):
         super().__init__()
         self.pad_level = pad_level
         self.in_channels = in_channels
@@ -42,20 +44,20 @@ class CoordsDataset(Dataset):
             for npy_file in base_path.glob("*.npy"):
                 all_paths.append(npy_file)
             if self.max_files > 0:
-                return all_paths[:self.max_files]
+                return all_paths[: self.max_files]
             return all_paths
 
     def __len__(self):
         return len(self.data_paths)
 
     def load_grid(self, path) -> GridBatch:
-        if path.suffix == '.pkl':
+        if path.suffix == ".pkl":
             input_data = torch.load(path)
-            input_points: GridBatch = input_data['grid']
-        elif path.suffix == '.csv':
-            input_data = np.loadtxt(path, delimiter=',').astype(int)
+            input_points: GridBatch = input_data["grid"]
+        elif path.suffix == ".csv":
+            input_data = np.loadtxt(path, delimiter=",").astype(int)
             input_points: GridBatch = sparse_grid_from_ijk(torch.from_numpy(input_data))
-        elif path.suffix == '.npy':
+        elif path.suffix == ".npy":
             input_data = np.load(path).astype(int)
             input_points: GridBatch = sparse_grid_from_ijk(torch.from_numpy(input_data))
         else:
@@ -69,9 +71,7 @@ class CoordsDataset(Dataset):
         # Pad data.
         if self.pad_level > 0:
             input_grid = sparse_grid_from_ijk(
-                input_grid.ijk,
-                pad_min=[-self.pad_level] * 3,
-                pad_max=[self.pad_level] * 3
+                input_grid.ijk, pad_min=[-self.pad_level] * 3, pad_max=[self.pad_level] * 3
             )
 
         # Make sure the coordinates are positive.

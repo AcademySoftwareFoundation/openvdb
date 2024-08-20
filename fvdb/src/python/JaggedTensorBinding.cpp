@@ -1,18 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-#include <torch/extension.h>
+#include "TypeCasters.h"
 
-#include "FVDB.h"
+#include <FVDB.h>
+
+#include <torch/extension.h>
 
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
-#include "TypeCasters.h"
-
-
-void bind_jagged_tensor(py::module& m) {
-
+void
+bind_jagged_tensor(py::module &m) {
     py::class_<fvdb::JaggedTensor>(m, "JaggedTensor")
         .def(py::init<std::vector<std::vector<torch::Tensor>>&>(), py::arg("tensor_list"))
         .def(py::init<std::vector<torch::Tensor>&>(), py::arg("tensor_list"), R"_FVDB_(
@@ -290,7 +289,7 @@ void bind_jagged_tensor(py::module& m) {
                     const torch::Tensor data = THPVariable_Unpack(t[0].ptr());
                     const torch::Tensor jidx = THPVariable_Unpack(t[1].ptr()).to(fvdb::JIdxScalarType);
                     const torch::Tensor jlidx = torch::empty({0, 1}, torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(data.device()));
-		            const int64_t batchSize = py::cast<int>(t[2]);
+                    const int64_t batchSize = py::cast<int>(t[2]);
                     return fvdb::JaggedTensor::from_data_indices_and_list_ids(data, jidx, jlidx, batchSize);
                 }
 
@@ -325,5 +324,4 @@ void bind_jagged_tensor(py::module& m) {
                 }
             }
         ));
-
 }

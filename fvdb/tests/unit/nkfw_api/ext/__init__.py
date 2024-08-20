@@ -31,15 +31,13 @@ def load_torch_extension(name, additional_files=None, ignore_files=None, **kwarg
     return load(
         name="fvdb_test_" + name,
         sources=list(cpp_files) + list(cu_files) + [base_path / t for t in additional_files],
-        verbose='COMPILE_VERBOSE' in os.environ.keys(),
-        extra_ldflags = ["-L%s/lib" %os.environ.get("CONDA_PREFIX")] if os.environ.get("CONDA_PREFIX") else None,
-        **kwargs
+        verbose="COMPILE_VERBOSE" in os.environ.keys(),
+        extra_ldflags=["-L%s/lib" % os.environ.get("CONDA_PREFIX")] if os.environ.get("CONDA_PREFIX") else None,
+        **kwargs,
     )
 
 
-common = load_torch_extension(
-    'common', extra_cflags=['-O2'], extra_cuda_cflags=['-O2', '-Xcompiler -fno-gnu-unique']
-)
+common = load_torch_extension("common", extra_cflags=["-O2"], extra_cuda_cflags=["-O2", "-Xcompiler -fno-gnu-unique"])
 
 
 class CuckooHashTable:
@@ -50,18 +48,18 @@ class CuckooHashTable:
             self.dim = data.size(1)
             source_hash = self._sphash(data)
         else:
-            self.dim = -1   # Never equals me.
+            self.dim = -1  # Never equals me.
             source_hash = hashed_data
         self.object = common.build_hash_table(source_hash, torch.tensor([]), enlarged)
 
     @classmethod
-    def _sphash(cls, coords: torch.Tensor, offsets=None) -> torch.Tensor:     # Int64
+    def _sphash(cls, coords: torch.Tensor, offsets=None) -> torch.Tensor:  # Int64
         assert coords.dtype in [torch.int, torch.long], coords.dtype
         coords = coords.contiguous()
         if offsets is None:
             assert coords.ndim == 2 and coords.shape[1] in [2, 3, 4], coords.shape
             if coords.size(0) == 0:
-                return torch.empty((coords.size(0), ), dtype=torch.int64, device=coords.device)
+                return torch.empty((coords.size(0),), dtype=torch.int64, device=coords.device)
             return common.hash_cuda(coords)
         else:
             assert offsets.dtype == torch.int, offsets.dtype

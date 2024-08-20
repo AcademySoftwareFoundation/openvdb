@@ -11,13 +11,14 @@ import fvdb
 
 
 all_device_dtype_combos = [
-    ['cpu', torch.float16],
-    ['cuda', torch.float16],
-    ['cpu', torch.float32],
-    ['cuda', torch.float32],
+    ["cpu", torch.float16],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
 ]
 
 NVOX = 1_000_000
+
 
 class TestBatching(unittest.TestCase):
     def setUp(self):
@@ -27,30 +28,33 @@ class TestBatching(unittest.TestCase):
     def test_getting_subgrids(self, device, dtype):
         num_grids = np.random.randint(32, 64)
         idx = np.random.randint(num_grids)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.01)
         self.assertTrue(gridbatch.is_contiguous())
 
-        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx]:gridbatch.joffsets[idx+1]]
+        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx] : gridbatch.joffsets[idx + 1]]
         voxels_idx_pred = gridbatch[idx].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(gridbatch.is_contiguous())
 
         # Negative indices
         idx = -idx
-        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx-1]:gridbatch.joffsets[idx]]
+        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx - 1] : gridbatch.joffsets[idx]]
         voxels_idx_pred = gridbatch[idx].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(gridbatch.is_contiguous())
 
         # Negative indices
         idx = -1
-        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx-1]:gridbatch.joffsets[idx]]
+        voxels_idx_target = gridbatch.ijk.jdata[gridbatch.joffsets[idx - 1] : gridbatch.joffsets[idx]]
         voxels_idx_pred = gridbatch[idx].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertFalse(gridbatch[idx].is_contiguous())
@@ -60,9 +64,12 @@ class TestBatching(unittest.TestCase):
     def test_getting_subgrids_slice(self, device, dtype):
         num_grids = np.random.randint(32, 64)
         idx = np.random.randint(num_grids)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 40_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 40_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
@@ -72,46 +79,58 @@ class TestBatching(unittest.TestCase):
         all_ijk = gridbatch.ijk
 
         # Slice random segment
-        sliced_offsets = gridbatch.joffsets[idx:idx+8]
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[sliced_offsets[i]:sliced_offsets[i+1]] for i in range(sliced_offsets.shape[0] - 1)
-        ])
-        self.assertTrue(torch.equal(gridbatch[idx:idx+7].num_voxels, gridbatch.num_voxels[idx:idx+7]))
-        voxels_idx_pred = gridbatch[idx:idx+7].ijk.jdata
+        sliced_offsets = gridbatch.joffsets[idx : idx + 8]
+        voxels_idx_target = torch.cat(
+            [all_ijk.jdata[sliced_offsets[i] : sliced_offsets[i + 1]] for i in range(sliced_offsets.shape[0] - 1)]
+        )
+        self.assertTrue(torch.equal(gridbatch[idx : idx + 7].num_voxels, gridbatch.num_voxels[idx : idx + 7]))
+        voxels_idx_pred = gridbatch[idx : idx + 7].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
-        self.assertFalse(gridbatch[idx:idx+7].is_contiguous())
+        self.assertFalse(gridbatch[idx : idx + 7].is_contiguous())
         self.assertTrue(gridbatch.is_contiguous())
 
         # Slice past the end
-        sliced_offsets = gridbatch.joffsets[gridbatch.grid_count-3:gridbatch.grid_count+5]
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[sliced_offsets[i]:sliced_offsets[i+1]] for i in range(sliced_offsets.shape[0] - 1)
-        ])
-        voxels_idx_pred = gridbatch[gridbatch.grid_count-3:gridbatch.grid_count+4].ijk.jdata
+        sliced_offsets = gridbatch.joffsets[gridbatch.grid_count - 3 : gridbatch.grid_count + 5]
+        voxels_idx_target = torch.cat(
+            [all_ijk.jdata[sliced_offsets[i] : sliced_offsets[i + 1]] for i in range(sliced_offsets.shape[0] - 1)]
+        )
+        voxels_idx_pred = gridbatch[gridbatch.grid_count - 3 : gridbatch.grid_count + 4].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
-        self.assertTrue(torch.equal(gridbatch[gridbatch.grid_count-3:gridbatch.grid_count+4].num_voxels,
-                                    gridbatch.num_voxels[gridbatch.grid_count-3:gridbatch.grid_count+4]))
-        self.assertFalse(gridbatch[gridbatch.grid_count-3:gridbatch.grid_count+4].is_contiguous())
+        self.assertTrue(
+            torch.equal(
+                gridbatch[gridbatch.grid_count - 3 : gridbatch.grid_count + 4].num_voxels,
+                gridbatch.num_voxels[gridbatch.grid_count - 3 : gridbatch.grid_count + 4],
+            )
+        )
+        self.assertFalse(gridbatch[gridbatch.grid_count - 3 : gridbatch.grid_count + 4].is_contiguous())
         self.assertTrue(gridbatch.is_contiguous())
 
         # Slice with step
         idx = np.random.randint(num_grids)
         step = np.random.randint(2, 4)
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i]:gridbatch.joffsets[i+1]] for i in range(idx, min(idx+20, len(gridbatch)), step)
-        ])
-        voxels_idx_pred = gridbatch[idx:idx+20:step].ijk.jdata
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i] : gridbatch.joffsets[i + 1]]
+                for i in range(idx, min(idx + 20, len(gridbatch)), step)
+            ]
+        )
+        voxels_idx_pred = gridbatch[idx : idx + 20 : step].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
-        self.assertTrue(torch.equal(gridbatch[idx:idx+20:step].num_voxels, gridbatch.num_voxels[idx:idx+20:step]))
-        self.assertFalse(gridbatch[idx:idx+20:step].is_contiguous())
+        self.assertTrue(
+            torch.equal(gridbatch[idx : idx + 20 : step].num_voxels, gridbatch.num_voxels[idx : idx + 20 : step])
+        )
+        self.assertFalse(gridbatch[idx : idx + 20 : step].is_contiguous())
         self.assertTrue(gridbatch.is_contiguous())
 
     @parameterized.expand(all_device_dtype_combos)
     def test_getting_subgrids_integer_array(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
@@ -122,9 +141,7 @@ class TestBatching(unittest.TestCase):
 
         # permutation
         pmt = torch.randperm(gridbatch.grid_count)
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i]:gridbatch.joffsets[i+1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat([all_ijk.jdata[gridbatch.joffsets[i] : gridbatch.joffsets[i + 1]] for i in pmt])
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -133,9 +150,7 @@ class TestBatching(unittest.TestCase):
 
         # duplication
         pmt = torch.ones(2 * gridbatch.grid_count, dtype=torch.int32)
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i]:gridbatch.joffsets[i+1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat([all_ijk.jdata[gridbatch.joffsets[i] : gridbatch.joffsets[i + 1]] for i in pmt])
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -144,9 +159,12 @@ class TestBatching(unittest.TestCase):
 
         # negative indices
         pmt = -torch.arange(gridbatch.grid_count)
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in pmt
+            ]
+        )
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -157,9 +175,12 @@ class TestBatching(unittest.TestCase):
         pmt = -torch.arange(gridbatch.grid_count)
         pmt = torch.cat([pmt, -pmt])
         pmt = pmt[torch.randperm(pmt.shape[0])]
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in pmt
+            ]
+        )
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -174,9 +195,12 @@ class TestBatching(unittest.TestCase):
             return [int(t_[i].item()) for i in range(t_.shape[0])]
 
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
@@ -187,9 +211,7 @@ class TestBatching(unittest.TestCase):
 
         # permutation
         pmt = listify(torch.randperm(gridbatch.grid_count))
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i]:gridbatch.joffsets[i+1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat([all_ijk.jdata[gridbatch.joffsets[i] : gridbatch.joffsets[i + 1]] for i in pmt])
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -198,9 +220,7 @@ class TestBatching(unittest.TestCase):
 
         # duplication
         pmt = listify(torch.ones(2 * gridbatch.grid_count, dtype=torch.int32))
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i]:gridbatch.joffsets[i+1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat([all_ijk.jdata[gridbatch.joffsets[i] : gridbatch.joffsets[i + 1]] for i in pmt])
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -209,9 +229,12 @@ class TestBatching(unittest.TestCase):
 
         # negative indices
         pmt = listify(-torch.arange(gridbatch.grid_count))
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in pmt
+            ]
+        )
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -222,9 +245,12 @@ class TestBatching(unittest.TestCase):
         pmt = -torch.arange(gridbatch.grid_count)
         pmt = torch.cat([pmt, -pmt])
         pmt = listify(pmt[torch.randperm(pmt.shape[0])])
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in pmt
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in pmt
+            ]
+        )
         voxels_idx_pred = gridbatch[pmt].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[pmt].num_voxels, gridbatch.num_voxels[pmt]))
@@ -234,9 +260,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_getting_subgrids_boolean_array(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
@@ -245,9 +274,12 @@ class TestBatching(unittest.TestCase):
         all_ijk = gridbatch.ijk
 
         mask = torch.rand(gridbatch.grid_count) > 0.5
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in torch.arange(gridbatch.grid_count)[mask]
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in torch.arange(gridbatch.grid_count)[mask]
+            ]
+        )
         voxels_idx_pred = gridbatch[mask].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
         self.assertTrue(torch.equal(gridbatch[mask].num_voxels, gridbatch.num_voxels[mask]))
@@ -257,9 +289,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_getting_subgrids_boolean_list(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
 
         gridbatch = fvdb.GridBatch(device)
@@ -269,9 +304,12 @@ class TestBatching(unittest.TestCase):
 
         mask = torch.rand(gridbatch.grid_count) > 0.5
         mask = [bool(mask[i].item()) for i in range(mask.shape[0])]
-        voxels_idx_target = torch.cat([
-            all_ijk.jdata[gridbatch.joffsets[i-1 if i < 0 else i]:gridbatch.joffsets[i if i < 0 else i + 1]] for i in torch.arange(gridbatch.grid_count)[mask]
-        ])
+        voxels_idx_target = torch.cat(
+            [
+                all_ijk.jdata[gridbatch.joffsets[i - 1 if i < 0 else i] : gridbatch.joffsets[i if i < 0 else i + 1]]
+                for i in torch.arange(gridbatch.grid_count)[mask]
+            ]
+        )
         self.assertTrue(torch.equal(gridbatch[mask].num_voxels, gridbatch.num_voxels[mask]))
         voxels_idx_pred = gridbatch[mask].ijk.jdata
         self.assertTrue(torch.equal(voxels_idx_target, voxels_idx_pred))
@@ -281,9 +319,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_empty_grid(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
         gd = gridbatch.dual_grid()
@@ -314,9 +355,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_grid_cat(self, device, dtype):
         num_grids = np.random.randint(64, 128)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.01)
@@ -382,9 +426,7 @@ class TestBatching(unittest.TestCase):
                 # mask select will produce sorted results
                 num_indices, _ = torch.sort(num_indices)
 
-            pts_to_cat.extend(
-                [pts_list[int(num_indices[j].item())] for j in range(num_indices.shape[0])]
-            )
+            pts_to_cat.extend([pts_list[int(num_indices[j].item())] for j in range(num_indices.shape[0])])
             grids_to_cat.append(gridbatch[indices])
             self.assertFalse(grids_to_cat[-1].is_contiguous())
 
@@ -403,11 +445,26 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_jagged_tensor_cat(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts1 = fvdb.JaggedTensor([torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)])
-        pts2 = fvdb.JaggedTensor([torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)])
-        pts3 = fvdb.JaggedTensor([torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)])
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts1 = fvdb.JaggedTensor(
+            [
+                torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+                for _ in range(num_grids)
+            ]
+        )
+        pts2 = fvdb.JaggedTensor(
+            [
+                torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+                for _ in range(num_grids)
+            ]
+        )
+        pts3 = fvdb.JaggedTensor(
+            [
+                torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+                for _ in range(num_grids)
+            ]
+        )
 
         pts_cat0 = fvdb.jcat([pts1, pts2, pts3], dim=None)
         for g in range(num_grids):
@@ -417,26 +474,27 @@ class TestBatching(unittest.TestCase):
 
         pts_cat1 = fvdb.jcat([pts1, pts2, pts3], dim=0)
         for g in range(num_grids):
-            self.assertTrue(torch.equal(
-                pts_cat1[g].jdata,
-                torch.cat([pts1[g].jdata, pts2[g].jdata, pts3[g].jdata], dim=0)
-            ))
+            self.assertTrue(
+                torch.equal(pts_cat1[g].jdata, torch.cat([pts1[g].jdata, pts2[g].jdata, pts3[g].jdata], dim=0))
+            )
 
         pts4 = pts1.jagged_like(torch.rand_like(pts1.jdata))
         pts5 = pts1.jagged_like(torch.rand_like(pts1.jdata))
         pts_cat2 = fvdb.jcat([pts1, pts4, pts5], dim=1)
         for g in range(num_grids):
-            self.assertTrue(torch.equal(
-                pts_cat2[g].jdata,
-                torch.cat([pts1[g].jdata, pts4[g].jdata, pts5[g].jdata], dim=1)
-            ))
+            self.assertTrue(
+                torch.equal(pts_cat2[g].jdata, torch.cat([pts1[g].jdata, pts4[g].jdata, pts5[g].jdata], dim=1))
+            )
 
     @parameterized.expand(all_device_dtype_combos)
     def test_contiguous(self, device, dtype):
         num_grids = np.random.randint(32, 64)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.01)
@@ -460,9 +518,7 @@ class TestBatching(unittest.TestCase):
                 # mask select will produce sorted results
                 num_indices, _ = torch.sort(num_indices)
 
-            pts_to_cat.extend(
-                [pts_list[int(num_indices[j].item())] for j in range(num_indices.shape[0])]
-            )
+            pts_to_cat.extend([pts_list[int(num_indices[j].item())] for j in range(num_indices.shape[0])])
             grids_to_cat.append(gridbatch[indices])
             self.assertFalse(grids_to_cat[-1].is_contiguous())
             contig_version = grids_to_cat[-1].contiguous()
@@ -474,9 +530,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_views_of_views(self, device, dtype):
         num_grids = 64
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.01)
@@ -488,7 +547,7 @@ class TestBatching(unittest.TestCase):
             if np.random.rand() > 0.5:
                 grids_to_cat.append(fvdb.GridBatch(device))
 
-            indices = torch.randperm(len(last_grid))[:len(last_grid)-np.random.randint(1, 3)]
+            indices = torch.randperm(len(last_grid))[: len(last_grid) - np.random.randint(1, 3)]
             num_indices = indices.clone()
 
             if i % 3 == 0:
@@ -510,9 +569,12 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_reverse_steps(self, device, dtype):
         num_grids = 64
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.01)
@@ -572,14 +634,19 @@ class TestBatching(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_negative_grid_indexing(self, device, dtype):
         num_grids = 64
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         gridbatch = fvdb.GridBatch(device)
 
         # Random voxel sizes and origins
-        gridbatch.set_from_points(randpts, voxel_sizes = np.random.rand(num_grids, 3), origins = np.random.randn(num_grids, 3))
+        gridbatch.set_from_points(
+            randpts, voxel_sizes=np.random.rand(num_grids, 3), origins=np.random.randn(num_grids, 3)
+        )
 
         # check negative indexes on a few grids
         for n in [1, 3, 9, 22, 63]:
@@ -588,5 +655,6 @@ class TestBatching(unittest.TestCase):
             self.assertTrue(torch.equal(gridbatch.bbox_at(-n), gridbatch.bbox_at(gridbatch.grid_count - n)))
             self.assertEqual(gridbatch.num_voxels_at(-n), gridbatch.num_voxels_at(num_grids - n))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

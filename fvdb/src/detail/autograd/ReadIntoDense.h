@@ -1,7 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-#pragma once
+#ifndef FVDB_DETAIL_AUTOGRAD_READINTODENSE_H
+#define FVDB_DETAIL_AUTOGRAD_READINTODENSE_H
 
 #include <torch/autograd.h>
 
@@ -14,20 +15,20 @@ namespace detail {
 namespace autograd {
 
 struct ReadIntoDense : public torch::autograd::Function<ReadIntoDense> {
-    using variable_list = torch::autograd::variable_list;
+    using variable_list   = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;
-    using Variable = torch::autograd::Variable;
+    using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx,
-                                 c10::intrusive_ptr<GridBatchImpl> grid,
-                                 Variable sparseData,
-                                 const torch::optional<Vec3iBatch>& maybeMinCoord,
-                                 const torch::optional<Vec3i>& maybeGridSize);
+    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
+                                 Variable                           sparseData,
+                                 const torch::optional<Vec3iBatch> &maybeMinCoord,
+                                 const torch::optional<Vec3i>      &maybeGridSize);
 
-    static variable_list backward(AutogradContext *ctx,
-                                  variable_list grad_output);
+    static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
 
 } // namespace autograd
 } // namespace detail
 } // namespace fvdb
+
+#endif // FVDB_DETAIL_AUTOGRAD_READINTODENSE_H

@@ -37,9 +37,11 @@ class VDBTensor:
         if self.grid.total_voxels != self.feature.jdata.size(0):
             raise ValueError("grid and feature should have the same total voxel count")
         if self.kmap is not None:
-            if not (self.same_grid(self.kmap.source_grid, self.grid) and
-                    self.same_grid(self.kmap.target_grid, self.grid) and
-                    self.kmap.stride == (1, 1, 1)):
+            if not (
+                self.same_grid(self.kmap.source_grid, self.grid)
+                and self.same_grid(self.kmap.target_grid, self.grid)
+                and self.kmap.stride == (1, 1, 1)
+            ):
                 raise ValueError("kmap should operate on the same grid as this tensor")
 
     @staticmethod
@@ -50,10 +52,10 @@ class VDBTensor:
         return VDBTensor(self.grid, self.feature.type(arg0))
 
     def cpu(self):
-        return VDBTensor(self.grid.to('cpu'), self.feature.cpu())
+        return VDBTensor(self.grid.to("cpu"), self.feature.cpu())
 
     def cuda(self):
-        return VDBTensor(self.grid.to('cuda'), self.feature.cuda())
+        return VDBTensor(self.grid.to("cuda"), self.feature.cuda())
 
     def to(self, device: Any):
         return VDBTensor(self.grid.to(device), self.feature.to(device))
@@ -107,8 +109,8 @@ class VDBTensor:
         assert len(tensors) > 0, "At least one tensor should be provided"
         if dim == 0:
             assert all(isinstance(t, VDBTensor) for t in tensors), "All tensors should be of type VDBTensor"
-            new_grid = fvdb.jcat([t.grid for t in tensors]) # type: ignore
-            new_feature = new_grid.jagged_like(torch.cat([t.feature.jdata for t in tensors])) # type: ignore
+            new_grid = fvdb.jcat([t.grid for t in tensors])  # type: ignore
+            new_feature = new_grid.jagged_like(torch.cat([t.feature.jdata for t in tensors]))  # type: ignore
             return VDBTensor(new_grid, new_feature)
         else:
             return VDBTensor._feature_ops(lambda *t: torch.cat(t, dim=dim), tensors)
@@ -122,8 +124,12 @@ class VDBTensor:
         if ijk_min is None:
             ijk_min = [0, 0, 0]
         grid = fvdb.sparse_grid_from_dense(
-            dense_feature.size(0), dense_feature.size()[1:4], ijk_min=ijk_min,
-            voxel_sizes=voxel_sizes, origins=origins, device=dense_feature.device
+            dense_feature.size(0),
+            dense_feature.size()[1:4],
+            ijk_min=ijk_min,
+            voxel_sizes=voxel_sizes,
+            origins=origins,
+            device=dense_feature.device,
         )
         # Note: this would map dense_feature[0, 0, 0] to grid[ijk_min]
         feature = grid.read_from_dense(dense_feature.contiguous(), dense_origins=ijk_min)

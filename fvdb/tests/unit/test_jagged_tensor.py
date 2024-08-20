@@ -15,20 +15,32 @@ from parameterized import parameterized
 import fvdb
 
 all_device_dtype_combos = [
-    ['cuda', torch.float16],
-    ['cpu', torch.float32],
-    ['cuda', torch.float32],
-    ['cpu', torch.float64],
-    ['cuda', torch.float64],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 NVOX = 10_000
+
 
 class TestJaggedTensor(unittest.TestCase):
     def setUp(self):
         pass
 
-    def mklol(self, num_outer, num_inner_min, num_inner_max, device, dtype, last_dims=(3, 4), base_num=1000, vary_num=10, empty_prob=0.0):
+    def mklol(
+        self,
+        num_outer,
+        num_inner_min,
+        num_inner_max,
+        device,
+        dtype,
+        last_dims=(3, 4),
+        base_num=1000,
+        vary_num=10,
+        empty_prob=0.0,
+    ):
         pts_list = []
         for _ in range(num_outer):
             pts_list_i = []
@@ -38,7 +50,8 @@ class TestJaggedTensor(unittest.TestCase):
                     size = 0
                 pts_list_i = [
                     torch.rand(size, *last_dims, device=device, dtype=dtype)
-                    for _ in range(np.random.randint(num_inner_min, num_inner_max))]
+                    for _ in range(np.random.randint(num_inner_min, num_inner_max))
+                ]
             pts_list.append(pts_list_i)
         ret = fvdb.JaggedTensor(pts_list), pts_list
         self.assertTrue(ret[0].eshape == [s for s in ret[0].jdata.shape[1:]])
@@ -134,7 +147,6 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertEqual(lshape1[i][j], lshape3[count])
                 count += 1
 
-
         jt4 = jt2.jflatten(dim=1)
         lshape2 = jt2.lshape
         lshape4 = jt4.lshape
@@ -184,8 +196,28 @@ class TestJaggedTensor(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_concatenation(self, device, dtype):
-        jt1, l1 = self.mklol(7, 2, 5, device, dtype, last_dims=(3,), base_num=1_000_000 if device == 'cuda' else 1000, vary_num=100, empty_prob=0.0)
-        jt2, _ = self.mklol(3, 3, 5, device, dtype, last_dims=(3,), base_num=1_000_000 if device == 'cuda' else 1000, vary_num=100, empty_prob=0.0)
+        jt1, l1 = self.mklol(
+            7,
+            2,
+            5,
+            device,
+            dtype,
+            last_dims=(3,),
+            base_num=1_000_000 if device == "cuda" else 1000,
+            vary_num=100,
+            empty_prob=0.0,
+        )
+        jt2, _ = self.mklol(
+            3,
+            3,
+            5,
+            device,
+            dtype,
+            last_dims=(3,),
+            base_num=1_000_000 if device == "cuda" else 1000,
+            vary_num=100,
+            empty_prob=0.0,
+        )
         jt3, l3 = self.mklol_like(l1, vary_dim_1=True, vary_dim_2=False)
         jt4, l4 = self.mklol_like(l1, vary_dim_1=False, vary_dim_2=True)
 
@@ -287,12 +319,12 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertTrue(torch.all(jtlij.jdata == ll[i][j]))
 
         # Nesting dimension mismatch
-        jt4 = fvdb.JaggedTensor([torch.randn(np.random.randint(4, 100), 4, device=device, dtype=dtype)]*7)
+        jt4 = fvdb.JaggedTensor([torch.randn(np.random.randint(4, 100), 4, device=device, dtype=dtype)] * 7)
         with self.assertRaises(ValueError):
             _ = fvdb.jcat([jt1, jt4], dim=None)
 
         # Device dimension mismatch
-        other_device = 'cpu' if device == 'cuda' else 'cuda'
+        other_device = "cpu" if device == "cuda" else "cuda"
         jt4 = jt1.to(other_device)
         with self.assertRaises(ValueError):
             _ = fvdb.jcat([jt1, jt4], dim=None)
@@ -307,14 +339,17 @@ class TestJaggedTensor(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = fvdb.jcat([], dim=None)
 
-    @parameterized.expand([
-        [*l1, *l2] for l1, l2 in itertools.product(all_device_dtype_combos, all_device_dtype_combos)
-    ])
+    @parameterized.expand(
+        [[*l1, *l2] for l1, l2 in itertools.product(all_device_dtype_combos, all_device_dtype_combos)]
+    )
     def test_jagged_like(self, from_device, from_dtype, to_device, to_dtype):
         num_grids = np.random.randint(1, 128)
-        nvox_per_grid = NVOX if from_device == 'cuda' else 100
-        nrand = 10_000 if from_device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=from_device, dtype=from_dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if from_device == "cuda" else 100
+        nrand = 10_000 if from_device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=from_device, dtype=from_dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         featdata = torch.randn(randpts.jdata.shape[0], 32, dtype=to_dtype, device=to_device)
 
@@ -323,16 +358,19 @@ class TestJaggedTensor(unittest.TestCase):
         self.check_lshape(randfeats, pts_list)
         self.assertEqual(randfeats.jdata.shape[0], randpts.jdata.shape[0])
         self.assertEqual(randfeats.jdata.shape[0], randpts.jdata.shape[0])
-        self.assertEqual(randfeats.device, randpts.device) # jagged_like ignore device
+        self.assertEqual(randfeats.device, randpts.device)  # jagged_like ignore device
         self.assertEqual(randpts.dtype, from_dtype)
         self.assertEqual(randfeats.dtype, to_dtype)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_rmask(self, device, dtype):
         num_grids = np.random.randint(1, 128)
-        nvox_per_grid = NVOX if device == 'cuda' else 100
-        nrand = 10_000 if device == 'cuda' else 100
-        pts_list = [torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype) for _ in range(num_grids)]
+        nvox_per_grid = NVOX if device == "cuda" else 100
+        nrand = 10_000 if device == "cuda" else 100
+        pts_list = [
+            torch.rand(nvox_per_grid + np.random.randint(nrand), 3, device=device, dtype=dtype)
+            for _ in range(num_grids)
+        ]
         randpts = fvdb.JaggedTensor(pts_list)
         self.check_lshape(randpts, pts_list)
 
@@ -340,7 +378,7 @@ class TestJaggedTensor(unittest.TestCase):
         masked_randpts = randpts.rmask(mask)
         masked_list = []
         for i, pts in enumerate(pts_list):
-            maski = mask[randpts.joffsets[i]:randpts.joffsets[i+1]]
+            maski = mask[randpts.joffsets[i] : randpts.joffsets[i + 1]]
             masked_list.append(pts[maski])
             self.assertTrue(torch.all(masked_randpts[i].jdata == masked_list[-1]))
         self.check_lshape(masked_randpts, masked_list)
@@ -360,8 +398,8 @@ class TestJaggedTensor(unittest.TestCase):
         grid = gridbatch[0]
 
         data_path = os.path.join(os.path.dirname(__file__), os.path.pardir, "data")
-        ray_o_path = os.path.join(data_path, 'ray_orig.pt')
-        ray_d_path = os.path.join(data_path, 'ray_dir.pt')
+        ray_o_path = os.path.join(data_path, "ray_orig.pt")
+        ray_d_path = os.path.join(data_path, "ray_dir.pt")
         ray_o = torch.load(ray_o_path).to(device=device, dtype=dtype)
         ray_d = torch.load(ray_d_path).to(device=device, dtype=dtype)
         ray_orig = fvdb.JaggedTensor([ray_o])
@@ -487,7 +525,6 @@ class TestJaggedTensor(unittest.TestCase):
             res = randpts_b + randpts_c
         fvdb.config.pedantic_error_checking = False
 
-
         # ------------
         # Subtract
         # ------------
@@ -506,7 +543,6 @@ class TestJaggedTensor(unittest.TestCase):
         with self.assertRaises(ValueError):
             res = randpts_b - randpts_c
         fvdb.config.pedantic_error_checking = False
-
 
         # ------------
         # Multiply
@@ -549,20 +585,20 @@ class TestJaggedTensor(unittest.TestCase):
         # ------------
         # Pow
         # ------------
-        res = randpts ** randpts_b
-        self.assertTrue(torch.allclose(res.jdata, randpts.jdata ** randpts_b.jdata))
+        res = randpts**randpts_b
+        self.assertTrue(torch.allclose(res.jdata, randpts.jdata**randpts_b.jdata))
         self.check_lshape(res, pts_list)
 
-        res2 = randpts_b ** randpts_c
-        self.assertTrue(torch.allclose(res2.jdata, randpts_b.jdata ** randpts_c.jdata))
+        res2 = randpts_b**randpts_c
+        self.assertTrue(torch.allclose(res2.jdata, randpts_b.jdata**randpts_c.jdata))
         self.check_lshape(res2, pts_list)
         fvdb.config.pedantic_error_checking = True
         with self.assertRaises(ValueError):
-            res = randpts_b ** randpts_c
+            res = randpts_b**randpts_c
         fvdb.config.pedantic_error_checking = False
 
-        res = randpts ** 5
-        self.assertTrue(torch.allclose(res.jdata, randpts.jdata ** 5))
+        res = randpts**5
+        self.assertTrue(torch.allclose(res.jdata, randpts.jdata**5))
         self.check_lshape(res, pts_list)
 
         # ------------
@@ -592,7 +628,7 @@ class TestJaggedTensor(unittest.TestCase):
         self.check_lshape(res, pts_list)
 
         res2 = randpts_b % randpts_c
-        if dtype != torch.float16: # Not stable in float 16, but not important for this test
+        if dtype != torch.float16:  # Not stable in float 16, but not important for this test
             self.assertTrue(torch.allclose(res2.jdata, randpts_b.jdata % randpts_c.jdata))
             self.check_lshape(res2, pts_list)
             fvdb.config.pedantic_error_checking = True
@@ -748,7 +784,10 @@ class TestJaggedTensor(unittest.TestCase):
         for _ in range(4):
             pts_list_i = []
             while len(pts_list_i) == 0:
-                pts_list_i = [torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype) for _ in range(np.random.randint(3, 7))]
+                pts_list_i = [
+                    torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype)
+                    for _ in range(np.random.randint(3, 7))
+                ]
             pts_list_a.append(pts_list_i)
         pts_list_b = [[torch.rand_like(x) + 1e-5 for x in pts_list_i] for pts_list_i in pts_list_a]
         randpts_a = fvdb.JaggedTensor(pts_list_a)
@@ -778,7 +817,10 @@ class TestJaggedTensor(unittest.TestCase):
         for _ in range(4):
             pts_list_i = []
             while len(pts_list_i) == 0:
-                pts_list_i = [torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype) for _ in range(np.random.randint(3, 7))]
+                pts_list_i = [
+                    torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype)
+                    for _ in range(np.random.randint(3, 7))
+                ]
             pts_list.append(pts_list_i)
         pts_list_b = [[torch.rand_like(x) + 1e-5 for x in pts_list_i] for pts_list_i in pts_list]
         randpts = fvdb.JaggedTensor(pts_list)
@@ -847,7 +889,7 @@ class TestJaggedTensor(unittest.TestCase):
         self.assertTrue(torch.allclose(res.jdata, randpts.jdata / randpts_b.jdata))
         self.check_lshape(res, pts_list)
 
-        if (dtype != torch.float16): # Not stable in float 16, but not important for this test
+        if dtype != torch.float16:  # Not stable in float 16, but not important for this test
             res2 = randpts / randpts_c
             self.assertTrue(torch.allclose(res2.jdata, randpts.jdata / randpts_c.jdata))
             self.check_lshape(res2, pts_list)
@@ -864,7 +906,7 @@ class TestJaggedTensor(unittest.TestCase):
         self.assertTrue(torch.allclose(res.jdata, randpts.jdata // randpts_b.jdata))
         self.check_lshape(res, pts_list)
 
-        if (dtype != torch.float16): # Not stable in float 16, but not important for this test
+        if dtype != torch.float16:  # Not stable in float 16, but not important for this test
             res2 = randpts // randpts_c
             self.assertTrue(torch.allclose(res2.jdata, randpts.jdata // randpts_c.jdata))
             self.check_lshape(res2, pts_list)
@@ -959,93 +1001,57 @@ class TestJaggedTensor(unittest.TestCase):
 
         for i, rpi in enumerate(randpts):
             for j, _ in enumerate(rpi):
-                self.assertTrue(torch.allclose((randpts + randpts_b)[i][j].jdata,
-                                                pts_list[i][j] + pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts + 2)[i][j].jdata,
-                                                pts_list[i][j] + 2))
-                self.assertTrue(torch.allclose((randpts + 3.14)[i][j].jdata,
-                                                pts_list[i][j] + 3.14))
+                self.assertTrue(torch.allclose((randpts + randpts_b)[i][j].jdata, pts_list[i][j] + pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts + 2)[i][j].jdata, pts_list[i][j] + 2))
+                self.assertTrue(torch.allclose((randpts + 3.14)[i][j].jdata, pts_list[i][j] + 3.14))
 
-                self.assertTrue(torch.allclose((randpts - randpts_b)[i][j].jdata,
-                                                pts_list[i][j] - pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts - 2)[i][j].jdata,
-                                                pts_list[i][j] - 2))
-                self.assertTrue(torch.allclose((randpts - 3.14)[i][j].jdata,
-                                                pts_list[i][j] - 3.14))
+                self.assertTrue(torch.allclose((randpts - randpts_b)[i][j].jdata, pts_list[i][j] - pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts - 2)[i][j].jdata, pts_list[i][j] - 2))
+                self.assertTrue(torch.allclose((randpts - 3.14)[i][j].jdata, pts_list[i][j] - 3.14))
 
-                self.assertTrue(torch.allclose((randpts * randpts_b)[i][j].jdata,
-                                                pts_list[i][j] * pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts * 2)[i][j].jdata,
-                                                pts_list[i][j] * 2))
-                self.assertTrue(torch.allclose((randpts * 3.14)[i][j].jdata,
-                                                pts_list[i][j] * 3.14))
+                self.assertTrue(torch.allclose((randpts * randpts_b)[i][j].jdata, pts_list[i][j] * pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts * 2)[i][j].jdata, pts_list[i][j] * 2))
+                self.assertTrue(torch.allclose((randpts * 3.14)[i][j].jdata, pts_list[i][j] * 3.14))
 
-                self.assertTrue(torch.allclose((randpts / randpts_b)[i][j].jdata,
-                                                pts_list[i][j] / pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts / 2)[i][j].jdata,
-                                                pts_list[i][j] / 2))
-                self.assertTrue(torch.allclose((randpts / 3.14)[i][j].jdata,
-                                                pts_list[i][j] / 3.14))
+                self.assertTrue(torch.allclose((randpts / randpts_b)[i][j].jdata, pts_list[i][j] / pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts / 2)[i][j].jdata, pts_list[i][j] / 2))
+                self.assertTrue(torch.allclose((randpts / 3.14)[i][j].jdata, pts_list[i][j] / 3.14))
 
-                self.assertTrue(torch.allclose((randpts // randpts_b)[i][j].jdata,
-                                                pts_list[i][j] // pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts // 2)[i][j].jdata,
-                                                pts_list[i][j] // 2))
-                self.assertTrue(torch.allclose((randpts // 3.14)[i][j].jdata,
-                                                pts_list[i][j] // 3.14))
+                self.assertTrue(torch.allclose((randpts // randpts_b)[i][j].jdata, pts_list[i][j] // pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts // 2)[i][j].jdata, pts_list[i][j] // 2))
+                self.assertTrue(torch.allclose((randpts // 3.14)[i][j].jdata, pts_list[i][j] // 3.14))
 
-                self.assertTrue(torch.allclose((randpts % randpts_b)[i][j].jdata,
-                                                pts_list[i][j] % pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts % 2)[i][j].jdata,
-                                                pts_list[i][j] % 2))
-                self.assertTrue(torch.allclose((randpts % 3.14)[i][j].jdata,
-                                                pts_list[i][j] % 3.14))
+                self.assertTrue(torch.allclose((randpts % randpts_b)[i][j].jdata, pts_list[i][j] % pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts % 2)[i][j].jdata, pts_list[i][j] % 2))
+                self.assertTrue(torch.allclose((randpts % 3.14)[i][j].jdata, pts_list[i][j] % 3.14))
 
-                self.assertTrue(torch.allclose((randpts > randpts_b)[i][j].jdata,
-                                                pts_list[i][j] > pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts > 2)[i][j].jdata,
-                                                pts_list[i][j] > 2))
-                self.assertTrue(torch.allclose((randpts > 3.14)[i][j].jdata,
-                                                pts_list[i][j] > 3.14))
+                self.assertTrue(torch.allclose((randpts > randpts_b)[i][j].jdata, pts_list[i][j] > pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts > 2)[i][j].jdata, pts_list[i][j] > 2))
+                self.assertTrue(torch.allclose((randpts > 3.14)[i][j].jdata, pts_list[i][j] > 3.14))
 
-                self.assertTrue(torch.allclose((randpts >= randpts_b)[i][j].jdata,
-                                                pts_list[i][j] >= pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts >= 2)[i][j].jdata,
-                                                pts_list[i][j] >= 2))
-                self.assertTrue(torch.allclose((randpts >= 3.14)[i][j].jdata,
-                                                pts_list[i][j] >= 3.14))
+                self.assertTrue(torch.allclose((randpts >= randpts_b)[i][j].jdata, pts_list[i][j] >= pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts >= 2)[i][j].jdata, pts_list[i][j] >= 2))
+                self.assertTrue(torch.allclose((randpts >= 3.14)[i][j].jdata, pts_list[i][j] >= 3.14))
 
-                self.assertTrue(torch.allclose((randpts < randpts_b)[i][j].jdata,
-                                                pts_list[i][j] < pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts < 2)[i][j].jdata,
-                                                pts_list[i][j] < 2))
-                self.assertTrue(torch.allclose((randpts < 3.14)[i][j].jdata,
-                                                pts_list[i][j] < 3.14))
+                self.assertTrue(torch.allclose((randpts < randpts_b)[i][j].jdata, pts_list[i][j] < pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts < 2)[i][j].jdata, pts_list[i][j] < 2))
+                self.assertTrue(torch.allclose((randpts < 3.14)[i][j].jdata, pts_list[i][j] < 3.14))
 
-                self.assertTrue(torch.allclose((randpts <= randpts_b)[i][j].jdata,
-                                                pts_list[i][j] <= pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts <= 2)[i][j].jdata,
-                                                pts_list[i][j] <= 2))
-                self.assertTrue(torch.allclose((randpts <= 3.14)[i][j].jdata,
-                                                pts_list[i][j] <= 3.14))
+                self.assertTrue(torch.allclose((randpts <= randpts_b)[i][j].jdata, pts_list[i][j] <= pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts <= 2)[i][j].jdata, pts_list[i][j] <= 2))
+                self.assertTrue(torch.allclose((randpts <= 3.14)[i][j].jdata, pts_list[i][j] <= 3.14))
 
-                self.assertTrue(torch.allclose((randpts == randpts_b)[i][j].jdata,
-                                                pts_list[i][j] == pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts == 2)[i][j].jdata,
-                                                pts_list[i][j] == 2))
-                self.assertTrue(torch.allclose((randpts == 3.14)[i][j].jdata,
-                                                pts_list[i][j] == 3.14))
+                self.assertTrue(torch.allclose((randpts == randpts_b)[i][j].jdata, pts_list[i][j] == pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts == 2)[i][j].jdata, pts_list[i][j] == 2))
+                self.assertTrue(torch.allclose((randpts == 3.14)[i][j].jdata, pts_list[i][j] == 3.14))
 
-                self.assertTrue(torch.allclose((randpts != randpts_b)[i][j].jdata,
-                                                pts_list[i][j] != pts_list_b[i][j]))
-                self.assertTrue(torch.allclose((randpts != 2)[i][j].jdata,
-                                                pts_list[i][j] != 2))
-                self.assertTrue(torch.allclose((randpts != 3.14)[i][j].jdata,
-                                                pts_list[i][j] != 3.14))
+                self.assertTrue(torch.allclose((randpts != randpts_b)[i][j].jdata, pts_list[i][j] != pts_list_b[i][j]))
+                self.assertTrue(torch.allclose((randpts != 2)[i][j].jdata, pts_list[i][j] != 2))
+                self.assertTrue(torch.allclose((randpts != 3.14)[i][j].jdata, pts_list[i][j] != 3.14))
 
     @parameterized.expand(all_device_dtype_combos)
     def test_to_devices(self, device, dtype):
-        create_device = 'cpu' if device == 'cuda' else 'cuda'
+        create_device = "cpu" if device == "cuda" else "cuda"
         pts_list = [torch.rand(1000 + np.random.randint(10), 3, device=create_device, dtype=dtype) for _ in range(17)]
         randpts = fvdb.JaggedTensor(pts_list)
         self.check_lshape(randpts, pts_list)
@@ -1089,7 +1095,7 @@ class TestJaggedTensor(unittest.TestCase):
             self.check_lshape(sum_res, sum_list)
 
             grad_out = torch.rand_like(sum_res_ours)
-            #(sum_res_ours * grad_out).sum().backward()
+            # (sum_res_ours * grad_out).sum().backward()
             sum_res_ours.backward(grad_out)
             assert jt.jdata.grad is not None
             grad_ours = jt.jdata.grad.clone()
@@ -1099,18 +1105,18 @@ class TestJaggedTensor(unittest.TestCase):
                 sum_res_ptscatter = torch_scatter.scatter_sum(jt.jdata, jt.jidx.long(), dim=0, dim_size=len(jt))
             else:
                 sum_res_ptscatter = jt.jdata.sum(dim=dim, keepdim=keepdim)
-            #(sum_res_ptscatter * grad_out).sum().backward()
+            # (sum_res_ptscatter * grad_out).sum().backward()
             sum_res_ptscatter.backward(grad_out)
             assert jt.jdata.grad is not None
             grad_ptscatter = jt.jdata.grad.clone()
 
             tol = {}
             if dtype == torch.float16:
-                tol['rtol'] = 1e-1
-                tol['atol'] = 1e-1
+                tol["rtol"] = 1e-1
+                tol["atol"] = 1e-1
             elif dtype == torch.float32:
-                tol['rtol'] = 1e-4
-                tol['atol'] = 1e-5
+                tol["rtol"] = 1e-4
+                tol["atol"] = 1e-5
             _ = torch.where(~torch.isclose(sum_res_ours, sum_res_ptscatter, **tol))
             self.assertTrue(torch.allclose(sum_res_ours, sum_res_ptscatter, **tol))
             self.assertTrue(torch.allclose(grad_ours, grad_ptscatter, **tol))
@@ -1277,7 +1283,10 @@ class TestJaggedTensor(unittest.TestCase):
                                 self.assertEqual(jt[i][j].jdata[idx_i, a, b], data_list[i][j][idx_ours, a, b])
                                 self.assertEqual(jt[i][j].jdata[idx_ours, a, b], data_list[i][j][idx_i, a, b])
                 else:
-                    self.assertTrue(torch.all(min_idx_ours[i][j].jdata == min_idx_i).item(), str(min_idx_ours[i][j].jdata) + " vs " + str(min_idx_i))
+                    self.assertTrue(
+                        torch.all(min_idx_ours[i][j].jdata == min_idx_i).item(),
+                        str(min_idx_ours[i][j].jdata) + " vs " + str(min_idx_i),
+                    )
         catted_min_idx = torch.stack(catted_min_idx, dim=0)
 
         min_res_jdata = min_val_ours.jdata
@@ -1297,8 +1306,10 @@ class TestJaggedTensor(unittest.TestCase):
             zgours = torch.sort(grad_ours[grad_ours != 0.0])[0]
             zgcmp = torch.sort(grad_ptscatter[grad_ptscatter != 0.0])[0]
             self.assertTrue(torch.allclose(zgours, zgcmp))
-            self.assertTrue(torch.allclose(grad_ours, grad_ptscatter),
-                            str((grad_ours[grad_ours != 0] - grad_ptscatter[grad_ptscatter != 0]).max()))
+            self.assertTrue(
+                torch.allclose(grad_ours, grad_ptscatter),
+                str((grad_ours[grad_ours != 0] - grad_ptscatter[grad_ptscatter != 0]).max()),
+            )
         else:
             zgours = torch.sort(grad_ours[grad_ours != 0.0])[0]
             zgcmp = torch.sort(grad_ptscatter[grad_ptscatter != 0.0])[0]
@@ -1338,7 +1349,7 @@ class TestJaggedTensor(unittest.TestCase):
                     # values in the tensor.
                     for a in range(max_idx_i.shape[0]):
                         for b in range(max_idx_i.shape[1]):
-                            if (max_idx_ours[i][j].jdata[0][a][b] != max_idx_i[a][b]):
+                            if max_idx_ours[i][j].jdata[0][a][b] != max_idx_i[a][b]:
                                 idx_ours = max_idx_ours[i][j].jdata[0][a][b].item()
                                 idx_i = max_idx_i[a][b].item()
                                 self.assertEqual(jt[i][j].jdata[idx_i, a, b], data_list[i][j][idx_i, a, b])
@@ -1346,7 +1357,10 @@ class TestJaggedTensor(unittest.TestCase):
                                 self.assertEqual(jt[i][j].jdata[idx_i, a, b], data_list[i][j][idx_ours, a, b])
                                 self.assertEqual(jt[i][j].jdata[idx_ours, a, b], data_list[i][j][idx_i, a, b])
                 else:
-                    self.assertTrue(torch.all(max_idx_ours[i][j].jdata == max_idx_i).item(), str(max_idx_ours[i][j].jdata) + " vs " + str(max_idx_i))
+                    self.assertTrue(
+                        torch.all(max_idx_ours[i][j].jdata == max_idx_i).item(),
+                        str(max_idx_ours[i][j].jdata) + " vs " + str(max_idx_i),
+                    )
 
         max_res_jdata = max_val_ours.jdata
         grad_out = torch.rand_like(max_res_jdata)
@@ -1372,11 +1386,11 @@ class TestJaggedTensor(unittest.TestCase):
     def test_jsum_list_of_lists(self, device, dtype):
         tol = {}
         if dtype == torch.float16:
-            tol['rtol'] = 1e-1
-            tol['atol'] = 1e-1
+            tol["rtol"] = 1e-1
+            tol["atol"] = 1e-1
         elif dtype == torch.float32:
-            tol['rtol'] = 1e-3
-            tol['atol'] = 1e-4
+            tol["rtol"] = 1e-3
+            tol["atol"] = 1e-4
 
         if dtype == torch.float16:
             min_num = 100
@@ -1399,19 +1413,21 @@ class TestJaggedTensor(unittest.TestCase):
         self.check_lshape(sum_ours, sum_list)
         for i, soi in enumerate(sum_ours):
             for j, soij in enumerate(soi):
-                self.assertTrue(torch.allclose(soij.jdata, data_list[i][j].sum(0), **tol),
-                                str(soij.jdata) + " vs " + str(data_list[i][j].sum(0)))
+                self.assertTrue(
+                    torch.allclose(soij.jdata, data_list[i][j].sum(0), **tol),
+                    str(soij.jdata) + " vs " + str(data_list[i][j].sum(0)),
+                )
 
         sum_ours_jdata = jt.jsum().jdata
         grad_out = torch.rand_like(sum_ours_jdata)
-        #(sum_ours_jdata * grad_out).sum().backward()
+        # (sum_ours_jdata * grad_out).sum().backward()
         sum_ours_jdata.backward(grad_out)
         assert jt.jdata.grad is not None
         grad_ours = jt.jdata.grad.clone()
 
         jt.jdata.grad = None
         sum_res_ptscatter = torch_scatter.scatter_sum(jt.jdata, jt.jidx.long(), dim=0, dim_size=jt.num_tensors)
-        #(sum_res_ptscatter * grad_out).sum().backward()
+        # (sum_res_ptscatter * grad_out).sum().backward()
         sum_res_ptscatter.backward(grad_out)
         assert jt.jdata.grad is not None
         grad_ptscatter = jt.jdata.grad.clone()
@@ -1463,15 +1479,13 @@ class TestJaggedTensor(unittest.TestCase):
 
         # fVDB
         with torch.backends.cuda.sdp_kernel(enable_flash=False, enable_math=True, enable_mem_efficient=False):
-            out_jagged_fvdb = fvdb.scaled_dot_product_attention(
-                q_jagged, k_jagged, v_jagged, scale=scale
-            )
+            out_jagged_fvdb = fvdb.scaled_dot_product_attention(q_jagged, k_jagged, v_jagged, scale=scale)
             self.check_lshape(out_jagged_fvdb, out_jagged_torch_forloop_list)
         self.assertTrue(torch.allclose(out_jagged_torch_forloop.jdata, out_jagged_fvdb.jdata))
         self.assertTrue(torch.all(out_jagged_torch_forloop.joffsets == out_jagged_fvdb.joffsets))
 
     def test_datatype_caster(self):
-        feature = torch.randn((120, 32), device='cpu')
+        feature = torch.randn((120, 32), device="cpu")
         jagged_feature = fvdb.JaggedTensor([feature])
         self.check_lshape(jagged_feature, [feature])
 
@@ -1502,7 +1516,10 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertTrue(torch.all(ltij == lt2[i][j]).item())
 
     def test_list_of_lists_indexing(self):
-        lt = [[torch.randn(np.random.randint(100, 200), 7) for _ in range(int(l.item()))] for l in torch.randint(3, 17, (7,))]
+        lt = [
+            [torch.randn(np.random.randint(100, 200), 7) for _ in range(int(l.item()))]
+            for l in torch.randint(3, 17, (7,))
+        ]
         jt = fvdb.JaggedTensor(lt)
         self.check_lshape(jt, lt)
         lt2 = jt.unbind()
@@ -1515,7 +1532,10 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertTrue(torch.all(jt[i][j].jdata == lt2[i][j]).item())
 
     def test_list_of_lists_slicing(self):
-        lt = [[torch.randn(np.random.randint(100, 200), 7) for _ in range(int(l.item()))] for l in torch.randint(3, 17, (7,))]
+        lt = [
+            [torch.randn(np.random.randint(100, 200), 7) for _ in range(int(l.item()))]
+            for l in torch.randint(3, 17, (7,))
+        ]
         jt = fvdb.JaggedTensor(lt)
         self.check_lshape(jt, lt)
 
@@ -1616,7 +1636,7 @@ class TestJaggedTensor(unittest.TestCase):
             for j, lij in enumerate(li):
                 self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
 
-    @parameterized.expand(['cuda', 'cpu'])
+    @parameterized.expand(["cuda", "cpu"])
     def test_jagged_tensor_integer_indexing(self, device):
         jt1, l1 = self.mklol(7, 4, 8, device, torch.float32)
         self.check_lshape(jt1, l1)
@@ -1643,7 +1663,7 @@ class TestJaggedTensor(unittest.TestCase):
         for jti in jt1:
             pli = []
             for jtij in jti:
-                pmtij = torch.randperm(jtij.rshape[0]).to(device)[:np.random.randint(1, 5)]
+                pmtij = torch.randperm(jtij.rshape[0]).to(device)[: np.random.randint(1, 5)]
                 pli.append(pmtij)
             permlist.append(pli)
         permjt = fvdb.JaggedTensor(permlist)
@@ -1659,7 +1679,7 @@ class TestJaggedTensor(unittest.TestCase):
         for jti in jt1:
             pli = []
             for jtij in jti:
-                pmtij = torch.randperm(jtij.rshape[0]).to(device)[:jtij.rshape[0]//2]
+                pmtij = torch.randperm(jtij.rshape[0]).to(device)[: jtij.rshape[0] // 2]
                 pmtij = torch.cat([pmtij, pmtij, pmtij, pmtij])
                 pli.append(pmtij)
             permlist.append(pli)
@@ -1689,8 +1709,7 @@ class TestJaggedTensor(unittest.TestCase):
         with self.assertRaises(IndexError):
             _ = jt1[randintegers]
 
-
-    @parameterized.expand(['cuda', 'cpu'])
+    @parameterized.expand(["cuda", "cpu"])
     def test_jagged_tensor_integer_indexing_multidim(self, device):
         jt1, _ = self.mklol(7, 4, 8, device, torch.float32)
 
@@ -1723,7 +1742,7 @@ class TestJaggedTensor(unittest.TestCase):
             pli = []
             pdi = []
             for jtij in jti:
-                pmtij = torch.randperm(jtij.rshape[0]).to(device)[:np.random.randint(1, 5)]
+                pmtij = torch.randperm(jtij.rshape[0]).to(device)[: np.random.randint(1, 5)]
                 pmtij = torch.stack([pmtij, pmtij], dim=-1)
                 pli.append(pmtij)
                 pdi.append(jtij.jdata[pmtij])
@@ -1744,7 +1763,7 @@ class TestJaggedTensor(unittest.TestCase):
             pli = []
             pdi = []
             for jtij in jti:
-                pmtij = torch.randperm(jtij.rshape[0]).to(device)[:jtij.rshape[0]//2]
+                pmtij = torch.randperm(jtij.rshape[0]).to(device)[: jtij.rshape[0] // 2]
                 pmtij = torch.cat([pmtij, pmtij, pmtij, pmtij])
                 pmtij = torch.stack([pmtij, pmtij], dim=-1)
                 pli.append(pmtij)
@@ -1766,9 +1785,9 @@ class TestJaggedTensor(unittest.TestCase):
             pli = []
             pdi = []
             for jtij in jti:
-                pmtij = torch.randperm(jtij.rshape[0]).to(device) # [N]
-                pmtij = torch.stack([pmtij, pmtij], dim=-1) # [N, 2]
-                pmtij = pmtij.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 3, 4) # [N, 2, 3, 4]
+                pmtij = torch.randperm(jtij.rshape[0]).to(device)  # [N]
+                pmtij = torch.stack([pmtij, pmtij], dim=-1)  # [N, 2]
+                pmtij = pmtij.unsqueeze(-1).unsqueeze(-1).repeat(1, 1, 3, 4)  # [N, 2, 3, 4]
                 pli.append(pmtij)
                 pdi.append(jtij.jdata[pmtij])
             permlist.append(pli)
@@ -1781,8 +1800,7 @@ class TestJaggedTensor(unittest.TestCase):
             for j, jtpij in enumerate(jtpi):
                 self.assertTrue(torch.all(jt1[i][j].jdata[permjt[i][j].jdata] == jtpij.jdata).item())
 
-
-    @parameterized.expand(['cuda', 'cpu'])
+    @parameterized.expand(["cuda", "cpu"])
     def test_jagged_tensor_boolean_indexing(self, device):
         jt1, l1 = self.mklol(7, 4, 8, device, torch.float32)
         self.check_lshape(jt1, l1)
@@ -1809,7 +1827,7 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertTrue(torch.all(jt1[i][j].jdata[permjt[i][j].jdata] == permdata[i][j]).item())
 
     def test_edim(self):
-        jt, lt = self.mklol(7, 4, 8, 'cuda', torch.float32)
+        jt, lt = self.mklol(7, 4, 8, "cuda", torch.float32)
         self.check_lshape(jt, lt)
         self.assertEqual(jt.edim, 2)
         self.assertEqual(jt.eshape[0], 3)
@@ -2074,7 +2092,7 @@ class TestJaggedTensor(unittest.TestCase):
         self.assertTrue(torch.all(jt1.jdata == jt2.jdata).item())
         self.assertTrue(not torch.all(jt1.jdata == jt3.jdata).item())
 
-        jt1 **= jt3.jdata.abs() # Because NaN
+        jt1 **= jt3.jdata.abs()  # Because NaN
         self.assertTrue(torch.all(jt1.jdata == jt2.jdata).item())
         self.assertTrue(not torch.all(jt1.jdata == jt3.jdata).item())
 
@@ -2150,5 +2168,5 @@ class TestJaggedTensor(unittest.TestCase):
     #         self.assertTrue(torch.all(data_sorted == jt[i].jdata[idx[i].jdata]).item())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

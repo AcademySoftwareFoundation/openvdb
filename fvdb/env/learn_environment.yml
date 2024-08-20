@@ -28,6 +28,7 @@ dependencies:
   - pytest-benchmark
   - polyscope
   - numpy<2
+  - pyrender
   - pip:
     - point-cloud-utils
     - linkify-it-py

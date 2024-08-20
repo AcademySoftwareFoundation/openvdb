@@ -12,9 +12,7 @@ from fvdb_benchmark.utils import encode_range_name
 
 class UpDown(nn.Module):
 
-    def __init__(self,
-                 backend: str,
-                 factor: int = 2):
+    def __init__(self, backend: str, factor: int = 2):
         super().__init__()
 
         self.backend = backend
@@ -26,12 +24,12 @@ class UpDown(nn.Module):
 
     def forward(self, x):
         # Isolate grid creation time for fvdb
-        if self.backend == 'fvdb':
+        if self.backend == "fvdb":
             with record_function(encode_range_name("grid_creation", self.backend, {})):
                 assert isinstance(x, fvdbnn.VDBTensor)
                 up_grid = x.grid.subdivided_grid(self.factor)
-                up_kwargs = {'ref_fine_data': up_grid}
-                down_kargs = {'ref_coarse_data': x.grid}
+                up_kwargs = {"ref_fine_data": up_grid}
+                down_kargs = {"ref_coarse_data": x.grid}
         else:
             up_kwargs = down_kargs = {}
 

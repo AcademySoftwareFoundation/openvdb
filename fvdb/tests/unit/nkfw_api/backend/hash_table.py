@@ -13,8 +13,13 @@ from .abc import BaseBackend
 print("SparseFeatureHierarchy Backend: Hash Table")
 
 
-def torch_unique(input: torch.Tensor, sorted: bool = False, return_inverse: bool = False,
-                 return_counts: bool = False, dim: int = None):
+def torch_unique(
+    input: torch.Tensor,
+    sorted: bool = False,
+    return_inverse: bool = False,
+    return_counts: bool = False,
+    dim: int = None,
+):
     """
     If used with dim, then torch.unique will return a flattened tensor. This fixes that behaviour.
     :param input: (Tensor) – the input tensor
@@ -80,8 +85,7 @@ class NeighbourMaps:
 
 class SparseFeatureHierarchy(BaseBackend):
 
-    CONFORM_OFFSETS = [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1),
-                       (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)]
+    CONFORM_OFFSETS = [(0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1), (1, 0, 0), (1, 0, 1), (1, 1, 0), (1, 1, 1)]
 
     def __init__(self, depth: int, voxel_size: float, device, range_kernel):
         self._depth = depth
@@ -94,7 +98,7 @@ class SparseFeatureHierarchy(BaseBackend):
         # Region-based exclude same-level
         self._region_nmap = NeighbourMaps(self._device)
 
-        self._strides = [2 ** d for d in range(self.depth)]
+        self._strides = [2**d for d in range(self.depth)]
         # List of torch.Tensor (Nx3)
         self._coords = [None for d in range(self.depth)]
         self._hash_table: List[CuckooHashTable] = [None for d in range(self.depth)]
@@ -116,17 +120,16 @@ class SparseFeatureHierarchy(BaseBackend):
 
         if expand >= 3:
             mc_offsets = self._range_kernel()(expand) * scale
-            base_coords = (base_coords.unsqueeze(dim=1).repeat(1, mc_offsets.size(0), 1) +
-                           mc_offsets.unsqueeze(0)).view(-1, 3)
+            base_coords = (
+                base_coords.unsqueeze(dim=1).repeat(1, mc_offsets.size(0), 1) + mc_offsets.unsqueeze(0)
+            ).view(-1, 3)
             base_coords = torch_unique(base_coords, dim=0)
 
         if conforming:
-            base_coords = (base_coords / scale / 2.).floor().int() * scale * 2
+            base_coords = (base_coords / scale / 2.0).floor().int() * scale * 2
             base_coords = torch_unique(base_coords, dim=0)
-            conform_offsets = torch.tensor(
-                self.CONFORM_OFFSETS, dtype=torch.int32, device=base_coords.device) * scale
-            base_coords = (base_coords.unsqueeze(dim=1).repeat(1, 8, 1) +
-                           conform_offsets.unsqueeze(0)).view(-1, 3)
+            conform_offsets = torch.tensor(self.CONFORM_OFFSETS, dtype=torch.int32, device=base_coords.device) * scale
+            base_coords = (base_coords.unsqueeze(dim=1).repeat(1, 8, 1) + conform_offsets.unsqueeze(0)).view(-1, 3)
 
         return base_coords
 
@@ -134,7 +137,7 @@ class SparseFeatureHierarchy(BaseBackend):
         return self._coords[depth].size(0) if self._coords[depth] is not None else 0
 
     def get_voxel_centers(self, depth: int, normalized: bool = False):
-        return (self.get_coords(depth) + self._strides[depth] / 2.) * (self._voxel_size if not normalized else 1.0)
+        return (self.get_coords(depth) + self._strides[depth] / 2.0) * (self._voxel_size if not normalized else 1.0)
 
     def __repr__(self):
         stat = f"Depth={self.depth}:\n"
@@ -144,8 +147,10 @@ class SparseFeatureHierarchy(BaseBackend):
                 continue
             c_min = torch.min(coords, dim=0).values
             c_max = torch.max(coords, dim=0).values
-            stat += f" + [{stride}] #Voxels={coords.size(0)} " \
-                    f"Bound=[{c_min[0]},{c_max[0]}]x[{c_min[1]},{c_max[1]}]x[{c_min[2]},{c_max[2]}]\n"
+            stat += (
+                f" + [{stride}] #Voxels={coords.size(0)} "
+                f"Bound=[{c_min[0]},{c_max[0]}]x[{c_min[1]},{c_max[1]}]x[{c_min[2]},{c_max[2]}]\n"
+            )
         return stat
 
     def _update_hash_table(self):
@@ -153,12 +158,13 @@ class SparseFeatureHierarchy(BaseBackend):
             self._hash_table[d] = CuckooHashTable(data=self._coords[d])
             assert self._hash_table[d].dim == 3
 
-    def _trilinear_weights(self, xyz: torch.Tensor, tree_stride: int, xyz_data: torch.Tensor = 1,
-                           compute_grad: bool = False):
+    def _trilinear_weights(
+        self, xyz: torch.Tensor, tree_stride: int, xyz_data: torch.Tensor = 1, compute_grad: bool = False
+    ):
         # Gradient is alpha_data w.r.t. xyz.
         q_coords = xyz / self._voxel_size
         d_coords = (q_coords / tree_stride).floor() * tree_stride
-        rel_coords = q_coords - d_coords - tree_stride / 2.
+        rel_coords = q_coords - d_coords - tree_stride / 2.0
         oct_sign = torch.sign(rel_coords)
         oct_local = torch.abs(rel_coords) / tree_stride
 
@@ -166,10 +172,12 @@ class SparseFeatureHierarchy(BaseBackend):
         alpha_data = []
         grad_alpha_data = []
         for nx, ny, nz in self.CONFORM_OFFSETS:
-            alpha_coords.append((d_coords + torch.stack([nx * oct_sign[:, 0],
-                                                         ny * oct_sign[:, 1],
-                                                         nz * oct_sign[:, 2]],
-                                                        dim=1) * tree_stride).int())
+            alpha_coords.append(
+                (
+                    d_coords
+                    + torch.stack([nx * oct_sign[:, 0], ny * oct_sign[:, 1], nz * oct_sign[:, 2]], dim=1) * tree_stride
+                ).int()
+            )
             alpha_x = oct_local[:, 0] if nx == 1 else 1 - oct_local[:, 0]
             alpha_y = oct_local[:, 1] if ny == 1 else 1 - oct_local[:, 1]
             alpha_z = oct_local[:, 2] if nz == 1 else 1 - oct_local[:, 2]
@@ -180,14 +188,16 @@ class SparseFeatureHierarchy(BaseBackend):
                 d_alpha_x = (oct_sign[:, 0] if nx == 1 else -oct_sign[:, 0]) / (self._voxel_size * tree_stride)
                 d_alpha_y = (oct_sign[:, 1] if ny == 1 else -oct_sign[:, 1]) / (self._voxel_size * tree_stride)
                 d_alpha_z = (oct_sign[:, 2] if nz == 1 else -oct_sign[:, 2]) / (self._voxel_size * tree_stride)
-                grad_alpha_data.append(torch.stack([
-                    d_alpha_x * alpha_y * alpha_z,
-                    alpha_x * d_alpha_y * alpha_z,
-                    alpha_x * alpha_y * d_alpha_z
-                ], dim=1))
+                grad_alpha_data.append(
+                    torch.stack(
+                        [d_alpha_x * alpha_y * alpha_z, alpha_x * d_alpha_y * alpha_z, alpha_x * alpha_y * d_alpha_z],
+                        dim=1,
+                    )
+                )
 
-            alpha_data.append(alpha_os * xyz_data if isinstance(xyz_data, int) or xyz_data.ndim == 1 else
-                              alpha_os[:, None] * xyz_data)
+            alpha_data.append(
+                alpha_os * xyz_data if isinstance(xyz_data, int) or xyz_data.ndim == 1 else alpha_os[:, None] * xyz_data
+            )
         alpha_coords = torch.cat(alpha_coords, dim=0)
         alpha_data = torch.cat(alpha_data, dim=0)
 
@@ -196,8 +206,16 @@ class SparseFeatureHierarchy(BaseBackend):
 
         return alpha_coords, alpha_data
 
-    def get_coords_neighbours(self, source_coords: torch.Tensor, source_stride: int, target_depth: int,
-                              nn_kernel: torch.Tensor, conv_based: bool = False, transposed: bool = False, raw: bool = False):
+    def get_coords_neighbours(
+        self,
+        source_coords: torch.Tensor,
+        source_stride: int,
+        target_depth: int,
+        nn_kernel: torch.Tensor,
+        conv_based: bool = False,
+        transposed: bool = False,
+        raw: bool = False,
+    ):
         """
         A generic interface for querying neighbourhood information. (This is without cache)
             For all source (data), find all target whose neighbourhood (in target level) covers it,
@@ -212,18 +230,23 @@ class SparseFeatureHierarchy(BaseBackend):
             #   neighbours that has no overlap support.
             assert source_stride <= self._strides[target_depth], "Data must be deeper and has more nodes."
             # Compute voxel center offsets.
-            quantized_source_coords = torch.div(
-                source_coords.detach() + 0.5 * source_stride, self._strides[target_depth],
-                rounding_mode='floor').int() * self._strides[target_depth]
-            c_offset = (quantized_source_coords - source_coords) / source_stride + \
-                       (self._strides[target_depth] // source_stride - 1) / 2.
+            quantized_source_coords = (
+                torch.div(
+                    source_coords.detach() + 0.5 * source_stride, self._strides[target_depth], rounding_mode="floor"
+                ).int()
+                * self._strides[target_depth]
+            )
+            c_offset = (quantized_source_coords - source_coords) / source_stride + (
+                self._strides[target_depth] // source_stride - 1
+            ) / 2.0
         else:
             assert not source_coords.requires_grad
             assert source_stride >= self._strides[target_depth], "Data must be sparser and shallower."
             quantized_source_coords = source_coords
 
         hash_res = self._hash_table[target_depth].query(
-            quantized_source_coords, nn_kernel * self._strides[target_depth])  # (K, N)
+            quantized_source_coords, nn_kernel * self._strides[target_depth]
+        )  # (K, N)
 
         if transposed:
             hash_res = hash_res.T
@@ -249,8 +272,7 @@ class SparseFeatureHierarchy(BaseBackend):
 
         return source_ids, target_ids, neighbour_types, nbsizes
 
-    def get_self_neighbours(self, source_depth: int, target_depth: int, target_range: int,
-                            conv_based: bool = False):
+    def get_self_neighbours(self, source_depth: int, target_depth: int, target_range: int, conv_based: bool = False):
         """
         :param source_depth: source depth where you want the coord id to start from
         :param target_depth: target depth where you want the coord id to shoot to
@@ -277,13 +299,14 @@ class SparseFeatureHierarchy(BaseBackend):
                 return inv_src_ids, inv_tgt_ids, inv_nts, inv_nbs
             else:
                 # Filter far away nodes.
-                near_mask = torch.all(inv_nts.abs() < target_range / 2. + 1.0e-6, dim=1)
+                near_mask = torch.all(inv_nts.abs() < target_range / 2.0 + 1.0e-6, dim=1)
                 # Convert back neighbour types.
                 inv_nts = -inv_nts / tree_strides[target_depth] * tree_strides[source_depth]
                 return inv_tgt_ids[near_mask], inv_src_ids[near_mask], inv_nts[near_mask], None
 
-        exist_src, exist_tgt, exist_nt, exist_nbs, lack_range = \
-            neighbour_maps.get_map(source_depth, target_depth, target_range)
+        exist_src, exist_tgt, exist_nt, exist_nbs, lack_range = neighbour_maps.get_map(
+            source_depth, target_depth, target_range
+        )
 
         if lack_range is None:
             return recover_inv_op(exist_src, exist_tgt, exist_nt, exist_nbs)
@@ -291,7 +314,7 @@ class SparseFeatureHierarchy(BaseBackend):
         # Only compute incremental part:
         neighbour_kernel = self._range_kernel()(target_range)
         starting_lap = max(0, lack_range[0] - 2)
-        starting_lap = starting_lap ** 3
+        starting_lap = starting_lap**3
         neighbour_kernel = neighbour_kernel[starting_lap:]
 
         source_ids, target_ids, neighbour_types, nbsizes = self.get_coords_neighbours(
@@ -305,8 +328,9 @@ class SparseFeatureHierarchy(BaseBackend):
             nbsizes = torch.cat([exist_nbs, nbsizes], dim=0)
 
         # Cache result for future use.
-        neighbour_maps.update_map(source_depth, target_depth, target_range,
-                                  [source_ids, target_ids, neighbour_types, nbsizes])
+        neighbour_maps.update_map(
+            source_depth, target_depth, target_range, [source_ids, target_ids, neighbour_types, nbsizes]
+        )
 
         return recover_inv_op(source_ids, target_ids, neighbour_types, nbsizes)
 
@@ -318,19 +342,23 @@ class SparseFeatureHierarchy(BaseBackend):
         :return: (N, ) long tensor, with value 0,1,2
         """
         from core.hashtree import VoxelStatus
+
         status = torch.full((coords.size(0),), VoxelStatus.VS_NON_EXIST.value, dtype=torch.long, device=coords.device)
         sidx, _, _, _ = self.get_coords_neighbours(
-            coords, self._strides[depth], depth, self._identity_kernel(), conv_based=True)
+            coords, self._strides[depth], depth, self._identity_kernel(), conv_based=True
+        )
         status[sidx] = VoxelStatus.VS_EXIST_STOP.value
 
         if depth > 0:
             # Next level.
-            conform_offsets = torch.tensor(self.CONFORM_OFFSETS, dtype=torch.int32, device=self._device) * \
-                              self._strides[depth - 1]
+            conform_offsets = (
+                torch.tensor(self.CONFORM_OFFSETS, dtype=torch.int32, device=self._device) * self._strides[depth - 1]
+            )
             conform_coords = (coords[sidx].unsqueeze(dim=1).repeat(1, 8, 1) + conform_offsets.unsqueeze(0)).view(-1, 3)
             qidx, _, _, _ = self.get_coords_neighbours(
-                conform_coords, self._strides[depth - 1], depth - 1, self._identity_kernel(), conv_based=True)
-            qidx = torch.div(qidx, 8, rounding_mode='floor')
+                conform_coords, self._strides[depth - 1], depth - 1, self._identity_kernel(), conv_based=True
+            )
+            qidx = torch.div(qidx, 8, rounding_mode="floor")
             status[sidx[qidx]] = VoxelStatus.VS_EXIST_CONTINUE.value
 
         return status
@@ -349,13 +377,23 @@ class SparseFeatureHierarchy(BaseBackend):
 
         alpha_coords, alpha_weight = self._trilinear_weights(xyz, tree_stride)
         alpha_source, alpha_target, _, _ = self.get_coords_neighbours(
-            alpha_coords, tree_stride, data_depth, self._identity_kernel())
-        return torch_scatter.scatter_sum(data[alpha_target] * alpha_weight[alpha_source, None],
-                                         alpha_source % xyz.size(0), dim=0,
-                                         dim_size=xyz.size(0))
+            alpha_coords, tree_stride, data_depth, self._identity_kernel()
+        )
+        return torch_scatter.scatter_sum(
+            data[alpha_target] * alpha_weight[alpha_source, None],
+            alpha_source % xyz.size(0),
+            dim=0,
+            dim_size=xyz.size(0),
+        )
 
-    def splat_data(self, xyz: torch.Tensor, data_depth: int, data: torch.Tensor = None,
-                   check_corr: bool = True, return_nf_mask: bool = False):
+    def splat_data(
+        self,
+        xyz: torch.Tensor,
+        data_depth: int,
+        data: torch.Tensor = None,
+        check_corr: bool = True,
+        return_nf_mask: bool = False,
+    ):
         """
         Splat the data onto the tree with tri-linear interpolation.
         :param xyz: data position
@@ -373,14 +411,18 @@ class SparseFeatureHierarchy(BaseBackend):
 
         # align normal_coords and tree_coords.
         alpha_source, alpha_target, _, nb_sizes = self.get_coords_neighbours(
-            alpha_coords, tree_stride, data_depth, self._identity_kernel(), transposed=True)
+            alpha_coords, tree_stride, data_depth, self._identity_kernel(), transposed=True
+        )
 
         # Make sure that each query coordinates has one correspondent:
         if alpha_source.size(0) < alpha_coords.size(0) and check_corr:
-            print("Warning: Some grids that normal should be splatted onto is missing because expansion is too small. "
-                  f"# Should = {alpha_coords.size(0)}, Actual = {alpha_source.size(0)}.")
-        splat_res = torch_scatter.scatter_sum(alpha_data[alpha_source], alpha_target, dim=0,
-                                         dim_size=self._coords[data_depth].size(0))
+            print(
+                "Warning: Some grids that normal should be splatted onto is missing because expansion is too small. "
+                f"# Should = {alpha_coords.size(0)}, Actual = {alpha_source.size(0)}."
+            )
+        splat_res = torch_scatter.scatter_sum(
+            alpha_data[alpha_source], alpha_target, dim=0, dim_size=self._coords[data_depth].size(0)
+        )
         if return_nf_mask:
             # If a point can only be splatted on to less than 4 voxels, it is a bad splat.
             return splat_res, nb_sizes.reshape(8, -1).sum(0) < 4
@@ -404,19 +446,26 @@ class SparseFeatureHierarchy(BaseBackend):
             unique_coords = torch_unique(coords, dim=0)
             if expand_range > 0:
                 offsets = self._range_kernel()(expand_range)
-                my_pad = (unique_coords.unsqueeze(dim=1).repeat(1, offsets.size(0), 1) +
-                          offsets.unsqueeze(0)).view(-1, 3)
+                my_pad = (unique_coords.unsqueeze(dim=1).repeat(1, offsets.size(0), 1) + offsets.unsqueeze(0)).view(
+                    -1, 3
+                )
                 unique_coords = torch_unique(my_pad, dim=0)
 
         self._coords = [unique_coords]
         for d in range(1, self.depth):
-            coords = torch.div(self._coords[-1], self._strides[d], rounding_mode='floor') * self._strides[d]
+            coords = torch.div(self._coords[-1], self._strides[d], rounding_mode="floor") * self._strides[d]
             coords = torch_unique(coords, dim=0)
             self._coords.append(coords)
         self._update_hash_table()
 
-    def build_hierarchy_subdivide(self, xyz: torch.Tensor, subdivide_policy, expand: bool = False,
-                                  limit_adaptive_depth: int = 100, **policy_kwargs):
+    def build_hierarchy_subdivide(
+        self,
+        xyz: torch.Tensor,
+        subdivide_policy,
+        expand: bool = False,
+        limit_adaptive_depth: int = 100,
+        **policy_kwargs,
+    ):
         """
         Build a hierarchy, based on subdivision policy
         :return:
@@ -433,7 +482,7 @@ class SparseFeatureHierarchy(BaseBackend):
                 xyz_depth_inds = xyz_depth_inds[nxt_mask]
                 policy_kwargs = {k: v[nxt_mask] if isinstance(v, torch.Tensor) else v for k, v in policy_kwargs.items()}
                 xyz_depth[xyz_depth_inds] -= 1
-            coords = torch.div(current_pts, self.get_stride(d), rounding_mode='floor').int() * self._strides[d]
+            coords = torch.div(current_pts, self.get_stride(d), rounding_mode="floor").int() * self._strides[d]
             unique_coords, inv_mapping = torch_unique(coords, dim=0, return_inverse=True)
             self._coords[d] = unique_coords
         xyz_depth.clamp_(max=limit_adaptive_depth - 1)
@@ -450,9 +499,14 @@ class SparseFeatureHierarchy(BaseBackend):
 
         return xyz_depth
 
-    def build_hierarchy_adaptive(self, xyz: torch.Tensor, xyz_density: torch.Tensor, log_base: float = 4.0,
-                                 min_density: float = 8.0,
-                                 limit_adaptive_depth: int = 100):
+    def build_hierarchy_adaptive(
+        self,
+        xyz: torch.Tensor,
+        xyz_density: torch.Tensor,
+        log_base: float = 4.0,
+        min_density: float = 8.0,
+        limit_adaptive_depth: int = 100,
+    ):
         """
         Build a hierarchy similar to Adaptive-OCNN, i.e., finest voxels does not cover all surfaces,
             but only detailed parts. Coarse voxels, however, must cover all fine voxels.
@@ -509,25 +563,34 @@ class SparseFeatureHierarchy(BaseBackend):
 
         # For the logic here refer to 'splat_data'
         alpha_source, alpha_target, _, nb_sizes = self.get_coords_neighbours(
-            alpha_coords, self._strides[depth], depth, self._identity_kernel(), transposed=False)
+            alpha_coords, self._strides[depth], depth, self._identity_kernel(), transposed=False
+        )
 
         pts_source = alpha_source % queries.size(0)
         depth_feature = torch_scatter.scatter_sum(
-            feature[alpha_target] * alpha_weight[alpha_source, None],
-            pts_source, dim=0, dim_size=queries.size(0))
+            feature[alpha_target] * alpha_weight[alpha_source, None], pts_source, dim=0, dim_size=queries.size(0)
+        )
 
         if compute_grad:
             depth_grad = torch_scatter.scatter_sum(
                 feature[alpha_target][:, :, None] * grad_alpha_weight[alpha_source, None, :],
-                pts_source, dim=0, dim_size=queries.size(0)
+                pts_source,
+                dim=0,
+                dim_size=queries.size(0),
             )
         else:
             depth_grad = None
 
         return depth_feature, depth_grad
 
-    def trilinear_interpolate(self, queries: torch.Tensor, depth: int, feature: torch.Tensor,
-                              feature_bg: torch.Tensor = None, compute_grad: bool = False):
+    def trilinear_interpolate(
+        self,
+        queries: torch.Tensor,
+        depth: int,
+        feature: torch.Tensor,
+        feature_bg: torch.Tensor = None,
+        compute_grad: bool = False,
+    ):
         if feature_bg is not None:
             assert feature_bg.ndim == 1
             assert feature.size(1) == feature_bg.size(0), "Dimension not matched!"
@@ -537,9 +600,10 @@ class SparseFeatureHierarchy(BaseBackend):
             pass
 
         from ext import sparse_op
+
         nb_ids, nb_weight, nb_grad = sparse_op.trilerp(
-            self._hash_table[depth].object,
-            queries, self.voxel_size, self._strides[depth], compute_grad)
+            self._hash_table[depth].object, queries, self.voxel_size, self._strides[depth], compute_grad
+        )
 
         nb_ids = nb_ids.view(-1)
         nb_weight = nb_weight.view(-1)
@@ -547,28 +611,33 @@ class SparseFeatureHierarchy(BaseBackend):
 
         nb_mask = nb_ids > -1
         depth_feature = torch_scatter.scatter_sum(
-            feature[nb_ids[nb_mask]] * nb_weight[nb_mask, None], pts_ids[nb_mask],
-            dim=0, dim_size=queries.size(0)
+            feature[nb_ids[nb_mask]] * nb_weight[nb_mask, None], pts_ids[nb_mask], dim=0, dim_size=queries.size(0)
         )
 
         if feature_bg is not None:
             non_nb_mask = nb_ids == -1
             depth_feature += torch_scatter.scatter_sum(
-                feature_bg[None, :] * nb_weight[non_nb_mask, None], pts_ids[non_nb_mask],
-                dim=0, dim_size=queries.size(0)
+                feature_bg[None, :] * nb_weight[non_nb_mask, None],
+                pts_ids[non_nb_mask],
+                dim=0,
+                dim_size=queries.size(0),
             )
 
         if compute_grad:
             nb_grad = nb_grad.view(-1, nb_grad.size(-1))
             depth_grad = torch_scatter.scatter_sum(
                 feature[nb_ids[nb_mask]][:, :, None] * nb_grad[nb_mask, None, :],
-                pts_ids[nb_mask], dim=0, dim_size=queries.size(0)
+                pts_ids[nb_mask],
+                dim=0,
+                dim_size=queries.size(0),
             )
             # Most of nb_grad[non_nb_mask] should be zero though...
             if feature_bg is not None:
                 depth_grad += torch_scatter.scatter_sum(
                     feature_bg[None, :, None] * nb_grad[non_nb_mask, None, :],
-                    pts_ids[non_nb_mask], dim=0, dim_size=queries.size(0)
+                    pts_ids[non_nb_mask],
+                    dim=0,
+                    dim_size=queries.size(0),
                 )
         else:
             depth_grad = None

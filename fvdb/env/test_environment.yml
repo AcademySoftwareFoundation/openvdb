@@ -1,28 +1,29 @@
 name: fvdb_test
 channels:
   - pyg
-  - nvidia/label/cuda-12.1.0
   - pytorch
+  - nvidia
+  - conda-forge
 dependencies:
   - python=3.10
   - pytorch::pytorch=2.2
   - pytorch::pytorch-cuda=12.1
   - tensorboard
-  - pip
+  - pip>=23.3.1
   - git
   - gitpython
   - ca-certificates
   - certifi
   - openssl
-  - nvidia/label/cuda-12.1.0::cuda
-  - nvidia/label/cuda-12.1.0::cuda-tools
-  - nvidia/label/cuda-12.1.0::cuda-nvcc
-  - nvidia/label/cuda-12.1.0::cuda-cccl
-  - nvidia/label/cuda-12.1.0::cuda-libraries-static
+  - cuda-toolkit=12.1
+  - cuda-compiler=12.1
+  - cuda-nvcc=12.1
+  - cuda-cccl=12.1
+  - cuda-libraries-static=12.1
   - parameterized
   - gcc_linux-64=11
   - gxx_linux-64=11
-  - setuptools
+  - setuptools>=68.2.2
   - cmake
   - make
   - ninja

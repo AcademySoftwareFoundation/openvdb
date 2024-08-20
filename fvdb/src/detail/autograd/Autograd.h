@@ -1,18 +1,23 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-#include "MaxPoolGrid.h"
+#ifndef FVDB_DETAIL_AUTOGRAD_AUTOGRAD_H
+#define FVDB_DETAIL_AUTOGRAD_AUTOGRAD_H
+
+#include "Attention.h"
 #include "AvgPoolGrid.h"
-#include "SampleGrid.h"
-#include "SplatIntoGrid.h"
-#include "UpsampleGrid.h"
-#include "TransformPoints.h"
-#include "VolumeRender.h"
-#include "SparseConvolutionKernelMap.h"
-#include "SparseConvolutionHalo.h"
-#include "SparseConvolutionImplicitGEMM.h"
-#include "ReadIntoDense.h"
-#include "ReadFromDense.h"
 #include "FillToGrid.h"
 #include "JaggedReduce.h"
-#include "Attention.h"
+#include "MaxPoolGrid.h"
+#include "ReadFromDense.h"
+#include "ReadIntoDense.h"
+#include "SampleGrid.h"
+#include "SparseConvolutionHalo.h"
+#include "SparseConvolutionImplicitGEMM.h"
+#include "SparseConvolutionKernelMap.h"
+#include "SplatIntoGrid.h"
+#include "TransformPoints.h"
+#include "UpsampleGrid.h"
+#include "VolumeRender.h"
+
+#endif // FVDB_DETAIL_AUTOGRAD_AUTOGRAD_H

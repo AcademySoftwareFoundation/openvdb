@@ -46,7 +46,62 @@ conda activate fvdb_learn
 
 
 ## Building *f*VDB from Source
-*f*VDB is a Python library implemented as a C++ Pytorch extension.
+
+### Environment Management
+ƒVDB is a Python library implemented as a C++ Pytorch extension.  Of course you can build ƒVDB in whatever environment suits you, but we provide two paths to constructing reliable environments for building and running ƒVDB:  using [docker](#setting-up-a-docker-container) and using [conda](#setting-up-a-conda-environment).
+
+`conda` tends to be more flexible since reconfiguring toolchains and modules to suit your larger project can be dynamic, but at the same time this can be a more brittle experience compared to using a virtualized `docker` container.  Using `conda` is generally recommended for development and testing, while using `docker` is recommended for CI/CD and deployment.
+
+#### Setting up a Docker Container
+
+Running a docker container is a great way to ensure that you have a consistent environment for building and running ƒVDB.
+
+Our provided [`Dockerfile`](Dockerfile) has two modes for building the image: `dev` and `production`.  `production` constructs an image capable of building ƒVDB, builds and installs the ƒVDB libraries and is read for you to start running python code that uses the `fvdb` module.  `dev` mode constructs an image which is ready to build ƒVDB but does not build the ƒVDB libraries.
+
+Building the docker image in `production` mode is the default and is as simple as running the following command from the root of this repository:
+```shell
+# Build the docker image in production mode
+docker build -t fvdb/prod .
+```
+
+Building the docker mage in `dev` mode is done by setting the `BUILD_MODE` argument to `dev`:
+```shell
+# Build the docker image in dev mode
+docker build --build-arg  MODE=dev -t fvdb/dev .
+```
+
+Running the docker container is done with the following command:
+```shell
+# Run an interactive bash shell (or replace with your command)
+docker run -it --gpus all --rm \
+  fvdb/dev:latest \
+  /bin/bash
+```
+
+
+#### Setting up a Conda Environment
+
+In order to get resolved package versions in your conda environment consistent with our testing, it is necessary to configure your `.condarc` since not all package resolving behaviour can be controlled with an `environment.yml` file.  We recommend using `strict` channel priority in your conda configuration.  This can be done by running the following command:
+
+```shell
+conda config --set channel_priority strict
+```
+
+Further, it is recommend to not mix the `defaults` and `conda-forge` package channels when resolving environments.  We have generally used `conda-forge` as the primary channel for our dependencies.  You can remove the `defaults` channel and add `conda-forge` with the following command:
+
+```shell
+conda config --remove channels defaults
+conda config --add channels conda-forge
+```
+
+With these changes, it is recommended that your `.condarc` file looks like the following:
+
+```yaml
+channel_priority: strict
+channels:
+  - conda-forge
+```
+
 
 **(Optional) Install libMamba for a huge quality of life improvement when using Conda**
 ```
@@ -55,7 +110,6 @@ conda install -n base conda-libmamba-solver
 conda config --set solver libmamba
 ```
 
-### Conda Environment
 
 Next, create the `fvdb` conda environment by running the following command from the root of this repository, and then grabbing a ☕:
 ```shell
@@ -105,22 +159,6 @@ sphinx-build -E -a docs/ build/sphinx
 # View the docs
 open build/sphinx/index.html
 ```
-
-### Docker Image
-
-To build and test *f*VDB, we have the dockerfile available:
-```shell
-# Build fvdb
-docker build . -t fvdb-dev
-# Run fvdb (or replace with your command)
-docker run -it --gpus all --rm \
-  --user $(id -u):$(id -g) \
-  --mount type=bind,source="$HOME/.ssh",target=/root/.ssh \
-  --mount type=bind,source="$(pwd)",target=/fvdb \
-  fvdb-dev:latest \
-  conda run -n fvdb_test --no-capture-output python setup.py develop
-```
-
 
 
 

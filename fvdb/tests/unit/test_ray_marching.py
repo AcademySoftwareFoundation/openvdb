@@ -12,29 +12,28 @@ import fvdb
 from fvdb import GridBatch, JaggedTensor, sparse_grid_from_ijk
 from fvdb.utils import volume_render
 
-from .common import (make_dense_grid_and_point_data,
-                     random_drop_points_if_mutable,
-                     dtype_to_atol)
+from .common import make_dense_grid_and_point_data, random_drop_points_if_mutable, dtype_to_atol
 
 all_device_combos = [
-    ['cpu', True],
-    ['cuda', True],
-    ['cpu', False],
-    ['cuda', False],
+    ["cpu", True],
+    ["cuda", True],
+    ["cpu", False],
+    ["cuda", False],
 ]
 
 all_device_dtype_combos = [
-    ['cuda', torch.float16, False],
-    ['cpu', torch.float32, False],
-    ['cuda', torch.float32, False],
-    ['cpu', torch.float64, False],
-    ['cuda', torch.float64, False],
-    ['cuda', torch.float16, True],
-    ['cpu', torch.float32, True],
-    ['cuda', torch.float32, True],
-    ['cpu', torch.float64, True],
-    ['cuda', torch.float64, True]
+    ["cuda", torch.float16, False],
+    ["cpu", torch.float32, False],
+    ["cuda", torch.float32, False],
+    ["cpu", torch.float64, False],
+    ["cuda", torch.float64, False],
+    ["cuda", torch.float16, True],
+    ["cpu", torch.float32, True],
+    ["cuda", torch.float32, True],
+    ["cpu", torch.float64, True],
+    ["cuda", torch.float64, True],
 ]
+
 
 class TestRayMarching(unittest.TestCase):
     def setUp(self):
@@ -42,14 +41,16 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_segments_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0])
+        grid = fvdb.sparse_grid_from_dense(
+            num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
+        )
 
-        ray_o = torch.tensor([[100,0,0]]).to(device).to(dtype)
-        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype) # towards the grid
-        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype) # away from the grid
+        ray_o = torch.tensor([[100, 0, 0]]).to(device).to(dtype)
+        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype)  # towards the grid
+        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype)  # away from the grid
 
-        ray_o = ray_o.repeat(10, 1) # shape [10, 3]
-        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1) # shape [10, 3]
+        ray_o = ray_o.repeat(10, 1)  # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1)  # shape [10, 3]
 
         segment = grid.segments_along_rays(ray_o, ray_d, 1, eps=1e-3)
         target_lshape = [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0]]
@@ -62,7 +63,7 @@ class TestRayMarching(unittest.TestCase):
             for j, tlsj in enumerate(tls):
                 self.assertEqual(sls[j], tlsj)
 
-        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0) # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0)  # shape [10, 3]
         segment = grid.segments_along_rays(ray_o, ray_d, 1, eps=1e-3)
         target_lshape = [[1, 1, 1, 1, 1, 0, 0, 0, 0, 0]]
         self.assertEqual(len(segment), 1)
@@ -76,14 +77,16 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_voxels_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0])
+        grid = fvdb.sparse_grid_from_dense(
+            num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
+        )
 
-        ray_o = torch.tensor([[100,0,0]]).to(device).to(dtype)
-        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype) # towards the grid
-        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype) # away from the grid
+        ray_o = torch.tensor([[100, 0, 0]]).to(device).to(dtype)
+        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype)  # towards the grid
+        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype)  # away from the grid
 
-        ray_o = ray_o.repeat(10, 1) # shape [10, 3]
-        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1) # shape [10, 3]
+        ray_o = ray_o.repeat(10, 1)  # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1)  # shape [10, 3]
 
         voxels, times = grid.voxels_along_rays(ray_o, ray_d, 1, eps=1e-3)
         target_lshape = [[1, 0, 1, 0, 1, 0, 1, 0, 1, 0]]
@@ -102,7 +105,7 @@ class TestRayMarching(unittest.TestCase):
                 self.assertEqual(sls[j], tlsj)
                 self.assertEqual(vls[j], tlsj)
 
-        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0) # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0)  # shape [10, 3]
         voxels, times = grid.voxels_along_rays(ray_o, ray_d, 1, eps=1e-3)
         target_lshape = [[1, 1, 1, 1, 1, 0, 0, 0, 0, 0]]
         self.assertEqual(len(voxels), 1)
@@ -122,14 +125,16 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_uniform_samples_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0])
+        grid = fvdb.sparse_grid_from_dense(
+            num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
+        )
 
-        ray_o = torch.tensor([[100,0,0]]).to(device).to(dtype)
-        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype) # towards the grid
-        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype) # away from the grid
+        ray_o = torch.tensor([[100, 0, 0]]).to(device).to(dtype)
+        ray_d_hit = torch.tensor([[-1, 0, 0]]).to(device).to(dtype)  # towards the grid
+        ray_d_nohit = torch.tensor([[1, 0, 0]]).to(device).to(dtype)  # away from the grid
 
-        ray_o = ray_o.repeat(10, 1) # shape [10, 3]
-        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1) # shape [10, 3]
+        ray_o = ray_o.repeat(10, 1)  # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit, ray_d_nohit], dim=0).repeat(5, 1)  # shape [10, 3]
 
         t_min = torch.zeros(ray_o.shape[0]).to(ray_o)
         t_max = torch.ones(ray_o.shape[0]).to(ray_o) * 1e10
@@ -145,7 +150,7 @@ class TestRayMarching(unittest.TestCase):
             for j, tlsj in enumerate(tls):
                 self.assertEqual(sls[j], tlsj)
 
-        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0) # shape [10, 3]
+        ray_d = torch.cat([ray_d_hit.repeat(5, 1), ray_d_nohit.repeat(5, 1)], dim=0)  # shape [10, 3]
         segment = grid.uniform_ray_samples(ray_o, ray_d, t_min, t_max, 0.5, eps=1e-3)
         target_lshape = [[8, 8, 8, 8, 8, 0, 0, 0, 0, 0]] if dtype != torch.float16 else [[7, 7, 7, 7, 7, 0, 0, 0, 0, 0]]
         self.assertEqual(len(segment), 1)
@@ -165,17 +170,19 @@ class TestRayMarching(unittest.TestCase):
 
         pts = torch.rand(10000, 3).to(device=device, dtype=dtype) - 0.5
         grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1]*3, [1]*3, vox_size, vox_origin)
+        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
         random_drop_points_if_mutable(grid, drop_pct=0.3)
         grid_dual = grid.dual_grid()
 
         def make_ray_grid(origin, nrays, minb=(-0.45, -0.45), maxb=(0.45, 0.45)):
-            ray_o = torch.tensor([origin] * nrays**2) #+ p.mean(0, keepdim=True)
+            ray_o = torch.tensor([origin] * nrays**2)  # + p.mean(0, keepdim=True)
             ray_d = torch.from_numpy(
-                np.stack([a.ravel() for a in
-                        np.mgrid[minb[0]:maxb[0]:nrays*1j,
-                                minb[1]:maxb[1]:nrays*1j]] +
-                        [np.ones(nrays**2)], axis=-1).astype(np.float32))
+                np.stack(
+                    [a.ravel() for a in np.mgrid[minb[0] : maxb[0] : nrays * 1j, minb[1] : maxb[1] : nrays * 1j]]
+                    + [np.ones(nrays**2)],
+                    axis=-1,
+                ).astype(np.float32)
+            )
             ray_d /= torch.norm(ray_d, dim=-1, keepdim=True)
 
             ray_o, ray_d = ray_o.to(device).to(dtype), ray_d.to(device).to(dtype)
@@ -212,8 +219,7 @@ class TestRayMarching(unittest.TestCase):
         ray_o, ray_d = make_ray_grid((0.0, 0.0, -1.0), 8)
         tmin = torch.zeros(ray_o.shape[0]).to(ray_o)
         tmax = torch.ones(ray_o.shape[0]).to(ray_o) * 1e10
-        ray_intervals = grid.uniform_ray_samples(
-            ray_o, ray_d, tmin, tmax, step_size)
+        ray_intervals = grid.uniform_ray_samples(ray_o, ray_d, tmin, tmax, step_size)
 
         # FIXME: Francis -- this is a hack before I the fix volume_render API
         ray_idx = ray_intervals.jidx.int()
@@ -221,8 +227,7 @@ class TestRayMarching(unittest.TestCase):
         ray_intervals = ray_intervals.jdata
 
         ray_t = ray_intervals.mean(1)
-        ray_mids = grid.uniform_ray_samples(
-            ray_o, ray_d, tmin, tmax, step_size, return_midpoints=True).jdata
+        ray_mids = grid.uniform_ray_samples(ray_o, ray_d, tmin, tmax, step_size, return_midpoints=True).jdata
         self.assertTrue(torch.allclose(ray_mids, ray_t, atol=dtype_to_atol(dtype)))
 
         ray_delta_t = ray_intervals[:, 1] - ray_intervals[:, 0]
@@ -233,9 +238,9 @@ class TestRayMarching(unittest.TestCase):
 
         assert isinstance(sigma_samples, torch.Tensor)  # Fix type errors
 
-        rgb1, depth1, opacity, ws, tot_samples = volume_render(sigma_samples.squeeze(), rgb_samples,
-                                                               ray_delta_t, ray_t, pack_info,
-                                                               t_threshold)
+        rgb1, depth1, opacity, ws, tot_samples = volume_render(
+            sigma_samples.squeeze(), rgb_samples, ray_delta_t, ray_t, pack_info, t_threshold
+        )
         loss = rgb1.sum() + depth1.sum()
         loss.backward()
 
@@ -250,9 +255,7 @@ class TestRayMarching(unittest.TestCase):
 
         rgb_samples = grid_dual.sample_trilinear(ray_pts, grid_data_rgb).jdata
         sigma_samples = grid_dual.sample_trilinear(ray_pts, grid_data_sigma).jdata
-        rgb2, depth2 = volume_render_pytorch(sigma_samples, rgb_samples,
-                                             ray_delta_t, ray_t, pack_info,
-                                             t_threshold)
+        rgb2, depth2 = volume_render_pytorch(sigma_samples, rgb_samples, ray_delta_t, ray_t, pack_info, t_threshold)
         loss = rgb2.sum() + depth2.sum()
         loss.backward()
         rgb_2_grad = grid_data_rgb.grad.detach().clone()
@@ -282,10 +285,10 @@ class TestRayMarching(unittest.TestCase):
         grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [2, 2, 2])
 
-        rays_o = torch.tensor([[-0.6, 0., 0.]], device=device)
-        rays_d = torch.tensor([[1., 0., 0.]], device=device)
-        nears = torch.tensor([0.], device=device)
-        fars = torch.tensor([5.], device=device)
+        rays_o = torch.tensor([[-0.6, 0.0, 0.0]], device=device)
+        rays_d = torch.tensor([[1.0, 0.0, 0.0]], device=device)
+        nears = torch.tensor([0.0], device=device)
+        fars = torch.tensor([5.0], device=device)
         step_size = 0.4
         cone_angle = 0.0
         if include_end_segments:
@@ -293,9 +296,7 @@ class TestRayMarching(unittest.TestCase):
         else:
             t_targets = torch.tensor([0.0, 0.4, 0.8, 1.2, 1.6, 2.0], device=device)
 
-        intervals = grid.uniform_ray_samples(
-            rays_o, rays_d, nears, fars, step_size, cone_angle, include_end_segments
-        )
+        intervals = grid.uniform_ray_samples(rays_o, rays_d, nears, fars, step_size, cone_angle, include_end_segments)
         middles = grid.uniform_ray_samples(
             rays_o, rays_d, nears, fars, step_size, cone_angle, include_end_segments, return_midpoints=True
         ).jdata
@@ -329,12 +330,16 @@ class TestRayMarching(unittest.TestCase):
         tmax = torch.ones_like(tmin) * 1e10
 
         step_size = 0.01
-        ray_times_inside = grid.uniform_ray_samples(ray_o_inside, ray_d_inside, tmin, tmax, step_size, include_end_segments=False)
+        ray_times_inside = grid.uniform_ray_samples(
+            ray_o_inside, ray_d_inside, tmin, tmax, step_size, include_end_segments=False
+        )
         ray_idx, ray_times_inside = ray_times_inside.jidx.long(), ray_times_inside.jdata
         nsteps_inside = (ray_times_inside - tmin[ray_idx, None]) / step_size
         self.assertTrue(torch.allclose(nsteps_inside, torch.round(nsteps_inside), atol=dtype_to_atol(dtype)))
 
-        ray_times_inside = grid.uniform_ray_samples(ray_o_outside, ray_d_outside, tmin, tmax, step_size, include_end_segments=False)
+        ray_times_inside = grid.uniform_ray_samples(
+            ray_o_outside, ray_d_outside, tmin, tmax, step_size, include_end_segments=False
+        )
         ray_idx, ray_times_inside = ray_times_inside.jidx.long(), ray_times_inside.jdata
         nsteps_outside = (ray_times_inside - tmin[ray_idx, None]) / step_size
         self.assertTrue(torch.allclose(nsteps_outside, torch.round(nsteps_outside), atol=dtype_to_atol(dtype)))
@@ -343,11 +348,9 @@ class TestRayMarching(unittest.TestCase):
     def test_segments_along_rays_bug(self, device, dtype, mutable):
         data_path = os.path.join(os.path.dirname(__file__), os.path.pardir, "data")
         data = torch.load(os.path.join(data_path, "repro_bug.pth"))
-        grid = sparse_grid_from_ijk(data['ijk'].to(device), voxel_sizes=data['vox_size'], origins=data['vox_origin'])
-        ray_o: torch.Tensor = torch.load(
-            os.path.join(data_path, "ray_o.pth")).to(device=device, dtype=dtype)
-        ray_d: torch.Tensor = torch.load(
-            os.path.join(data_path, "ray_d.pth")).to(device=device, dtype=dtype)
+        grid = sparse_grid_from_ijk(data["ijk"].to(device), voxel_sizes=data["vox_size"], origins=data["vox_origin"])
+        ray_o: torch.Tensor = torch.load(os.path.join(data_path, "ray_o.pth")).to(device=device, dtype=dtype)
+        ray_d: torch.Tensor = torch.load(os.path.join(data_path, "ray_d.pth")).to(device=device, dtype=dtype)
 
         segments = grid.segments_along_rays(ray_o.to(dtype), ray_d.to(dtype), 100, 0.0)
 
@@ -358,7 +361,7 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_segments_along_rays_always_sorted(self, device, dtype, mutable):
-        for eps in [0., 1e-5]:
+        for eps in [0.0, 1e-5]:
             pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
             grid = GridBatch(mutable=mutable).to(device)
             grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
@@ -375,13 +378,15 @@ class TestRayMarching(unittest.TestCase):
                     continue
                 segments_i = segments_i.jdata
                 self.assertTrue(torch.all(segments_i[:, 1] - segments_i[:, 0] >= eps))
-                self.assertTrue(torch.all(segments_i[1:, 0] - segments_i[:-1, 0] >= eps),
-                                f"mismatch eps = {eps}, diff = {segments_i[1:, 0] >= segments_i[:-1, 0]}, vals = {segments_i}, (1) = {segments_i[1:, 0]}, (2) = {segments_i[:-1, 0]}")
+                self.assertTrue(
+                    torch.all(segments_i[1:, 0] - segments_i[:-1, 0] >= eps),
+                    f"mismatch eps = {eps}, diff = {segments_i[1:, 0] >= segments_i[:-1, 0]}, vals = {segments_i}, (1) = {segments_i[1:, 0]}, (2) = {segments_i[:-1, 0]}",
+                )
                 self.assertTrue(torch.all(segments_i[1:, 1] - segments_i[:-1, 1] >= eps))
 
     @parameterized.expand(all_device_dtype_combos)
     def test_segments_along_rays_always_sorted_batched(self, device, dtype, mutable):
-        for eps in [0., 1e-5]:
+        for eps in [0.0, 1e-5]:
             pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)] * 2)
             grid = GridBatch(mutable=mutable).to(device)
             grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
@@ -401,8 +406,10 @@ class TestRayMarching(unittest.TestCase):
                         continue
                     segments_i = segments_i.jdata
                     self.assertTrue(torch.all(segments_i[:, 1] - segments_i[:, 0] >= eps))
-                    self.assertTrue(torch.all(segments_i[1:, 0] - segments_i[:-1, 0] >= eps),
-                                    f"mismatch eps = {eps}, diff = {segments_i[1:, 0] >= segments_i[:-1, 0]}, vals = {segments_i}, (1) = {segments_i[1:, 0]}, (2) = {segments_i[:-1, 0]}")
+                    self.assertTrue(
+                        torch.all(segments_i[1:, 0] - segments_i[:-1, 0] >= eps),
+                        f"mismatch eps = {eps}, diff = {segments_i[1:, 0] >= segments_i[:-1, 0]}, vals = {segments_i}, (1) = {segments_i[1:, 0]}, (2) = {segments_i[:-1, 0]}",
+                    )
                     self.assertTrue(torch.all(segments_i[1:, 1] - segments_i[:-1, 1] >= eps))
 
     @parameterized.expand(all_device_dtype_combos)
@@ -416,8 +423,8 @@ class TestRayMarching(unittest.TestCase):
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
         rays_d /= torch.norm(rays_d, dim=-1, keepdim=True)
-        rays_o = fvdb.JaggedTensor([rays_o]*2)
-        rays_d = fvdb.JaggedTensor([rays_d]*2)
+        rays_o = fvdb.JaggedTensor([rays_o] * 2)
+        rays_d = fvdb.JaggedTensor([rays_d] * 2)
 
         with self.assertRaises(ValueError):
             segments = grid.segments_along_rays(rays_o, rays_d, 100, eps=1e-4)
@@ -445,13 +452,18 @@ class TestRayMarching(unittest.TestCase):
                 if times_i.rshape[0] == 0:
                     continue
                 times_i, voxels_i = times_i.jdata, voxels_i.jdata
-                self.assertTrue(torch.all(times_i[:, 0] < times_i[:, 1]), f"Max diff = {(times_i[:, 1] - times_i[:, 0]).max().item()}")
+                self.assertTrue(
+                    torch.all(times_i[:, 0] < times_i[:, 1]),
+                    f"Max diff = {(times_i[:, 1] - times_i[:, 0]).max().item()}",
+                )
                 self.assertTrue(torch.all(times_i[1:, 0] > times_i[:-1, 0]))
                 self.assertTrue(torch.all(times_i[1:, 1] > times_i[:-1, 1]))
                 # Should always march
                 max_diff = torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values.cpu().detach().numpy()
-                self.assertTrue(torch.all(torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values >= 1),
-                                f"Max diff = {max_diff, voxels_i.cpu().numpy(), times_i.cpu().numpy()}")
+                self.assertTrue(
+                    torch.all(torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values >= 1),
+                    f"Max diff = {max_diff, voxels_i.cpu().numpy(), times_i.cpu().numpy()}",
+                )
 
     @parameterized.expand(all_device_dtype_combos)
     def test_voxels_along_rays_batch_size_mismatch_throws(self, device, dtype, mutable):
@@ -464,8 +476,8 @@ class TestRayMarching(unittest.TestCase):
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
         rays_d /= torch.norm(rays_d, dim=-1, keepdim=True)
-        rays_o = fvdb.JaggedTensor([rays_o]*2)
-        rays_d = fvdb.JaggedTensor([rays_d]*2)
+        rays_o = fvdb.JaggedTensor([rays_o] * 2)
+        rays_d = fvdb.JaggedTensor([rays_d] * 2)
 
         with self.assertRaises(ValueError):
             out_voxels, out_times = grid.voxels_along_rays(rays_o, rays_d, 100, 1.0e-5)
@@ -474,12 +486,12 @@ class TestRayMarching(unittest.TestCase):
     def test_voxels_along_rays_always_sorted_batched(self, device, dtype, mutable):
         for i in range(3):
             # pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
-            pts = fvdb.JaggedTensor([torch.rand(100, 3).to(device=device, dtype=dtype)]*2)
+            pts = fvdb.JaggedTensor([torch.rand(100, 3).to(device=device, dtype=dtype)] * 2)
             grid = GridBatch(mutable=mutable).to(device)
             grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.01, torch.zeros(3))
             random_drop_points_if_mutable(grid)
 
-            rays_o = [-torch.ones(100, 3).to(device).to(dtype)]*2
+            rays_o = [-torch.ones(100, 3).to(device).to(dtype)] * 2
             rays_d = [pts[i].jdata[:100] - rays_o[i] for i in range(2)]
             rays_d = [r / torch.norm(r, dim=-1, keepdim=True) for r in rays_d]
             rays_o = fvdb.JaggedTensor(rays_o)
@@ -498,15 +510,22 @@ class TestRayMarching(unittest.TestCase):
                         continue
                     times_i, voxels_i = times_i.jdata, voxels_i.jdata
                     # print(times_i)
-                    self.assertTrue(torch.all(times_i[:, 0] < times_i[:, 1]), f"Max diff = {(times_i[:, 1] - times_i[:, 0]).max().item()}")
+                    self.assertTrue(
+                        torch.all(times_i[:, 0] < times_i[:, 1]),
+                        f"Max diff = {(times_i[:, 1] - times_i[:, 0]).max().item()}",
+                    )
                     if times_i[1:, 0].numel() > 0:
-                        self.assertTrue(torch.all(times_i[1:, 0] > times_i[:-1, 0]), f"Max diff = {(times_i[1:, 0] - times_i[:-1, 0]).max().item()}")
+                        self.assertTrue(
+                            torch.all(times_i[1:, 0] > times_i[:-1, 0]),
+                            f"Max diff = {(times_i[1:, 0] - times_i[:-1, 0]).max().item()}",
+                        )
                     # Should always march
                     max_diff = torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values.cpu().detach().numpy()
-                    self.assertTrue(torch.all(torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values >= 1),
-                                    f"Max diff = {max_diff, voxels_i.cpu().numpy(), times_i.cpu().numpy()}")
+                    self.assertTrue(
+                        torch.all(torch.max(voxels_i[1:] - voxels_i[:-1], dim=1).values >= 1),
+                        f"Max diff = {max_diff, voxels_i.cpu().numpy(), times_i.cpu().numpy()}",
+                    )
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

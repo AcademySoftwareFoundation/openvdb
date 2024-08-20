@@ -12,31 +12,32 @@ from fvdb import GridBatch
 from .common import random_drop_points_if_mutable, sparse_grid_from_dense_cube
 
 all_device_dtype_combos = [
-    ['cpu', torch.float16, False],
-    ['cuda', torch.float16, False],
-    ['cpu', torch.float32, False],
-    ['cuda', torch.float32, False],
-    ['cpu', torch.float64, False],
-    ['cuda', torch.float64, False],
-    ['cpu', torch.float16, True],
-    ['cuda', torch.float16, True],
-    ['cpu', torch.float32, True],
-    ['cuda', torch.float32, True],
-    ['cpu', torch.float64, True],
-    ['cuda', torch.float64, True]
+    ["cpu", torch.float16, False],
+    ["cuda", torch.float16, False],
+    ["cpu", torch.float32, False],
+    ["cuda", torch.float32, False],
+    ["cpu", torch.float64, False],
+    ["cuda", torch.float64, False],
+    ["cpu", torch.float16, True],
+    ["cuda", torch.float16, True],
+    ["cpu", torch.float32, True],
+    ["cuda", torch.float32, True],
+    ["cpu", torch.float64, True],
+    ["cuda", torch.float64, True],
 ]
 
 all_device_combos = [
-    ['cpu'],
-    ['cuda'],
+    ["cpu"],
+    ["cuda"],
 ]
 
 
 class TestUtils(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_dense(self, device, dtype, mutable):
-        dense_vdb = sparse_grid_from_dense_cube([10, 11, 12], (-2.0, -2.0, -2.0), (1.0, 1.0, 1.0),
-                                                voxel_center=False, mutable=mutable, device=device)
+        dense_vdb = sparse_grid_from_dense_cube(
+            [10, 11, 12], (-2.0, -2.0, -2.0), (1.0, 1.0, 1.0), voxel_center=False, mutable=mutable, device=device
+        )
         self.assertTrue(dense_vdb.total_voxels == 10 * 11 * 12)
 
         vdb_coords = dense_vdb.grid_to_world(dense_vdb.ijk.float()).jdata
@@ -67,15 +68,22 @@ class TestUtils(unittest.TestCase):
         ijk = grid.ijk_enabled.jdata
 
         for _ in range(10):
-            dense_origin = torch.tensor([
-                np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item()) for i in range(3)
-            ]).to(torch.long).to(device)
+            dense_origin = (
+                torch.tensor(
+                    [
+                        np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item())
+                        for i in range(3)
+                    ]
+                )
+                .to(torch.long)
+                .to(device)
+            )
 
             ijk_offset = ijk - dense_origin.unsqueeze(0)
             max_bound = torch.tensor(random_grid.shape[:3], device=device, dtype=torch.long)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < max_bound.unsqueeze(0), dim=-1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < max_bound.unsqueeze(0), dim=-1)
+            )
 
             grid_index = grid.ijk_to_index(ijk).jdata[keep_mask]
             i, j, k = ijk_offset[keep_mask, 0], ijk_offset[keep_mask, 1], ijk_offset[keep_mask, 2]
@@ -103,15 +111,22 @@ class TestUtils(unittest.TestCase):
         ijk = grid.ijk_enabled.jdata
 
         for _ in range(10):
-            dense_origin = torch.tensor([
-                np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item()) for i in range(3)
-            ]).to(torch.long).to(device)
+            dense_origin = (
+                torch.tensor(
+                    [
+                        np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item())
+                        for i in range(3)
+                    ]
+                )
+                .to(torch.long)
+                .to(device)
+            )
 
             ijk_offset = ijk - dense_origin.unsqueeze(0)
             max_bound = torch.tensor(random_grid.shape[:3], device=device, dtype=torch.long)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < max_bound.unsqueeze(0), dim=1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < max_bound.unsqueeze(0), dim=1)
+            )
 
             grid_index = grid.ijk_to_index(ijk).jdata[keep_mask]
             i, j, k = ijk_offset[keep_mask, 0], ijk_offset[keep_mask, 1], ijk_offset[keep_mask, 2]
@@ -143,15 +158,22 @@ class TestUtils(unittest.TestCase):
         ijk = grid.ijk_enabled.jdata
 
         for _ in range(10):
-            dense_origin = torch.tensor([
-                np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item()) for i in range(3)
-            ]).to(torch.long).to(device)
+            dense_origin = (
+                torch.tensor(
+                    [
+                        np.random.randint(low=ijk.min(0).values[i].item(), high=ijk.max(0).values[i].item())
+                        for i in range(3)
+                    ]
+                )
+                .to(torch.long)
+                .to(device)
+            )
 
             ijk_offset = ijk - dense_origin.unsqueeze(0)
             max_bound = torch.tensor(random_grid.shape[:3], device=device, dtype=torch.long)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < max_bound.unsqueeze(0), dim=1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < max_bound.unsqueeze(0), dim=1)
+            )
 
             grid_index = grid.ijk_to_index(ijk).jdata[keep_mask]
             i, j, k = ijk_offset[keep_mask, 0], ijk_offset[keep_mask, 1], ijk_offset[keep_mask, 2]
@@ -174,7 +196,6 @@ class TestUtils(unittest.TestCase):
             assert random_grid_copy.grad is not None
             self.assertTrue(torch.equal(random_grid.grad, random_grid_copy.grad))
 
-
     @parameterized.expand(all_device_dtype_combos)
     def test_read_into_dense(self, device, dtype, mutable):
 
@@ -196,16 +217,18 @@ class TestUtils(unittest.TestCase):
         max_crop_size = bbsize + bbsize // 10
         max_crop_coord = min_crop_coord + max_crop_size
         for _ in range(10):
-            crop_min = torch.tensor([np.random.randint(low=min_crop_coord[i].item(),
-                                                       high=max_crop_coord[i].item()) for i in range(3)]).to(device)
-            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(device)
-
+            crop_min = torch.tensor(
+                [np.random.randint(low=min_crop_coord[i].item(), high=max_crop_coord[i].item()) for i in range(3)]
+            ).to(device)
+            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(
+                device
+            )
 
             target_crop = torch.zeros(*crop_size.cpu().numpy(), sparse_data.shape[-1], dtype=dtype, device=device)
             ijk_offset = ijk - crop_min.unsqueeze(0)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1)
+            )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
             target_crop.view(-1, sparse_data.shape[-1])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
@@ -235,15 +258,18 @@ class TestUtils(unittest.TestCase):
         max_crop_size = bbsize + bbsize // 10
         max_crop_coord = min_crop_coord + max_crop_size
         for _ in range(10):
-            crop_min = torch.tensor([np.random.randint(low=min_crop_coord[i].item(),
-                                                       high=max_crop_coord[i].item()) for i in range(3)]).to(device)
-            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(device)
+            crop_min = torch.tensor(
+                [np.random.randint(low=min_crop_coord[i].item(), high=max_crop_coord[i].item()) for i in range(3)]
+            ).to(device)
+            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(
+                device
+            )
 
             target_crop = torch.zeros(*crop_size.cpu().numpy(), *sparse_data.shape[1:], dtype=dtype, device=device)
             ijk_offset = ijk - crop_min.unsqueeze(0)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1)
+            )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
             target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
@@ -251,7 +277,6 @@ class TestUtils(unittest.TestCase):
             pred_crop = grid.read_into_dense(sparse_data, crop_min, crop_size).squeeze(0)
 
             self.assertTrue(torch.all(pred_crop == target_crop))
-
 
     @parameterized.expand(all_device_dtype_combos)
     def test_read_into_dense_multidim_grad(self, device, dtype, mutable):
@@ -277,22 +302,24 @@ class TestUtils(unittest.TestCase):
         max_crop_size = bbsize + bbsize // 10
         max_crop_coord = min_crop_coord + max_crop_size
         for _ in range(10):
-            crop_min = torch.tensor([np.random.randint(low=min_crop_coord[i].item(),
-                                                       high=max_crop_coord[i].item()) for i in range(3)]).to(device)
-            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(device)
+            crop_min = torch.tensor(
+                [np.random.randint(low=min_crop_coord[i].item(), high=max_crop_coord[i].item()) for i in range(3)]
+            ).to(device)
+            crop_size = torch.tensor([np.random.randint(low=1, high=max_crop_size[i].item()) for i in range(3)]).to(
+                device
+            )
 
             target_crop = torch.zeros(*crop_size.cpu().numpy(), *sparse_data.shape[1:], dtype=dtype, device=device)
             ijk_offset = ijk - crop_min.unsqueeze(0)
             keep_mask = torch.logical_and(
-                            torch.all(ijk_offset >= 0, dim=-1),
-                            torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1))
+                torch.all(ijk_offset >= 0, dim=-1), torch.all(ijk_offset < crop_size.unsqueeze(0), dim=1)
+            )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
             target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data_copy[grid.enabled_mask.jdata][keep_mask]
 
             loss_copy = target_crop.sum()
             loss_copy.backward()
-
 
             pred_crop = grid.read_into_dense(sparse_data, crop_min, crop_size).squeeze(0)
             loss = pred_crop.sum()
@@ -302,7 +329,6 @@ class TestUtils(unittest.TestCase):
             assert sparse_data_copy.grad is not None
             self.assertEqual(torch.abs(sparse_data.grad - sparse_data_copy.grad).max().item(), 0.0)
             self.assertTrue(torch.all(pred_crop == target_crop))
-
 
     @parameterized.expand(all_device_combos)
     def test_build_from_dense(self, device):
@@ -321,11 +347,14 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(torch.all(grid_ijk.min(0)[0] == target_min_ijk))
         self.assertTrue(torch.all(grid_ijk.max(0)[0] == target_max_ijk))
 
-        ijk_mask = torch.stack([
-            torch.randint(0, gsize[0], (100,), device=device),
-            torch.randint(0, gsize[1], (100,), device=device),
-            torch.randint(0, gsize[2], (100,), device=device),
-        ], dim=-1)
+        ijk_mask = torch.stack(
+            [
+                torch.randint(0, gsize[0], (100,), device=device),
+                torch.randint(0, gsize[1], (100,), device=device),
+                torch.randint(0, gsize[2], (100,), device=device),
+            ],
+            dim=-1,
+        )
         dense_mask = torch.zeros(*gsize, dtype=torch.bool).to(device)
         mask_coord_set = set()
         for idx in range(ijk_mask.shape[0]):
@@ -347,5 +376,5 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(pred_set, mask_coord_set)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
