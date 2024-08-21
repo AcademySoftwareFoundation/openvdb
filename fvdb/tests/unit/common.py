@@ -19,15 +19,18 @@ Vec3 = Union[Vec3i, Vec3d]
 # Hack parameterized to use the function name and the expand parameters as the test name
 test_expand = functools.partial(
     parameterized.expand,
-    name_func=lambda f, n, p: f'{f.__name__}_{parameterized.to_safe_name("_".join(str(x) for x in p.args))}')
+    name_func=lambda f, n, p: f'{f.__name__}_{parameterized.to_safe_name("_".join(str(x) for x in p.args))}',
+)
 
 
-def sparse_grid_from_dense_cube(resolution: NumberOrVec3,
-                                cube_min: Vec3d = (0., 0., 0.),
-                                cube_max: Vec3d = (1., 1., 1.),
-                                voxel_center: bool = False,
-                                mutable: bool = False,
-                                device: Union[torch.device, str] = 'cpu') -> GridBatch:
+def sparse_grid_from_dense_cube(
+    resolution: NumberOrVec3,
+    cube_min: Vec3d = (0.0, 0.0, 0.0),
+    cube_max: Vec3d = (1.0, 1.0, 1.0),
+    voxel_center: bool = False,
+    mutable: bool = False,
+    device: Union[torch.device, str] = "cpu",
+) -> GridBatch:
     def _coord3d_to_tensor(coord: Vec3, dtype: torch.dtype = torch.float64) -> torch.Tensor:
         if not hasattr(coord, "__len__") or len(coord) != 3:
             raise ValueError("expected 3D coordinate")
@@ -36,7 +39,6 @@ def sparse_grid_from_dense_cube(resolution: NumberOrVec3,
             return torch.tensor([c.item() for c in coord], dtype=dtype)
         else:
             return torch.tensor([c for c in coord], dtype=dtype)
-
 
     def _number_or_coord3d_to_tensor(coord_or_number: NumberOrVec3, dtype: torch.dtype = torch.float64) -> torch.Tensor:
         if isinstance(coord_or_number, (float, int)):
@@ -64,7 +66,10 @@ def sparse_grid_from_dense_cube(resolution: NumberOrVec3,
         voxel_size = (cube_max - cube_min) / resolution.to(torch.float64)
         origin = cube_min + 0.5 * voxel_size
 
-    return sparse_grid_from_dense(1, resolution, voxel_sizes=voxel_size, origins=origin, device=str(device), mutable=mutable)
+    return sparse_grid_from_dense(
+        1, resolution, voxel_sizes=voxel_size, origins=origin, device=str(device), mutable=mutable
+    )
+
 
 def random_drop_points_if_mutable(grid: GridBatch, drop_pct: float = 0.5):
     if grid.mutable:
@@ -101,7 +106,9 @@ def make_dense_grid_and_point_data(nvox, device, dtype, mutable):
     return fvdb, fvdb_d, p
 
 
-def make_sparse_grid_and_point_data(device, dtype, include_boundary_points: bool = False, expand: int = 10, mutable: bool = False):
+def make_sparse_grid_and_point_data(
+    device, dtype, include_boundary_points: bool = False, expand: int = 10, mutable: bool = False
+):
     p = torch.randn((100, 3), device=device, dtype=dtype)
     vox_size = 0.05
     grid = GridBatch(mutable=mutable, device=device)
@@ -144,4 +151,3 @@ def dtype_to_atol(dtype: torch.dtype) -> float:
     if dtype == torch.float64:
         return 1e-5
     raise ValueError("dtype must be a valid torch floating type")
-

@@ -1,14 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-#pragma once
-
+#ifndef FVDB_CONFIG_H
+#define FVDB_CONFIG_H
 
 namespace fvdb {
 
 class Config {
-
-public:
+  public:
     Config();
 
     void setUltraSparseAcceleration(bool enabled);
@@ -17,11 +16,13 @@ public:
     void setPendanticErrorChecking(bool enabled);
     bool pendanticErrorCheckingEnabled() const;
 
-    static Config& global();
+    static Config &global();
 
-private:
+  private:
     bool mUltraSparseAcceleration = false;
-    bool mPendanticErrorChecking = false;
+    bool mPendanticErrorChecking  = false;
 };
 
 } // namespace fvdb
+
+#endif // FVDB_CONFIG_H

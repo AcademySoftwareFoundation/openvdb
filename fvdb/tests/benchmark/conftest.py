@@ -13,6 +13,7 @@ from fvdb_benchmark.utils import create_l2_cache, flush_l2_cache
 
 # pytest_plugins = ["pytest_fvdbench.plugin"]
 
+
 def _make_runner(self, function_to_benchmark, args, kwargs):
     create_l2_cache()
 

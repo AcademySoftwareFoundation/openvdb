@@ -18,9 +18,15 @@ from torch.profiler import profile, record_function, ProfilerActivity
 
 from fvdb_benchmark.dataset import CoordsDataset
 from fvdb_benchmark.configs import all_configs, BaseConfig
-from fvdb_benchmark.utils import current_gpu_memory_usage, create_l2_cache, flush_l2_cache, \
-    df_to_table, decode_range_name, encode_range_name, is_range_name
-
+from fvdb_benchmark.utils import (
+    current_gpu_memory_usage,
+    create_l2_cache,
+    flush_l2_cache,
+    df_to_table,
+    decode_range_name,
+    encode_range_name,
+    is_range_name,
+)
 
 
 @torch.no_grad()
@@ -111,7 +117,7 @@ def main(args) -> None:
                 if args.detail:
 
                     with profile(activities=[ProfilerActivity.CPU], record_shapes=True) as prof:
-                        with record_function(encode_range_name("main", '-', {})):
+                        with record_function(encode_range_name("main", "-", {})):
                             baseline_out = model(baseline_input, **aux_dict)
 
                     all_events = prof.key_averages()
@@ -129,20 +135,17 @@ def main(args) -> None:
 
                 config.post_measure(baseline_input, baseline_out)
 
-            my_time = np.mean(
-                [start_events[j].elapsed_time(end_events[j]) for j in range(args.repeats)]
-            )
+            my_time = np.mean([start_events[j].elapsed_time(end_events[j]) for j in range(args.repeats)])
             my_memory = current_gpu_memory_usage() - start_gpu_memory_usage
 
-            baseline_gross_data.append({
-                "key": ijk_name,
-                "time": my_time,
-                # "memory": my_memory,      # We shouldn't use nvidia-smi to obtain memory usage.
-            })
-            baseline_detailed_data.append({
-                "key": ijk_name,
-                **{k: np.mean(v) for k, v in detailed_record.items()}
-            })
+            baseline_gross_data.append(
+                {
+                    "key": ijk_name,
+                    "time": my_time,
+                    # "memory": my_memory,      # We shouldn't use nvidia-smi to obtain memory usage.
+                }
+            )
+            baseline_detailed_data.append({"key": ijk_name, **{k: np.mean(v) for k, v in detailed_record.items()}})
 
         gross_data[baseline] = pd.DataFrame(baseline_gross_data)
         gross_data[baseline].set_index("key", inplace=True)
@@ -155,27 +158,22 @@ def main(args) -> None:
 
     for col_name in gross_col_names:
         rich.print(f"------ Comparing {col_name} ------")
-        full_dataframes = pd.concat(
-            [df[col_name].rename(baseline) for baseline, df in gross_data.items()],
-            axis=1
-        )
-        full_dataframes.loc['mean'] = full_dataframes.mean()
+        full_dataframes = pd.concat([df[col_name].rename(baseline) for baseline, df in gross_data.items()], axis=1)
+        full_dataframes.loc["mean"] = full_dataframes.mean()
         rich.print(df_to_table(full_dataframes))
 
     if args.detail:
         # Get all columns
-        detailed_col_all_names = [
-            set(df.columns) for df in detailed_data.values()
-        ]
+        detailed_col_all_names = [set(df.columns) for df in detailed_data.values()]
         detailed_col_names = list(set.union(*detailed_col_all_names))
 
         for col_name in detailed_col_names:
             rich.print(f"------ Comparing {col_name} ------")
             full_dataframes = pd.concat(
                 [df[col_name].rename(baseline) for baseline, df in detailed_data.items() if col_name in df.columns],
-                axis=1
+                axis=1,
             )
-            full_dataframes.loc['mean'] = full_dataframes.mean()
+            full_dataframes.loc["mean"] = full_dataframes.mean()
             rich.print(df_to_table(full_dataframes))
 
 
@@ -189,7 +187,7 @@ if __name__ == "__main__":
     options = parser.parse_args()
 
     if not options.no_clb:
-        os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+        os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
     create_l2_cache()
 
     main(options)

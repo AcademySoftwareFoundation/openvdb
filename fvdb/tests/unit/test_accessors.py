@@ -28,9 +28,7 @@ class TestAccessors(unittest.TestCase):
             device=device,
         )
 
-        sparse_points = torch.tensor(
-            [[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device
-        )
+        sparse_points = torch.tensor([[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device)
         grid = GridBatch(mutable=True, device=device)
         grid.set_from_points(sparse_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
@@ -40,16 +38,13 @@ class TestAccessors(unittest.TestCase):
     def test_read_from_dense(self, device):
         dense_origin = torch.tensor([0, 0, 0]).to(torch.long).to(device)
 
-        zero_points = torch.tensor(
-            [[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device
-        )
+        zero_points = torch.tensor([[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device)
         grid = GridBatch(mutable=True, device=device)
         grid.set_from_points(zero_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
         sparse_data = torch.tensor([[0], [0]], dtype=torch.float16, device=device)
-        grid.read_into_dense(
-            sparse_data, dense_origin, (RESOLUTION, RESOLUTION, RESOLUTION)
-        )
+        grid.read_into_dense(sparse_data, dense_origin, (RESOLUTION, RESOLUTION, RESOLUTION))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

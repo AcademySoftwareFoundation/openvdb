@@ -7,23 +7,28 @@ namespace fvdb {
 
 Config::Config() = default;
 
-Config& Config::global() {
+Config &
+Config::global() {
     static Config _config;
     return _config;
 }
 
-void Config::setUltraSparseAcceleration(bool enabled) {
+void
+Config::setUltraSparseAcceleration(bool enabled) {
     mUltraSparseAcceleration = enabled;
 }
 
-bool Config::ultraSparseAccelerationEnabled() const {
+bool
+Config::ultraSparseAccelerationEnabled() const {
     return mUltraSparseAcceleration;
 }
 
-void Config::setPendanticErrorChecking(bool enabled) {
+void
+Config::setPendanticErrorChecking(bool enabled) {
     mPendanticErrorChecking = enabled;
 }
-bool Config::pendanticErrorCheckingEnabled() const {
+bool
+Config::pendanticErrorCheckingEnabled() const {
     return mPendanticErrorChecking;
 }
 

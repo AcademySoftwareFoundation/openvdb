@@ -3,40 +3,37 @@
 //
 #include "Build.h"
 
+#include <detail/ops/Ops.h>
+#include <detail/utils/Utils.h>
+
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/tools/GridBuilder.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
-
-#include "detail/utils/Utils.h"
-#include "detail/ops/Ops.h"
-
+#include <nanovdb/tools/GridBuilder.h>
 
 namespace fvdb {
 namespace detail {
 namespace build {
 
-
 template <typename GridType>
-nanovdb::GridHandle<TorchDeviceBuffer> buildFineGridFromCoarseGridCPU(const GridBatchImpl& coarseBatchHdl,
-                                                                        const torch::Tensor& subdivMask,
-                                                                        const nanovdb::Coord subdivisionFactor) {
-
+nanovdb::GridHandle<TorchDeviceBuffer>
+buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch::Tensor &subdivMask,
+                               const nanovdb::Coord subdivisionFactor) {
     using IndexTree = nanovdb::NanoTree<GridType>;
 
-    const nanovdb::GridHandle<TorchDeviceBuffer>& coarseGridHdl = coarseBatchHdl.nanoGridHandle();
-    const torch::TensorAccessor<bool, 1>& subdivMaskAcc = subdivMask.accessor<bool, 1>();
+    const nanovdb::GridHandle<TorchDeviceBuffer> &coarseGridHdl = coarseBatchHdl.nanoGridHandle();
+    const torch::TensorAccessor<bool, 1>         &subdivMaskAcc = subdivMask.accessor<bool, 1>();
 
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(coarseGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < coarseGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType>* coarseGrid = coarseGridHdl.template grid<GridType>(bidx);
+        const nanovdb::NanoGrid<GridType> *coarseGrid = coarseGridHdl.template grid<GridType>(bidx);
         if (!coarseGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
-        const IndexTree& coarseTree = coarseGrid->tree();
+        const IndexTree &coarseTree = coarseGrid->tree();
 
-        using ProxyGridT = nanovdb::tools::build::Grid<float>;
-        auto proxyGrid = std::make_shared<ProxyGridT>(-1.0f);
+        using ProxyGridT       = nanovdb::tools::build::Grid<float>;
+        auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
         for (auto it = ActiveVoxelIterator<GridType, -1>(coarseTree); it.isValid(); it++) {
@@ -59,7 +56,8 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildFineGridFromCoarseGridCPU(const Grid
         }
 
         proxyGridAccessor.merge();
-        auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(*proxyGrid, 0u, false, false);
+        auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
+            *proxyGrid, 0u, false, false);
         ret.buffer().setDevice(torch::kCPU, true);
         batchHandles.push_back(std::move(ret));
     }
@@ -71,14 +69,13 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildFineGridFromCoarseGridCPU(const Grid
     }
 }
 
-
-nanovdb::GridHandle<TorchDeviceBuffer> buildFineGridFromCoarseGrid(bool isMutable,
-                                                                     const GridBatchImpl& coarseBatchHdl,
-                                                                     const torch::optional<JaggedTensor>& subdivMask,
-                                                                     const nanovdb::Coord subdivisionFactor) {
-
+nanovdb::GridHandle<TorchDeviceBuffer>
+buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseBatchHdl,
+                            const torch::optional<JaggedTensor> &subdivMask,
+                            const nanovdb::Coord                 subdivisionFactor) {
     if (coarseBatchHdl.device().is_cuda()) {
-        JaggedTensor coords = ops::dispatchFineIJKForCoarseGrid<torch::kCUDA>(coarseBatchHdl, subdivisionFactor, subdivMask);
+        JaggedTensor coords = ops::dispatchFineIJKForCoarseGrid<torch::kCUDA>(
+            coarseBatchHdl, subdivisionFactor, subdivMask);
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
     } else {
         torch::Tensor subdivMaskTensor;
@@ -88,11 +85,11 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildFineGridFromCoarseGrid(bool isMutabl
             subdivMaskTensor = torch::zeros(0, torch::TensorOptions().dtype(torch::kBool));
         }
         return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildFineGridFromCoarseGridCPU<GridType>(coarseBatchHdl, subdivMaskTensor, subdivisionFactor);
+            return buildFineGridFromCoarseGridCPU<GridType>(coarseBatchHdl, subdivMaskTensor,
+                                                            subdivisionFactor);
         });
     }
 }
-
 
 } // namespace build
 } // namespace detail

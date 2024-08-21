@@ -30,29 +30,29 @@ def FVDBExtension(name, sources, *args, **kwargs):
     :return: A :class:`torch.utils.cpp_extension.CppExtension` object.
     """
 
-    libraries = kwargs.get('libraries', [])
-    libraries.append('fvdb')
-    kwargs['libraries'] = libraries
+    libraries = kwargs.get("libraries", [])
+    libraries.append("fvdb")
+    kwargs["libraries"] = libraries
 
-    library_dirs = kwargs.get('library_dirs', [])
+    library_dirs = kwargs.get("library_dirs", [])
     library_dirs.append(os.path.dirname(fvdb.__file__))
-    kwargs['library_dirs'] = library_dirs
+    kwargs["library_dirs"] = library_dirs
 
-    include_dirs = kwargs.get('include_dirs', [])
-    include_dirs.append(os.path.join(os.path.dirname(fvdb.__file__), 'include'))
+    include_dirs = kwargs.get("include_dirs", [])
+    include_dirs.append(os.path.join(os.path.dirname(fvdb.__file__), "include"))
 
     # We also need to add this because fvdb internally will refer to their headers without the fvdb/ prefix.
-    include_dirs.append(os.path.join(os.path.dirname(fvdb.__file__), 'include/fvdb'))
-    kwargs['include_dirs'] = include_dirs
+    include_dirs.append(os.path.join(os.path.dirname(fvdb.__file__), "include/fvdb"))
+    kwargs["include_dirs"] = include_dirs
 
-    extra_link_args = kwargs.get('extra_link_args', [])
-    extra_link_args.append(f'-Wl,-rpath={os.path.dirname(fvdb.__file__)}')
-    kwargs['extra_link_args'] = extra_link_args
+    extra_link_args = kwargs.get("extra_link_args", [])
+    extra_link_args.append(f"-Wl,-rpath={os.path.dirname(fvdb.__file__)}")
+    kwargs["extra_link_args"] = extra_link_args
 
-    extra_compile_args = kwargs.get('extra_compile_args', {})
-    extra_compile_args['nvcc'] = extra_compile_args.get('nvcc', [])
-    if '--extended-lambda' not in extra_compile_args['nvcc']:
-        extra_compile_args['nvcc'].append('--extended-lambda')
-    kwargs['extra_compile_args'] = extra_compile_args
+    extra_compile_args = kwargs.get("extra_compile_args", {})
+    extra_compile_args["nvcc"] = extra_compile_args.get("nvcc", [])
+    if "--extended-lambda" not in extra_compile_args["nvcc"]:
+        extra_compile_args["nvcc"].append("--extended-lambda")
+    kwargs["extra_compile_args"] = extra_compile_args
 
     return cpp_extension.CUDAExtension(name, sources, *args, **kwargs)

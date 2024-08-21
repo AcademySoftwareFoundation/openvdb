@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-#pragma once
+#ifndef FVDB_DETAIL_UTILS_TRILINEARINTERPOLATIONITERATOR_H
+#define FVDB_DETAIL_UTILS_TRILINEARINTERPOLATIONITERATOR_H
 
 #include <nanovdb/NanoVDB.h>
-
 
 namespace fvdb {
 namespace detail {
@@ -23,32 +23,31 @@ namespace detail {
  *   ijk is the coordinate of one of the neighboring voxel
  *   w_tril is the trilinear weight that the voxel ijk contributes
  */
-template <typename ScalarT>
-struct TrilinearInterpolationIterator {
+template <typename ScalarT> struct TrilinearInterpolationIterator {
     struct PairT {
         nanovdb::Coord first;
-        ScalarT second;
+        ScalarT        second;
     };
 
-    template <typename Scalar, int N>
-    struct ArrayT {
+    template <typename Scalar, int N> struct ArrayT {
         Scalar mData[N];
 
-        __hostdev__
-        constexpr Scalar operator [] (int i) const {return mData[i];}
+        __hostdev__ constexpr Scalar
+        operator[](int i) const {
+            return mData[i];
+        }
     };
 
     // Iterator traits, previously from std::iterator.
-    using value_type = PairT;
-    using pointer = value_type*;
-    using reference = value_type&;
+    using value_type        = PairT;
+    using pointer           = value_type *;
+    using reference         = value_type &;
     using iterator_category = std::forward_iterator_tag;
 
     TrilinearInterpolationIterator() = delete;
 
     __hostdev__
     TrilinearInterpolationIterator(const nanovdb::math::Vec3<ScalarT> p) {
-
         mCount = 0;
         mVoxel = p.floor();
         const nanovdb::math::Vec3<ScalarT> uvw =
@@ -66,65 +65,67 @@ struct TrilinearInterpolationIterator {
             uvw[0] * uvw[1] * uvw[2],
         };
 
-        mCoordAndWeight = {
-            mVoxel, mTrilinearWeights[0]
-        };
+        mCoordAndWeight = { mVoxel, mTrilinearWeights[0] };
     }
 
-    __hostdev__
-    inline const TrilinearInterpolationIterator& operator++() {
+    __hostdev__ inline const TrilinearInterpolationIterator &
+    operator++() {
         mCount += 1;
         if (mCount >= 8) {
             return *this;
         }
-        const uint8_t di = (mCount & (1 << 2)) >> 2;
-        const uint8_t dj = (mCount & (1 << 1)) >> 1;
-        const uint8_t dk = mCount & 1;
-        const nanovdb::Coord ijk = nanovdb::Coord(di, dj, dk) + mVoxel;
-        const ScalarT weight = mTrilinearWeights[mCount];
-        mCoordAndWeight = { ijk, weight };
+        const uint8_t        di     = (mCount & (1 << 2)) >> 2;
+        const uint8_t        dj     = (mCount & (1 << 1)) >> 1;
+        const uint8_t        dk     = mCount & 1;
+        const nanovdb::Coord ijk    = nanovdb::Coord(di, dj, dk) + mVoxel;
+        const ScalarT        weight = mTrilinearWeights[mCount];
+        mCoordAndWeight             = { ijk, weight };
         return *this;
     }
 
-    __hostdev__
-    TrilinearInterpolationIterator operator++(int) {
-        TrilinearInterpolationIterator tmp = *this; ++(*this); return tmp;
+    __hostdev__ TrilinearInterpolationIterator
+    operator++(int) {
+        TrilinearInterpolationIterator tmp = *this;
+        ++(*this);
+        return tmp;
     }
 
     // Dereferencable.
-    __hostdev__
-    inline constexpr const value_type& operator*() const {
+    __hostdev__ inline constexpr const value_type &
+    operator*() const {
         return mCoordAndWeight;
     }
 
-    __hostdev__
-    inline constexpr const value_type* operator->() const {
-        return (const value_type*) &mCoordAndWeight;
+    __hostdev__ inline constexpr const value_type *
+    operator->() const {
+        return (const value_type *)&mCoordAndWeight;
     }
 
     // Equality / inequality.
-    __hostdev__
-    inline constexpr bool operator==(const TrilinearInterpolationIterator& rhs) const {
+    __hostdev__ inline constexpr bool
+    operator==(const TrilinearInterpolationIterator &rhs) const {
         return mVoxel == rhs.mVoxel && mCount == rhs.mCount;
     }
 
-    __hostdev__
-    inline constexpr bool operator!=(const TrilinearInterpolationIterator& rhs) const {
+    __hostdev__ inline constexpr bool
+    operator!=(const TrilinearInterpolationIterator &rhs) const {
         return !(*this == rhs);
     }
 
-    __hostdev__
-    inline constexpr bool isValid() {
+    __hostdev__ inline constexpr bool
+    isValid() {
         return mCount < 8;
     }
 
-private:
-    int32_t mCount = 0;
-    value_type mCoordAndWeight;
-    nanovdb::Coord mVoxel;
+  private:
+    int32_t            mCount = 0;
+    value_type         mCoordAndWeight;
+    nanovdb::Coord     mVoxel;
     ArrayT<ScalarT, 8> mTrilinearWeights;
     // std::array<ScalarT, 8> mTrilinearWeights;
 };
 
 } // namespace detail
 } // namespace fvdb
+
+#endif // FVDB_DETAIL_UTILS_TRILINEARINTERPOLATIONITERATOR_H

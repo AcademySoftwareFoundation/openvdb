@@ -84,8 +84,16 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def get_coords_neighbours(self, source_coords: torch.Tensor, source_stride: int, target_depth: int,
-                              nn_kernel: torch.Tensor, conv_based: bool = False, transposed: bool = False, raw: bool = False):
+    def get_coords_neighbours(
+        self,
+        source_coords: torch.Tensor,
+        source_stride: int,
+        target_depth: int,
+        nn_kernel: torch.Tensor,
+        conv_based: bool = False,
+        transposed: bool = False,
+        raw: bool = False,
+    ):
         """
         Get neighbourhood information of source_coords.
         :param source_coords:
@@ -99,8 +107,7 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def get_self_neighbours(self, source_depth: int, target_depth: int, target_range: int,
-                            conv_based: bool = False):
+    def get_self_neighbours(self, source_depth: int, target_depth: int, target_range: int, conv_based: bool = False):
         """
 
         :param source_depth:
@@ -136,8 +143,14 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def splat_data(self, xyz: torch.Tensor, data_depth: int, data: torch.Tensor = None,
-                   check_corr: bool = True, return_nf_mask: bool = False):
+    def splat_data(
+        self,
+        xyz: torch.Tensor,
+        data_depth: int,
+        data: torch.Tensor = None,
+        check_corr: bool = True,
+        return_nf_mask: bool = False,
+    ):
         """
         Splat data located at xyz to the tree voxels.
         :param xyz: torch.Tensor (N, 3)
@@ -160,8 +173,14 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def build_hierarchy_subdivide(self, xyz: torch.Tensor, subdivide_policy, expand: bool = False,
-                                  limit_adaptive_depth: int = 100, **policy_kwargs):
+    def build_hierarchy_subdivide(
+        self,
+        xyz: torch.Tensor,
+        subdivide_policy,
+        expand: bool = False,
+        limit_adaptive_depth: int = 100,
+        **policy_kwargs,
+    ):
         """
         Ignore for now
         :param xyz:
@@ -174,9 +193,14 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def build_hierarchy_adaptive(self, xyz: torch.Tensor, xyz_density: torch.Tensor, log_base: float = 4.0,
-                                 min_density: float = 8.0,
-                                 limit_adaptive_depth: int = 100) -> torch.Tensor:
+    def build_hierarchy_adaptive(
+        self,
+        xyz: torch.Tensor,
+        xyz_density: torch.Tensor,
+        log_base: float = 4.0,
+        min_density: float = 8.0,
+        limit_adaptive_depth: int = 100,
+    ) -> torch.Tensor:
         """
         Build the hierarchy by first determine the integer level of each point (based on xyz_density, log_base and
         min_density), then splat the points onto the tree structure.
@@ -206,8 +230,14 @@ class BaseBackend(ABC):
         pass
 
     @abstractmethod
-    def trilinear_interpolate(self, queries: torch.Tensor, depth: int, feature: torch.Tensor,
-                              feature_bg: torch.Tensor = None, compute_grad: bool = False):
+    def trilinear_interpolate(
+        self,
+        queries: torch.Tensor,
+        depth: int,
+        feature: torch.Tensor,
+        feature_bg: torch.Tensor = None,
+        compute_grad: bool = False,
+    ):
         """
         Trilinearly interpolate the features, this is very similar to self.splat.
             Maybe merge them in the future.
@@ -231,10 +261,14 @@ class BaseBackend(ABC):
                 d_min, d_max = 0.1 * self.get_stride(d), 0.9 * self.get_stride(d)
             if self.get_coords(d).size(0) == 0:
                 continue
-            blk_wireframe = vis.wireframe_bbox((self.get_coords(d) + d_min) * self.voxel_size,
-                                               (self.get_coords(d) + d_max) * self.voxel_size,
-                                               solid=is_solid, ucid=d if stylized else -1, tube=render_level,
-                                               tube_radius=0.001)
+            blk_wireframe = vis.wireframe_bbox(
+                (self.get_coords(d) + d_min) * self.voxel_size,
+                (self.get_coords(d) + d_max) * self.voxel_size,
+                solid=is_solid,
+                ucid=d if stylized else -1,
+                tube=render_level,
+                tube_radius=0.001,
+            )
             if render_level and d == 0:
                 blk_wireframe = vis.transparent(blk_wireframe, alpha=0.5)
             tree_wireframes.append(blk_wireframe)
