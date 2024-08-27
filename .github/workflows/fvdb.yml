@@ -1,0 +1,152 @@
+
+name: fVDB
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'pendingchanges/**'
+      - '**.md'
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'pendingchanges/**'
+      - '**.md'
+  schedule:
+    # run this workflow every day 7am UTC
+    - cron:  '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'The type of CI to run (all, linux, win, mac)'
+        required: true
+        default: 'linux'
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-fvdb-build:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'linux'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    name: >
+      linux-fvdb-build:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
+    container:
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          - { cxx: g++,     image: '2022-clang11', build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', build: 'Debug' }
+          - { cxx: clang++, image: '2022-clang11', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
+      fail-fast: false
+    steps:
+        - uses: actions/checkout@v3
+
+        - name: Set up fvdb_test Conda env
+          uses: conda-incubator/setup-miniconda@v3
+          with:
+            miniconda-version: "latest"
+            mamba-version: "*"
+            channels: conda-forge
+            channel-priority: true
+            activate-environment: fvdb_test
+            environment-file: fvdb/env/test_environment.yml
+
+        - name: Build fvdb
+          run: |
+            conda activate fvdb_test
+            TORCH_CUDA_ARCH_LIST="6.1;7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}'))) python fvdb/setup.py bdist_wheel --dist-dir=dist 
+          shell:
+            bash -el {0}
+
+        - name: Upload package
+          uses: actions/upload-artifact@v4
+          with:
+              name: fvdb-package-${{ matrix.config.cxx }}-${{ matrix.config.build }}
+              path: dist/
+
+        - name: Clean Conda
+          run: |
+                conda clean -pty
+          shell:
+                bash -el {0}
+
+  linux-fvdb-test:
+    needs: [linux-fvdb-build]
+    if: |
+        github.event_name != 'workflow_dispatch' ||
+        github.event.inputs.type == 'all' ||
+        github.event.inputs.type == 'linux'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-gpu-t4-4c-16g-178h') || 'ubuntu-latest' }}
+    name: >
+        linux-fvdb-test:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
+    container:
+        image: aswf/ci-openvdb:${{ matrix.config.image }}
+    env:
+        CXX: ${{ matrix.config.cxx }}
+    strategy:
+        matrix:
+            config:
+                - { cxx: g++,     image: '2022-clang11', build: 'Release' }
+                - { cxx: g++,     image: '2022-clang11', build: 'Debug' }
+                - { cxx: clang++, image: '2022-clang11', build: 'Release' }
+                - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
+        fail-fast: false
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+            miniconda-version: "latest"
+            mamba-version: "*"
+            channels: conda-forge
+            channel-priority: true
+            activate-environment: fvdb_test
+            environment-file: fvdb/env/test_environment.yml
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+            name: fvdb-package-${{ matrix.config.cxx }}-${{ matrix.config.build }}
+      - name: Install package
+        run: |
+            python -m pip install dist/*.whl
+
+      - name: Run tests
+        run: |
+            conda activate fvdb_test
+            pytest -v fvdb/tests/unit
+        shell:
+             bash -el {0}
+  
+      - name: Clean Conda
+        run: |
+            conda clean -pty
+        shell:
+            bash -el {0}
