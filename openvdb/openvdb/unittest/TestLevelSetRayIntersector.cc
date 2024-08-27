@@ -34,7 +34,9 @@ class TestLevelSetRayIntersector : public ::testing::Test
 };
 
 
-TEST_F(TestLevelSetRayIntersector, tests)
+template<typename GridT>
+void
+testLevelSetRayIntersectorImpl()
 {
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
@@ -45,9 +47,9 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(20.0f, 0.0f, 0.0f);
         const float s = 0.5f, w = 2.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+        tools::LevelSetRayIntersector<GridT> lsri(*ls);
 
         const Vec3T dir(1.0, 0.0, 0.0);
         const Vec3T eye(2.0, 0.0, 0.0);
@@ -73,9 +75,9 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(20.0f, 0.0f, 0.0f);
         const float s = 0.5f, w = 2.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+        tools::LevelSetRayIntersector<GridT> lsri(*ls);
 
         const Vec3T dir(1.0,-0.0,-0.0);
         const Vec3T eye(2.0, 0.0, 0.0);
@@ -101,28 +103,30 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(0.0f, 20.0f, 0.0f);
         const float s = 1.5f, w = 2.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+        tools::LevelSetRayIntersector<GridT> lsri(*ls);
 
         const Vec3T dir(0.0, 1.0, 0.0);
         const Vec3T eye(0.0,-2.0, 0.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
         Real time = 0;
+        constexpr double tolerance = std::is_floating_point_v<typename GridT::ValueType> ? 1e-6 : 1e-3;
+
         EXPECT_TRUE(lsri.intersectsWS(ray, xyz, time));
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
-        ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time);
+        EXPECT_NEAR( 0.0, xyz[0], tolerance);
+        EXPECT_NEAR(15.0, xyz[1], tolerance);
+        EXPECT_NEAR( 0.0, xyz[2], tolerance);
+        EXPECT_NEAR(17.0, time, tolerance);
         double t0=0, t1=0;
         EXPECT_TRUE(ray.intersects(c, r, t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
+        EXPECT_NEAR(t0, time, tolerance);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
-        ASSERT_DOUBLES_APPROX_EQUAL(15.0, ray(t0)[1]);
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[2]);
+        EXPECT_NEAR( 0.0, ray(t0)[0], tolerance);
+        EXPECT_NEAR(15.0, ray(t0)[1], tolerance);
+        EXPECT_NEAR( 0.0, ray(t0)[2], tolerance);
     }
 
     {// voxel intersection against a level set sphere
@@ -130,28 +134,30 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(0.0f, 20.0f, 0.0f);
         const float s = 1.5f, w = 2.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+        tools::LevelSetRayIntersector<GridT> lsri(*ls);
 
         const Vec3T dir(-0.0, 1.0,-0.0);
         const Vec3T eye( 0.0,-2.0, 0.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
         Real time = 0;
+        constexpr double tolerance = std::is_floating_point_v<typename GridT::ValueType> ? 1e-6 : 1e-3;
+
         EXPECT_TRUE(lsri.intersectsWS(ray, xyz, time));
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
-        ASSERT_DOUBLES_APPROX_EQUAL(15.0, xyz[1]);
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[2]);
-        ASSERT_DOUBLES_APPROX_EQUAL(17.0, time);
+        EXPECT_NEAR( 0.0, xyz[0], tolerance);
+        EXPECT_NEAR(15.0, xyz[1], tolerance);
+        EXPECT_NEAR( 0.0, xyz[2], tolerance);
+        EXPECT_NEAR(17.0, time, tolerance);
         double t0=0, t1=0;
         EXPECT_TRUE(ray.intersects(c, r, t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
+        EXPECT_NEAR(t0, time, tolerance);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "Intersection at  xyz = " << xyz << std::endl;
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[0]);
-        ASSERT_DOUBLES_APPROX_EQUAL(15.0, ray(t0)[1]);
-        ASSERT_DOUBLES_APPROX_EQUAL( 0.0, ray(t0)[2]);
+        EXPECT_NEAR( 0.0, ray(t0)[0], tolerance);
+        EXPECT_NEAR(15.0, ray(t0)[1], tolerance);
+        EXPECT_NEAR( 0.0, ray(t0)[2], tolerance);
     }
 
     {// voxel intersection against a level set sphere
@@ -159,16 +165,17 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(0.0f, 0.0f, 20.0f);
         const float s = 1.0f, w = 3.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        typedef tools::LinearSearchImpl<FloatGrid> SearchImplT;
-        tools::LevelSetRayIntersector<FloatGrid, SearchImplT, -1> lsri(*ls);
+        typedef tools::LinearSearchImpl<GridT> SearchImplT;
+        tools::LevelSetRayIntersector<GridT, SearchImplT, -1> lsri(*ls);
 
         const Vec3T dir(0.0, 0.0, 1.0);
         const Vec3T eye(0.0, 0.0, 4.0);
         RayT ray(eye, dir);
         Vec3T xyz(0);
         Real time = 0;
+
         EXPECT_TRUE(lsri.intersectsWS(ray, xyz, time));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[0]);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, xyz[1]);
@@ -189,10 +196,10 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(0.0f, 0.0f, 20.0f);
         const float s = 1.0f, w = 3.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        typedef tools::LinearSearchImpl<FloatGrid> SearchImplT;
-        tools::LevelSetRayIntersector<FloatGrid, SearchImplT, -1> lsri(*ls);
+        typedef tools::LinearSearchImpl<GridT> SearchImplT;
+        tools::LevelSetRayIntersector<GridT, SearchImplT, -1> lsri(*ls);
 
         const Vec3T dir(-0.0,-0.0, 1.0);
         const Vec3T eye( 0.0, 0.0, 4.0);
@@ -220,10 +227,10 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(0.0f, 0.0f, 20.0f);
         const float s = 1.0f, w = 3.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        typedef tools::LinearSearchImpl<FloatGrid> SearchImplT;
-        tools::LevelSetRayIntersector<FloatGrid, SearchImplT, -1> lsri(*ls);
+        typedef tools::LinearSearchImpl<GridT> SearchImplT;
+        tools::LevelSetRayIntersector<GridT, SearchImplT, -1> lsri(*ls);
 
         const Vec3T dir(-0.0,-0.0, 1.0);
         const Vec3T eye( 0.0, 0.0, 4.0);
@@ -251,9 +258,9 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(10.0f, 10.0f, 10.0f);
         const float s = 1.0f, w = 3.0f;
 
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+        tools::LevelSetRayIntersector<GridT> lsri(*ls);
 
         Vec3T dir(1.0, 1.0, 1.0); dir.normalize();
         const Vec3T eye(0.0, 0.0, 0.0);
@@ -261,20 +268,22 @@ TEST_F(TestLevelSetRayIntersector, tests)
         //std::cerr << "ray: " << ray << std::endl;
         Vec3T xyz(0);
         Real time = 0;
+        constexpr double tolerance = std::is_floating_point_v<typename GridT::ValueType> ? 1e-6 : 2e-5;
+
         EXPECT_TRUE(lsri.intersectsWS(ray, xyz, time));
         //std::cerr << "\nIntersection at  xyz = " << xyz << std::endl;
         //analytical intersection test
         double t0=0, t1=0;
         EXPECT_TRUE(ray.intersects(c, r, t0, t1));
-        ASSERT_DOUBLES_APPROX_EQUAL(t0, time);
-        ASSERT_DOUBLES_APPROX_EQUAL((ray(t0)-c).length()-r, 0);
-        ASSERT_DOUBLES_APPROX_EQUAL((ray(t1)-c).length()-r, 0);
+        EXPECT_NEAR(t0, time, tolerance);
+        EXPECT_NEAR((ray(t0)-c).length()-r, 0, tolerance);
+        EXPECT_NEAR((ray(t1)-c).length()-r, 0, tolerance);
         //std::cerr << "\nray("<<t0<<")="<<ray(t0)<<std::endl;
         //std::cerr << "\nray("<<t1<<")="<<ray(t1)<<std::endl;
         const Vec3T delta = xyz - ray(t0);
         //std::cerr << "delta = " << delta << std::endl;
         //std::cerr << "|delta|/dx=" << (delta.length()/ls->voxelSize()[0]) << std::endl;
-        ASSERT_DOUBLES_APPROX_EQUAL(0, delta.length());
+        EXPECT_NEAR(0, delta.length(), tolerance);
     }
 
     {// test intersections against a high-resolution level set sphere @1024^3
@@ -282,10 +291,10 @@ TEST_F(TestLevelSetRayIntersector, tests)
         const Vec3f c(10.0f, 10.0f, 20.0f);
         const float s = 0.01f, w = 2.0f;
         double t0=0, t1=0;
-        FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+        typename GridT::Ptr ls = tools::createLevelSetSphere<GridT>(r, c, s, w);
 
-        typedef tools::LinearSearchImpl<FloatGrid, /*iterations=*/2> SearchImplT;
-        tools::LevelSetRayIntersector<FloatGrid, SearchImplT> lsri(*ls);
+        typedef tools::LinearSearchImpl<GridT, /*iterations=*/2> SearchImplT;
+        tools::LevelSetRayIntersector<GridT, SearchImplT> lsri(*ls);
 
         Vec3T xyz(0);
         Real time = 0;
@@ -306,6 +315,16 @@ TEST_F(TestLevelSetRayIntersector, tests)
             }
         }
     }
+}
+
+TEST_F(TestLevelSetRayIntersector, testLevelSetRayIntersectorFloat)
+{
+    testLevelSetRayIntersectorImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestLevelSetRayIntersector, testLevelSetRayIntersectorHalf)
+{
+    testLevelSetRayIntersectorImpl<openvdb::HalfGrid>();
 }
 
 TEST_F(TestLevelSetRayIntersector, testMissedIntersections)

@@ -165,16 +165,20 @@ TEST_F(TestVolumeToSpheres, testMinimumSphereCount)
 }
 
 
-TEST_F(TestVolumeToSpheres, testClosestSurfacePoint)
+template<typename GridT>
+void
+testClosestSurfacePointImpl()
 {
     using namespace openvdb;
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
 
-    const float voxelSize = 1.0f;
-    const Vec3f center{0.0f}; // ensure multiple internal nodes
+    const ValueT voxelSize = ValueT(1.0);
+    const Vec3T center{ValueT(0.0)}; // ensure multiple internal nodes
 
     for (const float radius: { 8.0f, 50.0f }) {
         // Construct a spherical level set.
-        const auto sphere = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize);
+        const auto sphere = tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         EXPECT_TRUE(sphere);
 
         // Construct the corners of a cube that exactly encloses the sphere.
@@ -191,7 +195,7 @@ TEST_F(TestVolumeToSpheres, testClosestSurfacePoint)
         // Compute the distance from a corner of the cube to the surface of the sphere.
         const auto distToSurface = Vec3d{radius}.length() - radius;
 
-        auto csp = tools::ClosestSurfacePoint<FloatGrid>::create(*sphere);
+        auto csp = tools::ClosestSurfacePoint<GridT>::create(*sphere);
         EXPECT_TRUE(csp);
 
         // Move each corner point to the closest surface point.
@@ -222,4 +226,12 @@ TEST_F(TestVolumeToSpheres, testClosestSurfacePoint)
         EXPECT_TRUE(points[0].eq(Vec3R{radius, 0, 0}, /*tolerance=*/0.5));
             ///< @todo off by half a voxel in y and z
     }
+}
+
+TEST_F(TestVolumeToSpheres, testClosestSurfacePointFloat) {
+    testClosestSurfacePointImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestVolumeToSpheres, testClosestSurfacePointHalf) {
+    testClosestSurfacePointImpl<openvdb::HalfGrid>();
 }

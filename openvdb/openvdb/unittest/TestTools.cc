@@ -32,6 +32,7 @@
 #include <atomic>
 #include <random>
 #include <sstream>
+#include <type_traits>
 
 
 // Uncomment to test on models from our web-site
@@ -114,19 +115,25 @@ TEST_F(TestTools, testInteriorMask)
 }
 
 
-TEST_F(TestTools, testLevelSetSphere)
+template<typename GridT>
+void
+testLevelSetSphereImpl()
 {
-    const float radius = 4.3f;
-    const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
-    const float voxelSize = 1.5f, width = 3.25f;
-    const int dim = 32;
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
 
-    openvdb::FloatGrid::Ptr grid1 =
-        openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize, width);
+    const ValueT radius = 4.3f;
+    const Vec3T center(ValueT(15.8), ValueT(13.2), ValueT(16.7));
+    const ValueT voxelSize = 1.5f, width = 3.25f;
+    const int dim = 32;
+    ValueT tolerance = std::is_floating_point<typename GridT::ValueType>::value ? 0.0001 : 0.004;
+
+    typename GridT::Ptr grid1 =
+        openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize, width);
 
     /// Also test ultra slow makeSphere in unittest/util.h
-    openvdb::FloatGrid::Ptr grid2 = openvdb::createLevelSet<openvdb::FloatGrid>(voxelSize, width);
-    unittest_util::makeSphere<openvdb::FloatGrid>(
+    typename GridT::Ptr grid2 = openvdb::createLevelSet<GridT>(voxelSize, width);
+    unittest_util::makeSphere<GridT>(
         openvdb::Coord(dim), center, radius, *grid2, unittest_util::SPHERE_SPARSE_NARROW_BAND);
 
     const float outside = grid1->background(), inside = -outside;
@@ -138,21 +145,34 @@ TEST_F(TestTools, testLevelSetSphere)
                 const float val1 = grid1->tree().getValue(openvdb::Coord(i,j,k));
                 const float val2 = grid2->tree().getValue(openvdb::Coord(i,j,k));
                 if (dist > outside) {
-                    EXPECT_NEAR( outside, val1, 0.0001);
-                    EXPECT_NEAR( outside, val2, 0.0001);
+                    EXPECT_NEAR( outside, val1, tolerance);
+                    EXPECT_NEAR( outside, val2, tolerance);
                 } else if (dist < inside) {
-                    EXPECT_NEAR( inside, val1, 0.0001);
-                    EXPECT_NEAR( inside, val2, 0.0001);
+                    EXPECT_NEAR( inside, val1, tolerance);
+                    EXPECT_NEAR( inside, val2, tolerance);
                 } else {
-                    EXPECT_NEAR(  dist, val1, 0.0001);
-                    EXPECT_NEAR(  dist, val2, 0.0001);
+                    EXPECT_NEAR(  dist, val1, tolerance);
+                    EXPECT_NEAR(  dist, val2, tolerance);
                 }
             }
         }
     }
+    // For Half, we need to change unittest_util::makeSphere
+    if constexpr(std::is_floating_point<typename GridT::ValueType>::value) {
+        EXPECT_EQ(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+    }
+}// testLevelSetSphereImpl
 
-    EXPECT_EQ(grid1->activeVoxelCount(), grid2->activeVoxelCount());
-}// testLevelSetSphere
+
+TEST_F(TestTools, testLevelSetSphereFloat)
+{
+    testLevelSetSphereImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestTools, testLevelSetSphereHalf)
+{
+    testLevelSetSphereImpl<openvdb::HalfGrid>();
+}
 
 TEST_F(TestTools, testLevelSetPlatonic)
 {
@@ -217,21 +237,21 @@ TEST_F(TestTools, testLevelSetPlatonic)
 
 }// testLevelSetPlatonic
 
-TEST_F(TestTools, testLevelSetAdvect)
+template<typename GridT>
+void
+testLevelSetAdvectImpl()
 {
     // Uncomment sections below to run this (time-consuming) test
     using namespace openvdb;
+    using T = typename GridT::ValueType;
 
     const int dim = 128;
     const Vec3f center(0.35f, 0.35f, 0.35f);
-    const float radius = 0.15f, voxelSize = 1.0f/(dim-1);
-    const float halfWidth = 3.0f, gamma = halfWidth*voxelSize;
-
-    using GridT = FloatGrid;
-    //using VectT = Vec3fGrid;
+    const T radius = 0.15f, voxelSize = 1.0f/(dim-1);
+    const T halfWidth = 3.0f, gamma = halfWidth*voxelSize;
 
     {//test tracker::resize
-        GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
+        typename GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxelSize, halfWidth);
         using TrackerT = tools::LevelSetTracker<GridT>;
         TrackerT tracker(*grid);
         tracker.setSpatialScheme(math::FIRST_BIAS);
@@ -243,7 +263,7 @@ TEST_F(TestTools, testLevelSetAdvect)
         EXPECT_TRUE(!tracker.resize());
 
         {// check range of on values in a sphere w/o mask
-            tools::CheckRange<GridT, true, true, GridT::ValueOnCIter> c(-gamma, gamma);
+            tools::CheckRange<GridT, true, true, typename GridT::ValueOnCIter> c(-gamma, gamma);
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c);
             //std::cerr << "Values out of range:\n" << str;
@@ -267,8 +287,8 @@ TEST_F(TestTools, testLevelSetAdvect)
         ASSERT_DOUBLES_EXACTLY_EQUAL( 4.0f, tracker.getHalfWidth());
 
         {// check range of on values in a sphere w/o mask
-            const float g = gamma + voxelSize;
-            tools::CheckRange<GridT, true, true, GridT::ValueOnCIter> c(-g, g);
+            const T g = gamma + voxelSize;
+            tools::CheckRange<GridT, true, true, typename GridT::ValueOnCIter> c(-g, g);
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c);
             //std::cerr << "Values out of range:\n" << str;
@@ -288,7 +308,7 @@ TEST_F(TestTools, testLevelSetAdvect)
     }
     /*
     {//test tracker
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
+        typename GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         using TrackerT = openvdb::tools::LevelSetTracker<GridT>;
         TrackerT tracker(*grid);
         tracker.setSpatialScheme(openvdb::math::HJWENO5_BIAS);
@@ -302,11 +322,11 @@ TEST_F(TestTools, testLevelSetAdvect)
             tracker.track();
             fw("Tracker", 0, 0);
         }
+    }
     */
-
     /*
     {//test EnrightField
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
+        typename GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         using FieldT = openvdb::tools::EnrightField<float>;
         FieldT field;
 
@@ -324,11 +344,12 @@ TEST_F(TestTools, testLevelSetAdvect)
         for (float t = 0, dt = 0.5f; !grid->empty() && t < 1.0f; t += dt) {
             fw("Enright", t + dt, advect.advect(t, t + dt));
         }
-        }
+    }
     */
     /*
+    using VectT = Vec3fGrid;
     {// test DiscreteGrid - Aligned
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
+        typename GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         VectT vect(openvdb::Vec3f(1,0,0));
         using FieldT = openvdb::tools::DiscreteField<VectT>;
         FieldT field(vect);
@@ -344,18 +365,18 @@ TEST_F(TestTools, testLevelSetAdvect)
         for (float t = 0, dt = 0.5f; !grid->empty() && t < 1.0f; t += dt) {
             fw("Aligned", t + dt, advect.advect(t, t + dt));
         }
-        }
+    }
     */
     /*
     {// test DiscreteGrid - Transformed
-        GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
+        typename GridT::Ptr grid = openvdb::tools::createLevelSetSphere<GridT>(radius, center, voxelSize);
         VectT vect(openvdb::Vec3f(0,0,0));
         VectT::Accessor acc = vect.getAccessor();
         for (openvdb::Coord ijk(0); ijk[0]<dim; ++ijk[0])
             for (ijk[1]=0; ijk[1]<dim; ++ijk[1])
                 for (ijk[2]=0; ijk[2]<dim; ++ijk[2])
                     acc.setValue(ijk, openvdb::Vec3f(1,0,0));
-        vect.transform().scale(2.0f);
+        // vect.transform().scale(2.0f);
         using FieldT = openvdb::tools::DiscreteField<VectT>;
         FieldT field(vect);
         using AdvectT = openvdb::tools::LevelSetAdvection<GridT, FieldT>;
@@ -370,23 +391,38 @@ TEST_F(TestTools, testLevelSetAdvect)
         for (float t = 0, dt = 0.5f; !grid->empty() && t < 1.0f; t += dt) {
             fw("Xformed", t + dt, advect.advect(t, t + dt));
         }
-        }
+    }
     */
-}//testLevelSetAdvect
+}
+
+TEST_F(TestTools, testLevelSetAdvectFloat)
+{
+    testLevelSetAdvectImpl<openvdb::FloatGrid>();
+}//testLevelSetAdvectFloat
+
+
+TEST_F(TestTools, testLevelSetAdvectHalf)
+{
+    testLevelSetAdvectImpl<openvdb::HalfGrid>();
+}//testLevelSetAdvectHalf
 
 
 ////////////////////////////////////////
 
-TEST_F(TestTools, testLevelSetMorph)
+
+template<typename GridT>
+void
+testLevelSetMorphImpl()
 {
-    using GridT = openvdb::FloatGrid;
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
     {//test morphing overlapping but aligned spheres
         const int dim = 64;
-        const openvdb::Vec3f C1(0.35f, 0.35f, 0.35f), C2(0.4f, 0.4f, 0.4f);
-        const float radius = 0.15f, voxelSize = 1.0f/(dim-1);
+        const Vec3T C1(ValueT(0.35), ValueT(0.35), ValueT(0.35)), C2(ValueT(0.4), ValueT(0.4), ValueT(0.4));
+        const ValueT radius = ValueT(0.15), voxelSize = ValueT(1.0)/(dim-1);
 
-        GridT::Ptr source = openvdb::tools::createLevelSetSphere<GridT>(radius, C1, voxelSize);
-        GridT::Ptr target = openvdb::tools::createLevelSetSphere<GridT>(radius, C2, voxelSize);
+        typename GridT::Ptr source = openvdb::tools::createLevelSetSphere<GridT>(radius, C1, voxelSize);
+        typename GridT::Ptr target = openvdb::tools::createLevelSetSphere<GridT>(radius, C2, voxelSize);
 
         using MorphT = openvdb::tools::LevelSetMorphing<GridT>;
         MorphT morph(*source, *target);
@@ -410,16 +446,16 @@ TEST_F(TestTools, testLevelSetMorph)
 
         const float invDx = 1.0f/voxelSize;
         openvdb::math::Stats s;
-        for (GridT::ValueOnCIter it = source->tree().cbeginValueOn(); it; ++it) {
+        for (typename GridT::ValueOnCIter it = source->tree().cbeginValueOn(); it; ++it) {
             s.add( invDx*(*it - target->tree().getValue(it.getCoord())) );
         }
-        for (GridT::ValueOnCIter it = target->tree().cbeginValueOn(); it; ++it) {
+        for (typename GridT::ValueOnCIter it = target->tree().cbeginValueOn(); it; ++it) {
             s.add( invDx*(*it - target->tree().getValue(it.getCoord())) );
         }
         //s.print("Morph");
         EXPECT_NEAR(0.0, s.min(), 0.50);
-        EXPECT_NEAR(0.0, s.max(), 0.50);
-        EXPECT_NEAR(0.0, s.avg(), 0.02);
+        EXPECT_NEAR(0.0, s.max(), 0.60); //Float passes with 0.50 tol
+        EXPECT_NEAR(0.0, s.avg(), 0.025); //Float passes with 0.025 tol
         /*
         openvdb::math::Histogram h(s, 30);
         for (GridT::ValueOnCIter it = source->tree().cbeginValueOn(); it; ++it) {
@@ -498,7 +534,18 @@ TEST_F(TestTools, testLevelSetMorph)
         }
 
     */
-}//testLevelSetMorph
+}//testLevelSetMorphImpl
+
+TEST_F(TestTools, testLevelSetMorphFloat)
+{
+    testLevelSetMorphImpl<openvdb::FloatGrid>();
+}
+
+
+TEST_F(TestTools, testLevelSetMorphHalf)
+{
+    testLevelSetMorphImpl<openvdb::HalfGrid>();
+}
 
 ////////////////////////////////////////
 
@@ -699,8 +746,187 @@ TEST_F(TestTools, testLevelSetMeasure)
        EXPECT_EQ(2, x);
      }
    }
-
 }//testLevelSetMeasure
+
+
+template<typename GridT>
+void
+testLevelSetMeasureImpl()
+{
+    using ValueT = typename GridT::ValueType;
+    // Double can pass with 0.1% percentage, Half requires 0.25% tolerance.
+    const typename GridT::ValueType percentage = ValueT(0.25)/ValueT(100.0);//i.e. 0.25%
+    const int dim = 256;
+    openvdb::Real area, volume, mean, gauss;
+
+    // First sphere
+    openvdb::Vec3f C(0.35f, 0.35f, 0.35f);
+    openvdb::Real r = 0.15, voxelSize = 1.0/(dim-1);
+    const openvdb::Real Pi = openvdb::math::pi<openvdb::Real>();
+    typename GridT::Ptr sphere = openvdb::tools::createLevelSetSphere<GridT>(float(r), C, float(voxelSize));
+
+    using MeasureT = openvdb::tools::LevelSetMeasure<GridT>;
+    MeasureT m(*sphere);
+
+    /// Test area and volume of sphere in world units
+    area = 4*Pi*r*r;
+    volume = 4.0/3.0*Pi*r*r*r;
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+
+    // Test area, volume and average mean curvature of sphere in world units
+    mean = 1.0/r;
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
+
+    // Test area, volume, average mean curvature and average gaussian curvature of sphere in world units
+    gauss = 1.0/(r*r);
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,  m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
+    EXPECT_NEAR(gauss, m.avgGaussianCurvature(), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
+
+    // Test measures of sphere in voxel units
+    r /= voxelSize;
+    area = 4*Pi*r*r;
+    volume = 4.0/3.0*Pi*r*r*r;
+    mean = 1.0/r;
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
+
+    gauss = 1.0/(r*r);
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
+
+    // Second sphere
+    C = openvdb::Vec3f(5.4f, 6.4f, 8.4f);
+    r = 0.57;
+    sphere = openvdb::tools::createLevelSetSphere<GridT>(float(r), C, float(voxelSize));
+    m.init(*sphere);
+
+    // Test all measures of sphere in world units
+    area = 4*Pi*r*r;
+    volume = 4.0/3.0*Pi*r*r*r;
+    mean = 1.0/r;
+    gauss = 1.0/(r*r);
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
+
+    // Test all measures of sphere in voxel units
+    r /= voxelSize;
+    area = 4*Pi*r*r;
+    volume = 4.0/3.0*Pi*r*r*r;
+    mean = 1.0/r;
+    gauss = 1.0/(r*r);
+    // Test accuracy of computed measures to within 0.1% of the exact measure.
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
+    EXPECT_NEAR(area,  openvdb::tools::levelSetArea(*sphere,false),
+                                 percentage*area);
+    EXPECT_NEAR(volume,openvdb::tools::levelSetVolume(*sphere,false),
+                                 percentage*volume);
+    EXPECT_EQ(0, openvdb::tools::levelSetGenus(*sphere));
+
+    // Read level set from file
+    /*
+    util::CpuTimer timer;
+    openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
+    openvdb::io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/venusstatue.vdb");
+    sourceFile.open();
+    GridT::Ptr model = openvdb::gridPtrCast<GridT>(sourceFile.getGrids()->at(0));
+    m.reinit(*model);
+
+    //m.setGrainSize(1);
+    timer.start("\nParallel measure of area and volume");
+    m.measure(a, v, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
+
+    timer.start("\nParallel measure of area, volume and curvature");
+    m.measure(a, v, c, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v
+              << ", average curvature = " << c << std::endl;
+
+    m.setGrainSize(0);
+    timer.start("\nSerial measure of area and volume");
+    m.measure(a, v, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v << std::endl;
+
+    timer.start("\nSerial measure of area, volume and curvature");
+    m.measure(a, v, c, false);
+    timer.stop();
+    std::cerr << "Model: area = " << a << ", volume = " << v
+              << ", average curvature = " << c << std::endl;
+    */
+   // Run these tests if it is a FloatGrid (but not HalfGrid) because csgUnion currently does not support HalfGrid
+   if constexpr(std::is_floating_point<typename GridT::ValueType>::value)
+   {
+       {// testing total genus of multiple disjoint level set spheres with different radius
+         const float dx = 0.5f, r = 50.0f;
+         auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
+         EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+         for (int i=1; i<=3; ++i) {
+           auto sphere = openvdb::tools::createLevelSetSphere<GridT>(r+float(i)*5.0f , openvdb::Vec3f(100.0f*float(i)), dx);
+           openvdb::tools::csgUnion(*grid, *sphere);
+           const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);// since they are not overlapping re-normalization is not required
+           EXPECT_EQ(2*i, x);
+         }
+       }
+       {// testing total genus of multiple disjoint level set cubes of different size
+         const float dx = 0.5f, size = 50.0f;
+         auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
+         EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+         for (int i=1; i<=2; ++i) {
+           auto shape = openvdb::tools::createLevelSetCube<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*float(i)), dx);
+           openvdb::tools::csgUnion(*grid, *shape);
+           const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);
+           EXPECT_EQ(2*i, x);
+         }
+       }
+       {// testing Euler characteristic and total genus of multiple intersecting (connected) level set spheres
+         const float dx = 0.5f, r = 50.0f;
+         auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
+         EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+         for (int i=1; i<=4; ++i) {
+           auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r , openvdb::Vec3f(30.0f*float(i), 0.0f, 0.0f), dx);
+           openvdb::tools::csgUnion(*grid, *sphere);
+           const int genus = openvdb::tools::levelSetGenus(*grid);
+           const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);
+           EXPECT_EQ(0, genus);
+           EXPECT_EQ(2, x);
+         }
+       }
+   }
+}//testLevelSetMeasureImpl
+
+TEST_F(TestTools, testLevelSetMeasureFloat)
+{
+    testLevelSetMeasureImpl<openvdb::FloatGrid>();
+}//testLevelSetMeasureFloat
+
+TEST_F(TestTools, testLevelSetMeasureHalf)
+{
+    testLevelSetMeasureImpl<openvdb::HalfGrid>();
+}//testLevelSetMeasureHalf
 
 TEST_F(TestTools, testMagnitude)
 {
@@ -1137,20 +1363,24 @@ TEST_F(TestTools, testPointScatter)
 
 ////////////////////////////////////////
 
-TEST_F(TestTools, testVolumeAdvect)
+template<typename GridT>
+void
+testVolumeAdvectImpl()
 {
     using namespace openvdb;
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
 
-    Vec3fGrid velocity(Vec3f(1.0f, 0.0f, 0.0f));
-    using GridT = FloatGrid;
+    // TODO: Define Vec3TreeT = typename tree::Tree4<ValueT, 5, 4, 3>::Type and use Grid<Vec3TreeT>
+    Vec3fGrid velocity(Vec3T(ValueT(1.0), ValueT(0.0), ValueT(0.0)));
     using AdvT = tools::VolumeAdvection<Vec3fGrid>;
     using SamplerT = tools::Sampler<1>;
 
     {//test non-uniform grids (throws)
-        GridT::Ptr density0 = GridT::create(0.0f);
+        typename GridT::Ptr density0 = GridT::create(0.0f);
         density0->transform().preScale(Vec3d(1.0, 2.0, 3.0));//i.e. non-uniform voxels
         AdvT a(velocity);
-        EXPECT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
+        EXPECT_THROW((a.advect<GridT, SamplerT>(*density0, ValueT(0.1))), RuntimeError);
     }
 
     {// test spatialOrder and temporalOrder
@@ -1198,7 +1428,7 @@ TEST_F(TestTools, testVolumeAdvect)
     }
 
     {//test RK4 advect without a mask
-        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        typename GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
@@ -1224,7 +1454,7 @@ TEST_F(TestTools, testVolumeAdvect)
         EXPECT_TRUE( density0->tree().isValueOn(Coord(24,3,3)));
     }
     {//test MAC advect without a mask
-        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        typename GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
@@ -1250,7 +1480,7 @@ TEST_F(TestTools, testVolumeAdvect)
         EXPECT_TRUE( density0->tree().isValueOn(Coord(24,3,3)));
     }
     {//test advect with a mask
-        GridT::Ptr density0 = GridT::create(0.0f), density1;
+        typename GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
         EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
@@ -1312,7 +1542,15 @@ TEST_F(TestTools, testVolumeAdvect)
             }
             }
     */
-}// testVolumeAdvect
+}// testVolumeAdvectImpl
+
+TEST_F(TestTools, testVolumeAdvectFloat) {
+    testVolumeAdvectImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestTools, testVolumeAdvectHalf) {
+    testVolumeAdvectImpl<openvdb::HalfGrid>();
+}
 
 ////////////////////////////////////////
 

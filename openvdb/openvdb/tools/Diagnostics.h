@@ -12,6 +12,7 @@
 #define OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
+#include <openvdb/Types.h> // for openvdb::is_floating_point
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Vec3.h>
 #include <openvdb/math/Stencils.h>
@@ -428,7 +429,7 @@ template<typename GridT,
 struct CheckNormGrad
 {
     using ValueType = typename GridT::ValueType;
-    static_assert(std::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value,
         "openvdb::tools::CheckNormGrad requires a scalar, floating-point grid");
     using TileIterT = TreeIterT;
     using VoxelIterT = typename tree::IterTraits<typename TreeIterT::NodeT,

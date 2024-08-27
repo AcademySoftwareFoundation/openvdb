@@ -21,6 +21,7 @@
 #include <cstdio> // for remove()
 #include <fstream>
 #include <sstream>
+#include <type_traits>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
@@ -1951,19 +1952,23 @@ TEST_F(TestTree, testFill)
 
 }// testFill
 
-TEST_F(TestTree, testSignedFloodFill)
+template<typename GridT>
+void
+testSignedFloodFillImpl()
 {
+    using ValueT = typename GridT::ValueType;
+    using Vec3T = typename openvdb::math::Vec3<ValueT>;
     // Use a custom tree configuration to ensure we flood-fill at all levels!
-    using LeafT = openvdb::tree::LeafNode<float,2>;//4^3
+    using LeafT = openvdb::tree::LeafNode<ValueT,2>;//4^3
     using InternalT = openvdb::tree::InternalNode<LeafT,2>;//4^3
     using RootT = openvdb::tree::RootNode<InternalT>;// child nodes are 16^3
     using TreeT = openvdb::tree::Tree<RootT>;
 
-    const float outside = 2.0f, inside = -outside, radius = 20.0f;
+    const ValueT outside = ValueT(2.0), inside = -outside, radius = ValueT(20.0);
 
     {//first test flood filling of a leaf node
 
-        const LeafT::ValueType fill0=5, fill1=-fill0;
+        const typename LeafT::ValueType fill0=5, fill1=-fill0;
         openvdb::tools::SignedFloodFillOp<TreeT> sff(fill0, fill1);
 
         int D = LeafT::dim(), C=D/2;
@@ -1991,7 +1996,7 @@ TEST_F(TestTree, testSignedFloodFill)
         EXPECT_EQ(fill1, leaf.getValue(last));
     }
 
-    openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
+    typename openvdb::Grid<TreeT>::Ptr grid = openvdb::Grid<TreeT>::create(outside);
     TreeT& tree = grid->tree();
     const RootT& root = tree.root();
     const openvdb::Coord dim(3*16, 3*16, 3*16);
@@ -2001,16 +2006,16 @@ TEST_F(TestTree, testSignedFloodFill)
     EXPECT_TRUE(root.getTableSize()==0);
 
     //make narrow band of sphere without setting sign for the background values!
-    openvdb::Grid<TreeT>::Accessor acc = grid->getAccessor();
-    const openvdb::Vec3f center(static_cast<float>(C[0]),
-                                static_cast<float>(C[1]),
-                                static_cast<float>(C[2]));
+    typename openvdb::Grid<TreeT>::Accessor acc = grid->getAccessor();
+    const Vec3T center(static_cast<ValueT>(C[0]),
+                       static_cast<ValueT>(C[1]),
+                       static_cast<ValueT>(C[2]));
     openvdb::Coord xyz;
     for (xyz[0]=0; xyz[0]<dim[0]; ++xyz[0]) {
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = float((p-center).length() - radius);
+                const ValueT dist = float((p-center).length() - radius);
                 if (fabs(dist) > outside) continue;
                 acc.setValue(xyz, dist);
             }
@@ -2025,8 +2030,8 @@ TEST_F(TestTree, testSignedFloodFill)
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = float((p-center).length() - radius);
-                const float val  =  acc.getValue(xyz);
+                const ValueT dist = ValueT((p-center).length() - radius);
+                const ValueT val  =  acc.getValue(xyz);
                 if (dist < inside) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL( val, outside);
                 } else if (dist>outside) {
@@ -2047,8 +2052,8 @@ TEST_F(TestTree, testSignedFloodFill)
         for (xyz[1]=0; xyz[1]<dim[1]; ++xyz[1]) {
             for (xyz[2]=0; xyz[2]<dim[2]; ++xyz[2]) {
                 const openvdb::Vec3R p =  grid->transform().indexToWorld(xyz);
-                const float dist = float((p-center).length() - radius);
-                const float val  =  acc.getValue(xyz);
+                const ValueT dist = ValueT((p-center).length() - radius);
+                const ValueT val  =  acc.getValue(xyz);
                 if (dist < inside) {
                     ASSERT_DOUBLES_EXACTLY_EQUAL( val, inside);
                 } else if (dist>outside) {
@@ -2063,6 +2068,18 @@ TEST_F(TestTree, testSignedFloodFill)
     EXPECT_TRUE(root.getTableSize()>size_before);//added inside root tiles
     EXPECT_TRUE(!tree.isValueOn(C));
     ASSERT_DOUBLES_EXACTLY_EQUAL(inside,tree.getValue(C));
+}//testSignedFloodFillImpl
+
+
+TEST_F(TestTree, testSignedFloodFillFloat)
+{
+    testSignedFloodFillImpl<openvdb::FloatGrid>();
+}
+
+
+TEST_F(TestTree, testSignedFloodFillHalf)
+{
+    testSignedFloodFillImpl<openvdb::HalfGrid>();
 }
 
 

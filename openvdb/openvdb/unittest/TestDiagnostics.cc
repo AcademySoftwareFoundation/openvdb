@@ -262,6 +262,29 @@ TEST_F(TestDiagnostics, testDiagnose)
     }
 }// testDiagnose
 
+TEST_F(TestDiagnostics, testDiagnoseHalf)
+{
+    using namespace openvdb;
+    using half = openvdb::math::half;
+
+    const half radius = 4.3f;
+    const openvdb::Vec3H center(half(15.8), half(13.2), half(16.7));
+    const half voxelSize = 0.1f, width = 2.0f, gamma=voxelSize*width;
+
+    HalfGrid::Ptr gridSphere =
+        tools::createLevelSetSphere<HalfGrid>(radius, center, voxelSize, width);
+
+    {// check norm of gradient of sphere w/o mask
+        tools::CheckNormGrad<HalfGrid> c(*gridSphere, 0.75f, 1.25f);
+        tools::Diagnose<HalfGrid> d(*gridSphere);
+        std::string str = d.check(c, false, true, false, false);
+        //std::cerr << "NormGrad:\n" << str;
+        EXPECT_TRUE(str.empty());
+        EXPECT_EQ(0, int(d.valueCount()));
+        EXPECT_EQ(0, int(d.failureCount()));
+    }
+}// testDiagnoseHalf
+
 TEST_F(TestDiagnostics, testCheckLevelSet)
 {
     using namespace openvdb;

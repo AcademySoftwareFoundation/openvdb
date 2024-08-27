@@ -27,14 +27,16 @@ class TestVolumeRayIntersector : public ::testing::Test
 };
 
 
-TEST_F(TestVolumeRayIntersector, testAll)
+template<typename GridT>
+void
+testVolumeRayIntersectorImpl()
 {
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
     typedef RayT::Vec3Type     Vec3T;
 
     {//one single leaf node
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0,0,0), 1.0f);
         grid.tree().setValue(Coord(7,7,7), 1.0f);
@@ -42,7 +44,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -51,7 +53,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//same as above but with dilation
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0,0,0), 1.0f);
         grid.tree().setValue(Coord(7,7,7), 1.0f);
@@ -59,7 +61,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
+        tools::VolumeRayIntersector<GridT> inter(grid, 1);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -68,7 +70,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//one single leaf node
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(1,1,1), 1.0f);
         grid.tree().setValue(Coord(7,3,3), 1.0f);
@@ -76,7 +78,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -85,7 +87,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
      {//same as above but with dilation
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(1,1,1), 1.0f);
         grid.tree().setValue(Coord(7,3,3), 1.0f);
@@ -93,7 +95,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
+        tools::VolumeRayIntersector<GridT> inter(grid, 1);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -102,7 +104,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leaf nodes
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0,0,0), 1.0f);
         grid.tree().setValue(Coord(8,0,0), 1.0f);
@@ -111,7 +113,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -120,7 +122,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab and leaf
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
@@ -130,7 +132,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -142,7 +144,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab, a leaf and an active tile
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
@@ -152,7 +154,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
         EXPECT_TRUE(inter.march(t0, t1));
@@ -165,7 +167,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
     }
 
     {//two adjacent leafs followed by a gab, a leaf and an active tile
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
@@ -175,7 +177,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
 
         std::vector<RayT::TimeSpan> list;
@@ -188,7 +190,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
     }
 
     {//same as above but now with std::deque instead of std::vector
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
 
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
@@ -198,7 +200,7 @@ TEST_F(TestVolumeRayIntersector, testAll)
         const Vec3T dir( 1.0, 0.0, 0.0);
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         EXPECT_TRUE(inter.setIndexRay(ray));
 
         std::deque<RayT::TimeSpan> list;
@@ -211,11 +213,11 @@ TEST_F(TestVolumeRayIntersector, testAll)
     }
 
     {// Test submitted by "Jan" @ GitHub
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
         grid.tree().setValue(Coord(0*8,0,0), 1.0f);
         grid.tree().setValue(Coord(1*8,0,0), 1.0f);
         grid.tree().setValue(Coord(3*8,0,0), 1.0f);
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
 
         const Vec3T dir(-1.0, 0.0, 0.0);
         const Vec3T eye(50.0, 0.0, 0.0);
@@ -233,10 +235,10 @@ TEST_F(TestVolumeRayIntersector, testAll)
 
     {// Test submitted by "Trevor" @ GitHub
 
-        FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
+        typename GridT::Ptr grid = createGrid<GridT>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
         tools::dilateActiveValues(grid->tree(), 1, tools::NN_FACE, tools::IGNORE_TILES);
-        tools::VolumeRayIntersector<FloatGrid> inter(*grid);
+        tools::VolumeRayIntersector<GridT> inter(*grid);
 
         //std::cerr << "BBox = " << inter.bbox() << std::endl;
 
@@ -251,10 +253,10 @@ TEST_F(TestVolumeRayIntersector, testAll)
 
     {// Test submitted by "Trevor" @ GitHub
 
-        FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
+        typename GridT::Ptr grid = createGrid<GridT>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
         tools::dilateActiveValues(grid->tree(), 1, tools::NN_FACE, tools::IGNORE_TILES);
-        tools::VolumeRayIntersector<FloatGrid> inter(*grid);
+        tools::VolumeRayIntersector<GridT> inter(*grid);
 
         //GridPtrVec grids;
         //grids.push_back(grid);
@@ -275,9 +277,9 @@ TEST_F(TestVolumeRayIntersector, testAll)
 
     {// Test derived from the test submitted by "Trevor" @ GitHub
 
-        FloatGrid grid(0.0f);
+        GridT grid(0.0f);
         grid.fill(math::CoordBBox(Coord(-1,-1,-1),Coord(1,1,1)), 1.0f);
-        tools::VolumeRayIntersector<FloatGrid> inter(grid);
+        tools::VolumeRayIntersector<GridT> inter(grid);
         //std::cerr << "BBox = " << inter.bbox() << std::endl;
 
         const Vec3T eye(-0.25, -0.25, 10.0);
@@ -289,4 +291,14 @@ TEST_F(TestVolumeRayIntersector, testAll)
         EXPECT_TRUE(inter.march(t0, t1));// hits leafs
         //std::cerr << "t0=" << t0 << " t1=" << t1 << std::endl;
     }
+}
+
+TEST_F(TestVolumeRayIntersector, testAllFloat)
+{
+    testVolumeRayIntersectorImpl<openvdb::FloatGrid>();
+}
+
+TEST_F(TestVolumeRayIntersector, testAllHalf)
+{
+    testVolumeRayIntersectorImpl<openvdb::HalfGrid>();
 }
