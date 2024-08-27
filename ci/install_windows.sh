@@ -20,6 +20,7 @@ VCPKG_INSTALL_CMD="vcpkg install
     boost-interprocess
     boost-algorithm
     pybind11
+    lz4
     --clean-after-build"
 
 # Update vcpkg
