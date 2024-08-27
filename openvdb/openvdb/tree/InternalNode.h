@@ -37,6 +37,7 @@ public:
     using ChildNodeType = _ChildNodeType;
     using LeafNodeType = typename ChildNodeType::LeafNodeType;
     using ValueType = typename ChildNodeType::ValueType;
+    using ComputeType = typename ChildNodeType::ComputeType;
     using BuildType = typename ChildNodeType::BuildType;
     using UnionType = NodeUnion<ValueType, ChildNodeType>;
     using NodeMaskType = util::NodeMask<Log2Dim>;

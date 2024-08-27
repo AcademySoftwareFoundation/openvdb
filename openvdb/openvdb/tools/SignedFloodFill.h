@@ -83,9 +83,10 @@ class SignedFloodFillOp
 {
 public:
     using ValueT = typename TreeOrLeafManagerT::ValueType;
+    using ComputeT = typename TreeOrLeafManagerT::ComputeType;
     using RootT = typename TreeOrLeafManagerT::RootNodeType;
     using LeafT = typename TreeOrLeafManagerT::LeafNodeType;
-    static_assert(std::is_signed<ValueT>::value,
+    static_assert(std::is_signed<ComputeT>::value,
         "signed flood fill is supported only for signed value grids");
 
     SignedFloodFillOp(const TreeOrLeafManagerT& tree, Index minLevel = 0)
@@ -116,19 +117,19 @@ public:
 
         const Index first = valueMask.findFirstOn();
         if (first < LeafT::SIZE) {
-            bool xInside = buffer[first]<0, yInside = xInside, zInside = xInside;
+            bool xInside = math::isNegative(buffer[first]), yInside = xInside, zInside = xInside;
             for (Index x = 0; x != (1 << LeafT::LOG2DIM); ++x) {
                 const Index x00 = x << (2 * LeafT::LOG2DIM);
-                if (valueMask.isOn(x00)) xInside = buffer[x00] < 0; // element(x, 0, 0)
+                if (valueMask.isOn(x00)) xInside = math::isNegative(buffer[x00]); // element(x, 0, 0)
                 yInside = xInside;
                 for (Index y = 0; y != (1 << LeafT::LOG2DIM); ++y) {
                     const Index xy0 = x00 + (y << LeafT::LOG2DIM);
-                    if (valueMask.isOn(xy0)) yInside = buffer[xy0] < 0; // element(x, y, 0)
+                    if (valueMask.isOn(xy0)) yInside = math::isNegative(buffer[xy0]); // element(x, y, 0)
                     zInside = yInside;
                     for (Index z = 0; z != (1 << LeafT::LOG2DIM); ++z) {
                         const Index xyz = xy0 + z; // element(x, y, z)
                         if (valueMask.isOn(xyz)) {
-                            zInside = buffer[xyz] < 0;
+                            zInside = math::isNegative(buffer[xyz]);
                         } else {
                             buffer[xyz] = zInside ? mInside : mOutside;
                         }
@@ -136,7 +137,7 @@ public:
                 }
             }
         } else {// if no active voxels exist simply use the sign of the first value
-            leaf.fill(buffer[0] < 0 ? mInside : mOutside);
+            leaf.fill(math::isNegative(buffer[0]) ? mInside : mOutside);
         }
     }
 
@@ -152,20 +153,20 @@ public:
 
         const Index first = childMask.findFirstOn();
         if (first < NodeT::NUM_VALUES) {
-            bool xInside = table[first].getChild()->getFirstValue()<0;
+            bool xInside = math::isNegative(table[first].getChild()->getFirstValue());
             bool yInside = xInside, zInside = xInside;
             for (Index x = 0; x != (1 << NodeT::LOG2DIM); ++x) {
                 const int x00 = x << (2 * NodeT::LOG2DIM); // offset for block(x, 0, 0)
-                if (childMask.isOn(x00)) xInside = table[x00].getChild()->getLastValue()<0;
+                if (childMask.isOn(x00)) xInside = math::isNegative(table[x00].getChild()->getLastValue());
                 yInside = xInside;
                 for (Index y = 0; y != (1 << NodeT::LOG2DIM); ++y) {
                     const Index xy0 = x00 + (y << NodeT::LOG2DIM); // offset for block(x, y, 0)
-                    if (childMask.isOn(xy0)) yInside = table[xy0].getChild()->getLastValue()<0;
+                    if (childMask.isOn(xy0)) yInside = math::isNegative(table[xy0].getChild()->getLastValue());
                     zInside = yInside;
                     for (Index z = 0; z != (1 << NodeT::LOG2DIM); ++z) {
                         const Index xyz = xy0 + z; // offset for block(x, y, z)
                         if (childMask.isOn(xyz)) {
-                            zInside = table[xyz].getChild()->getLastValue()<0;
+                            zInside = math::isNegative(table[xyz].getChild()->getLastValue());
                         } else {
                             table[xyz].setValue(zInside ? mInside : mOutside);
                         }
@@ -215,7 +216,7 @@ private:
 
 template<typename TreeOrLeafManagerT>
 inline
-typename std::enable_if<std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
+typename std::enable_if_t<std::is_signed<typename TreeOrLeafManagerT::ComputeType>::value, void>
 doSignedFloodFill(TreeOrLeafManagerT& tree,
                   typename TreeOrLeafManagerT::ValueType outsideValue,
                   typename TreeOrLeafManagerT::ValueType insideValue,
@@ -231,7 +232,7 @@ doSignedFloodFill(TreeOrLeafManagerT& tree,
 // Dummy (no-op) implementation for unsigned types
 template <typename TreeOrLeafManagerT>
 inline
-typename std::enable_if<!std::is_signed<typename TreeOrLeafManagerT::ValueType>::value, void>::type
+typename std::enable_if_t<!std::is_signed<typename TreeOrLeafManagerT::ComputeType>::value, void>
 doSignedFloodFill(TreeOrLeafManagerT&,
                   const typename TreeOrLeafManagerT::ValueType&,
                   const typename TreeOrLeafManagerT::ValueType&,

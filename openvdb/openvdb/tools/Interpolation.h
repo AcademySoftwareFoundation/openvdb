@@ -41,6 +41,7 @@
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
+#include <openvdb/Types.h> // for ValueToComputeMap
 #include <openvdb/Platform.h> // for round()
 #include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
@@ -314,7 +315,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer x-coordinate in index space
+    /// @param k Integer z-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -393,7 +394,7 @@ public:
     /// @brief Sample value in integer index space
     /// @param i Integer x-coordinate in index space
     /// @param j Integer y-coordinate in index space
-    /// @param k Integer x-coordinate in index space
+    /// @param k Integer z-coordinate in index space
     ValueType sampleVoxel(typename Coord::ValueType i,
                           typename Coord::ValueType j,
                           typename Coord::ValueType k) const
@@ -745,17 +746,31 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename TreeT::ComputeType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the eight voxels surrounding the
     // fractional source coordinates.
-    ValueT data[2][2][2];
+    ValueT probeData[2][2][2];
+    ComputeT computeData[2][2][2];
+    bool hasActiveValues;
 
-    const bool hasActiveValues = BoxSampler::probeValues(data, inTree, Coord(inIdx));
+    if constexpr(std::is_same_v<ValueT, ComputeT>) {
+        hasActiveValues = BoxSampler::probeValues(computeData, inTree, Coord(inIdx));
+    } else {
+        hasActiveValues = BoxSampler::probeValues(probeData, inTree, Coord(inIdx));
+        for (int dx = 0; dx < 2; ++dx) {
+            for (int dy = 0; dy < 2; ++dy) {
+                for (int dz = 0; dz < 2; ++dz) {
+                    computeData[dx][dy][dz] = probeData[dx][dy][dz];
+                }
+            }
+        }
+    }
 
-    result = BoxSampler::trilinearInterpolation(data, uvw);
+    result = BoxSampler::trilinearInterpolation(computeData, uvw);
 
     return hasActiveValues;
 }
@@ -766,17 +781,18 @@ inline typename TreeT::ValueType
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename TreeT::ComputeType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the eight voxels surrounding the
     // fractional source coordinates.
-    ValueT data[2][2][2];
+    ComputeT data[2][2][2];
 
     BoxSampler::getValues(data, inTree, Coord(inIdx));
 
-    return BoxSampler::trilinearInterpolation(data, uvw);
+    return ValueT(BoxSampler::trilinearInterpolation(data, uvw));
 }
 
 
@@ -832,6 +848,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename TreeT::ComputeType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -840,15 +857,17 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     // fractional source coordinates.
     bool active = false;
     ValueT data[3][3][3];
+    ComputeT computeData[3][3][3];
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
                 if (inTree.probeValue(Coord(ix, iy, iz), data[dx][dy][dz])) active = true;
+                computeData[dx][dy][dz] = data[dx][dy][dz];
             }
         }
     }
 
-    result = QuadraticSampler::triquadraticInterpolation(data, uvw);
+    result = QuadraticSampler::triquadraticInterpolation(computeData, uvw);
 
     return active;
 }
@@ -858,13 +877,14 @@ inline typename TreeT::ValueType
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename TreeT::ComputeType;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
 
     // Retrieve the values of the 27 voxels surrounding the
     // fractional source coordinates.
-    ValueT data[3][3][3];
+    ComputeT data[3][3][3];
     for (int dx = 0, ix = inLoIdx.x(); dx < 3; ++dx, ++ix) {
         for (int dy = 0, iy = inLoIdx.y(); dy < 3; ++dy, ++iy) {
             for (int dz = 0, iz = inLoIdx.z(); dz < 3; ++dz, ++iz) {
@@ -873,7 +893,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
         }
     }
 
-    return QuadraticSampler::triquadraticInterpolation(data, uvw);
+    return ValueT(QuadraticSampler::triquadraticInterpolation(data, uvw));
 }
 
 
