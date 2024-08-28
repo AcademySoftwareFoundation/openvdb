@@ -4,8 +4,7 @@ set -x
 set -e
 
 # Required dependencies
-VCPKG_INSTALL_CMD="vcpkg install
-    zlib
+VCPKG_INSTALL_CMD="zlib
     libpng
     openexr
     tbb
@@ -22,12 +21,13 @@ VCPKG_INSTALL_CMD="vcpkg install
     pybind11
     lz4"
 
-# if VCPKG_DEFAULT_TRIPLET ends with -static, then add ':x64-windows-static' to all the dependencies
+# if VCPKG_DEFAULT_TRIPLET ends with -static, then add ':x64-windows-static' to each word in the dependencies
 if [[ $VCPKG_DEFAULT_TRIPLET == *"-static" ]]; then
-    VCPKG_INSTALL_CMD="$VCPKG_INSTALL_CMD:x64-windows-static"
+    VCPKG_INSTALL_CMD=$(echo $VCPKG_INSTALL_CMD | sed 's/\S\+/\0:x64-windows-static/g')
 fi
 
-VCPKG_INSTALL_CMD="$VCPKG_INSTALL_CMD  --clean-after-build"
+
+VCPKG_INSTALL_CMD="vcpkg install $VCPKG_INSTALL_CMD  --clean-after-build"
 
 # Update vcpkg
 vcpkg update
