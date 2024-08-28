@@ -20,8 +20,14 @@ VCPKG_INSTALL_CMD="vcpkg install
     boost-interprocess
     boost-algorithm
     pybind11
-    lz4
-    --clean-after-build"
+    lz4"
+
+# if VCPKG_DEFAULT_TRIPLET ends with -static, then add ':x64-windows-static' to all the dependencies
+if [[ $VCPKG_DEFAULT_TRIPLET == *"-static" ]]; then
+    VCPKG_INSTALL_CMD="$VCPKG_INSTALL_CMD:x64-windows-static"
+fi
+
+VCPKG_INSTALL_CMD="$VCPKG_INSTALL_CMD  --clean-after-build"
 
 # Update vcpkg
 vcpkg update
