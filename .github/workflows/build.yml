@@ -1,205 +1,205 @@
 
-name: Build
+# name: Build
 
-on:
-  push:
-    branches:
-      - 'master'
-      - 'feature/**'
-      - 'pr/**'
-    paths-ignore:
-      - 'CHANGES'
-      - 'CODEOWNERS'
-      - 'doc/**'
-      - 'openvdb_maya/**'
-      - 'openvdb_houdini/**'
-      - 'openvdb_ax/**'
-      - 'nanovdb/**'
-      - 'pendingchanges/**'
-      - '**.md'
-  pull_request:
-    branches:
-      - '**'
-    paths-ignore:
-      - 'CHANGES'
-      - 'CODEOWNERS'
-      - 'doc/**'
-      - 'openvdb_maya/**'
-      - 'openvdb_houdini/**'
-      - 'openvdb_ax/**'
-      - 'nanovdb/**'
-      - 'pendingchanges/**'
-      - '**.md'
-  schedule:
-    # run this workflow every day at 7am UTC except Monday
-    - cron:  '0 7 * * 0,2-6'
-    # run this workflow Monday 7am UTC
-    # warning: This pattern is checked in various places below
-    - cron:  '0 7 * * 1'
-  workflow_dispatch:
-    inputs:
-      type:
-        description: 'The type of CI to run (all, linux, win, mac)'
-        required: true
-        default: 'all'
+# on:
+#   push:
+#     branches:
+#       - 'master'
+#       - 'feature/**'
+#       - 'pr/**'
+#     paths-ignore:
+#       - 'CHANGES'
+#       - 'CODEOWNERS'
+#       - 'doc/**'
+#       - 'openvdb_maya/**'
+#       - 'openvdb_houdini/**'
+#       - 'openvdb_ax/**'
+#       - 'nanovdb/**'
+#       - 'pendingchanges/**'
+#       - '**.md'
+#   pull_request:
+#     branches:
+#       - '**'
+#     paths-ignore:
+#       - 'CHANGES'
+#       - 'CODEOWNERS'
+#       - 'doc/**'
+#       - 'openvdb_maya/**'
+#       - 'openvdb_houdini/**'
+#       - 'openvdb_ax/**'
+#       - 'nanovdb/**'
+#       - 'pendingchanges/**'
+#       - '**.md'
+#   schedule:
+#     # run this workflow every day at 7am UTC except Monday
+#     - cron:  '0 7 * * 0,2-6'
+#     # run this workflow Monday 7am UTC
+#     # warning: This pattern is checked in various places below
+#     - cron:  '0 7 * * 1'
+#   workflow_dispatch:
+#     inputs:
+#       type:
+#         description: 'The type of CI to run (all, linux, win, mac)'
+#         required: true
+#         default: 'all'
 
-# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+# # Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+#   cancel-in-progress: true
 
-defaults:
-  run:
-    shell: bash
+# defaults:
+#   run:
+#     shell: bash
 
-jobs:
-  linux-vfx:
-    # VFX platform jobs. These are run on the appropriate CentOS images from
-    # the provided ASWF docker containers
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: >
-      linux-vfx:${{ matrix.config.image }}-
-      abi:${{ matrix.config.abi }}-
-      cxx:${{ matrix.config.cxx }}-
-      type:${{ matrix.config.build }}
-    container:
-      image: aswf/ci-openvdb:${{ matrix.config.image }}
-    env:
-      CXX: ${{ matrix.config.cxx }}
-      CCACHE_DIR: /tmp/ccache
-    strategy:
-      matrix:
-        config:
-          # @note  we specifically use clang15.0 (not clang15) here as the newest
-          #  versions of the clang15.X containers have some issues with the GLFW
-          #  installation
-          - { cxx: clang++, image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '11', build: 'Debug',   cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v3
-    - name: pybind11
-      #if: contains(matrix.config.image, '2023') == false
-      run: ./ci/install_pybind11.sh 2.10.0
-    - name: timestamp
-      id: timestamp
-      run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
-    - name: ccache
-      # don't use ccache for debug builds
-      if: matrix.config.build == 'Release'
-      id: ccache
-      uses: actions/cache@v3
-      with:
-        path: /tmp/ccache
-        key: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
-        restore-keys: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=${{ matrix.config.build }}
-        --components=\"core,python,bin,view,render,test\"
-        --cargs=\"
-        ${{ matrix.config.cmake }}
-        -DOPENVDB_CXX_STRICT=ON
-        -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}
-        \"
-    - name: test
-      # Always run tests on weekly builds but skip Debug on commits as they take a while.
-      # https://github.community/t/distinct-job-for-each-schedule/17811/2
-      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
-      run: |
-        cd build && ctest -V
-        cd - && ./ci/test_install.sh
-    # Keep ccache light by stripping out any caches not accessed in the last day
-    - name: ccache_clean
-      if: matrix.config.build == 'Release'
-      run: ccache --evict-older-than 1d
+# jobs:
+#   linux-vfx:
+#     # VFX platform jobs. These are run on the appropriate CentOS images from
+#     # the provided ASWF docker containers
+#     if: |
+#       github.event_name != 'workflow_dispatch' ||
+#       github.event.inputs.type == 'all' ||
+#       github.event.inputs.type == 'linux'
+#     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+#     name: >
+#       linux-vfx:${{ matrix.config.image }}-
+#       abi:${{ matrix.config.abi }}-
+#       cxx:${{ matrix.config.cxx }}-
+#       type:${{ matrix.config.build }}
+#     container:
+#       image: aswf/ci-openvdb:${{ matrix.config.image }}
+#     env:
+#       CXX: ${{ matrix.config.cxx }}
+#       CCACHE_DIR: /tmp/ccache
+#     strategy:
+#       matrix:
+#         config:
+#           # @note  we specifically use clang15.0 (not clang15) here as the newest
+#           #  versions of the clang15.X containers have some issues with the GLFW
+#           #  installation
+#           - { cxx: clang++, image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
+#           - { cxx: g++,     image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
+#           - { cxx: clang++, image: '2022-clang11',   abi: '11', build: 'Debug',   cmake: '' }
+#           - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
+#           - { cxx: g++,     image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
+#           - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+#           - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+#       fail-fast: false
+#     steps:
+#     - uses: actions/checkout@v3
+#     - name: pybind11
+#       #if: contains(matrix.config.image, '2023') == false
+#       run: ./ci/install_pybind11.sh 2.10.0
+#     - name: timestamp
+#       id: timestamp
+#       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+#     - name: ccache
+#       # don't use ccache for debug builds
+#       if: matrix.config.build == 'Release'
+#       id: ccache
+#       uses: actions/cache@v3
+#       with:
+#         path: /tmp/ccache
+#         key: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
+#         restore-keys: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-
+#     - name: build
+#       run: >
+#         ./ci/build.sh -v
+#         --build-type=${{ matrix.config.build }}
+#         --components=\"core,python,bin,view,render,test\"
+#         --cargs=\"
+#         ${{ matrix.config.cmake }}
+#         -DOPENVDB_CXX_STRICT=ON
+#         -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}
+#         \"
+#     - name: test
+#       # Always run tests on weekly builds but skip Debug on commits as they take a while.
+#       # https://github.community/t/distinct-job-for-each-schedule/17811/2
+#       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
+#       run: |
+#         cd build && ctest -V
+#         cd - && ./ci/test_install.sh
+#     # Keep ccache light by stripping out any caches not accessed in the last day
+#     - name: ccache_clean
+#       if: matrix.config.build == 'Release'
+#       run: ccache --evict-older-than 1d
 
-  windows:
-    # Windows CI. Tests static and dynamic builds with MT and MD respectively.
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'win'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
-    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
-    env:
-      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
-    strategy:
-      matrix:
-        config:
-          # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-          # Boost as both shared and static libs are installed.
-          # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
-          # due to disk space constraints
-          # @note  Commented out the static debug build due to linker OOM LNK1102
-          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
-          #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v3
-    - name: path
-      shell: pwsh
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: install
-      run: ./ci/install_windows.sh
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --config=${{ matrix.config.build }}
-        --components=${{ matrix.config.components }}
-        --cargs=\'
-        ${{ matrix.config.cmake }}
-        -DMSVC_COMPRESS_PDB=ON
-        -DUSE_EXR=ON
-        -DUSE_PNG=ON
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
-        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
-        \'
-    - name: size
-      # Print the build directy size (monitor if we're hitting runner limits)
-      run: du -h build
-    - name: test
-      # Always run tests on weekly builds but skip Debug on commits as they take a while.
-      # https://github.community/t/distinct-job-for-each-schedule/17811/2
-      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
-      run: cd build && ctest -V -C ${{ matrix.config.build }}
+#   windows:
+#     # Windows CI. Tests static and dynamic builds with MT and MD respectively.
+#     if: |
+#       github.event_name != 'workflow_dispatch' ||
+#       github.event.inputs.type == 'all' ||
+#       github.event.inputs.type == 'win'
+#     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+#     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+#     env:
+#       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+#     strategy:
+#       matrix:
+#         config:
+#           # static build of blosc from vcpkg does not build internal sources.
+#           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+#           # Boost as both shared and static libs are installed.
+#           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
+#           # due to disk space constraints
+#           # @note  Commented out the static debug build due to linker OOM LNK1102
+#           - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+#           #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+#           - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+#           - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+#           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
+#       fail-fast: false
+#     steps:
+#     - uses: actions/checkout@v3
+#     - name: path
+#       shell: pwsh
+#       run: |
+#         # note: system path must be modified in a previous step to it's use
+#         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+#         echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+#     - name: install
+#       run: ./ci/install_windows.sh
+#     - name: build
+#       run: >
+#         ./ci/build.sh -v
+#         --config=${{ matrix.config.build }}
+#         --components=${{ matrix.config.components }}
+#         --cargs=\'
+#         ${{ matrix.config.cmake }}
+#         -DMSVC_COMPRESS_PDB=ON
+#         -DUSE_EXR=ON
+#         -DUSE_PNG=ON
+#         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+#         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+#         \'
+#     - name: size
+#       # Print the build directy size (monitor if we're hitting runner limits)
+#       run: du -h build
+#     - name: test
+#       # Always run tests on weekly builds but skip Debug on commits as they take a while.
+#       # https://github.community/t/distinct-job-for-each-schedule/17811/2
+#       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
+#       run: cd build && ctest -V -C ${{ matrix.config.build }}
 
-  macos:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'mac'
-    runs-on: macos-13 # Last macos runner befor M1 (macos-14)
-    env:
-      CXX: clang++
-    steps:
-    - uses: actions/checkout@v3
-    - name: install
-      run: ./ci/install_macos.sh
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,python,bin,view,render,test\"
-        --cargs=\'
-        -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
-        \'
-    - name: test
-      run: cd build && ctest -V
+#   macos:
+#     if: |
+#       github.event_name != 'workflow_dispatch' ||
+#       github.event.inputs.type == 'all' ||
+#       github.event.inputs.type == 'mac'
+#     runs-on: macos-13 # Last macos runner befor M1 (macos-14)
+#     env:
+#       CXX: clang++
+#     steps:
+#     - uses: actions/checkout@v3
+#     - name: install
+#       run: ./ci/install_macos.sh
+#     - name: build
+#       run: >
+#         ./ci/build.sh -v
+#         --build-type=Release
+#         --components=\"core,python,bin,view,render,test\"
+#         --cargs=\'
+#         -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+#         \'
+#     - name: test
+#       run: cd build && ctest -V

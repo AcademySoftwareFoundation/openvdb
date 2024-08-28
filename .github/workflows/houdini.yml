@@ -141,6 +141,9 @@ jobs:
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: macos-latest
+    env:
+      ACTIONS_RUNNER_DEBUG: true
+      ACTIONS_STEP_DEBUG: true
     steps:
     - uses: actions/checkout@v3
     - name: fetch_houdini
