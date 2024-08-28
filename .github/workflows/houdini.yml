@@ -168,6 +168,7 @@ jobs:
         echo $PATH
         echo $GITHUB_PATH
         echo $(which getopt)
+        echo $BASH_VERSION
         ./ci/build.sh -v \
           --build-type=Release \
           --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest" \
