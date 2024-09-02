@@ -23,6 +23,7 @@ http.client.HTTPConnection.debuglevel = 1
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("urllib3").setLevel(logging.DEBUG)
 
+
 is_conda_env = "CONDA_PREFIX" in os.environ
 if is_conda_env:
     os.environ["CXX"] = "x86_64-conda-linux-gnu-g++"
@@ -136,7 +137,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             # NOTE:  In python <=3.8, __file__ will be a relative path and >3.8 it is an absolute path
             cutlass_repo.git.apply(Path(__file__).resolve().parent / "env" / "cutlass.patch")
         except GitCommandError as e:
-            print(f"Failed to apply cutlass patch: {str(e)}, continuing without patching")
+            logging.info(f"Failed to apply cutlass patch: {str(e)}, continuing without patching")
 
         self.download_external_dep(
             name="cudnn_fe", git_url="https://github.com/NVIDIA/cudnn-frontend", git_tag="v1.3.0"
@@ -205,7 +206,7 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
     tar_filepath = external_dir / "cudnn.tar.xz"
     folder_filepath = external_dir / "cudnn"
 
-    print("CUDNN path: %s" % folder_filepath.resolve())
+    logging.info("CUDNN path: %s" % folder_filepath.resolve())
     if not tar_filepath.exists():
         response = requests.get(url, stream=True)
 
@@ -230,7 +231,7 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
             raise RuntimeError("Hash of cudnn.tar.xz does not match")
         
     if not folder_filepath.exists():
-        print("Extracting cudnn…")
+        logging.info("Extracting cudnn…")
         with tarfile.open(tar_filepath, "r:xz") as tar:
             tar.extractall(folder_filepath)
 
@@ -323,7 +324,7 @@ if __name__ == "__main__":
         language="c++",
     )
 
-    def retrieve_version(file_path="fvdb/__init__.py"):
+    def retrieve_version(file_path:Path = get_cwd() / "fvdb/__init__.py")->str:
         with open(file_path, "r") as f:
             for line in f:
                 if line.startswith("__version__"):
