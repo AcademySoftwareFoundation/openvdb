@@ -3,12 +3,9 @@ ARG CUDNN_VERSION=8
 
 FROM nvidia/cuda:${CUDA_VERSION}-cudnn${CUDNN_VERSION}-devel-ubuntu20.04
 
-ENV PATH /usr/local/cuda/bin:$PATH
-ENV LD_LIBRARY_PATH /usr/lib64:/usr/local/cuda/lib64:/usr/local/cuda/lib:${LD_LIBRARY_PATH}
-
 # # nvidia-container-runtime
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility,graphics
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
 
 RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-peer.conf \
     && if [ -f /etc/apt/sources.list.d/cuda.list ]; then \
@@ -26,8 +23,6 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
          git \
          unzip \
          gfortran \
-         libopenblas-dev \
-         liblapack-dev \
          ssh \
          rsync \
          iputils-ping \
@@ -37,15 +32,14 @@ RUN echo "Acquire { https::Verify-Peer false }" > /etc/apt/apt.conf.d/99verify-p
 WORKDIR /tmp
 RUN mkdir actions-runner && \
     cd actions-runner && \
-    curl -o actions-runner-linux-x64-2.316.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.316.0/actions-runner-linux-x64-2.316.0.tar.gz && \
-    tar xzf ./actions-runner-linux-x64-2.316.0.tar.gz && \
+    curl -o actions-runner-linux-x64-2.319.1.tar.gz -L https://github.com/actions/runner/releases/download/v2.319.1/actions-runner-linux-x64-2.319.1.tar.gz && \
+    tar xzf ./actions-runner-linux-x64-2.319.1.tar.gz && \
     DEBIAN_FRONTEND=noninteractive ./bin/installdependencies.sh && \
-    rm actions-runner-linux-x64-2.316.0.tar.gz
+    rm actions-runner-linux-x64-2.319.1.tar.gz
 
 # used for cross-compilation in docker build
 ENV FORCE_CUDA=1
 ENV RUNNER_ALLOW_RUNASROOT=1
-ENV TORCH_CUDA_ARCH_LIST "6.1;7.0;7.5;8.0;8.6+PTX"
 
 # Install AWS CLI
 RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \

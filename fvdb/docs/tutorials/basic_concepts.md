@@ -22,11 +22,11 @@ Every operation in fVDB is built upon this kind of query (e.g. Sparse Convolutio
 
 Each grid in a `GridBatch` can have a different number of voxels (****e.g.**** in the mini batch of four cars above, each car has a different number of voxels). This means that unlike the dense case, fVDB needs to handle parallel operations over ***jagged batches***. I.e. batches containing different numbers of elements.
 
-To handle jagged batches, fVDB provides a `JaggedTensor` class. Conceptually, a `JaggedTensor` is a list of tensors with shapes $[N_0, *], [N_1, *], \ldots, [N_B, *]$ where $B$ is the number of elements in the batch, $N_i$ is the number of elements in the $i^\text{th}$ batch item and $*$ is an arbitrary numer of additional dimensions that all match between the tensors. The figure below illustrates such a list of tensors pictorially.
+To handle jagged batches, fVDB provides a `JaggedTensor` class. Conceptually, a `JaggedTensor` is a list of tensors with shapes $[N_0, *], [N_1, *], \ldots, [N_{B-1}, *]$ where $B$ is the number of elements in the batch, $N_i$ is the number of elements in the $i^\text{th}$ batch item and $*$ is an arbitrary numer of additional dimensions that all match between the tensors. The figure below illustrates such a list of tensors pictorially.
 
 ![jaggedtensor1.png](../imgs/fig/jaggedtensor1.png)
 
-In practice, `JaggedTensor`s are represented in memory by concatenating each tensor in the list into a single `jdata` (for Jagged Data) tensor of shape $[N_0 + N_1 + \ldots + N_B, *]$. Additionally, each `JaggedTensor` stores an additional `jidx` tensor (for Jagged Indexes) of shape $[N_0 + N_1 + \ldots + N_B]$ containing one int per element in the jagged tensor. `jidx[i]` is the batch index of the $i^\text{th}$ element of `jdata`. Finally, a `JaggedTensor` contains a `joffsets` tensor (for Jagged Offsets) of shape $[B, 2]$ which indicates the start and end positions of the $i^\text{th}$ tensor in the batch.
+In practice, `JaggedTensor`s are represented in memory by concatenating each tensor in the list into a single `jdata` (for Jagged Data) tensor of shape $[N_0 + N_1 + \ldots + N_{B-1}, *]$. Additionally, each `JaggedTensor` stores an additional `jidx` tensor (for Jagged Indexes) of shape $[N_0 + N_1 + \ldots + N_{B-1}]$ containing one int per element in the jagged tensor. `jidx[i]` is the batch index of the $i^\text{th}$ element of `jdata`. Finally, a `JaggedTensor` contains a `joffsets` tensor (for Jagged Offsets) of shape $[B, 2]$ which indicates the start and end positions of the $i^\text{th}$ tensor in the batch.
 
 ![jaggedtensor4.png](../imgs/fig/jaggedtensor4.png)
 
@@ -35,6 +35,8 @@ Similarly, each `GridBatch` also has `jidx` and `joffsets` corresponding to the 
 ## A simple example
 
 To illustrate the use of `GridBatch`and `JaggedTensor`, consider a simple example where we build a grid from a point cloud, splat some values onto the voxels of that grid, and then sample them again using a different set of points.
+
+First, we construct a minibatch of grids using the input points. These input points have corresponding color attributes.
 
 ```python
 import fvdb
@@ -48,7 +50,7 @@ pts2, clrs2 = pcu.load_mesh_vn("points2.ply")
 pts1, clrs1 = torch.from_numpy(pts1).cuda(), torch.from_numpy(clrs1).cuda()
 pts2, clrs2 = torch.from_numpy(pts2).cuda(), torch.from_numpy(clrs2).cuda()
 
-# JaggedTensors of points and normals
+# Creating JaggedTensors: one for points and one for colors
 points = fvdb.JaggedTensor([pts1, pts2])
 colors = fvdb.JaggedTensor([clrs1, clrs2])
 
@@ -60,29 +62,27 @@ print(points[0].jdata.shape)
 print(points[1].jdata.shape)
 ```
 
-![We construct a minibatch of grids using the input points. These input points have corresponding color attributes](../imgs/fig/screenshot_000000.png.trim.png)
+![Minibatch of grids constructed from the input points. These input points have corresponding color attributes.](../imgs/fig/screenshot_000000.png.trim.png)
 
-We construct a minibatch of grids using the input points. These input points have corresponding color attributes
+Next, we splat the colors at the points to the constructed grid, yielding per-voxel colors.
 
 ```python
-# Splat the normals into the grid with trilinear interpolation
-# vox_normals is a JaggedTensor of per-voxel normas
+# Splat the colors into the grid with trilinear interpolation
+# vox_colors is a JaggedTensor of per-voxel normas
 vox_colors = grid.splat_trilinear(points, colors)
 ```
 
-![We then splat the colors at the points to the constructed grid, yielding per-voxel colors.](../imgs/fig/screenshot_000006.png.trim.png)
+![Colors splat at the input points to grid, yielding per-voxel colors.](../imgs/fig/screenshot_000006.png.trim.png)
 
-We then splat the colors at the points to the constructed grid, yielding per-voxel colors.
+Finally, we generate a new set of noisy points and sample the grid to recover colors at those new samples.
 
 ```python
 # Now let's generate some random points and sample the grid at those points
-samples = fvdb.JaggedTensor([torch.rand(10_000, 3), torch.rand(11_000, 3)]).cuda()
+sample_points = fvdb.JaggedTensor([torch.rand(10_000, 3), torch.rand(11_000, 3)]).cuda()
 
-# sampled_normals is a JaggedTensor with the same shape as samples with
-# one normal sampled from the grid at each point in samples
-sampled_normals = grid.sample_trilinear(samples)
+# sampled_colors is a JaggedTensor with the same shape as sample_points with
+# one color sampled from the grid at each point
+sampled_colors = grid.sample_trilinear(sample_points, vox_colors)
 ```
 
-![We now generate a new set of noisy points and sample the grid colors to recover colors at those new samples.](../imgs/fig/screenshot_000004.png.trim.png)
-
-We now generate a new set of noisy points and sample the grid colors to recover colors at those new samples.
+![Colors resampled at random locations from the grid.](../imgs/fig/screenshot_000004.png.trim.png)

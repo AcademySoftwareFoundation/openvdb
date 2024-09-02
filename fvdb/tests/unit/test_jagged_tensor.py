@@ -457,6 +457,23 @@ class TestJaggedTensor(unittest.TestCase):
         # self.check_lshape(gridbatch[9:8:1].ijk, ijk_list[9:8:1])
         self.check_lshape(gridbatch.ijk[9:8:1], ijk_list[9:8:1])
 
+        self.assertTrue(torch.equal(gridbatch[9:8:2].ijk.jdata, gridbatch.ijk[9:8:1].jdata))
+        # An empty grid returns an ijk JaggedTensor with one thing in it so we can't quite compare!
+        # self.check_lshape(gridbatch[9:8:1].ijk, ijk_list[9:8:1])
+        self.check_lshape(gridbatch.ijk[9:8:2], ijk_list[9:8:2])
+
+        self.assertTrue(torch.equal(gridbatch[-13:8:2].ijk.jdata, gridbatch.ijk[-13:8:2].jdata))
+        self.check_lshape(gridbatch[-13:8:2].ijk, ijk_list[-13:8:2])
+        self.check_lshape(gridbatch.ijk[-13:8:2], ijk_list[-13:8:2])
+
+        self.assertTrue(torch.equal(gridbatch[4:17:3].ijk.jdata, gridbatch.ijk[4:17:3].jdata))
+        self.check_lshape(gridbatch[4:17:3].ijk, ijk_list[4:17:3])
+        self.check_lshape(gridbatch.ijk[4:17:3], ijk_list[4:17:3])
+
+        self.assertTrue(torch.equal(gridbatch[4:15:4].ijk.jdata, gridbatch.ijk[4:15:4].jdata))
+        self.check_lshape(gridbatch[4:15:4].ijk, ijk_list[4:15:4])
+        self.check_lshape(gridbatch.ijk[4:15:4], ijk_list[4:15:4])
+
         self.assertTrue(torch.equal(gridbatch.ijk.jdata, gridbatch.ijk[...].jdata))
         self.check_lshape(gridbatch.ijk, ijk_list)
         self.check_lshape(gridbatch.ijk[...], ijk_list)
@@ -469,22 +486,22 @@ class TestJaggedTensor(unittest.TestCase):
         self.check_lshape(gridbatch[::].ijk, ijk_list[::])
         self.check_lshape(gridbatch.ijk[::], ijk_list[::])
 
-        with self.assertRaises(IndexError):
-            print(gridbatch.ijk[9:8:2])
+        with self.assertRaises(ValueError):
+            print(gridbatch.ijk[9:8:0])
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             print(gridbatch.ijk[9:8:-1])
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             print(gridbatch.ijk[None])
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             print(gridbatch.ijk[9:8:-1])
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             print(gridbatch.ijk[::-1])
 
-        with self.assertRaises(IndexError):
+        with self.assertRaises(ValueError):
             print(gridbatch.ijk[::-3])
 
     @parameterized.expand(all_device_dtype_combos)
@@ -1531,13 +1548,20 @@ class TestJaggedTensor(unittest.TestCase):
                 self.assertTrue(torch.all(lij == lt2[i][j]).item())
                 self.assertTrue(torch.all(jt[i][j].jdata == lt2[i][j]).item())
 
-    def test_list_of_lists_slicing(self):
+    @parameterized.expand(["cuda", "cpu"])
+    def test_list_of_lists_slicing(self, device):
         lt = [
-            [torch.randn(np.random.randint(100, 200), 7) for _ in range(int(l.item()))]
-            for l in torch.randint(3, 17, (7,))
+            [torch.randn(np.random.randint(100, 200), 7).to(device) for _ in range(int(l.item()))]
+            for l in torch.randint(3, 5, (10,))
         ]
         jt = fvdb.JaggedTensor(lt)
         self.check_lshape(jt, lt)
+
+        def check_eq(jt_, lt_):
+            for i, li in enumerate(lt_):
+                self.assertEqual(len(li), len(jt_[i].unbind()))
+                for j, lij in enumerate(li):
+                    self.assertTrue(torch.all(lij == jt_[i][j].jdata).item())
 
         lt2 = jt.unbind()
         self.check_lshape(jt, lt2)
@@ -1551,42 +1575,27 @@ class TestJaggedTensor(unittest.TestCase):
         jt2 = jt[2:3]
         lt2 = lt[2:3]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[:4]
         lt2 = lt[:4]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[:]
         lt2 = lt[:]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[:-1]
         lt2 = lt[:-1]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-5:]
         lt2 = lt[-5:]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-1]
         lt2 = lt[-1]
@@ -1599,42 +1608,204 @@ class TestJaggedTensor(unittest.TestCase):
         jt2 = jt[1:1]
         lt2 = lt[1:1]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-1:1]
         lt2 = lt[-1:1]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-5:-1]
         lt2 = lt[-5:-1]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-5000:-1]
         lt2 = lt[-5000:-1]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
 
         jt2 = jt[-5000:5000]
         lt2 = lt[-5000:5000]
         self.check_lshape(jt2, lt2)
-        for i, li in enumerate(lt2):
-            self.assertEqual(len(li), len(jt2[i].unbind()))
-            for j, lij in enumerate(li):
-                self.assertTrue(torch.all(lij == jt2[i][j].jdata).item())
+        check_eq(jt2, lt2)
+
+        jt2 = jt[2:8:2]
+        lt2 = lt[2:8:2]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:-1:3]
+        lt2 = lt[3:-1:3]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:11:4]
+        lt2 = lt[3:11:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:2:4]
+        lt2 = lt[3:2:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+    @parameterized.expand(["cuda", "cpu"])
+    def test_slicing_list_of_lists_small(self, device):
+        lt = [
+            [torch.randn(0, 7, device=device), torch.randn(2, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(1, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(1, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(1, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(0, 7, device=device)],
+            [torch.randn(0, 7, device=device), torch.randn(1, 7, device=device), torch.randn(0, 7, device=device)],
+        ]
+        jt = fvdb.JaggedTensor(lt)
+
+        def check_eq(jt_, lt_):
+            for i, li in enumerate(lt_):
+                self.assertEqual(len(li), len(jt_[i].unbind()))
+                for j, lij in enumerate(li):
+                    self.assertTrue(torch.all(lij == jt_[i][j].jdata).item())
+
+        jt2 = jt[2:3]
+        lt2 = lt[2:3]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[2:4]
+        lt2 = lt[2:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[:4]
+        lt2 = lt[:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[:]
+        lt2 = lt[:]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[:-1]
+        lt2 = lt[:-1]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[-5:]
+        lt2 = lt[-5:]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[1:1]
+        lt2 = lt[1:1]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[-1:1]
+        lt2 = lt[-1:1]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[-5:-1]
+        lt2 = lt[-5:-1]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[-5000:-1]
+        lt2 = lt[-5000:-1]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[-5000:5000]
+        lt2 = lt[-5000:5000]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[2:8:2]
+        lt2 = lt[2:8:2]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:-1:3]
+        lt2 = lt[3:-1:3]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:11:4]
+        lt2 = lt[3:11:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+        jt2 = jt[3:2:4]
+        lt2 = lt[3:2:4]
+        self.check_lshape(jt2, lt2)
+        check_eq(jt2, lt2)
+
+    @parameterized.expand(["cuda", "cpu"])
+    def test_jagged_tensor_jagged_tensor_indexing_single_tensor_list(self, device):
+        t1 = torch.randn(100, 3, device=device)
+        l1 = [t1]
+        jt1 = fvdb.JaggedTensor(l1)
+        pmt1 = torch.randperm(100, device=device)
+        lpmt1 = [pmt1]
+        jpmt1 = fvdb.JaggedTensor(lpmt1)
+        jt_permuted = jt1[jpmt1]
+        self.assertTrue(torch.all(jt_permuted.jdata == t1[pmt1]).item())
+
+        t1 = torch.randn(100, 3, device=device)
+        l1 = [[t1]]
+        jt1 = fvdb.JaggedTensor(l1)
+        pmt1 = torch.randperm(100, device=device)
+        lpmt1 = [[pmt1]]
+        jpmt1 = fvdb.JaggedTensor(lpmt1)
+        jt_permuted = jt1[jpmt1]
+        self.assertTrue(torch.all(jt_permuted.jdata == t1[pmt1]).item())
+
+        t1 = torch.randn(10, 3, device=device)
+        l1 = [torch.zeros(0, 3, device=device), t1, torch.zeros(0, 3, device=device)]
+        jt1 = fvdb.JaggedTensor(l1)
+        pmt1 = torch.randperm(10, device=device)
+        empty_idx = torch.zeros(0, dtype=pmt1.dtype, device=device)
+        lpmt1 = [empty_idx, pmt1, empty_idx]
+        jpmt1 = fvdb.JaggedTensor(lpmt1)
+        jt_permuted = jt1[jpmt1]
+        self.assertEqual(jt_permuted.lshape, [0, 10, 0])
+        self.assertTrue(torch.all(jt_permuted.jdata == t1[pmt1]).item())
+
+        t1 = torch.randn(10, 3, device=device)
+        empty_data = torch.zeros(0, 3, device=device)
+        l1 = [
+            [empty_data, t1, empty_data],
+            [t1, empty_data],
+            [empty_data],
+            [empty_data, empty_data, t1, empty_data],
+            [t1],
+        ]
+        jt1 = fvdb.JaggedTensor(l1)
+        pmt1 = torch.randperm(10, device=device)
+        empty_idx = torch.zeros(0, dtype=pmt1.dtype, device=device)
+        lpmt1 = [
+            [empty_idx, pmt1, empty_idx],
+            [pmt1, empty_idx],
+            [empty_idx],
+            [empty_idx, empty_idx, pmt1, empty_idx],
+            [pmt1],
+        ]
+        jpmt1 = fvdb.JaggedTensor(lpmt1)
+        jt_permuted = jt1[jpmt1]
+        self.assertEqual(jt_permuted.lshape, [[0, 10, 0], [10, 0], [0], [0, 0, 10, 0], [10]])
+        for i, jtpi in enumerate(jt_permuted):
+            for j, jtpij in enumerate(jtpi):
+                self.assertTrue(torch.all(jt1[i][j].jdata[jpmt1[i][j].jdata] == jtpij.jdata).item())
 
     @parameterized.expand(["cuda", "cpu"])
     def test_jagged_tensor_integer_indexing(self, device):
