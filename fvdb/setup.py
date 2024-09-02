@@ -15,6 +15,13 @@ from git.exc import GitCommandError, InvalidGitRepositoryError
 from setuptools import setup
 from torch.utils import cpp_extension
 from tqdm import tqdm
+from typing import Tuple, List
+import logging
+import http.client
+http.client.HTTPConnection.debuglevel = 1
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("urllib3").setLevel(logging.DEBUG)
 
 is_conda_env = "CONDA_PREFIX" in os.environ
 if is_conda_env:
@@ -22,17 +29,28 @@ if is_conda_env:
     os.environ["NVCC_CCBIN"] = "x86_64-conda-linux-gnu-gcc"
 
 
-def get_nanovdb_source_dir():
+def get_nanovdb_source_dir() -> str:
     nanovdb_source_dir = "../nanovdb"
     if not os.path.exists(nanovdb_source_dir):
         nanovdb_source_dir = "external/openvdb/nanovdb"
     return nanovdb_source_dir
 
+def get_cwd() -> Path:
+    return Path(__file__).resolve().parent
 
+def get_external_dir() -> Path:
+    based = get_cwd()
+    external_path = based / "external"
+    if not external_path.exists():
+        external_path.mkdir()
+    elif not external_path.is_dir():
+        raise RuntimeError(f"External path {external_path} exists but is not a directory")
+    return external_path
+    
 class FVDBBuildCommand(cpp_extension.BuildExtension):
 
     @staticmethod
-    def is_git_repo(repo_path: str):
+    def is_git_repo(repo_path: str) -> bool:
         is_repo = False
         try:
             _ = git.repo.Repo(repo_path)
@@ -43,16 +61,11 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         return is_repo
 
     @staticmethod
-    def download_external_dep(name: str, git_url: str, git_tag: str, recursive: bool = False):
-        based = os.path.dirname(os.path.abspath(__file__))
-        external_path = os.path.join(based, "external")
-        if not os.path.exists(external_path):
-            os.makedirs(external_path, exist_ok=True)
-        elif not os.path.isdir(external_path):
-            raise RuntimeError(f"External path {external_path} exists but is not a directory")
+    def download_external_dep(name: str, git_url: str, git_tag: str, recursive: bool = False) -> Tuple[Path, git.repo.Repo]:
+        external_path = get_external_dir()
 
-        repo_path = os.path.join(external_path, name)
-        if os.path.exists(repo_path) and os.path.isdir(repo_path):
+        repo_path = external_path / name
+        if repo_path.exists() and repo_path.is_dir():
             if FVDBBuildCommand.is_git_repo(repo_path):
                 repo = git.repo.Repo(repo_path)
                 repo.git.checkout(git_tag)
@@ -79,7 +92,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         subprocess.check_call(["cmake", "--build", ".", "--target", "install"], cwd=cmake_build_dir)
         return cmake_install_dir
 
-    def build_extension(self, _ext):
+    def build_extension(self, _ext) -> None:
         path = os.path.join(self.build_lib, "fvdb")
 
         if _ext.name == "fvdb._Cpp":
@@ -158,7 +171,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
                 shutil.copy(header_file, os.path.join(self.build_lib, header_folder))
 
 
-def get_source_files_recursive(base_path, include_bindings=True):
+def get_source_files_recursive(base_path, include_bindings=True) -> List[str]:
     source_files = []
     for dir_name, _, dir_files in os.walk(base_path):
         if not include_bindings and os.path.basename(dir_name) == "python":
@@ -169,7 +182,7 @@ def get_source_files_recursive(base_path, include_bindings=True):
     return source_files
 
 
-def get_header_files_recursive(base_path, new_path):
+def get_header_files_recursive(base_path, new_path) -> List[Tuple[str, List[str]]]:
     base_len = len(base_path.split("/"))
     source_files = []
     for dir_name, _, dir_files in os.walk(base_path):
@@ -183,16 +196,17 @@ def get_header_files_recursive(base_path, new_path):
     return source_files
 
 
-def download_and_install_cudnn():
+def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
     url = (
         "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-x86_64/"
         + "cudnn-linux-x86_64-9.1.0.70_cuda12-archive.tar.xz"
     )
-    cwd = os.path.dirname(os.path.abspath(__file__))
-    tar_filepath = os.path.join(cwd, "external/cudnn.tar.xz")
-    folder_filepath = os.path.join(cwd, "external/cudnn")
+    external_dir = get_external_dir()
+    tar_filepath = external_dir / "cudnn.tar.xz"
+    folder_filepath = external_dir / "cudnn"
 
-    if not os.path.exists(tar_filepath):
+    print("CUDNN path: %s" % folder_filepath.resolve())
+    if not tar_filepath.exists():
         response = requests.get(url, stream=True)
 
         # Sizes in bytes.
@@ -208,14 +222,23 @@ def download_and_install_cudnn():
         if total_size != 0 and progress_bar.n != total_size:
             raise RuntimeError("Could not download cudnn")
 
-    if not os.path.exists(folder_filepath):
+        # Check hash of cudnn.tar.xz
+        cudnn_hash = "105585f6dd62cc013354d81a2a692d2e"
+        cudnn_hash_cmd = f"md5sum {tar_filepath}"
+        cudnn_hash_output = subprocess.check_output(cudnn_hash_cmd, shell=True).decode().split()[0]
+        if cudnn_hash != cudnn_hash_output:
+            raise RuntimeError("Hash of cudnn.tar.xz does not match")
+        
+    if not folder_filepath.exists():
+        print("Extracting cudnn…")
         with tarfile.open(tar_filepath, "r:xz") as tar:
             tar.extractall(folder_filepath)
 
     # Find include directories and all static libraries
     cudnn_include = None
     cudnn_libs = []
-    for dir_name, _, dir_files in os.walk(folder_filepath):
+    # NOTE: Similar Path.walk() is only available in Python 3.12+
+    for dir_name, _, dir_files in os.walk(str(folder_filepath)):
         if cudnn_include is None and "include" in dir_name:
             cudnn_include = dir_name
         if "lib" in dir_name:
@@ -231,10 +254,7 @@ def download_and_install_cudnn():
 
 
 if __name__ == "__main__":
-    if not os.path.exists("external"):
-        os.makedirs("external")
-    else:
-        assert os.path.isdir("external"), "external exists but is not a directory"
+    external_dir = get_external_dir()
 
     # Use new C++ standard for newer NVCC versions
     cuda_home = cpp_extension.CUDA_HOME
@@ -252,7 +272,6 @@ if __name__ == "__main__":
         cpp_std = "c++17"
         cudnn_include_dirs, cudnn_static_libs = [], []
 
-    cwd = os.path.dirname(os.path.abspath(__file__))
     cpp_flags = [
         f"-std={cpp_std}",
         "-Wno-unknown-pragmas",
@@ -271,15 +290,16 @@ if __name__ == "__main__":
     user_nvcc_flags = os.getenv("NVCC_FLAGS", "").split()
     nvcc_flags += user_nvcc_flags
 
+    cwd = get_cwd()
     lib_ext = cpp_extension.CUDAExtension(
         name="fvdb.fvdblib",
         sources=get_source_files_recursive("src", include_bindings=False),
         include_dirs=[
-            os.path.join(cwd, "src"),
-            os.path.join(cwd, get_nanovdb_source_dir()),
-            os.path.join(cwd, "external/cutlass/include"),
-            os.path.join(cwd, "external/c-blosc/install/include"),
-            os.path.join(cwd, "external/cudnn_fe/include"),
+            cwd / "src",
+            cwd / get_nanovdb_source_dir(),
+            cwd / "external/cutlass/include",
+            cwd / "external/c-blosc/install/include",
+            cwd / "external/cudnn_fe/include",
         ]
         + cudnn_include_dirs,
         extra_objects=["external/c-blosc/install/lib/libblosc.a"] + cudnn_static_libs,
@@ -291,12 +311,12 @@ if __name__ == "__main__":
         name="fvdb._Cpp",
         sources=get_source_files_recursive("src/python/"),
         include_dirs=[
-            os.path.join(cwd, "src"),
-            os.path.join(cwd, get_nanovdb_source_dir()),
-            os.path.join(cwd, "external/cutlass/include"),
-            os.path.join(cwd, "external/c-blosc/install/include"),
+            cwd / "src",
+            cwd / get_nanovdb_source_dir(),
+            cwd / "external/cutlass/include",
+            cwd / "external/c-blosc/install/include",
         ],
-        library_dirs=[os.path.join(cwd, "fvdb")],
+        library_dirs=[str(cwd / "fvdb")],
         libraries=["fvdb"],
         extra_link_args=["-Wl,-rpath,$ORIGIN"],
         extra_compile_args={"cxx": cpp_flags + ["-fvisibility=hidden"], "nvcc": nvcc_flags},
