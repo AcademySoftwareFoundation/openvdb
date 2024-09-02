@@ -37,18 +37,23 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
     if (iAmHost && guideIsHost) {
         std::memcpy(buffer.data(), mBuffer.data(),
                     mBuffer.size()); // deep copy of buffer in CPU RAM
+        return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmHost && guideIsDevice) {
+        const at::cuda::CUDAGuard device_guard{ guide.device() };
         at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(guide.device().index());
         cudaCheck(cudaMemcpyAsync(buffer.deviceData(), mBuffer.data(), mBuffer.size(),
                                   cudaMemcpyHostToDevice, defaultStream.stream()));
         cudaCheck(cudaStreamSynchronize(defaultStream.stream()));
+        return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmDevice && guideIsHost) {
         at::cuda::CUDAStream defaultStream =
             at::cuda::getCurrentCUDAStream(mBuffer.device().index());
         cudaCheck(cudaMemcpyAsync(buffer.data(), mBuffer.deviceData(), mBuffer.size(),
                                   cudaMemcpyDeviceToHost, defaultStream.stream()));
         cudaCheck(cudaStreamSynchronize(defaultStream.stream()));
+        return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmDevice && guideIsDevice) {
+        const at::cuda::CUDAGuard device_guard{ guide.device() };
         if (mBuffer.device() == guide.device()) {
             at::cuda::CUDAStream defaultStream =
                 at::cuda::getCurrentCUDAStream(mBuffer.device().index());
@@ -68,8 +73,10 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
                                       cudaMemcpyHostToDevice, outBufferStream.stream()));
             cudaCheck(cudaStreamSynchronize(outBufferStream.stream()));
         }
+        return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
+    } else {
+        TORCH_CHECK(false, "All host/device combos exhausted. This should never happen.");
     }
-    return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
 }
 
 } // namespace nanovdb
@@ -143,11 +150,13 @@ TorchDeviceBuffer::toCpu(bool blocking) {
 
     // If this is a cuda device, copy the data to the CPU
     if (mDevice.is_cuda()) {
+        c10::cuda::CUDAGuard deviceGuard(mDevice);
         at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(mDevice.index());
         copyDeviceToHostAndFreeDevice(defaultStream.stream(), blocking);
     }
 
     if (mGpuData != nullptr) {
+        c10::cuda::CUDAGuard deviceGuard(mDevice);
         c10::cuda::CUDACachingAllocator::raw_delete(mGpuData);
         mGpuData = nullptr;
     }
@@ -247,6 +256,7 @@ TorchDeviceBuffer::init(uint64_t size, void *data /* = nullptr */, bool host /* 
 void
 TorchDeviceBuffer::clear() {
     if (mGpuData) {
+        c10::cuda::CUDAGuard deviceGuard(mDevice);
         c10::cuda::CUDACachingAllocator::raw_delete(mGpuData);
     }
     if (mCpuData) {

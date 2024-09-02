@@ -624,6 +624,9 @@ bind_grid_batch(py::module &m) {
         .def("to", py::overload_cast<const fvdb::GridBatch &>(&fvdb::GridBatch::to, py::const_),
              py::arg("to_grid"))
 
+        .def("cpu", [](const fvdb::GridBatch &self) { return self.to(torch::kCPU); })
+        .def("cuda", [](const fvdb::GridBatch &self) { return self.to(torch::kCUDA); })
+
         // .def("clone", &fvdb::GridBatch::clone) // TODO: We totally want this
 
         .def(

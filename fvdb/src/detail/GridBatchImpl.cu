@@ -87,8 +87,10 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 };
 
 GridBatchImpl::~GridBatchImpl() {
+    torch::Device device = mGridHdl->buffer().device();
     mHostGridMetadata.clear();
     if (mDeviceGridMetadata != nullptr) {
+        c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
     }
 };
@@ -172,10 +174,12 @@ void
 GridBatchImpl::syncMetadataToDeviceIfCUDA(bool blocking) {
     if (device().is_cuda()) { // There is something to sync and we're on a cuda device
 
+        // Global device guards as we operate on this.
+        c10::cuda::CUDAGuard deviceGuard(device());
+
         // We haven't allocated the cuda memory yet, so we need to do that now
         if (mDeviceGridMetadata == nullptr) {
             // We need to allocate the memory on the device
-            c10::cuda::CUDAGuard deviceGuard(device());
             size_t               metaDataByteSize = sizeof(GridMetadata) * mHostGridMetadata.size();
             at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(device().index());
             mDeviceGridMetadata =
@@ -321,6 +325,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     // Clear out old grid metadata
     mHostGridMetadata.clear();
     if (mDeviceGridMetadata != nullptr) {
+        c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
         mDeviceGridMetadata = nullptr;
     }
@@ -355,6 +360,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
         // We don't need the device copy of the global batch metadata anymore (we only carry around
         // the host version and pass it by value to device kernels), so delete it
         if constexpr (DeviceTag == torch::kCUDA) {
+            c10::cuda::CUDAGuard deviceGuard(device);
             c10::cuda::CUDACachingAllocator::raw_delete(deviceBatchMetadataPtr);
         }
     });

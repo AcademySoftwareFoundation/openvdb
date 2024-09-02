@@ -39,6 +39,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A contiguous copy of this grid batch
     GridBatch
     contiguous() const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(detail::GridBatchImpl::contiguous(impl()));
     }
 
@@ -72,6 +73,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The number of grids indexed by this batch
     int64_t
     grid_count() const {
+        detail::RAIIDeviceGuard guard(device());
         TORCH_CHECK(impl()->batchSize() <= MAX_GRIDS_PER_BATCH, "Cannot have more than ",
                     MAX_GRIDS_PER_BATCH, " grids in a batch");
         return impl()->batchSize();
@@ -82,6 +84,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The total number of enabled voxels indexed by this batch of grids
     int64_t
     total_enabled_voxels() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->totalEnabledVoxels(false);
     }
 
@@ -89,6 +92,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The total number of voxels indexed by this batch of grids
     int64_t
     total_voxels() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->totalVoxels();
     }
 
@@ -97,6 +101,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The number of voxels indexed by the bi^th grid in the batch
     int64_t
     num_voxels_at(int64_t bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->numVoxels(bi);
     }
 
@@ -111,6 +116,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The cumulative number of voxels indexed by the first bi+1 grids
     int64_t
     cum_voxels_at(int64_t bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->cumVoxels(bi);
     }
 
@@ -146,6 +152,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The total number of bytes required to store all grids indexed by this batch
     int64_t
     total_bytes() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->totalBytes();
     }
 
@@ -157,6 +164,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The total number of leaf nodes indexed by this batch of grids
     int64_t
     total_leaf_nodes() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->totalLeaves();
     }
 
@@ -171,6 +179,7 @@ struct GridBatch : torch::CustomClassHolder {
     ///         grid in the batch
     torch::Tensor
     joffsets() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->voxelOffsets(true);
     }
 
@@ -179,7 +188,8 @@ struct GridBatch : torch::CustomClassHolder {
     /// the i^th grid
     torch::Tensor
     jlidx() const {
-        const torch::Tensor ret = impl()->jlidx(true);
+        detail::RAIIDeviceGuard guard(device());
+        const torch::Tensor     ret = impl()->jlidx(true);
         if (ret.numel() == 0) {
             return torch::arange({ grid_count() },
                                  torch::TensorOptions().device(device()).dtype(torch::kInt64));
@@ -193,7 +203,8 @@ struct GridBatch : torch::CustomClassHolder {
     /// of the i^th voxel
     torch::Tensor
     jidx() const {
-        const torch::Tensor ret = impl()->jidx(true);
+        detail::RAIIDeviceGuard guard(device());
+        const torch::Tensor     ret = impl()->jidx(true);
         if (grid_count() == 1 && ret.numel() == 0) {
             return torch::zeros({ total_voxels() },
                                 torch::TensorOptions().device(device()).dtype(torch::kInt16));
@@ -206,6 +217,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param voxel_size A 3D (shape [3,]) tensor specifying the voxel size to set for each grid
     inline void
     set_global_voxel_size(const Vec3dOrScalar &voxel_size) {
+        detail::RAIIDeviceGuard guard(device());
         impl()->setGlobalVoxelSize(voxel_size.value());
     }
 
@@ -213,6 +225,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param origin A 3D (shape [3,]) tensor specifying the voxel origin to set for each grid
     inline void
     set_global_origin(const Vec3d &origin) {
+        detail::RAIIDeviceGuard guard(device());
         impl()->setGlobalVoxelOrigin(origin.value());
     }
 
@@ -220,6 +233,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return Whether the grid is mutable
     inline bool
     is_mutable() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->isMutable();
     }
 
@@ -236,6 +250,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// this batch
     inline const std::vector<detail::VoxelCoordTransform>
     primal_transforms() const {
+        detail::RAIIDeviceGuard                  guard(device());
         std::vector<detail::VoxelCoordTransform> transforms;
         transforms.reserve(grid_count());
         for (int64_t bi = 0; bi < grid_count(); ++bi) {
@@ -250,6 +265,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// grids in this batch
     inline const std::vector<detail::VoxelCoordTransform>
     dual_transforms() const {
+        detail::RAIIDeviceGuard                  guard(device());
         std::vector<detail::VoxelCoordTransform> transforms;
         transforms.reserve(grid_count());
         for (int64_t bi = 0; bi < grid_count(); ++bi) {
@@ -264,6 +280,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The primal transform of the bi^th grid in the batch
     inline const fvdb::detail::VoxelCoordTransform
     primal_transform_at(int64_t bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->primalTransform(bi);
     }
 
@@ -273,6 +290,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The dual transform of the bi^th grid in the batch
     inline const fvdb::detail::VoxelCoordTransform
     dual_transform_at(int64_t bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->dualTransform(bi);
     }
 
@@ -824,6 +842,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A GridBatch representing the grid at the specified index
     GridBatch
     index(int64_t bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(impl()->index(bi));
     }
 
@@ -834,6 +853,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A GridBatch representing the slice of this grid batch
     GridBatch
     index(size_t start, size_t stop, size_t step) const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(impl()->index(start, stop, step));
     }
 
@@ -843,6 +863,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The grid batch vieweed at the specified indices
     GridBatch
     index(const std::vector<int64_t> &bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(impl()->index(bi));
     }
 
@@ -852,6 +873,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The grid batch vieweed at the specified indices
     GridBatch
     index(const std::vector<bool> &bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(impl()->index(bi));
     }
 
@@ -861,6 +883,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The grid batch vieweed at the specified indices
     GridBatch
     index(const torch::Tensor &bi) const {
+        detail::RAIIDeviceGuard guard(device());
         return GridBatch(impl()->index(bi));
     }
 
@@ -872,6 +895,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A JaggedTensor corresponding to the voxel grid of this grid batch
     JaggedTensor
     jagged_like(const torch::Tensor &data, bool ignore_disabled = true) const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->jaggedTensor(data, ignore_disabled);
     }
 
@@ -964,6 +988,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A serialized grid batch encoded as a torch::Tensor of type int8
     torch::Tensor
     serialize() const {
+        detail::RAIIDeviceGuard guard(device());
         return impl()->serialize();
     }
 
@@ -972,6 +997,7 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return The deserializes grid batch
     static GridBatch
     deserialize(const torch::Tensor &data) {
+        detail::RAIIDeviceGuard guard(data.device());
         return GridBatch(detail::GridBatchImpl::deserialize(data));
     }
 

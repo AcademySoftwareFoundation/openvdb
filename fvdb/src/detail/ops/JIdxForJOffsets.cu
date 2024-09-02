@@ -55,9 +55,9 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
         torch::empty({ numElements },
                      torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
 
-    const int blockSize = 1024;
-    const int gridSize  = (numElements + blockSize - 1) / blockSize;
-    jIdxForJOffsets<<<gridSize, blockSize>>>(
+    const int NUM_THREADS = 1024;
+    const int NUM_BLOCKS  = GET_BLOCKS(numElements, NUM_THREADS);
+    jIdxForJOffsets<<<NUM_BLOCKS, NUM_THREADS>>>(
         joffsets.packed_accessor32<fvdb::JOffsetsType, 1, torch::RestrictPtrTraits>(),
         retJIdx.packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();

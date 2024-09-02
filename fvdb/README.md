@@ -19,7 +19,7 @@ Lastly, our [documentation](docs) provides deeper details on the concepts as wel
 
 ## Installing *f*VDB
 
-fVDB is provided as an installable python package from *[todo: insert package distributor]*.  We provide pre-built packages of the latest *f*VDB version for the following dependent library configurations:
+fVDB is provided as an installable python package from conda.  We provide pre-built packages of the latest *f*VDB version for the following dependent library configurations:
 
 |   PyTorch      | Python     | CUDA |
 | -------------- | ---------- | ------- |
@@ -34,7 +34,7 @@ fVDB is provided as an installable python package from *[todo: insert package di
 Use the following command to install `fvdb` into your environment.
 
 ```bash
-conda install -c jswartz fvdb
+conda install [TBD]
 ```
 
 If you intend to use our learning material such as the [notebooks](notebooks) or [examples](examples), we recommend you start from the `fvdb_learn` conda environment which contains all the dependencies needed to run the learning material as well as build *f*VDB from source. To create this environment, run the following commands from the root of this repository:

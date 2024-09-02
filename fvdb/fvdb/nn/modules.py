@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 import math
-from typing import Optional, Union, List, Sequence
+from typing import List, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -10,6 +10,7 @@ from torch.profiler import record_function
 
 import fvdb
 from fvdb import GridBatch, JaggedTensor
+
 from .vdbtensor import VDBTensor
 
 
@@ -266,6 +267,11 @@ class SparseConv3d(nn.Module):
     def _dispatch_conv(self, in_feature, in_grid, in_kmap, out_grid):
 
         backend = self.backend
+
+        if self.allow_tf32 and self.weight.is_cuda:
+            assert (
+                torch.cuda.get_device_capability()[0] >= 8
+            ), "TF32 requires GPU with compute capability >= 8.0. Please set fvdb.nn.SparseConv3d.allow_tf32 = False."
 
         if backend == "cutlass" and (
             (not self.weight.is_cuda) or (self.in_channels, self.out_channels) not in self.CUTLASS_SUPPORTED_CHANNELS

@@ -80,6 +80,8 @@ computeIndexPutArg(
 template <>
 JaggedTensor
 dispatchJCat0<torch::kCUDA>(const std::vector<JaggedTensor> &vec) {
+    c10::cuda::CUDAGuard deviceGuard(vec[0].device());
+
     int64_t                             totalElements = 0;
     int64_t                             maxElements   = 0;
     thrust::host_vector<JOffsetsType *> offsets;
