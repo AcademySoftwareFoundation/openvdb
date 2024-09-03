@@ -331,6 +331,11 @@ if __name__ == "__main__":
                     return line.split("=")[1].strip().strip("'").strip('"')
         return "0.0.0"
 
+    # print all the files in the package
+    print("Files in package:")
+    for root, dirs, files in os.walk("fvdb"):
+        for file in files:
+            print(os.path.join(root, file))
     setup(
         name="fvdb",
         version=retrieve_version(),
