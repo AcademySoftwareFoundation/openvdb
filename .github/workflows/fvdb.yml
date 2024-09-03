@@ -80,8 +80,8 @@ jobs:
           run: |
             cd fvdb;
             free -g;
-            free -g | awk '/^Mem:/{jobs=int($4); print "Free memory (GB): " jobs}';
-            DISTUTILS_DEBUG="1" TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist 
+            free -g | awk '/^Mem:/{jobs=int($7); print "Free memory (GB): " jobs}';
+            DISTUTILS_DEBUG="1" TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist 
           shell:
             bash -el {0}
 
