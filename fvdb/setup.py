@@ -88,7 +88,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         os.makedirs(cmake_build_dir, exist_ok=True)
         os.makedirs(cmake_install_dir, exist_ok=True)
         subprocess.check_call(
-            ["cmake", base_path, f"-DCMAKE_INSTALL_PREFIX={cmake_install_dir}"] + cmake_args, cwd=cmake_build_dir
+            ["cmake", base_path, f"-DCMAKE_INSTALL_PREFIX={cmake_install_dir}", "-DCMAKE_INSTALL_LIBDIR=lib"] + cmake_args, cwd=cmake_build_dir
         )
         subprocess.check_call(["cmake", "--build", ".", "--target", "install"], cwd=cmake_build_dir)
         return cmake_install_dir
