@@ -573,14 +573,13 @@ JaggedTensor
 JaggedTensor::index(JaggedTensorIndex idx) const {
     if (idx.is_integer()) {
         return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
-            return detail::ops::dispatchJaggedTensorIndex<DeviceTag>(*this, idx.integer());
+            return detail::ops::dispatchJaggedTensorIndexInt<DeviceTag>(*this, idx.integer());
         });
     } else if (idx.is_slice()) {
         int64_t start = idx.slice().start().as_int_unchecked();
         int64_t end   = idx.slice().stop().as_int_unchecked();
         int64_t step  = idx.slice().step().as_int_unchecked();
-        TORCH_CHECK_INDEX(step == 1,
-                          "step must be 1 for JaggedTensor. Only contiguous slicing is supported.");
+        TORCH_CHECK_VALUE(step >= 1, "step in slice must be >= 1");
 
         // Deal with symbolic int
         if (start >= at::indexing::INDEX_MAX) {
@@ -590,138 +589,18 @@ JaggedTensor::index(JaggedTensorIndex idx) const {
             end = 0;
         }
 
-        // Convert indexes to positive values
-        if (start < 0) {
-            start += mNumOuterLists;
-        }
-        if (end < 0) {
-            end += mNumOuterLists;
-        }
-        if (start >= end) {
-            start = end;
-        }
-
-        start = std::max(start, (int64_t)0);
-        end   = std::min(end, mNumOuterLists);
-
-        if (mListIdx.size(0) == 0) {
-            TORCH_CHECK(ldim() == 1, "bad list indexes. this should never happen");
-            const JOffsetsType  startIdx = mOffsets[start].item<JOffsetsType>();
-            const JOffsetsType  endIdx   = mOffsets[end].item<JOffsetsType>();
-            const torch::Tensor retLidx =
-                mListIdx.numel() == 0 ? mListIdx
-                                      : mListIdx.index({ torch::indexing::Slice(start, end) });
-            return JaggedTensor::from_data_offsets_and_list_ids(
-                mData.index({ torch::indexing::Slice(startIdx, endIdx) }),
-                mOffsets.index({ torch::indexing::Slice(start, end + 1) }) - startIdx, retLidx);
-        } else {
-            // Find all tensors that belong to the slice
-            const torch::Tensor outerLidx = mListIdx.index({ torch::indexing::Slice(), 0 });
-            const torch::Tensor mask      = outerLidx.ge(start).logical_and(outerLidx.lt(end));
-            const torch::Tensor joffsetCat =
-                torch::stack({ mOffsets.index({ torch::indexing::Slice(0, num_tensors()) }),
-                               mOffsets.index({ torch::indexing::Slice(1, num_tensors() + 1) }) },
-                             1);
-            const torch::Tensor selectedOffsets = joffsetCat.index({ mask });
-
-            // Get the start and end offsets into the data tensor for the slice
-            JOffsetsType startIdx =
-                selectedOffsets.size(0) > 0 ? selectedOffsets[0][0].item<JOffsetsType>() : 0;
-            JOffsetsType endIdx =
-                selectedOffsets.size(0) > 0 ? selectedOffsets[-1][1].item<JOffsetsType>() : 0;
-
-            // Slice the data tensor
-            const torch::Tensor retData = mData.index({ torch::indexing::Slice(startIdx, endIdx) });
-
-            // Subtract the start offset from the selected offsets to get the new offsets
-            // NOTE: This assumes offsets are always contiguous
-            const torch::Tensor retOffsets =
-                selectedOffsets.numel() > 0
-                    ? torch::cat({ selectedOffsets.index({ torch::indexing::Slice(), 0 }),
-                                   selectedOffsets.index({ -1, 1 }).unsqueeze(0) }) -
-                          startIdx
-                    : torch::zeros(
-                          { 1 },
-                          torch::TensorOptions().dtype(JOffsetsScalarType).device(mData.device()));
-
-            // Slice the list indices and subtract the start index
-            TORCH_CHECK(mListIdx.size(1) > 1, "bad list indexes. this should never happen");
-            torch::Tensor retListIdx = mListIdx.index({ mask });
-            retListIdx.index({ torch::indexing::Slice(), 0 }) -= start;
-            if (retListIdx.dim() == 0) {
-                retListIdx = retListIdx.unsqueeze(1);
-            }
-            const int64_t       retNumOuterLists = end - start;
-            const torch::Tensor retJidx          = jidx_from_joffsets(retOffsets, retData.size(0));
-            return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-                retData, retOffsets, retJidx, retListIdx, retNumOuterLists);
-        }
+        return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
+            return detail::ops::dispatchJaggedTensorIndexSlice<DeviceTag>(*this, start, end, step);
+        });
     } else if (idx.is_ellipsis()) {
         return *this;
     } else if (idx.is_jagged_tensor()) {
         const JaggedTensor &jtIndices = idx.jagged_tensor();
-        TORCH_CHECK_VALUE(jtIndices.device() == device(),
-                          "indices must be on the same device as the JaggedTensor");
-
-        TORCH_CHECK_INDEX(
-            jtIndices.mListIdx.dim() == mListIdx.dim(),
-            "Indices must have the same list structure as JaggedTensor being indexed");
-        for (int i = 0; i < mListIdx.dim(); ++i) {
-            TORCH_CHECK_INDEX(
-                jtIndices.mListIdx.size(i) == mListIdx.size(i),
-                "Indices must have the same list structure as JaggedTensor being indexed");
-        }
-        if (Config::global().pendanticErrorCheckingEnabled()) {
-            // This is a slow check that we cap optionally do for correctness.
-            TORCH_CHECK_INDEX(
-                torch::all(jtIndices.mListIdx == mListIdx).item<bool>(),
-                "Indices must have the same list structure as JaggedTensor being indexed. ",
-                "This error was raised because config.pendatic_error_checking was enabled");
-        }
-
-        c10::ScalarType idxdt  = jtIndices.scalar_type();
-        const bool isIndexType = (idxdt == c10::ScalarType::Long || idxdt == c10::ScalarType::Int ||
-                                  idxdt == c10::ScalarType::Byte || idxdt == c10::ScalarType::Bool);
-        TORCH_CHECK_INDEX(
-            isIndexType,
-            "JaggedTensors used as indices must be long, int, byte or bool JaggedTensors but got ",
-            idxdt);
-
-        torch::Tensor selidx;
-        if (jtIndices.scalar_type() == torch::kBool) {
-            selidx = jtIndices.jdata();
-        } else {
-            // FIXME (Francis): We're not checking out of range here and it's sketchy! Fix in a
-            // unified CUDA kernel
-            selidx = jtIndices.jdata().clone();
-            for (int i = 0; i < jtIndices.joffsets().size(0) - 1; ++i) {
-                const JOffsetsType start = jtIndices.joffsets()[i].item<JOffsetsType>();
-                const JOffsetsType end   = jtIndices.joffsets()[i + 1].item<JOffsetsType>();
-                const JOffsetsType add   = mOffsets[i].item<JOffsetsType>();
-                selidx.index({ torch::indexing::Slice(start, end) }).add_(add);
-            }
-        }
-
-        const torch::Tensor retJdata = mData.index({ selidx });
-        torch::Tensor       retJidx  = mBatchIdx.index({ selidx });
-        if (retJidx.dim() > 1) {
-            std::vector<at::indexing::TensorIndex> idx;
-            idx.reserve(retJidx.dim());
-            idx.push_back(at::indexing::Slice());
-            for (int i = 1; i < retJidx.dim(); ++i) {
-                idx.push_back(0);
-            }
-            retJidx = retJidx.index(idx);
-        }
-        retJidx = retJidx.contiguous();
-        const torch::Tensor retJOffsets =
-            joffsets_from_jidx_and_jdata(retJidx, retJdata, num_tensors());
-        const torch::Tensor retListIdx = mListIdx;
-
-        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-            retJdata, retJOffsets, retJidx, retListIdx, mNumOuterLists);
+        return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
+            return detail::ops::dispatchJaggedTensorIndexJaggedTensor<DeviceTag>(*this, jtIndices);
+        });
     } else {
-        TORCH_CHECK_INDEX(false, "Unsupported indexing operation");
+        TORCH_CHECK_VALUE(false, "Unsupported indexing operation");
     }
 }
 

@@ -282,6 +282,7 @@ getIndexGrid(const GridBatch &gridBatch, const std::vector<std::string> names = 
 
     // Write out the full grid to the buffer
     if (isCuda) {
+        c10::cuda::CUDAGuard deviceGuard(gridBatch.device());
         at::cuda::CUDAStream defaultStream =
             at::cuda::getCurrentCUDAStream(gridBatch.device().index());
         cudaMemcpyAsync(writeHead, readHead, sourceGridByteSize, cudaMemcpyDeviceToHost,
@@ -382,6 +383,7 @@ saveIndexGridWithBlindData(const std::string &path, const GridBatch &gridBatch,
         // Copy the full bi^th index grid to the buffer
         const size_t sourceGridByteSize = nanoGridHdl.gridSize(bi);
         if (isCuda) {
+            c10::cuda::CUDAGuard deviceGuard(gridBatch.device());
             at::cuda::CUDAStream defaultStream =
                 at::cuda::getCurrentCUDAStream(gridBatch.device().index());
             cudaMemcpyAsync((void *)writeHead, (void *)readHead, sourceGridByteSize,

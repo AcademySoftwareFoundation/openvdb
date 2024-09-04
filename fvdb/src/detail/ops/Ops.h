@@ -15,7 +15,14 @@ namespace detail {
 namespace ops {
 
 template <c10::DeviceType>
-JaggedTensor dispatchJaggedTensorIndex(const JaggedTensor &jt, int64_t idxVal);
+JaggedTensor dispatchJaggedTensorIndexInt(const JaggedTensor &jt, int64_t idxVal);
+
+template <c10::DeviceType>
+JaggedTensor dispatchJaggedTensorIndexSlice(const JaggedTensor &jt, int64_t start, int64_t end,
+                                            int64_t step);
+
+template <c10::DeviceType>
+JaggedTensor dispatchJaggedTensorIndexJaggedTensor(const JaggedTensor &jt, const JaggedTensor &idx);
 
 template <c10::DeviceType> JaggedTensor dispatchJCat0(const std::vector<JaggedTensor> &tensors);
 

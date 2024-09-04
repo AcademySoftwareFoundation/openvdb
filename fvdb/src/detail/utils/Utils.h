@@ -12,6 +12,7 @@
 
 #include <nanovdb/NanoVDB.h>
 
+#include <c10/cuda/CUDAGuard.h>
 #include <c10/util/Half.h>
 #include <torch/extension.h>
 
@@ -294,6 +295,31 @@ StringToTorchScalarType(std::string dtypeStr) {
 
     TORCH_CHECK(false, "Invalid dtype string " + dtypeStr);
 }
+
+struct RAIIDeviceGuard {
+    RAIIDeviceGuard(torch::Device device) {
+        if (device.is_cuda()) {
+            mGuard = new c10::cuda::CUDAGuard(device.index());
+        }
+    }
+
+    RAIIDeviceGuard(torch::Device device1, torch::Device device2) {
+        if (device1.is_cuda()) {
+            mGuard = new c10::cuda::CUDAGuard(device1.index());
+        } else if (device2.is_cuda()) {
+            mGuard = new c10::cuda::CUDAGuard(device2.index());
+        }
+    }
+
+    RAIIDeviceGuard(const RAIIDeviceGuard &) = delete;
+
+    RAIIDeviceGuard &operator=(const RAIIDeviceGuard &) = delete;
+
+    ~RAIIDeviceGuard() { delete mGuard; }
+
+  private:
+    c10::cuda::CUDAGuard *mGuard = nullptr;
+};
 
 } // namespace detail
 } // namespace fvdb

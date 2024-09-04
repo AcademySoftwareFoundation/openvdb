@@ -260,11 +260,12 @@ dispatchVolumeRender<torch::kCUDA>(
     // auto total_samples = torch::zeros({numRays},
     // torch::dtype(torch::kLong).device(sigmas.device()));
 
-    const int64_t threads = 1024, blocks = (numRays + threads - 1) / threads;
+    const int64_t NUM_THREADS = 1024;
+    const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
 
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(
         sigmas.scalar_type(), "volumeRender", ([&] {
-            volumeRender<scalar_t><<<blocks, threads>>>(
+            volumeRender<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
                 sigmas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 rgbs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
                 deltas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
@@ -324,11 +325,12 @@ dispatchVolumeRenderBackward<torch::kCUDA>(const torch::Tensor dLdOpacity,
 
     torch::Tensor dLdWs_times_ws = (dLdWs * ws); // auxiliary input
 
-    const int64_t threads = 1024, blocks = (numRays + threads - 1) / threads;
+    const int64_t NUM_THREADS = 1024;
+    const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
 
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(
         sigmas.scalar_type(), "volumeRenderBackward", ([&] {
-            volumeRenderBackward<scalar_t><<<blocks, threads>>>(
+            volumeRenderBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
                 dLdOpacity.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 dLdDepth.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 // dLdDepthSq.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),

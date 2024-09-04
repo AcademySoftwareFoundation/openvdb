@@ -265,6 +265,8 @@ if __name__ == "__main__":
         "--extended-lambda",
         "--diag-suppress=186",
         "-diag-suppress=3189",
+        "-Xfatbin",
+        "-compress-all",
     ]
     user_nvcc_flags = os.getenv("NVCC_FLAGS", "").split()
     nvcc_flags += user_nvcc_flags
