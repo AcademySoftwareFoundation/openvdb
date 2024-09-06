@@ -9,15 +9,15 @@ import numpy as np
 import torch
 from parameterized import parameterized
 
-from fvdb import GridBatch, JaggedTensor
 import fvdb
+from fvdb import GridBatch, JaggedTensor
 
 from .common import (
+    dtype_to_atol,
+    expand_tests,
     make_dense_grid_and_point_data,
     make_sparse_grid_and_point_data,
     random_drop_points_if_mutable,
-    test_expand,
-    dtype_to_atol,
 )
 
 all_device_dtype_combos = [
@@ -38,8 +38,8 @@ bfloat16_combos = [["cuda", torch.bfloat16, False], ["cuda", torch.bfloat16, Tru
 
 class TestBasicOps(unittest.TestCase):
     def setUp(self):
-        # self.test_path = os.path.join(os.path.dirname(
-        #     os.path.realpath(__file__)), "..", "data")
+        torch.random.manual_seed(0)
+        np.random.seed(0)
         pass
 
     @parameterized.expand(["cpu", "cuda"])
@@ -1437,7 +1437,7 @@ class TestBasicOps(unittest.TestCase):
         # ps.register_point_cloud("hits", hit_pts.cpu().numpy())
         # ps.show()
 
-    @test_expand(list(itertools.product(["cpu", "cuda"], [torch.float32, torch.float64])))
+    @expand_tests(list(itertools.product(["cpu", "cuda"], [torch.float32, torch.float64])))
     def test_marching_cubes(self, device, dtype):
         # Generate the SDF for a sphere on a grid
         N = 32 if device == "cpu" else 64

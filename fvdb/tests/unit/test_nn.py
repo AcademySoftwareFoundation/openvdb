@@ -14,7 +14,7 @@ import fvdb
 import fvdb.nn as fvnn
 from fvdb import GridBatch
 
-from .common import test_expand
+from .common import expand_tests
 
 all_device_dtype_combos = [
     ["cuda", torch.float16, False],
@@ -302,7 +302,7 @@ class TestNN(unittest.TestCase):
         )
         self.assertLess(rel_diff_dense, 1e-3)
 
-    @test_expand(list(itertools.product(["cpu", "cuda"], [torch.float32, torch.float64], [1, 8], [16, 32])))
+    @expand_tests(list(itertools.product(["cpu", "cuda"], [torch.float32, torch.float64], [1, 8], [16, 32])))
     def test_simple_net(self, device, dtype, batch_size, resolution):
         torch.random.manual_seed(0)
         torch.backends.cuda.matmul.allow_tf32 = False

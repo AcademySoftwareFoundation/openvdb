@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 import itertools
-import os
 import tempfile
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -12,8 +12,7 @@ from parameterized import parameterized
 
 import fvdb
 
-from .common import random_drop_points_if_mutable
-
+from .common import get_fvdb_test_data_path, random_drop_points_if_mutable
 
 standard_dtypes_and_dims = [
     (torch.float16, 1),
@@ -175,9 +174,11 @@ class TestIO(unittest.TestCase):
                 self.assertTrue(torch.all(grid.ijk.jdata == grid2.ijk.jdata))
 
     def test_load_basic(self):
-        datadir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "data")
-        grids, data, names = fvdb.load(os.path.join(datadir, "batch.nvdb"))
-        grids, data, names = fvdb.load(os.path.join(datadir, "smoke-blosc.nvdb"))
+        datadir = get_fvdb_test_data_path()
+        # Load an uncompressed gridbatch
+        grids, data, names = fvdb.load(str(datadir / "io" / "batch.nvdb"))
+        # Load a blosc-compressed gridbatch
+        grids, data, names = fvdb.load(str(datadir / "io" / "smoke-blosc.nvdb"))
 
     @parameterized.expand(["cpu", "cuda"])
     def test_name_too_long_raises(self, device):

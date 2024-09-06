@@ -65,6 +65,81 @@ class SparseConvPackInfo : torch::CustomClassHolder {
     GridBatch mTargetGrid;
 
   public:
+    SparseConvPackInfo
+    to(TorchDeviceOrString to_device) const {
+        torch::Device toDevice = to_device.value();
+
+        SparseConvPackInfo copy = *this;
+        if (copy.mGSNeighborMap) {
+            copy.mGSNeighborMap = copy.mGSNeighborMap.value().to(toDevice);
+        }
+        if (copy.mGSNeighborSizes) {
+            copy.mGSNeighborSizes = copy.mGSNeighborSizes.value().to(toDevice);
+        }
+        if (copy.mIGEMMOutInMap) {
+            copy.mIGEMMOutInMap = copy.mIGEMMOutInMap.value().to(toDevice);
+        }
+        if (copy.mIGEMMReorderLoc) {
+            copy.mIGEMMReorderLoc = copy.mIGEMMReorderLoc.value().to(toDevice);
+        }
+        if (copy.mIGEMMSortedMask) {
+            copy.mIGEMMSortedMask = copy.mIGEMMSortedMask.value().to(toDevice);
+        }
+        if (copy.mIGEMMReducedSortedMask) {
+            copy.mIGEMMReducedSortedMask = copy.mIGEMMReducedSortedMask.value().to(toDevice);
+        }
+        if (copy.mIGEMMReoderOutInMap) {
+            copy.mIGEMMReoderOutInMap = copy.mIGEMMReoderOutInMap.value().to(toDevice);
+        }
+        if (copy.mIGEMMOutInMapBwd) {
+            copy.mIGEMMOutInMapBwd = copy.mIGEMMOutInMapBwd.value().to(toDevice);
+        }
+        if (copy.mIGEMMReorderLocBwd) {
+            copy.mIGEMMReorderLocBwd = copy.mIGEMMReorderLocBwd.value().to(toDevice);
+        }
+        if (copy.mIGEMMSortedMaskBwdW) {
+            copy.mIGEMMSortedMaskBwdW = copy.mIGEMMSortedMaskBwdW.value().to(toDevice);
+        }
+        if (copy.mIGEMMSortedMaskBwdD) {
+            copy.mIGEMMSortedMaskBwdD = copy.mIGEMMSortedMaskBwdD.value().to(toDevice);
+        }
+        if (copy.mIGEMMReorderOutInMapBwd) {
+            copy.mIGEMMReorderOutInMapBwd = copy.mIGEMMReorderOutInMapBwd.value().to(toDevice);
+        }
+        if (copy.mCUTLASSHaloIndexBuffer) {
+            copy.mCUTLASSHaloIndexBuffer = copy.mCUTLASSHaloIndexBuffer.value().to(toDevice);
+        }
+        if (copy.mCUTLASSOutputIndexBuffer) {
+            copy.mCUTLASSOutputIndexBuffer = copy.mCUTLASSOutputIndexBuffer.value().to(toDevice);
+        }
+        if (copy.mLGGSSpokeIndicesFlattenedOffset) {
+            copy.mLGGSSpokeIndicesFlattenedOffset =
+                copy.mLGGSSpokeIndicesFlattenedOffset.value().to(toDevice);
+        }
+        if (copy.mLGGSSpokeInputGlobalIndicesFlattenedData) {
+            copy.mLGGSSpokeInputGlobalIndicesFlattenedData =
+                copy.mLGGSSpokeInputGlobalIndicesFlattenedData.value().to(toDevice);
+        }
+        if (copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
+            copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData =
+                copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData.value().to(toDevice);
+        }
+        copy.mSourceGrid = copy.mSourceGrid.to(to_device);
+        copy.mTargetGrid = copy.mTargetGrid.to(to_device);
+
+        return copy;
+    }
+
+    SparseConvPackInfo
+    cuda() const {
+        return to(torch::kCUDA);
+    }
+
+    SparseConvPackInfo
+    cpu() const {
+        return to(torch::kCPU);
+    }
+
     const torch::optional<torch::Tensor>
     neighborMap() const {
         return mGSNeighborMap;

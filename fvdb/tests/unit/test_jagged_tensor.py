@@ -14,6 +14,8 @@ from parameterized import parameterized
 
 import fvdb
 
+from .common import get_fvdb_test_data_path
+
 all_device_dtype_combos = [
     ["cuda", torch.float16],
     ["cpu", torch.float32],
@@ -397,17 +399,9 @@ class TestJaggedTensor(unittest.TestCase):
 
         grid = gridbatch[0]
 
-        data_path = os.path.join(os.path.dirname(__file__), os.path.pardir, "data")
-        ray_o_path = os.path.join(data_path, "ray_orig.pt")
-        ray_d_path = os.path.join(data_path, "ray_dir.pt")
-        ray_o = torch.load(ray_o_path).to(device=device, dtype=dtype)
-        ray_d = torch.load(ray_d_path).to(device=device, dtype=dtype)
-        ray_orig = fvdb.JaggedTensor([ray_o])
-        ray_dir = fvdb.JaggedTensor([ray_d])
-        self.check_lshape(ray_orig, [ray_o])
-        self.check_lshape(ray_dir, [ray_d])
-        grid.voxels_along_rays(ray_orig, ray_dir, 1)
-
+        data_path = get_fvdb_test_data_path()
+        ray_o_path = data_path / "jagged_tensor" / "ray_orig.pt"
+        ray_d_path = data_path / "jagged_tensor" / "ray_dir.pt"
         ray_o = torch.load(ray_o_path).to(device=device, dtype=dtype)
         ray_d = torch.load(ray_d_path).to(device=device, dtype=dtype)
         ray_orig = fvdb.JaggedTensor([ray_o])
@@ -518,6 +512,13 @@ class TestJaggedTensor(unittest.TestCase):
         self.check_lshape(randpts, pts_list)
         self.check_lshape(randpts_b, pts_list)
         self.check_lshape(randpts_c, pts_list_2)
+
+        # ------------
+        # Neg
+        # ------------
+        res = -randpts
+        self.assertTrue(torch.allclose(res.jdata, -randpts.jdata))
+        self.check_lshape(res, pts_list)
 
         # ------------
         # Add
@@ -849,6 +850,10 @@ class TestJaggedTensor(unittest.TestCase):
         randpts_c = fvdb.JaggedTensor(pts_list_c)
         self.check_lshape(randpts_c, pts_list_c)
         self.assertTrue(torch.all(randpts_c.joffsets == randpts.joffsets))
+
+        res = -randpts
+        self.assertTrue(torch.allclose(res.jdata, -randpts.jdata))
+        self.check_lshape(res, pts_list)
 
         res = randpts + randpts_b
         self.assertTrue(torch.allclose(res.jdata, randpts.jdata + randpts_b.jdata))

@@ -85,6 +85,8 @@ bind_jagged_tensor(py::module &m) {
         .def("__getitem__", &fvdb::JaggedTensor::index)
         .def("__len__", &fvdb::JaggedTensor::num_outer_lists)
 
+        .def("__neg__", [](const fvdb::JaggedTensor& self) { return -self; }, py::is_operator())
+
         .def("__add__", py::overload_cast<const torch::Tensor&>(&fvdb::JaggedTensor::operator+, py::const_), py::arg("other"), py::is_operator())
         .def("__add__", py::overload_cast<const fvdb::JaggedTensor&>(&fvdb::JaggedTensor::operator+, py::const_), py::arg("other"), py::is_operator())
         .def("__add__", py::overload_cast<const int>(&fvdb::JaggedTensor::operator+, py::const_), py::arg("other"), py::is_operator())

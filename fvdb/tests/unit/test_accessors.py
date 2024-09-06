@@ -4,7 +4,6 @@
 import unittest
 
 import torch
-import numpy as np
 from parameterized import parameterized
 
 from fvdb import GridBatch

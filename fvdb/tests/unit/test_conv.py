@@ -13,9 +13,9 @@ import torchsparse_20
 import torchsparse_20.nn.functional as spF
 from parameterized import parameterized
 
-from fvdb import JaggedTensor, GridBatch, ConvPackBackend
+from fvdb import ConvPackBackend, GridBatch, JaggedTensor
 
-from .common import random_drop_points_if_mutable, test_expand
+from .common import expand_tests, random_drop_points_if_mutable
 
 all_device_dtype_combos = [
     ["cuda", torch.bfloat16, False, "gather_scatter"],
@@ -124,7 +124,7 @@ class TestConv(unittest.TestCase):
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    @test_expand(list(itertools.product([8, 64, 128], [8, 64, 128], [1, 4], [8, 64])))
+    @expand_tests(list(itertools.product([8, 64, 128], [8, 64, 128], [1, 4], [8, 64])))
     def test_conv_halo(self, in_channel, out_channel, batch_size, variant):
         device = "cuda"
         dtype = torch.float32
@@ -192,7 +192,7 @@ class TestConv(unittest.TestCase):
             f"Max dist is {torch.max(vdb_kernels_grad - ts_kernels_grad)}",
         )
 
-    @test_expand(
+    @expand_tests(
         list(itertools.product([torch.float32], [1, 4], ["cutlass", "gather_scatter", "igemm", "igemm_sorted", "lggs"]))
     )
     def test_special_conv(self, dtype, batch_size, backend):
@@ -246,7 +246,7 @@ class TestConv(unittest.TestCase):
             f"Max dist is {torch.max(out_vdb_features.jdata - ts_features)}",
         )
 
-    @test_expand(
+    @expand_tests(
         list(
             itertools.product(
                 ["cuda"],  # torchsparse supports only cuda.
@@ -349,7 +349,7 @@ class TestConv(unittest.TestCase):
             f"Max dist is {torch.max(vdb_kernels_grad - dense_kernels_grad)}",
         )
 
-    @test_expand(
+    @expand_tests(
         list(
             itertools.product(
                 ["cpu", "cuda"],
@@ -444,7 +444,7 @@ class TestConv(unittest.TestCase):
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
 
-    @test_expand(
+    @expand_tests(
         list(
             itertools.product(
                 ["cpu", "cuda"],
