@@ -534,6 +534,15 @@ meshToLevelSet(nb::object, nb::object, nb::object, nb::object, nb::object)
 }
 
 template<typename GridType>
+inline typename GridType::Ptr
+meshToSignedDistanceField(nb::object, nb::object, nb::object, nb::object, nb::object, nb::object)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
+    throw nb::python_error();
+    return typename GridType::Ptr();
+}
+
+template<typename GridType>
 inline nb::object
 volumeToQuadMesh(const GridType&, nb::object)
 {
@@ -592,6 +601,46 @@ meshToLevelSet(
     else {
         math::Transform::Ptr identity = math::Transform::createLinearTransform();
         return tools::meshToLevelSet<GridType>(*identity, points, triangles, quads, halfWidth);
+    }
+}
+
+template<typename GridType>
+inline typename GridType::Ptr
+meshToSignedDistanceField(
+        nb::ndarray<float, nb::shape<-1, 3>, nb::device::cpu> pointsObj,
+        std::optional<nb::ndarray<Index32, nb::shape<-1, 3>, nb::device::cpu>>& trianglesObj,
+        std::optional<nb::ndarray<Index32, nb::shape<-1, 4>, nb::device::cpu>>& quadsObj,
+        math::Transform::Ptr xform, float exBandWidth, float inBandWidth)
+{
+    // Extract the list of mesh vertices from the arguments to this method.
+    std::vector<Vec3s> points(pointsObj.shape(0));
+    // Copy values from the array to the vector.
+    for (size_t i = 0; i < pointsObj.shape(0); ++i)
+        points[i] = Vec3s(pointsObj(i, 0), pointsObj(i, 1), pointsObj(i, 2));
+
+    // Extract the list of triangle indices from the arguments to this method.
+    std::vector<Vec3I> triangles;
+    if (trianglesObj) {
+        triangles.resize(trianglesObj->shape(0));
+         for (size_t i = 0; i < trianglesObj->shape(0); ++i)
+             triangles[i] = Vec3I((*trianglesObj)(i, 0), (*trianglesObj)(i, 1), (*trianglesObj)(i, 2));
+    }
+
+    // Extract the list of quad indices from the arguments to this method.
+     std::vector<Vec4I> quads;
+    if (quadsObj) {
+        quads.resize(quadsObj->shape(0));
+         for (size_t i = 0; i < quadsObj->shape(0); ++i)
+             quads[i] = Vec4I((*quadsObj)(i, 0), (*quadsObj)(i, 1), (*quadsObj)(i, 2), (*quadsObj)(i, 3));
+    }
+
+    // Generate and return a level set grid.
+    if (xform) {
+        return tools::meshToSignedDistanceField<GridType>(*xform, points, triangles, quads, exBandWidth, inBandWidth);
+    }
+    else {
+        math::Transform::Ptr identity = math::Transform::createLinearTransform();
+        return tools::meshToSignedDistanceField<GridType>(*identity, points, triangles, quads, exBandWidth, inBandWidth);
     }
 }
 
@@ -1313,6 +1362,30 @@ exportGrid(nb::module_ m)
              "The resulting volume will have the given transform (or the identity\n"
              "transform if no transform is given) and a narrow band width of\n"
              "2 x halfWidth voxels.")
+        .def_static("createLevelSetFromPolygons",
+            &pyGrid::meshToSignedDistanceField<GridType>,
+            nb::arg("points"),
+#ifdef PY_OPENVDB_USE_NUMPY
+            nb::arg("triangles")=nb::none(),
+            nb::arg("quads")=nb::none(),
+#else
+            nb::arg("triangles")=std::vector<Index32>(),
+            nb::arg("quads")=std::vector<Index32>(),
+#endif
+            nb::arg("transform")=openvdb::math::Transform(),
+            nb::arg("exBandWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
+            nb::arg("inBandWidth")=openvdb::LEVEL_SET_HALF_WIDTH,
+             "Convert a triangle and/or quad mesh to a narrow-band level set volume.\n"
+             "The mesh must form a closed surface, but the surface need not be\n"
+             "manifold and may have self intersections and degenerate faces.\n"
+             "The mesh is described by a NumPy array of world-space points\n"
+             "and NumPy arrays of 3- and 4-tuples of point indices that specify\n"
+             "the vertices of the triangles and quadrilaterals that form the mesh.\n"
+             "Either the triangle or the quad array may be empty or None.\n"
+             "The resulting volume will have the given transform (or the identity\n"
+             "transform if no transform is given) and a narrow band width of\n"
+             "exBandWidth exterior voxels and inBandWidth interior voxels.")
+
 
         .def("prune", &pyGrid::prune<GridType>,
             nb::arg("tolerance") = 0,
