@@ -75,6 +75,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Enable Node 16
+        if: contains(matrix.config.image, '2021') || contains(matrix.config.image, '2022')
         run: |
           echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3

@@ -55,6 +55,8 @@ jobs:
     #   run: pip install epydoc
     - name: install_latex
       run: |
+        # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
+        # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
         sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
         sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
         yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
