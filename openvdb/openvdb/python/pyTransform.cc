@@ -13,15 +13,6 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 
 namespace pyTransform {
 
-inline void scale1(math::Transform& t, double s) { t.preScale(s); }
-inline void scale3(math::Transform& t, const Vec3d& xyz) { t.preScale(xyz); }
-
-inline Vec3d voxelDim0(math::Transform& t) { return t.voxelSize(); }
-inline Vec3d voxelDim1(math::Transform& t, const Vec3d& p) { return t.voxelSize(p); }
-
-inline double voxelVolume0(math::Transform& t) { return t.voxelVolume(); }
-inline double voxelVolume1(math::Transform& t, const Vec3d& p) { return t.voxelVolume(p); }
-
 inline Vec3d indexToWorld(math::Transform& t, const Vec3d& p) { return t.indexToWorld(p); }
 inline Vec3d worldToIndex(math::Transform& t, const Vec3d& p) { return t.worldToIndex(p); }
 
@@ -223,17 +214,17 @@ exportTransform(py::module_ m)
             "Postfix a shear (axis0 and axis1 are either\n"
             "Axis.X, Axis.Y or Axis.Z).")
 
-        .def("voxelSize", &pyTransform::voxelDim0,
+        .def("voxelSize", py::overload_cast<>(&math::Transform::voxelSize, py::const_),
             "voxelSize() -> (dx, dy, dz)\n\n"
             "Return the size of voxels of the linear component of this transform.")
-        .def("voxelSize", &pyTransform::voxelDim1, py::arg("xyz"),
+        .def("voxelSize", py::overload_cast<const Vec3d&>(&math::Transform::voxelSize, py::const_), py::arg("xyz"),
             "voxelSize((x, y, z)) -> (dx, dy, dz)\n\n"
             "Return the size of the voxel at position (x, y, z).")
 
-        .def("voxelVolume", &pyTransform::voxelVolume0,
+        .def("voxelVolume", py::overload_cast<>(&math::Transform::voxelVolume, py::const_),
             "voxelVolume() -> float\n\n"
             "Return the voxel volume of the linear component of this transform.")
-        .def("voxelVolume", &pyTransform::voxelVolume1, py::arg("xyz"),
+        .def("voxelVolume", py::overload_cast<const Vec3d&>(&math::Transform::voxelVolume, py::const_), py::arg("xyz"),
             "voxelVolume((x, y, z)) -> float\n\n"
             "Return the voxel volume at position (x, y, z).")
 
