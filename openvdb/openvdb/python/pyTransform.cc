@@ -185,23 +185,42 @@ exportTransform(py::module_ m)
         .def_property_readonly("isLinear", &math::Transform::isLinear,
             "True if this transform is linear")
 
-        .def("rotate", &math::Transform::preRotate,
+        .def("preRotate", &math::Transform::preRotate,
             py::arg("radians"), py::arg("axis") = math::X_AXIS,
             "rotate(radians, axis)\n\n"
-            "Accumulate a rotation about either Axis.X, Axis.Y or Axis.Z.")
-        .def("translate", &math::Transform::postTranslate, py::arg("xyz"),
+            "Prepend a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("preTranslate", &math::Transform::preTranslate, py::arg("xyz"),
             "translate((x, y, z))\n\n"
-            "Accumulate a translation.")
-        .def("scale", &pyTransform::scale1, py::arg("s"),
+            "Prepend a translation.")
+        .def("preScale", py::overload_cast<double>(&math::Transform::preScale), py::arg("s"),
             "scale(s)\n\n"
-            "Accumulate a uniform scale.")
-        .def("scale", &pyTransform::scale3, py::arg("sxyz"),
+            "Prepend a uniform scale.")
+        .def("preScale", py::overload_cast<const Vec3d&>(&math::Transform::preScale), py::arg("sxyz"),
             "scale((sx, sy, sz))\n\n"
-            "Accumulate a nonuniform scale.")
-        .def("shear", &math::Transform::preShear,
+            "Prepend a nonuniform scale.")
+        .def("preShear", &math::Transform::preShear,
             py::arg("s"), py::arg("axis0"), py::arg("axis1"),
             "shear(s, axis0, axis1)\n\n"
-            "Accumulate a shear (axis0 and axis1 are either\n"
+            "Prepend a shear (axis0 and axis1 are either\n"
+            "Axis.X, Axis.Y or Axis.Z).")
+
+        .def("postRotate", &math::Transform::postRotate,
+            py::arg("radians"), py::arg("axis") = math::X_AXIS,
+            "rotate(radians, axis)\n\n"
+            "Postfix a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("postTranslate", &math::Transform::postTranslate, py::arg("xyz"),
+            "translate((x, y, z))\n\n"
+            "Postfix a translation.")
+        .def("postScale", py::overload_cast<double>(&math::Transform::postScale), py::arg("s"),
+            "scale(s)\n\n"
+            "Postfix a uniform scale.")
+        .def("postScale", py::overload_cast<const Vec3d&>(&math::Transform::postScale), py::arg("sxyz"),
+            "scale((sx, sy, sz))\n\n"
+            "Postfix a nonuniform scale.")
+        .def("postShear", &math::Transform::postShear,
+            py::arg("s"), py::arg("axis0"), py::arg("axis1"),
+            "shear(s, axis0, axis1)\n\n"
+            "Postfix a shear (axis0 and axis1 are either\n"
             "Axis.X, Axis.Y or Axis.Z).")
 
         .def("voxelSize", &pyTransform::voxelDim0,
