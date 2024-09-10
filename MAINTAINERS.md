@@ -14,5 +14,5 @@ The current OpenVDB maintainers are:
 | Ken Museth       | ken.museth@gmail.com
 | Andre Pradhana   | andre.pradhana@gmail.com
 | Richard Jones    | richardj@ilm.com
-| Gergory Hurst    | tbd
+| Gregory Hurst    | tbd
 | Jonathan Swartz  | tbd
