@@ -594,20 +594,6 @@ Abs(const Vec3<T>& v)
     return Vec3<T>(Abs(v[0]), Abs(v[1]), Abs(v[2]));
 }
 
-template<>
-inline auto cwiseAdd(const Vec3<math::internal::half>& v, const float s)
-{
-    Vec3<math::internal::half> out;
-    const math::internal::half* ip = v.asPointer();
-    math::internal::half* op = out.asPointer();
-    for (unsigned i = 0; i < 3; ++i, ++op, ++ip) {
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        *op = *ip + s;
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-    }
-    return out;
-}
-
 /// Orthonormalize vectors v1, v2 and v3 and store back the resulting
 /// basis e.g.   Vec3d::orthonormalize(v1,v2,v3);
 template <typename T>
