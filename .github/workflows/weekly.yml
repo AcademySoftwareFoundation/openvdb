@@ -77,6 +77,9 @@ jobs:
     container:
       image: aswf/ci-base:2023
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
     # with the Houdini download script. In so doing we broke some of the caching
@@ -171,6 +174,9 @@ jobs:
           - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test,axcore,axtest', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: pybind11
       #if: contains(container.image, '2023') == false
@@ -253,6 +259,10 @@ jobs:
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core', cmake: '' }
       fail-fast: false
     steps:
+      - name: Enable Node 16
+        if: contains(matrix.config.image, '2021') || contains(matrix.config.image, '2022')
+        run: |
+          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: pybind11
         #f: contains(matrix.config.image, '2023') == false
@@ -397,6 +407,9 @@ jobs:
         blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
       fail-fast: false
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: install_blosc
       run: sudo ./ci/install_blosc.sh ${{ matrix.blosc }}
@@ -423,6 +436,9 @@ jobs:
       # may not have this build type. See OpenVDBCXX.cmake
       CXXFLAGS: "-gdwarf-4 -g3 -ggdb -Og"
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
