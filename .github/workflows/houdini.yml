@@ -175,6 +175,7 @@ jobs:
             -DDISABLE_CMAKE_SEARCH_PATHS=ON \
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
+            -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
             -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"

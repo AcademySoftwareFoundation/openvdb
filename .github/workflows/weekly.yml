@@ -127,7 +127,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh 20.0 macosx_x86_64_clang12.0_11 --prod
+      run: ./ci/download_houdini.sh 20.0 macosx_arm64_clang14.0_13 --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
