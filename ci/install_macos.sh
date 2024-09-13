@@ -31,6 +31,10 @@ echo "Using python $py_version"
 echo "Python_ROOT_DIR=/usr/local/opt/$py_version" >> $GITHUB_ENV
 echo "/usr/local/opt/$py_version/bin" >> $GITHUB_PATH
 
+# use bash
+echo "/usr/local/opt/bash/bin" >> $GITHUB_PATH
+echo "/opt/homebrew/opt/bash/bin" >> $GITHUB_PATH
+
 # use gnu-getopt
 echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
 echo "/opt/homebrew/opt/gnu-getopt/bin" >> $GITHUB_PATH
