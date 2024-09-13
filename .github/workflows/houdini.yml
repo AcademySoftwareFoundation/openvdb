@@ -176,7 +176,7 @@ jobs:
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
             -DLLVM_DIR=/usr/local/opt/llvm@15/lib/cmake/llvm \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"
     - name: test
       run: cd build && ctest -V
