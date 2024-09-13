@@ -216,6 +216,7 @@ jobs:
             sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev pybind11-dev
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 15
+            ./ci/install_tbb_macos.sh
           else
             echo "$RUNNER_OS not supported"; exit 1
           fi
@@ -317,7 +318,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+        run: |
+          ./ci/install_macos.sh ${{ matrix.config.llvm }}
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
