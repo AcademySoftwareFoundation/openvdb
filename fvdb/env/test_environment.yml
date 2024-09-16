@@ -1,12 +1,11 @@
 name: fvdb_test
 channels:
-  - pyg
   - pytorch
   - nvidia
   - conda-forge
 dependencies:
   - python=3.10
-  - pytorch::pytorch=2.2
+  - pytorch::pytorch=2.4.0
   - pytorch::pytorch-cuda=12.1
   - tensorboard
   - pip>=23.3.1
@@ -20,6 +19,7 @@ dependencies:
   - cuda-nvcc=12.1
   - cuda-cccl=12.1
   - cuda-libraries-static=12.1
+  - cuda-version=12.1
   - parameterized
   - gcc_linux-64=11
   - gxx_linux-64=11
@@ -30,9 +30,8 @@ dependencies:
   - ipython
   - matplotlib
   - tqdm
-  - pyg
   - sparsehash
-  - pytorch-scatter
+  - pyg::pytorch-scatter=2.1.2
   - sphinx>=7.0.0
   - sphinx_rtd_theme
   - myst-parser
@@ -40,8 +39,8 @@ dependencies:
   - rich
   - pytest-benchmark
   - numpy<2
+  - linkify-it-py
   - pip:
-    - linkify-it-py
     - python-pycg
-    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/torchsparse_20-2.0.0b0-cp310-cp310-linux_x86_64.whl
-    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/torchsparse-2.1.0-cp310-cp310-linux_x86_64.whl
+    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse_20-2.0.0b0-cp310-cp310-linux_x86_64.whl
+    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse-2.1.0-cp310-cp310-linux_x86_64.whl

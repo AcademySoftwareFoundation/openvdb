@@ -23,9 +23,7 @@ During the project's initial stage of release, it is necessary to [run the build
 
 |   PyTorch      | Python     | CUDA |
 | -------------- | ---------- | ------- |
-|  2.2.0-2.2.2  | 3.10 - 3.12 |   `cu121`   |
-|  2.3.0-2.3.1  | 3.10 - 3.12 |   `cu121`   |
-|  2.4.0        | 3.10 - 3.12 |   `cu121`   |
+|  2.4.0-2.4.1   | 3.10 - 3.12 |  12.1   |
 
 
 
