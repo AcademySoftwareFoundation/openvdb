@@ -228,6 +228,60 @@ jobs:
       - name: test
         run: cd build && ctest -V
 
+  windows:
+    # Windows CI. Tests static and dynamic builds with MT and MD respectively.
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'win'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
+          # due to disk space constraints
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: path
+      shell: pwsh
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install
+      run: ./ci/install_windows.sh
+    - name: build
+      run: >
+        ./ci/build.sh -v
+        --config=${{ matrix.config.build }}
+        --components=${{ matrix.config.components }}
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXR=ON
+        -DUSE_PNG=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: size
+      # Print the build directy size (monitor if we're hitting runner limits)
+      run: du -h build
+    - name: test
+      # Always run tests on weekly builds but skip Debug on commits as they take a while.
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
+      run: cd build && ctest -V -C ${{ matrix.config.build }}
+
   #############################################################################
   ############################ AX Library Extras ##############################
   #############################################################################
@@ -388,6 +442,64 @@ jobs:
         echo "$Env:VDB_INSTALL_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: test
       run: cd build && ctest -V -C ${{ matrix.config.build }}
+
+  #############################################################################
+  ################################## Blosc ####################################
+  #############################################################################
+
+  windows-nanovdb:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'win'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      visual_studio: "Visual Studio 17 2022"
+      cuda: "12.4.0"
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
+          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
+          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: path
+      shell: powershell
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install_cuda
+      shell: powershell
+      run: .\ci\install_windows_cuda.ps1
+    - name: install_deps
+      shell: bash
+      run: ./ci/install_windows.sh
+    - name: build
+      shell: bash
+      run: >
+        ./ci/build.sh -v
+        --config=${{ matrix.config.build }}
+        --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXPLICIT_INSTANTIATION=OFF
+        -DNANOVDB_USE_CUDA=ON
+        -DNANOVDB_USE_OPENVDB=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: test
+      shell: bash
+      run: cd build && ctest -V -E ".*cuda.*"
 
   #############################################################################
   ################################## Blosc ####################################
