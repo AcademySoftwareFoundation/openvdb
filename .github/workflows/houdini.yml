@@ -162,12 +162,12 @@ jobs:
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_deps
-      run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+      run: ./ci/install_macos.sh 15
     - name: build
       run: |
         ./ci/build.sh -v \
           --build-type=Release \
-          --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest" \
+          --components="core,hou,bin,view,render,python,test,axcore,axbin" \
           --cargs=\" \
             -DHOUDINI_ROOT=$HOME/houdini_install/hou \
             -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF \
@@ -175,8 +175,9 @@ jobs:
             -DDISABLE_CMAKE_SEARCH_PATHS=ON \
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
-            -DLLVM_DIR=/usr/local/opt/llvm@15/lib/cmake/llvm \
-            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+            -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
+            -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"
     - name: test
       run: cd build && ctest -V

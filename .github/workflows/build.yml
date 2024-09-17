@@ -197,7 +197,9 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: install
-      run: ./ci/install_macos.sh
+      run: |
+        ./ci/install_macos.sh
+        ./ci/install_tbb_macos.sh
     - name: build
       run: >
         ./ci/build.sh -v

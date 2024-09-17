@@ -134,7 +134,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+        run: |
+          ./ci/install_macos.sh ${{ matrix.config.llvm }}
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
