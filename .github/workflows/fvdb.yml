@@ -125,12 +125,9 @@ jobs:
             conda activate fvdb_test
             pip install ./dist/*.whl
 
-      - name: cd fvdb
-        run: cd fvdb
-
       - name: Run tests
         run: |
-            cd tests;
+            cd fvdb/tests &&
             pytest -v unit
 
       - name: Cleanup
@@ -175,13 +172,9 @@ jobs:
         run: |
           git config --global --add safe.directory "$(pwd)"
 
-      - name: cd fvdb
-        run: cd fvdb
-
       - name: Run benchmarks
         run: |
-          tree &&
-          cd tests &&
+          cd fvdb/tests &&
           pytest benchmark --benchmark-json benchmark/output.json
 
       - name: Store benchmark result
@@ -189,7 +182,7 @@ jobs:
         with:
             name: Python Benchmark with pytest-benchmark
             tool: 'pytest'
-            output-file-path: tests/benchmark/output.json
+            output-file-path: fvdb/tests/benchmark/output.json
             # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
             github-token: ${{ secrets.GITHUB_TOKEN }}
             auto-push: true
