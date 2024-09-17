@@ -15,6 +15,7 @@ on:
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
       - 'nanovdb/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -28,6 +29,7 @@ on:
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
       - 'nanovdb/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:

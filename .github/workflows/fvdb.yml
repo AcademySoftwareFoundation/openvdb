@@ -10,9 +10,12 @@ on:
         - 'CHANGES'
         - 'CODEOWNERS'
         - 'doc/**'
+        - 'openvdb/**'
+        - 'openvdb_cmd/**'
         - 'openvdb_ax/**'
         - 'openvdb_maya/**'
         - 'openvdb_houdini/**'
+        - 'nanovdb/**'
         - 'pendingchanges/**'
         - '**.md'
         - 'fvdb/debug/**'
@@ -27,9 +30,12 @@ on:
         - 'CHANGES'
         - 'CODEOWNERS'
         - 'doc/**'
+        - 'openvdb/**'
+        - 'openvdb_cmd/**'
         - 'openvdb_ax/**'
         - 'openvdb_maya/**'
         - 'openvdb_houdini/**'
+        - 'nanovdb/**'
         - 'pendingchanges/**'
         - '**.md'
         - 'fvdb/debug/**'
@@ -50,7 +56,7 @@ jobs:
 
   fvdb-build:
     name: fVDB Build
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-16c-64g-600h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2023-clang15.0
       options: --rm
@@ -71,7 +77,8 @@ jobs:
       - name: Buid fvdb
         run: |
           cd fvdb &&
-          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist
+          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist &&
+          tree
 
       - name: Upload package
         uses: actions/upload-artifact@v4

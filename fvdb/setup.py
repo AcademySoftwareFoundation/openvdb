@@ -288,6 +288,7 @@ if __name__ == "__main__":
         "-diag-suppress=3189",
         "-Xfatbin",
         "-compress-all",
+        "-O0",
     ]
     user_nvcc_flags = os.getenv("NVCC_FLAGS", "").split()
     nvcc_flags += user_nvcc_flags

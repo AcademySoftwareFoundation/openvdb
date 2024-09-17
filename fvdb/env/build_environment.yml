@@ -29,3 +29,4 @@ dependencies:
   - linkify-it-py
   - numpy<2
   - tqdm
+  - tree
