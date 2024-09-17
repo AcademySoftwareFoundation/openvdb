@@ -108,9 +108,33 @@
         "__config": "cpp"
     },
     "files.trimTrailingWhitespace": true,
-    "editor.rulers": [
-        120
-    ],
+    "editor.rulers": [ 100 ],
+    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.enhancedColorization": "enabled",
+    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
+    "C_Cpp.autocomplete": "default",
+    "terminal.integrated.defaultLocation": "editor",
+    "cmake.environment": {
+        "PATH": "${env:CONDA_PREFIX}/envs/fvdb/bin:${env:PATH}"
+    },
+    "cmake.configureOnOpen": false,
+    "C_Cpp.default.compilerPath": "${env:CONDA_PREFIX}/envs/fvdb/bin/x86_64-conda-linux-gnu-c++",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
+    "[cuda-cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.formatOnSave": true
+    },
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        },
+        "editor.rulers": [ 120 ]
+    },
     "python.linting.pylintArgs": [
         "--disable", "C0114",
         "--disable", "C0115",
@@ -125,17 +149,6 @@
         "--generated-members=numpy.* ,torch.*"
     ],
     "python.analysis.typeCheckingMode": "basic",
-    "C_Cpp.intelliSenseEngine": "default",
-    "C_Cpp.enhancedColorization": "enabled",
-    "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
-    "C_Cpp.autocomplete": "default",
-    "terminal.integrated.defaultLocation": "editor",
-    "cmake.environment": {
-        "PATH": "${env:CONDA_PREFIX}/envs/fvdb/bin:${env:PATH}"
-    },
-    "cmake.configureOnOpen": false,
-    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, UseTab: Never, IndentWidth: 4, TabWidth: 4, BreakBeforeBraces: Allman, AllowShortIfStatementsOnASingleLine: false, IndentCaseLabels: false, ColumnLimit: 0, AccessModifierOffset: -4, NamespaceIndentation: All, FixNamespaceComments: false,  ReferenceAlignment: Left }",
-    "C_Cpp.default.compilerPath": "${env:CONDA_PREFIX}/envs/fvdb/bin/x86_64-conda-linux-gnu-c++",
     "python.testing.unittestArgs": [
         "-v", "-s", "."
     ],
@@ -145,4 +158,9 @@
         "--target-version=py311",
         "--line-length=120"
     ],
+    "isort.args": [
+        "--profile", "black"
+    ],
+    "json.format.keepLines": true,
+    "C_Cpp.formatting": "clangFormat",
 }

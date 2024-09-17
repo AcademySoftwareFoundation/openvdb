@@ -30,7 +30,7 @@ def _clone_fvdb_example_data():
         return is_repo
 
     git_tag = "main"
-    git_url = "git@github.com:voxel-foundation/fvdb-example-data.git"
+    git_url = "https://github.com/voxel-foundation/fvdb-example-data.git"
     repo_root = Path(__file__).resolve().parent.parent
     external_path = repo_root / "external"
     if not external_path.exists():

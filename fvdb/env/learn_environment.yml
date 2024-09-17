@@ -6,10 +6,9 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
-  - jswartz::fvdb
   - jupyterlab
   - pytorch-cuda=12.1
-  - pytorch
+  - pytorch=2.4.0
   - tensorboard
   - pip
   - git
@@ -23,13 +22,13 @@ dependencies:
   - tqdm
   - pyg
   - sparsehash
-  - pytorch-scatter
+  - pyg::pytorch-scatter
   - pandas
   - pytest-benchmark
   - polyscope
   - numpy<2
   - pyrender
+  - linkify-it-py
   - pip:
     - point-cloud-utils
-    - linkify-it-py
     - python-pycg

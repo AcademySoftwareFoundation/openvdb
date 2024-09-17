@@ -25,7 +25,7 @@ dependencies:
   - tqdm
   - requests
   - python=3.8
-  - pytorch=2.2
+  - pytorch=2.4.0
   - pytorch-cuda=12.1
   - cuda
   - cuda-nvcc

@@ -9,7 +9,6 @@ from parameterized import parameterized
 
 import fvdb
 
-
 all_device_dtype_combos = [
     ["cpu", torch.float16],
     ["cuda", torch.float16],
@@ -22,6 +21,8 @@ NVOX = 1_000_000
 
 class TestBatching(unittest.TestCase):
     def setUp(self):
+        torch.random.manual_seed(32)
+        np.random.seed(32)
         pass
 
     @parameterized.expand(all_device_dtype_combos)

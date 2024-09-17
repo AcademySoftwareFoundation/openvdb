@@ -19,7 +19,7 @@ pages:
   stage: deploy
   script:
     # build and publish automated documentation with Sphinx:
-    - export MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')
+    - export MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/3); if(jobs<1) jobs=1; print jobs}')
     - python setup.py build_ext --inplace
     - sphinx-build -E -a docs/ public/
 

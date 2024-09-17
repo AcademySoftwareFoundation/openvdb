@@ -5,7 +5,7 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
-  - pytorch::pytorch=2.2
+  - pytorch::pytorch=2.4.0
   - pytorch::pytorch-cuda=12.1
   - git
   - gitpython

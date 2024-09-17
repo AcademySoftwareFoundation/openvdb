@@ -19,30 +19,15 @@ Lastly, our [documentation](docs) provides deeper details on the concepts as wel
 
 ## Installing *f*VDB
 
-fVDB is provided as an installable python package from conda.  We provide pre-built packages of the latest *f*VDB version for the following dependent library configurations:
+During the project's initial stage of release, it is necessary to [run the build steps](#building-fvdb-from-source) to install ƒVDB. Eventually, ƒVDB will be provided as a pre-built, installable package from anaconda.  We support building the latest ƒVDB version for the following dependent library configurations:
 
 |   PyTorch      | Python     | CUDA |
 | -------------- | ---------- | ------- |
-|  2.0.0-2.0.3  | 3.8 - 3.11 |   `cu121`   |
-|  2.1.0-2.1.3  | 3.8 - 3.12 |   `cu121`   |
-|  2.3.0        | 3.8 - 3.12 |   `cu121`   |
+|  2.4.0-2.4.1   | 3.10 - 3.12 |  12.1   |
+
 
 
 ***Note:** Linux is the only platform currently supported (Ubuntu >= 20.04 recommended).
-
-
-Use the following command to install `fvdb` into your environment.
-
-```bash
-conda install [TBD]
-```
-
-If you intend to use our learning material such as the [notebooks](notebooks) or [examples](examples), we recommend you start from the `fvdb_learn` conda environment which contains all the dependencies needed to run the learning material as well as build *f*VDB from source. To create this environment, run the following commands from the root of this repository:
-
-```bash
-conda env create -f env/learn_environment.yml
-conda activate fvdb_learn
-```
 
 
 ## Building *f*VDB from Source
@@ -56,7 +41,7 @@ conda activate fvdb_learn
 
 Running a docker container is a great way to ensure that you have a consistent environment for building and running ƒVDB.
 
-Our provided [`Dockerfile`](Dockerfile) has two modes for building the image: `dev` and `production`.  `production` constructs an image capable of building ƒVDB, builds and installs the ƒVDB libraries and is read for you to start running python code that uses the `fvdb` module.  `dev` mode constructs an image which is ready to build ƒVDB but does not build the ƒVDB libraries.
+Our provided [`Dockerfile`](Dockerfile) has two modes for building the image: `dev` and `production`.  `production` constructs an image capable of building ƒVDB, builds and installs the ƒVDB libraries and is ready for you to start running python code that uses the `fvdb` module.  `dev` mode constructs an image which is ready to build ƒVDB but does not build the ƒVDB libraries.
 
 Building the docker image in `production` mode is the default and is as simple as running the following command from the root of this repository:
 ```shell
@@ -64,7 +49,7 @@ Building the docker image in `production` mode is the default and is as simple a
 docker build -t fvdb/prod .
 ```
 
-Building the docker mage in `dev` mode is done by setting the `BUILD_MODE` argument to `dev`:
+Building the docker mage in `dev` mode is done by setting the `MODE` argument to `dev`:
 ```shell
 # Build the docker image in dev mode
 docker build --build-arg  MODE=dev -t fvdb/dev .
@@ -116,7 +101,7 @@ Next, create the `fvdb` conda environment by running the following command from 
 conda env create -f env/test_environment.yml
 ```
 
-**Note:**  You can optionally use the `env/build_environment.yml` environment file if you want a minimum set of dependencies needed to build *f*VDB and don't intend to run the tests or the `env/learn_environment` if you would like the additional packages needed to run the examples and view their visualizations.
+**Note:**  You can optionally use the `env/build_environment.yml` environment file if you want a minimum set of dependencies needed to build *f*VDB and don't intend to run the tests or the `env/learn_environment` if you would like the additional packages needed to run the examples and view their visualizations.  If you intend to use our learning material such as the [notebooks](notebooks) or [examples](examples), we recommend you start from the `fvdb_learn` conda environment which contains all the dependencies needed to run the learning material as well as build *f*VDB from source.
 
 Now activate the environment:
 ```shell

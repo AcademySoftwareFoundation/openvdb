@@ -1,0 +1,100 @@
+---
+Language: Cpp
+
+# Indentation
+IndentWidth: 4
+UseTab: Never
+
+# Line length
+ColumnLimit: 100
+
+# Line endings
+DeriveLineEnding: false
+LineEnding: LF
+
+# Spacing and padding
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: true
+SpaceAfterLogicalNot: false
+SpaceAfterControlStatementKeyword: true
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: false
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesBeforeTrailingComments: 1
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeCtorInitializerColon: true
+SpaceBeforeInheritanceColon: true
+SpaceBeforeSquareBrackets: false
+SpacesInSquareBrackets: false
+SpaceBeforeCaseColon: false
+BreakBeforeBinaryOperators: None
+SpaceBeforeAssignmentOperators: true
+
+# Brace placement
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# Function definitions
+# BreakAfterReturnType: AllDefinitions
+AlwaysBreakAfterDefinitionReturnType: All
+
+# Alignment
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+AlignEscapedNewlines: Left
+AlignOperands: true
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+
+# Miscellaneous
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
+BreakBeforeBraces: Attach
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: false
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: false
+Cpp11BracedListStyle: false
+IncludeBlocks: Preserve
+IncludeIsMainRegex: "$"
+IncludeCategories:
+  - Regex: '^<.*\.h>'
+    Priority: 1
+  - Regex: ".*"
+    Priority: 2
+IncludeIsMainSourceRegex: "$"
+IndentPPDirectives: None
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+SortIncludes: true
+SortUsingDeclarations: true
+TabWidth: 4
+Standard: c++20

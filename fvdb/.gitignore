@@ -50,3 +50,5 @@ releases/
 data/
 !tests/data
 .vscode/launch.json
+lightning_logs
+tests/data/

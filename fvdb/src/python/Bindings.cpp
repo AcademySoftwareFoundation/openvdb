@@ -215,7 +215,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
              py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER)
         .def("sparse_transpose_conv_3d", &fvdb::SparseConvPackInfo::sparseTransposeConv3d,
              "Sparse 3d convolution transpose", py::arg("input"), py::arg("weights"),
-             py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER);
+             py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER)
+        .def("to", &fvdb::SparseConvPackInfo::to, py::arg("device"))
+        .def("cuda", &fvdb::SparseConvPackInfo::cuda)
+        .def("cpu", &fvdb::SparseConvPackInfo::cpu);
 }
 
 TORCH_LIBRARY(my_classes, m) {

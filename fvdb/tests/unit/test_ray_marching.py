@@ -1,18 +1,23 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: MPL-2.0
 #
-import os
 import unittest
+from pathlib import Path
 
 import numpy as np
 import torch
 from parameterized import parameterized
 
 import fvdb
-from fvdb import GridBatch, JaggedTensor, sparse_grid_from_ijk
+from fvdb import GridBatch, sparse_grid_from_ijk
 from fvdb.utils import volume_render
 
-from .common import make_dense_grid_and_point_data, random_drop_points_if_mutable, dtype_to_atol
+from .common import (
+    dtype_to_atol,
+    get_fvdb_test_data_path,
+    make_dense_grid_and_point_data,
+    random_drop_points_if_mutable,
+)
 
 all_device_combos = [
     ["cpu", True],
@@ -346,11 +351,11 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_segments_along_rays_bug(self, device, dtype, mutable):
-        data_path = os.path.join(os.path.dirname(__file__), os.path.pardir, "data")
-        data = torch.load(os.path.join(data_path, "repro_bug.pth"))
+        data_path = get_fvdb_test_data_path()
+        data = torch.load(str(data_path / "ray_marching" / "repro_bug.pth"))
         grid = sparse_grid_from_ijk(data["ijk"].to(device), voxel_sizes=data["vox_size"], origins=data["vox_origin"])
-        ray_o: torch.Tensor = torch.load(os.path.join(data_path, "ray_o.pth")).to(device=device, dtype=dtype)
-        ray_d: torch.Tensor = torch.load(os.path.join(data_path, "ray_d.pth")).to(device=device, dtype=dtype)
+        ray_o: torch.Tensor = torch.load(str(data_path / "ray_marching" / "ray_o.pth")).to(device=device, dtype=dtype)
+        ray_d: torch.Tensor = torch.load(str(data_path / "ray_marching" / "ray_d.pth")).to(device=device, dtype=dtype)
 
         segments = grid.segments_along_rays(ray_o.to(dtype), ray_d.to(dtype), 100, 0.0)
 
