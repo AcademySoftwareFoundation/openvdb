@@ -180,7 +180,8 @@ jobs:
 
       - name: Run benchmarks
         run: |
-          cd tests;
+          tree &&
+          cd tests &&
           pytest benchmark --benchmark-json benchmark/output.json
 
       - name: Store benchmark result
