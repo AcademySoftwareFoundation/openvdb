@@ -84,7 +84,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
             name: fvdb-test-package
-            path: dist/*.whl
+            path: fvdb/dist/*.whl
             retention-days: 4
 
       - name: Cleanup
@@ -114,10 +114,6 @@ jobs:
           activate-environment: fvdb_test
           environment-file: fvdb/env/test_environment.yml
 
-      - name: cd fvdb
-        run: cd fvdb
-
-
       - name: Download package
         uses: actions/download-artifact@v4
         with:
@@ -128,6 +124,9 @@ jobs:
         run: |
             conda activate fvdb_test
             pip install ./dist/*.whl
+
+      - name: cd fvdb
+        run: cd fvdb
 
       - name: Run tests
         run: |
@@ -161,9 +160,6 @@ jobs:
           activate-environment: fvdb_test
           environment-file: fvdb/env/test_environment.yml
 
-      - name: cd fvdb
-        run: cd fvdb
-
       - name: Download package
         uses: actions/download-artifact@v4
         with:
@@ -178,6 +174,9 @@ jobs:
       - name: Disable git ownership verification
         run: |
           git config --global --add safe.directory "$(pwd)"
+
+      - name: cd fvdb
+        run: cd fvdb
 
       - name: Run benchmarks
         run: |
