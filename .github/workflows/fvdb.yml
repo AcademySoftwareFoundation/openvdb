@@ -70,18 +70,9 @@ jobs:
 
       - name: Free up disk space
         run: |
-          sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^cpp.*'
-          sudo apt-get remove -y '^g\+\+.*'
-          sudo apt-get remove -y '^clang.*'
-          sudo apt-get remove -y '^gfortran.*'
-          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          rm -rf /usr/share/dotnet/
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
           df -h
-          
+
       - name: Unset PYTHONPATH
         run: |
           echo $PYTHONPATH &&
@@ -136,16 +127,7 @@ jobs:
       
       - name: Free up disk space
         run: |
-          sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^cpp.*'
-          sudo apt-get remove -y '^g\+\+.*'
-          sudo apt-get remove -y '^clang.*'
-          sudo apt-get remove -y '^gfortran.*'
-          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          rm -rf /usr/share/dotnet/
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -197,16 +179,7 @@ jobs:
 
       - name: Free up disk space
         run: |
-          sudo apt-get remove -y '^llvm-.*'
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^cpp.*'
-          sudo apt-get remove -y '^g\+\+.*'
-          sudo apt-get remove -y '^clang.*'
-          sudo apt-get remove -y '^gfortran.*'
-          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-          rm -rf /usr/share/dotnet/
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
           df -h
 
       - name: Set up fvdb_test Conda env
