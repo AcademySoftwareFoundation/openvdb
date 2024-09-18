@@ -5,15 +5,15 @@
 #include <cmath>
 #include <chrono>
 
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-#include <nanovdb/util/Ray.h>
-#include <nanovdb/util/HDDA.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/math/Ray.h>
+#include <nanovdb/math/HDDA.h>
 
 #include "common.h"
 
 #if defined(NANOVDB_USE_CUDA)
-using BufferT = nanovdb::CudaDeviceBuffer;
+using BufferT = nanovdb::cuda::DeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
 #endif

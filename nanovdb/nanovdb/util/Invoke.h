@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file Invoke.h
+    \file nanovdb/util/Invoke.h
 
     \author Ken Museth
 
@@ -16,8 +16,8 @@
     @endcode
 */
 
-#ifndef NANOVDB_INVOKE_H_HAS_BEEN_INCLUDED
-#define NANOVDB_INVOKE_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_INVOKE_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_INVOKE_H_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>// for nanovdb::CoordBBox
 
@@ -30,6 +30,8 @@
 #include <vector>
 
 namespace nanovdb {
+
+namespace util {
 
 namespace {
 #ifndef NANOVDB_USE_TBB
@@ -82,6 +84,14 @@ int invoke(const Func &taskFunc1, Rest... taskFuncN) {
     return -1;// should never happen
 }
 
+}// namespace util
+
+template<typename Func, typename... Rest>
+[[deprecated("Use nanovdb::util::invoke instead")]]
+int invoke(const Func &taskFunc1, Rest... taskFuncN) {
+    return util::invoke<Func, Rest...>(taskFunc1, taskFuncN...);
+}
+
 }// namespace nanovdb
 
-#endif // NANOVDB_INVOKE_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_INVOKE_H_HAS_BEEN_INCLUDED
