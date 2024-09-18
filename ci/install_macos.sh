@@ -2,6 +2,13 @@
 
 set -x
 
+# Remove Python3 symlinks in /usr/local/bin as workaround to brew update issues
+# https://github.com/actions/setup-python/issues/577
+rm /usr/local/bin/2to3* || :
+rm /usr/local/bin/idle3* || :
+rm /usr/local/bin/pydoc* || :
+rm /usr/local/bin/python3* || :
+
 brew update
 brew install bash gnu-getopt # for CI scripts
 brew install boost
@@ -12,7 +19,6 @@ brew install googletest
 brew install jq # for trivial parsing of brew json
 brew install openexr
 brew install pybind11 # also installs the dependent python version
-brew install tbb
 brew install zlib
 brew install jemalloc
 
@@ -24,8 +30,13 @@ echo "Using python $py_version"
 echo "Python_ROOT_DIR=/usr/local/opt/$py_version" >> $GITHUB_ENV
 echo "/usr/local/opt/$py_version/bin" >> $GITHUB_PATH
 
+# use bash
+echo "/usr/local/opt/bash/bin" >> $GITHUB_PATH
+echo "/opt/homebrew/opt/bash/bin" >> $GITHUB_PATH
+
 # use gnu-getopt
 echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+echo "/opt/homebrew/opt/gnu-getopt/bin" >> $GITHUB_PATH
 
 LLVM_VERSION=$1
 if [ ! -z "$LLVM_VERSION" ]; then
