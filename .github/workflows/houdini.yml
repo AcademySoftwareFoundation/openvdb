@@ -13,6 +13,7 @@ on:
       - 'doc/**'
       - 'nanovdb/**'
       - 'openvdb_maya/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -24,6 +25,7 @@ on:
       - 'doc/**'
       - 'nanovdb/**'
       - 'openvdb_maya/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
