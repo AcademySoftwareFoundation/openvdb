@@ -118,7 +118,7 @@ jobs:
       image: aswf/ci-openvdb:2024-clang17.0
       env:
         PYTHONPATH: 
-      options: --rm
+      options: --rm --gpus all
     defaults:
       run:
         shell: bash -el {0}
@@ -170,7 +170,7 @@ jobs:
       image: aswf/ci-openvdb:2024-clang17.0
       env:
         PYTHONPATH: 
-      options: --rm
+      options: --rm --gpus all
     defaults:
       run:
         shell: bash -el {0}
