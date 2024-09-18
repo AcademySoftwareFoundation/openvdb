@@ -70,7 +70,7 @@ jobs:
 
       - name: Free up disk space
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz
           df -h
 
       - name: Unset PYTHONPATH
@@ -127,7 +127,7 @@ jobs:
       
       - name: Free up disk space
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -179,7 +179,7 @@ jobs:
 
       - name: Free up disk space
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-command-line-tools-12-3 cuda-nsight-compute-12-3
+          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz
           df -h
 
       - name: Set up fvdb_test Conda env
