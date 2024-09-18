@@ -68,6 +68,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free up disk space
+        run: |
+          sudo apt-get remove -y '^llvm-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^cpp.*'
+          sudo apt-get remove -y '^g\+\+.*'
+          sudo apt-get remove -y '^clang.*'
+          sudo apt-get remove -y '^gfortran.*'
+          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
+          
       - name: Unset PYTHONPATH
         run: |
           echo $PYTHONPATH &&
@@ -120,9 +134,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Unset PYTHONPATH
+      - name: Free up disk space
         run: |
-          unset PYTHONPATH
+          sudo apt-get remove -y '^llvm-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^cpp.*'
+          sudo apt-get remove -y '^g\+\+.*'
+          sudo apt-get remove -y '^clang.*'
+          sudo apt-get remove -y '^gfortran.*'
+          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
 
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
@@ -171,9 +195,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Unset PYTHONPATH
+      - name: Free up disk space
         run: |
-          unset PYTHONPATH
+          sudo apt-get remove -y '^llvm-.*'
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^cpp.*'
+          sudo apt-get remove -y '^g\+\+.*'
+          sudo apt-get remove -y '^clang.*'
+          sudo apt-get remove -y '^gfortran.*'
+          sudo apt-get remove -y google-chrome-stable firefox powershell mono-devel monodoc-http
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+          rm -rf /usr/share/dotnet/
+          df -h
 
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
