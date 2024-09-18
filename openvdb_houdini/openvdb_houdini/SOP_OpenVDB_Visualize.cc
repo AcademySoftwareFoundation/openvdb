@@ -1964,8 +1964,6 @@ template<typename GridType>
 void
 TreeVisualizer::operator()(const GridType& grid)
 {
-    using TreeType = typename GridType::TreeType;
-
     bool renderNodes = mParms.internalStyle || mParms.leafStyle;
     bool renderVoxels = mParms.tileStyle || mParms.voxelStyle;
 

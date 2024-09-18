@@ -5,6 +5,8 @@
 
 #include "Logger.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <stack>
 
 namespace openvdb {
@@ -130,7 +132,7 @@ nodeToCodeLocation(const ast::Node* node,
                     <const ax::ast::Node*, Logger::CodeLocation>& map)
 {
     if (!tree) return Logger::CodeLocation(0,0);
-    assert(node);
+    OPENVDB_ASSERT(node);
     std::stack<size_t> pathStack = pathStackFromNode(node);
     const ast::Node* nodeInMap = nodeFromPathStack(pathStack, *tree);
     const auto locationIter = map.find(nodeInMap);

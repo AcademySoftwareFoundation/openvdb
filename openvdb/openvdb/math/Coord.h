@@ -10,6 +10,7 @@
 #include <iostream>
 #include <limits>
 #include <openvdb/Platform.h>
+#include <openvdb/util/Assert.h>
 #include "Math.h"
 #include "Vec3.h"
 
@@ -130,11 +131,11 @@ public:
     Int32 x() const { return mVec[0]; }
     Int32 y() const { return mVec[1]; }
     Int32 z() const { return mVec[2]; }
-    Int32 operator[](size_t i) const { assert(i < 3); return mVec[i]; }
+    Int32 operator[](size_t i) const { OPENVDB_ASSERT(i < 3); return mVec[i]; }
     Int32& x() { return mVec[0]; }
     Int32& y() { return mVec[1]; }
     Int32& z() { return mVec[2]; }
-    Int32& operator[](size_t i) { assert(i < 3); return mVec[i]; }
+    Int32& operator[](size_t i) { OPENVDB_ASSERT(i < 3); return mVec[i]; }
 
     const Int32* data() const { return mVec.data(); }
     Int32* data() { return mVec.data(); }
@@ -306,7 +307,7 @@ public:
     /// @note The other bounding box is assumed to be divisible.
     CoordBBox(CoordBBox& other, const tbb::split&): mMin(other.mMin), mMax(other.mMax)
     {
-        assert(this->is_divisible());
+        OPENVDB_ASSERT(this->is_divisible());
         const size_t n = this->maxExtent();
         mMax[n] = (mMin[n] + mMax[n]) >> 1;
         other.mMin[n] = mMax[n] + 1;
@@ -471,7 +472,7 @@ public:
     /// least seven times, i.e. has storage for eight Coord elements!
     void getCornerPoints(Coord *p) const
     {
-        assert(p != nullptr);
+        OPENVDB_ASSERT(p != nullptr);
         p->reset(mMin.x(), mMin.y(), mMin.z()); ++p;
         p->reset(mMin.x(), mMin.y(), mMax.z()); ++p;
         p->reset(mMin.x(), mMax.y(), mMin.z()); ++p;

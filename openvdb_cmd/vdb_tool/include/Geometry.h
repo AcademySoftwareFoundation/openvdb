@@ -29,6 +29,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointCount.h>
+#include <openvdb/util/Assert.h>
 
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
@@ -709,7 +710,7 @@ void Geometry::readVDB(const std::string &fileName)
     for (auto m : *meta) {
         if (m->isType<points::PointDataGrid>()) {
             auto grid = gridPtrCast<points::PointDataGrid>(file.readGrid(m->getName()));
-            assert(grid);
+            OPENVDB_ASSERT(grid);
             size_t n = mVtx.size();
             const auto m = points::pointCount(grid->tree());
             mVtx.resize(n + m);
@@ -788,7 +789,7 @@ void Geometry::readSTL(const std::string &fileName)
                 while(std::getline(infile, line)) {// loop over vertices of the facet
                     tmp = trim(line, " ");
                     if (tmp.compare(0, 7, "endloop")==0) break;
-                    assert(tmp.compare(0, 6, "vertex")==0);
+                    OPENVDB_ASSERT(tmp.compare(0, 6, "vertex")==0);
                     iss.clear();
                     iss.str(tmp.substr(6));
                     if (iss >> xyz[0] >> xyz[1] >> xyz[2]) {

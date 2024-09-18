@@ -13,7 +13,6 @@
 
 #include <gtest/gtest.h>
 
-#include <cassert>
 #include <deque>
 #include <iostream>
 #include <vector>

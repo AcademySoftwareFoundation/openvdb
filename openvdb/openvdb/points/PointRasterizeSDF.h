@@ -50,6 +50,7 @@
 #include <openvdb/tools/ValueTransformer.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
 
 #include <unordered_map>
 

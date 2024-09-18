@@ -141,7 +141,7 @@ uniformPointScatter(const GridT& grid,
 
     LeafManagerT leafManager(tree);
     const Index64 voxelCount = leafManager.activeLeafVoxelCount();
-    assert(voxelCount != 0);
+    OPENVDB_ASSERT(voxelCount != 0);
 
     const double pointsPerVolume = double(count) / double(voxelCount);
     const Index32 pointsPerVoxel = static_cast<Index32>(math::RoundDown(pointsPerVolume));
@@ -177,7 +177,7 @@ uniformPointScatter(const GridT& grid,
     {
         const Index64 lowerOffset = voxelOffsets[idx]; // inclusive
         const Index64 upperOffset = voxelOffsets[idx + 1]; // exclusive
-        assert(upperOffset > lowerOffset);
+        OPENVDB_ASSERT(upperOffset > lowerOffset);
 
         const auto valuesEnd = values.end();
         auto lower = std::lower_bound(values.begin(), valuesEnd, lowerOffset);
@@ -194,7 +194,7 @@ uniformPointScatter(const GridT& grid,
             const Index32 nextOffset = Index32(vId - lowerOffset);
             iter.increment(nextOffset - currentOffset);
             currentOffset = nextOffset;
-            assert(iter);
+            OPENVDB_ASSERT(iter);
 
             auto& value = data[iter.pos()];
             value = value + 1; // no += operator support
@@ -235,7 +235,7 @@ uniformPointScatter(const GridT& grid,
         }
 
         // offset should always be non zero
-        assert(offset != 0);
+        OPENVDB_ASSERT(offset != 0);
         point_scatter_internal::generatePositions<PositionType, CodecType>
             (*leaf, descriptor, offset, spread, rand01);
     }

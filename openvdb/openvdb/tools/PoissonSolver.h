@@ -66,6 +66,8 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/util/Assert.h>
+
 #include "Morphology.h" // for erodeActiveValues
 #include <openvdb/openvdb.h>
 
@@ -340,7 +342,7 @@ populateIndexTree(VIndexTreeType& result)
     }
 
     // The last accumulated value should be the total of all active voxels.
-    assert(Index64(perLeafCount[leafCount-1]) == result.activeVoxelCount());
+    OPENVDB_ASSERT(Index64(perLeafCount[leafCount-1]) == result.activeVoxelCount());
 
     // Parallelize over the leaf nodes of the tree, storing a unique index
     // in each active voxel.
@@ -461,7 +463,7 @@ struct CopyFromVecOp
     {
         const VectorT& vec = *vector;
         OutLeafT* leaf = tree->probeLeaf(idxLeaf.origin());
-        assert(leaf != nullptr);
+        OPENVDB_ASSERT(leaf != nullptr);
         for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
             leaf->setValueOnly(it.pos(), static_cast<TreeValueType>(vec[*it]));
         }
@@ -533,7 +535,7 @@ struct ISStaggeredLaplacianOp
 
         // Loop over active voxels in this leaf.
         for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
-            assert(it.getValue() > -1);
+            OPENVDB_ASSERT(it.getValue() > -1);
             const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());
 
             LaplacianMatrix::RowEditor row = laplacian->getRowEditor(rowNum);
@@ -650,7 +652,7 @@ struct ISLaplacianOp
 
         // For each active voxel in this leaf...
         for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
-            assert(it.getValue() > -1);
+            OPENVDB_ASSERT(it.getValue() > -1);
 
             const Coord ijk = it.getCoord();
             const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());

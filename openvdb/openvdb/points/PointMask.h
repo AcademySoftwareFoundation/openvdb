@@ -12,6 +12,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ValueTransformer.h> // valxform::SumOp
+#include <openvdb/util/Assert.h>
 
 #include "PointDataGrid.h"
 #include "IndexFilter.h"

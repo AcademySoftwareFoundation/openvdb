@@ -14,6 +14,8 @@
 #include "openvdb_ax/Exceptions.h"
 #include "openvdb_ax/ast/Scanners.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <llvm/ADT/SmallVector.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/CallingConv.h>
@@ -144,15 +146,15 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
         [&](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 12);
+        OPENVDB_ASSERT(args.size() == 12);
         llvm::Value* vbuff = args[2]; //extractArgument(rangeFunction, "value_buffer");
         llvm::Value* abuff = args[3]; //extractArgument(rangeFunction, "active_buffer");
         llvm::Value* buffSize = args[4]; //extractArgument(rangeFunction, "buffer_size");
         llvm::Value* mode = args[5]; //extractArgument(rangeFunction, "mode");
-        assert(buffSize);
-        assert(vbuff);
-        assert(abuff);
-        assert(mode);
+        OPENVDB_ASSERT(buffSize);
+        OPENVDB_ASSERT(vbuff);
+        OPENVDB_ASSERT(abuff);
+        OPENVDB_ASSERT(mode);
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::LLVMContext& C = B.getContext();
@@ -327,8 +329,8 @@ decode(llvm::Value* buffer,
         buffer = B.CreatePointerCast(buffer, type->getPointerTo());
         return ir_gep(B, buffer, pid);
     }
-    assert(!codecs->empty());
-    assert(store);
+    OPENVDB_ASSERT(!codecs->empty());
+    OPENVDB_ASSERT(store);
 
     llvm::Function* self = B.GetInsertBlock()->getParent();
     llvm::BasicBlock* post = llvm::BasicBlock::Create(C, "k1.get_buffer.decode", self);
@@ -351,13 +353,13 @@ decode(llvm::Value* buffer,
             // the input value and decode the value.
             const FunctionGroup* const F = codec->decoder();
             llvm::Type* encodedType = codec->decodedToEncoded(decodedType, C);
-            assert(encodedType);
+            OPENVDB_ASSERT(encodedType);
             encodedType = encodedType->getPointerTo();
 
             // guranteed to be castable
             llvm::Value* typedBuffer = B.CreatePointerCast(buffer, encodedType);
             llvm::Value* encoded = ir_gep(B, typedBuffer, pid);
-            assert(F->match({store->getType(), encoded->getType()}, C));
+            OPENVDB_ASSERT(F->match({store->getType(), encoded->getType()}, C));
             F->execute({store, encoded}, B);
             B.CreateBr(post);
         }
@@ -403,7 +405,7 @@ encode(llvm::Value* in,
         B.CreateStore(ir_load(B, in), ir_gep(B, buffer, pid));
         return;
     }
-    assert(!codecs->empty());
+    OPENVDB_ASSERT(!codecs->empty());
 
     llvm::Function* self = B.GetInsertBlock()->getParent();
     llvm::BasicBlock* post = llvm::BasicBlock::Create(C, "k1.set_buffer.encode", self);
@@ -424,11 +426,11 @@ encode(llvm::Value* in,
         {
             const FunctionGroup* const F = codec->encoder();
             llvm::Type* encodedType = codec->decodedToEncoded(decodedType, C);
-            assert(encodedType);
+            OPENVDB_ASSERT(encodedType);
             encodedType = encodedType->getPointerTo();
             llvm::Value* typedBuffer = B.CreatePointerCast(buffer, encodedType);
             llvm::Value* loc = ir_gep(B, typedBuffer, pid);
-            assert(F->match({loc->getType(),in->getType()}, C));
+            OPENVDB_ASSERT(F->match({loc->getType(),in->getType()}, C));
             F->execute({loc, in}, B);
             B.CreateBr(post);
         }
@@ -455,15 +457,15 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
         [&](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 11);
+        OPENVDB_ASSERT(args.size() == 11);
         auto& C = B.getContext();
         llvm::Function* self = B.GetInsertBlock()->getParent();
         llvm::Value* pindex = extractArgument(self, "point_index");
         llvm::Value* flags = extractArgument(self, "flags");
         llvm::Value* buffers = extractArgument(self, "buffers");
-        assert(buffers);
-        assert(pindex);
-        assert(flags);
+        OPENVDB_ASSERT(buffers);
+        OPENVDB_ASSERT(pindex);
+        OPENVDB_ASSERT(flags);
 
         // create array of void*. each pointer will encode an address to a stored typed value
         llvm::Type* locType = llvm::ArrayType::get(LLVMType<void*>::get(C), registry.data().size()); // [SIZE x i8*]
@@ -479,7 +481,7 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             decodedPtrs = B.CreatePointerCast(decodedPtrs, type->getPointerTo()->getPointerTo()); // ValueType**
 
             llvm::Value* index = mModule.getGlobalVariable(token);
-            assert(index);
+            OPENVDB_ASSERT(index);
             index = ir_load(B, index);
             llvm::Value* buffer = ir_gep(B, buffers, index);
             buffer = ir_load(B, buffer); // void** = void*
@@ -548,7 +550,7 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             store = B.CreatePointerCast(store, type->getPointerTo()); // ValueType*
 
             llvm::Value* index = mModule.getGlobalVariable(token);
-            assert(index);
+            OPENVDB_ASSERT(index);
             index = ir_load(B, index);
             llvm::Value* flag = ir_load(B, ir_gep(B, flags, index));
 
@@ -613,11 +615,11 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         // insert the attribute into the map of global variables and get a unique global representing
         // the location which will hold the attribute handle offset.
         llvm::Value* index = M->getGlobalVariable(token);
-        assert(index);
+        OPENVDB_ASSERT(index);
         index = ir_load(B, index);
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
-        assert(arrays);
+        OPENVDB_ASSERT(arrays);
         llvm::Value* array = ir_gep(B, arrays, index);
         array = ir_load(B, array); // void** = void*
 
@@ -654,11 +656,11 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         // insert the attribute into the map of global variables and get a unique global representing
         // the location which will hold the attribute handle offset.
         llvm::Value* index = M->getGlobalVariable(token);
-        assert(index);
+        OPENVDB_ASSERT(index);
         index = ir_load(B, index);
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
-        assert(arrays);
+        OPENVDB_ASSERT(arrays);
         llvm::Value* array = ir_gep(B, arrays, index);
         array = ir_load(B, array); // void** = void*
 
@@ -680,7 +682,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
 
         if (usingString) {
             llvm::Value* leafdata = extractArgument(self, "leaf_data");
-            assert(leafdata);
+            OPENVDB_ASSERT(leafdata);
             args.emplace_back(leafdata);
         }
 
@@ -694,7 +696,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         [&](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
-        assert(args.size() == 11);
+        OPENVDB_ASSERT(args.size() == 11);
         auto& C = B.getContext();
         llvm::Function* self = B.GetInsertBlock()->getParent();
         llvm::Value* pindex = extractArgument(self, "point_index");
@@ -709,7 +711,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         size_t i = 0;
         for (const AttributeRegistry::AccessData& access : registry.data()) {
             llvm::Value* value = insertStaticAlloca(B, llvmTypeFromToken(access.type(), C));
-            assert(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
+            OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
             table.insert(access.tokenname(), value);
 
             // store the allocated ptr in the array of void*
@@ -740,7 +742,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
             const std::string token = data.tokenname();
             llvm::Value* value = table.get(token);
             // // Expected to be used more than one (i.e. should never be zero)
-            // assert(value->hasNUsesOrMore(1));
+            // OPENVDB_ASSERT(value->hasNUsesOrMore(1));
             // // Check to see if this value is still being used - it may have
             // // been cleaned up due to returns. If there's only one use, it's
             // // the original get of this attribute.
@@ -862,7 +864,7 @@ bool PointComputeGenerator::visit(const ast::Attribute* node)
     llvm::Value* index = mModule.getGlobalVariable(node->tokenname());
     llvm::Type* type = llvmTypeFromToken(node->type(), mContext);
 
-    assert(index);
+    OPENVDB_ASSERT(index);
     // index into the void* array of handles and load the value.
     index = ir_load(mBuilder, index);
     llvm::Value* value = extractArgument(mFunction, "values"); // void**

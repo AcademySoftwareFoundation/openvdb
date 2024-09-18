@@ -354,7 +354,7 @@ inline void sampleGrid( size_t order,
             // append attribute of source grid value type
             appendAttribute<typename SourceGridT::ValueType>(points.tree(), attribute);
             targetIndex = leaf->attributeSet().descriptor().find(attribute);
-            assert(targetIndex != AttributeSet::INVALID_POS);
+            OPENVDB_ASSERT(targetIndex != AttributeSet::INVALID_POS);
 
             // sample using same type as source grid
             pointDataSampler.template sample<SourceGridT>(sourceGrid, Index(targetIndex));
@@ -394,7 +394,7 @@ inline void sampleGrid( size_t order,
             // (point_sample_internal wrapper disables the ability to use DummySampleType)
             AppendAttributeOp<PointDataGridT, TargetValueT>::append(points, attribute);
             targetIndex = leaf->attributeSet().descriptor().find(attribute);
-            assert(targetIndex != AttributeSet::INVALID_POS);
+            OPENVDB_ASSERT(targetIndex != AttributeSet::INVALID_POS);
         }
         else {
             const Name targetType = typeNameAsString<TargetValueT>();

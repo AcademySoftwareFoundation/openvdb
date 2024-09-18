@@ -6,6 +6,8 @@
 #include "Scanners.h"
 #include "Visitor.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <string>
 #include <map>
 
@@ -270,7 +272,7 @@ bool usesAttribute(const ast::Node& node,
     bool found = false;
     visitNodeType<ast::Attribute>(node,
         [&](const ast::Attribute& attrib) -> bool {
-            assert(!found);
+            OPENVDB_ASSERT(!found);
             if (type != tokens::UNKNOWN) {
                 if (attrib.type() != type) return true;
             }
@@ -291,7 +293,7 @@ bool writesToAttribute(const ast::Node& node,
 
     // See if any attributes in the result vec match the given name/type
     for (const ast::Variable* var : vars) {
-        assert(var->isType<ast::Attribute>());
+        OPENVDB_ASSERT(var->isType<ast::Attribute>());
         const ast::Attribute* attrib = static_cast<const ast::Attribute*>(var);
         if (type != tokens::UNKNOWN) {
             if (attrib->type() != type) continue;
@@ -370,7 +372,7 @@ void catalogueVariables(const ast::Node& node,
             parent = child->parent();
         }
 
-        assert(read || write);
+        OPENVDB_ASSERT(read || write);
         if (readWrite && read && write)  readWrite->emplace_back(var);
         if (readOnly && read && !write)  readOnly->emplace_back(var);
         if (writeOnly && !read && write) writeOnly->emplace_back(var);
@@ -405,7 +407,7 @@ void catalogueAttributeTokens(const ast::Node& node,
         const bool write)
     {
         for (const ast::Variable* var : vars) {
-            assert(var->isType<ast::Attribute>());
+            OPENVDB_ASSERT(var->isType<ast::Attribute>());
             const ast::Attribute* attrib = static_cast<const ast::Attribute*>(var);
             auto& access = accessmap[attrib->tokenname()];
             access.first |= read;
@@ -468,8 +470,8 @@ struct UseVisitor :
                 if (!this->traverse(loop->condition())) return false;
                 if (!this->traverse(loop->body())) return false;
             }
-            assert(!loop->initial());
-            assert(!loop->iteration());
+            OPENVDB_ASSERT(!loop->initial());
+            OPENVDB_ASSERT(!loop->iteration());
         }
         else {
             if (!this->reverseChildVisits()) {
@@ -518,7 +520,7 @@ void attributeDependencyTokens(const ast::Tree& tree,
     const std::string token = ast::Attribute::tokenFromNameType(name, type);
     const ast::Variable* var = lastUse(tree, token);
     if (!var) return;
-    assert(var->isType<ast::Attribute>());
+    OPENVDB_ASSERT(var->isType<ast::Attribute>());
 
     std::vector<const ast::Variable*> deps;
     variableDependencies(*var, deps);

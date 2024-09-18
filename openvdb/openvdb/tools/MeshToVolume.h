@@ -22,6 +22,7 @@
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/util/Assert.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/openvdb.h>
 
@@ -933,7 +934,7 @@ public:
 
         for (Index i = 0; i < LeafNodeType::DIM; ++i) {
 
-            assert(pos >= 0);
+            OPENVDB_ASSERT(pos >= 0);
             ValueType& dist = data[pos];
 
             if (dist < ValueType(0.0)) {
@@ -1975,7 +1976,7 @@ struct VoxelizationData {
             mPrimCount = 0;
             primIdTree.root().clear();
             primIdTree.clearAllAccessors();
-            assert(mPrimCount == 0);
+            OPENVDB_ASSERT(mPrimCount == 0);
         }
 
         return mPrimCount++;
@@ -2501,7 +2502,7 @@ struct ExpandNarrowband
             LeafNodeType      * distNodePt = distAcc.probeLeaf(origin);
             Int32LeafNodeType * indexNodePt = indexAcc.probeLeaf(origin);
 
-            assert(!distNodePt == !indexNodePt);
+            OPENVDB_ASSERT(!distNodePt == !indexNodePt);
 
             bool usingNewNodes = false;
 

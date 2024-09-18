@@ -1,0 +1,3 @@
+OpenVDB:
+	- Bug Fixes::
+		- Fixed an occurance of undefined behaviour in tools::activate (though this would typically not have manifested with any unintended behaviour)

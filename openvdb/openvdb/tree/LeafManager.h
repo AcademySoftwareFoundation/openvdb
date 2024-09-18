@@ -16,6 +16,7 @@
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 #include "RootNode.h" // for NodeChain
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -106,7 +107,7 @@ public:
         public:
             Iterator(const LeafRange& range, size_t pos): mRange(range), mPos(pos)
             {
-                assert(this->isValid());
+                OPENVDB_ASSERT(this->isValid());
             }
             Iterator(const Iterator&) = default;
             Iterator& operator=(const Iterator&) = default;
@@ -180,7 +181,7 @@ public:
 
         static size_t doSplit(LeafRange& r)
         {
-            assert(r.is_divisible());
+            OPENVDB_ASSERT(r.is_divisible());
             size_t middle = r.mBegin + (r.mEnd - r.mBegin) / 2u;
             r.mEnd = middle;
             return middle;
@@ -315,7 +316,7 @@ public:
 
     /// @brief Return a pointer to the leaf node at index @a leafIdx in the array.
     /// @note For performance reasons no range check is performed (other than an assertion)!
-    LeafType& leaf(size_t leafIdx) const { assert(leafIdx<mLeafCount); return *mLeafs[leafIdx]; }
+    LeafType& leaf(size_t leafIdx) const { OPENVDB_ASSERT(leafIdx<mLeafCount); return *mLeafs[leafIdx]; }
 
     /// @brief Return the leaf or auxiliary buffer for the leaf node at index @a leafIdx.
     /// If @a bufferIdx is zero, return the leaf buffer, otherwise return the nth
@@ -329,8 +330,8 @@ public:
     /// but it is not safe to modify the leaf buffer (@a bufferIdx = 0).
     BufferType& getBuffer(size_t leafIdx, size_t bufferIdx) const
     {
-        assert(leafIdx < mLeafCount);
-        assert(bufferIdx == 0 || bufferIdx - 1 < mAuxBuffersPerLeaf);
+        OPENVDB_ASSERT(leafIdx < mLeafCount);
+        OPENVDB_ASSERT(bufferIdx == 0 || bufferIdx - 1 < mAuxBuffersPerLeaf);
         return bufferIdx == 0 ? mLeafs[leafIdx]->buffer()
              : mAuxBuffers[leafIdx * mAuxBuffersPerLeaf + bufferIdx - 1];
     }

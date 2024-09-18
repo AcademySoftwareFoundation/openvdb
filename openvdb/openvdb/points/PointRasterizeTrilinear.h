@@ -18,6 +18,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/util/Assert.h>
 
 #include "PointDataGrid.h"
 #include "PointMask.h"

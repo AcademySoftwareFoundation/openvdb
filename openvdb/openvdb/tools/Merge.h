@@ -16,6 +16,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/util/Assert.h>
 
 #include "NodeVisitor.h"
 
@@ -449,7 +450,7 @@ void
 TreeToMerge<TreeT>::pruneMask(Index level, const Coord& ijk)
 {
     if (!mSteal) {
-        assert(this->hasMask());
+        OPENVDB_ASSERT(this->hasMask());
         this->mask()->addTile(level, ijk, false, false);
     }
 }
@@ -1042,7 +1043,7 @@ const typename CsgUnionOrIntersectionOp<TreeT, Union>::ValueT&
 CsgUnionOrIntersectionOp<TreeT, Union>::background() const
 {
     // this operator is only intended to be used with foreachTopDown()
-    assert(mBackground);
+    OPENVDB_ASSERT(mBackground);
     return *mBackground;
 }
 
@@ -1254,7 +1255,7 @@ const typename CsgDifferenceOp<TreeT>::ValueT&
 CsgDifferenceOp<TreeT>::background() const
 {
     // this operator is only intended to be used with foreachTopDown()
-    assert(mBackground);
+    OPENVDB_ASSERT(mBackground);
     return *mBackground;
 }
 
@@ -1263,7 +1264,7 @@ const typename CsgDifferenceOp<TreeT>::ValueT&
 CsgDifferenceOp<TreeT>::otherBackground() const
 {
     // this operator is only intended to be used with foreachTopDown()
-    assert(mOtherBackground);
+    OPENVDB_ASSERT(mOtherBackground);
     return *mOtherBackground;
 }
 
@@ -1547,7 +1548,7 @@ const typename SumMergeOp<TreeT>::ValueT&
 SumMergeOp<TreeT>::background() const
 {
     // this operator is only intended to be used with foreachTopDown()
-    assert(mBackground);
+    OPENVDB_ASSERT(mBackground);
     return *mBackground;
 }
 

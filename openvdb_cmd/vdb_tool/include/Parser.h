@@ -32,6 +32,7 @@
 #include <stdio.h>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/util/Assert.h>
 
 #include "Util.h"
 
@@ -805,7 +806,7 @@ Parser::Parser(std::vector<Option> &&def)
          {"help", "", "*|+,-,...", "print a list of all or specified list operations each with brief documentation"}},
         [](){},
         [&](){
-            assert(iter->name == "eval");
+            OPENVDB_ASSERT(iter->name == "eval");
             if (!iter->options[1].value.empty()) {
                 if (iter->options[1].value=="*") {
                     processor.help();
@@ -839,7 +840,7 @@ Parser::Parser(std::vector<Option> &&def)
         std::vector<Option>(defaults), // using std::move produces error: moving a temporary object prevents copy elision
         [&](){assert(iter->name == "default");
               std::vector<Option> &src = iter->options, &dst = defaults;
-              assert(src.size() == dst.size());
+              OPENVDB_ASSERT(src.size() == dst.size());
               for (size_t i=0; i<src.size(); ++i) if (!src[i].value.empty()) dst[i].value = src[i].value;},
         [](){}
     );
@@ -857,7 +858,7 @@ Parser::Parser(std::vector<Option> &&def)
                 i += 1;
             }
         }
-        assert(it->name == "end");
+        OPENVDB_ASSERT(it->name == "end");
     };
 
     this->addAction(
@@ -865,7 +866,7 @@ Parser::Parser(std::vector<Option> &&def)
         {{"", "", "i=0,9|i=0,9,2", "define name of loop variable and its range."}},
         [&](){++counter;},
         [&](){
-            assert(iter->name == "for");
+            OPENVDB_ASSERT(iter->name == "for");
             const std::string &name = iter->options[0].name;
             std::shared_ptr<BaseLoop> loop;
             try {
@@ -887,7 +888,7 @@ Parser::Parser(std::vector<Option> &&def)
         {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
         [&](){++counter;},
         [&](){
-            assert(iter->name == "each");
+            OPENVDB_ASSERT(iter->name == "each");
             const std::string &name = iter->options[0].name;
             auto loop = std::make_shared<EachLoop>(processor.memory(), iter, name, this->getVec<std::string>(name,","));
             if (loop->valid()) {
@@ -904,7 +905,7 @@ Parser::Parser(std::vector<Option> &&def)
         {{"test", "", "0|1|false|true", "boolean value used to test if-statement"}},
         [&](){++counter;},
         [&](){
-            assert(iter->name == "if");
+            OPENVDB_ASSERT(iter->name == "if");
             if (this->get<bool>("test")) {
                 loops.push_back(std::make_shared<IfLoop>(processor.memory(), iter));
             } else {
@@ -919,7 +920,7 @@ Parser::Parser(std::vector<Option> &&def)
             if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for,-each, or -if");
             --counter;},
         [&](){
-            assert(iter->name == "end");
+            OPENVDB_ASSERT(iter->name == "end");
             auto loop = loops.back();// current loop
             if (loop->next()) {// rewind loop
                 iter = loop->begin;
@@ -955,7 +956,7 @@ void Parser::finalize()
 
 void Parser::parse(int argc, char *argv[])
 {
-    assert(!hashMap.empty());
+    OPENVDB_ASSERT(!hashMap.empty());
     if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try " + getFile(argv[0]) + " -help\"");
     counter = 0;// reset to check for matching {for,each}/end loops
     for (int i=1; i<argc; ++i) {

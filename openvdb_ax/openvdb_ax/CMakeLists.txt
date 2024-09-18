@@ -306,6 +306,10 @@ if(OPENVDB_AX_STATIC)
     PROPERTIES OUTPUT_NAME openvdb_ax
   )
 
+  if(WIN32)
+    set_target_properties(openvdb_ax_static PROPERTIES PREFIX "lib")
+  endif()
+
   target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 
   # @todo fix opaque pointer requirements

@@ -370,6 +370,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   points/AttributeSet.cc
   points/StreamCompression.cc
   points/points.cc
+  util/Assert.cc
   util/Formats.cc
 )
 
@@ -538,6 +539,7 @@ set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
+  util/Assert.h
   util/CpuTimer.h
   util/ExplicitInstantiation.h
   util/Formats.h

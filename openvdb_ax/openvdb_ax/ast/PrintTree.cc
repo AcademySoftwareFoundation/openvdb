@@ -8,6 +8,8 @@
 #include "Tokens.h"
 #include "Visitor.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <ostream>
 
 namespace openvdb {
@@ -578,7 +580,7 @@ struct ReprintVisitor : public ast::Visitor<ReprintVisitor>
 
             for (size_t i = 1; i < children; ++i) {
                 // all child statements should be declare locals
-                assert(stmtl->child(i)->nodetype() ==
+                OPENVDB_ASSERT(stmtl->child(i)->nodetype() ==
                     ast::Node::DeclareLocalNode);
 
                 mOs << ", ";

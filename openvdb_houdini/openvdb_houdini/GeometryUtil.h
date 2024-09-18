@@ -15,6 +15,7 @@
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>
+#include <GEO/GEO_Primitive.h>
 
 #include <algorithm> // for std::max/min()
 #include <memory>

@@ -394,7 +394,7 @@ hax_chramp(const openvdb::ax::FunctionOptions& op)
            const void* const data)
     {
         const openvdb::ax::CustomData* const customData =
-            static_cast<const openvdb::ax::CustomData* const>(data);
+            static_cast<const openvdb::ax::CustomData*>(data);
         const std::string nameString(name);
 
         const openvdb::Metadata::ConstPtr& meta = customData->getData(nameString);

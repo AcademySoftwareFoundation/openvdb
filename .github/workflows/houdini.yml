@@ -64,7 +64,7 @@ jobs:
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
-    name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
+    name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
     env:
@@ -73,12 +73,21 @@ jobs:
     strategy:
       matrix:
         config:
-          #- { cxx: clang++, image: '2022', hou: '20_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: clang++, image: '2021', hou: '19_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          #- { cxx: clang++, image: '2022', hou: '20_0', build: 'Debug',   components: 'core,hou' }
-          #- { cxx: g++,     image: '2022', hou: '20_0', build: 'Release', components: 'core,hou' }
+          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
+          - { cxx: clang++, image: '2021',   hou_hash: '19_5',        build: 'Release', components: 'core,hou' }
+          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
       fail-fast: false
     steps:
+      # See note on this step in the Houdini weekly.yml job
+      # We can remove this when we no longer use < 2023 images
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
+    - name: remove zstd
+      run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: pybind11
       #if: contains(matrix.config.image, '2023') == false
@@ -93,18 +102,17 @@ jobs:
       uses: actions/cache@v3
       with:
         path: /tmp/ccache
-        key: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
-        restore-keys: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-
+        key: linux-vfx-hou${{ matrix.config.hou_hash }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: linux-vfx-hou${{ matrix.config.hou_hash }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-
     - name: fetch_houdini
       uses: actions/cache/restore@v3
       with:
         path: hou
-        key: dummy-houdini${{ matrix.config.hou }}-${{ steps.timestamp.outputs.timestamp }}
-        restore-keys: vdb-v5-houdini${{ matrix.config.hou }}-
+        key: dummy-houdini${{ matrix.config.hou_hash }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: vdb-v5-houdini${{ matrix.config.hou_hash }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
-      # Make sure the cache is copied, not moved, as the cache action always posts the cache.
-      # Also make sure that the unpacked install is NOT in the root of the OpenVDB checkout
+      # Make sure that the unpacked install is NOT in the root of the OpenVDB checkout
       # otherwise CMake's install RPATHs wil not work correctly.
     - name: install_houdini
       run: |
@@ -113,16 +121,63 @@ jobs:
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: build
       run: |
-        export HFS="$HOME/houdini_install/hou"
-        export HDSO="${HFS}/dsolib"
-        export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/usr/lib64:${HDSO}"
-        ./ci/build.sh -v --build-type=Release --components="core,hou" --cargs=\"-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\ -DTBB_INCLUDEDIR=/usr/local/include -DTBB_LIBRARYDIR=/usr/local/lib\"
+        ./ci/build.sh -v \
+          --build-type=Release \
+          --components="${{ matrix.config.components }}" \
+          --cargs=\" \
+            -DHOUDINI_ROOT=$HOME/houdini_install/hou \
+            -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF \
+            -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
+            -DDISABLE_CMAKE_SEARCH_PATHS=ON \
+            -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
+            \"
     - name: test
       run: cd build && ctest -V
     # Keep ccache light by stripping out any caches not accessed in the last day
     - name: ccache_clean
       if: matrix.config.build == 'Release'
       run: ccache --evict-older-than 1d
-      # Delete the houdini tarball so that this dummy cache occupies no space
-    - name: delete_hou
-      run: rm -f hou/hou.tar.gz
+
+  macos-houdini:
+    needs: [checksecret]
+    if: >
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+          github.repository_owner == 'AcademySoftwareFoundation' }}
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: fetch_houdini
+      uses: actions/cache/restore@v3
+      with:
+        path: hou
+        key: dummy-houdini
+        restore-keys: vdb-v5-houdini-macos-
+    - name: validate_houdini
+      run: test -f "hou/hou.tar.gz"
+      # Make sure that the unpacked install is NOT in the root of the OpenVDB checkout
+      # otherwise CMake's install RPATHs wil not work correctly.
+    - name: install_houdini
+      run: |
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
+    - name: install_deps
+      run: ./ci/install_macos.sh 15
+    - name: build
+      run: |
+        ./ci/build.sh -v \
+          --build-type=Release \
+          --components="core,hou,bin,view,render,python,test,axcore,axbin" \
+          --cargs=\" \
+            -DHOUDINI_ROOT=$HOME/houdini_install/hou \
+            -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF \
+            -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
+            -DDISABLE_CMAKE_SEARCH_PATHS=ON \
+            -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
+            -DUSE_EXPLICIT_INSTANTIATION=OFF \
+            -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
+            -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+            \"
+    - name: test
+      run: cd build && ctest -V

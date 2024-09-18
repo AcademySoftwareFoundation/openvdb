@@ -16,6 +16,7 @@
 #include "VelocityFields.h" // for EnrightField
 #include <openvdb/Platform.h>
 #include <openvdb/math/FiniteDifference.h>
+#include <openvdb/util/Assert.h>
 //#include <openvdb/util/CpuTimer.h>
 #include <functional>
 
@@ -442,7 +443,7 @@ sampleField(ValueType time0, ValueType time1)
     } else {
         mTask = std::bind(&Advect::sampleXformed, ph::_1, ph::_2, time0, time1);
     }
-    assert(voxelCount == mParent.mTracker.grid().activeVoxelCount());
+    OPENVDB_ASSERT(voxelCount == mParent.mTracker.grid().activeVoxelCount());
     mVelocity = new VectorType[ voxelCount ];
     this->cook("Sampling advection field");
 

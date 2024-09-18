@@ -549,7 +549,7 @@ private:
     const std::vector<Vec3R>& mPoints;
     std::vector<float>& mDistances;
     std::vector<unsigned char>& mMask;
-    bool mOverlapping;
+    const bool mOverlapping;
     float mRadius;
     int mIndex;
 };
@@ -578,8 +578,8 @@ UpdatePoints::UpdatePoints(UpdatePoints& rhs, tbb::split)
     , mDistances(rhs.mDistances)
     , mMask(rhs.mMask)
     , mOverlapping(rhs.mOverlapping)
-    , mRadius(rhs.mRadius)
-    , mIndex(rhs.mIndex)
+    , mRadius(0.0)
+    , mIndex(0)
 {
 }
 

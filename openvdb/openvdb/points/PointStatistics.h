@@ -20,6 +20,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>

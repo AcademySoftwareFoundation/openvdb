@@ -1,0 +1,3 @@
+Build:
+    - USE_EXPLICIT_INSTANTIATION is now disabled on Windows by default due to
+    OOM linker issues.

@@ -42,6 +42,7 @@
 
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/Interpolation.h>
+#include <openvdb/util/Assert.h>
 
 #include "IndexIterator.h"
 #include "AttributeArray.h"
@@ -198,7 +199,7 @@ public:
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mInitialized);
+        OPENVDB_ASSERT(mInitialized);
         // accept no include filters as valid
         bool includeValid = mIncludeHandles.empty();
         for (const GroupHandle& handle : mIncludeHandles) {
@@ -348,13 +349,13 @@ public:
 
     template <typename LeafT>
     void reset(const LeafT& leaf) {
-        assert(leaf.hasAttribute(mIndex));
+        OPENVDB_ASSERT(leaf.hasAttribute(mIndex));
         mIdHandle.reset(new Handle(leaf.constAttributeArray(mIndex)));
     }
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mIdHandle);
+        OPENVDB_ASSERT(mIdHandle);
         const IntType id = mIdHandle->get(*iter);
         const unsigned int seed = mSeed + static_cast<unsigned int>(id);
         RandGenT generator(seed);
@@ -410,8 +411,8 @@ public:
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mPositionHandle);
-        assert(iter);
+        OPENVDB_ASSERT(mPositionHandle);
+        OPENVDB_ASSERT(iter);
 
         const openvdb::Coord ijk = iter.getCoord();
         const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();
@@ -477,7 +478,7 @@ public:
 
     template <typename IterT>
     bool valid(const IterT& iter) const {
-        assert(mPositionHandle);
+        OPENVDB_ASSERT(mPositionHandle);
 
         const openvdb::Coord ijk = iter.getCoord();
         const openvdb::Vec3f voxelIndexSpace = ijk.asVec3d();

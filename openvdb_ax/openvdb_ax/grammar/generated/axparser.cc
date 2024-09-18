@@ -271,7 +271,7 @@ typedef enum yysymbol_kind_t yysymbol_kind_t;
     template<typename T, typename... Args>
     T* newNode(AXLTYPE* loc, const Args&... args) {
         T* ptr = new T(args...);
-        assert(axlog);
+        OPENVDB_ASSERT(axlog);
         axlog->addNodeLocation(ptr, {loc->first_line, loc->first_column});
         return ptr;
     }
@@ -2273,7 +2273,7 @@ yyreduce:
 
   case 37: /* declaration_list: declaration_list COMMA IDENTIFIER EQUALS expression  */
                                                             { const auto firstNode = (yyvsp[-4].statementlist)->child(0);
-                                                              assert(firstNode);
+                                                              OPENVDB_ASSERT(firstNode);
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>(firstNode)->type();
                                                               (yyval.statementlist)->addStatement(newNode<DeclareLocal>(&(yylsp[-4]), type, newNode<Local>(&(yylsp[-2]), (yyvsp[-2].string)), (yyvsp[0].expression)));
                                                               (yyval.statementlist) = (yyvsp[-4].statementlist);
@@ -2283,7 +2283,7 @@ yyreduce:
 
   case 38: /* declaration_list: declaration_list COMMA IDENTIFIER  */
                                                             { const auto firstNode = (yyvsp[-2].statementlist)->child(0);
-                                                              assert(firstNode);
+                                                              OPENVDB_ASSERT(firstNode);
                                                               const tokens::CoreType type =  static_cast<const DeclareLocal*>(firstNode)->type();
                                                               (yyval.statementlist)->addStatement(newNode<DeclareLocal>(&(yylsp[-2]), type, newNode<Local>(&(yylsp[0]), (yyvsp[0].string))));
                                                               free(const_cast<char*>((yyvsp[0].string)));

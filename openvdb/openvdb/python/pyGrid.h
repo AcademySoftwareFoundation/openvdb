@@ -10,6 +10,7 @@
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/functional.h>
 #ifdef PY_OPENVDB_USE_NUMPY
 #include <pybind11/numpy.h>
 #include <openvdb/tools/MeshToVolume.h>
@@ -942,30 +943,20 @@ struct TreeCombineOp
     using TreeT = typename GridType::TreeType;
     using ValueT = typename GridType::ValueType;
 
-    TreeCombineOp(py::function _op): op(_op) {}
+    TreeCombineOp(const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& _op): op(_op) {}
     void operator()(const ValueT& a, const ValueT& b, ValueT& result)
     {
-        py::object resultObj = op(a, b);
-
-        if (!py::isinstance<py::float_>(resultObj)) {
-            std::ostringstream os;
-            os << "expected callable argument to " << pyutil::GridTraits<GridType>::name();
-            os << ".combine() to return " << openvdb::typeNameAsString<ValueT>();
-            os << ", found " <<  pyutil::className(resultObj);
-            throw py::type_error(os.str());
-        }
-
-        result = py::cast<ValueT>(resultObj);
+        result = op(a, b);
     }
-    py::function op;
+    const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& op;
 };
 
 
 template<typename GridType>
 inline void
-combine(GridType& grid, GridType& otherGrid, py::function funcObj)
+combine(GridType& grid, GridType& otherGrid, const std::function<typename GridType::ValueType(typename GridType::ValueType, typename GridType::ValueType)>& func)
 {
-    TreeCombineOp<GridType> op(funcObj);
+    TreeCombineOp<GridType> op(func);
     grid.tree().combine(otherGrid.tree(), op, /*prune=*/true);
 }
 
@@ -1346,7 +1337,7 @@ public:
             .def("__getitem__", &IterValueProxyT::getItem,
                 "__getitem__(key) -> value\n\n"
                 "Return the value of the item with the given key.")
-            .def("__setitem__", &IterValueProxyT::getItem,
+            .def("__setitem__", &IterValueProxyT::setItem,
                 "__setitem__(key, value)\n\n"
                 "Set the value of the item with the given key.");
     }

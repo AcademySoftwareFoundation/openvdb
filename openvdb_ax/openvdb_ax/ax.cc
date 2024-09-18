@@ -7,6 +7,8 @@
 #include "compiler/PointExecutable.h"
 #include "compiler/VolumeExecutable.h"
 
+#include <openvdb/util/Assert.h>
+
 #include <llvm/InitializePasses.h>
 #include <llvm/PassRegistry.h>
 #include <llvm/Config/llvm-config.h> // version numbers
@@ -35,7 +37,7 @@ void run(const char* ax, openvdb::GridBase& grid, const AttributeBindings& bindi
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
             compiler.compile<openvdb::ax::PointExecutable>(ax);
-        assert(exe);
+        OPENVDB_ASSERT(exe);
 
         //Set the attribute bindings
         exe->setAttributeBindings(bindings);
@@ -49,7 +51,7 @@ void run(const char* ax, openvdb::GridBase& grid, const AttributeBindings& bindi
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
             compiler.compile<openvdb::ax::VolumeExecutable>(ax);
-        assert(exe);
+        OPENVDB_ASSERT(exe);
 
         // Set the attribute bindings
         exe->setAttributeBindings(bindings);
@@ -81,7 +83,7 @@ void run(const char* ax, openvdb::GridPtrVec& grids, const AttributeBindings& bi
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
             compiler.compile<openvdb::ax::PointExecutable>(ax);
-        assert(exe);
+        OPENVDB_ASSERT(exe);
 
         //Set the attribute bindings
         exe->setAttributeBindings(bindings);
@@ -97,7 +99,7 @@ void run(const char* ax, openvdb::GridPtrVec& grids, const AttributeBindings& bi
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
             compiler.compile<openvdb::ax::VolumeExecutable>(ax);
-        assert(exe);
+        OPENVDB_ASSERT(exe);
 
         //Set the attribute bindings
         exe->setAttributeBindings(bindings);

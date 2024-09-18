@@ -47,10 +47,10 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 
 #include <tbb/spin_mutex.h>
 
-#include <cassert>
 #include <limits>
 #include <type_traits>
 #include <mutex>
@@ -198,7 +198,7 @@ public:
     TreeType* getTree() const { return mTree; }
 
     /// @brief Return a reference to the tree associated with this accessor.
-    TreeType& tree() const { assert(mTree); return *mTree; }
+    TreeType& tree() const { OPENVDB_ASSERT(mTree); return *mTree; }
 
     /// @brief  Pure virtual method, clears the derived accessor
     virtual void clear() = 0;
@@ -334,8 +334,8 @@ struct ValueAccessorLeafBuffer
     template <typename NodeT>
     static constexpr bool BypassLeafAPI =
         std::is_same<NodeT, typename TreeTypeT::LeafNodeType>::value;
-    inline const typename TreeTypeT::ValueType* buffer() { assert(mBuffer); return mBuffer; }
-    inline const typename TreeTypeT::ValueType* buffer() const { assert(mBuffer); return mBuffer; }
+    inline const typename TreeTypeT::ValueType* buffer() { OPENVDB_ASSERT(mBuffer); return mBuffer; }
+    inline const typename TreeTypeT::ValueType* buffer() const { OPENVDB_ASSERT(mBuffer); return mBuffer; }
     inline void setBuffer(const typename TreeTypeT::ValueType* b) const { mBuffer = b; }
 private:
     mutable const typename TreeTypeT::ValueType* mBuffer;
@@ -350,9 +350,9 @@ struct ValueAccessorLeafBuffer<TreeTypeT, IntegerSequence,
     >::type>
 {
     template <typename> static constexpr bool BypassLeafAPI = false;
-    inline constexpr typename TreeTypeT::ValueType* buffer() { assert(false); return nullptr; }
-    inline constexpr typename TreeTypeT::ValueType* buffer() const { assert(false); return nullptr; }
-    inline constexpr void setBuffer(const typename TreeTypeT::ValueType*) const { assert(false); }
+    inline constexpr typename TreeTypeT::ValueType* buffer() { OPENVDB_ASSERT(false); return nullptr; }
+    inline constexpr typename TreeTypeT::ValueType* buffer() const { OPENVDB_ASSERT(false); return nullptr; }
+    inline constexpr void setBuffer(const typename TreeTypeT::ValueType*) const { OPENVDB_ASSERT(false); }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -469,7 +469,7 @@ public:
                 }
                 else {
                     auto node = mNodes.template get<Idx>();
-                    assert(node);
+                    OPENVDB_ASSERT(node);
                     return &(node->getValueAndCache(xyz, *this));
                 }
             });
@@ -480,7 +480,7 @@ public:
     bool isValueOn(const Coord& xyz) const
     {
         return this->evalFirstCached(xyz, [&](const auto node) -> bool {
-                assert(node);
+                OPENVDB_ASSERT(node);
                 return node->isValueOnAndCache(xyz, *this);
             });
     }
@@ -494,7 +494,7 @@ public:
         return this->evalFirstCached(xyz, [&](const auto node) -> bool
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
                     const auto offset = LeafNodeT::coordToOffset(xyz);
@@ -518,7 +518,7 @@ public:
         return this->evalFirstCached(xyz, [&](const auto node) -> int
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(std::is_same<RootNodeT, NodeType>::value) {
                     return node->getValueDepthAndCache(xyz, *this);
@@ -534,7 +534,7 @@ public:
     /// @param xyz  The index space coordinate to query
     bool isVoxel(const Coord& xyz) const
     {
-        assert(BaseT::mTree);
+        OPENVDB_ASSERT(BaseT::mTree);
         return this->getValueDepth(xyz) ==
             static_cast<int>(RootNodeT::LEVEL);
     }
@@ -553,7 +553,7 @@ public:
         this->evalFirstCached(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
                     const auto offset = LeafNodeT::coordToOffset(xyz);
@@ -590,7 +590,7 @@ public:
                 }
                 else {
                     auto node = mNodes.template get<Idx>();
-                    assert(node);
+                    OPENVDB_ASSERT(node);
                     const_cast<NodeType*>(node)->setValueOnlyAndCache(xyz, value, *this);
                 }
                 return true;
@@ -610,7 +610,7 @@ public:
         this->evalFirstCached(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
                     const auto offset = LeafNodeT::coordToOffset(xyz);
@@ -635,7 +635,7 @@ public:
         this->evalFirstCached(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
                     const auto offset = LeafNodeT::coordToOffset(xyz);
@@ -659,7 +659,7 @@ public:
         this->evalFirstCached(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
 
                 if constexpr(IsLeafAndBypassLeafAPI<NodeType>) {
                     const auto offset = LeafNodeT::coordToOffset(xyz);
@@ -686,7 +686,7 @@ public:
         this->evalFirstCached(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 const_cast<NodeType*>(node)->setActiveStateAndCache(xyz, on, *this);
             });
     }
@@ -718,7 +718,7 @@ public:
         return this->evalFirstCached(xyz, [&](const auto node) -> LeafNodeT*
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 return const_cast<NodeType*>(node)->touchLeafAndCache(xyz, *this);
             });
     }
@@ -731,11 +731,11 @@ public:
         constexpr int64_t Start = NodeLevelList::template Index<LeafNodeT> + 1;
         static_assert(!BaseT::IsConstTree, "can't add a node to a const tree");
         static_assert(Start >= 0);
-        assert(leaf);
+        OPENVDB_ASSERT(leaf);
         this->evalFirstCached<Start>(leaf->origin(), [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 const_cast<NodeType*>(node)->addLeafAndCache(leaf, *this);
             });
     }
@@ -759,7 +759,7 @@ public:
         this->evalFirstCached<Start>(xyz, [&](const auto node) -> void
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 const_cast<NodeType*>(node)->addTileAndCache(level, xyz, value, state, *this);
             });
     }
@@ -790,12 +790,12 @@ public:
             [&](const auto node) -> NodeT*
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 if constexpr(std::is_same<NodeT, NodeType>::value) {
                     return const_cast<NodeT*>(node);
                 }
                 else {
-                    assert(NodeT::LEVEL < NodeType::LEVEL);
+                    OPENVDB_ASSERT(NodeT::LEVEL < NodeType::LEVEL);
                     return const_cast<NodeType*>(node)->template probeNodeAndCache<NodeT>(xyz, *this);
                 }
             });
@@ -817,12 +817,12 @@ public:
             [&](const auto node) -> const NodeT*
             {
                 using NodeType = std::remove_pointer_t<decltype(node)>;
-                assert(node);
+                OPENVDB_ASSERT(node);
                 if constexpr(std::is_same<NodeT, NodeType>::value) {
                     return node;
                 }
                 else {
-                    assert(NodeT::LEVEL < NodeType::LEVEL);
+                    OPENVDB_ASSERT(NodeT::LEVEL < NodeType::LEVEL);
                     return const_cast<NodeType*>(node)->template probeConstNodeAndCache<NodeT>(xyz, *this);
                 }
             });
@@ -969,7 +969,7 @@ private:
     template <typename OpT>
     OPENVDB_FORCE_INLINE auto evalFirstIndex(OpT&& op) const
     {
-        assert(BaseT::mTree);
+        OPENVDB_ASSERT(BaseT::mTree);
         // Mutex lock the accessor. Does nothing if no mutex if in place
         [[maybe_unused]] const auto lock = this->lock();
         // Get the return type of the provided operation OpT
@@ -986,7 +986,7 @@ private:
     template <typename PredT, typename OpT>
     OPENVDB_FORCE_INLINE auto evalFirstPred(PredT&& pred, OpT&& op) const
     {
-        assert(BaseT::mTree);
+        OPENVDB_ASSERT(BaseT::mTree);
         // Mutex lock the accessor. Does nothing if no mutex if in place
         [[maybe_unused]] const auto lock = this->lock();
         using RetT = typename std::invoke_result<OpT, RootNodeT*>::type;

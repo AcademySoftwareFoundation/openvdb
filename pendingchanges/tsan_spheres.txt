@@ -1,0 +1,5 @@
+OpenVDB:
+  Bug Fixes:
+    - Fixed a thread sanitizer issue which could cause undefined behaviour
+    in VolumeToSpheres::fillWithSpheres
+    [Reported by Jérémie Dumas]

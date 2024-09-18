@@ -10,9 +10,9 @@
 #include "io/io.h"
 #include "math/Transform.h"
 #include "tree/Tree.h"
+#include "util/Assert.h"
 #include "util/logging.h"
 #include "util/Name.h"
-#include <cassert>
 #include <iostream>
 #include <set>
 #include <type_traits>
@@ -1610,7 +1610,7 @@ Grid<TreeT>::readBuffers(std::istream& is)
         uint16_t numPasses = 1;
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
-        assert(bool(meta));
+        OPENVDB_ASSERT(bool(meta));
         for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
             uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
@@ -1632,7 +1632,7 @@ Grid<TreeT>::readBuffers(std::istream& is, const CoordBBox& bbox)
         uint16_t numPasses = 1;
         is.read(reinterpret_cast<char*>(&numPasses), sizeof(uint16_t));
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is);
-        assert(bool(meta));
+        OPENVDB_ASSERT(bool(meta));
         for (uint16_t passIndex = 0; passIndex < numPasses; ++passIndex) {
             uint32_t pass = (uint32_t(numPasses) << 16) | uint32_t(passIndex);
             meta->setPass(pass);
@@ -1662,7 +1662,7 @@ Grid<TreeT>::writeBuffers(std::ostream& os) const
     } else {
         // Determine how many leaf buffer passes are required for this grid
         const io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os);
-        assert(bool(meta));
+        OPENVDB_ASSERT(bool(meta));
         uint16_t numPasses = 1;
         meta->setCountingPasses(true);
         meta->setPass(0);

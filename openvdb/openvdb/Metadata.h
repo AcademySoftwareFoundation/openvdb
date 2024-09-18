@@ -9,6 +9,7 @@
 #include "Types.h"
 #include "math/Math.h" // for math::isZero()
 #include "util/Name.h"
+#include "util/Assert.h"
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -279,9 +280,9 @@ TypedMetadata<T>::copy(const Metadata &other)
 
 template<typename T>
 inline void
-TypedMetadata<T>::readValue(std::istream& is, Index32 /*numBytes*/)
+TypedMetadata<T>::readValue(std::istream& is, [[maybe_unused]] Index32 numBytes)
 {
-    //assert(this->size() == numBytes);
+    OPENVDB_ASSERT(this->size() == numBytes);
     is.read(reinterpret_cast<char*>(&mValue), this->size());
 }
 

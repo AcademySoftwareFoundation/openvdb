@@ -26,7 +26,7 @@
 #include <GT/GT_PrimCurveMesh.h>
 #include <GU/GU_DetailHandle.h>
 
-#include "GEO_PrimVDB.h"
+#include <GEO/GEO_PrimVDB.h>
 #include <UT/UT_ParallelUtil.h>
 #include <UT/UT_Vector3.h>
 #include <UT/UT_Version.h>

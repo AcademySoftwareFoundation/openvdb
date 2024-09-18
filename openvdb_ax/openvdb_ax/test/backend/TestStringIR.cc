@@ -8,6 +8,8 @@
 #include <openvdb_ax/codegen/Functions.h>
 #include <openvdb_ax/codegen/FunctionRegistry.h>
 
+#include <openvdb/util/Assert.h>
+
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <numeric> // iota
@@ -295,7 +297,7 @@ TestStringIR::testStringStringIR()
         // zero out the data held by a String object (expected to not hold heap memory).
         // This is used to test the IR methods work as expected with the allocated, but
         // uninitialized stack mem from the compute generator
-        assert(S.isLocal());
+        OPENVDB_ASSERT(S.isLocal());
         std::memset(&S, 0, sizeof(String)); // uninit string, invalid class memory
 #if defined(__GNUC__) && !defined(__clang__)
 #if OPENVDB_CHECK_GCC(8, 0)

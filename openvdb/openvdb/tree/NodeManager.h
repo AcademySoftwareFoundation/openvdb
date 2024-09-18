@@ -14,6 +14,7 @@
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/util/Assert.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <deque>
@@ -56,9 +57,9 @@ class NodeList
 public:
     NodeList() = default;
 
-    NodeT& operator()(size_t n) const { assert(n<mNodeCount); return *(mNodes[n]); }
+    NodeT& operator()(size_t n) const { OPENVDB_ASSERT(n<mNodeCount); return *(mNodes[n]); }
 
-    NodeT*& operator[](size_t n) { assert(n<mNodeCount); return mNodes[n]; }
+    NodeT*& operator[](size_t n) { OPENVDB_ASSERT(n<mNodeCount); return mNodes[n]; }
 
     Index64 nodeCount() const { return mNodeCount; }
 
@@ -210,7 +211,7 @@ public:
         public:
             Iterator(const NodeRange& range, size_t pos): mRange(range), mPos(pos)
             {
-                assert(this->isValid());
+                OPENVDB_ASSERT(this->isValid());
             }
             Iterator(const Iterator&) = default;
             Iterator& operator=(const Iterator&) = default;
@@ -251,7 +252,7 @@ public:
 
         static size_t doSplit(NodeRange& r)
         {
-            assert(r.is_divisible());
+            OPENVDB_ASSERT(r.is_divisible());
             size_t middle = r.mBegin + (r.mEnd - r.mBegin) / 2u;
             r.mEnd = middle;
             return middle;
