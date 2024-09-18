@@ -57,18 +57,20 @@ code and has the right to release it under the
 [Mozilla Public License, version 2.0](LICENSE.md)
 license. See the [TAC documentation on contribution sign off](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off) for more information on this requirement.
 
-## Committer
+## Maintainer
 
-The committer role enables the participant to commit code directly to the repository, but also comes with the obligation to be a responsible leader in the community.
+The maintainer role is the equivalent of the "Committer" role in the charter.
 
-### Process for becoming a committer
+This role enables the participant to commit code directly to the repository, but also comes with the obligation to be a responsible leader in the community.
+
+### Process for becoming a maintainer
 
 * Show your experience with the codebase through contributions and engagement on the community channels.
-* Request to become a committer.
-* Have the majority of committers approve you becoming a committer.
+* Request to become a maintainer.
+* Have the majority of maintainers approve you becoming a maintainer.
 * Your name and email is added to the MAINTAINERS.md file for the project.
 
-### Committer responsibilities
+### Maintainer responsibilities
 
 * Monitor email aliases.
 * Monitor Slack (delayed response is perfectly acceptable).
@@ -76,28 +78,29 @@ The committer role enables the participant to commit code directly to the reposi
 * Make sure that ongoing PRs are moving forward at the right pace or close them.
 * Remain an active contributor to the project in general and the code base in particular.
 
-### When does a committer lose committer status?
+### When does a maintainer lose maintainer status?
 
-If a committer is no longer interested or cannot perform the committer duties listed above, they
+If a maintainer is no longer interested or cannot perform the maintainer duties listed above, they
 should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
-the committers per the voting process below.
+the maintainers per the voting process below.
 
 ## Technical Steering Committee (TSC) member
 
 The Technical Steering Committee (TSC) oversees the overall technical direction of OpenVDB, as defined in the [charter](charter.md).
 
-TSC voting members consist of committers that have been nominated by the committers, with a supermajority of voting members required to have a committer elected to be a TSC voting member. TSC voting members term and succession is defined in the [charter](charter.md).
+TSC voting members consist of maintainers that have been nominated by the TSC, with a supermajority of voting members required to have a maintainer elected to be a TSC voting member. TSC voting members term and succession is defined in the [charter](charter.md).
 
 All meetings of the TSC are open to participation by any member of the OpenVDB community. Meeting times are listed in the [ASWF technical community calendar](https://lists.aswf.io/g/tac/calendar).
 
 ## Current TSC members
 
-* Ken Museth, Chair / NVIDIA
-* Andre Pradhana, DreamWorks
+* Ken Museth (Chair), Nvidia
+* Andre Pradhana, Nvidia
 * Jeff Lait, SideFX
-* Nick Avramoussis, WETA
+* Nick Avramoussis, WETA FX
 * Dan Bailey, ILM
-* Richard Jones, DNEG
+* Richard Jones, ILM
+* Gregory Hurst, United Therapeutics
 
 # Release Process
 
