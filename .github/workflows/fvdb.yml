@@ -72,10 +72,12 @@ jobs:
           miniforge-version: latest
           activate-environment: fvdb_build
           environment-file: fvdb/env/build_environment.yml
+          auto-activate-base: false
 
 
       - name: Buid fvdb
         run: |
+          conda activate fvdb_build &&
           cd fvdb &&
           TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist &&
           tree
@@ -113,6 +115,7 @@ jobs:
           miniforge-version: latest
           activate-environment: fvdb_test
           environment-file: fvdb/env/test_environment.yml
+          auto-activate-base: false
 
       - name: Download package
         uses: actions/download-artifact@v4
@@ -122,7 +125,7 @@ jobs:
 
       - name: Install package
         run: |
-            conda activate fvdb_test
+            conda activate fvdb_test &&
             pip install ./dist/*.whl
 
       - name: Run tests
@@ -156,6 +159,7 @@ jobs:
           miniforge-version: latest
           activate-environment: fvdb_test
           environment-file: fvdb/env/test_environment.yml
+          auto-activate-base: false
 
       - name: Download package
         uses: actions/download-artifact@v4
@@ -165,7 +169,7 @@ jobs:
 
       - name: Install package
         run: |
-            conda activate fvdb_test
+            conda activate fvdb_test &&
             pip install ./dist/*.whl
 
       - name: Disable git ownership verification
