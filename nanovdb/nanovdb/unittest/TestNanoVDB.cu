@@ -22,6 +22,7 @@
 
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
+#include <iomanip> // for std::setw, std::setfill
 
 namespace nanovdb {// this namespace is required by gtest
 
