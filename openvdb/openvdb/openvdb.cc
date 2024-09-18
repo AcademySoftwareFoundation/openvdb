@@ -80,7 +80,7 @@ initialize()
 
     // Register common grid types.
     GridBase::clearRegistry();
-    GridTypes::foreach<RegisterGrid>();
+    AllGridTypes::foreach<RegisterGrid>();
 
     // Register types associated with point index grids.
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);

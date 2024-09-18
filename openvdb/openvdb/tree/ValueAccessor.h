@@ -1021,6 +1021,19 @@ private:
 }; // ValueAccessorImpl
 
 } // namespace tree
+
+
+////////////////////////////////////////
+
+// Overload the TreeTraits struct to declare a const/non-const ValueAccessorImpl as sparse
+
+template<typename TreeT, bool IsSafeT, typename MutexT, typename IndexSequenceT>
+struct TreeTraits<tree::ValueAccessorImpl<TreeT, IsSafeT, MutexT, IndexSequenceT>>
+{
+    constexpr static TreeRepresentation Representation = TreeRepresentation::Sparse;
+};
+
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 

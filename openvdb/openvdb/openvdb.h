@@ -13,6 +13,7 @@
 #include "Grid.h"
 #include "tree/Tree.h"
 #include "points/PointDataGrid.h"
+#include "adaptive/AdaptiveGrid.h"
 #include "io/File.h"
 
 
@@ -98,8 +99,8 @@ using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>;
 /// The Vec3 Grid types which OpenVDB will register by default.
 using Vec3GridTypes     = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
-/// The Grid types which OpenVDB will register by default.
-using GridTypes =
+/// The sparse Grid types.
+using SparseGridTypes =
     NumericGridTypes::
         Append<Vec3GridTypes>::
         Append<tools::PointIndexGrid>::
@@ -108,6 +109,15 @@ using GridTypes =
         Append<points::PointDataGrid>::
 #endif
         Append<BoolGrid, MaskGrid>;
+/// @}
+
+// for backwards-compatibility
+using GridTypes = SparseGridTypes;
+
+/// The Grid types which OpenVDB will register by default.
+using AllGridTypes =
+    SparseGridTypes::
+        Append<adaptive::AdaptiveGridTypes>;
 /// @}
 
 
