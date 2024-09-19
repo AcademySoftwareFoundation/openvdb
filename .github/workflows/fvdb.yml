@@ -1,59 +1,57 @@
 name: fVDB
 
 on:
-    push:
-      branches:
-        - 'master'
-        - 'feature/**'
-        - 'pr/**'
-      paths-ignore:
-        - 'CHANGES'
-        - 'CODEOWNERS'
-        - 'doc/**'
-        - 'openvdb/**'
-        - 'openvdb_cmd/**'
-        - 'openvdb_ax/**'
-        - 'openvdb_maya/**'
-        - 'openvdb_houdini/**'
-        - 'nanovdb/**'
-        - 'pendingchanges/**'
-        - '**.md'
-        - 'fvdb/debug/**'
-        - 'fvdb/docs/**'
-        - 'fvdb/examples/**'
-        - 'fvdb/notebooks/**'
-        - 'fvdb/scripts/**'
-    pull_request:
-      branches:
-        - '**'
-      paths-ignore:
-        - 'CHANGES'
-        - 'CODEOWNERS'
-        - 'doc/**'
-        - 'openvdb/**'
-        - 'openvdb_cmd/**'
-        - 'openvdb_ax/**'
-        - 'openvdb_maya/**'
-        - 'openvdb_houdini/**'
-        - 'nanovdb/**'
-        - 'pendingchanges/**'
-        - '**.md'
-        - 'fvdb/debug/**'
-        - 'fvdb/docs/**'
-        - 'fvdb/examples/**'
-        - 'fvdb/notebooks/**'
-        - 'fvdb/scripts/**'
-    schedule:
-      # run this workflow every day 7am UTC
-      - cron:  '0 7 * * *'
+  push:
+    branches:
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb/**'
+      - 'openvdb_cmd/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'nanovdb/**'
+      - 'pendingchanges/**'
+      - '**.md'
+      - 'fvdb/debug/**'
+      - 'fvdb/docs/**'
+      - 'fvdb/examples/**'
+      - 'fvdb/notebooks/**'
+      - 'fvdb/scripts/**'
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb/**'
+      - 'openvdb_cmd/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'nanovdb/**'
+      - 'pendingchanges/**'
+      - '**.md'
+      - 'fvdb/debug/**'
+      - 'fvdb/docs/**'
+      - 'fvdb/examples/**'
+      - 'fvdb/notebooks/**'
+      - 'fvdb/scripts/**'
+  schedule:
+    # run this workflow every day 7am UTC
+    - cron: '0 7 * * *'
 
 permissions:
   contents: write
   deployments: write
 
-
 jobs:
-
   fvdb-build:
     name: fVDB Build
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-16c-64g-600h') || 'ubuntu-latest' }}
@@ -62,7 +60,7 @@ jobs:
       # image: aswf/ci-openvdb:2024-clang17.1
       env:
         PYTHONPATH:
-      options: --rm 
+      options: --rm
     defaults:
       run:
         shell: bash -el {0}
@@ -71,7 +69,7 @@ jobs:
 
       - name: Install required commands
         run: |
-          yum install procps &&
+          yum install -y procps &&
           df -h
 
       - name: Set up fvdb_build Conda env
@@ -81,7 +79,6 @@ jobs:
           activate-environment: fvdb_build
           environment-file: fvdb/env/build_environment.yml
           auto-activate-base: false
-
 
       - name: Buid fvdb
         run: |
@@ -93,9 +90,9 @@ jobs:
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
-            name: fvdb-test-package
-            path: fvdb/dist/*.whl
-            retention-days: 4
+          name: fvdb-test-package
+          path: fvdb/dist/*.whl
+          retention-days: 4
 
       - name: Cleanup
         if: always()
@@ -104,25 +101,24 @@ jobs:
           rm -rf /__w/_temp/*
           echo "Cleanup completed"
 
-
   fvdb-unit-test:
     needs: [fvdb-build]
     name: fVDB Unit Tests
-    runs-on:  ubuntu-20.04-gpu-t4-4c-16g-176h
+    runs-on: ubuntu-20.04-gpu-t4-4c-16g-176h
     container:
       image: nvidia/cuda:12.3.1-devel-rockylinux8
       env:
-        PYTHONPATH: 
+        PYTHONPATH:
       options: --rm --gpus all
     defaults:
       run:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install required commands
         run: |
-          yum install procps &&
+          yum install -y procps &&
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -136,18 +132,18 @@ jobs:
       - name: Download package
         uses: actions/download-artifact@v4
         with:
-            name: fvdb-test-package
-            path: ./dist
+          name: fvdb-test-package
+          path: ./dist
 
       - name: Install package
         run: |
-            conda activate fvdb_test &&
-            pip install ./dist/*.whl
+          conda activate fvdb_test &&
+          pip install ./dist/*.whl
 
       - name: Run tests
         run: |
-            cd fvdb/tests &&
-            pytest -v unit
+          cd fvdb/tests &&
+          pytest -v unit
 
       - name: Cleanup
         if: always()
@@ -164,7 +160,7 @@ jobs:
     container:
       image: nvidia/cuda:12.3.1-devel-rockylinux8
       env:
-        PYTHONPATH: 
+        PYTHONPATH:
       options: --rm --gpus all
     defaults:
       run:
@@ -174,7 +170,7 @@ jobs:
 
       - name: Install required commands
         run: |
-          yum install procps &&
+          yum install -y procps &&
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -188,13 +184,13 @@ jobs:
       - name: Download package
         uses: actions/download-artifact@v4
         with:
-            name: fvdb-test-package
-            path: ./dist
+          name: fvdb-test-package
+          path: ./dist
 
       - name: Install package
         run: |
-            conda activate fvdb_test &&
-            pip install ./dist/*.whl
+          conda activate fvdb_test &&
+          pip install ./dist/*.whl
 
       - name: Disable git ownership verification
         run: |
@@ -208,17 +204,17 @@ jobs:
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
-            name: Python Benchmark with pytest-benchmark
-            tool: 'pytest'
-            output-file-path: fvdb/tests/benchmark/output.json
-            # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            auto-push: true
-            # Show alert with commit comment on detecting possible performance regression
-            alert-threshold: '200%'
-            comment-on-alert: true
-            fail-on-alert: true
-            alert-comment-cc-users: '@swahtz'
+          name: Python Benchmark with pytest-benchmark
+          tool: 'pytest'
+          output-file-path: fvdb/tests/benchmark/output.json
+          # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          # Show alert with commit comment on detecting possible performance regression
+          alert-threshold: '200%'
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@swahtz'
 
       - name: Cleanup
         if: always()
