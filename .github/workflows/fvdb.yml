@@ -61,7 +61,7 @@ jobs:
       image: nvidia/cuda:12.3.1-devel-rockylinux8 # using this image, which is the base of aswf 2024, to avoid docker image bloat in aswf image
       # image: aswf/ci-openvdb:2024-clang17.1
       env:
-        PYTHONPATH: 
+        PYTHONPATH:
       options: --rm 
     defaults:
       run:
@@ -69,16 +69,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free up disk space
+      - name: Install required commands
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz libnccl xorg-x11-server-utils libxkbcommon-x11 xorg-x11-proto-devel &&
+          yum install procps &&
           df -h
-
-      - name: Unset PYTHONPATH
-        run: |
-          echo $PYTHONPATH &&
-          unset PYTHONPATH &&
-          echo $PYTHONPATH
 
       - name: Set up fvdb_build Conda env
         uses: conda-incubator/setup-miniconda@v3
@@ -107,7 +101,7 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
+          rm -rf /__w/_temp/*
           echo "Cleanup completed"
 
 
@@ -126,9 +120,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Free up disk space
+      - name: Install required commands
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz libnccl xorg-x11-server-utils libxkbcommon-x11 xorg-x11-proto-devel
+          yum install procps &&
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -159,7 +153,7 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
+          rm -rf /__w/_temp/*
           echo "Cleanup completed"
 
   fvdb-benchmarks:
@@ -178,9 +172,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Free up disk space
+      - name: Install required commands
         run: |
-          yum remove -y python3.11 gcc cuda-toolkit-12-config-common mesa-libGL cuda-compat-12-3 cuda-command-line-tools-12-3 cuda-nsight-compute-12-3 java-1.8.0-openjdk-headless nodejs nodejs-docs python39-libs  doxygen cuda-nvprof-12-3 ruby-libs graphviz libnccl xorg-x11-server-utils libxkbcommon-x11 xorg-x11-proto-devel
+          yum install procps &&
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -230,5 +224,5 @@ jobs:
         if: always()
         run: |
           echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
+          rm -rf /__w/_temp/*
           echo "Cleanup completed"
