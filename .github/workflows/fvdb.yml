@@ -58,7 +58,8 @@ jobs:
     name: fVDB Build
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-16c-64g-600h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2024-clang17.0
+      image: nvidia/cuda:12.3.1-devel-rockylinux8 # using this image, which is the base of aswf 2024, to avoid docker image bloat in aswf image
+      # image: aswf/ci-openvdb:2024-clang17.1
       env:
         PYTHONPATH: 
       options: --rm 
@@ -115,7 +116,7 @@ jobs:
     name: fVDB Unit Tests
     runs-on:  ubuntu-20.04-gpu-t4-4c-16g-176h
     container:
-      image: aswf/ci-openvdb:2024-clang17.0
+      image: nvidia/cuda:12.3.1-devel-rockylinux8
       env:
         PYTHONPATH: 
       options: --rm --gpus all
@@ -167,7 +168,7 @@ jobs:
     runs-on:
       - ubuntu-20.04-gpu-t4-4c-16g-176h
     container:
-      image: aswf/ci-openvdb:2024-clang17.0
+      image: nvidia/cuda:12.3.1-devel-rockylinux8
       env:
         PYTHONPATH: 
       options: --rm --gpus all

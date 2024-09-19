@@ -38,7 +38,7 @@ dependencies:
   - pandas
   - rich
   - pytest-benchmark
-  - numpy=1.26
+  - numpy<2
   - linkify-it-py
   - tree
   - pip:

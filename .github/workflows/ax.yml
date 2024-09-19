@@ -16,7 +16,6 @@ on:
       - 'openvdb_houdini/**'
       - 'fvdb/**'
       - 'pendingchanges/**'
-      - 'fvdb/**'
       - '**.md'
   pull_request:
     branches:
@@ -30,7 +29,6 @@ on:
       - 'openvdb_houdini/**'
       - 'fvdb/**'
       - 'pendingchanges/**'
-      - 'fvdb/**'
       - '**.md'
   schedule:
     # run this workflow every day 7am UTC
