@@ -69,7 +69,7 @@ jobs:
 
       - name: Install required commands
         run: |
-          yum install -y procps &&
+          yum install -y procps which &&
           df -h
 
       - name: Set up fvdb_build Conda env
@@ -118,7 +118,7 @@ jobs:
 
       - name: Install required commands
         run: |
-          yum install -y procps &&
+          yum install -y procps which &&
           df -h
 
       - name: Set up fvdb_test Conda env
@@ -170,7 +170,7 @@ jobs:
 
       - name: Install required commands
         run: |
-          yum install -y procps &&
+          yum install -y procps which &&
           df -h
 
       - name: Set up fvdb_test Conda env
