@@ -206,7 +206,7 @@ jobs:
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
-          - { runson: macos-latest,  cxx: '',      cmake: '-D CMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++' }
+          - { runson: macos-latest,  cxx: '',      cmake: '-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++ -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
