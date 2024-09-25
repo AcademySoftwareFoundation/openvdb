@@ -276,7 +276,7 @@ struct Node
     /// @param  parent  The parent to set
     inline void setParent(Node* parent) {
 #ifndef NDEBUG
-        bool hasChild = false;
+        [[maybe_unused]] bool hasChild = false;
         for (size_t i = 0; i < parent->children(); ++i)
             hasChild |= parent->child(i) == this;
         OPENVDB_ASSERT(hasChild);

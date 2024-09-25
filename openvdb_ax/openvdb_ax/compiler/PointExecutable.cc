@@ -159,7 +159,7 @@ using KernelBufferRangeFunctionPtr = std::add_pointer<codegen::PointKernelBuffer
 using PointLeafLocalData = codegen::codegen_internal::PointLeafLocalData;
 
 #ifndef NDEBUG
-inline bool supported(const ast::tokens::CoreType type)
+[[maybe_unused]] inline bool supported(const ast::tokens::CoreType type)
 {
     switch (type) {
         case ast::tokens::BOOL    : return true;
