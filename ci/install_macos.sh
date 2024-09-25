@@ -18,12 +18,12 @@ brew install glfw
 brew install googletest
 brew install jq # for trivial parsing of brew json
 brew install openexr
-brew install pybind11 # also installs the dependent python version
+brew install nanobind # also installs the dependent python version
 brew install zlib
 brew install jemalloc
 
-# Alias python version installed by pybind11 to path
-py_version=$(brew info pybind11 --json | \
+# Alias python version installed by nanobind to path
+py_version=$(brew info nanobind --json | \
     jq -cr '.[].dependencies[] | select(. | startswith("python"))')
 echo "Using python $py_version"
 # export for subsequent action steps (note, not exported for this env)
