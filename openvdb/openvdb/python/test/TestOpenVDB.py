@@ -23,7 +23,7 @@ if 'add_dll_directory' in dir(os):
         os.add_dll_directory(os.getcwd() +
             '\\..\\..\\..\\..\\openvdb_ax\\openvdb_ax\\' + config)
 
-import pyopenvdb as openvdb
+import openvdb
 
 
 def valueFactory(zeroValue, elemValue):
@@ -46,14 +46,14 @@ def valueFactory(zeroValue, elemValue):
 
 def ax_is_enabled():
     '''
-    Return true if we should be testing pyopenvdb.ax(). This environment
+    Return true if we should be testing openvdb.ax(). This environment
     variable is set by the CMake test command if we expect AX to be tested.
     '''
     ax_hook_exists = 'ax' in dir(openvdb) and inspect.isbuiltin(openvdb.ax)
     ax_is_enabled = os.getenv('OPENVDB_TEST_PYTHON_AX')
     if ax_is_enabled and not ax_hook_exists:
         raise RuntimeError('Expected to test the AX python hooks but '
-            'pyopenvdb.ax() has not been located.')
+            'openvdb.ax() has not been located.')
     return ax_is_enabled
 
 
