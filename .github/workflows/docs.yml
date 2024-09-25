@@ -48,9 +48,9 @@ jobs:
     - uses: actions/checkout@v3
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
-    - name: pybind11
+    - name: nanobind
       #if: contains(matrix.config.image, '2023') == false
-      run: ./ci/install_pybind11.sh 2.10.0
+      run: ./ci/install_nanobind.sh 2.0.0
     # - name: install_epydoc
     #   run: pip install epydoc
     - name: install_latex

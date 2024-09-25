@@ -19,7 +19,7 @@ VCPKG_INSTALL_CMD="vcpkg install
     boost-iostreams
     boost-interprocess
     boost-algorithm
-    pybind11
+    nanobind
     --clean-after-build"
 
 # Update vcpkg

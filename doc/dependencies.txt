@@ -147,9 +147,9 @@ apt-get install libblosc-dev            # Blosc
 # AX
 apt-get install llvm-10-dev             # LLVM
 # Python
-apt-get install pybind11-dev            # Python
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
+pip install nanobind                    # nanobind
 # Optional
 apt-get install libpng-dev              # libpng
 apt-get install libopenexr-dev          # OpenEXR
@@ -180,9 +180,9 @@ brew install c-blosc                   # blosc
 # AX
 brew install llvm                      # LLVM
 # Python
-brew install pybind11                  # PyBind11
 brew install python                    # Python
 brew install numpy                     # NumPy
+brew install nanobind                  # nanobind
 # Unit Tests
 brew install gtest                     # GoogleTest
 brew install cppunit                   # CppUnit
