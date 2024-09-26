@@ -357,7 +357,7 @@ copyFromArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& o
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    CoordBBox bbox(origin, origin + Coord(static_cast<Int32>(array.shape(0)), static_cast<Int32>(array.shape(1)), static_cast<Int32>(array.shape(2))) - Coord(1));
     if (array.dtype() == nb::dtype<float>()) {
         tools::Dense<float> valArray(bbox, reinterpret_cast<float*>(array.data()));
         tools::copyFromDense(valArray, grid, tolerance);
@@ -400,7 +400,7 @@ copyFromArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& o
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    CoordBBox bbox(origin, origin + Coord(static_cast<Int32>(array.shape(0)), static_cast<Int32>(array.shape(1)), static_cast<Int32>(array.shape(2))) - Coord(1));
     if (array.dtype() == nb::dtype<float>()) {
         tools::Dense<math::Vec3<float>> valArray(bbox, reinterpret_cast<math::Vec3<float>*>(array.data()));
         tools::copyFromDense(valArray, grid, tolerance);
@@ -443,7 +443,7 @@ copyToArrayScalar(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& ori
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    CoordBBox bbox(origin, origin + Coord(static_cast<Int32>(array.shape(0)), static_cast<Int32>(array.shape(1)), static_cast<Int32>(array.shape(2))) - Coord(1));
     if (array.dtype() == nb::dtype<float>()) {
         tools::Dense<float> valArray(bbox, reinterpret_cast<float*>(array.data()));
         tools::copyToDense(grid, valArray);
@@ -486,7 +486,7 @@ copyToArrayVector(GridType& grid, nb::ndarray<nb::numpy> array, const Coord& ori
     // Compute the bounding box of the region of the grid that is to be copied from or to.
     // origin specifies the coordinates (i, j, k) of the voxel at which to start populating data.
     // Voxel (i, j, k) will correspond to array element (0, 0, 0).
-    CoordBBox bbox(origin, origin + Coord(array.shape(0), array.shape(1), array.shape(2)) - Coord(1));
+    CoordBBox bbox(origin, origin + Coord(static_cast<Int32>(array.shape(0)), static_cast<Int32>(array.shape(1)), static_cast<Int32>(array.shape(2))) - Coord(1));
     if (array.dtype() == nb::dtype<float>()) {
         tools::Dense<math::Vec3<float>> valArray(bbox, reinterpret_cast<math::Vec3<float>*>(array.data()));
         tools::copyToDense(grid, valArray);
@@ -1234,7 +1234,6 @@ inline nb::class_<GridType, GridBase>
 exportGrid(nb::module_ m)
 {
     using ValueT = typename GridType::ValueType;
-    using GridPtr = typename GridType::Ptr;
     using Traits = pyutil::GridTraits<GridType>;
 
     using ValueOnCIterT = typename GridType::ValueOnCIter;
