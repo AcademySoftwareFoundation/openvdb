@@ -2,15 +2,13 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 import unittest
-from pathlib import Path
 
 import numpy as np
 import torch
 from parameterized import parameterized
 
 import fvdb
-from fvdb import GridBatch, sparse_grid_from_ijk
-from fvdb.utils import volume_render
+from fvdb import GridBatch, gridbatch_from_ijk, volume_render
 
 from .common import (
     dtype_to_atol,
@@ -46,7 +44,7 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_segments_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(
+        grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
 
@@ -82,7 +80,7 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_voxels_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(
+        grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
 
@@ -130,7 +128,7 @@ class TestRayMarching(unittest.TestCase):
 
     @parameterized.expand(all_device_dtype_combos)
     def test_uniform_samples_with_misses(self, device, dtype, mutable):
-        grid = fvdb.sparse_grid_from_dense(
+        grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
 
@@ -353,7 +351,7 @@ class TestRayMarching(unittest.TestCase):
     def test_segments_along_rays_bug(self, device, dtype, mutable):
         data_path = get_fvdb_test_data_path()
         data = torch.load(str(data_path / "ray_marching" / "repro_bug.pth"))
-        grid = sparse_grid_from_ijk(data["ijk"].to(device), voxel_sizes=data["vox_size"], origins=data["vox_origin"])
+        grid = gridbatch_from_ijk(data["ijk"].to(device), voxel_sizes=data["vox_size"], origins=data["vox_origin"])
         ray_o: torch.Tensor = torch.load(str(data_path / "ray_marching" / "ray_o.pth")).to(device=device, dtype=dtype)
         ray_d: torch.Tensor = torch.load(str(data_path / "ray_marching" / "ray_d.pth")).to(device=device, dtype=dtype)
 

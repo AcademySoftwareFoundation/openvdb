@@ -4,9 +4,9 @@
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/Utils.cuh>
 
+#include <ATen/cuda/Atomic.cuh>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
-#include <ATen/cuda/Atomic.cuh>
 
 namespace fvdb {
 namespace detail {

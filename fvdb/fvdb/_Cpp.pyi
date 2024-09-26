@@ -1,49 +1,25 @@
 from __future__ import annotations
-from typing import List, Optional, Tuple, Union, Iterator, Sequence, Iterable
 
-from typing import overload
+from enum import Enum
+from typing import Iterator, List, Optional, Sequence, Tuple, Union, overload
+
 import numpy
 import torch
-from enum import Enum
 
-Numeric = Union[int, float]
-TorchDeviceOrString = Union[torch.device, str]
-Vec3iBatch = Union[
-    torch.Tensor, numpy.ndarray, List[int], List[List[int]], Tuple[int, int, int], List[Tuple[int, int, int]]
-]
-Vec3dBatch = Union[
-    torch.Tensor,
-    numpy.ndarray,
-    List[float],
-    List[List[float]],
-    Tuple[float, float, float],
-    List[Tuple[float, float, float]],
+from fvdb.types import (
+    GridIdentifier,
+    Index,
+    LShapeSpec,
+    RShapeSpec,
+    TorchDeviceOrString,
+    Vec3d,
+    Vec3dBatch,
+    Vec3dBatchOrScalar,
+    Vec3dOrScalar,
+    Vec3i,
     Vec3iBatch,
-]
-Vec3dBatchOrScalar = Union[
-    torch.Tensor,
-    numpy.ndarray,
-    List[float],
-    List[List[float]],
-    Tuple[float, float, float],
-    List[Tuple[float, float, float]],
-    float,
-    Vec3iBatch,
-    int,
-]
-
-Vec3i = Union[torch.Tensor, numpy.ndarray, List[int], Tuple[int, int, int]]
-Vec3d = Union[torch.Tensor, numpy.ndarray, List[float], Tuple[float, float, float]]
-Vec3dOrScalar = Union[Vec3d, float, int]
-Vec3iOrScalar = Union[Vec3i, int]
-Vec4i = Union[torch.Tensor, numpy.ndarray, List[int], Tuple[int, int, int, int]]
-
-Index = Union[int, slice, type(Ellipsis), None]
-
-GridIdentifier = Union[str, int, List[str], List[int], Tuple[str, ...], Tuple[int, ...]]
-
-LShapeSpec = Union[Iterable[int], Iterable[Iterable[int]]]
-RShapeSpec = Iterable[int]
+    Vec3iOrScalar,
+)
 
 class config:
     enable_ultra_sparse_acceleration: bool = ...
@@ -127,6 +103,8 @@ class JaggedTensor:
     def joffsets(self) -> torch.LongTensor: ...
     @property
     def jdata(self) -> torch.Tensor: ...
+    @jdata.setter
+    def jdata(self, value: torch.Tensor) -> None: ...
     @property
     def rshape(self) -> List[int]: ...
     @property
@@ -215,6 +193,7 @@ class GridBatch:
     def total_bbox(self) -> torch.IntTensor: ...
     @property
     def address(self) -> int: ...
+    def is_same(self, other: GridBatch) -> bool: ...
     def voxel_size_at(self, bi: int) -> torch.FloatTensor: ...
     def origin_at(self, bi: int) -> torch.FloatTensor: ...
     def num_voxels_at(self, bi: int) -> int: ...
@@ -262,7 +241,7 @@ class GridBatch:
         origins: Vec3dBatch = ...,
     ) -> None: ...
     def read_from_dense(self, dense_data: torch.Tensor, dense_origins: Vec3iBatch = ...) -> JaggedTensor: ...
-    def read_into_dense(
+    def write_to_dense(
         self, sparse_data: JaggedTensorOrTensor, min_coord: Optional[Vec3iBatch] = ..., grid_size: Optional[Vec3i] = ...
     ) -> torch.Tensor: ...
     def clip(
@@ -270,8 +249,8 @@ class GridBatch:
     ) -> Tuple[JaggedTensor, GridBatch]: ...
     def clipped_grid(self, ijk_min: Vec3iBatch, ijk_max: Vec3iBatch) -> GridBatch: ...
     def dual_grid(self, exclude_border: bool = False) -> GridBatch: ...
-    def fill_to_grid(
-        self, features: JaggedTensor, other_grid: GridBatch, default_value: float = ...
+    def fill_from_grid(
+        self, other_features: JaggedTensor, other_grid: GridBatch, default_value: float = ...
     ) -> JaggedTensor: ...
     def coarsened_grid(self, coarsening_factor: Vec3iOrScalar) -> GridBatch: ...
     def subdivided_grid(self, subdiv_factor: Vec3iOrScalar, mask: JaggedTensorOrTensor = ...) -> GridBatch: ...
@@ -298,7 +277,7 @@ class GridBatch:
     ) -> Tuple[JaggedTensor, GridBatch]: ...
     def disable_ijk(self, ijk: JaggedTensorOrTensor) -> None: ...
     def enable_ijk(self, ijk: JaggedTensorOrTensor) -> None: ...
-    def points_in_active_voxel(self, xyz: JaggedTensorOrTensor, ignore_disabled: bool = False) -> JaggedTensor: ...
+    def points_in_active_voxel(self, points: JaggedTensorOrTensor, ignore_disabled: bool = False) -> JaggedTensor: ...
     def coords_in_active_voxel(self, ijk: JaggedTensorOrTensor, ignore_disabled: bool = False) -> JaggedTensor: ...
     def cubes_in_grid(
         self,
@@ -364,7 +343,7 @@ class GridBatch:
         eps: float = 0.0,
     ) -> JaggedTensor: ...
     def grid_to_world(self, ijk: JaggedTensorOrTensor) -> JaggedTensor: ...
-    def world_to_grid(self, ijk: JaggedTensorOrTensor) -> JaggedTensor: ...
+    def world_to_grid(self, points: JaggedTensorOrTensor) -> JaggedTensor: ...
     def marching_cubes(
         self, field: JaggedTensorOrTensor, level: float = 0.0
     ) -> Tuple[JaggedTensor, JaggedTensor, JaggedTensor]: ...
@@ -485,8 +464,8 @@ class SparseConvPackInfo:
 @overload
 def jcat(grid_batches: List[GridBatch]) -> GridBatch: ...
 @overload
-def jcat(jagged_tensors: List[JaggedTensorOrTensor], dim: int | None = ...) -> JaggedTensor: ...
-def sparse_grid_from_ijk(
+def jcat(jagged_tensors: List[JaggedTensorOrTensor], dim: int | None = None) -> JaggedTensor: ...
+def gridbatch_from_ijk(
     ijk: JaggedTensorOrTensor,
     pad_min: Vec3i = ...,
     pad_max: Vec3i = ...,
@@ -494,10 +473,10 @@ def sparse_grid_from_ijk(
     origins: Vec3dBatch = ...,
     mutable: bool = ...,
 ) -> GridBatch: ...
-def sparse_grid_from_nearest_voxels_to_points(
+def gridbatch_from_nearest_voxels_to_points(
     points: JaggedTensorOrTensor, voxel_sizes: Vec3dBatchOrScalar = ..., origins: Vec3dBatch = ..., mutable: bool = ...
 ) -> GridBatch: ...
-def sparse_grid_from_points(
+def gridbatch_from_points(
     points: JaggedTensorOrTensor,
     pad_min: Vec3i = ...,
     pad_max: Vec3i = ...,
@@ -505,7 +484,7 @@ def sparse_grid_from_points(
     origins: Vec3dBatch = ...,
     mutable: bool = ...,
 ) -> GridBatch: ...
-def sparse_grid_from_dense(
+def gridbatch_from_dense(
     num_grids: int,
     dense_dims: Vec3i,
     ijk_min: Vec3i = ...,
@@ -514,7 +493,7 @@ def sparse_grid_from_dense(
     device: TorchDeviceOrString = ...,
     mutable: bool = ...,
 ) -> GridBatch: ...
-def sparse_grid_from_mesh(
+def gridbatch_from_mesh(
     vertices: JaggedTensorOrTensor,
     faces: JaggedTensorOrTensor,
     voxel_sizes: Vec3dBatchOrScalar = ...,
@@ -529,6 +508,23 @@ def volume_render(
     ts: torch.Tensor,
     packInfo: torch.Tensor,
     transmittanceThresh: float,
+) -> List[torch.Tensor]: ...
+def gaussian_render(
+    means: torch.Tensor,
+    quats: torch.Tensor,
+    scales: torch.Tensor,
+    opacities: torch.Tensor,
+    sh_coeffs: torch.Tensor,
+    viewmats: torch.Tensor,
+    Ks: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    eps2d: float = 0.3,
+    near_plane: float = 0.01,
+    far_plane: float = 1e10,
+    radius_clip: float = 0.0,
+    sh_degree_to_use: int = 3,
+    tile_size: int = 16,
 ) -> List[torch.Tensor]: ...
 def load(
     path: str, grid_id: Optional[GridIdentifier] = None, device: TorchDeviceOrString = "cpu", verbose: bool = False

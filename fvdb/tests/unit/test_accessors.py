@@ -19,7 +19,7 @@ RESOLUTION = 1292  # over int32_t max limit
 
 class TestAccessors(unittest.TestCase):
     @parameterized.expand(all_device_combos)
-    def test_read_into_dense(self, device):
+    def test_write_to_dense(self, device):
         dense_origin = torch.tensor([0, 0, 0]).to(torch.long).to(device)
         dense_grid = torch.zeros(
             (1, RESOLUTION, RESOLUTION, RESOLUTION, 1),
@@ -42,7 +42,7 @@ class TestAccessors(unittest.TestCase):
         grid.set_from_points(zero_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
         sparse_data = torch.tensor([[0], [0]], dtype=torch.float16, device=device)
-        grid.read_into_dense(sparse_data, dense_origin, (RESOLUTION, RESOLUTION, RESOLUTION))
+        grid.write_to_dense(sparse_data, dense_origin, (RESOLUTION, RESOLUTION, RESOLUTION))
 
 
 if __name__ == "__main__":

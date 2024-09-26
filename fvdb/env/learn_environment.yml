@@ -1,11 +1,10 @@
 name: fvdb_learn
 channels:
-  - pyg
-  - nvidia
   - pytorch
+  - nvidia
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.10
   - jupyterlab
   - pytorch-cuda=12.1
   - pytorch=2.4.0
@@ -20,9 +19,8 @@ dependencies:
   - ipython
   - matplotlib
   - tqdm
-  - pyg
   - sparsehash
-  - pyg::pytorch-scatter
+  - pyg::pytorch-scatter=2.1.2
   - pandas
   - pytest-benchmark
   - polyscope
@@ -30,5 +28,6 @@ dependencies:
   - pyrender
   - linkify-it-py
   - pip:
+    - gsplat
     - point-cloud-utils
     - python-pycg

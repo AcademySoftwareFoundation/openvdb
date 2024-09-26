@@ -55,7 +55,7 @@ points = fvdb.JaggedTensor([pts1, pts2])
 colors = fvdb.JaggedTensor([clrs1, clrs2])
 
 # Create a grid where the voxels each have unit sidelength
-grid = fvdb.sparse_grid_from_points(points, voxel_sizes=1.0)
+grid = fvdb.gridbatch_from_points(points, voxel_sizes=1.0)
 
 # Indexing into a JaggedTensor returns a JaggedTensor
 print(points[0].jdata.shape)

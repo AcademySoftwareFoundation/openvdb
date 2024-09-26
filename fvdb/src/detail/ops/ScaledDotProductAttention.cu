@@ -4,8 +4,8 @@
 #include <detail/utils/BezierInterpolationIterator.h>
 #include <detail/utils/cuda/Utils.cuh>
 
-#include <c10/cuda/CUDAException.h>
 #include <THC/THCAtomics.cuh>
+#include <c10/cuda/CUDAException.h>
 
 #if (defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 12)
 #include <ATen/cudnn/Handle.h>

@@ -68,8 +68,8 @@ void dispatchReadFromDense(const GridBatchImpl &batchHdl, const torch::Tensor &i
                            bool ignoreMasked);
 
 template <c10::DeviceType>
-void dispatchFillToGrid(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
-                        const torch::Tensor &fromFeatures, torch::Tensor &toFeatures);
+void dispatchFillFromGrid(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
+                          const torch::Tensor &fromFeatures, torch::Tensor &toFeatures);
 
 template <c10::DeviceType>
 JaggedTensor dispatchIjkToInvIndex(const GridBatchImpl &batchHdl, const JaggedTensor &ijk,
@@ -312,6 +312,137 @@ torch::Tensor
 dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tensor &key,
                                   const torch::Tensor &value, const torch::Tensor &qLengths,
                                   const torch::Tensor &kvLengths, bool training, float scale);
+
+// template <c10::DeviceType>
+// std::tuple<torch::Tensor, torch::Tensor> dispatchQuatScaleToCovarPerciForward(
+//     const torch::Tensor &quats,  // [N, 4]
+//     const torch::Tensor &scales, // [N, 3]
+//     const bool compute_covar,
+//     const bool compute_preci,
+//     const bool triu
+// );
+
+template <c10::DeviceType>
+torch::Tensor dispatchSphericalHarmonicsForward(const int            sh_degree_to_use,
+                                                const torch::Tensor &dirs,     // [N, 3]
+                                                const torch::Tensor &sh_coeffs // [N, ...]
+);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor>
+dispatchSphericalHarmonicsBackward(const int            sh_degree_to_use,
+                                   const torch::Tensor &dirs,      // [N, 3]
+                                   const torch::Tensor &sh_coeffs, // [N, K, 3]
+                                   const torch::Tensor &v_colors, const bool compute_v_dirs);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchGaussianFullyFusedProjectionForward(const torch::Tensor &means,    // [N, 3]
+                                            const torch::Tensor &quats,    // [N, 4]
+                                            const torch::Tensor &scales,   // [N, 3]
+                                            const torch::Tensor &viewmats, // [C, 4, 4]
+                                            const torch::Tensor &Ks,       // [C, 3, 3]
+                                            const uint32_t image_width, const uint32_t image_height,
+                                            const float eps2d, const float near_plane,
+                                            const float far_plane, const float radius_clip);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchGaussianFullyFusedProjectionBackward(const torch::Tensor &means,     // [N, 3]
+                                             const torch::Tensor &quats,     // [N, 4]
+                                             const torch::Tensor &scales,    // [N, 3]
+                                             const torch::Tensor &viewmats,  // [C, 4, 4]
+                                             const torch::Tensor &Ks,        // [C, 3, 3]
+                                             const uint32_t       image_width,
+                                             const uint32_t image_height, const float eps2d,
+                                             const torch::Tensor &radii,     // [C, N]
+                                             const torch::Tensor &conics,    // [C, N, 3]
+                                             const torch::Tensor &v_means2d, // [C, N, 2]
+                                             const torch::Tensor &v_depths,  // [C, N]
+                                             const torch::Tensor &v_conics,  // [C, N, 3]
+                                             const bool           viewmats_requires_grad);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchIsectTiles(const torch::Tensor               &means2d,      // [C, N, 2] or [nnz, 2]
+                   const torch::Tensor               &radii,        // [C, N] or [nnz]
+                   const torch::Tensor               &depths,       // [C, N] or [nnz]
+                   const at::optional<torch::Tensor> &camera_ids,   // [nnz]
+                   const at::optional<torch::Tensor> &gaussian_ids, // [nnz]
+                   const uint32_t C, const uint32_t tile_size, const uint32_t tile_width,
+                   const uint32_t tile_height, const bool sort, const bool double_buffer);
+
+template <c10::DeviceType>
+torch::Tensor dispatchIsectOffsetEncode(const torch::Tensor &isect_ids, // [n_isects]
+                                        const uint32_t C, const uint32_t tile_width,
+                                        const uint32_t tile_height);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> dispatchRasterizeToPixelsForward(
+    // Gaussian parameters
+    const torch::Tensor &means2d,   // [C, N, 2]
+    const torch::Tensor &conics,    // [C, N, 3]
+    const torch::Tensor &colors,    // [C, N, D]
+    const torch::Tensor &opacities, // [N]
+    // image size
+    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    // intersections
+    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
+    const torch::Tensor &flatten_ids   // [n_isects]
+);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchRasterizeToPixelsBackward(
+    // Gaussian parameters
+    const torch::Tensor &means2d,   // [C, N, 2]
+    const torch::Tensor &conics,    // [C, N, 3]
+    const torch::Tensor &colors,    // [C, N, 3]
+    const torch::Tensor &opacities, // [N]
+    // image size
+    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    // intersections
+    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
+    const torch::Tensor &flatten_ids,  // [n_isects]
+    // forward outputs
+    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
+    const torch::Tensor &last_ids,      // [C, image_height, image_width]
+    // gradients of outputs
+    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
+    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
+    // options
+    bool absgrad);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchGaussianFullyFusedProjectionJaggedForward(
+    const torch::Tensor &g_sizes,  // [B] gaussian sizes
+    const torch::Tensor &means,    // [ggz, 3]
+    const torch::Tensor &quats,    // [ggz, 4] optional
+    const torch::Tensor &scales,   // [ggz, 3] optional
+    const torch::Tensor &c_sizes,  // [B] camera sizes
+    const torch::Tensor &viewmats, // [ccz, 4, 4]
+    const torch::Tensor &Ks,       // [ccz, 3, 3]
+    const uint32_t image_width, const uint32_t image_height, const float eps2d,
+    const float near_plane, const float far_plane, const float radius_clip);
+
+template <c10::DeviceType>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchGaussianFullyFusedProjectionJaggedBackward(
+    const torch::Tensor &g_sizes,   // [B] gaussian sizes
+    const torch::Tensor &means,     // [ggz, 3]
+    const torch::Tensor &quats,     // [ggz, 4] optional
+    const torch::Tensor &scales,    // [ggz, 3] optional
+    const torch::Tensor &c_sizes,   // [B] camera sizes
+    const torch::Tensor &viewmats,  // [ccz, 4, 4]
+    const torch::Tensor &Ks,        // [ccz, 3, 3]
+    const uint32_t image_width, const uint32_t image_height, const float eps2d,
+    const torch::Tensor &radii,     // [nnz]
+    const torch::Tensor &conics,    // [nnz, 3]
+    const torch::Tensor &v_means2d, // [nnz, 2]
+    const torch::Tensor &v_depths,  // [nnz]
+    const torch::Tensor &v_conics,  // [nnz, 3]
+    const bool           viewmats_requires_grad);
 
 } // namespace ops
 } // namespace detail

@@ -72,6 +72,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             else:
                 raise ValueError(f"A path {repo_path} exists but is not a git repo")
         else:
+            print(f"Cloning {git_url}:{git_tag} into {repo_path}")
             if recursive:
                 repo = git.repo.Repo.clone_from(git_url, repo_path, multi_options=["--recursive"])
             else:
@@ -81,7 +82,7 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         return repo_path, repo
 
     @staticmethod
-    def build_cmake_project(base_path, cmake_args):
+    def build_cmake_project(base_path, cmake_args, parallel_jobs: int = 1):
         cmake_build_dir = os.path.join(base_path, "build")
         cmake_install_dir = os.path.join(base_path, "install")
         os.makedirs(cmake_build_dir, exist_ok=True)
@@ -91,7 +92,9 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             + cmake_args,
             cwd=cmake_build_dir,
         )
-        subprocess.check_call(["cmake", "--build", ".", "--target", "install"], cwd=cmake_build_dir)
+        subprocess.check_call(
+            ["cmake", "--build", ".", "--target", "install", f"-j{parallel_jobs}"], cwd=cmake_build_dir
+        )
         return cmake_install_dir
 
     def build_extension(self, _ext) -> None:
@@ -304,7 +307,10 @@ if __name__ == "__main__":
             cwd / "external/cudnn_fe/include",
         ]
         + cudnn_include_dirs,
-        extra_objects=["external/c-blosc/install/lib/libblosc.a"] + cudnn_static_libs,
+        extra_objects=[
+            "external/c-blosc/install/lib/libblosc.a",
+        ]
+        + cudnn_static_libs,
         extra_compile_args={"cxx": cpp_flags + ["-fvisibility=default"], "nvcc": nvcc_flags},
         language="c++",
     )

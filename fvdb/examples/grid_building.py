@@ -23,7 +23,7 @@ def build_from_pointcloud(pcd_1: np.ndarray, pcd_2: np.ndarray):
     voxel_sizes = [[voxel_size_1, voxel_size_1, voxel_size_1], [voxel_size_2, voxel_size_2, voxel_size_2]]
 
     # Method 1:
-    grid_a1 = fvdb.sparse_grid_from_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+    grid_a1 = fvdb.gridbatch_from_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 
     # Method 2:
     grid_a2 = fvdb.GridBatch(device=pcd_jagged.device)
@@ -43,7 +43,7 @@ def build_from_pointcloud(pcd_1: np.ndarray, pcd_2: np.ndarray):
     ps.show()
 
     # Build grid from containing nearest voxels to the points
-    grid_b = fvdb.sparse_grid_from_nearest_voxels_to_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+    grid_b = fvdb.gridbatch_from_nearest_voxels_to_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 
     # Visualization
     gv_b, ge_b = grid_b.viz_edge_network
@@ -63,7 +63,7 @@ def build_from_coordinates(coords_1: np.ndarray, coords_2: np.ndarray):
     coords_jagged = JaggedTensor([torch.from_numpy(coords_1).long().cuda(), torch.from_numpy(coords_2).long().cuda()])
     voxel_sizes = [[voxel_size_1, voxel_size_1, voxel_size_1], [voxel_size_2, voxel_size_2, voxel_size_2]]
 
-    grid = fvdb.sparse_grid_from_ijk(coords_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+    grid = fvdb.gridbatch_from_ijk(coords_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 
     # Visualization
     grid_mesh_1 = pcu.voxel_grid_geometry(
@@ -91,7 +91,7 @@ def build_from_mesh(mesh_1_vf, mesh_2_vf):
     )
 
     voxel_sizes = [[voxel_size_1, voxel_size_1, voxel_size_1], [voxel_size_2, voxel_size_2, voxel_size_2]]
-    grid = fvdb.sparse_grid_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+    grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 
     # Visualization
     gv, ge = grid.viz_edge_network
@@ -108,11 +108,11 @@ def build_from_mesh(mesh_1_vf, mesh_2_vf):
 
 
 def build_from_dense():
-    grid = fvdb.sparse_grid_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="cuda")
+    grid = fvdb.gridbatch_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="cuda")
 
     # Easy way to initialize a VDBTensor from a torch 3D tensor [B, D, H, W, C]
     dense_data = torch.ones(2, 32, 32, 32, 16).cuda()
-    sparse_data = VDBTensor.from_dense(dense_data, voxel_sizes=[0.1] * 3)
+    sparse_data = fvdb.nn.vdbtensor_from_dense(dense_data, voxel_sizes=[0.1] * 3)
     dense_data_back = sparse_data.to_dense()
     assert torch.all(dense_data == dense_data_back)
 

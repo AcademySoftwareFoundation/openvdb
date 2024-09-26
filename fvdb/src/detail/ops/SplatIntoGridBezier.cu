@@ -4,8 +4,8 @@
 #include <detail/utils/BezierInterpolationIterator.h>
 #include <detail/utils/cuda/Utils.cuh>
 
-#include <c10/cuda/CUDAException.h>
 #include <THC/THCAtomics.cuh>
+#include <c10/cuda/CUDAException.h>
 
 namespace fvdb {
 namespace detail {

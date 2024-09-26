@@ -7,7 +7,7 @@ fvdb.nn
 .. autoclass:: fvdb.nn.MaxPool
 .. autoclass:: fvdb.nn.AvgPool
 .. autoclass:: fvdb.nn.UpsamplingNearest
-.. autoclass:: fvdb.nn.FillToGrid
+.. autoclass:: fvdb.nn.FillFromGrid
 .. autoclass:: fvdb.nn.SparseConv3d
 .. autoclass:: fvdb.nn.GroupNorm
 .. autoclass:: fvdb.nn.Linear

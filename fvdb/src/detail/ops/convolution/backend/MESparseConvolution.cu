@@ -5,10 +5,10 @@
 #define GPU_CONVOLUTION
 
 #include <ATen/OpMathType.h>
+#include <ATen/cuda/Atomic.cuh>
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <torch/extension.h>
-#include <ATen/cuda/Atomic.cuh>
 
 #include <cublas_v2.h>
 

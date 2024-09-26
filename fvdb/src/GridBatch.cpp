@@ -126,9 +126,9 @@ GridBatch::read_from_dense(const torch::Tensor &dense_data, const Vec3iBatch &de
 }
 
 torch::Tensor
-GridBatch::read_into_dense(const JaggedTensor                &sparse_data,
-                           const torch::optional<Vec3iBatch> &min_coord,
-                           const torch::optional<Vec3i>      &grid_size) const {
+GridBatch::write_to_dense(const JaggedTensor                &sparse_data,
+                          const torch::optional<Vec3iBatch> &min_coord,
+                          const torch::optional<Vec3i>      &grid_size) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         sparse_data.ldim() == 1,
@@ -139,15 +139,15 @@ GridBatch::read_into_dense(const JaggedTensor                &sparse_data,
 }
 
 JaggedTensor
-GridBatch::fill_to_grid(const JaggedTensor &features, const GridBatch &other_grid,
-                        float default_value) const {
+GridBatch::fill_from_grid(const JaggedTensor &other_features, const GridBatch &other_grid,
+                          float default_value) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
-        features.ldim() == 1,
+        other_features.ldim() == 1,
         "Expected features to have 1 list dimension, i.e. be a single list of coordinate values, but got",
-        features.ldim(), "list dimensions");
-    torch::Tensor retData = detail::autograd::FillToGrid::apply(other_grid.impl(), impl(),
-                                                                features.jdata(), default_value)[0];
+        other_features.ldim(), "list dimensions");
+    torch::Tensor retData = detail::autograd::FillFromGrid::apply(
+        other_grid.impl(), impl(), other_features.jdata(), default_value)[0];
 
     return impl()->jaggedTensor(retData, false);
 }
@@ -166,16 +166,16 @@ GridBatch::grid_to_world(const JaggedTensor &ijk) const {
 }
 
 JaggedTensor
-GridBatch::world_to_grid(const JaggedTensor &xyz) const {
+GridBatch::world_to_grid(const JaggedTensor &points) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
-        xyz.ldim() == 1,
-        "Expected xyz to have 1 list dimension, i.e. be a single list of coordinate values, but got",
-        xyz.ldim(), "list dimensions");
+        points.ldim() == 1,
+        "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        points.ldim(), "list dimensions");
     torch::Tensor ret = detail::autograd::TransformPoints::apply(
-        impl(), xyz, xyz.jdata(), false /* isInverse*/, false /*isDual*/)[0];
+        impl(), points, points.jdata(), false /* isInverse*/, false /*isDual*/)[0];
 
-    return xyz.jagged_like(ret);
+    return points.jagged_like(ret);
 }
 
 torch::Tensor
@@ -797,8 +797,8 @@ GridBatch::clipped_grid(const Vec3iBatch &ijk_min, const Vec3iBatch &ijk_max) co
     JaggedTensor activeVoxelMaskCoords = activeVoxelCoords.rmask(activeVoxelMask.jdata());
 
     // construct grid from ijk's clipped from original grid
-    GridBatch clippedGrid = sparse_grid_from_ijk(activeVoxelMaskCoords, Vec3i(), Vec3i(),
-                                                 voxel_sizes(), origins(), is_mutable());
+    GridBatch clippedGrid = gridbatch_from_ijk(activeVoxelMaskCoords, Vec3i(), Vec3i(),
+                                               voxel_sizes(), origins(), is_mutable());
 
     return clippedGrid;
 }
@@ -832,8 +832,8 @@ GridBatch::clip(const JaggedTensor &features, const Vec3iBatch &ijk_min,
     JaggedTensor activeVoxelMaskCoords = activeVoxelCoords.rmask(activeVoxelMask.jdata());
 
     // construct grid from ijk's clipped from original grid
-    GridBatch clippedGrid = sparse_grid_from_ijk(activeVoxelMaskCoords, Vec3i(), Vec3i(),
-                                                 voxel_sizes(), origins(), is_mutable());
+    GridBatch clippedGrid = gridbatch_from_ijk(activeVoxelMaskCoords, Vec3i(), Vec3i(),
+                                               voxel_sizes(), origins(), is_mutable());
     // features clipped to voxels in bounds
     JaggedTensor clippedFeatures = features.rmask(activeVoxelMask.jdata());
 
@@ -1061,14 +1061,14 @@ GridBatch::neighbor_indexes(const JaggedTensor &ijk, int32_t extent, int32_t bit
 }
 
 JaggedTensor
-GridBatch::points_in_active_voxel(const JaggedTensor &xyz, bool ignore_disabled) const {
+GridBatch::points_in_active_voxel(const JaggedTensor &points, bool ignore_disabled) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
-        xyz.ldim() == 1,
-        "Expected xyz to have 1 list dimension, i.e. be a single list of coordinate values, but got",
-        xyz.ldim(), "list dimensions");
+        points.ldim() == 1,
+        "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        points.ldim(), "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchPointsInGrid<DeviceTag>(*impl(), xyz, ignore_disabled);
+        return fvdb::detail::ops::dispatchPointsInGrid<DeviceTag>(*impl(), points, ignore_disabled);
     });
 }
 

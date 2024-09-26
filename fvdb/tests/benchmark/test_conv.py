@@ -1,14 +1,14 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: MPL-2.0
 #
-import torch
-import fvdb
-import fvdb.nn as fvdbnn
+import logging
 import random
 
 import pytest
-import logging
+import torch
 
+import fvdb
+import fvdb.nn as fvdbnn
 
 torch.backends.cudnn.deterministic = True
 
@@ -28,7 +28,7 @@ def test_forward_conv3d(benchmark, i_ch, o_ch, backend):
     pts = random.choice(PTS_CACHE).to(device=device) * 4
 
     coords = torch.floor(pts / 0.01).to(torch.int32)
-    grid = fvdb.sparse_grid_from_ijk(coords).to(device)
+    grid = fvdb.gridbatch_from_ijk(coords).to(device)
 
     feature = torch.empty(grid.total_voxels, i_ch, dtype=torch.float32, device=device).random_()
 

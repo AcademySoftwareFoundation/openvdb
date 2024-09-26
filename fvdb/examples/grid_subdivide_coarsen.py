@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     [p] = load_dragon_mesh(mode="v", device=torch.device("cuda"))
 
-    grid_origin = fvdb.sparse_grid_from_points(p, voxel_sizes=[0.005] * 3, origins=[0.0] * 3)
+    grid_origin = fvdb.gridbatch_from_points(p, voxel_sizes=[0.005] * 3, origins=[0.0] * 3)
     visualize_grid(grid_origin, 0.0)
 
     grid_subdivided = grid_origin.subdivided_grid(2)

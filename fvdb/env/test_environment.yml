@@ -19,10 +19,12 @@ dependencies:
   - cuda-nvcc=12.1
   - cuda-cccl=12.1
   - cuda-libraries-static=12.1
+  - cuda-cudart-static=12.1
   - cuda-version=12.1
   - parameterized
   - gcc_linux-64=11
   - gxx_linux-64=11
+  - cxx-compiler
   - setuptools>=68.2.2
   - cmake
   - make
@@ -39,8 +41,11 @@ dependencies:
   - rich
   - pytest-benchmark
   - numpy<2
+  - py-openimageio
   - linkify-it-py
+  - glm
   - pip:
     - python-pycg
+    - gsplat
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse_20-2.0.0b0-cp310-cp310-linux_x86_64.whl
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse-2.1.0-cp310-cp310-linux_x86_64.whl

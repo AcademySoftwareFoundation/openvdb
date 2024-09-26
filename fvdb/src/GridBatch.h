@@ -43,6 +43,14 @@ struct GridBatch : torch::CustomClassHolder {
         return GridBatch(detail::GridBatchImpl::contiguous(impl()));
     }
 
+    /// @brief Check if two GridBatches refer to the same underlying NanoVDB grid
+    /// @param other Another GridBatch to compare with
+    /// @return true if the two GridBatches refer to the same underlying NanoVDB grid
+    bool
+    is_same(const GridBatch &other) const {
+        return impl() == other.impl();
+    }
+
     /// @brief Get the voxel size of the bi^th grid in the batch and return is a tensor of type
     /// dtype
     /// @param bi The batch index of the grid for which to get the voxel size
@@ -398,19 +406,19 @@ struct GridBatch : torch::CustomClassHolder {
     ///                  Defaults to the total size of a grid containing the whole batch.
     /// @return A dense tensor of shape [B, W, H, D, *] containing the values at the specified
     /// coordinates (and zero elsewhere)
-    torch::Tensor read_into_dense(const JaggedTensor                &sparse_data,
-                                  const torch::optional<Vec3iBatch> &min_coord = torch::nullopt,
-                                  const torch::optional<Vec3i> &grid_size = torch::nullopt) const;
+    torch::Tensor write_to_dense(const JaggedTensor                &sparse_data,
+                                 const torch::optional<Vec3iBatch> &min_coord = torch::nullopt,
+                                 const torch::optional<Vec3i> &grid_size = torch::nullopt) const;
 
     /// @brief Given a GridBatch and features associated with it,
-    ///        return a JaggedTensor representing features for this batch of grid.
+    ///        return a JaggedTensor representing features for this batch of grids.
     ///        Fill any voxels not in the GridBatch with the default value.
-    /// @param features A JaggedTensor of shape [B, -1, *] containing features associated with
+    /// @param other_features A JaggedTensor of shape [B, -1, *] containing features associated with
     /// other_grid.
     /// @param other_grid A GridBatch representing the grid to fill from.
     /// @param default_value The value to fill in for voxels not in other_grid.
-    JaggedTensor fill_to_grid(const JaggedTensor &features, const GridBatch &other_grid,
-                              float default_value = 0.0f) const;
+    JaggedTensor fill_from_grid(const JaggedTensor &other_features, const GridBatch &other_grid,
+                                float default_value = 0.0f) const;
 
     /// @brief Convert grid coordinates to world coordinates
     /// @param ijk A JaggedTensor of grid coordinates with shape [B, -1, 3] (one point set per grid
@@ -420,11 +428,11 @@ struct GridBatch : torch::CustomClassHolder {
     JaggedTensor grid_to_world(const JaggedTensor &ijk) const;
 
     /// @brief Convert world coordinates to grid coordinates
-    /// @param xyz A JaggedTensor of world coordinates with shape [B, -1, 3] (one point set per grid
-    /// in the batch)
+    /// @param points A JaggedTensor of world coordinates with shape [B, -1, 3] (one point set per
+    /// grid in the batch)
     /// @return A JaggedTensor of grid coordinates with shape [B, -1, 3] (one point set per grid in
     /// the batch)
-    JaggedTensor world_to_grid(const JaggedTensor &xyz) const;
+    JaggedTensor world_to_grid(const JaggedTensor &points) const;
 
     /// @brief Get grid-to-world matrices
     /// @return A JaggedTensor of grid-to-world matrices with shape [B, 4, 4]
@@ -514,14 +522,14 @@ struct GridBatch : torch::CustomClassHolder {
                                   int32_t bitshift = 0) const;
 
     /// @brief Return whether each point lies inside the grid batch
-    /// @param xyz A JaggedTensor of points with shape [B, -1, 3] (one point set per grid in the
+    /// @param points A JaggedTensor of points with shape [B, -1, 3] (one point set per grid in the
     /// batch)
     /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to
     /// mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per point)
     ///         where the [bi, i]^th entry is true if points[bi, i] lies inside the bi^th grid in
     ///         the batch
-    JaggedTensor points_in_active_voxel(const JaggedTensor &xyz,
+    JaggedTensor points_in_active_voxel(const JaggedTensor &points,
                                         bool                ignore_disabled = false) const;
 
     /// @brief Return whether the cube with corners at cube_min and cube_max centered at each point

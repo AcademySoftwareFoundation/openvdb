@@ -22,7 +22,7 @@ For example:
 import fvdb
 
 # Create mutable grid
-grid = fvdb.sparse_grid_from_mesh(
+grid = fvdb.gridbatch_from_mesh(
     mesh_v_jagged, mesh_f_jagged,
     voxel_sizes=[0.01] * 3, origins=[0.0] * 3,
     mutable=True
@@ -96,7 +96,7 @@ import fvdb
 init_resolution = 96
 
 # Suppose our shape lies within the unit bounding box from [-0.5, 0.5, 0.5] to [0.5, 0.5, 0.5]
-grid = fvdb.sparse_grid_from_dense(
+grid = fvdb.gridbatch_from_dense(
     num_grids=1, dense_dims=[init_resolution] * 3,
     voxel_sizes=[1.0 / (init_resolution - 1)] * 3, origins=[-0.5, -0.5, -0.5],
     device="cuda",

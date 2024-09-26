@@ -72,6 +72,18 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("volume_render", &fvdb::volumeRender, py::arg("sigmas"), py::arg("rgbs"),
           py::arg("deltaTs"), py::arg("ts"), py::arg("packInfo"), py::arg("transmittanceThresh"));
 
+    // gaussian rendering
+    m.def("gaussian_fully_fused_projection", &fvdb::gaussianFullyFusedProjection, py::arg("means"),
+          py::arg("quats"), py::arg("scales"), py::arg("viewmats"), py::arg("Ks"),
+          py::arg("image_width"), py::arg("image_height"), py::arg("eps2d"), py::arg("near_plane"),
+          py::arg("far_plane"), py::arg("radius_clip"));
+
+    m.def("gaussian_render", &fvdb::gaussianRender, py::arg("means"), py::arg("quats"),
+          py::arg("scales"), py::arg("opacities"), py::arg("sh_coeffs"), py::arg("viewmats"),
+          py::arg("Ks"), py::arg("image_width"), py::arg("image_height"), py::arg("eps2d"),
+          py::arg("near_plane"), py::arg("far_plane"), py::arg("radius_clip"),
+          py::arg("sh_degree_to_use"), py::arg("tile_size"));
+
     // attention
     m.def("scaled_dot_product_attention", &fvdb::scaledDotProductAttention, py::arg("query"),
           py::arg("key"), py::arg("value"), py::arg("scale"), R"_FVDB_(
@@ -105,24 +117,23 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // py::arg("data"));
 
     // Static grid construction
-    m.def("sparse_grid_from_points", &fvdb::sparse_grid_from_points, py::arg("points"),
+    m.def("gridbatch_from_points", &fvdb::gridbatch_from_points, py::arg("points"),
           py::arg("pad_min") = torch::zeros({ 3 }, torch::kInt32),
           py::arg("pad_max") = torch::zeros({ 3 }, torch::kInt32), py::arg("voxel_sizes") = 1.0,
           py::arg("origins") = torch::zeros({ 3 }), py::arg("mutable") = false);
-    m.def("sparse_grid_from_nearest_voxels_to_points",
-          &fvdb::sparse_grid_from_nearest_voxels_to_points, py::arg("points"),
-          py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
+    m.def("gridbatch_from_nearest_voxels_to_points", &fvdb::gridbatch_from_nearest_voxels_to_points,
+          py::arg("points"), py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
           py::arg("mutable") = false);
-    m.def("sparse_grid_from_ijk", &fvdb::sparse_grid_from_ijk, py::arg("ijk"),
+    m.def("gridbatch_from_ijk", &fvdb::gridbatch_from_ijk, py::arg("ijk"),
           py::arg("pad_min") = torch::zeros({ 3 }, torch::kInt32),
           py::arg("pad_max") = torch::zeros({ 3 }, torch::kInt32), py::arg("voxel_sizes") = 1.0,
           py::arg("origins") = torch::zeros({ 3 }), py::arg("mutable") = false);
-    m.def("sparse_grid_from_dense", &fvdb::sparse_grid_from_dense, py::arg("num_grids"),
+    m.def("gridbatch_from_dense", &fvdb::gridbatch_from_dense, py::arg("num_grids"),
           py::arg("dense_dims"), py::arg("ijk_min") = torch::zeros(3, torch::kInt32),
           py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
           py::arg("mask") = nullptr, py::arg("device") = "cpu", py::arg("mutable") = false);
-    m.def("sparse_grid_from_mesh", &fvdb::sparse_grid_from_mesh, py::arg("vertices"),
-          py::arg("faces"), py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
+    m.def("gridbatch_from_mesh", &fvdb::gridbatch_from_mesh, py::arg("vertices"), py::arg("faces"),
+          py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
           py::arg("mutable") = false);
 
     // Loading and saving grids

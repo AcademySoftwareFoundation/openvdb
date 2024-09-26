@@ -52,7 +52,7 @@ if __name__ == "__main__":
     pcd_jagged = JaggedTensor([torch.from_numpy(pcd_1).float().cuda(), torch.from_numpy(pcd_2).float().cuda()])
 
     # Grid creation
-    grid = fvdb.sparse_grid_from_mesh(
+    grid = fvdb.gridbatch_from_mesh(
         mesh_v_jagged, mesh_f_jagged, voxel_sizes=[0.01] * 3, origins=[0.0] * 3, mutable=True
     )
     feature = grid.grid_to_world(grid.ijk.float())

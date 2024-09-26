@@ -3,13 +3,13 @@
 #
 import unittest
 
-import torch
 import numpy as np
+import torch
 from parameterized import parameterized
 
 from fvdb import GridBatch
 
-from .common import random_drop_points_if_mutable, sparse_grid_from_dense_cube
+from .common import gridbatch_from_dense_cube, random_drop_points_if_mutable
 
 all_device_dtype_combos = [
     ["cpu", torch.float16, False],
@@ -35,7 +35,7 @@ all_device_combos = [
 class TestUtils(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
     def test_dense(self, device, dtype, mutable):
-        dense_vdb = sparse_grid_from_dense_cube(
+        dense_vdb = gridbatch_from_dense_cube(
             [10, 11, 12], (-2.0, -2.0, -2.0), (1.0, 1.0, 1.0), voxel_center=False, mutable=mutable, device=device
         )
         self.assertTrue(dense_vdb.total_voxels == 10 * 11 * 12)
@@ -45,7 +45,7 @@ class TestUtils(unittest.TestCase):
         self.assertAlmostEqual(torch.max(vdb_coords).item(), 1.0 - 3 / 12 * 0.5, places=6)
 
         vdb_feature = torch.randn((dense_vdb.total_voxels, 4), device=device, dtype=dtype)
-        dense_feature = dense_vdb.read_into_dense(vdb_feature).squeeze(0)
+        dense_feature = dense_vdb.write_to_dense(vdb_feature).squeeze(0)
         for i in range(10):
             for j in range(11):
                 for k in range(12):
@@ -197,7 +197,7 @@ class TestUtils(unittest.TestCase):
             self.assertTrue(torch.equal(random_grid.grad, random_grid_copy.grad))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_into_dense(self, device, dtype, mutable):
+    def test_write_to_dense(self, device, dtype, mutable):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
         grid = GridBatch(mutable=mutable, device=device)
@@ -233,12 +233,12 @@ class TestUtils(unittest.TestCase):
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
             target_crop.view(-1, sparse_data.shape[-1])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
 
-            pred_crop = grid.read_into_dense(sparse_data, crop_min, crop_size).squeeze(0)
+            pred_crop = grid.write_to_dense(sparse_data, crop_min, crop_size).squeeze(0)
 
             self.assertTrue(torch.all(pred_crop == target_crop))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_into_dense_multidim(self, device, dtype, mutable):
+    def test_write_to_dense_multidim(self, device, dtype, mutable):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
         grid = GridBatch(mutable=mutable, device=device)
@@ -274,12 +274,12 @@ class TestUtils(unittest.TestCase):
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
             target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
 
-            pred_crop = grid.read_into_dense(sparse_data, crop_min, crop_size).squeeze(0)
+            pred_crop = grid.write_to_dense(sparse_data, crop_min, crop_size).squeeze(0)
 
             self.assertTrue(torch.all(pred_crop == target_crop))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_into_dense_multidim_grad(self, device, dtype, mutable):
+    def test_write_to_dense_multidim_grad(self, device, dtype, mutable):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
         grid = GridBatch(mutable=mutable, device=device)
@@ -321,7 +321,7 @@ class TestUtils(unittest.TestCase):
             loss_copy = target_crop.sum()
             loss_copy.backward()
 
-            pred_crop = grid.read_into_dense(sparse_data, crop_min, crop_size).squeeze(0)
+            pred_crop = grid.write_to_dense(sparse_data, crop_min, crop_size).squeeze(0)
             loss = pred_crop.sum()
             loss.backward()
 

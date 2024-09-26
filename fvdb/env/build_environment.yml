@@ -17,8 +17,10 @@ dependencies:
   - cuda-nvcc=12.1
   - cuda-cccl=12.1
   - cuda-libraries-static=12.1
+  - cuda-cudart-static=12.1
   - gcc_linux-64=11
   - gxx_linux-64=11
+  - cxx-compiler
   - setuptools>=68.2.2
   - cmake
   - make
@@ -29,3 +31,4 @@ dependencies:
   - linkify-it-py
   - numpy<2
   - tqdm
+  - glm
