@@ -9,10 +9,10 @@ import torch
 from parameterized import parameterized
 
 from .common import (
+    gridbatch_from_dense_cube,
     make_dense_grid_and_point_data,
-    make_sparse_grid_and_point_data,
+    make_gridbatch_and_point_data,
     random_drop_points_if_mutable,
-    sparse_grid_from_dense_cube,
 )
 
 all_device_dtype_combos = [
@@ -30,7 +30,7 @@ all_device_dtype_combos = [
 
 
 def trilinear_sample_pytorch(fvdb, p, features, is_dual: bool):
-    dual_features_grid = fvdb.read_into_dense(features).squeeze(0).permute(3, 2, 1, 0).unsqueeze(0)
+    dual_features_grid = fvdb.write_to_dense(features).squeeze(0).permute(3, 2, 1, 0).unsqueeze(0)
     p_in = p.reshape(1, 1, 1, -1, 3)  # [1, 1, 1, N, 3]
     res = (
         torch.nn.functional.grid_sample(dual_features_grid, p_in, mode="bilinear", align_corners=is_dual)
@@ -245,7 +245,7 @@ class TestSample(unittest.TestCase):
 
         nvox = 7
         scale = 2
-        fvdb = sparse_grid_from_dense_cube([nvox] * 3, device=device, mutable=mutable)
+        fvdb = gridbatch_from_dense_cube([nvox] * 3, device=device, mutable=mutable)
 
         small_features = torch.rand((1, nvox, nvox, nvox), device=device, dtype=dtype)
         small_features.requires_grad = True
@@ -255,7 +255,7 @@ class TestSample(unittest.TestCase):
         big_pos = fvdb_big.grid_to_world(fvdb_big.ijk.type(dtype)).jdata
         self.assertEqual(big_pos.dtype, dtype)
         big_features_vdb = fvdb.sample_trilinear(big_pos, small_features_vdb).jdata
-        fv = fvdb_big.read_into_dense(big_features_vdb).squeeze(0).permute(3, 2, 1, 0)
+        fv = fvdb_big.write_to_dense(big_features_vdb).squeeze(0).permute(3, 2, 1, 0)
         grad_out = torch.rand_like(fv) + 0.1
         fv.backward(grad_out)
         assert small_features.grad is not None
@@ -276,7 +276,7 @@ class TestSample(unittest.TestCase):
         fvdb_big = fvdb.subdivided_grid(scale)
         big_pos = fvdb_big.grid_to_world(fvdb_big.ijk.type(dtype)).jdata
         big_features_vdb, _ = fvdb.subdivide(scale, small_features_vdb, fine_grid=fvdb_big)
-        fv = fvdb_big.read_into_dense(big_features_vdb).squeeze(0).permute(3, 2, 1, 0)
+        fv = fvdb_big.write_to_dense(big_features_vdb).squeeze(0).permute(3, 2, 1, 0)
         fv.backward(grad_out)
         gv = small_features.grad.clone()
         small_features.grad.zero_()
@@ -299,7 +299,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -348,7 +348,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -407,7 +407,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -469,7 +469,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -529,7 +529,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -581,7 +581,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(device, dtype, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
         random_drop_points_if_mutable(grid)
         random_drop_points_if_mutable(grid_d)
 
@@ -639,7 +639,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(
+        grid, grid_d, p = make_gridbatch_and_point_data(
             device, dtype, include_boundary_points=True, mutable=mutable, expand=1
         )
         random_drop_points_if_mutable(grid)
@@ -701,7 +701,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(
+        grid, grid_d, p = make_gridbatch_and_point_data(
             device, dtype, include_boundary_points=True, mutable=mutable, expand=1
         )
         random_drop_points_if_mutable(grid)
@@ -765,7 +765,7 @@ class TestSample(unittest.TestCase):
             gatol = 1e-5
             grtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(
+        grid, grid_d, p = make_gridbatch_and_point_data(
             device, dtype, include_boundary_points=True, mutable=mutable, expand=1
         )
         random_drop_points_if_mutable(grid)
@@ -800,7 +800,7 @@ class TestSample(unittest.TestCase):
             gatol = 1e-5
             grtol = 1e-8
 
-        grid, grid_d, p = make_sparse_grid_and_point_data(
+        grid, grid_d, p = make_gridbatch_and_point_data(
             device, dtype, include_boundary_points=True, mutable=mutable, expand=1
         )
         random_drop_points_if_mutable(grid)

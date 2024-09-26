@@ -172,8 +172,9 @@ class TestNN(unittest.TestCase):
                     ).to(device)
                     our_gn_input = fvnn.VDBTensor(grid, vdb_features)
                     our_gn_output = our_gn_op(our_gn_input)
-                    our_gn_output.feature.jdata.sum().backward()
-                    our_gn_grad = our_gn_input.feature.jdata.grad.clone()
+                    our_gn_output.data.jdata.sum().backward()
+                    assert our_gn_input.data.jdata.grad is not None
+                    our_gn_grad = our_gn_input.data.jdata.grad.clone()
 
                     # Pytorch groupnorm
                     torch_gn_op = torch.nn.GroupNorm(
@@ -189,7 +190,7 @@ class TestNN(unittest.TestCase):
                     torch_gn_grad = torch_gn_input.grad.clone().reshape(-1, num_channels)
 
                     # Check that the outputs are the same
-                    self.assertTrue(torch.mean(our_gn_output.feature.jdata - torch_gn_output) < 1e-3)
+                    self.assertTrue(torch.mean(our_gn_output.data.jdata - torch_gn_output) < 1e-3)
                     self.assertTrue(torch.mean(our_gn_grad - torch_gn_grad) < 1e-3)
 
     @parameterized.expand(all_device_dtype_combos)
@@ -206,7 +207,7 @@ class TestNN(unittest.TestCase):
             our_pooling = fvnn.MaxPool(pool_factor)
             our_pooling_input = fvnn.VDBTensor(grid, grid.jagged_like(grid_vals))
             our_pooling_output = our_pooling(our_pooling_input)
-            grid_vals_coarse = our_pooling_output.feature.jdata
+            grid_vals_coarse = our_pooling_output.data.jdata
             grid_coarse = our_pooling_output.grid
             self.assertTrue(torch.allclose(grid_coarse.voxel_sizes[0], grid.voxel_sizes[0] * pool_factor))
             self.assertTrue(
@@ -234,48 +235,48 @@ class TestNN(unittest.TestCase):
 
     def test_vdbtensor_dense(self):
         dense_tensor = torch.randn(8, 32, 32, 32, 3)
-        vdb_tensor = fvnn.VDBTensor.from_dense(dense_tensor)
+        vdb_tensor = fvnn.vdbtensor_from_dense(dense_tensor)
         self.assertEqual(vdb_tensor.grid_count, 8)
         self.assertEqual(vdb_tensor.total_voxels, 32**3 * 8)
         self.assertTrue(torch.allclose(dense_tensor, vdb_tensor.to_dense()))
 
     def test_vdbtensor_arithmetic(self):
-        grid = fvdb.sparse_grid_from_dense(8, [32, 32, 32], voxel_sizes=0.05, origins=(0.0, 0.0, 0.0))
+        grid = fvdb.gridbatch_from_dense(8, [32, 32, 32], voxel_sizes=0.05, origins=(0.0, 0.0, 0.0))
         v1 = fvnn.VDBTensor(grid, grid.jagged_like(torch.randn(grid.total_voxels, 3)))
         v2 = fvnn.VDBTensor(grid, grid.jagged_like(torch.randn(grid.total_voxels, 3)))
 
-        v = fvnn.cat([v1, v2])
+        v = fvdb.jcat([v1, v2])
         self.assertTrue(v.grid_count == 16)
-        self.assertTrue(torch.allclose(v.feature.jdata, torch.cat([v1.feature.jdata, v2.feature.jdata])))
+        self.assertTrue(torch.allclose(v.data.jdata, torch.cat([v1.data.jdata, v2.data.jdata])))
 
-        v = fvnn.cat([v1, v2], dim=1)
+        v = fvdb.jcat([v1, v2], dim=1)
         self.assertTrue(v.grid_count == 8)
-        self.assertTrue(torch.allclose(v.feature.jdata, torch.cat([v1.feature.jdata, v2.feature.jdata], dim=1)))
+        self.assertTrue(torch.allclose(v.data.jdata, torch.cat([v1.data.jdata, v2.data.jdata], dim=1)))
 
         v = v1 + v2
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + v2.feature.jdata))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata + v2.data.jdata))
 
-        v = v1 + v2.feature
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + v2.feature.jdata))
+        v = v1 + v2.data
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata + v2.data.jdata))
 
         v = v1 + 1.0
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata + 1.0))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata + 1.0))
 
         v = v1 - v2
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata - v2.feature.jdata))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata - v2.data.jdata))
 
         v = v1 * 2.0
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata * 2.0))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata * 2.0))
 
         v = v1 / 2.0
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata / 2.0))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata / 2.0))
 
         v = v1 / v2
-        self.assertTrue(torch.allclose(v.feature.jdata, v1.feature.jdata / v2.feature.jdata))
+        self.assertTrue(torch.allclose(v.data.jdata, v1.data.jdata / v2.data.jdata))
 
     def test_conv_backends(self):
         dtype, device = torch.float32, "cuda"
-        grid = fvdb.sparse_grid_from_points(
+        grid = fvdb.gridbatch_from_points(
             fvdb.JaggedTensor([torch.rand(1024, 3, device=device, dtype=dtype) * 2.0 - 1.0 for _ in range(8)]),
             voxel_sizes=[0.025] * 3,
             origins=[0.0] * 3,
@@ -284,10 +285,10 @@ class TestNN(unittest.TestCase):
         conv_layer = fvnn.SparseConv3d(16, 32).to(device=device, dtype=dtype)
 
         conv_layer.backend = "default"
-        out_feature_default = conv_layer(fvnn.VDBTensor(grid, feature)).feature.jdata
+        out_feature_default = conv_layer(fvnn.VDBTensor(grid, feature)).data.jdata
 
         conv_layer.backend = "halo"
-        out_feature_halo = conv_layer(fvnn.VDBTensor(grid, feature)).feature.jdata
+        out_feature_halo = conv_layer(fvnn.VDBTensor(grid, feature)).data.jdata
 
         rel_diff_halo = torch.linalg.norm(out_feature_halo - out_feature_default) / torch.linalg.norm(
             out_feature_default
@@ -295,7 +296,7 @@ class TestNN(unittest.TestCase):
         self.assertLess(rel_diff_halo, 1e-3)
 
         conv_layer.backend = "dense"
-        out_feature_dense = conv_layer(fvnn.VDBTensor(grid, feature)).feature.jdata
+        out_feature_dense = conv_layer(fvnn.VDBTensor(grid, feature)).data.jdata
 
         rel_diff_dense = torch.linalg.norm(out_feature_dense - out_feature_default) / torch.linalg.norm(
             out_feature_default
@@ -320,11 +321,11 @@ class TestNN(unittest.TestCase):
 
         sparse_unet = MyUNet(is_fvdb=True).to(device).to(dtype).requires_grad_(True).train()
         copy_weights(sparse_unet, dense_unet)
-        sparse_in_feature = fvnn.VDBTensor.from_dense(dense_in_feature.permute(0, 4, 3, 2, 1))
+        sparse_in_feature = fvnn.vdbtensor_from_dense(dense_in_feature.permute(0, 4, 3, 2, 1))
 
         sparse_out_feature = sparse_unet(sparse_in_feature)
         sparse_out_feature_dense = sparse_out_feature.to_dense().permute(0, 4, 3, 2, 1)
-        sparse_out_feature.feature.jdata.sum().backward()
+        sparse_out_feature.data.jdata.sum().backward()
         sparse_out_grad = {
             name: param.grad.clone() for name, param in sparse_unet.named_parameters() if param.grad is not None
         }

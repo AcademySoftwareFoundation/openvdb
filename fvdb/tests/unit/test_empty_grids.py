@@ -12,8 +12,7 @@ from parameterized import parameterized
 
 import fvdb
 
-from fvdb import GridBatch, sparse_grid_from_ijk, JaggedTensor
-from fvdb.utils import volume_render
+from fvdb import GridBatch, gridbatch_from_ijk, JaggedTensor, volume_render
 
 from .common import random_drop_points_if_mutable
 
@@ -51,7 +50,7 @@ class TestBasicOps(unittest.TestCase):
     def test_building_empty_grids_from_ijk(self, device, dtype, mutable):
         batch_size = 1
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (0, 3)) for i in range(batch_size)]).to(device)
-        grid = fvdb.sparse_grid_from_ijk(grid_ijk, mutable=mutable)
+        grid = fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
         random_drop_points_if_mutable(grid, 0.5)
         self.assertEqual(len(grid), batch_size)
         self.assertEqual(grid.joffsets[0].item(), 0)
@@ -59,22 +58,22 @@ class TestBasicOps(unittest.TestCase):
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.randint(-512, 512, (0, 2)) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_ijk(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_ijk(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.randint(-512, 512, (0,)) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_ijk(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_ijk(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.randint(-512, 512, (5, 0)) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_ijk(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_ijk(grid_ijk_bad, mutable=mutable)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_building_grid_with_one_empty_element_in_jagged_tensor(self, device, dtype, mutable):
         shapes = [512, 0, 128]
         batch_size = len(shapes)
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (shapes[i], 3)) for i in range(batch_size)]).to(device)
-        grid = fvdb.sparse_grid_from_ijk(grid_ijk, mutable=mutable)
+        grid = fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
         random_drop_points_if_mutable(grid, 0.5)
         self.assertEqual(len(grid), batch_size)
 
@@ -89,7 +88,7 @@ class TestBasicOps(unittest.TestCase):
     def test_building_empty_grids_from_points(self, device, dtype, mutable):
         batch_size = 1
         grid_ijk = fvdb.JaggedTensor([torch.rand(0, 3) for i in range(batch_size)]).to(device)
-        grid = fvdb.sparse_grid_from_points(grid_ijk, mutable=mutable)
+        grid = fvdb.gridbatch_from_points(grid_ijk, mutable=mutable)
         random_drop_points_if_mutable(grid, 0.5)
         self.assertEqual(len(grid), batch_size)
         self.assertEqual(grid.joffsets[0].item(), 0)
@@ -97,21 +96,21 @@ class TestBasicOps(unittest.TestCase):
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(0, 2) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_points(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(0) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_points(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(5, 0) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_points(grid_ijk_bad, mutable=mutable)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_building_empty_grids_from_nearest_points(self, device, dtype, mutable):
         batch_size = 1
         grid_ijk = fvdb.JaggedTensor([torch.rand(0, 3) for i in range(batch_size)]).to(device)
-        grid = fvdb.sparse_grid_from_nearest_voxels_to_points(grid_ijk, mutable=mutable)
+        grid = fvdb.gridbatch_from_nearest_voxels_to_points(grid_ijk, mutable=mutable)
         random_drop_points_if_mutable(grid, 0.5)
         self.assertEqual(len(grid), batch_size)
         self.assertEqual(grid.joffsets[0].item(), 0)
@@ -119,15 +118,15 @@ class TestBasicOps(unittest.TestCase):
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(0, 2) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(0) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
 
         grid_ijk_bad = fvdb.JaggedTensor([torch.rand(5, 0) for i in range(batch_size)]).to(device)
         with self.assertRaises(ValueError):
-            fvdb.sparse_grid_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
+            fvdb.gridbatch_from_nearest_voxels_to_points(grid_ijk_bad, mutable=mutable)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_fvdb_cat(self, device, dtype, mutable):
@@ -136,7 +135,7 @@ class TestBasicOps(unittest.TestCase):
             grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(
                 device
             )
-            return fvdb.sparse_grid_from_ijk(grid_ijk, mutable=mutable)
+            return fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
 
         # Test concat batches with 1 grid
         grid1, grid2 = _make_random_grid(1), _make_random_grid(1)
@@ -225,14 +224,14 @@ class TestBasicOps(unittest.TestCase):
             grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(
                 device
             )
-            return fvdb.sparse_grid_from_ijk(grid_ijk, mutable=mutable)
+            return fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
 
         def _make_empty_grid(batch_size):
             sizes = [0 for _ in range(batch_size)]
             grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(
                 device
             )
-            return fvdb.sparse_grid_from_ijk(grid_ijk, mutable=mutable)
+            return fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
 
         # Test concat batches with 1 grid
         grid1, grid2 = _make_random_grid(1), _make_empty_grid(1)

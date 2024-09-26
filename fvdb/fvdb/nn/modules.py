@@ -58,7 +58,7 @@ class MaxPool(nn.Module):
             coarse_grid, coarse_kmap = None, None
 
         new_feature, new_grid = input.grid.max_pool(
-            self.kernel_size, input.feature, stride=self.stride, coarse_grid=coarse_grid
+            self.kernel_size, input.data, stride=self.stride, coarse_grid=coarse_grid
         )
         new_feature.jdata[torch.isinf(new_feature.jdata)] = 0.0
         return VDBTensor(new_grid, new_feature, kmap=coarse_kmap)
@@ -91,7 +91,7 @@ class AvgPool(nn.Module):
             coarse_grid, coarse_kmap = None, None
 
         new_feature, new_grid = input.grid.avg_pool(
-            self.kernel_size, input.feature, stride=self.stride, coarse_grid=coarse_grid
+            self.kernel_size, input.data, stride=self.stride, coarse_grid=coarse_grid
         )
         return VDBTensor(new_grid, new_feature, kmap=coarse_kmap)
 
@@ -121,7 +121,7 @@ class UpsamplingNearest(nn.Module):
         else:
             fine_grid, fine_kmap = None, None
 
-        new_feature, new_grid = input.grid.subdivide(self.scale_factor, input.feature, mask, fine_grid=fine_grid)
+        new_feature, new_grid = input.grid.subdivide(self.scale_factor, input.data, mask, fine_grid=fine_grid)
         return VDBTensor(new_grid, new_feature, kmap=fine_kmap)
 
     def extra_repr(self) -> str:
@@ -129,7 +129,7 @@ class UpsamplingNearest(nn.Module):
 
 
 @fvnn_module
-class FillToGrid(nn.Module):
+class FillFromGrid(nn.Module):
     r"""
     Fill the content of input vdb-tensor to another grid.
 
@@ -149,7 +149,7 @@ class FillToGrid(nn.Module):
         else:
             return input
 
-        new_feature = other_grid.fill_to_grid(input.feature, input.grid, self.default_value)
+        new_feature = other_grid.fill_from_grid(input.data, input.grid, self.default_value)
         return VDBTensor(other_grid, new_feature, kmap=other_kmap)
 
 
@@ -292,14 +292,14 @@ class SparseConv3d(nn.Module):
                 backend = "igemm_mode1"
 
         if backend == "halo" and self.stride == (1, 1, 1) and self.kernel_size == (3, 3, 3):
-            assert out_grid is None or VDBTensor.same_grid(in_grid, out_grid)
+            assert out_grid is None or in_grid.is_same(out_grid)
             return in_grid, in_grid.sparse_conv_halo(in_feature, self.weight, 8), None
 
         elif backend == "dense" and self.stride == (1, 1, 1):
-            assert out_grid is None or VDBTensor.same_grid(in_grid, out_grid)
+            assert out_grid is None or in_grid.is_same(out_grid)
             min_coord = in_grid.ijk.jdata.min(axis=0).values
             # BWHDC -> BCDHW
-            dense_feature = in_grid.read_into_dense(in_feature, min_coord=min_coord).permute(0, 4, 3, 2, 1)
+            dense_feature = in_grid.write_to_dense(in_feature, min_coord=min_coord).permute(0, 4, 3, 2, 1)
             dense_feature = torch.nn.functional.conv3d(dense_feature, self.weight, padding=1, stride=1)
             # BCDHW -> BWHDC
             dense_feature = dense_feature.permute(0, 4, 3, 2, 1).contiguous()
@@ -309,7 +309,7 @@ class SparseConv3d(nn.Module):
 
         else:
             # Fallback to the default implementation
-            can_cache = self.stride == (1, 1, 1) and (out_grid is None or VDBTensor.same_grid(out_grid, in_grid))
+            can_cache = self.stride == (1, 1, 1) and (out_grid is None or out_grid.is_same(in_grid))
 
             if in_kmap is not None and in_kmap.kernel_size == self.kernel_size and can_cache:
                 kmap, out_grid = in_kmap, in_grid
@@ -370,7 +370,7 @@ class SparseConv3d(nn.Module):
         input: VDBTensor,
         out_grid: Optional[GridBatch] = None,
     ) -> VDBTensor:
-        in_feature, in_grid, in_kmap = input.feature, input.grid, input.kmap
+        in_feature, in_grid, in_kmap = input.data, input.grid, input.kmap
 
         if self.kernel_size == (1, 1, 1) and self.stride == (1, 1, 1):
             out_feature = in_feature.jdata.matmul(self.weight.transpose(0, 1))
@@ -383,6 +383,8 @@ class SparseConv3d(nn.Module):
         if self.bias is not None:
             out_feature.jdata = out_feature.jdata + self.bias
 
+        if out_grid is None:
+            raise RuntimeError("Failed to compute output grid. This is a bug in the implementation.")
         return VDBTensor(out_grid, out_feature, out_kmap)
 
 
@@ -393,11 +395,11 @@ class GroupNorm(nn.GroupNorm):
     """
 
     def forward(self, input: VDBTensor) -> VDBTensor:
-        num_channels = input.feature.jdata.size(1)
+        num_channels = input.data.jdata.size(1)
         assert num_channels == self.num_channels, "Input feature should have the same number of channels as GroupNorm"
         num_batches = input.grid.grid_count
 
-        flat_data, flat_offsets = input.feature.jdata, input.feature.joffsets
+        flat_data, flat_offsets = input.data.jdata, input.data.joffsets
 
         result_data = torch.empty_like(flat_data)
 
@@ -420,9 +422,9 @@ class BatchNorm(nn.BatchNorm1d):
     """
 
     def forward(self, input: VDBTensor) -> VDBTensor:
-        num_channels = input.feature.jdata.size(1)
+        num_channels = input.data.jdata.size(1)
         assert num_channels == self.num_features, "Input feature should have the same number of channels as BatchNorm"
-        result_data = super().forward(input.feature.jdata)
+        result_data = super().forward(input.data.jdata)
         return VDBTensor(input.grid, input.grid.jagged_like(result_data), input.kmap)
 
 
@@ -430,8 +432,8 @@ class BatchNorm(nn.BatchNorm1d):
 class ElementwiseMixin:
     def forward(self, input: VDBTensor) -> VDBTensor:
         assert isinstance(input, VDBTensor), "Input should have type VDBTensor"
-        res = super().forward(input.feature.jdata)  # type: ignore
-        return VDBTensor(input.grid, input.feature.jagged_like(res), input.kmap)
+        res = super().forward(input.data.jdata)  # type: ignore
+        return VDBTensor(input.grid, input.data.jagged_like(res), input.kmap)
 
 
 class Linear(ElementwiseMixin, nn.Linear):

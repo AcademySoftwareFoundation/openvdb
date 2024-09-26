@@ -6,8 +6,8 @@
 #include "detail/utils/cuda/Utils.cuh"
 #include "detail/utils/nanovdb/CustomAccessors.h"
 
-#include <c10/cuda/CUDAException.h>
 #include <THC/THCAtomics.cuh>
+#include <c10/cuda/CUDAException.h>
 
 namespace fvdb {
 namespace detail {

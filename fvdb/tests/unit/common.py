@@ -12,15 +12,24 @@ import torch
 from git.exc import InvalidGitRepositoryError
 from parameterized import parameterized
 
-from fvdb import GridBatch, sparse_grid_from_dense
+from fvdb import GridBatch, gridbatch_from_dense
 
 Vec3i = Union[torch.Tensor, np.ndarray, List[int], Tuple[int, int, int]]
 Vec3d = Union[torch.Tensor, np.ndarray, List[float], Tuple[float, float, float]]
 NumberOrVec3 = Union[Vec3i, Vec3d, int, float]
 Vec3 = Union[Vec3i, Vec3d]
 
+git_tag_for_data = "main"
+
+
+def set_testing_git_tag(git_tag):
+    global git_tag_for_data
+    git_tag_for_data = git_tag
+
 
 def _clone_fvdb_test_data() -> Tuple[Path, git.repo.Repo]:
+    global git_tag_for_data
+
     def is_git_repo(repo_path: str) -> bool:
         is_repo = False
         try:
@@ -31,7 +40,6 @@ def _clone_fvdb_test_data() -> Tuple[Path, git.repo.Repo]:
 
         return is_repo
 
-    git_tag = "main"
     git_url = "https://github.com/voxel-foundation/fvdb-test-data.git"
     tests_root = Path(__file__).resolve().parent.parent
     repo_path = tests_root / "data"
@@ -39,12 +47,12 @@ def _clone_fvdb_test_data() -> Tuple[Path, git.repo.Repo]:
     if repo_path.exists() and repo_path.is_dir():
         if is_git_repo(str(repo_path)):
             repo = git.repo.Repo(repo_path)
-            repo.git.checkout(git_tag)
         else:
             raise ValueError(f"A path {repo_path} exists but is not a git repo")
     else:
         repo = git.repo.Repo.clone_from(git_url, repo_path)
-        repo.git.checkout(git_tag)
+    repo.remotes.origin.fetch()
+    repo.git.checkout(git_tag_for_data)
 
     return repo_path, repo
 
@@ -61,7 +69,7 @@ expand_tests = functools.partial(
 )
 
 
-def sparse_grid_from_dense_cube(
+def gridbatch_from_dense_cube(
     resolution: NumberOrVec3,
     cube_min: Vec3d = (0.0, 0.0, 0.0),
     cube_max: Vec3d = (1.0, 1.0, 1.0),
@@ -104,7 +112,7 @@ def sparse_grid_from_dense_cube(
         voxel_size = (cube_max - cube_min) / resolution.to(torch.float64)
         origin = cube_min + 0.5 * voxel_size
 
-    return sparse_grid_from_dense(
+    return gridbatch_from_dense(
         1, resolution, voxel_sizes=voxel_size, origins=origin, device=str(device), mutable=mutable
     )
 
@@ -144,7 +152,7 @@ def make_dense_grid_and_point_data(nvox, device, dtype, mutable):
     return fvdb, fvdb_d, p
 
 
-def make_sparse_grid_and_point_data(
+def make_gridbatch_and_point_data(
     device, dtype, include_boundary_points: bool = False, expand: int = 10, mutable: bool = False
 ):
     p = torch.randn((100, 3), device=device, dtype=dtype)

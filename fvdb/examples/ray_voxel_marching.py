@@ -1,16 +1,15 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: MPL-2.0
 #
-import timeit
 import logging
+import timeit
 
 import polyscope as ps
 import torch
+from common import load_dragon_mesh, make_ray_grid, plot_ray_segments
 
 import fvdb
-from fvdb import JaggedTensor, GridBatch
-
-from common import load_dragon_mesh, make_ray_grid, plot_ray_segments
+from fvdb import GridBatch, JaggedTensor
 
 
 def main():
@@ -82,7 +81,7 @@ def main():
         logging.info("Plotted Ray Segments")
 
         logging.info(f"Creating a new grid of only the voxels intersected by this ray")
-        isected_grid = fvdb.sparse_grid_from_ijk(vox[i].jflatten(), voxel_sizes=vox_size, origins=vox_origin)
+        isected_grid = fvdb.gridbatch_from_ijk(vox[i].jflatten(), voxel_sizes=vox_size, origins=vox_origin)
         logging.info(f"Created {len(isected_grid)} grids with {isected_grid.total_voxels} total voxels")
         iv, ie = isected_grid.viz_edge_network
         ps.register_curve_network("intersected voxels", iv.jdata.cpu(), ie.jdata.cpu(), enabled=True, radius=0.0009)

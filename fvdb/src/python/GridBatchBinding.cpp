@@ -318,7 +318,7 @@ bind_grid_batch(py::module &m) {
                 )_FVDB_")
 
         // Interface with dense grids
-        .def("read_into_dense", &fvdb::GridBatch::read_into_dense, py::arg("sparse_data"),
+        .def("write_to_dense", &fvdb::GridBatch::write_to_dense, py::arg("sparse_data"),
              py::arg("min_coord") = nullptr, py::arg("grid_size") = nullptr,
              R"_FVDB_(
                 Read the data in a tensor indexed by this batch of grids into a dense tensor, setting non indexed values to zero.
@@ -344,14 +344,14 @@ bind_grid_batch(py::module &m) {
                         sparse_data (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, *]` of values indexed by this grid batch.
                 )_FVDB_")
 
-        .def("fill_to_grid", &fvdb::GridBatch::fill_to_grid, py::arg("features"),
+        .def("fill_from_grid", &fvdb::GridBatch::fill_from_grid, py::arg("features"),
              py::arg("other_grid"), py::arg("default_value") = 0.0,
              R"_FVDB_(
                     Given a GridBatch and features associated with it, return a JaggedTensor representing features for this batch of grid.
                     Fill any voxels not in the GridBatch with the default value.
 
                     Args:
-                        features (JaggedTensor): A JaggedTensor of shape `[B, -1, *]` containing features associated with other_grid.
+                        other_features (JaggedTensor): A JaggedTensor of shape `[B, -1, *]` containing features associated with other_grid.
                         other_grid (GridBatch): A GridBatch containing the grid to fill from.
                         default_value (float): The value to fill in for voxels not in the GridBatch (default 0.0).
 
@@ -504,12 +504,12 @@ bind_grid_batch(py::module &m) {
         )_FVDB_")
 
         // Grid intersects/contains objects
-        .def("points_in_active_voxel", &fvdb::GridBatch::points_in_active_voxel, py::arg("xyz"),
+        .def("points_in_active_voxel", &fvdb::GridBatch::points_in_active_voxel, py::arg("points"),
              py::arg("ignore_disabled") = false, R"_FVDB_(
             Given a set of points, return a JaggedTensor of booleans indicating which points are in active voxels.
 
             Args:
-                xyz (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of point positions.
+                points (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of point positions.
                 ignore_disabled (bool): Whether to ignore disabled voxels when computing the output.
 
             Returns:
@@ -612,7 +612,7 @@ bind_grid_batch(py::module &m) {
 
         // Coordinate transform
         .def("grid_to_world", &fvdb::GridBatch::grid_to_world, py::arg("ijk"))
-        .def("world_to_grid", &fvdb::GridBatch::world_to_grid, py::arg("xyz"))
+        .def("world_to_grid", &fvdb::GridBatch::world_to_grid, py::arg("points"))
 
         // To device
         .def("to", py::overload_cast<fvdb::TorchDeviceOrString>(&fvdb::GridBatch::to, py::const_),
@@ -629,6 +629,14 @@ bind_grid_batch(py::module &m) {
 
         // .def("clone", &fvdb::GridBatch::clone) // TODO: We totally want this
 
+        .def("is_same", &fvdb::GridBatch::is_same, py::arg("other"), R"_FVDB_(
+            Check if this grid batch refers to the same underlying NanoVDB grid as another GridBatch.
+
+            Args:
+                other (GridBatch): The other grid batch to compare to.
+
+            Returns:
+                is_same (bool): Whether the two grid batches are the same.")_FVDB_")
         .def(
             "sparse_conv_kernel_map",
             [](fvdb::GridBatch &self, fvdb::Vec3iOrScalar kernelSize, fvdb::Vec3iOrScalar stride,

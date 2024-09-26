@@ -12,8 +12,8 @@
 #include <cute/atom/copy_atom.hpp>
 #include <cute/atom/mma_atom.hpp>
 
-#include <c10/cuda/CUDAException.h>
 #include <THC/THCAtomics.cuh>
+#include <c10/cuda/CUDAException.h>
 
 #include <algorithm>
 

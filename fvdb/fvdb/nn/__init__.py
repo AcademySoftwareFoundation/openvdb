@@ -3,5 +3,4 @@
 #
 from .modules import *
 from .vdbtensor import VDBTensor
-
-cat = concat = concatenate = VDBTensor.cat
+from .vdbtensor import vdbtensor_from_dense

@@ -85,7 +85,7 @@ class TestConv(unittest.TestCase):
 
         spconv, target_grid, symbol = build_spconv(grid, kernel_size, stride, backend)
         out_vdb_features = spconv.sparse_conv_3d(vdb_features, vdb_kernels, symbol)
-        out_dense_features = target_grid.read_into_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        out_dense_features = target_grid.write_to_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
         grad_out = torch.randn_like(out_dense_features)
 
         out_dense_features.backward(grad_out)
@@ -100,7 +100,7 @@ class TestConv(unittest.TestCase):
         vdb_kernels.grad.zero_()
 
         # # Dense convolution & backward
-        dense_features = grid.read_into_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        dense_features = grid.write_to_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
         out_dense_features_ref = torch.nn.functional.conv3d(
             dense_features, vdb_kernels, padding=(kernel_size - 1) // 2, stride=stride
         )
@@ -388,7 +388,7 @@ class TestConv(unittest.TestCase):
         vdb_kernels.requires_grad = True
 
         # Dense convolution & backward
-        dense_features = grid.read_into_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        dense_features = grid.write_to_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
         out_dense_features_ref = torch.nn.functional.conv3d(
             dense_features, vdb_kernels, padding=(kernel_size - 1) // 2, stride=stride
         )
@@ -406,7 +406,7 @@ class TestConv(unittest.TestCase):
         # Sparse convolution & backward
         spconv, target_grid, symbol = build_spconv(grid, kernel_size, stride, backend)
         out_vdb_features = spconv.sparse_conv_3d(vdb_features, vdb_kernels, symbol)
-        out_dense_features = target_grid.read_into_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        out_dense_features = target_grid.write_to_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
 
         if out_dense_features.size(-1) != out_dense_features_ref.size(-1):
             delta = out_dense_features.size(-1) - out_dense_features_ref.size(-1)
@@ -486,7 +486,7 @@ class TestConv(unittest.TestCase):
         vdb_kernels.requires_grad = True
 
         # Dense convolution & backward
-        dense_features = grid.read_into_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        dense_features = grid.write_to_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
         out_dense_features_ref = torch.nn.functional.conv3d(
             dense_features,
             vdb_kernels,
@@ -507,7 +507,7 @@ class TestConv(unittest.TestCase):
         # Sparse convolution & backward
         spconv, target_grid, symbol = build_spconv(grid, kernel_size, stride, backend)
         out_vdb_features = spconv.sparse_conv_3d(vdb_features, vdb_kernels, symbol)
-        out_dense_features = target_grid.read_into_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        out_dense_features = target_grid.write_to_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
 
         for i, (dense_features_dim, ref_features_dim) in enumerate(
             zip(out_dense_features.shape[-3:], out_dense_features_ref.shape[-3:])
@@ -607,7 +607,7 @@ class TestConv(unittest.TestCase):
 
         # Sparse convolution & backward
         out_vdb_features = kmap.sparse_transpose_conv_3d(vdb_features, vdb_kernels, symbol)
-        out_dense_features = source_grid.read_into_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        out_dense_features = source_grid.write_to_dense(out_vdb_features).squeeze(0).permute(3, 2, 1, 0)
         out_grad = torch.rand_like(out_dense_features)
         # TODO: Hack to compare with PyTorch with even filter size
         # out_dense_features = out_dense_features[:, :31, :31, :31]
@@ -628,7 +628,7 @@ class TestConv(unittest.TestCase):
         out_padding = 32 - out_size if out_size < 32 else 0
         in_padding = (out_size - 32) // 2 if out_size > 32 else 0
 
-        dense_features = target_grid.read_into_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
+        dense_features = target_grid.write_to_dense(vdb_features).squeeze(0).permute(3, 2, 1, 0)
         out_dense_features_ref = torch.nn.functional.conv_transpose3d(
             dense_features, vdb_kernels, stride=stride, padding=in_padding, output_padding=out_padding
         )

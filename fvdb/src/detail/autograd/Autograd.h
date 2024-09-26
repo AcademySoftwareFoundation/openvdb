@@ -6,7 +6,8 @@
 
 #include "Attention.h"
 #include "AvgPoolGrid.h"
-#include "FillToGrid.h"
+#include "FillFromGrid.h"
+#include "GaussianRender.h"
 #include "JaggedReduce.h"
 #include "MaxPoolGrid.h"
 #include "ReadFromDense.h"

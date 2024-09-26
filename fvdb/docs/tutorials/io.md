@@ -22,7 +22,7 @@ p = fvdb.JaggedTensor(
         torch.randn(100, 3),
     ]
 )
-grid = fvdb.sparse_grid_from_points(
+grid = fvdb.gridbatch_from_points(
     p, voxel_sizes=[[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]], origins=[0.0] * 3
 )
 

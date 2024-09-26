@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 import itertools
-import os
 import tempfile
 import unittest
 from typing import List
@@ -29,7 +28,8 @@ NVOX = 10_000
 
 class TestJaggedTensor(unittest.TestCase):
     def setUp(self):
-        pass
+        torch.random.manual_seed(2024)
+        np.random.seed(2024)
 
     def mklol(
         self,
@@ -417,7 +417,7 @@ class TestJaggedTensor(unittest.TestCase):
         while len(pts_list) == 0:
             for _ in range(17):
                 pts = torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype) * 10.0
-                ijk = fvdb.sparse_grid_from_points(pts, voxel_sizes=0.5).ijk.jdata
+                ijk = fvdb.gridbatch_from_points(pts, voxel_sizes=0.5).ijk.jdata
                 ijk_list.append(ijk)
                 pts_list.append(pts)
         randpts = fvdb.JaggedTensor(pts_list)

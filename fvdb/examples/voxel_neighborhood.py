@@ -6,7 +6,7 @@ import polyscope as ps
 import torch
 from common import load_dragon_mesh
 
-from fvdb import GridBatch, sparse_grid_from_ijk
+from fvdb import GridBatch, gridbatch_from_ijk
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
         vp, ve = index.viz_edge_network
         vp, ve = vp.jdata, ve.jdata
 
-        vi, vei = sparse_grid_from_ijk(nhood_ijk, voxel_sizes=vox_size, origins=vox_origin).viz_edge_network
+        vi, vei = gridbatch_from_ijk(nhood_ijk, voxel_sizes=vox_size, origins=vox_origin).viz_edge_network
         vi, vei = vi.jdata, vei.jdata
 
         ps.register_curve_network("vox", vp.cpu().numpy(), ve.cpu().numpy(), radius=0.0025)

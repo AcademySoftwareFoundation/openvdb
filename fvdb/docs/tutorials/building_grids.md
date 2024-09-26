@@ -19,7 +19,7 @@ coords_jagged = JaggedTensor([
 ])
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
 
-grid = fvdb.sparse_grid_from_ijk(coords_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+grid = fvdb.gridbatch_from_ijk(coords_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 ```
 
 The above code assumes that you want to build a grid with two batch elements, one with voxel size `[0.1, 0.1, 0.1]`, and the other with voxel size `[0.15, 0.15, 0.15]` (although usually you just want all the elements in your batch to have the same size, in which case you could just pass in `voxel_sizes=[0.1, 0.1, 0.1]`).
@@ -41,7 +41,7 @@ pcd_jagged = JaggedTensor([
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
 
 # Method 1:
-grid_a1 = fvdb.sparse_grid_from_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+grid_a1 = fvdb.gridbatch_from_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 
 # Method 2:
 grid_a2 = fvdb.GridBatch(device=pcd_jagged.device)
@@ -56,7 +56,7 @@ In some applications, you may want to build a dilated version of the grid by ens
 
 ```python
 # Build grid from containing nearest voxels to the points
-grid_b = fvdb.sparse_grid_from_nearest_voxels_to_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+grid_b = fvdb.gridbatch_from_nearest_voxels_to_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 ```
 
 ![build_from_points_nn.png](../imgs/fig/build_from_points_nn.png)
@@ -78,7 +78,7 @@ mesh_f_jagged = JaggedTensor([
 ])
 
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
-grid = fvdb.sparse_grid_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
+grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 ```
 
 Here `mesh_1_v` and `mesh_1_f` are the vertex array and triangle array of the mesh to build grid from, with the shape of $(V, 3)$ and $(F, 3)$. The triangle array is an integer array that indexes into the vertex array (starting from 0 for each element in the batch). Same for another `mesh_2_v` and `mesh_2_f`.
@@ -90,7 +90,7 @@ Here `mesh_1_v` and `mesh_1_f` are the vertex array and triangle array of the me
 We have APIs for you to build dense grids of shape $(D, H, W)$ containing the full $D\times H \times W$ voxels.
 
 ```python
-grid = fvdb.sparse_grid_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="cuda")
+grid = fvdb.gridbatch_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="cuda")
 ```
 
 ![build_from_dense.png](../imgs/fig/build_from_dense.png)

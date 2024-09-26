@@ -6,9 +6,10 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-import fvdb
-from fvdb.nn import VDBTensor, SparseConv3d
 from torchsparse import SparseTensor
+
+import fvdb
+from fvdb.nn import SparseConv3d, VDBTensor
 
 
 class BaseConfig(ABC):
@@ -84,9 +85,7 @@ class XCubeConfig(BaseConfig):
             coords = torch.unique(coords, dim=0)
             gt_coords[layer_idx] = coords
 
-        return {
-            "gt_coords": {layer_idx: fvdb.sparse_grid_from_ijk(coords) for (layer_idx, coords) in gt_coords.items()}
-        }
+        return {"gt_coords": {layer_idx: fvdb.gridbatch_from_ijk(coords) for (layer_idx, coords) in gt_coords.items()}}
 
     def _make_model(self, baseline: str) -> nn.Module:
         from fvdb_benchmark.model.xcube import XCubeVAE

@@ -255,7 +255,7 @@ To perform inference with the network, you could simply create a VDBTensor and f
 
 ```python
 xyz: JaggedTensor, features: JaggedTensor = ...
-grid = fvdb.sparse_grid_from_points(coords, voxel_sizes=[voxel_size] * 3)
+grid = fvdb.gridbatch_from_points(coords, voxel_sizes=[voxel_size] * 3)
 features: JaggedTensor = grid.splat_trilinear(xyz, features)
 sinput = fvnn.VDBTensor(grid, features)
 soutput = model(sinput)
