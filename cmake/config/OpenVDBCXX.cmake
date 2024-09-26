@@ -184,8 +184,8 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,9.3.0>>:-Wimplicit-fallthrough>")
   # Only check global constructors for libraries (we should really check for
   # executables too but gtest relies on these types of constructors for its
-  # framework).
-  add_compile_options("$<$<AND:$<NOT:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
+  # framework). nanobind also incorporates these constructors so skip it as well.
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-sign-conversion>")
   # GNU
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Werror>")
