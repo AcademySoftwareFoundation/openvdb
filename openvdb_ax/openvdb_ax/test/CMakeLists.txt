@@ -52,6 +52,18 @@ endif()
 find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
 list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS CppUnit::cppunit)
 
+find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
+
+if(TARGET GTest::gtest_main)
+  # New gtest targets as of CMake 3.20. Defined by both the Config and Module
+  # find modes
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS GTest::gtest GTest::gtest_main)
+else()
+  # Older targets, only defined by the Module find_package calls
+  list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS GTest::GTest GTest::Main)
+endif()
+
+
 set(TEST_SOURCE_FILES
   ast/TestScanners.cc
   ast/TestPrinters.cc
