@@ -298,7 +298,11 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+  if(SKBUILD)
+    install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION openvdb/${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+  else()
+    install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+  endif()
 endif()
 
 # Configure component dependencies by loading the Houdini/Maya setup
