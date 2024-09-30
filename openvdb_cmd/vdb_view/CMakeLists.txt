@@ -45,4 +45,4 @@ endif()
 
 target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
 
-install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_view RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})

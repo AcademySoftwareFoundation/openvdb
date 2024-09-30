@@ -1,0 +1,46 @@
+[build-system]
+requires = ["scikit_build_core", "nanobind"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "openvdb"
+version = "11.0.1"
+description= "Python bindings for OpenVDB: sparse volume data structure and tools."
+dependencies = [
+    "numpy",
+]
+authors = [
+  { name = "OpenVDB Developer Team", email = "openvdb-dev@lists.aswf.io" },
+]
+requires-python = ">=3.8"
+classifiers = [
+  "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+
+[project.urls]
+homepage = "https://www.openvdb.org/"
+documentation = "https://www.openvdb.org/documentation"
+forum = "https://github.com/AcademySoftwareFoundation/openvdb/discussions"
+repository = "https://github.com/AcademySoftwareFoundation/openvdb"
+slack = "https://slack.aswf.io/"
+
+[tool.scikit-build]
+wheel.packages = []
+
+[tool.scikit-build.cmake.define]
+OPENVDB_CORE_STATIC="OFF"
+USE_EXPLICIT_INSTANTIATION="OFF"
+DISABLE_DEPENDENCY_VERSION_CHECKS="ON"
+OPENVDB_USE_DELAYED_LOADING="OFF"
+OPENVDB_BUILD_PYTHON_MODULE="ON"
+USE_NUMPY="ON"
+
+USE_NANOVDB="ON"
+NANOVDB_USE_CUDA="ON"
+NANOVDB_BUILD_PYTHON_MODULE="ON"
+NANOVDB_USE_OPENVDB="ON"
+
