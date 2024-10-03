@@ -44,7 +44,7 @@ TEST_F(TestPrinters, testReprint)
 
     // Test binary ops
     std::string in = "a + b * c / d % e << f >> g = h & i | j ^ k && l || m;";
-    std::string expected = "((( a + (((b * c) / d) % e)) << f) >> g = ((((h & i) | (j ^ k)) && l) || m));\n";
+    std::string expected = "(((a + (((b * c) / d) % e)) << f) >> g = ((((h & i) | (j ^ k)) && l) || m));\n";
     Tree::ConstPtr tree = parse(in.c_str());
     ASSERT_TRUE(tree.get());
     reprint(*tree, os, "");
