@@ -79,13 +79,13 @@ jobs:
           # @note  we specifically use clang15.0 (not clang15) here as the newest
           #  versions of the clang15.X containers have some issues with the GLFW
           #  installation
-          - { cxx: clang++, image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '11', build: 'Debug',   cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: clang++, image: '2024', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2024', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2024', abi: '11', build: 'Debug',   cmake: '' }
+          - { cxx: clang++, image: '2023', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2023', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - name: Enable Node 16

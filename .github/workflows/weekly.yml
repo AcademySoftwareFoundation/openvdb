@@ -73,9 +73,10 @@ jobs:
           - { houdini_version: '19.5', platform: 'linux_x86_64_gcc9.3',  hou_hash: '19_5' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc9.3',  hou_hash: '20_0-oldabi' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
-      image: aswf/ci-base:2023
+      image: aswf/ci-base:2024
     steps:
     - name: Enable Node 16
       run: |
@@ -156,7 +157,7 @@ jobs:
       # @note  we specifically use clang15.0 (not clang15) here as the newest
       #  versions of the clang15.X containers have some issues with the GLFW
       #  installation
-      image: aswf/ci-openvdb:2023-clang15.0
+      image: aswf/ci-openvdb:2024
     env:
       CXX: clang++
     strategy:
@@ -303,19 +304,18 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2023-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2023-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
           - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
           - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
           # Standalone
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core', cmake: '' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core', cmake: '' }
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core', cmake: '' }
       fail-fast: false
     steps:
       - name: Enable Node 16
-        if: contains(matrix.config.image, '2021') || contains(matrix.config.image, '2022')
+        if: contains(matrix.config.image, '2022')
         run: |
           echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3

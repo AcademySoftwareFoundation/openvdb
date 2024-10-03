@@ -75,11 +75,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2023', hou_hash: '20_5', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2023', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: clang++, image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
-          - { cxx: clang++, image: '2021',   hou_hash: '19_5',        build: 'Release', components: 'core,hou' }
-          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: g++,     image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
       fail-fast: false
     steps:
