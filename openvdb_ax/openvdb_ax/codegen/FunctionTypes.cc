@@ -426,7 +426,7 @@ FunctionGroup::execute(const std::vector<llvm::Value*>& args,
 
 #ifndef NDEBUG
     std::vector<llvm::Type*> unused;
-    llvm::Type* ret = target->types(unused, B.getContext());
+    [[maybe_unused]] llvm::Type* ret = target->types(unused, B.getContext());
     OPENVDB_ASSERT(result || ret->isVoidTy());
 #endif
     return result;
@@ -448,7 +448,7 @@ FunctionGroup::execute(const std::vector<llvm::Value*>& args,
 
 #ifndef NDEBUG
     std::vector<llvm::Type*> unused;
-    llvm::Type* ret = target->types(unused, B.getContext());
+    [[maybe_unused]] llvm::Type* ret = target->types(unused, B.getContext());
     OPENVDB_ASSERT(result || ret->isVoidTy());
 #endif
 
