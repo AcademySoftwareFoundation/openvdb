@@ -95,6 +95,9 @@ jobs:
     - name: pybind11
       #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_pybind11.sh 2.10.0
+    - name: glfw
+      if: contains(matrix.config.image, '2023') == true
+      run: ./ci/install_glfw.sh 3.3.10
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
