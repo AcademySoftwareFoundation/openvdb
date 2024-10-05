@@ -20,6 +20,8 @@
 #include <openvdb/version.h>
 #include <openvdb/points/PointDataGrid.h>
 
+#include <gtest/gtest.h> // FRIEND_TEST, see TestPointExecutable.cc
+
 #include <unordered_map>
 
 class TestPointExecutable;
@@ -167,7 +169,9 @@ public:
 
 private:
     friend class Compiler;
-    friend class ::TestPointExecutable;
+    
+    FRIEND_TEST(TestPointExecutable, testConstructionDestruction);
+    FRIEND_TEST(TestPointExecutable, testAttributeCodecs);
 
     /// @brief  Private method used in the unit tests
     bool usesAcceleratedKernel(const points::PointDataTree& tree) const;
