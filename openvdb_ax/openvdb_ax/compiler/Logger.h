@@ -16,6 +16,8 @@
 
 #include <openvdb/version.h>
 
+#include <gtest/gtest.h> // FRIEND_TEST, see TestLogger.cc
+
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -197,7 +199,9 @@ public:
 
 private:
 
-    friend class ::TestLogger;
+    FRIEND_TEST(TestLogger, testParseSetsTree);
+    FRIEND_TEST(TestLogger, testAddError);
+    FRIEND_TEST(TestLogger, testAddWarning);
 
     OutputFunction mErrorOutput;
     OutputFunction mWarningOutput;
