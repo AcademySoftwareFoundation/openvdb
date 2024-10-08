@@ -73,6 +73,7 @@ jobs:
           - { houdini_version: '19.5', platform: 'linux_x86_64_gcc9.3',  hou_hash: '19_5' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc9.3',  hou_hash: '20_0-oldabi' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
       image: aswf/ci-base:2023
