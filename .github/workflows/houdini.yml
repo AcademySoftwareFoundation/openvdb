@@ -98,6 +98,9 @@ jobs:
     - name: glfw
       if: contains(matrix.config.image, '2023') == true
       run: ./ci/install_glfw.sh 3.3.10
+    - name: cppunit
+      if: contains(matrix.config.image, '2022') == false
+      run: ./ci/install_cppunit.sh 1.15.1
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
