@@ -107,7 +107,7 @@ public:
     {
         // Compute the node counts for each node
 
-        std::vector<Index32> nodeCounts;
+        std::vector<Index64> nodeCounts;
         if (serial) {
             nodeCounts.reserve(parents.nodeCount());
             for (size_t i = 0; i < parents.nodeCount(); i++) {
