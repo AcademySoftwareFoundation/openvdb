@@ -893,6 +893,12 @@ public:
     ///          other tools do not yet support variable offsets.
     void setOrigin(const Coord &origin);
 
+    /// Return a MapType key for the given coordinates, offset by the mOrigin.
+    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
+
+    /// Return @c true if this node's mTable contains the given key.
+    bool hasKey(const Coord& key) const { return mTable.find(key) != mTable.end(); }
+
 private:
     /// During topology-only construction, access is needed
     /// to protected/private members of other template instances.
@@ -901,14 +907,9 @@ private:
     template<typename, typename, bool> friend struct RootNodeCopyHelper;
     template<typename, typename, typename, bool> friend struct RootNodeCombineHelper;
 
-    /// Return a MapType key for the given coordinates, offset by the mOrigin.
-    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
-
     /// Insert this node's mTable keys into the given set.
     void insertKeys(CoordSet&) const;
 
-    /// Return @c true if this node's mTable contains the given key.
-    bool hasKey(const Coord& key) const { return mTable.find(key) != mTable.end(); }
     //@{
     /// @brief Look up the given key in this node's mTable.
     /// @return an iterator pointing to the matching mTable entry or to mTable.end().
