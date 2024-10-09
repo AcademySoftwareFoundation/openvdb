@@ -486,6 +486,9 @@ public:
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
+    Index32 tileCount() const;
+    Index32 activeTileCount() const;
+    Index32 inactiveTileCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -897,10 +900,6 @@ private:
 
     template<typename, typename, bool> friend struct RootNodeCopyHelper;
     template<typename, typename, typename, bool> friend struct RootNodeCombineHelper;
-
-    Index getTileCount() const;
-    Index getActiveTileCount() const;
-    Index getInactiveTileCount() const;
 
     /// Return a MapType key for the given coordinates, offset by the mOrigin.
     Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
@@ -1485,42 +1484,6 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 
 
 template<typename ChildT>
-inline Index
-RootNode<ChildT>::getTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTile(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getActiveTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTileOn(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getInactiveTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTileOff(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
 inline Index32
 RootNode<ChildT>::leafCount() const
 {
@@ -1553,6 +1516,42 @@ RootNode<ChildT>::childCount() const
     Index sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::tileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTile(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::activeTileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTileOn(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::inactiveTileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTileOff(i)) ++sum;
     }
     return sum;
 }
@@ -2268,7 +2267,7 @@ RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
     }
     io::setGridBackgroundValuePtr(os, &mBackground);
 
-    const Index numTiles = this->getTileCount(), numChildren = this->childCount();
+    const Index numTiles = this->tileCount(), numChildren = this->childCount();
     os.write(reinterpret_cast<const char*>(&numTiles), sizeof(Index));
     os.write(reinterpret_cast<const char*>(&numChildren), sizeof(Index));
 
