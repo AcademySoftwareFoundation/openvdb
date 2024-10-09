@@ -111,6 +111,7 @@ else()
     TestInt32Metadata.cc
     TestInt64Metadata.cc
     TestInternalOrigin.cc
+    TestInternalNode.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -166,6 +167,7 @@ else()
     TestQuantizedUnitVec.cc
     TestQuat.cc
     TestRay.cc
+    TestRootNode.cc
     TestStats.cc
     TestStencils.cc
     TestStream.cc
