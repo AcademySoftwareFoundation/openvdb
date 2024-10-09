@@ -13,15 +13,6 @@ using namespace openvdb::OPENVDB_VERSION_NAME;
 
 namespace pyTransform {
 
-inline void scale1(math::Transform& t, double s) { t.preScale(s); }
-inline void scale3(math::Transform& t, const Vec3d& xyz) { t.preScale(xyz); }
-
-inline Vec3d voxelDim0(math::Transform& t) { return t.voxelSize(); }
-inline Vec3d voxelDim1(math::Transform& t, const Vec3d& p) { return t.voxelSize(p); }
-
-inline double voxelVolume0(math::Transform& t) { return t.voxelVolume(); }
-inline double voxelVolume1(math::Transform& t, const Vec3d& p) { return t.voxelVolume(p); }
-
 inline Vec3d indexToWorld(math::Transform& t, const Vec3d& p) { return t.indexToWorld(p); }
 inline Vec3d worldToIndex(math::Transform& t, const Vec3d& p) { return t.worldToIndex(p); }
 
@@ -185,36 +176,55 @@ exportTransform(py::module_ m)
         .def_property_readonly("isLinear", &math::Transform::isLinear,
             "True if this transform is linear")
 
-        .def("rotate", &math::Transform::preRotate,
+        .def("preRotate", &math::Transform::preRotate,
             py::arg("radians"), py::arg("axis") = math::X_AXIS,
             "rotate(radians, axis)\n\n"
-            "Accumulate a rotation about either Axis.X, Axis.Y or Axis.Z.")
-        .def("translate", &math::Transform::postTranslate, py::arg("xyz"),
+            "Prepend a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("preTranslate", &math::Transform::preTranslate, py::arg("xyz"),
             "translate((x, y, z))\n\n"
-            "Accumulate a translation.")
-        .def("scale", &pyTransform::scale1, py::arg("s"),
+            "Prepend a translation.")
+        .def("preScale", py::overload_cast<double>(&math::Transform::preScale), py::arg("s"),
             "scale(s)\n\n"
-            "Accumulate a uniform scale.")
-        .def("scale", &pyTransform::scale3, py::arg("sxyz"),
+            "Prepend a uniform scale.")
+        .def("preScale", py::overload_cast<const Vec3d&>(&math::Transform::preScale), py::arg("sxyz"),
             "scale((sx, sy, sz))\n\n"
-            "Accumulate a nonuniform scale.")
-        .def("shear", &math::Transform::preShear,
+            "Prepend a nonuniform scale.")
+        .def("preShear", &math::Transform::preShear,
             py::arg("s"), py::arg("axis0"), py::arg("axis1"),
             "shear(s, axis0, axis1)\n\n"
-            "Accumulate a shear (axis0 and axis1 are either\n"
+            "Prepend a shear (axis0 and axis1 are either\n"
             "Axis.X, Axis.Y or Axis.Z).")
 
-        .def("voxelSize", &pyTransform::voxelDim0,
+        .def("postRotate", &math::Transform::postRotate,
+            py::arg("radians"), py::arg("axis") = math::X_AXIS,
+            "rotate(radians, axis)\n\n"
+            "Postfix a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("postTranslate", &math::Transform::postTranslate, py::arg("xyz"),
+            "translate((x, y, z))\n\n"
+            "Postfix a translation.")
+        .def("postScale", py::overload_cast<double>(&math::Transform::postScale), py::arg("s"),
+            "scale(s)\n\n"
+            "Postfix a uniform scale.")
+        .def("postScale", py::overload_cast<const Vec3d&>(&math::Transform::postScale), py::arg("sxyz"),
+            "scale((sx, sy, sz))\n\n"
+            "Postfix a nonuniform scale.")
+        .def("postShear", &math::Transform::postShear,
+            py::arg("s"), py::arg("axis0"), py::arg("axis1"),
+            "shear(s, axis0, axis1)\n\n"
+            "Postfix a shear (axis0 and axis1 are either\n"
+            "Axis.X, Axis.Y or Axis.Z).")
+
+        .def("voxelSize", py::overload_cast<>(&math::Transform::voxelSize, py::const_),
             "voxelSize() -> (dx, dy, dz)\n\n"
             "Return the size of voxels of the linear component of this transform.")
-        .def("voxelSize", &pyTransform::voxelDim1, py::arg("xyz"),
+        .def("voxelSize", py::overload_cast<const Vec3d&>(&math::Transform::voxelSize, py::const_), py::arg("xyz"),
             "voxelSize((x, y, z)) -> (dx, dy, dz)\n\n"
             "Return the size of the voxel at position (x, y, z).")
 
-        .def("voxelVolume", &pyTransform::voxelVolume0,
+        .def("voxelVolume", py::overload_cast<>(&math::Transform::voxelVolume, py::const_),
             "voxelVolume() -> float\n\n"
             "Return the voxel volume of the linear component of this transform.")
-        .def("voxelVolume", &pyTransform::voxelVolume1, py::arg("xyz"),
+        .def("voxelVolume", py::overload_cast<const Vec3d&>(&math::Transform::voxelVolume, py::const_), py::arg("xyz"),
             "voxelVolume((x, y, z)) -> float\n\n"
             "Return the voxel volume at position (x, y, z).")
 
