@@ -61,10 +61,10 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2022-clang11', build: 'Release' }
-          - { cxx: g++,     image: '2022-clang11', build: 'Debug' }
-          - { cxx: clang++, image: '2022-clang11', build: 'Release' }
-          - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
+          - { cxx: g++,     image: '2024', build: 'Release' }
+          - { cxx: g++,     image: '2024', build: 'Debug' }
+          - { cxx: clang++, image: '2024', build: 'Release' }
+          - { cxx: clang++, image: '2024', build: 'Debug' }
       fail-fast: false
     steps:
       - name: Enable Node 16
