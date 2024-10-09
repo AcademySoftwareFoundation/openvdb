@@ -166,6 +166,7 @@ else()
     TestQuantizedUnitVec.cc
     TestQuat.cc
     TestRay.cc
+    TestRootNode.cc
     TestStats.cc
     TestStencils.cc
     TestStream.cc
