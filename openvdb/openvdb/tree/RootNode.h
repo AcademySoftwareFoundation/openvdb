@@ -898,15 +898,6 @@ private:
     template<typename, typename, bool> friend struct RootNodeCopyHelper;
     template<typename, typename, typename, bool> friend struct RootNodeCombineHelper;
 
-    /// Currently no-op, but can be used to define empty and delete keys for mTable
-    void initTable() {}
-    //@{
-    /// @internal Used by doVisit2().
-    void resetTable(MapType& table) { mTable.swap(table); table.clear(); }
-    void resetTable(const MapType&) const {}
-    //@}
-
-    Index getChildCount() const;
     Index getTileCount() const;
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
@@ -1025,7 +1016,6 @@ RootNode<ChildT>::RootNode()
     : mBackground(zeroVal<ValueType>())
     , mOrigin(0, 0, 0)
 {
-    this->initTable();
 }
 
 
@@ -1035,7 +1025,6 @@ RootNode<ChildT>::RootNode(const ValueType& background)
     : mBackground(background)
     , mOrigin(0, 0, 0)
 {
-    this->initTable();
 }
 
 
@@ -1057,7 +1046,6 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(foregd, true);
-    this->initTable();
 
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
         mTable[i->first] = OtherRootT::isTile(i)
@@ -1085,7 +1073,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(backgd, true);
-    this->initTable();
+
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
         mTable[i->first] = OtherRootT::isTile(i)
             ? NodeStruct(OtherRootT::isTileOn(i) ? fgTile : bgTile)
@@ -1144,7 +1132,6 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         self.mTransientData = other.mTransientData;
 
         self.clear();
-        self.initTable();
 
         for (OtherMapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
             if (other.isTile(i)) {
@@ -1175,7 +1162,6 @@ RootNode<ChildT>::operator=(const RootNode& other)
         mTransientData = other.mTransientData;
 
         this->clear();
-        this->initTable();
 
         for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
             mTable[i->first] =
@@ -1495,13 +1481,6 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
             bbox.expand(iter->first, ChildT::DIM);
         }
     }
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getChildCount() const {
-    return this->childCount();
 }
 
 
@@ -2336,7 +2315,6 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
         is.read(reinterpret_cast<char*>(rangeMin.asPointer()), 3 * sizeof(Int32));
         is.read(reinterpret_cast<char*>(rangeMax.asPointer()), 3 * sizeof(Int32));
 
-        this->initTable();
         Index tableSize = 0, log2Dim[4] = { 0, 0, 0, 0 };
         Int32 offset[3];
         for (int i = 0; i < 3; ++i) {
