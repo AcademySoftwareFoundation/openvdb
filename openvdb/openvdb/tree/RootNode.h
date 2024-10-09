@@ -2609,10 +2609,10 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::setOrigin(const Coord &origin)
 {
-    mOrigin = origin;
-    if (mOrigin != Coord(0,0,0)) {
+    if (origin != Coord(0,0,0)) {
         OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are currently not supported");
     }
+    mOrigin = origin;
 }
 
 template<typename ChildT>
