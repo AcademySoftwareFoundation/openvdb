@@ -140,6 +140,7 @@ private:
         NodeStruct(ChildType& c): child(&c) {}
         NodeStruct(const Tile& t): child(nullptr), tile(t) {}
         NodeStruct(const NodeStruct&) = default;
+        NodeStruct(NodeStruct&&) noexcept = default;
         NodeStruct& operator=(const NodeStruct&) = default;
         ~NodeStruct() {} ///< @note doesn't delete child
 
@@ -1077,9 +1078,9 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     this->initTable();
 
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
-        mTable[i->first] = OtherRootT::isTile(i)
+        mTable.emplace(i->first, OtherRootT::isTile(i)
             ? NodeStruct(OtherRootT::isTileOn(i) ? fgTile : bgTile)
-            : NodeStruct(*(new ChildT(OtherRootT::getChild(i), backgd, foregd, TopologyCopy())));
+            : NodeStruct(*(new ChildT(OtherRootT::getChild(i), backgd, foregd, TopologyCopy()))));
     }
 }
 
@@ -1108,9 +1109,10 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const Tile bgTile(backgd, /*active=*/false), fgTile(backgd, true);
     this->initTable();
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
-        mTable[i->first] = OtherRootT::isTile(i)
+        mTable.emplace(i->first,
+            OtherRootT::isTile(i)
             ? NodeStruct(OtherRootT::isTileOn(i) ? fgTile : bgTile)
-            : NodeStruct(*(new ChildT(OtherRootT::getChild(i), backgd, TopologyCopy())));
+            : NodeStruct(*(new ChildT(OtherRootT::getChild(i), backgd, TopologyCopy()))));
     }
 }
 
@@ -1173,11 +1175,11 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
             if (other.isTile(i)) {
                 // Copy the other node's tile, but convert its value to this node's ValueType.
                 const OtherTile& otherTile = other.getTile(i);
-                self.mTable[i->first] = NodeStruct(
+                self.mTable.emplace(i->first,
                     Tile(Local::convertValue(otherTile.value), otherTile.active));
             } else {
                 // Copy the other node's child, but convert its values to this node's ValueType.
-                self.mTable[i->first] = NodeStruct(*(new ChildT(other.getChild(i))));
+                self.mTable.emplace(i->first, *(new ChildT(other.getChild(i))));
             }
         }
     }
@@ -1203,8 +1205,8 @@ RootNode<ChildT>::operator=(const RootNode& other)
         this->initTable();
 
         for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
-            mTable[i->first] =
-                isTile(i) ? NodeStruct(getTile(i)) : NodeStruct(*(new ChildT(getChild(i))));
+            mTable.emplace(i->first,
+                isTile(i) ? NodeStruct(getTile(i)) : NodeStruct(*(new ChildT(getChild(i)))));
         }
     }
     return *this;
@@ -1321,8 +1323,8 @@ inline typename RootNode<ChildT>::MapIter
 RootNode<ChildT>::findOrAddCoord(const Coord& xyz)
 {
     const Coord key = coordToKey(xyz);
-    std::pair<MapIter, bool> result = mTable.insert(
-        typename MapType::value_type(key, NodeStruct(Tile(mBackground, /*active=*/false))));
+    std::pair<MapIter, bool> result = mTable.try_emplace(key,
+        Tile(mBackground, /*active=*/false));
     return result.first;
 }
 
@@ -1332,8 +1334,8 @@ inline bool
 RootNode<ChildT>::expand(const Coord& xyz)
 {
     const Coord key = coordToKey(xyz);
-    std::pair<MapIter, bool> result = mTable.insert(
-        typename MapType::value_type(key, NodeStruct(Tile(mBackground, /*active=*/false))));
+    std::pair<MapIter, bool> result = mTable.try_emplace(key,
+        Tile(mBackground, /*active=*/false));
     return result.second; // return true if the key did not already exist
 }
 
@@ -1790,11 +1792,12 @@ inline void
 RootNode<ChildT>::setActiveState(const Coord& xyz, bool on)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (on) {
             child = new ChildT(xyz, mBackground);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+            mTable.emplace(key, *child);
         } else {
             // Nothing to do; (x, y, z) is background and therefore already inactive.
         }
@@ -1813,11 +1816,12 @@ inline void
 RootNode<ChildT>::setActiveStateAndCache(const Coord& xyz, bool on, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (on) {
             child = new ChildT(xyz, mBackground);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+            mTable.emplace(key, *child);
         } else {
             // Nothing to do; (x, y, z) is background and therefore already inactive.
         }
@@ -1839,11 +1843,12 @@ inline void
 RootNode<ChildT>::setValueOff(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (!math::isExactlyEqual(mBackground, value)) {
             child = new ChildT(xyz, mBackground);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+            mTable.emplace(key, *child);
         }
     } else if (isChild(iter)) {
         child = &getChild(iter);
@@ -1860,11 +1865,12 @@ inline void
 RootNode<ChildT>::setValueOffAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (!math::isExactlyEqual(mBackground, value)) {
             child = new ChildT(xyz, mBackground);
-            mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+            mTable.emplace(key, *child);
         }
     } else if (isChild(iter)) {
         child = &getChild(iter);
@@ -1884,10 +1890,11 @@ inline void
 RootNode<ChildT>::setValueOn(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else if (isTileOff(iter) || !math::isExactlyEqual(getTile(iter).value, value)) {
@@ -1903,10 +1910,11 @@ inline void
 RootNode<ChildT>::setValueAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else if (isTileOff(iter) || !math::isExactlyEqual(getTile(iter).value, value)) {
@@ -1925,10 +1933,11 @@ inline void
 RootNode<ChildT>::setValueOnly(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else if (!math::isExactlyEqual(getTile(iter).value, value)) {
@@ -1944,10 +1953,11 @@ inline void
 RootNode<ChildT>::setValueOnlyAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else if (!math::isExactlyEqual(getTile(iter).value, value)) {
@@ -1967,10 +1977,11 @@ inline void
 RootNode<ChildT>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -1999,10 +2010,11 @@ inline void
 RootNode<ChildT>::modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -2035,10 +2047,11 @@ inline void
 RootNode<ChildT>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -2063,10 +2076,11 @@ RootNode<ChildT>::modifyValueAndActiveStateAndCache(
     const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -2154,13 +2168,13 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
                         // No child or tile exists.  Create a child and initialize it
                         // with the background value.
                         child = new ChildT(xyz, mBackground);
-                        mTable[tileMin] = NodeStruct(*child);
+                        mTable.emplace(tileMin, *child);
                     } else if (isTile(iter)) {
                         // Replace the tile with a newly-created child that is filled
                         // with the tile's value and active state.
                         const Tile& tile = getTile(iter);
                         child = new ChildT(xyz, tile.value, tile.active);
-                        mTable[tileMin] = NodeStruct(*child);
+                        mTable.emplace(tileMin, *child);
                     } else if (isChild(iter)) {
                         child = &getChild(iter);
                     }
@@ -2394,14 +2408,14 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
                 // Read in and insert a child node.
                 ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
                 child->readTopology(is);
-                mTable[origin] = NodeStruct(*child);
+                mTable.emplace(origin, *child);
             } else {
                 // Read in a tile value and insert a tile, but only if the value
                 // is either active or non-background.
                 ValueType value;
                 is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
                 if (valueMask.isOn(i) || (!math::isApproxEqual(value, mBackground))) {
-                    mTable[origin] = NodeStruct(Tile(value, valueMask.isOn(i)));
+                    mTable.emplace(origin, Tile(value, valueMask.isOn(i)));
                 }
             }
         }
@@ -2428,7 +2442,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
         is.read(reinterpret_cast<char*>(vec), 3 * sizeof(Int32));
         is.read(reinterpret_cast<char*>(&value), sizeof(ValueType));
         is.read(reinterpret_cast<char*>(&active), sizeof(bool));
-        mTable[Coord(vec)] = NodeStruct(Tile(value, active));
+        mTable.emplace(Coord(vec), Tile(value, active));
     }
 
     // Read child nodes.
@@ -2437,7 +2451,7 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
         Coord origin(vec);
         ChildT* child = new ChildT(PartialCreate(), origin, mBackground);
         child->readTopology(is, fromHalf);
-        mTable[Coord(vec)] = NodeStruct(*child);
+        mTable.emplace(Coord(vec), *child);
     }
 
     return true; // not empty
@@ -2575,14 +2589,15 @@ RootNode<ChildT>::addLeaf(LeafNodeType* leaf)
     if (leaf == nullptr) return;
     ChildT* child = nullptr;
     const Coord& xyz = leaf->origin();
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (ChildT::LEVEL>0) {
             child = new ChildT(xyz, mBackground, false);
         } else {
             child = reinterpret_cast<ChildT*>(leaf);
         }
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         if (ChildT::LEVEL>0) {
             child = &getChild(iter);
@@ -2610,14 +2625,15 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     if (leaf == nullptr) return;
     ChildT* child = nullptr;
     const Coord& xyz = leaf->origin();
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (ChildT::LEVEL>0) {
             child = new ChildT(xyz, mBackground, false);
         } else {
             child = reinterpret_cast<ChildT*>(leaf);
         }
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         if (ChildT::LEVEL>0) {
             child = &getChild(iter);
@@ -2643,9 +2659,10 @@ RootNode<ChildT>::addChild(ChildT* child)
 {
     if (!child) return false;
     const Coord& xyz = child->origin();
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {//background
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else {//child or tile
         setChild(iter, *child);//this also deletes the existing child node
     }
@@ -2668,9 +2685,10 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::addTile(const Coord& xyz, const ValueType& value, bool state)
 {
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {//background
-        mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+        mTable.emplace(key, Tile(value, state));
     } else {//child or tile
         setTile(iter, Tile(value, state));//this also deletes the existing child node
     }
@@ -2682,14 +2700,15 @@ RootNode<ChildT>::addTile(Index level, const Coord& xyz,
                           const ValueType& value, bool state)
 {
     if (LEVEL >= level) {
-        MapIter iter = this->findCoord(xyz);
+        Coord key = this->coordToKey(xyz);
+        MapIter iter = this->findKey(key);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mBackground, false);
-                mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+                mTable.emplace(key, *child);
                 child->addTile(level, xyz, value, state);
             } else {
-                mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+                mTable.emplace(key, Tile(value, state));
             }
         } else if (isChild(iter)) {//child
             if (LEVEL > level) {
@@ -2717,15 +2736,16 @@ RootNode<ChildT>::addTileAndCache(Index level, const Coord& xyz, const ValueType
                                   bool state, AccessorT& acc)
 {
     if (LEVEL >= level) {
-        MapIter iter = this->findCoord(xyz);
+        Coord key = this->coordToKey(xyz);
+        MapIter iter = this->findKey(key);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
                 ChildT* child = new ChildT(xyz, mBackground, false);
                 acc.insert(xyz, child);
-                mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+                mTable.emplace(key, *child);
                 child->addTileAndCache(level, xyz, value, state, acc);
             } else {
-                mTable[this->coordToKey(xyz)] = NodeStruct(Tile(value, state));
+                mTable.emplace(key, Tile(value, state));
             }
         } else if (isChild(iter)) {//child
             if (LEVEL > level) {
@@ -2757,10 +2777,11 @@ inline typename ChildT::LeafNodeType*
 RootNode<ChildT>::touchLeaf(const Coord& xyz)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground, false);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -2777,10 +2798,11 @@ inline typename ChildT::LeafNodeType*
 RootNode<ChildT>::touchLeafAndCache(const Coord& xyz, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    MapIter iter = this->findCoord(xyz);
+    Coord key = this->coordToKey(xyz);
+    MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground, false);
-        mTable[this->coordToKey(xyz)] = NodeStruct(*child);
+        mTable.emplace(key, *child);
     } else if (isChild(iter)) {
         child = &getChild(iter);
     } else {
@@ -3021,7 +3043,7 @@ RootNode<ChildT>::merge(RootNode& other)
                 if (j == mTable.end()) { // insert other node's child
                     ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
                     child.resetBackground(other.mBackground, mBackground);
-                    mTable[i->first] = NodeStruct(child);
+                    mTable.emplace(i->first, child);
                 } else if (isTile(j)) {
                     if (isTileOff(j)) { // replace inactive tile with other node's child
                         ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
@@ -3034,7 +3056,7 @@ RootNode<ChildT>::merge(RootNode& other)
                 }
             } else if (other.isTileOn(i)) {
                 if (j == mTable.end()) { // insert other node's active tile
-                    mTable[i->first] = i->second;
+                    mTable.emplace(i->first, i->second);
                 } else if (!isTileOn(j)) {
                     // Replace anything except an active tile with the other node's active tile.
                     setTile(j, Tile(other.getTile(i).value, true));
@@ -3050,7 +3072,7 @@ RootNode<ChildT>::merge(RootNode& other)
                 if (j == mTable.end()) { // insert other node's child
                     ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
                     child.resetBackground(other.mBackground, mBackground);
-                    mTable[i->first] = NodeStruct(child);
+                    mTable.emplace(i->first, child);
                 } else if (isTile(j)) { // replace tile with other node's child
                     ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
                     child.resetBackground(other.mBackground, mBackground);
@@ -3071,7 +3093,7 @@ RootNode<ChildT>::merge(RootNode& other)
                     // Steal and insert the other node's child.
                     ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
                     child.resetBackground(other.mBackground, mBackground);
-                    mTable[i->first] = NodeStruct(child);
+                    mTable.emplace(i->first, child);
                 } else if (isTile(j)) {
                     // Replace this node's tile with the other node's child.
                     ChildNodeType& child = stealChild(i, Tile(other.mBackground, /*on=*/false));
@@ -3091,7 +3113,7 @@ RootNode<ChildT>::merge(RootNode& other)
             } else if (other.isTileOn(i)) {
                 if (j == mTable.end()) {
                     // Insert a copy of the other node's active tile.
-                    mTable[i->first] = i->second;
+                    mTable.emplace(i->first, i->second);
                 } else if (isTileOff(j)) {
                     // Replace this node's inactive tile with a copy of the other's active tile.
                     setTile(j, Tile(other.getTile(i).value, true));
@@ -3130,7 +3152,7 @@ RootNode<ChildT>::topologyUnion(const RootNode<OtherChildType>& other, const boo
         MapIter j = mTable.find(i->first);
         if (other.isChild(i)) {
             if (j == mTable.end()) { // create child branch with identical topology
-                mTable[i->first] = NodeStruct(
+                mTable.emplace(i->first,
                     *(new ChildT(other.getChild(i), mBackground, TopologyCopy())));
             } else if (this->isChild(j)) { // union with child branch
                 this->getChild(j).topologyUnion(other.getChild(i), preserveTiles);
@@ -3144,7 +3166,7 @@ RootNode<ChildT>::topologyUnion(const RootNode<OtherChildType>& other, const boo
             }
         } else if (other.isTileOn(i)) { // other is an active tile
             if (j == mTable.end()) { // insert an active tile
-                mTable[i->first] = NodeStruct(Tile(mBackground, true));
+                mTable.emplace(i->first, Tile(mBackground, true));
             } else if (this->isChild(j)) {
                 this->getChild(j).setValuesOn();
             } else if (this->isTileOff(j)) {
