@@ -9,7 +9,7 @@ tar -xzf cppunit.tar.gz
 
 cd cppunit-${CURL_VERSION}
 
-./configure 
+./configure
 
 make -j8
 make install
