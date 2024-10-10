@@ -140,7 +140,6 @@ AttributeSet::memUsage() const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 10
 size_t
 AttributeSet::memUsageIfLoaded() const
 {
@@ -150,7 +149,6 @@ AttributeSet::memUsageIfLoaded() const
     }
     return bytes;
 }
-#endif
 
 
 size_t
