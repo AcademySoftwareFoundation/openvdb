@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <iostream> // must be included before python on macos
 #include <cstring> // for strncmp(), strrchr(), etc.

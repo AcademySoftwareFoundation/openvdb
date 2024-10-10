@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 // this removes the PointDataGrid and PointDataTree aliases
 #define OPENVDB_DISABLE_POINT_DATA_TREE_ALIAS
