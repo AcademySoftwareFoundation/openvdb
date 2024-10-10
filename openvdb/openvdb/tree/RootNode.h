@@ -1142,6 +1142,13 @@ struct RootNodeCopyHelper
 template<typename RootT, typename OtherRootT>
 struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 {
+    /// @todo Consider using a value conversion functor passed as an argument instead.
+    template<typename ValueT, typename OtherValueT>
+    static inline ValueT convertValue(const OtherValueT &val)
+    {
+      return ValueT(val);
+    }
+
     static inline void copyWithValueConversion(RootT& self, const OtherRootT& other)
     {
         using ValueT = typename RootT::ValueType;
@@ -1152,12 +1159,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         using OtherMapCIter = typename OtherRootT::MapCIter;
         using OtherTile = typename OtherRootT::Tile;
 
-        struct Local {
-            /// @todo Consider using a value conversion functor passed as an argument instead.
-            static inline ValueT convertValue(const OtherValueT& val) { return ValueT(val); }
-        };
-
-        self.mBackground = Local::convertValue(other.mBackground);
+        self.mBackground = convertValue<ValueT, OtherValueT>(other.mBackground);
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
         if (other.mOrigin != Coord(0,0,0)) {
             OPENVDB_THROW(ValueError, "RootNodeCopyHelper::copyWithValueConversion: non-zero offsets are currently not supported");
@@ -1174,7 +1176,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
                 // Copy the other node's tile, but convert its value to this node's ValueType.
                 const OtherTile& otherTile = other.getTile(i);
                 self.mTable[i->first] = NodeStruct(
-                    Tile(Local::convertValue(otherTile.value), otherTile.active));
+                    Tile(convertValue<ValueT, OtherValueT>(otherTile.value), otherTile.active));
             } else {
                 // Copy the other node's child, but convert its values to this node's ValueType.
                 self.mTable[i->first] = NodeStruct(*(new ChildT(other.getChild(i))));
