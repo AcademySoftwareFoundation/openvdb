@@ -1148,7 +1148,6 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
     {
         using ValueT = typename RootT::ValueType;
         using ChildT = typename RootT::ChildNodeType;
-        using NodeStruct = typename RootT::NodeStruct;
         using Tile = typename RootT::Tile;
         using OtherValueT = typename OtherRootT::ValueType;
         using OtherMapCIter = typename OtherRootT::MapCIter;
