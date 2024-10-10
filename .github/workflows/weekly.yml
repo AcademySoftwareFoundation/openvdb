@@ -154,9 +154,6 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      # @note  we specifically use clang15.0 (not clang15) here as the newest
-      #  versions of the clang15.X containers have some issues with the GLFW
-      #  installation
       image: aswf/ci-openvdb:2024
     env:
       CXX: clang++

@@ -76,9 +76,6 @@ jobs:
     strategy:
       matrix:
         config:
-          # @note  we specifically use clang15.0 (not clang15) here as the newest
-          #  versions of the clang15.X containers have some issues with the GLFW
-          #  installation
           - { cxx: clang++, image: '2024', abi: '11', build: 'Release', cmake: '' }
           - { cxx: g++,     image: '2024', abi: '11', build: 'Release', cmake: '' }
           - { cxx: clang++, image: '2024', abi: '11', build: 'Debug',   cmake: '' }
