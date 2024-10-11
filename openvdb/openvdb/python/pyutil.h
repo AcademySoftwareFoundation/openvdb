@@ -6,13 +6,13 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 #include <mutex>
 #include <sstream>
 #include <string>
 #include <utility> // for std::pair
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 namespace pyutil {
 
@@ -73,7 +73,7 @@ GRID_TRAITS(openvdb::points::PointDataGrid, "PointDataGrid");
 
 
 // Note that the elements are pointers to C strings (char**), because
-// py::class_::def_readonly() requires a pointer to a static member.
+// nb::class_::def_ro() requires a pointer to a static member.
 typedef std::pair<const char* const*, const char* const*> CStringPair;
 
 
@@ -103,10 +103,10 @@ template<typename Descr>
 struct StringEnum
 {
     /// Return the (key, value) map as a Python dict.
-    static py::dict items()
+    static nb::dict items()
     {
         static std::mutex sMutex;
-        static py::dict itemDict;
+        static nb::dict itemDict;
         if (!itemDict) {
             // The first time this function is called, populate
             // the static dict with (key, value) pairs.
@@ -116,8 +116,8 @@ struct StringEnum
                     const CStringPair item = Descr::item(i);
                     OPENVDB_START_THREADSAFE_STATIC_WRITE
                     if (item.first) {
-                        itemDict[py::str(*item.first)] =
-                            py::str(*item.second);
+                        itemDict[nb::str(*item.first)] =
+                            nb::str(*item.second);
                     }
                     OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
                     else break;
@@ -128,33 +128,33 @@ struct StringEnum
     }
 
     /// Return the keys as a Python list of strings.
-    static py::object keys() { return items().attr("keys")(); }
+    static nb::object keys() { return items().attr("keys")(); }
     /// Return the number of keys as a Python int.
-    py::int_ numItems() const
+    nb::int_ numItems() const
     {
-        return py::int_(py::len(items()));
+        return nb::int_(nb::len(items()));
     }
     /// Return the value (as a Python string) for the given key.
-    py::object getItem(py::object keyObj) const { return items()[keyObj]; }
+    nb::object getItem(nb::object keyObj) const { return items()[keyObj]; }
     /// Return a Python iterator over the keys.
-    py::object iter() const { return items().attr("__iter__")(); }
+    nb::object iter() const { return items().attr("__iter__")(); }
 
     /// Register this enum.
-    static void wrap(py::module_ m)
+    static void wrap(nb::module_ m)
     {
-        py::class_<StringEnum> cls(
+        nb::class_<StringEnum> cls(
             m,
             /*classname=*/Descr::name(),
             /*docstring=*/Descr::doc());
-        cls.def_static("keys", &StringEnum::keys, "keys() -> list")
-            .def("__len__", &StringEnum::numItems, "__len__() -> int")
-            .def("__iter__", &StringEnum::iter, "__iter__() -> iterator")
-            .def("__getitem__", &StringEnum::getItem, "__getitem__(str) -> str")
+        cls.def_static("keys", &StringEnum::keys)
+            .def("__len__", &StringEnum::numItems)
+            .def("__iter__", &StringEnum::iter)
+            .def("__getitem__", &StringEnum::getItem)
             /*end*/;
         // Add a read-only, class-level attribute for each (key, value) pair.
         for (int i = 0; ; ++i) {
             const CStringPair item = Descr::item(i);
-            if (item.first) cls.def_readonly_static(*item.first, item.second);
+            if (item.first) cls.def_ro_static(*item.first, item.second);
             else break;
         }
     }
@@ -165,9 +165,9 @@ struct StringEnum
 
 /// Return the name of the given Python object's class.
 inline std::string
-className(py::handle h)
+className(nb::handle h)
 {
-    return py::cast<std::string>(h.attr("__class__").attr("__name__"));
+    return nb::cast<std::string>(h.attr("__class__").attr("__name__"));
 }
 
 } // namespace pyutil

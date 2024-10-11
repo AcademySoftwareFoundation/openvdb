@@ -18,7 +18,7 @@ $vcpkgPackages = @(
     "boost-iostreams",
     "boost-interprocess",
     "boost-algorithm",
-    "pybind11"
+    "nanobind"
 )
 
 # Update vcpkg

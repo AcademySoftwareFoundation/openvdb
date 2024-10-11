@@ -322,7 +322,7 @@ class TestOpenVDB(unittest.TestCase):
 
             # Verify that writing through a const iterator is not allowed.
             value = grid.citerOnValues().next()
-            self.assertRaises(AttributeError, lambda: setattr(value, 'active', 0))
+            self.assertRaises(AttributeError, lambda: setattr(value, 'active', False))
             self.assertRaises(AttributeError, lambda: setattr(value, 'depth', 0))
             # Verify that some value attributes are immutable, even given a non-const iterator.
             value = grid.iterOnValues().next()
@@ -679,7 +679,7 @@ class TestOpenVDB(unittest.TestCase):
                 for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, bool):
                     # Return a new NumPy array.
                     arr = np.ndarray(shape, dtype)
-                    arr.fill(-100)
+                    arr.fill(999)
                     yield arr
 
         # Test copying from arrays of various types to grids of various types.
@@ -787,8 +787,6 @@ class TestOpenVDB(unittest.TestCase):
         # Vector-valued grids can't be used to store level sets.
         self.assertRaises(TypeError, lambda: openvdb.Vec3SGrid.createLevelSetFromPolygons(
             cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
-        # The "points" argument to createLevelSetFromPolygons() can be a regular array.
-        openvdb.FloatGrid.createLevelSetFromPolygons(cubeVertices, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
         # The "points" argument to createLevelSetFromPolygons() can be an array that's implicitly convertible to float
         openvdb.FloatGrid.createLevelSetFromPolygons(np.array(cubeVertices, bool), quads=cubeQuads, transform=xform, halfWidth=halfWidth)
         # The "triangles" argument to createLevelSetFromPolygons() must be an N x 3 NumPy array.

@@ -2,16 +2,16 @@
 // SPDX-License-Identifier: MPL-2.0
 //
 /// @file pyVec3Grid.cc
-/// @brief pybind11 wrappers for vector-valued openvdb::Grid types
+/// @brief nanobind wrappers for vector-valued openvdb::Grid types
 
 #include "pyGrid.h"
 
 void
-exportVec3Grid(py::module_ m)
+exportVec3Grid(nb::module_ m)
 {
-    pyGrid::exportGrid<Vec3SGrid>(m);
+    pyGrid::exportVectorGrid<Vec3SGrid>(m);
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
-    pyGrid::exportGrid<Vec3IGrid>(m);
-    pyGrid::exportGrid<Vec3DGrid>(m);
+    pyGrid::exportVectorGrid<Vec3IGrid>(m);
+    pyGrid::exportVectorGrid<Vec3DGrid>(m);
 #endif
 }
