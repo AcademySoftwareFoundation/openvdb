@@ -49,76 +49,9 @@ if(USE_AX)
   endif()
 endif()
 
-# Small function which mimics basic output (bar components) of
-# FindPackageHandleStandardArgs. This is required as we want to ensure
-# the minimum python version is MINIMUM_PYTHON_VERSION - however this cannot
-# be provided to find_package(Python) with differing major versions. e.g.
-# calls to find_package(Python 2.7) fails if python3 is found on the system.
-function(OPENVDB_CHECK_PYTHON_VERSION)
-  set(PY_TARGET ${ARGV0})
-  set(PY_TARGET_VERSION ${ARGV1})
-  set(PY_TARGET_INCLUDES ${ARGV2})
-  set(MIN_VERSION ${ARGV3})
-  set(FUTURE_MIN_VERSION ${ARGV4})
-
-  if(NOT TARGET ${PY_TARGET})
-    message(FATAL_ERROR "Could NOT find ${PY_TARGET} (Required is at least version "
-      "\"${MIN_VERSION}\")"
-    )
-  endif()
-
-  if(PY_TARGET_VERSION AND MIN_VERSION)
-    if(PY_TARGET_VERSION VERSION_LESS MIN_VERSION)
-      message(FATAL_ERROR "Could NOT find ${PY_TARGET}: Found unsuitable version "
-        "\"${PY_TARGET_VERSION}\" but required is at least \"${MIN_VERSION}\" (found ${PY_TARGET_INCLUDES})"
-      )
-    endif()
-  endif()
-
-  message(STATUS "Found ${PY_TARGET}: ${PY_TARGET_INCLUDES}) (found suitable "
-    "version \"${PY_TARGET_VERSION}\", minimum required is \"${MIN_VERSION}\")"
-  )
-
-  if(OPENVDB_FUTURE_DEPRECATION AND PY_TARGET_VERSION AND FUTURE_MIN_VERSION)
-    if(PY_TARGET_VERSION VERSION_LESS FUTURE_MIN_VERSION)
-      message(DEPRECATION "Support for ${PY_TARGET} versions < ${FUTURE_MIN_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-endfunction()
-
-# Configure Python and Numpy.
-# To ensure consistent versions between components Interpreter, Compiler,
-# Development and NumPy, specify all components at the same time when using
-# FindPython.
-set(OPENVDB_PYTHON_DEPS)
-
-# @note  explicitly only search for Development.Module from 3.18 as searching
-#   Development.Embed can cause issues on linux systems where it doesn't exist
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development.Module Interpreter)
-
-if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
-endif()
-
-# Make sure find_package(Python) is only ever invoked once with all required components
-find_package(Python 3.8 REQUIRED COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-find_package(nanobind)
-if(NOT nanobind_FOUND)
-  message(FATAL_ERROR "Could NOT find nanobind. Please install nanobind "
-    "(via pip install nanobind) and set nanobind_DIR at build time.")
-endif()
-
-openvdb_check_python_version(Python::Module
-  "${Python_VERSION}"
-  "${Python_INCLUDE_DIRS}"
-  "${MINIMUM_PYTHON_VERSION}"
-  "${FUTURE_MINIMUM_PYTHON_VERSION}")
-list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
-
 ##########################################################################
 
-set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
+nanobind_add_module(openvdb_python NB_STATIC
   pyFloatGrid.cc
   pyGridBase.cc
   pyIntGrid.cc
@@ -129,63 +62,46 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
   pyVec3Grid.cc
 )
 
-if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-  get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
-  set(PYOPENVDB_INSTALL_DIRECTORY
-    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
-    CACHE STRING "The directory to install the pyopenvdb.so module."
-  )
-endif()
-
-nanobind_add_module(pyopenvdb ${OPENVDB_PYTHON_MODULE_SOURCE_FILES})
-
-target_link_libraries(pyopenvdb PUBLIC
-  ${OPENVDB_LIB}
-  ${OPENVDB_PYTHON_DEPS}
-)
-
+target_link_libraries(openvdb_python PUBLIC ${OPENVDB_LIB})
 if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
-  target_compile_definitions(pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
+  target_compile_definitions(openvdb_python PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
 endif()
 if(USE_NUMPY)
-  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
+  target_compile_definitions(openvdb_python PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
 if(USE_AX)
-  target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
-  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
+  target_link_libraries(openvdb_python PUBLIC ${OPENVDB_AX_LIB})
+  target_compile_definitions(openvdb_python PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
+set_target_properties(openvdb_python PROPERTIES OUTPUT_NAME "openvdb")
 
-install(TARGETS
-  pyopenvdb
-  DESTINATION
-  ${PYOPENVDB_INSTALL_DIRECTORY}
-)
+install(TARGETS openvdb_python DESTINATION ${VDB_PYTHON_INSTALL_DIRECTORY})
 
 # pytest
 if(OPENVDB_BUILD_PYTHON_UNITTESTS)
 
-  set(PYVDB_WORKING_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+  set(OPENVDB_PYTHON_WORKING_DIR "${CMAKE_CURRENT_BINARY_DIR}")
   if(WIN32)
-    set(PYVDB_WORKING_DIR "${PYVDB_WORKING_DIR}/$<CONFIG>")
+    set(OPENVDB_PYTHON_WORKING_DIR "${OPENVDB_PYTHON_WORKING_DIR}/$<CONFIG>")
   endif()
 
-  add_test(NAME pytest
+  add_test(NAME pytest_openvdb
     COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py -v
-    WORKING_DIRECTORY "${PYVDB_WORKING_DIR}")
+    WORKING_DIRECTORY "${OPENVDB_PYTHON_WORKING_DIR}")
 
-  set(PYOPENVDB_TEST_ENV "")
+  set(OPENVDB_PYTHON_TEST_ENV "")
   if(USE_AX)
-    list(APPEND PYOPENVDB_TEST_ENV "OPENVDB_TEST_PYTHON_AX=1")
+    list(APPEND OPENVDB_PYTHON_TEST_ENV "OPENVDB_TEST_PYTHON_AX=1")
   endif()
 
   if(WIN32)
-    set(PYTHONPATH "$ENV{PYTHONPATH};${PYVDB_WORKING_DIR}")
+    set(PYTHONPATH "$ENV{PYTHONPATH};${OPENVDB_PYTHON_WORKING_DIR}")
     string(REPLACE "\\;" ";" PYTHONPATH "${PYTHONPATH}")
     string(REPLACE ";" "\\;" PYTHONPATH "${PYTHONPATH}")
-    set_tests_properties(pytest PROPERTIES
-      ENVIRONMENT "PYTHONPATH=${PYTHONPATH};${PYOPENVDB_TEST_ENV}")
+    set_tests_properties(pytest_openvdb PROPERTIES
+      ENVIRONMENT "PYTHONPATH=${PYTHONPATH};${OPENVDB_PYTHON_TEST_ENV}")
   else()
-    set_tests_properties(pytest PROPERTIES
-      ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${PYVDB_WORKING_DIR};${PYOPENVDB_TEST_ENV}")
+    set_tests_properties(pytest_openvdb PROPERTIES
+      ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${OPENVDB_PYTHON_WORKING_DIR};${OPENVDB_PYTHON_TEST_ENV}")
   endif()
 endif()

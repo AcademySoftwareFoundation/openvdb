@@ -15,7 +15,7 @@ namespace nb = nanobind;
 namespace nanobind { namespace detail {
     template <> struct type_caster<openvdb::Coord> {
     public:
-        NB_TYPE_CASTER(openvdb::Coord, const_name("openvdb::Coord"));
+        NB_TYPE_CASTER(openvdb::Coord, const_name("openvdb::Coord"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -24,7 +24,7 @@ namespace nanobind { namespace detail {
 
             Py_ssize_t length = PySequence_Length(source);
             if (length == 1) {
-                openvdb::Coord::Int32 items[1];
+                openvdb::Coord::Int32 items[1] = { 0 }; // init required to workaround gcc warning
                 for (Py_ssize_t i = 0; i < length; ++i) {
                     PyObject* item = PySequence_GetItem(source, i);
                     if (item) {
@@ -44,7 +44,7 @@ namespace nanobind { namespace detail {
             }
             else if (length == 3)
             {
-                openvdb::Coord::Int32 items[3];
+                openvdb::Coord::Int32 items[3] = { 0, 0, 0 }; // init required to workaround gcc warning
                 for (Py_ssize_t i = 0; i < length; ++i) {
                     PyObject* item = PySequence_GetItem(source, i);
                     if (item) {
@@ -76,7 +76,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2i> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2i, const_name("openvdb::Vec2i"));
+        NB_TYPE_CASTER(openvdb::Vec2i, const_name("openvdb::Vec2i"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -112,7 +112,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2I> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2I, const_name("openvdb::Vec2I"));
+        NB_TYPE_CASTER(openvdb::Vec2I, const_name("openvdb::Vec2I"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -148,7 +148,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2s> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2s, const_name("openvdb::Vec2s"));
+        NB_TYPE_CASTER(openvdb::Vec2s, const_name("openvdb::Vec2s"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -184,7 +184,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2d> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2d, const_name("openvdb::Vec2d"));
+        NB_TYPE_CASTER(openvdb::Vec2d, const_name("openvdb::Vec2d"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -220,7 +220,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3i> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3i, const_name("openvdb::Vec3i"));
+        NB_TYPE_CASTER(openvdb::Vec3i, const_name("openvdb::Vec3i"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -256,7 +256,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3I> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3I, const_name("openvdb::Vec3I"));
+        NB_TYPE_CASTER(openvdb::Vec3I, const_name("openvdb::Vec3I"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -292,7 +292,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3s> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3s, const_name("openvdb::Vec3s"));
+        NB_TYPE_CASTER(openvdb::Vec3s, const_name("openvdb::Vec3s"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -328,7 +328,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3d> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3d, const_name("openvdb::Vec3d"));
+        NB_TYPE_CASTER(openvdb::Vec3d, const_name("openvdb::Vec3d"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -364,7 +364,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4i> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4i, const_name("openvdb::Vec4i"));
+        NB_TYPE_CASTER(openvdb::Vec4i, const_name("openvdb::Vec4i"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -400,7 +400,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4I> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4I, const_name("openvdb::Vec4I"));
+        NB_TYPE_CASTER(openvdb::Vec4I, const_name("openvdb::Vec4I"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -436,7 +436,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4s> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4s, const_name("openvdb::Vec4s"));
+        NB_TYPE_CASTER(openvdb::Vec4s, const_name("openvdb::Vec4s"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -472,7 +472,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4d> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4d, const_name("openvdb::Vec4d"));
+        NB_TYPE_CASTER(openvdb::Vec4d, const_name("openvdb::Vec4d"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -508,7 +508,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Mat4s> {
     public:
-        NB_TYPE_CASTER(openvdb::Mat4s, const_name("openvdb::Mat4s"));
+        NB_TYPE_CASTER(openvdb::Mat4s, const_name("openvdb::Mat4s"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -568,7 +568,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Mat4d> {
     public:
-        NB_TYPE_CASTER(openvdb::Mat4d, const_name("openvdb::Mat4d"));
+        NB_TYPE_CASTER(openvdb::Mat4d, const_name("openvdb::Mat4d"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -628,7 +628,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::PointIndex32> {
     public:
-        NB_TYPE_CASTER(openvdb::PointIndex32, const_name("openvdb::PointIndex32"));
+        NB_TYPE_CASTER(openvdb::PointIndex32, const_name("openvdb::PointIndex32"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -652,7 +652,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::PointIndex64> {
     public:
-        NB_TYPE_CASTER(openvdb::PointIndex64, const_name("openvdb::PointIndex64"));
+        NB_TYPE_CASTER(openvdb::PointIndex64, const_name("openvdb::PointIndex64"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -676,7 +676,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::PointDataIndex32> {
     public:
-        NB_TYPE_CASTER(openvdb::PointDataIndex32, const_name("openvdb::PointDataIndex32"));
+        NB_TYPE_CASTER(openvdb::PointDataIndex32, const_name("openvdb::PointDataIndex32"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -700,7 +700,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::PointDataIndex64> {
     public:
-        NB_TYPE_CASTER(openvdb::PointDataIndex64, const_name("openvdb::PointDataIndex64"));
+        NB_TYPE_CASTER(openvdb::PointDataIndex64, const_name("openvdb::PointDataIndex64"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
@@ -724,7 +724,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::StringMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::StringMetadata, const_name("openvdb::StringMetadata"));
+        NB_TYPE_CASTER(openvdb::StringMetadata, const_name("openvdb::StringMetadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::str>(src)) {
@@ -742,7 +742,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::BoolMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::BoolMetadata, const_name("openvdb::BoolMetadata"));
+        NB_TYPE_CASTER(openvdb::BoolMetadata, const_name("openvdb::BoolMetadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::bool_>(src)) {
@@ -760,7 +760,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Int32Metadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Int32Metadata, const_name("openvdb::Int32Metadata"));
+        NB_TYPE_CASTER(openvdb::Int32Metadata, const_name("openvdb::Int32Metadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::int_>(src)) {
@@ -778,7 +778,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Int64Metadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Int64Metadata, const_name("openvdb::Int64Metadata"));
+        NB_TYPE_CASTER(openvdb::Int64Metadata, const_name("openvdb::Int64Metadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::int_>(src)) {
@@ -796,7 +796,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::FloatMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::FloatMetadata, const_name("openvdb::FloatMetadata"));
+        NB_TYPE_CASTER(openvdb::FloatMetadata, const_name("openvdb::FloatMetadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::float_>(src)) {
@@ -814,7 +814,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::DoubleMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::DoubleMetadata, const_name("openvdb::DoubleMetadata"));
+        NB_TYPE_CASTER(openvdb::DoubleMetadata, const_name("openvdb::DoubleMetadata"))
 
         bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             if (!nb::isinstance<nb::float_>(src)) {
@@ -832,7 +832,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2IMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2IMetadata, const_name("openvdb::Vec2IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec2IMetadata, const_name("openvdb::Vec2IMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -854,7 +854,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3IMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3IMetadata, const_name("openvdb::Vec3IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec3IMetadata, const_name("openvdb::Vec3IMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -876,7 +876,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4IMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4IMetadata, const_name("openvdb::Vec4IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec4IMetadata, const_name("openvdb::Vec4IMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -898,7 +898,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec2DMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec2DMetadata, const_name("openvdb::Vec2DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec2DMetadata, const_name("openvdb::Vec2DMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -920,7 +920,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec3DMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec3DMetadata, const_name("openvdb::Vec3DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec3DMetadata, const_name("openvdb::Vec3DMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -942,7 +942,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Vec4DMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Vec4DMetadata, const_name("openvdb::Vec4DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec4DMetadata, const_name("openvdb::Vec4DMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::tuple>(src)) {
@@ -964,7 +964,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Mat4SMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Mat4SMetadata, const_name("openvdb::Mat4SMetadata"));
+        NB_TYPE_CASTER(openvdb::Mat4SMetadata, const_name("openvdb::Mat4SMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::list>(src)) {
@@ -986,7 +986,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::Mat4DMetadata> {
     public:
-        NB_TYPE_CASTER(openvdb::Mat4DMetadata, const_name("openvdb::Mat4DMetadata"));
+        NB_TYPE_CASTER(openvdb::Mat4DMetadata, const_name("openvdb::Mat4DMetadata"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             if (!nb::isinstance<nb::list>(src)) {
@@ -1008,7 +1008,7 @@ namespace nanobind { namespace detail {
 
     template <> struct type_caster<openvdb::MetaMap> {
     public:
-        NB_TYPE_CASTER(openvdb::MetaMap, const_name("openvdb::MetaMap"));
+        NB_TYPE_CASTER(openvdb::MetaMap, const_name("openvdb::MetaMap"))
 
         bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
             nb::dict dictionary = nb::borrow<nb::dict>(src);
