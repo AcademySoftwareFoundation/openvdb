@@ -258,7 +258,8 @@ jobs:
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: install
-      run: ./ci/install_windows.sh
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       run: >
         ./ci/build.sh -v
@@ -417,7 +418,8 @@ jobs:
     - name: llvm
       run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
     - name: install
-      run: ./ci/install_windows.sh
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       run: >
         ./ci/build.sh -v
@@ -479,9 +481,9 @@ jobs:
     - name: install_cuda
       shell: powershell
       run: .\ci\install_windows_cuda.ps1
-    - name: install_deps
-      shell: bash
-      run: ./ci/install_windows.sh
+    - name: install
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       shell: bash
       run: >
