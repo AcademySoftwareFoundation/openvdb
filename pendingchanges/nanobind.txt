@@ -1,0 +1,4 @@
+Python:
+    - OpenVDB Python bindings are now implemented using nanobind instead of pybind11
+    - The OpenVDB Python module has been changed from pyopenvdb to openvdb
+    - Added Python bindings for NanoVDB
