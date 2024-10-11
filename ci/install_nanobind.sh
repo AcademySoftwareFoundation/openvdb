@@ -9,8 +9,8 @@ if [ ! -z "${INSTALL_ROOT}" ]; then
     CMAKE_EXTRA+=("-DCMAKE_INSTALL_PREFIX=${INSTALL_ROOT}")
 fi
 
-git clone https://github.com/pybind/pybind11.git
-cd pybind11
+git clone --recurse-submodules https://github.com/wjakob/nanobind.git
+cd nanobind
 
 if [ "$PYBIND11_VERSION" != "latest" ]; then
     git checkout tags/v${PYBIND11_VERSION} -b v${PYBIND11_VERSION}
@@ -20,7 +20,6 @@ mkdir build
 cd build
 
 cmake \
-    -DPYBIND11_TEST=OFF \
     "${CMAKE_EXTRA[@]}" \
     ..
 

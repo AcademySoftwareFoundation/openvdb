@@ -92,9 +92,9 @@ jobs:
     - name: remove zstd
       run: yum -y remove zstd
     - uses: actions/checkout@v3
-    - name: pybind11
+    - name: nanobind
       #if: contains(matrix.config.image, '2023') == false
-      run: ./ci/install_pybind11.sh 2.10.0
+      run: ./ci/install_nanobind.sh 2.0.0
     - name: glfw
       if: contains(matrix.config.image, '2023') == true
       run: ./ci/install_glfw.sh 3.3.10
