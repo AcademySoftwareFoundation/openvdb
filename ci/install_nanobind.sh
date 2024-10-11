@@ -20,6 +20,7 @@ mkdir build
 cd build
 
 cmake \
+    -DNB_TEST=OFF \
     "${CMAKE_EXTRA[@]}" \
     ..
 
