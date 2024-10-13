@@ -9,6 +9,8 @@
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/LevelSetThickenedMesh.h>
+#include <openvdb/tools/LevelSetTubes.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetMorph.h>
@@ -216,6 +218,126 @@ TEST_F(TestTools, testLevelSetPlatonic)
     }
 
 }// testLevelSetPlatonic
+
+TEST_F(TestTools, testLevelSetThickenedMesh)
+{
+    using namespace openvdb;
+
+    const float r = 2.9f;
+    const Vec3s p0(15.8f, 13.2f, 16.7f),  p1(4.3f, 7.9f, -4.8f);
+    const Vec3s p2(-3.0f, -7.4f, 8.9f),   p3(-2.7f, 8.9f, 30.4f);
+    const Vec3s p4(23.0f, 17.4f, -10.9f), p5(5.2f, -5.7f, 29.0f);
+    const Vec3s p6(-14.6f, 3.7f, 10.9f),  p7(35.8f, 23.4f, 5.8f);
+
+    const std::vector<Vec3s> vertices({p0, p1, p2, p3, p4, p5, p6, p7});
+    const std::vector<Vec3I> triangles1({Vec3I(0, 1, 2), Vec3I(0, 1, 3), Vec3I(0, 1, 4)});
+    const std::vector<Vec3I> triangles2({Vec3I(0, 1, 4)});
+    const std::vector<Vec4I> quads1({Vec4I(0, 1, 2, 5), Vec4I(0, 1, 6, 3), Vec4I(0, 1, 4, 7)});
+    const std::vector<Vec4I> quads2({Vec4I(0, 1, 4, 7)});
+
+    const float voxelSize = 0.1f, width = 3.25f;
+    const Coord ijk(int(p1[0]/voxelSize),
+                    int(p1[1]/voxelSize),
+                    int(p1[2]/voxelSize));// inside
+
+    {// test thickened triangle mesh
+        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+            vertices, triangles1, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+    {// test thickened quad mesh
+        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+            vertices, quads1, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+    {// test thickened mixed triangle & quad mesh
+        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+            vertices, triangles2, quads2, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
+}// testLevelSetThickenedMesh
+
+TEST_F(TestTools, testLevelSetTubes)
+{
+    using namespace openvdb;
+
+    const float r1 = 4.3f, r2 = 1.2f, r3 = 2.1f, r4 = 3.6f;
+    const Vec3s p1(15.8f, 13.2f, 16.7f), p2(4.3f, 7.9f, -4.8f);
+    const Vec3s p3(-3.0f, -7.4f, 8.9f), p4(-2.7f, 8.9f, 30.4f);
+
+    const std::vector<Vec3s> vertices({p1, p2, p3, p4});
+    const std::vector<Vec2I> segments({Vec2I(0, 1), Vec2I(0, 2), Vec2I(0, 3)});
+    const std::vector<float> radii({r1, r2, r3, r4});
+
+    const float voxelSize = 0.1f, width = 3.25f;
+    const Coord ijk(int(p1[0]/voxelSize),
+                    int(p1[1]/voxelSize),
+                    int(p1[2]/voxelSize));// inside
+
+    {// test capsule
+        FloatGrid::Ptr ls = tools::createLevelSetCapsule<FloatGrid>(p1, p2, r1, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+    {// test tapered capsule
+        FloatGrid::Ptr ls = tools::createLevelSetTaperedCapsule<FloatGrid>(
+            p1, p2, r1, r2, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+    {// test tube complex with constant radius
+        FloatGrid::Ptr ls = tools::createLevelSetTubeComplex<FloatGrid>(
+            vertices, segments, r3, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+    {// test tube complex with variable radius
+        FloatGrid::Ptr ls = tools::createLevelSetTubeComplex<FloatGrid>(
+            vertices, segments, radii, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
+}// testLevelSetTubes
 
 TEST_F(TestTools, testLevelSetAdvect)
 {

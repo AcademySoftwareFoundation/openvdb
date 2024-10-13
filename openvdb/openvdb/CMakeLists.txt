@@ -473,6 +473,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/ChangeBackground.h
   tools/Clip.h
   tools/Composite.h
+  tools/ConvexVoxelizer.h
   tools/Count.h
   tools/Dense.h
   tools/DenseSparseTools.h
@@ -491,7 +492,9 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetPlatonic.h
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h
+  tools/LevelSetThickenedMesh.h
   tools/LevelSetTracker.h
+  tools/LevelSetTubes.h
   tools/LevelSetUtil.h
   tools/Mask.h
   tools/Merge.h
