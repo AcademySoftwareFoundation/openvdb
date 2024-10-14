@@ -783,11 +783,10 @@ private:
             tileIterateXYZ<NodeT>();
         }
 
-        iterateTile<PoppedChainT>();
+        if constexpr (!std::is_same_v<PoppedChainT, openvdb::TypeList<>>) {
+            iterateTile<PoppedChainT>();
+        }
     }
-
-    template <>
-    inline void iterateTile<openvdb::TypeList<>>() {}
 
     inline void iterateLeaf()
     {
@@ -1109,11 +1108,10 @@ private:
 
         sizes.push_back(NodeT::DIM);
 
-        doTreeTileSizes<PoppedChainT>(sizes);
+        if constexpr (!std::is_same_v<PoppedChainT, openvdb::TypeList<>>) {
+            doTreeTileSizes<PoppedChainT>(sizes);
+        }
     }
-
-    template <>
-    static inline void doTreeTileSizes<openvdb::TypeList<>>(std::vector<int>&) {}
 
     inline bool checkInterrupter()
     {
@@ -1258,17 +1256,15 @@ private:
         template<int ZDir>
         bool atNewLeafPos(const Coord& ijk) const
         {
-            return Coord::lessThan(ijk, mOrigin)
-                || Coord::lessThan(mOrigin.offsetBy(DIM-1u), ijk);
+            if constexpr (ZDir == -1) {
+                return (ijk[2] & (DIM-1u)) == DIM-1u;
+            } else if constexpr (ZDir == 1) {
+                return (ijk[2] & (DIM-1u)) == 0;
+            } else {
+                return Coord::lessThan(ijk, mOrigin)
+                    || Coord::lessThan(mOrigin.offsetBy(DIM-1u), ijk);
+            }
         }
-
-        // assumes value just above has been cached already!
-        template<>
-        inline bool atNewLeafPos<-1>(const Coord& ijk) const { return (ijk[2] & (DIM-1u)) == DIM-1u; }
-
-        // assumes value just below has been cached already!
-        template<>
-        inline bool atNewLeafPos<1>(const Coord& ijk) const { return (ijk[2] & (DIM-1u)) == 0; }
 
         inline void cacheNewLeafData(const Coord& ijk)
         {
