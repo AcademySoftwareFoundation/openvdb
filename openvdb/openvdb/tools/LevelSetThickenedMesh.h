@@ -224,7 +224,7 @@ private:
         const float udist =
             math::Sign(mBAXNrml.dot(pa)) +
             math::Sign(mCBXNrml.dot(pb)) +
-            math::Sign(mACXNrml.dot(pc)) < 2.0f
+            math::Sign(mACXNrml.dot(pc)) < 2
             ?
             math::Sqrt(math::Min(
                 (mBA * math::Clamp01(mBANorm2.dot(pa)) - pa).lengthSqr(),

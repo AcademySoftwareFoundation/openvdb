@@ -814,10 +814,10 @@ private:
                     z2 = z*z*mVLenSqr,
                     k  = mRdiff2*x2; // should multiply by sgn(mRdiff), but it's always positive
 
-        if (math::Sign(z)*mA2*z2 >= k)
+        if (float(math::Sign(z))*mA2*z2 >= k)
             return  math::Sqrt(x2 + z2)*mInvVLenSqr - mRad2;
 
-        if (math::Sign(y)*mA2*y2 <= k)
+        if (float(math::Sign(y))*mA2*y2 <= k)
             return  math::Sqrt(x2 + y2)*mInvVLenSqr - mRad1;
 
         return (math::Sqrt(x2*mA2*mInvVLenSqr) + y*mRdiff)*mInvVLenSqr - mRad1;
@@ -826,7 +826,7 @@ private:
     inline bool
     tileCanFit(const Index& dim) const override
     {
-        return math::Max(mRad1, mRad2) >= BaseT::halfWidth() + 0.70711f * (dim-1u);
+        return math::Max(mRad1, mRad2) >= BaseT::halfWidth() + 0.70711f * (float(dim)-1.0f);
     }
 
     std::function<bool(float&, float&, const float&, const float&)> TaperedCapsuleBottomTop =
