@@ -1009,11 +1009,11 @@ public:
     TriangleMeshEdgeConnectivity(const std::vector<Vec3s>& coords, const std::vector<Vec3I>& cells)
     : mCoords(coords), mCells(cells)
     {
-        const Index n = coords.size();
+        const Index n = Index(coords.size());
 
         mNormals.resize(cells.size());
 
-        for (Index i = 0; i < cells.size(); i++) {
+        for (Index i = 0; i < cells.size(); ++i) {
             const Vec3I& cell = mCells[i];
 
             Edge edges[3] = {
@@ -1059,51 +1059,64 @@ public:
     }
 
     /// @brief Retrieves the 3D coordinate at a given index.
-    ///
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
     /// @param i Index of the vertex.
     /// @return The 3D coordinate as a constant reference to Vec3s.
+    template <typename T>
     inline const Vec3s&
-    getCoord(const Index& i) const
+    getCoord(const T& i) const
     {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
         return mCoords[i];
     }
 
     /// @brief Retrieves the cell (triangle) at a given index.
-    ///
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
     /// @param i Index of the cell.
     /// @return Constant reference to the triangle's vertex indices.
+    template <typename T>
     inline const Vec3I&
-    getCell(const Index& i) const
+    getCell(const T& i) const
     {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
         return mCells[i];
     }
 
     /// @brief Retrieves the 3D coordinates of the vertices forming a
     /// primitive (triangle) at a given cell index.
-    ///
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
     /// @param i Index of the cell (triangle).
     /// @return A vector of three Vec3s representing the coordinates of the triangle's vertices.
+    template <typename T>
     inline std::vector<Vec3s>
-    getPrimitive(const Index& i) const
+    getPrimitive(const T& i) const
     {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
         const Vec3I cell = mCells[i];
+
         return {mCoords[cell[0]], mCoords[cell[1]], mCoords[cell[2]]};
     }
 
     /// @brief Retrieves the unit normal vector of a cell (triangle) at a given index.
-    ///
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
     /// @param i Index of the cell.
     /// @return The normal vector of the triangle as a Vec3s.
+    template <typename T>
     inline Vec3s
-    getNormal(const Index& i) const
+    getNormal(const T& i) const
     {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
         return mNormals[i];
     }
 
     /// @brief Retrieves the total number of coordinates in the mesh.
     ///
     /// @return The number of coordinates as an Index.
-    inline Index
+    inline Index64
     coordCount() const
     {
         return mCoords.size();
@@ -1112,7 +1125,7 @@ public:
     /// @brief Retrieves the total number of cells (triangles) in the mesh.
     ///
     /// @return The number of cells as an Index.
-    inline Index
+    inline Index64
     cellCount() const
     {
         return mCells.size();
@@ -1233,9 +1246,9 @@ public:
     ThickenedMeshVoxelizer(const std::vector<Vec3s>& vertices, const std::vector<Vec3I>& triangles,
         float radius, float voxelSize, float background,
         InterruptT* interrupter, GridPtr grid = nullptr)
-    : mVox(voxelSize), mBg(background)
-    , mMesh(std::make_shared<const MeshConnectivity>(MeshConnectivity(vertices, triangles)))
-    , mRad(radius), mInterrupter(interrupter)
+    : mMesh(std::make_shared<const MeshConnectivity>(MeshConnectivity(vertices, triangles)))
+    , mVox(voxelSize), mBg(background), mRad(radius)
+    , mInterrupter(interrupter)
     {
         if (!grid)
             initializeGrid();
@@ -1250,9 +1263,10 @@ public:
     }
 
     ThickenedMeshVoxelizer(ThickenedMeshVoxelizer& other, tbb::split)
-    : mVox(other.mVox), mBg(other.mBg)
-    , mPtPartitioner(other.mPtPartitioner), mMesh(other.mMesh)
-    , mRad(other.mRad), mInterrupter(other.mInterrupter)
+    : mMesh(other.mMesh)
+    , mVox(other.mVox), mBg(other.mBg), mRad(other.mRad)
+    , mInterrupter(other.mInterrupter)
+    , mPtPartitioner(other.mPtPartitioner)
     {
         initializeGrid();
 
@@ -1284,9 +1298,9 @@ public:
         other.mGrid = nullptr;
     }
 
-    inline Index bucketSize() const { return mPtPartitioner->size(); }
+    inline Index64 bucketSize() const { return mPtPartitioner->size(); }
 
-    inline Index cellSize() const { return mMesh->cellCount(); }
+    inline Index64 cellSize() const { return mMesh->cellCount(); }
 
     inline GridPtr getGrid() const { return mGrid; }
 
@@ -1322,7 +1336,7 @@ private:
         for (Index j = 0; j < 3; ++j) {
             const bool success = mMesh->getAdjacentCells(cell[j], cell[(j+1) % 3], cellIds);
             if (success && cellIds[0] == i) {
-                if (findWedgeNormals(i, j, cellIds, n1, n2))
+                if (findWedgeNormals(Index(i), j, cellIds, n1, n2))
                     (*mWVoxelizer)(pts[j], pts[(j+1) % 3], mRad, n1, n2);
             }
         }
@@ -1412,10 +1426,10 @@ private:
     {
         const Vec3I &cell  = mMesh->getCell(cellIdx);
 
-        const Index n = cellIds.size(),
-                    offset = cell[vIdx] + cell[(vIdx+1) % 3];
+        const Index64 n = cellIds.size();
+        const Index offset = cell[vIdx] + cell[(vIdx+1) % 3];
 
-        for (Index i = 0; i < n; ++i) {
+        for (Index64 i = 0; i < n; ++i) {
             const Vec3I &cell0 = mMesh->getCell(cellIds[i]),
                         &cell1 = mMesh->getCell(cellIds[(i+1) % n]),
                         &cell2 = mMesh->getCell(cellIds[(i+2) % n]);
@@ -1502,14 +1516,14 @@ private:
 
     const float mVox, mBg, mRad;
 
-    std::shared_ptr<PartitionerT> mPtPartitioner;
+    InterruptT* mInterrupter;
 
     GridPtr mGrid;
 
+    std::shared_ptr<PartitionerT> mPtPartitioner;
+
     std::shared_ptr<PrismVoxelizer> mPVoxelizer;
     std::shared_ptr<WedgeVoxelizer> mWVoxelizer;
-
-    InterruptT* mInterrupter;
 
 }; // class ThickenedMeshVoxelizer
 
@@ -1560,12 +1574,12 @@ createLevelSetThickenedMesh(
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
     if (halfWidth <= 0) OPENVDB_THROW(ValueError, "half-width must be positive");
 
-    const Index n = quads.size();
+    const Index64 n = quads.size();
     std::vector<Vec3I> triangles(2*n);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
         [&](const tbb::blocked_range<size_t>& r) {
-            for (size_t i = r.begin(); i != r.end(); ++i) {
+            for (Index64 i = r.begin(); i != r.end(); ++i) {
                 const Vec4I& q = quads[i];
                 triangles[i]     = Vec3I(q.x(), q.y(), q.z());
                 triangles[i + n] = Vec3I(q.x(), q.z(), q.w());
@@ -1594,20 +1608,20 @@ createLevelSetThickenedMesh(const std::vector<Vec3s>& vertices,
         return createLevelSetThickenedMesh<GridType, InterruptT>(vertices, triangles, radius,
                                                                  voxelSize, halfWidth, interrupter);
 
-    const Index tn = triangles.size(), qn = quads.size();
-    const Index qn2 = tn + qn;
+    const Index64 tn = triangles.size(), qn = quads.size();
+    const Index64 qn2 = tn + qn;
     std::vector<Vec3I> tris(tn + 2*qn);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, tn),
         [&](const tbb::blocked_range<size_t>& r) {
-            for (size_t i = r.begin(); i != r.end(); ++i) {
+            for (Index64 i = r.begin(); i != r.end(); ++i) {
                 tris[i] = triangles[i];
             }
         });
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, qn),
         [&](const tbb::blocked_range<size_t>& r) {
-            for (size_t i = r.begin(); i != r.end(); ++i) {
+            for (Index64 i = r.begin(); i != r.end(); ++i) {
                 const Vec4I& q = quads[i];
                 tris[i + tn]  = Vec3I(q.x(), q.y(), q.z());
                 tris[i + qn2] = Vec3I(q.x(), q.z(), q.w());

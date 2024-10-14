@@ -185,12 +185,12 @@ public:
     /// meaning the voxel size and background value need to be set prior to voxelization
     ConvexVoxelizer(GridPtr& grid, const bool& threaded = false, InterruptType* interrupter = nullptr)
     : mTree(grid->tree())
-    , mVox((grid->voxelSize())[0])
-    , mBg(grid->background())
-    , mNegBg(-(grid->background()))
+    , mVox(float((grid->voxelSize())[0]))
     , mBgF(float(grid->background()))
     , mNegBgF(float(-(grid->background())))
     , mHw(float(grid->background())/float((grid->voxelSize())[0]))
+    , mBg(grid->background())
+    , mNegBg(-(grid->background()))
     , mSerial(!threaded)
     , mInterrupter(interrupter)
     {
@@ -304,7 +304,7 @@ protected:
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
     /// This function is called many times, so a lambda is used to avoid virtual table overhead.
     std::function<bool(float&, float&, const float&, const float&)> bottomTop =
-        [this](float&, float&, const float&, const float&) { return false; };
+        [](float&, float&, const float&, const float&) { return false; };
 
     // ------------ utilities ------------
 
@@ -313,14 +313,29 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     inline static float
-    tileCeil(const float& x, const Index& step)
+    tileCeil(const float& x, const float& step)
     {
-        const float s = static_cast<float>(step);
-        const float offset = 0.5f * (s - 1.0f);
+        const float offset = 0.5f * (step - 1.0f);
 
-        return step == 1
+        return step == 1.0f
             ? static_cast<float>(math::Ceil(perturbDown(x)))
-            : s * static_cast<float>(math::Ceil(perturbDown((x - offset)/s))) + offset;
+            : step * static_cast<float>(math::Ceil(perturbDown((x - offset)/step))) + offset;
+    }
+
+    /// @brief Rounds an input scalar up to the nearest valid ordinate of tile of a specified size.
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
+    /// @param x Input value.
+    /// @param step Tile step size.
+    /// @return The ceiling of the value based on the tile size.
+    template <typename T>
+    inline static float
+    tileCeil(const float& x, const T& step)
+    {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
+        const float s = static_cast<float>(step);
+
+        return tileCeil(x, s);
     }
 
     /// @brief Rounds an input scalar down to the nearest valid ordinate of tile of a specified size.
@@ -328,14 +343,29 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     inline static float
-    tileFloor(const float& x, const Index& step)
+    tileFloor(const float& x, const float& step)
     {
-        const float s = static_cast<float>(step);
-        const float offset = 0.5f * (s - 1.0f);
+        const float offset = 0.5f * (step - 1.0f);
 
-        return step == 1
+        return step == 1.0f
             ? static_cast<float>(math::Floor(perturbUp(x)))
-            : s * static_cast<float>(math::Floor(perturbUp((x - offset)/s))) + offset;
+            : step * static_cast<float>(math::Floor(perturbUp((x - offset)/step))) + offset;
+    }
+
+    /// @brief Rounds an input scalar down to the nearest valid ordinate of tile of a specified size.
+    /// @tparam T Any integral type (int, unsigned int, size_t, etc.)
+    /// @param x Input value.
+    /// @param step Tile step size.
+    /// @return The ceiling of the value based on the tile size.
+    template <typename T>
+    inline static float
+    tileFloor(const float& x, const T& step)
+    {
+        static_assert(std::is_integral<T>::value, "Index must be an integral type");
+
+        const float s = static_cast<float>(step);
+
+        return tileFloor(x, s);
     }
 
     /// @brief Computes the bottom y-coordinate of a circle at a given x position.
@@ -679,13 +709,13 @@ protected:
         inline Index
         indexDistance(const ValueType& a, const ValueType& b)
         {
-            return math::Round(mStepInv*math::Abs(a - b));
+            return Index(math::Round(mStepInv*math::Abs(a - b)));
         }
 
         inline Index
         worldToIndex(const ValueType& x) const
         {
-            const Index i = math::Round(mStepInv*(x - mXStart));
+            const Index i = Index(math::Round(mStepInv*(x - mXStart)));
             assert(i < mSize);
 
             return i;
@@ -696,7 +726,7 @@ protected:
         {
             assert(i < mSize);
 
-            return mXStart + i*mStep;
+            return mXStart + ValueType(i)*mStep;
         }
 
         Index mStep, mSize;
@@ -842,7 +872,7 @@ private:
             Coord ijk(Int32(x), Int32(y), Int32(0));
             Vec3s p(x, y, 0.0f);
 
-            ijk[2] = voxelCeil(zb)-1;
+            ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
 
             for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
@@ -892,7 +922,7 @@ private:
             bool early_break = false;
             float z_stop;
 
-            ijk[2] = voxelCeil(zb)-1;
+            ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
             for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
@@ -910,7 +940,7 @@ private:
                 }
             }
             if (early_break) {
-                ijk[2] = voxelFloor(zt)+1;
+                ijk[2] = Int32(voxelFloor(zt))+1;
                 acc.reset(ijk);
                 for (float z = voxelFloor(zt); z > z_stop; --z) {
                     ijk[2] = Int32(z);
@@ -1111,7 +1141,7 @@ private:
         /// the internal accessor with the provided tree.
         /// @param tree Reference to the tree being accessed.
         CacheLastLeafAccessor(TreeT& tree)
-        : mAcc(tree)
+        : mAcc(tree), mTileSizes(treeTileSizes())
         {
         }
 
@@ -1268,6 +1298,8 @@ private:
         NodeMaskType* mValueMask;
         Coord         mOrigin;
 
+        const std::vector<int> mTileSizes;
+
     }; // class CacheLastLeafAccessor
 
     // ------------ private members ------------
@@ -1276,7 +1308,7 @@ private:
 
     TreeT &mTree;
 
-    inline static const std::vector<int> mTileSizes = treeTileSizes();
+    const std::vector<int> mTileSizes = treeTileSizes();
 
     const float mVox, mBgF, mNegBgF, mHw;
 

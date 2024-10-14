@@ -806,13 +806,13 @@ private:
     inline float
     signedDistance(const Vec3s& p) const
     {
-        const Vec3s  w  = p - mPt1;
-        const ValueT y  = w.dot(mV),
-                     z  = y - mVLenSqr,
-                     x2 = (w*mVLenSqr - mV*y).lengthSqr(),
-                     y2 = y*y*mVLenSqr,
-                     z2 = z*z*mVLenSqr,
-                     k  = mRdiff2*x2; // should multiply by sgn(mRdiff), but it's always positive
+        const Vec3s w  = p - mPt1;
+        const float y  = w.dot(mV),
+                    z  = y - mVLenSqr,
+                    x2 = (w*mVLenSqr - mV*y).lengthSqr(),
+                    y2 = y*y*mVLenSqr,
+                    z2 = z*z*mVLenSqr,
+                    k  = mRdiff2*x2; // should multiply by sgn(mRdiff), but it's always positive
 
         if (math::Sign(z)*mA2*z2 >= k)
             return  math::Sqrt(x2 + z2)*mInvVLenSqr - mRad2;
@@ -857,10 +857,10 @@ private:
 
         // attempt to short circuit when top and bottom hits are on sphere caps
         if (in_ball1 || in_ball2) {
-            const float ht = mConeD.dot(Vec3s(x,y,zt) - mConeV);
+            const float ht = float(mConeD.dot(Vec3s(x,y,zt) - mConeV));
             // top point is in one of the half spaces pointing away from the cone
             if (mH1 > ht || ht > mH2) {
-                const float hb = mConeD.dot(Vec3s(x,y,zb) - mConeV);
+                const float hb = float(mConeD.dot(Vec3s(x,y,zb) - mConeV));
                 // bottom point is in one of the half spaces pointing away from the cone
                 if (mH1 > hb || hb > mH2)
                     return true;
@@ -924,16 +924,16 @@ private:
                 const double t1 = mC2Inv*(-c1 + sqrt);
                 if (validFrustumRange(t1, ddotdiff)) {
                     cint_cnt++;
-                    conezb = mRayZ - t1;
+                    conezb = float(mRayZ - t1);
                 }
                 const double t2 = mC2Inv*(-c1 - sqrt);
                 if (validFrustumRange(t2, ddotdiff)) {
                     cint_cnt++;
                     if (cint_cnt == 2 && t1 > t2)
-                        conezt = mRayZ - t2;
+                        conezt = float(mRayZ - t2);
                     else {
                         conezt = conezb;
-                        conezb = mRayZ - t2;
+                        conezb = float(mRayZ - t2);
                     }
                 }
             }
@@ -941,7 +941,7 @@ private:
             const double t = -c0/(2.0f*c1);
             if (validFrustumRange(t, ddotdiff)) {
                 cint_cnt = 1;
-                conezb = mRayZ - t;
+                conezb = float(mRayZ - t);
             }
         }
 
@@ -1123,9 +1123,8 @@ public:
     /// argument util::NullInterrupter if no interruption is desired.
     TubeComplexVoxelizer(const std::vector<Vec3s>& vertices, const std::vector<Vec2I>& segments,
                          float radius, float voxelSize, float background, InterruptT* interrupter)
-    : mVox(voxelSize), mBg(background)
-    , mCoords(vertices), mCells(segments)
-    , mRad(radius), mRadii(mEmptyVector)
+    : mVox(voxelSize), mBg(background), mRad(radius)
+    , mCoords(vertices), mCells(segments), mRadii(getEmptyVector())
     , mInterrupter(interrupter)
     {
         initializeGrid();
@@ -1148,9 +1147,8 @@ public:
     TubeComplexVoxelizer(const std::vector<Vec3s>& vertices, const std::vector<Vec2I>& segments,
                          const std::vector<float>& radii, float voxelSize, float background,
                          InterruptT* interrupter)
-    : mVox(voxelSize), mBg(background)
-    , mCoords(vertices), mCells(segments)
-    , mRadii(radii), mRad(0.0)
+    : mVox(voxelSize), mBg(background), mRad(0.0)
+    , mCoords(vertices), mCells(segments), mRadii(radii)
     , mInterrupter(interrupter)
     {
         if constexpr (PerSegmentRadii) {
@@ -1168,9 +1166,8 @@ public:
     }
 
     TubeComplexVoxelizer(TubeComplexVoxelizer& other, tbb::split)
-    : mVox(other.mVox), mBg(other.mBg)
-    , mCoords(other.mCoords), mCells(other.mCells)
-    , mRadii(other.mRadii), mRad(other.mRad)
+    : mVox(other.mVox), mBg(other.mBg), mRad(other.mRad)
+    , mCoords(other.mCoords), mCells(other.mCells), mRadii(other.mRadii)
     , mPtPartitioner(other.mPtPartitioner), mInterrupter(other.mInterrupter)
     {
         initializeGrid();
@@ -1211,7 +1208,7 @@ public:
         other.mGrid = nullptr;
     }
 
-    inline Index bucketSize() const { return mPtPartitioner->size(); }
+    inline Index64 bucketSize() const { return mPtPartitioner->size(); }
 
     inline GridPtr getGrid() const { return mGrid; }
 
@@ -1290,7 +1287,7 @@ private:
     inline void
     computeCentroids(std::vector<Vec3s>& centroids)
     {
-        const Index n = mCoords.size();
+        const Index n = Index(mCoords.size());
 
         centroids.resize(mCells.size());
 
@@ -1338,21 +1335,25 @@ private:
         return true;
     }
 
+    static const std::vector<float>&
+    getEmptyVector() {
+        static const std::vector<float> empty;
+        return empty;
+    }
+
     // ------------ private members ------------
+
+    const float mVox, mBg, mRad;
 
     const std::vector<Vec3s>& mCoords;
     const std::vector<Vec2I>& mCells;
     const std::vector<float>& mRadii;
 
-    inline static const std::vector<float> mEmptyVector = {};
-
-    const float mVox, mBg, mRad;
-
     std::shared_ptr<PartitionerT> mPtPartitioner;
 
-    GridPtr mGrid;
-
     InterruptT* mInterrupter;
+
+    GridPtr mGrid;
 
 }; // class TubeComplexVoxelizer
 
@@ -1369,7 +1370,6 @@ createLevelSetTubeComplex(const std::vector<Vec3s>& vertices, const std::vector<
     float radius, float voxelSize, float halfWidth, InterruptT* interrupter)
 {
     using GridPtr = typename GridType::Ptr;
-    using TreeT = typename GridType::TreeType;
     using ValueT = typename GridType::ValueType;
 
     using ComplexVoxelizer = typename lvlset::TubeComplexVoxelizer<GridType, InterruptT>;
