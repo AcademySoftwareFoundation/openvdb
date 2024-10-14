@@ -110,9 +110,10 @@ private:
 ///     inline void
 ///     setXYRangeData(const Index& step = 1) override
 ///     {
+///         const float stepf = float(step);
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
-///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
+///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += stepf)
 ///             mXYData.expandYRange(x, BaseT::circleBottom(x), BaseT::circleTop(x));
 ///     }
 ///
@@ -195,6 +196,8 @@ public:
     {
     }
 
+    virtual ~ConvexVoxelizer() = default;
+
     /// @brief Return the voxel size of the grid.
     inline float voxelSize() const { return mVox; }
 
@@ -266,13 +269,13 @@ protected:
     /// can't fit then @c iterate will not try to populate the level set with background
     /// tiles of this dimension.
     /// @return true if the tile can possibly fit; otherwise false.
-    virtual inline bool tileCanFit(const Index& dim) const { return true; }
+    virtual inline bool tileCanFit(const Index&) const { return true; }
 
     // distance in index space
     /// @brief Computes the signed distance from a point to the convex region in index space.
     ///
     /// @param p The point in 3D space for which to compute the signed distance.
-    inline float signedDistance(const Vec3s& p) const { return 0.0f; }
+    inline float signedDistance(const Vec3s&) const { return 0.0f; }
 
     /// @brief Computes the signed distance for tiles in index space,
     /// considering the center of the tile.
@@ -301,7 +304,7 @@ protected:
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
     /// This function is called many times, so a lambda is used to avoid virtual table overhead.
     std::function<bool(float&, float&, const float&, const float&)> bottomTop =
-        [this](float& zb, float& zt, const float& x, const float& y) { return false; };
+        [this](float&, float&, const float&, const float&) { return false; };
 
     // ------------ utilities ------------
 
@@ -770,11 +773,11 @@ private:
     {
         // borrowing parallel logic from tools/LevelSetSphere.h
 
-        const int n = mXYData.size();
+        const Index n = mXYData.size();
 
         if (mSerial) {
             CacheLastLeafAccessor acc(mTree);
-            for (int i = 0; i < n; ++i) {
+            for (Index i = 0; i < n; ++i) {
                 if (mInterrupter && !(i & ((1 << 7) - 1)) && !checkInterrupter())
                     return;
 
@@ -783,14 +786,14 @@ private:
         } else {
             tbb::enumerable_thread_specific<TreeT> pool(mTree);
 
-            auto kernel = [&](const tbb::blocked_range<int>& rng) {
+            auto kernel = [&](const tbb::blocked_range<Index>& rng) {
                 TreeT &tree = pool.local();
                 CacheLastLeafAccessor acc(tree);
 
                 if (!checkInterrupter())
                     return;
 
-                for (int i = rng.begin(); i != rng.end(); ++i) {
+                for (Index i = rng.begin(); i != rng.end(); ++i) {
                     if constexpr (LeapFrog)
                         iterateNoTilesYZ(i, acc);
                     else
@@ -798,7 +801,7 @@ private:
                 }
             };
 
-            tbb::parallel_for(tbb::blocked_range<int>(0, n, 128), kernel);
+            tbb::parallel_for(tbb::blocked_range<Index>(Index(0), n, Index(128)), kernel);
             using RangeT = tbb::blocked_range<typename tbb::enumerable_thread_specific<TreeT>::iterator>;
             struct Op {
                 const bool mDelete;
@@ -821,7 +824,7 @@ private:
     // for each x ordinate and y-scan range
     //   find the z-range for each y and then populate the grid with distance values
     template <bool LeapFrog = false>
-    inline void iterateYZ(const int& i, CacheLastLeafAccessor& acc)
+    inline void iterateYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -836,14 +839,14 @@ private:
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
-            Coord ijk(x, y, 0);
+            Coord ijk(Int32(x), Int32(y), Int32(0));
             Vec3s p(x, y, 0.0f);
 
             ijk[2] = voxelCeil(zb)-1;
             acc.reset(ijk);
 
             for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
-                ijk[2] = z;
+                ijk[2] = Int32(z);
                 const float val = float(acc.template getValue<1>(ijk));
 
                 if (val == mNegBgF) {
@@ -868,7 +871,7 @@ private:
     // for a given x value, create a hollow slice of the object by only populating active voxels
     // for each x ordinate and y-scan range
     //   find the z-range for each y and then populate the grid with distance values
-    inline void iterateNoTilesYZ(const int& i, CacheLastLeafAccessor& acc)
+    inline void iterateNoTilesYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -883,7 +886,7 @@ private:
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
-            Coord ijk(x, y, 0);
+            Coord ijk(Int32(x), Int32(y), Int32(0));
             Vec3s p(x, y, 0.0f);
 
             bool early_break = false;
@@ -892,7 +895,7 @@ private:
             ijk[2] = voxelCeil(zb)-1;
             acc.reset(ijk);
             for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
-                ijk[2] = z;
+                ijk[2] = Int32(z);
                 p[2] = z;
                 const float dist = mVox * sDist(p);
 
@@ -910,7 +913,7 @@ private:
                 ijk[2] = voxelFloor(zt)+1;
                 acc.reset(ijk);
                 for (float z = voxelFloor(zt); z > z_stop; --z) {
-                    ijk[2] = z;
+                    ijk[2] = Int32(z);
                     p[2] = z;
                     const float dist = mVox * sDist(p);
 
@@ -930,7 +933,7 @@ private:
     void tileIterateXYZ()
     {
         AccessorT acc(mTree);
-        for (int i = 0; i < mXYData.size(); ++i) {
+        for (Index i = 0; i < mXYData.size(); ++i) {
             if (mInterrupter && !(i & ((1 << 7) - 1)) && !checkInterrupter())
                 return;
 
@@ -939,7 +942,7 @@ private:
     }
 
     template <typename NodeT>
-    inline void tileIterateYZ(const int& i, AccessorT& acc)
+    inline void tileIterateYZ(const Index& i, AccessorT& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -956,13 +959,13 @@ private:
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
-            Coord ijk(x, y, 0);
+            Coord ijk(Int32(x), Int32(y), Int32(0));
             Vec3s p(x, y, 0.0f);
 
             bool tiles_added = false;
             float z = tileCeil(zb, TILESIZE) - 2*TILESIZE;
             while (z <= tileFloor(zt, TILESIZE) + TILESIZE) {
-                ijk[2] = z;
+                ijk[2] = Int32(z);
                 p[2] = z;
 
                 if (leapFrogToNextTile<NodeT, 1>(ijk, z, acc))
@@ -978,7 +981,7 @@ private:
     inline bool leapFrogToNextTile(const Coord& ijk, float& z, AccessorT& acc) const
     {
         static const int offset  = NodeT::DIM;
-        static const Index nodeDepth = TreeT::DEPTH - NodeT::LEVEL - 1;
+        static const int nodeDepth = int(TreeT::DEPTH - NodeT::LEVEL - 1);
 
         // we have not encountered an already populated tile
         if (acc.getValue(ijk) != mNegBg) {

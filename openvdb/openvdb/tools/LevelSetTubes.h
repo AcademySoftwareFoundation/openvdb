@@ -283,8 +283,8 @@ private:
     //   |       | |***        *** |       |               | |
     //   |       | |   ********    |       |               | |
     //   |       | |               |       |               | |
-    //   |       /  \              |       |               /  \
-    //   |     a0    a1            a2      a3            a4    a5
+    //   |      |   |              |       |              |   |
+    //   |     a0   a1             a2      a3            a4   a5
     //   |                                                           x
     //   └----------------------------------------------------------->
     //
@@ -294,11 +294,13 @@ private:
     inline void
     setXYRangeData(const Index& step = 1) override
     {
+        const float stepf = float(step);
+
         // short circuit a vertical cylinder
         if (mIsVertical) {
             mXYData.reset(mX1 - mORad, mX1 + mORad, step);
 
-            for (float x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += step)
+            for (float x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += stepf)
                 mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
             return;
         }
@@ -320,43 +322,43 @@ private:
 
         mXYData.reset(a0, a5, step);
 
-        for (float x = tc0; x <= a1; x += step)
+        for (float x = tc0; x <= a1; x += stepf)
             mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (float x = tc1; x <= math::Min(a2, a3); x += step)
+                for (float x = tc1; x <= math::Min(a2, a3); x += stepf)
                     mXYData.expandYRange(x, lineBottom(x), circle1Top(x));
             } else {
-                for (float x = tc1; x <= math::Min(a2, a3); x += step)
+                for (float x = tc1; x <= math::Min(a2, a3); x += stepf)
                     mXYData.expandYRange(x, circle1Bottom(x), lineTop(x));
             }
         }
 
         if (a2 < a3) {
-            for (float x = tc2; x <= a3; x += step)
+            for (float x = tc2; x <= a3; x += stepf)
                 mXYData.expandYRange(x, lineBottom(x), lineTop(x));
         } else {
             if (mY2 <= mY1) {
-                for (float x = tc3; x <= a2; x += step)
+                for (float x = tc3; x <= a2; x += stepf)
                     mXYData.expandYRange(x, circle2Bottom(x), circle1Top(x));
             } else {
-                for (float x = tc3; x <= a2; x += step)
+                for (float x = tc3; x <= a2; x += stepf)
                     mXYData.expandYRange(x, circle1Bottom(x), circle2Top(x));
             }
         }
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (float x = math::Max(tc2, tc3); x <= a4; x += step)
+                for (float x = math::Max(tc2, tc3); x <= a4; x += stepf)
                     mXYData.expandYRange(x, circle2Bottom(x), lineTop(x));
             } else {
-                for (float x = math::Max(tc2, tc3); x <= a4; x += step)
+                for (float x = math::Max(tc2, tc3); x <= a4; x += stepf)
                     mXYData.expandYRange(x, lineBottom(x), circle2Top(x));
             }
         }
 
-        for (float x = tc4; x <= a5; x += step)
+        for (float x = tc4; x <= a5; x += stepf)
             mXYData.expandYRange(x, circle2Bottom(x), circle2Top(x));
 
         mXYData.trim();
@@ -656,15 +658,17 @@ private:
     inline void
     setXYRangeData(const Index& step = 1) override
     {
+        const float stepf = float(step);
+
         // short circuit when one circle is in the other
         if (mXYNorm2 <= mRdiff2) {
             if (mX1 - mORad1 <= mX2 - mORad2) {
                 mXYData.reset(mX1 - mORad1, mX1 + mORad1, step);
-                for (float x = tileCeil(mX1 - mORad1, step); x <= mX1 + mORad1; x += step)
+                for (float x = tileCeil(mX1 - mORad1, step); x <= mX1 + mORad1; x += stepf)
                     mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
             } else {
                 mXYData.reset(mX2 - mORad2, mX2 + mORad2, step);
-                for (float x = tileCeil(mX2 - mORad2, step); x <= mX2 + mORad2; x += step)
+                for (float x = tileCeil(mX2 - mORad2, step); x <= mX2 + mORad2; x += stepf)
                     mXYData.expandYRange(x, circle2Bottom(x), circle2Top(x));
             }
             return;
@@ -680,11 +684,11 @@ private:
         const bool success = pullyPoints(p1t, p2t, p1b, p2b);
 
         if (success) {
-            setLineXYData(p1t, p2t, step);
-            setLineXYData(p1b, p2b, step);
+            setLineXYData(p1t, p2t, stepf);
+            setLineXYData(p1b, p2b, stepf);
 
-            setCircleXYData(p1t, p1b, step, true);  // mPt1
-            setCircleXYData(p2t, p2b, step, false); // mPt2
+            setCircleXYData(p1t, p1b, stepf, true);  // mPt1
+            setCircleXYData(p2t, p2b, stepf, false); // mPt2
         }
 
         mXYData.trim();
@@ -751,7 +755,7 @@ private:
             tileCeil(p1.x() + r1, step)
         };
 
-        for (int i = 0; i < xs.size()-1; ++i) {
+        for (int i = 0; i < int(xs.size()-1); ++i) {
             setCircleHiXYData(xs[i], xs[i+1], step, is_pt1);
             setCircleLoXYData(xs[i], xs[i+1], step, is_pt1);
         }

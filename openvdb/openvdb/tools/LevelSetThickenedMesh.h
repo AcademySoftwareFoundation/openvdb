@@ -162,8 +162,6 @@ private:
         const float &x1 = mPts[0].x(), &x2 = mPts[1].x(), &x3 = mPts[2].x(),
                     &x4 = mPts[3].x(), &x5 = mPts[4].x(), &x6 = mPts[5].x();
 
-        const float &y1 = mPts[0].y(), &y2 = mPts[1].y(), &y3 = mPts[2].y();
-
         const float xmin = math::Min(x1, x2, x3, x4, x5, x6);
         const float xmax = math::Max(x1, x2, x3, x4, x5, x6);
         mXYData.reset(xmin, xmax, step);
@@ -195,10 +193,11 @@ private:
         if (tileCeil(x1, step) == tileCeil(x2, step))
             return;
 
-        const float x_start = tileCeil(math::Min(x1, x2), step);
-        const float x_end = math::Max(x1, x2);
+        const float x_start = tileCeil(math::Min(x1, x2), step),
+                    x_end = math::Max(x1, x2),
+                    stepf = float(step);
 
-        for (float x = x_start; x <= x_end; x += step) {
+        for (float x = x_start; x <= x_end; x += stepf) {
             if constexpr (MinMax <= 0)
                 mXYData.expandYMin(x, line2D<i,j>(x));
             if constexpr (MinMax >= 0)
@@ -463,11 +462,13 @@ private:
     inline void
     setXYRangeData(const Index& step = 1) override
     {
+        const float stepf = float(step);
+
         // short circuit a vertical cylinder
         if (mIsVertical) {
             mXYData.reset(mX1 - mORad, mX1 + mORad, step);
 
-            for (float x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += step)
+            for (float x = tileCeil(mX1 - mORad, step); x <= mX1 + mORad; x += stepf)
                 mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
 
             intersectWithXYWedgeLines();
@@ -491,43 +492,43 @@ private:
 
         mXYData.reset(a0, a5, step);
 
-        for (float x = tc0; x <= a1; x += step)
+        for (float x = tc0; x <= a1; x += stepf)
             mXYData.expandYRange(x, circle1Bottom(x), circle1Top(x));
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (float x = tc1; x <= math::Min(a2, a3); x += step)
+                for (float x = tc1; x <= math::Min(a2, a3); x += stepf)
                     mXYData.expandYRange(x, lineBottom(x), circle1Top(x));
             } else {
-                for (float x = tc1; x <= math::Min(a2, a3); x += step)
+                for (float x = tc1; x <= math::Min(a2, a3); x += stepf)
                     mXYData.expandYRange(x, circle1Bottom(x), lineTop(x));
             }
         }
 
         if (a2 < a3) {
-            for (float x = tc2; x <= a3; x += step)
+            for (float x = tc2; x <= a3; x += stepf)
                 mXYData.expandYRange(x, lineBottom(x), lineTop(x));
         } else {
             if (mY2 <= mY1) {
-                for (float x = tc3; x <= a2; x += step)
+                for (float x = tc3; x <= a2; x += stepf)
                     mXYData.expandYRange(x, circle2Bottom(x), circle1Top(x));
             } else {
-                for (float x = tc3; x <= a2; x += step)
+                for (float x = tc3; x <= a2; x += stepf)
                     mXYData.expandYRange(x, circle1Bottom(x), circle2Top(x));
             }
         }
 
         if (!math::isApproxZero(mXdiff)) {
             if (mY1 > mY2) {
-                for (float x = math::Max(tc2, tc3); x <= a4; x += step)
+                for (float x = math::Max(tc2, tc3); x <= a4; x += stepf)
                     mXYData.expandYRange(x, circle2Bottom(x), lineTop(x));
             } else {
-                for (float x = math::Max(tc2, tc3); x <= a4; x += step)
+                for (float x = math::Max(tc2, tc3); x <= a4; x += stepf)
                     mXYData.expandYRange(x, lineBottom(x), circle2Top(x));
             }
         }
 
-        for (float x = tc4; x <= a5; x += step)
+        for (float x = tc4; x <= a5; x += stepf)
             mXYData.expandYRange(x, circle2Bottom(x), circle2Top(x));
 
         intersectWithXYStrip();
@@ -542,7 +543,7 @@ private:
             return;
 
         const Vec3s &pp1 = mPlanePts[0], &pp2 = mPlanePts[1];
-        const float &vx = mV.x(), &vy = mV.y(), &vz = mV.z();
+        const float &vx = mV.x(), &vy = mV.y();
 
         Vec2s n = Vec2s(-vy, vx).unitSafe();
         Vec3s cvec = mORad * Vec3s(-vy, vx, 0.0f).unitSafe();
@@ -553,8 +554,8 @@ private:
         const Vec3s cpmin(mPt1 - cvec), cpmax(mPt1 + cvec);
 
         if (math::isApproxZero(mXdiff)) {
-            const float px = mPt1.x(), py = mPt1.y();
-            const float xmin = math::Min(px, pp1.x(), pp2.x()),
+            const float px = mPt1.x(),
+                        xmin = math::Min(px, pp1.x(), pp2.x()),
                         xmax = math::Max(px, pp1.x(), pp2.x());
 
             if (!inWedge(cpmin))
