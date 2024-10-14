@@ -240,7 +240,7 @@ private:
     inline bool
     tileCanFit(const Index& dim) const override
     {
-        return mRad >= BaseT::halfWidth() + 0.5f * (dim-1u);
+        return mRad >= BaseT::halfWidth() + 0.5f * (float(dim)-1.0f);
     }
 
     std::function<bool(float&, float&, const float&, const float&)> prismBottomTop =
@@ -595,9 +595,9 @@ private:
               n1(-mDirVectors[1].y(), mDirVectors[1].x());
 
         if (n0.dot(d) > 0.0f)
-            n0 *= -1;
+            n0 *= -1.0f;
         if (n1.dot(d) > 0.0f)
-            n1 *= -1;
+            n1 *= -1.0f;
 
         if (!math::isApproxZero(n0.lengthSqr()))
             intersectWithXYHalfSpace(n0, n0.dot(p2_2d - p1_2d) < 0.0f ? p1_2d : p2_2d);
@@ -681,7 +681,7 @@ private:
     inline bool
     tileCanFit(const Index& dim) const override
     {
-        return mRad >= BaseT::halfWidth() + 0.5f * (dim-1u);
+        return mRad >= BaseT::halfWidth() + 0.5f * (float(dim)-1.0f);
     }
 
     std::function<bool(float&, float&, const float&, const float&)> tubeBottomTopVertical =
@@ -1192,7 +1192,7 @@ private:
                       sgn2 = math::Sign(bi_nrml.dot(p2 - p0));
 
             return sgn != 0
-                ? (sgn == 1 ? 1.0f + sgn2 * cos_theta : 3.0f - sgn2 * cos_theta)
+                ? (sgn == 1 ? 1.0f + float(sgn2) * cos_theta : 3.0f - float(sgn2) * cos_theta)
                 : (onSameHalfPlane(bi_nrml, p0, p1, p2) ? 0.0f : 2.0f);
         };
 

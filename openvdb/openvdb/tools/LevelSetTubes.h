@@ -386,7 +386,7 @@ private:
     inline bool
     tileCanFit(const Index& dim) const override
     {
-        return mRad >= BaseT::halfWidth() + 0.70711f * (dim-1u);
+        return mRad >= BaseT::halfWidth() + 0.70711f * (float(dim)-1.0f);
     }
 
     // vertical capsule

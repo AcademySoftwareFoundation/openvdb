@@ -110,10 +110,9 @@ private:
 ///     inline void
 ///     setXYRangeData(const Index& step = 1) override
 ///     {
-///         const float stepf = float(step);
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
-///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += stepf)
+///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
 ///             mXYData.expandYRange(x, BaseT::circleBottom(x), BaseT::circleTop(x));
 ///     }
 ///
@@ -686,8 +685,8 @@ protected:
                 return;
 
             mSize -= i + j;
-            mXStart += i * mStep;
-            mXEnd -= j * mStep;
+            mXStart += ValueType(i * mStep);
+            mXEnd -= ValueType(j * mStep);
 
             if (i > 0) {
                 mYMins.erase(mYMins.begin(), mYMins.begin() + i);
@@ -726,7 +725,7 @@ protected:
         {
             assert(i < mSize);
 
-            return mXStart + ValueType(i)*mStep;
+            return mXStart + ValueType(i * mStep);
         }
 
         Index mStep, mSize;
@@ -1030,8 +1029,8 @@ private:
         const float sz = (float)mTileSizes[depth];
 
         z = dir > 0
-            ? sz * math::Ceil(z/sz) + 0.5f * (offset - 1.0f)
-            : sz * math::Floor(z/sz) - 0.5f * (offset + 1.0f);
+            ? sz * float(math::Ceil(z/sz)) + 0.5f * (offset - 1.0f)
+            : sz * float(math::Floor(z/sz)) - 0.5f * (offset + 1.0f);
 
         return true;
     }
@@ -1247,7 +1246,7 @@ private:
             const int depth = mAcc.getValueDepth(ijk);
             const float sz = (float)mTileSizes[depth];
 
-            z = sz*math::Ceil((z+1.0f)/sz) - 1.0f;
+            z = sz * float(math::Ceil((z+1.0f)/sz)) - 1.0f;
         }
 
     private:
