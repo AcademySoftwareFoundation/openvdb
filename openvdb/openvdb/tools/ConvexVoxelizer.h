@@ -788,7 +788,8 @@ private:
         }
     }
 
-    inline void iterateLeaf()
+    inline void
+    iterateLeaf()
     {
         setXYRangeData();
 
@@ -797,7 +798,8 @@ private:
     }
 
     template <bool LeapFrog = false>
-    void iterateXYZ()
+    void
+    iterateXYZ()
     {
         // borrowing parallel logic from tools/LevelSetSphere.h
 
@@ -852,7 +854,8 @@ private:
     // for each x ordinate and y-scan range
     //   find the z-range for each y and then populate the grid with distance values
     template <bool LeapFrog = false>
-    inline void iterateYZ(const Index& i, CacheLastLeafAccessor& acc)
+    inline void
+    iterateYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -899,7 +902,8 @@ private:
     // for a given x value, create a hollow slice of the object by only populating active voxels
     // for each x ordinate and y-scan range
     //   find the z-range for each y and then populate the grid with distance values
-    inline void iterateNoTilesYZ(const Index& i, CacheLastLeafAccessor& acc)
+    inline void
+    iterateNoTilesYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -958,7 +962,8 @@ private:
     }
 
     template <typename NodeT>
-    void tileIterateXYZ()
+    void
+    tileIterateXYZ()
     {
         AccessorT acc(mTree);
         for (Index i = 0; i < mXYData.size(); ++i) {
@@ -970,7 +975,8 @@ private:
     }
 
     template <typename NodeT>
-    inline void tileIterateYZ(const Index& i, AccessorT& acc)
+    inline void
+    tileIterateYZ(const Index& i, AccessorT& acc)
     {
         // initialize x value and y-range
         float x, yb, yt;
@@ -1006,7 +1012,8 @@ private:
     }
 
     template <typename NodeT, int dir>
-    inline bool leapFrogToNextTile(const Coord& ijk, float& z, AccessorT& acc) const
+    inline bool
+    leapFrogToNextTile(const Coord& ijk, float& z, AccessorT& acc) const
     {
         static const int offset  = NodeT::DIM;
         static const int nodeDepth = int(TreeT::DEPTH - NodeT::LEVEL - 1);
@@ -1036,7 +1043,8 @@ private:
 
     // add negative background tile inside the object if it fits and return true iff it was added
     template<typename NodeT>
-    inline bool addTile(const Vec3s& p, const Coord& ijk, AccessorT& acc)
+    inline bool
+    addTile(const Vec3s& p, const Coord& ijk, AccessorT& acc)
     {
         static const Index LEVEL = NodeT::LEVEL + 1;
 
@@ -1049,7 +1057,8 @@ private:
     }
 
     template <typename NodeT>
-    inline bool tileFits(const Vec3s& p) const
+    inline bool
+    tileFits(const Vec3s& p) const
     {
         static const Index TILESIZE = NodeT::DIM;
 
@@ -1077,19 +1086,22 @@ private:
             && tpDist(p + Vec3s(R1, R1, R1))    < -mHw;
     }
 
-    inline float sDist(const Vec3s& p) const
+    inline float
+    sDist(const Vec3s& p) const
     {
         return static_cast<const Derived*>(this)->signedDistance(p);
     }
 
-    inline float tpDist(const Vec3s& p) const
+    inline float
+    tpDist(const Vec3s& p) const
     {
         return static_cast<const Derived*>(this)->tilePointSignedDistance(p);
     }
 
     // misc
 
-    static inline std::vector<int> treeTileSizes()
+    static inline std::vector<int>
+    treeTileSizes()
     {
         // iterate over all non root nodes
         using ChainT = typename NodeChainT::PopBack;
@@ -1101,7 +1113,8 @@ private:
     }
 
     template <typename ChainT>
-    static inline void doTreeTileSizes(std::vector<int>& sizes)
+    static inline void
+    doTreeTileSizes(std::vector<int>& sizes)
     {
         using NodeT        = typename ChainT::Back;
         using PoppedChainT = typename ChainT::PopBack;
@@ -1113,7 +1126,8 @@ private:
         }
     }
 
-    inline bool checkInterrupter()
+    inline bool
+    checkInterrupter()
     {
         if (util::wasInterrupted(mInterrupter)) {
             openvdb::thread::cancelGroupExecution();
