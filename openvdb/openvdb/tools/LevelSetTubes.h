@@ -867,7 +867,7 @@ private:
             }
         }
 
-        float conezb, conezt;
+        float conezb = 0.0f, conezt = 0.0f;
         int cint_cnt;
         openConeFrustumBottomTop(conezb, conezt, cint_cnt, x, y);
 

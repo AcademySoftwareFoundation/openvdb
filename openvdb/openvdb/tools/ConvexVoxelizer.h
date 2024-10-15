@@ -1257,8 +1257,10 @@ private:
         bool atNewLeafPos(const Coord& ijk) const
         {
             if constexpr (ZDir == -1) {
+                // assumes value just above has been cached already!
                 return (ijk[2] & (DIM-1u)) == DIM-1u;
             } else if constexpr (ZDir == 1) {
+                // assumes value just below has been cached already!
                 return (ijk[2] & (DIM-1u)) == 0;
             } else {
                 return Coord::lessThan(ijk, mOrigin)
