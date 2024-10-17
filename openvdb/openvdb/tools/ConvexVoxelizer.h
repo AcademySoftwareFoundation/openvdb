@@ -89,7 +89,8 @@ private:
 ///     {
 ///     }
 ///
-///     void operator()(const Vec3s& pt, const float& r)
+///     void
+///     operator()(const Vec3s& pt, const float& r)
 ///     {
 ///         if (r <= 0.0f)
 ///             return;
@@ -509,7 +510,7 @@ protected:
         }
 
         /// @brief Set the minimum y value for a given x value,
-        /// even if its larger than the current value.
+        /// even if it is larger than the current value.
         /// @param x The x value.
         /// @param ymin The minimum y value to reset.
         inline void
@@ -521,7 +522,7 @@ protected:
         }
 
         /// @brief Set the maximum y value for a given x value,
-        /// even if its larger than the current value.
+        /// even if it is smaller than the current value.
         /// @param x The x value.
         /// @param ymax The maximum y value to reset.
         inline void
@@ -554,7 +555,7 @@ protected:
             assert(step != 0);
 
             mStep = step;
-            mStepInv = ValueType(1)/static_cast<float>(mStep);
+            mStepInv = ValueType(1)/static_cast<ValueType>(mStep);
 
             mXStart = tileCeil(xmin, mStep);
             mXEnd = tileFloor(xmax, mStep);
