@@ -277,9 +277,13 @@ public:
     void setValuesOff() { mBuffer.mData.setOff(); }
 
     /// Return @c true if the voxel at the given coordinates is active.
-    bool isValueOn(const Coord& xyz) const { return mBuffer.mData.isOn(this->coordToOffset(xyz)); }
+    bool isValueOn(const Coord& xyz) const { return this->isValueOn(this->coordToOffset(xyz)); }
     /// Return @c true if the voxel at the given offset is active.
     bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mBuffer.mData.isOn(offset); }
+    /// Return @c true if the voxel at the given coordinates is inactive.
+    bool isValueOff(const Coord& xyz) const { return this->isValueOff(this->coordToOffset(xyz)); }
+    /// Return @c true if the voxel at the given offset is inactive.
+    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mBuffer.mData.isOff(offset); }
 
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }

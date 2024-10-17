@@ -331,7 +331,11 @@ public:
     /// Return @c true if the voxel at the given coordinates is active.
     bool isValueOn(const Coord& xyz) const;
     /// Return @c true if the voxel at the given offset is active.
-    bool isValueOn(Index offset) const { return mValueMask.isOn(offset); }
+    bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOn(offset); }
+    /// Return @c true if the voxel at the given coordinates is inactive.
+    bool isValueOff(const Coord& xyz) const;
+    /// Return @c true if the voxel at the given offset is inactive.
+    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOff(offset); }
 
     /// Return @c true if this node or any of its child nodes have any active tiles.
     bool hasActiveTiles() const;
@@ -1552,6 +1556,15 @@ InternalNode<ChildT, Log2Dim>::isValueOn(const Coord& xyz) const
     const Index n = this->coordToOffset(xyz);
     if (this->isChildMaskOff(n)) return this->isValueMaskOn(n);
     return mNodes[n].getChild()->isValueOn(xyz);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::isValueOff(const Coord& xyz) const
+{
+    const Index n = this->coordToOffset(xyz);
+    if (this->isChildMaskOff(n)) return this->isValueMaskOn(n);
+    return mNodes[n].getChild()->isValueOff(xyz);
 }
 
 template<typename ChildT, Index Log2Dim>
