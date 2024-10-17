@@ -620,6 +620,41 @@ public:
     /// If no such node exists, return nullptr.
     template<typename NodeType> NodeType* probeNode(const Coord& xyz);
     template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
+    template<typename NodeType> const NodeType* probeNode(const Coord& xyz) const;
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node that contains voxel (x, y, z).
+    /// If no such node exists, return nullptr.
+    ChildNodeType* probeChild(const Coord& xyz);
+    const ChildNodeType* probeConstChild(const Coord& xyz) const;
+    const ChildNodeType* probeChild(const Coord& xyz) const;
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node that contains voxel (x, y, z).
+    /// If no such node exists, return nullptr.
+    ChildNodeType* probeChild(const Coord& xyz, ValueType& value, bool& active);
+    const ChildNodeType* probeConstChild(const Coord& xyz, ValueType& value, bool& active) const;
+    const ChildNodeType* probeChild(const Coord& xyz, ValueType& value, bool& active) const;
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node for a specific offset.
+    /// If no such node exists, return nullptr.
+    /// @note Out-of-bounds memory access attempts will wrap around using modulo indexing.
+    ChildNodeType* probeChild(Index offset);
+    const ChildNodeType* probeConstChild(Index offset) const;
+    const ChildNodeType* probeChild(Index offset) const;
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node for a specific offset.
+    /// If no such node exists, return nullptr.
+    /// @note Out-of-bounds memory access attempts will wrap around using modulo indexing.
+    ChildNodeType* probeChild(Index offset, ValueType& value, bool& active);
+    const ChildNodeType* probeConstChild(Index offset, ValueType& value, bool& active) const;
+    const ChildNodeType* probeChild(Index offset, ValueType& value, bool& active) const;
     //@}
 
     //@{
@@ -1227,6 +1262,15 @@ InternalNode<ChildT, Log2Dim>::probeConstNode(const Coord& xyz) const
 
 
 template<typename ChildT, Index Log2Dim>
+template<typename NodeT>
+inline const NodeT*
+InternalNode<ChildT, Log2Dim>::probeNode(const Coord& xyz) const
+{
+    return this->probeConstNode<NodeT>(xyz);
+}
+
+
+template<typename ChildT, Index Log2Dim>
 template<typename NodeT, typename AccessorT>
 inline const NodeT*
 InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
@@ -1244,6 +1288,113 @@ InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, Accessor
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz)
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeChild(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(const Coord& xyz) const
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeConstChild(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz) const
+{
+    return this->probeConstChild(xyz);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz, ValueType& value, bool& active)
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeChild(n, value, active);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(const Coord& xyz, ValueType& value, bool& active) const
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeConstChild(n, value, active);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz, ValueType& value, bool& active) const
+{
+    return this->probeConstChild(xyz, value, active);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(Index offset)
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    offset &= (NUM_VALUES - 1); // prevent use of an out-of-bounds index
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(Index offset) const
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    offset &= (NUM_VALUES - 1); // prevent use of an out-of-bounds index
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(Index offset) const
+{
+    return this->probeConstChild(offset);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(Index offset, ValueType& value, bool& active)
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    offset &= (NUM_VALUES - 1); // prevent use of an out-of-bounds index
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    value = mNodes[offset].getValue();
+    active = mValueMask.isOn(offset);
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(Index offset, ValueType& value, bool& active) const
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    offset &= (NUM_VALUES - 1); // prevent use of an out-of-bounds index
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    value = mNodes[offset].getValue();
+    active = mValueMask.isOn(offset);
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(Index offset, ValueType& value, bool& active) const
+{
+    return this->probeConstChild(offset, value, active);
+}
 
 ////////////////////////////////////////
 
