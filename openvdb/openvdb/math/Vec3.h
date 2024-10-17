@@ -392,7 +392,7 @@ public:
     Vec3<T> unitSafe() const
     {
         T l2 = lengthSqr();
-        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
+        return l2 != T(0) ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
     }
 
     // Number of cols, rows, elements

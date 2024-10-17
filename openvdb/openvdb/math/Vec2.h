@@ -246,7 +246,7 @@ public:
     Vec2<T> unitSafe() const
     {
         T l2 = lengthSqr();
-        return l2 ? *this/static_cast<T>(sqrt(l2)) : Vec2<T>(1,0);
+        return l2 != T(0) ? *this/static_cast<T>(sqrt(l2)) : Vec2<T>(1,0);
     }
 
     /// Multiply each element of this vector by @a scalar.
