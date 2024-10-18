@@ -120,3 +120,141 @@ TEST_F(TestInternalNode, test)
         EXPECT_EQ(Index32(5), internalNode3.transientData());
     }
 }
+
+TEST_F(TestInternalNode, testProbe)
+{
+    using RootNode = FloatTree::RootNodeType;
+    using InternalNode = RootNode::ChildNodeType;
+
+    const Coord ijk(0, 0, 4096);
+    InternalNode internalNode(ijk, 1.0f);
+
+    internalNode.addTile(32, 3.0f, true); // (0, 128, 4096)
+    internalNode.addTile(33, 4.0f, true); // (0, 128, 4224)
+
+    auto* child = new InternalNode::ChildNodeType(Coord(0, 256, 4096), 5.0f, true);
+    EXPECT_TRUE(internalNode.addChild(child)); // always returns true
+
+    { // probeNode, probeConstNode
+        auto* node1 = internalNode.probeNode<InternalNode::ChildNodeType>(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node1));
+        auto* node2 = internalNode.probeNode<InternalNode::ChildNodeType>(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node2));
+        const InternalNode& constInternalNode = internalNode;
+        auto* node3 = constInternalNode.probeNode<InternalNode::ChildNodeType>(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node3));
+        auto* node4 = constInternalNode.probeNode<InternalNode::ChildNodeType>(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node4));
+        auto* node5 = internalNode.probeConstNode<InternalNode::ChildNodeType>(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node5));
+        auto* node6 = internalNode.probeConstNode<InternalNode::ChildNodeType>(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node6));
+    }
+
+    { // probeChild, probeConstChild - coord access
+        auto* node1 = internalNode.probeChild(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node1));
+        auto* node2 = internalNode.probeChild(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node2));
+        const InternalNode& constInternalNode = internalNode;
+        auto* node3 = constInternalNode.probeChild(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node3));
+        auto* node4 = constInternalNode.probeChild(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node4));
+        auto* node5 = internalNode.probeConstChild(Coord(0, 256, 4096));
+        EXPECT_TRUE(bool(node5));
+        auto* node6 = internalNode.probeConstChild(Coord(0, 128, 4096));
+        EXPECT_FALSE(bool(node6));
+    }
+
+    { // probeChild, probeConstChild - index access
+        auto* node1 = internalNode.probeChild(64);
+        EXPECT_TRUE(bool(node1));
+        auto* node2 = internalNode.probeChild(33);
+        EXPECT_FALSE(bool(node2));
+        const InternalNode& constInternalNode = internalNode;
+        auto* node3 = constInternalNode.probeChild(64);
+        EXPECT_TRUE(bool(node3));
+        auto* node4 = constInternalNode.probeChild(33);
+        EXPECT_FALSE(bool(node4));
+        auto* node5 = internalNode.probeConstChild(64);
+        EXPECT_TRUE(bool(node5));
+        auto* node6 = internalNode.probeConstChild(33);
+        EXPECT_FALSE(bool(node6));
+
+        // wrap-around modulo indexing
+        auto* node7 = internalNode.probeConstChild(64 + 32*32*32);
+        EXPECT_TRUE(bool(node7));
+        auto* node8 = internalNode.probeConstChild(33 + 32*32*32);
+        EXPECT_FALSE(bool(node8));
+    }
+
+    float value = -1.0f;
+    bool active = false;
+
+    { // probeChild, probeConstChild - coord access with value and active status
+        auto* node1 = internalNode.probeChild(Coord(0, 256, 4096), value, active);
+        EXPECT_TRUE(bool(node1));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node2 = internalNode.probeChild(Coord(0, 128, 4096), value, active);
+        EXPECT_FALSE(bool(node2));
+        EXPECT_EQ(value, 3.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+        const InternalNode& constInternalNode = internalNode;
+        auto* node3 = constInternalNode.probeChild(Coord(0, 256, 4096), value, active);
+        EXPECT_TRUE(bool(node3));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node4 = constInternalNode.probeChild(Coord(0, 128, 4096), value, active);
+        EXPECT_FALSE(bool(node4));
+        EXPECT_EQ(value, 3.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+        auto* node5 = internalNode.probeConstChild(Coord(0, 256, 4096), value, active);
+        EXPECT_TRUE(bool(node5));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node6 = internalNode.probeConstChild(Coord(0, 128, 4096), value, active);
+        EXPECT_FALSE(bool(node6));
+        EXPECT_EQ(value, 3.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+    }
+
+    { // probeChild, probeConstChild - index access with value and active status
+        auto* node1 = internalNode.probeChild(64, value, active);
+        EXPECT_TRUE(bool(node1));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node2 = internalNode.probeChild(33, value, active);
+        EXPECT_FALSE(bool(node2));
+        EXPECT_EQ(value, 4.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+        const InternalNode& constInternalNode = internalNode;
+        auto* node3 = constInternalNode.probeChild(64, value, active);
+        EXPECT_TRUE(bool(node3));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node4 = constInternalNode.probeChild(33, value, active);
+        EXPECT_FALSE(bool(node4));
+        EXPECT_EQ(value, 4.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+        auto* node5 = internalNode.probeConstChild(64, value, active);
+        EXPECT_TRUE(bool(node5));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node6 = internalNode.probeConstChild(33, value, active);
+        EXPECT_FALSE(bool(node6));
+        EXPECT_EQ(value, 4.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+
+        // wrap-around modulo indexing
+        auto* node7 = internalNode.probeConstChild(64 + 32*32*32, value, active);
+        EXPECT_TRUE(bool(node7));
+        EXPECT_EQ(value, -1.0f);
+        EXPECT_FALSE(active);
+        auto* node8 = internalNode.probeConstChild(33 + 32*32*32, value, active);
+        EXPECT_FALSE(bool(node8));
+        EXPECT_EQ(value, 4.0f); value = -1.0f;
+        EXPECT_TRUE(active); active = false;
+    }
+}
