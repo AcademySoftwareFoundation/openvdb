@@ -11,7 +11,7 @@
 #include <unordered_map>
 #include <functional>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -590,20 +590,11 @@ static const std::vector<StrWrapper> tests {
 
 }
 
-class TestSyntaxFailures : public CppUnit::TestCase
+class TestSyntaxFailures : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestSyntaxFailures);
-    CPPUNIT_TEST(testSyntax);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSyntax();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestSyntaxFailures);
-
-void TestSyntaxFailures::testSyntax()
+TEST_F(TestSyntaxFailures, testSyntax)
 {
     // Quickly check the above doesn't have multiple occurrence
     // store multiple in a hash map

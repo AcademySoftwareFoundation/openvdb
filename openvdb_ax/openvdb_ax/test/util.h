@@ -35,7 +35,7 @@
         const std::string& code = test.first; \
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
         std::stringstream str; \
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unexpected parsing error(s)\n", str.str()), tree && !logger.hasError()); \
+        ASSERT_TRUE(tree && !logger.hasError()) << ERROR_MSG("Unexpected parsing error(s)\n", str.str());\
     } \
 } \
 
@@ -46,7 +46,7 @@
         logger.clear();\
         const std::string& code = test.first; \
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected parsing error", code), !tree && logger.hasError()); \
+        ASSERT_TRUE(!tree && logger.hasError()) << ERROR_MSG("Expected parsing error", code); \
     } \
 } \
 

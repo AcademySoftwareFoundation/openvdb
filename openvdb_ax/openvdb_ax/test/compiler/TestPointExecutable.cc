@@ -10,39 +10,22 @@
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointGroup.h>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 
-using namespace openvdb;
+// namespace must be the same as where PointExecutable is defined in order
+// to access private methods. See also
+//https://google.github.io/googletest/advanced.html#testing-private-code
+namespace openvdb {
+namespace OPENVDB_VERSION_NAME {
+namespace ax {
 
-class TestPointExecutable : public CppUnit::TestCase
+class TestPointExecutable : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestPointExecutable);
-    CPPUNIT_TEST(testConstructionDestruction);
-    CPPUNIT_TEST(testCreateMissingAttributes);
-    CPPUNIT_TEST(testGroupExecution);
-    CPPUNIT_TEST(testCompilerCases);
-    CPPUNIT_TEST(testExecuteBindings);
-    CPPUNIT_TEST(testAttributeCodecs);
-    CPPUNIT_TEST(testCLI);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testConstructionDestruction();
-    void testCreateMissingAttributes();
-    void testGroupExecution();
-    void testCompilerCases();
-    void testExecuteBindings();
-    void testAttributeCodecs();
-    void testCLI();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointExecutable);
-
-void
-TestPointExecutable::testConstructionDestruction()
+TEST_F(TestPointExecutable, testConstructionDestruction)
 {
     // Test the building and teardown of executable objects. This is primarily to test
     // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
@@ -51,7 +34,7 @@ TestPointExecutable::testConstructionDestruction()
     // must be initialized, otherwise construction/destruction of llvm objects won't
     // exhibit correct behaviour
 
-    CPPUNIT_ASSERT(openvdb::ax::isInitialized());
+    ASSERT_TRUE(openvdb::ax::isInitialized());
 
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
     std::unique_ptr<llvm::Module> M(new llvm::Module("test_module", *C));
@@ -59,8 +42,8 @@ TestPointExecutable::testConstructionDestruction()
             .setEngineKind(llvm::EngineKind::JIT)
             .create());
 
-    CPPUNIT_ASSERT(!M);
-    CPPUNIT_ASSERT(E);
+    ASSERT_TRUE(!M);
+    ASSERT_TRUE(E);
 
     std::weak_ptr<llvm::LLVMContext> wC = C;
     std::weak_ptr<const llvm::ExecutionEngine> wE = E;
@@ -73,25 +56,24 @@ TestPointExecutable::testConstructionDestruction()
     openvdb::ax::PointExecutable::Ptr pointExecutable
         (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}, tree));
 
-    CPPUNIT_ASSERT_EQUAL(2, int(wE.use_count()));
-    CPPUNIT_ASSERT_EQUAL(2, int(wC.use_count()));
+    ASSERT_EQ(2, int(wE.use_count()));
+    ASSERT_EQ(2, int(wC.use_count()));
 
     C.reset();
     E.reset();
 
-    CPPUNIT_ASSERT_EQUAL(1, int(wE.use_count()));
-    CPPUNIT_ASSERT_EQUAL(1, int(wC.use_count()));
+    ASSERT_EQ(1, int(wE.use_count()));
+    ASSERT_EQ(1, int(wC.use_count()));
 
     // test destruction
 
     pointExecutable.reset();
 
-    CPPUNIT_ASSERT_EQUAL(0, int(wE.use_count()));
-    CPPUNIT_ASSERT_EQUAL(0, int(wC.use_count()));
+    ASSERT_EQ(0, int(wE.use_count()));
+    ASSERT_EQ(0, int(wC.use_count()));
 }
 
-void
-TestPointExecutable::testCreateMissingAttributes()
+TEST_F(TestPointExecutable, testCreateMissingAttributes)
 {
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform();
@@ -104,10 +86,10 @@ TestPointExecutable::testCreateMissingAttributes()
     openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
     openvdb::ax::PointExecutable::Ptr executable =
         compiler->compile<openvdb::ax::PointExecutable>("@a=v@b.x;");
-    CPPUNIT_ASSERT(executable);
+    ASSERT_TRUE(executable);
 
     executable->setCreateMissing(false);
-    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
+    ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
 
     executable->setCreateMissing(true);
     executable->execute(*grid);
@@ -115,24 +97,23 @@ TestPointExecutable::testCreateMissingAttributes()
     const auto leafIter = grid->tree().cbeginLeaf();
     const auto& descriptor = leafIter->attributeSet().descriptor();
 
-    CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor.size());
+    ASSERT_EQ(size_t(3), descriptor.size());
     const size_t bIdx = descriptor.find("b");
-    CPPUNIT_ASSERT(bIdx != openvdb::points::AttributeSet::INVALID_POS);
-    CPPUNIT_ASSERT(descriptor.valueType(bIdx) == openvdb::typeNameAsString<openvdb::Vec3f>());
+    ASSERT_TRUE(bIdx != openvdb::points::AttributeSet::INVALID_POS);
+    ASSERT_TRUE(descriptor.valueType(bIdx) == openvdb::typeNameAsString<openvdb::Vec3f>());
     openvdb::points::AttributeHandle<openvdb::Vec3f>::Ptr
         bHandle = openvdb::points::AttributeHandle<openvdb::Vec3f>::create(leafIter->constAttributeArray(bIdx));
-    CPPUNIT_ASSERT(bHandle->get(0) == openvdb::Vec3f::zero());
+    ASSERT_TRUE(bHandle->get(0) == openvdb::Vec3f::zero());
 
     const size_t aIdx = descriptor.find("a");
-    CPPUNIT_ASSERT(aIdx != openvdb::points::AttributeSet::INVALID_POS);
-    CPPUNIT_ASSERT(descriptor.valueType(aIdx) == openvdb::typeNameAsString<float>());
+    ASSERT_TRUE(aIdx != openvdb::points::AttributeSet::INVALID_POS);
+    ASSERT_TRUE(descriptor.valueType(aIdx) == openvdb::typeNameAsString<float>());
     openvdb::points::AttributeHandle<float>::Ptr
         aHandle = openvdb::points::AttributeHandle<float>::create(leafIter->constAttributeArray(aIdx));
-    CPPUNIT_ASSERT(aHandle->get(0) == 0.0f);
+    ASSERT_TRUE(aHandle->get(0) == 0.0f);
 }
 
-void
-TestPointExecutable::testGroupExecution()
+TEST_F(TestPointExecutable, testGroupExecution)
 {
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform(0.1);
@@ -154,16 +135,16 @@ TestPointExecutable::testGroupExecution()
     auto checkValues = [&](const int expected)
     {
         auto leafIter = grid->tree().cbeginLeaf();
-        CPPUNIT_ASSERT(leafIter);
+        ASSERT_TRUE(leafIter);
 
         const auto& descriptor = leafIter->attributeSet().descriptor();
         const size_t aIdx = descriptor.find("a");
-        CPPUNIT_ASSERT(aIdx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(aIdx != openvdb::points::AttributeSet::INVALID_POS);
 
         for (; leafIter; ++leafIter) {
             openvdb::points::AttributeHandle<int> handle(leafIter->constAttributeArray(aIdx));
-            CPPUNIT_ASSERT(handle.size() == 1);
-            CPPUNIT_ASSERT_EQUAL(expected, handle.get(0));
+            ASSERT_TRUE(handle.size() == 1);
+            ASSERT_EQ(expected, handle.get(0));
         }
     };
 
@@ -172,13 +153,13 @@ TestPointExecutable::testGroupExecution()
     openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
     openvdb::ax::PointExecutable::Ptr executable =
         compiler->compile<openvdb::ax::PointExecutable>("i@a=1;");
-    CPPUNIT_ASSERT(executable);
+    ASSERT_TRUE(executable);
 
     const std::string group = "test";
 
     // non existent group
     executable->setGroupExecution(group);
-    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
+    ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
     checkValues(0);
 
     openvdb::points::appendGroup(grid->tree(), group);
@@ -194,19 +175,18 @@ TestPointExecutable::testGroupExecution()
     checkValues(1);
 }
 
-void
-TestPointExecutable::testCompilerCases()
+TEST_F(TestPointExecutable, testCompilerCases)
 {
     openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
-    CPPUNIT_ASSERT(compiler);
+    ASSERT_TRUE(compiler);
     {
         // with string only
-        CPPUNIT_ASSERT(static_cast<bool>(compiler->compile<openvdb::ax::PointExecutable>("int i;")));
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i;"), openvdb::AXCompilerError);
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i"), openvdb::AXSyntaxError);
+        ASSERT_TRUE(static_cast<bool>(compiler->compile<openvdb::ax::PointExecutable>("int i;")));
+        ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i;"), openvdb::AXCompilerError);
+        ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i"), openvdb::AXSyntaxError);
         // with AST only
         auto ast = openvdb::ax::ast::parse("i;");
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>(*ast), openvdb::AXCompilerError);
+        ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>(*ast), openvdb::AXCompilerError);
     }
 
     openvdb::ax::Logger logger([](const std::string&) {});
@@ -215,68 +195,68 @@ TestPointExecutable::testCompilerCases()
     {
         openvdb::ax::PointExecutable::Ptr executable =
         compiler->compile<openvdb::ax::PointExecutable>("", logger); // empty
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
     }
     logger.clear();
     {
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("i;", logger); // undeclared variable error
-        CPPUNIT_ASSERT(!executable);
-        CPPUNIT_ASSERT(logger.hasError());
+        ASSERT_TRUE(!executable);
+        ASSERT_TRUE(logger.hasError());
         logger.clear();
         openvdb::ax::PointExecutable::Ptr executable2 =
             compiler->compile<openvdb::ax::PointExecutable>("i", logger); // expected ; error (parser)
-        CPPUNIT_ASSERT(!executable2);
-        CPPUNIT_ASSERT(logger.hasError());
+        ASSERT_TRUE(!executable2);
+        ASSERT_TRUE(logger.hasError());
     }
     logger.clear();
     {
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("int i = 18446744073709551615;", logger); // warning
-        CPPUNIT_ASSERT(executable);
-        CPPUNIT_ASSERT(logger.hasWarning());
+        ASSERT_TRUE(executable);
+        ASSERT_TRUE(logger.hasWarning());
     }
 
     // using syntax tree and logger
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // empty
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         logger.clear(); // no tree for line col numbers
         openvdb::ax::PointExecutable::Ptr executable2 =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // empty
-        CPPUNIT_ASSERT(executable2);
+        ASSERT_TRUE(executable2);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // undeclared variable error
-        CPPUNIT_ASSERT(!executable);
-        CPPUNIT_ASSERT(logger.hasError());
+        ASSERT_TRUE(!executable);
+        ASSERT_TRUE(logger.hasError());
         logger.clear(); // no tree for line col numbers
         openvdb::ax::PointExecutable::Ptr executable2 =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // undeclared variable error
-        CPPUNIT_ASSERT(!executable2);
-        CPPUNIT_ASSERT(logger.hasError());
+        ASSERT_TRUE(!executable2);
+        ASSERT_TRUE(logger.hasError());
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
-        CPPUNIT_ASSERT(tree);
+        ASSERT_TRUE(tree);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // warning
-        CPPUNIT_ASSERT(executable);
-        CPPUNIT_ASSERT(logger.hasWarning());
+        ASSERT_TRUE(executable);
+        ASSERT_TRUE(logger.hasWarning());
         logger.clear(); // no tree for line col numbers
         openvdb::ax::PointExecutable::Ptr executable2 =
             compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // warning
-        CPPUNIT_ASSERT(executable2);
-        CPPUNIT_ASSERT(logger.hasWarning());
+        ASSERT_TRUE(executable2);
+        ASSERT_TRUE(logger.hasWarning());
     }
     logger.clear();
 
@@ -286,7 +266,7 @@ TestPointExecutable::testCompilerCases()
         std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // empty
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
     }
     logger.clear();
     {
@@ -294,7 +274,7 @@ TestPointExecutable::testCompilerCases()
         std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // undeclared variable error
-        CPPUNIT_ASSERT(!executable);
+        ASSERT_TRUE(!executable);
     }
     logger.clear();
     {
@@ -302,13 +282,12 @@ TestPointExecutable::testCompilerCases()
         std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // warning
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
     }
     logger.clear();
 }
 
-void
-TestPointExecutable::testExecuteBindings()
+TEST_F(TestPointExecutable, testExecuteBindings)
 {
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform();
@@ -324,23 +303,23 @@ TestPointExecutable::testExecuteBindings()
         openvdb::points::appendAttribute<float>(points->tree(), "a");
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b", "a"); // bind @b to attribute a
         executable->setAttributeBindings(bindings);
         executable->setCreateMissing(false);
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         const auto& descriptor = leafIter->attributeSet().descriptor();
 
         // check value set via binding is correct
-        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        ASSERT_EQ(size_t(2), descriptor.size());
         const size_t aidx = descriptor.find("a");
-        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
-        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+        ASSERT_EQ(1.0f, handle.get(0));
     }
 
     // binding to existing attribute AND default bind other attribute
@@ -352,30 +331,30 @@ TestPointExecutable::testExecuteBindings()
         openvdb::points::appendAttribute<float>(points->tree(), "c");
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @c = 2.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b","a"); // bind b to a
         executable->setAttributeBindings(bindings);
         executable->setCreateMissing(false);
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         const auto& descriptor = leafIter->attributeSet().descriptor();
 
         // check value set via binding
-        CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor.size());
+        ASSERT_EQ(size_t(3), descriptor.size());
         const size_t aidx = descriptor.find("a");
-        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
-        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+        ASSERT_EQ(1.0f, handle.get(0));
 
         // check value set not using binding
         const size_t cidx = descriptor.find("c");
-        CPPUNIT_ASSERT(cidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(cidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle2(leafIter->constAttributeArray(cidx));
-        CPPUNIT_ASSERT_EQUAL(2.0f, handle2.get(0));
+        ASSERT_EQ(2.0f, handle2.get(0));
     }
 
     // bind to created attribute AND not binding to created attribute
@@ -385,29 +364,29 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @c = 2.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b", "a"); // bind b to a
         executable->setAttributeBindings(bindings);
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         const auto& descriptor = leafIter->attributeSet().descriptor();
 
         // check value set via binding
-        CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor.size());
+        ASSERT_EQ(size_t(3), descriptor.size());
         const size_t aidx = descriptor.find("a");
-        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
-        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+        ASSERT_EQ(1.0f, handle.get(0));
 
         // check value set not using binding
         const size_t cidx = descriptor.find("c");
-        CPPUNIT_ASSERT(cidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(cidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle2(leafIter->constAttributeArray(cidx));
-        CPPUNIT_ASSERT_EQUAL(2.0f, handle2.get(0));
+        ASSERT_EQ(2.0f, handle2.get(0));
     }
 
     // binding to non existent attribute, error
@@ -417,13 +396,13 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b","a"); // bind b to a
         executable->setAttributeBindings(bindings);
         executable->setCreateMissing(false);
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
-        CPPUNIT_ASSERT_THROW(executable->execute(*points), openvdb::AXExecutionError);
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_THROW(executable->execute(*points), openvdb::AXExecutionError);
     }
 
     // trying to bind to an attribute and use the original attribute name at same time
@@ -433,10 +412,10 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b","a"); // bind b to a
-        CPPUNIT_ASSERT_THROW(executable->setAttributeBindings(bindings), openvdb::AXExecutionError);
+        ASSERT_THROW(executable->setAttributeBindings(bindings), openvdb::AXExecutionError);
     }
 
     // swap ax and data attributes with bindings
@@ -446,13 +425,13 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b","a"); // bind b to a
         bindings.set("a","b"); // bind a to b
 
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_NO_THROW(executable->execute(*points));
     }
 
 
@@ -463,23 +442,23 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("f@P = 1.25f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("P","a"); // bind float a to P
 
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         const auto& descriptor = leafIter->attributeSet().descriptor();
 
         // check value set via binding
-        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        ASSERT_EQ(size_t(2), descriptor.size());
         const size_t aidx = descriptor.find("a");
-        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        ASSERT_TRUE(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
         openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
-        CPPUNIT_ASSERT_EQUAL(1.25f, handle.get(0));
+        ASSERT_EQ(1.25f, handle.get(0));
     }
 
     // bind P away from world space position to some other attribute, defaulting to vec3f (as P does)
@@ -489,49 +468,48 @@ TestPointExecutable::testExecuteBindings()
                 <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@P = 1.25f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("P","a"); // bind float a to P
 
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         const auto& descriptor = leafIter->attributeSet().descriptor();
 
         // check value set via binding
-        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        ASSERT_EQ(size_t(2), descriptor.size());
         const size_t aidx = descriptor.find("a");
-        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<openvdb::Vec3f>());
+        ASSERT_TRUE(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        ASSERT_TRUE(descriptor.valueType(aidx) == openvdb::typeNameAsString<openvdb::Vec3f>());
         openvdb::points::AttributeHandle<openvdb::Vec3f> handle(leafIter->constAttributeArray(aidx));
-        CPPUNIT_ASSERT_EQUAL(openvdb::Vec3f(1.25f), handle.get(0));
+        ASSERT_EQ(openvdb::Vec3f(1.25f), handle.get(0));
     }
 
     // test setting bindings and then resetting some of those bindings on the same executable
     {
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f; @c = 3.0f;");
-        CPPUNIT_ASSERT(executable);
+        ASSERT_TRUE(executable);
         openvdb::ax::AttributeBindings bindings;
         bindings.set("b","a"); // bind b to a
         bindings.set("c","b"); // bind c to b
         bindings.set("a","c"); // bind a to c
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
 
         bindings.set("a","b"); // bind a to b
         bindings.set("b","a"); // bind a to b
-        CPPUNIT_ASSERT(!bindings.dataNameBoundTo("c")); // c should be unbound
+        ASSERT_TRUE(!bindings.dataNameBoundTo("c")); // c should be unbound
         // check that the set call resets c to c
-        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
         const openvdb::ax::AttributeBindings& bindingsOnExecutable = executable->getAttributeBindings();
-        CPPUNIT_ASSERT(bindingsOnExecutable.isBoundAXName("c"));
-        CPPUNIT_ASSERT_EQUAL(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
+        ASSERT_TRUE(bindingsOnExecutable.isBoundAXName("c"));
+        ASSERT_EQ(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
     }
 }
 
-void
-TestPointExecutable::testAttributeCodecs()
+TEST_F(TestPointExecutable, testAttributeCodecs)
 {
     math::Transform::Ptr defaultTransform =
         math::Transform::createLinearTransform(5.0f);
@@ -545,7 +523,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::NullCodec, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        ASSERT_EQ(points->tree().leafCount(), Index32(1));
 
         // collapsed uniform 0 attributes
         points::appendAttribute<float, points::NullCodec>(points->tree(), "f");
@@ -560,20 +538,20 @@ TestPointExecutable::testAttributeCodecs()
         points::AttributeHandle<float> handle1(leafIter->constAttributeArray("t"));
         points::AttributeHandle<int32_t> handle2(leafIter->constAttributeArray("i"));
         points::AttributeHandle<Vec3f> handle3(leafIter->constAttributeArray("vu"));
-        CPPUNIT_ASSERT(handle0.isUniform());
-        CPPUNIT_ASSERT(handle1.isUniform());
-        CPPUNIT_ASSERT(handle2.isUniform());
-        CPPUNIT_ASSERT(handle3.isUniform());
-        CPPUNIT_ASSERT_EQUAL(0.0f, handle0.get(0));
-        CPPUNIT_ASSERT_EQUAL(float(math::half(0.0f)), handle1.get(0));
-        CPPUNIT_ASSERT_EQUAL(int32_t(0), handle2.get(0));
-        CPPUNIT_ASSERT_EQUAL(Vec3f(math::half(0)), handle3.get(0));
+        ASSERT_TRUE(handle0.isUniform());
+        ASSERT_TRUE(handle1.isUniform());
+        ASSERT_TRUE(handle2.isUniform());
+        ASSERT_TRUE(handle3.isUniform());
+        ASSERT_EQ(0.0f, handle0.get(0));
+        ASSERT_EQ(float(math::half(0.0f)), handle1.get(0));
+        ASSERT_EQ(int32_t(0), handle2.get(0));
+        ASSERT_EQ(Vec3f(math::half(0)), handle3.get(0));
 
         // non uniform codec compressed inputs
         points::AttributeWriteHandle<Vec3f> handle4(leafIter->attributeArray("vnu"));
         handle4.set(0, Vec3f(1.0f));
         handle4.set(1, Vec3f(2.0f));
-        CPPUNIT_ASSERT(!handle4.isUniform());
+        ASSERT_TRUE(!handle4.isUniform());
 
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>
@@ -592,37 +570,37 @@ TestPointExecutable::testAttributeCodecs()
     if (openvdb::ax::x86::CheckX86Feature("f16c") ==
         openvdb::ax::x86::CpuFlagStatus::Unsupported)
     {
-        CPPUNIT_ASSERT(!executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(!executable->usesAcceleratedKernel(points->tree()));
     }
     else {
-        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
     }
 #else
-        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
 #endif
 
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->execute(*points));
 
-        CPPUNIT_ASSERT_EQUAL(3.245e-7f, handle0.get(0));
-        CPPUNIT_ASSERT_EQUAL(9.28e-12f, handle0.get(1));
-        CPPUNIT_ASSERT_EQUAL(float(math::half(3.245e-7f)), handle1.get(0));
-        CPPUNIT_ASSERT_EQUAL(float(math::half(0.0f)), handle1.get(1));
-        CPPUNIT_ASSERT_EQUAL(int32_t(3), handle2.get(0));
-        CPPUNIT_ASSERT_EQUAL(int32_t(0), handle2.get(1));
+        ASSERT_EQ(3.245e-7f, handle0.get(0));
+        ASSERT_EQ(9.28e-12f, handle0.get(1));
+        ASSERT_EQ(float(math::half(3.245e-7f)), handle1.get(0));
+        ASSERT_EQ(float(math::half(0.0f)), handle1.get(1));
+        ASSERT_EQ(int32_t(3), handle2.get(0));
+        ASSERT_EQ(int32_t(0), handle2.get(1));
 
-        CPPUNIT_ASSERT_EQUAL(float(math::half(3.245e-7f)),  handle3.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(100000.0f)),  handle3.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(-1e-2f)),     handle3.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(6.1e-3f)),    handle3.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(0.0f)),       handle3.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(-9.367e-6f)), handle3.get(1).z());
+        ASSERT_EQ(float(math::half(3.245e-7f)),  handle3.get(0).x());
+        ASSERT_EQ(float(math::half(100000.0f)),  handle3.get(0).y());
+        ASSERT_EQ(float(math::half(-1e-2f)),     handle3.get(0).z());
+        ASSERT_EQ(float(math::half(6.1e-3f)),    handle3.get(1).x());
+        ASSERT_EQ(float(math::half(0.0f)),       handle3.get(1).y());
+        ASSERT_EQ(float(math::half(-9.367e-6f)), handle3.get(1).z());
 
-        CPPUNIT_ASSERT_EQUAL(float(math::half(7.135e-7f)),   handle4.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(200000.0f)),   handle4.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(-5e-3f)),      handle4.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(-1.0f)),       handle4.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(80123.14f)),   handle4.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(float(math::half(9019.53123f)), handle4.get(1).z());
+        ASSERT_EQ(float(math::half(7.135e-7f)),   handle4.get(0).x());
+        ASSERT_EQ(float(math::half(200000.0f)),   handle4.get(0).y());
+        ASSERT_EQ(float(math::half(-5e-3f)),      handle4.get(0).z());
+        ASSERT_EQ(float(math::half(-1.0f)),       handle4.get(1).x());
+        ASSERT_EQ(float(math::half(80123.14f)),   handle4.get(1).y());
+        ASSERT_EQ(float(math::half(9019.53123f)), handle4.get(1).z());
     }
 
     // compress/decompress val according to op and return it as the same type as val
@@ -641,7 +619,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::NullCodec, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        ASSERT_EQ(points->tree().leafCount(), Index32(1));
 
         // collapsed uniform 0 attributes
         points::appendAttribute<Vec3f, points::FixedPointCodec<true, points::UnitRange>>(points->tree(), "fpu8");
@@ -656,22 +634,22 @@ TestPointExecutable::testAttributeCodecs()
         points::AttributeHandle<float> handle1(leafIter->constAttributeArray("f"));
         points::AttributeHandle<Vec3f> handle2(leafIter->constAttributeArray("fpr8"));
         points::AttributeHandle<Vec3f> handle3(leafIter->constAttributeArray("fpu16"));
-        CPPUNIT_ASSERT(handle0.isUniform());
-        CPPUNIT_ASSERT(handle1.isUniform());
-        CPPUNIT_ASSERT(handle2.isUniform());
-        CPPUNIT_ASSERT(handle3.isUniform());
+        ASSERT_TRUE(handle0.isUniform());
+        ASSERT_TRUE(handle1.isUniform());
+        ASSERT_TRUE(handle2.isUniform());
+        ASSERT_TRUE(handle3.isUniform());
 
         const float fpr8zero = compress(points::FixedPointCodec<true, points::PositionRange>(), 0.0f);
-        CPPUNIT_ASSERT_EQUAL(Vec3f(0.0f), handle0.get(0));
-        CPPUNIT_ASSERT_EQUAL(float(0.0f), handle1.get(0));
-        CPPUNIT_ASSERT_EQUAL(Vec3f(fpr8zero), handle2.get(0));
-        CPPUNIT_ASSERT_EQUAL(Vec3f(0.0f), handle3.get(0));
+        ASSERT_EQ(Vec3f(0.0f), handle0.get(0));
+        ASSERT_EQ(float(0.0f), handle1.get(0));
+        ASSERT_EQ(Vec3f(fpr8zero), handle2.get(0));
+        ASSERT_EQ(Vec3f(0.0f), handle3.get(0));
 
         // non uniform codec compressed inputs
         points::AttributeWriteHandle<Vec3f> handle4(leafIter->attributeArray("fpr16"));
         handle4.set(0, Vec3f(0.49f));
         handle4.set(1, Vec3f(1e-9f));
-        CPPUNIT_ASSERT(!handle4.isUniform());
+        ASSERT_TRUE(!handle4.isUniform());
 
         openvdb::ax::PointExecutable::Ptr executable =
             compiler->compile<openvdb::ax::PointExecutable>
@@ -686,40 +664,40 @@ TestPointExecutable::testAttributeCodecs()
                  "if (v@P.x > 0.5) { v@fpr16[0] = 7.135e-7f; v@fpr16[1] = 200000.0f; v@fpr16[2] = -5e-3f; }"
                  "else             { v@fpr16[0] = -0.5f;     v@fpr16[1] = 0.0f;      v@fpr16[2] = 0.5f; }");
 
-        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_NO_THROW(executable->execute(*points));
 
 
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), 0.924599f),  handle0.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), 0.0f),       handle0.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), -7e-2f),     handle0.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), 9.9e-9f),    handle0.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), -0.9999f),   handle0.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::UnitRange>(), 7.2134e-4f), handle0.get(1).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), 0.924599f),  handle0.get(0).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), 0.0f),       handle0.get(0).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), -7e-2f),     handle0.get(0).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), 9.9e-9f),    handle0.get(1).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), -0.9999f),   handle0.get(1).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::UnitRange>(), 7.2134e-4f), handle0.get(1).z());
 
-        CPPUNIT_ASSERT_EQUAL(float(3.245e-7f), handle1.get(0));
-        CPPUNIT_ASSERT_EQUAL(float(0.0f),      handle1.get(1));
+        ASSERT_EQ(float(3.245e-7f), handle1.get(0));
+        ASSERT_EQ(float(0.0f),      handle1.get(1));
 
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), 3.245e-7f),  handle2.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), 0.0f),       handle2.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), -1e-12f),    handle2.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), -1.245e-9f), handle2.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), -0.49f),     handle2.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), 0.078918f),  handle2.get(1).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), 3.245e-7f),  handle2.get(0).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), 0.0f),       handle2.get(0).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), -1e-12f),    handle2.get(0).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), -1.245e-9f), handle2.get(1).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), -0.49f),     handle2.get(1).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), 0.078918f),  handle2.get(1).z());
 
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), 0.999999f),   handle3.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), -0.0f),       handle3.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), 7.66e-2f),    handle3.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), 0.0f),        handle3.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), -0.999999f),  handle3.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::UnitRange>(), 5.9811e-14f), handle3.get(1).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), 0.999999f),   handle3.get(0).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), -0.0f),       handle3.get(0).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), 7.66e-2f),    handle3.get(0).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), 0.0f),        handle3.get(1).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), -0.999999f),  handle3.get(1).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::UnitRange>(), 5.9811e-14f), handle3.get(1).z());
 
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), 7.135e-7f), handle4.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), 200000.0f), handle4.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), -5e-3f),   handle4.get(0).z());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), -0.5f),     handle4.get(1).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), 0.0f),      handle4.get(1).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<false, points::PositionRange>(), 0.5f),      handle4.get(1).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), 7.135e-7f), handle4.get(0).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), 200000.0f), handle4.get(0).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), -5e-3f),   handle4.get(0).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), -0.5f),     handle4.get(1).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), 0.0f),      handle4.get(1).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<false, points::PositionRange>(), 0.5f),      handle4.get(1).z());
     }
 
     // finally test position (uint8_t compression) and different codecs together
@@ -728,7 +706,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::FixedPointCodec<true, points::PositionRange>, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        ASSERT_EQ(points->tree().leafCount(), Index32(1));
 
         points::appendAttribute<float, points::TruncateCodec>(points->tree(), "t");
         points::appendAttribute<Vec3f, points::FixedPointCodec<false, points::PositionRange>>(points->tree(), "f");
@@ -746,16 +724,16 @@ TestPointExecutable::testAttributeCodecs()
     if (openvdb::ax::x86::CheckX86Feature("f16c") ==
         openvdb::ax::x86::CpuFlagStatus::Unsupported)
     {
-        CPPUNIT_ASSERT(!executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(!executable->usesAcceleratedKernel(points->tree()));
     }
     else {
-        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
     }
 #else
-        CPPUNIT_ASSERT(executable->usesAcceleratedKernel(points->tree()));
+        ASSERT_TRUE(executable->usesAcceleratedKernel(points->tree()));
 #endif
 
-        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+        ASSERT_NO_THROW(executable->execute(*points));
 
         const auto leafIter = points->tree().cbeginLeaf();
         points::AttributeHandle<Vec3f> handle0(leafIter->constAttributeArray("P"));
@@ -771,17 +749,16 @@ TestPointExecutable::testAttributeCodecs()
         pos = Vec3f(defaultTransform->worldToIndex(pos));
         pos -= coord.asVec3s();
 
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.x()), handle0.get(0).x());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.y()), handle0.get(0).y());
-        CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.z()), handle0.get(0).z());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.x()), handle0.get(0).x());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.y()), handle0.get(0).y());
+        ASSERT_EQ(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.z()), handle0.get(0).z());
 
-        CPPUNIT_ASSERT_EQUAL(float(math::half(8908410.12384910f)), handle1.get(0));
-        CPPUNIT_ASSERT_EQUAL(Vec3f(compress(points::FixedPointCodec<false, points::PositionRange>(), 245e-9f)), handle2.get(0));
+        ASSERT_EQ(float(math::half(8908410.12384910f)), handle1.get(0));
+        ASSERT_EQ(Vec3f(compress(points::FixedPointCodec<false, points::PositionRange>(), 245e-9f)), handle2.get(0));
     }
 }
 
-void
-TestPointExecutable::testCLI()
+TEST_F(TestPointExecutable, testCLI)
 {
     using CLI = openvdb::ax::PointExecutable::CLI;
 
@@ -829,77 +806,77 @@ TestPointExecutable::testCLI()
     const auto defaultGrain = defaultExe->getGrainSize();
     const auto defaultBindings = defaultExe->getAttributeBindings();
 
-    CPPUNIT_ASSERT_THROW(CreateCLI("--unknown"), UnusedCLIParam);
-    CPPUNIT_ASSERT_THROW(CreateCLI("-unknown"), UnusedCLIParam);
-    CPPUNIT_ASSERT_THROW(CreateCLI("-"), UnusedCLIParam);
-    CPPUNIT_ASSERT_THROW(CreateCLI("--"), UnusedCLIParam);
-    CPPUNIT_ASSERT_THROW(CreateCLI("-- "), UnusedCLIParam);
+    ASSERT_THROW(CreateCLI("--unknown"), UnusedCLIParam);
+    ASSERT_THROW(CreateCLI("-unknown"), UnusedCLIParam);
+    ASSERT_THROW(CreateCLI("-"), UnusedCLIParam);
+    ASSERT_THROW(CreateCLI("--"), UnusedCLIParam);
+    ASSERT_THROW(CreateCLI("-- "), UnusedCLIParam);
 
     {
         CLI cli = CreateCLI("");
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(defaultGroup, exe->getGroupExecution());
+        ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
+        ASSERT_EQ(defaultGrain, exe->getGrainSize());
+        ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
     }
 
     // --create-missing
     {
-        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing invalid"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing --group test"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--create-missing"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--create-missing invalid"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--create-missing --group test"), openvdb::CLIError);
 
         CLI cli = CreateCLI("--create-missing ON");
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(true, exe->getCreateMissing());
+        ASSERT_EQ(defaultGroup, exe->getGroupExecution());
+        ASSERT_EQ(defaultGrain, exe->getGrainSize());
+        ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
     }
 
     // --group
     {
-        CPPUNIT_ASSERT_THROW(CreateCLI("--group"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--group --create-missing ON"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--group"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--group --create-missing ON"), openvdb::CLIError);
 
         CLI cli = CreateCLI("--group test");
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(std::string("test"), exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
+        ASSERT_EQ(std::string("test"), exe->getGroupExecution());
+        ASSERT_EQ(defaultGrain, exe->getGrainSize());
+        ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
     }
 
     // --grain
     {
-        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain nan"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain -1"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain --create-missing ON"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--points-grain"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--points-grain nan"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--points-grain -1"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--points-grain --create-missing ON"), openvdb::CLIError);
 
         CLI cli = CreateCLI("--points-grain 0");
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
+        ASSERT_EQ(defaultGroup, exe->getGroupExecution());
+        ASSERT_EQ(size_t(0), exe->getGrainSize());
+        ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
     }
 
     // --bindings
     {
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a:"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a,b"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :b"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,a:b"), openvdb::CLIError);
-        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings --create-missing ON"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings :"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings ,"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings a:"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings a,b"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings :b"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings ,a:b"), openvdb::CLIError);
+        ASSERT_THROW(CreateCLI("--bindings --create-missing ON"), openvdb::CLIError);
 
         CLI cli = CreateCLI("--bindings a:b,c:d,12:13");
         ax::AttributeBindings bindings;
@@ -908,22 +885,22 @@ TestPointExecutable::testCLI()
         bindings.set("12", "13");
 
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(defaultCreateMissing, exe->getCreateMissing());
+        ASSERT_EQ(defaultGroup, exe->getGroupExecution());
+        ASSERT_EQ(defaultGrain, exe->getGrainSize());
+        ASSERT_EQ(bindings, exe->getAttributeBindings());
     }
 
     // multiple
     {
         CLI cli = CreateCLI("--points-grain 5 --create-missing OFF");
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(size_t(5), exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(false, exe->getCreateMissing());
+        ASSERT_EQ(defaultGroup, exe->getGroupExecution());
+        ASSERT_EQ(size_t(5), exe->getGrainSize());
+        ASSERT_EQ(defaultBindings, exe->getAttributeBindings());
     }
 
     {
@@ -932,10 +909,14 @@ TestPointExecutable::testCLI()
         bindings.set("a", "b");
 
         auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
-        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
-        CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(std::string("123"), exe->getGroupExecution());
-        CPPUNIT_ASSERT_EQUAL(size_t(128), exe->getGrainSize());
-        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
+        ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        ASSERT_EQ(false, exe->getCreateMissing());
+        ASSERT_EQ(std::string("123"), exe->getGroupExecution());
+        ASSERT_EQ(size_t(128), exe->getGrainSize());
+        ASSERT_EQ(bindings, exe->getAttributeBindings());
     }
 }
+
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
