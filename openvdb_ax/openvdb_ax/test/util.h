@@ -27,13 +27,6 @@
 
 #define ERROR_MSG(Msg, Code) Msg + std::string(": \"") + Code + std::string("\"")
 
-// TEMPORARY transitional measure to switch from
-// CPPUnit to GoogleTest incrementally. If gtest
-// has been included, use its assertion macros,
-// otherwise, fallback to CPPUnit macros.
-// TODO: replace with just gtest macros once CPPUnit is unused
-#ifdef GOOGLETEST_INCLUDE_GTEST_GTEST_H_ // gtest.h has been included
-
 #define TEST_SYNTAX_PASSES(Tests) \
 { \
     openvdb::ax::Logger logger;\
@@ -56,33 +49,6 @@
         ASSERT_TRUE(!tree && logger.hasError()) << ERROR_MSG("Expected parsing error", code); \
     } \
 } \
-
-#else // if gtest.h has not been included
-
-#define TEST_SYNTAX_PASSES(Tests) \
-{ \
-    openvdb::ax::Logger logger;\
-    for (const auto& test : Tests) { \
-        logger.clear();\
-        const std::string& code = test.first; \
-        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
-        std::stringstream str; \
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unexpected parsing error(s)\n", str.str()), tree && !logger.hasError()); \
-    } \
-} \
-
-#define TEST_SYNTAX_FAILS(Tests) \
-{ \
-    openvdb::ax::Logger logger([](const std::string&) {});\
-    for (const auto& test : Tests) { \
-        logger.clear();\
-        const std::string& code = test.first; \
-        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected parsing error", code), !tree && logger.hasError()); \
-    } \
-} \
-
-#endif // gtest.h has not been included
 
 namespace unittest_util
 {
