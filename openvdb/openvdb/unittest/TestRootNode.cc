@@ -110,3 +110,36 @@ TEST_F(TestRoot, test)
         EXPECT_EQ(Index32(5), rootNode3.transientData());
     }
 }
+
+TEST_F(TestRoot, testUnsafe)
+{
+    using RootNode = FloatTree::RootNodeType;
+
+    RootNode root(1.0f);
+
+    root.addTile(Coord(1, 2, 3), 2.0f, true);
+    root.addTile(Coord(4096, 2, 3), 3.0f, false);
+
+    auto* child = new RootNode::ChildNodeType(Coord(0, 0, 4096), 5.0f, true);
+    EXPECT_TRUE(root.addChild(child)); // always returns true
+
+    { // get value
+        EXPECT_EQ(root.getValueUnsafe(Coord(1, 2, 3)), 2.0f);
+        EXPECT_EQ(root.getValueUnsafe(Coord(4096, 2, 3)), 3.0f);
+        float value = -1.0f;
+        EXPECT_TRUE(root.getValueUnsafe(Coord(1, 2, 3), value));
+        EXPECT_EQ(value, 2.0f); value = -1.0f;
+        EXPECT_FALSE(root.getValueUnsafe(Coord(4096, 2, 3), value));
+        EXPECT_EQ(value, 3.0f); value = -1.0f;
+    }
+
+    { // get child
+        auto* node1 = root.getChildUnsafe(Coord(0, 0, 4096));
+        EXPECT_TRUE(node1);
+        const RootNode& constRoot = root;
+        auto* node2 = root.getChildUnsafe(Coord(0, 0, 4096));
+        EXPECT_TRUE(node2);
+        auto* node3 = root.getConstChildUnsafe(Coord(0, 0, 4096));
+        EXPECT_TRUE(node3);
+    }
+}

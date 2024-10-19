@@ -120,3 +120,94 @@ TEST_F(TestInternalNode, test)
         EXPECT_EQ(Index32(5), internalNode3.transientData());
     }
 }
+
+TEST_F(TestInternalNode, testUnsafe)
+{
+    using RootNode = FloatTree::RootNodeType;
+    using InternalNode = RootNode::ChildNodeType;
+
+    const Coord ijk(0, 0, 4096);
+    InternalNode internalNode(ijk, 1.0f);
+
+    internalNode.addTile(32, 3.0f, true); // (0, 128, 4096)
+    internalNode.addTile(33, 4.0f, false); // (0, 128, 4224)
+
+    auto* child = new InternalNode::ChildNodeType(Coord(0, 256, 4096), 5.0f, true);
+    EXPECT_TRUE(internalNode.addChild(child)); // always returns true
+
+    { // get value
+
+        EXPECT_EQ(internalNode.getValueUnsafe(32), 3.0f);
+        EXPECT_EQ(internalNode.getValueUnsafe(33), 4.0f);
+
+        float value = -1.0f;
+        EXPECT_TRUE(internalNode.getValueUnsafe(32, value));
+        EXPECT_EQ(value, 3.0f); value = -1.0f;
+        EXPECT_FALSE(internalNode.getValueUnsafe(33, value));
+        EXPECT_EQ(value, 4.0f); value = -1.0f;
+    }
+
+    { // set value and active state
+        EXPECT_TRUE(internalNode.isValueOn(32));
+        internalNode.setValueOffUnsafe(32);
+        EXPECT_TRUE(internalNode.isValueOff(32));
+        internalNode.setValueOnUnsafe(32);
+        EXPECT_TRUE(internalNode.isValueOn(32));
+        internalNode.setActiveStateUnsafe(32, false);
+        EXPECT_TRUE(internalNode.isValueOff(32));
+        internalNode.setActiveStateUnsafe(32, true);
+        EXPECT_TRUE(internalNode.isValueOn(32));
+
+        internalNode.setValueOnlyUnsafe(32, 5.0f);
+        EXPECT_EQ(internalNode.getValueUnsafe(32), 5.0f);
+        EXPECT_TRUE(internalNode.isValueOn(32));
+        internalNode.setValueOffUnsafe(32);
+        EXPECT_TRUE(internalNode.isValueOff(32));
+        internalNode.setValueOnUnsafe(32);
+        EXPECT_TRUE(internalNode.isValueOn(32));
+
+        internalNode.setValueOnUnsafe(33, 7.0f);
+        EXPECT_TRUE(internalNode.isValueOn(33));
+        EXPECT_EQ(internalNode.getValueUnsafe(33), 7.0f);
+        internalNode.setValueOffUnsafe(33, 6.0f);
+        EXPECT_TRUE(internalNode.isValueOff(33));
+        EXPECT_EQ(internalNode.getValueUnsafe(33), 6.0f);
+    }
+
+    { // get child
+        auto* node1 = internalNode.getChildUnsafe(64);
+        EXPECT_TRUE(bool(node1));
+        const InternalNode& constInternalNode = internalNode;
+        auto* node2 = constInternalNode.getChildUnsafe(64);
+        EXPECT_TRUE(bool(node2));
+        auto* node3 = internalNode.getConstChildUnsafe(64);
+        EXPECT_TRUE(bool(node3));
+    }
+
+    { // set child
+        auto* child1 = new InternalNode::ChildNodeType(Coord(0, 128, 0), 8.0f, true);
+        internalNode.setChildUnsafe(32, child1);
+        auto* node1 = internalNode.getChildUnsafe(32);
+        EXPECT_TRUE(node1);
+        EXPECT_EQ(node1->origin(), Coord(0, 128, 0));
+
+        auto* child2 = new InternalNode::ChildNodeType(Coord(0, 256, 0), 9.0f, true);
+        internalNode.resetChildUnsafe(64, child2);
+        auto* node2 = internalNode.getChildUnsafe(64);
+        EXPECT_TRUE(node2);
+        EXPECT_EQ(node2->origin(), Coord(0, 256, 0));
+
+        auto* child3 = new InternalNode::ChildNodeType(Coord(0, 512, 0), 10.0f, true);
+        auto* node3 = internalNode.stealChildUnsafe(64, 12.0f, false);
+        EXPECT_TRUE(node3);
+        EXPECT_EQ(node3->origin(), Coord(0, 256, 0));
+        delete node3;
+        EXPECT_EQ(internalNode.getValueUnsafe(64), 12.0f);
+        EXPECT_TRUE(internalNode.isValueOff(64));
+
+        internalNode.deleteChildUnsafe(32, 13.0f, true);
+        EXPECT_EQ(internalNode.getValueUnsafe(32), 13.0f);
+        EXPECT_TRUE(internalNode.isValueOn(32));
+    }
+}
+

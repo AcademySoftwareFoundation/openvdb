@@ -533,3 +533,41 @@ TEST_F(TestLeaf, testTransientData)
     LeafT leaf3 = leaf;
     EXPECT_EQ(Index32(5), leaf3.transientData());
 }
+
+TEST_F(TestLeaf, testUnsafe)
+{
+    using namespace openvdb;
+    using LeafT = tree::LeafNode<float, 3>;
+    const Coord origin(-9, -2, -8);
+    LeafT leaf(origin, 1.0f, false);
+
+    EXPECT_FALSE(leaf.isValueOn(1));
+    EXPECT_TRUE(leaf.isValueOff(1));
+    EXPECT_EQ(leaf.getValueUnsafe(1), 1.0f);
+    float value = -1.0f;
+    EXPECT_FALSE(leaf.getValueUnsafe(1, value));
+    EXPECT_EQ(value, 1.0f); value = -1.0f;
+
+    EXPECT_TRUE(leaf.isValueOff(32));
+    leaf.setValueOnUnsafe(32);
+    EXPECT_TRUE(leaf.isValueOn(32));
+    leaf.setValueOffUnsafe(32);
+    EXPECT_TRUE(leaf.isValueOff(32));
+    leaf.setActiveStateUnsafe(32, true);
+    EXPECT_TRUE(leaf.isValueOn(32));
+    leaf.setActiveStateUnsafe(32, false);
+    EXPECT_TRUE(leaf.isValueOff(32));
+
+    leaf.setValueOnlyUnsafe(32, 5.0f);
+    EXPECT_EQ(leaf.getValueUnsafe(32), 5.0f);
+    EXPECT_TRUE(leaf.isValueOff(32));
+    leaf.setValueOnUnsafe(32);
+    EXPECT_TRUE(leaf.isValueOn(32));
+
+    leaf.setValueOnUnsafe(33, 7.0f);
+    EXPECT_TRUE(leaf.isValueOn(33));
+    EXPECT_EQ(leaf.getValueUnsafe(33), 7.0f);
+    leaf.setValueOffUnsafe(33, 6.0f);
+    EXPECT_TRUE(leaf.isValueOff(33));
+    EXPECT_EQ(leaf.getValueUnsafe(33), 6.0f);
+}

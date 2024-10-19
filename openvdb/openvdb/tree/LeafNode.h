@@ -829,6 +829,29 @@ public:
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mValueMask.isOff(); }
 
+    //
+    // Unsafe methods
+    //
+    // These methods are not in fact unsafe, but are only offered so that
+    // the same methods can be called on both internal nodes and leaf nodes.
+
+    /// Return the value of the voxel at the given offset.
+    const ValueType& getValueUnsafe(Index offset) const { return this->getValue(offset); }
+    /// Return true if the voxel at the given offset is active and set value.
+    bool getValueUnsafe(Index offset, ValueType& value) const { return this->probeValue(offset, value); }
+    /// Set the active state of the voxel at the given offset but don't change its value.
+    void setActiveStateUnsafe(Index offset, bool on) { this->setActiveState(offset, on); }
+    /// Set the value of the voxel at the given coordinates but don't change its active state.
+    void setValueOnlyUnsafe(Index offset, const ValueType& value) { return this->setValueOnly(offset, value); }
+    /// Mark the voxel at the given offset as active but don't change its value.
+    void setValueOnUnsafe(Index offset) { this->setValueOn(offset); }
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValueOnUnsafe(Index offset, const ValueType& value) { this->setValueOn(offset, value); }
+    /// Mark the voxel at the given offset as inactive but don't change its value.
+    void setValueOffUnsafe(Index offset) { this->setValueOff(offset); }
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValueOffUnsafe(Index offset, const ValueType& value) { this->setValueOff(offset, value); }
+
 protected:
     friend class ::TestLeaf;
     template<typename> friend class ::TestLeafIO;
