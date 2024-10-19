@@ -222,6 +222,10 @@ public:
     /// @param xyz       the coordinates of the voxel to be probed
     /// @param[out] val  the value of the voxel at the given coordinates
     bool probeValue(const Coord& xyz, bool& val) const;
+    /// @brief Return @c true if the voxel at the given offset is active.
+    /// @param offset    the linear offset of the voxel to be probed
+    /// @param[out] val  the value of the voxel at the given coordinates
+    bool probeValue(Index offset, bool& val) const;
 
     /// Return the level (0) at which leaf node values reside.
     static Index getValueLevel(const Coord&) { return LEVEL; }
@@ -1113,7 +1117,14 @@ template<Index Log2Dim>
 inline bool
 LeafNode<ValueMask, Log2Dim>::probeValue(const Coord& xyz, bool& val) const
 {
-    const Index offset = this->coordToOffset(xyz);
+    return this->probeValue(this->coordToOffset(xyz), val);
+}
+
+
+template<Index Log2Dim>
+inline bool
+LeafNode<ValueMask, Log2Dim>::probeValue(Index offset, bool& val) const
+{
     val = mBuffer.mData.isOn(offset);
     return val;
 }
