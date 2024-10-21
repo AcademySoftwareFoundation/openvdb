@@ -1,6 +1,6 @@
 #!/usr/local/bin/python
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 
 """
 Unit tests for the OpenVDB Python module

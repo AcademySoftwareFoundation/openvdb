@@ -2,7 +2,7 @@
 
 (* ::Text:: *)
 (*Copyright Contributors to the OpenVDB Project*)
-(*SPDX-License-Identifier: MPL-2.0*)
+(*SPDX-License-Identifier: Apache-2.0*)
 
 
 Switch[$OperatingSystem,
