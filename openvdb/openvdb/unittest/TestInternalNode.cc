@@ -197,7 +197,6 @@ TEST_F(TestInternalNode, testUnsafe)
         EXPECT_TRUE(node2);
         EXPECT_EQ(node2->origin(), Coord(0, 256, 0));
 
-        auto* child3 = new InternalNode::ChildNodeType(Coord(0, 512, 0), 10.0f, true);
         auto* node3 = internalNode.stealChildUnsafe(64, 12.0f, false);
         EXPECT_TRUE(node3);
         EXPECT_EQ(node3->origin(), Coord(0, 256, 0));
