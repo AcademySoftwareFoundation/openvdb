@@ -202,17 +202,17 @@ TEST_F(TestRoot, testProbe)
         EXPECT_FALSE(bool(childPtr));
 
         const RootNode& constRoot = root;
-        EXPECT_TRUE(root.probe(Coord(0, 0, 0), childPtr, value, active));
-        EXPECT_FALSE(bool(childPtr));
+        EXPECT_TRUE(constRoot.probe(Coord(0, 0, 0), constChildPtr, value, active));
+        EXPECT_FALSE(bool(constChildPtr));
         EXPECT_EQ(value, 2.0f);
         EXPECT_EQ(active, true);
         value = -1.0f;
-        EXPECT_TRUE(root.probe(Coord(4096, 0, 0), childPtr, value, active));
-        EXPECT_FALSE(bool(childPtr));
+        EXPECT_TRUE(root.probe(Coord(4096, 0, 0), constChildPtr, value, active));
+        EXPECT_FALSE(bool(constChildPtr));
         EXPECT_EQ(value, 3.0f);
         EXPECT_EQ(active, false);
-        EXPECT_FALSE(root.probe(Coord(4096, 4096, 4096), childPtr, value, active));
-        EXPECT_FALSE(bool(childPtr));
+        EXPECT_FALSE(root.probe(Coord(4096, 4096, 4096), constChildPtr, value, active));
+        EXPECT_FALSE(bool(constChildPtr));
 
         EXPECT_TRUE(root.probeConst(Coord(0, 0, 0), constChildPtr, value, active));
         EXPECT_FALSE(bool(constChildPtr));
