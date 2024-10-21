@@ -586,10 +586,10 @@ public:
     using ValueAllIter        = typename _TreeType::ValueAllIter;
     using ValueAllCIter       = typename _TreeType::ValueAllCIter;
 
-    using Accessor            = typename tree::ValueAccessor<_TreeType, true>;
-    using ConstAccessor       = typename tree::ValueAccessor<const _TreeType, true>;
-    using UnsafeAccessor      = typename tree::ValueAccessor<_TreeType, false>;
-    using ConstUnsafeAccessor = typename tree::ValueAccessor<const _TreeType, false>;
+    using Accessor            = typename _TreeType::Accessor;
+    using ConstAccessor       = typename _TreeType::ConstAccessor;
+    using UnsafeAccessor      = typename _TreeType::UnsafeAccessor;
+    using ConstUnsafeAccessor = typename _TreeType::ConstUnsafeAccessor;
 
     /// @brief ValueConverter<T>::Type is the type of a grid having the same
     /// hierarchy as this grid but a different value type, T.
@@ -729,7 +729,7 @@ public:
     /// @brief Return an accessor that provides random read and write access
     /// to this grid's voxels.
     /// @details The accessor is safe in the sense that it is registered with this grid's tree.
-    Accessor getAccessor() { return Accessor(tree()); }
+    Accessor getAccessor() { return mTree->getAccessor(); }
     /// @brief Return an unsafe accessor that provides random read and write access
     /// to this grid's voxels.
     /// @details The accessor is unsafe in the sense that it is not registered
@@ -737,11 +737,11 @@ public:
     /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    UnsafeAccessor getUnsafeAccessor() { return UnsafeAccessor(tree()); }
+    UnsafeAccessor getUnsafeAccessor() { return mTree->getUnsafeAccessor(); }
     /// Return an accessor that provides random read-only access to this grid's voxels.
-    ConstAccessor getAccessor() const { return ConstAccessor(tree()); }
+    ConstAccessor getAccessor() const { return mTree->getConstAccessor(); }
     /// Return an accessor that provides random read-only access to this grid's voxels.
-    ConstAccessor getConstAccessor() const { return ConstAccessor(tree()); }
+    ConstAccessor getConstAccessor() const { return mTree->getConstAccessor(); }
     /// @brief Return an unsafe accessor that provides random read-only access
     /// to this grid's voxels.
     /// @details The accessor is unsafe in the sense that it is not registered
@@ -749,7 +749,7 @@ public:
     /// over a registered accessor, but it is unsafe if the tree topology is modified.
     /// @warning Only use this method if you're an expert and know the
     /// risks of using an unregistered accessor (see tree/ValueAccessor.h)
-    ConstUnsafeAccessor getConstUnsafeAccessor() const { return ConstUnsafeAccessor(tree()); }
+    ConstUnsafeAccessor getConstUnsafeAccessor() const { return mTree->getConstUnsafeAccessor(); }
 
     /// Return an iterator over all of this grid's active values (tile and voxel).
     ValueOnIter   beginValueOn()       { return tree().beginValueOn(); }
@@ -1063,7 +1063,7 @@ struct TreeAdapter
     using TreePtrType          = typename TreeType::Ptr;
     using ConstTreePtrType     = typename TreeType::ConstPtr;
     using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
-    using GridType             = Grid<TreeType>;
+    using GridType             = Grid<NonConstTreeType>;
     using NonConstGridType     = Grid<NonConstTreeType>;
     using GridPtrType          = typename GridType::Ptr;
     using NonConstGridPtrType  = typename NonConstGridType::Ptr;
@@ -1073,14 +1073,14 @@ struct TreeAdapter
     using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
     using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
-    static TreeType& tree(TreeType& t) { return t; }
-    static TreeType& tree(GridType& g) { return g.tree(); }
-    static const TreeType& tree(const TreeType& t) { return t; }
-    static const TreeType& tree(const GridType& g) { return g.tree(); }
-    static const TreeType& constTree(TreeType& t) { return t; }
-    static const TreeType& constTree(GridType& g) { return g.constTree(); }
-    static const TreeType& constTree(const TreeType& t) { return t; }
-    static const TreeType& constTree(const GridType& g) { return g.constTree(); }
+    static NonConstTreeType& tree(NonConstTreeType& t) { return t; }
+    static NonConstTreeType& tree(NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& tree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& tree(const NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& constTree(NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(const NonConstGridType& g) { return g.constTree(); }
 };
 
 
@@ -1103,19 +1103,19 @@ struct TreeAdapter<Grid<_TreeType> >
     using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
     using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
-    static TreeType& tree(TreeType& t) { return t; }
-    static TreeType& tree(GridType& g) { return g.tree(); }
-    static const TreeType& tree(const TreeType& t) { return t; }
-    static const TreeType& tree(const GridType& g) { return g.tree(); }
-    static const TreeType& constTree(TreeType& t) { return t; }
-    static const TreeType& constTree(GridType& g) { return g.constTree(); }
-    static const TreeType& constTree(const TreeType& t) { return t; }
-    static const TreeType& constTree(const GridType& g) { return g.constTree(); }
+    static NonConstTreeType& tree(NonConstTreeType& t) { return t; }
+    static NonConstTreeType& tree(NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& tree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& tree(const NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& constTree(NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(const NonConstGridType& g) { return g.constTree(); }
 };
 
-/// Partial specialization for ValueAccessor types
+/// Partial specialization for const Grid types
 template<typename _TreeType>
-struct TreeAdapter<tree::ValueAccessor<_TreeType> >
+struct TreeAdapter<const Grid<_TreeType> >
 {
     using TreeType             = _TreeType;
     using NonConstTreeType     = typename std::remove_const<TreeType>::type;
@@ -1132,16 +1132,51 @@ struct TreeAdapter<tree::ValueAccessor<_TreeType> >
     using ConstAccessorType    = typename tree::ValueAccessor<const TreeType>;
     using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
 
-    static TreeType& tree(TreeType& t) { return t; }
-    static TreeType& tree(GridType& g) { return g.tree(); }
-    static TreeType& tree(AccessorType& a) { return a.tree(); }
-    static const TreeType& tree(const TreeType& t) { return t; }
-    static const TreeType& tree(const GridType& g) { return g.tree(); }
-    static const TreeType& tree(const AccessorType& a) { return a.tree(); }
-    static const TreeType& constTree(TreeType& t) { return t; }
-    static const TreeType& constTree(GridType& g) { return g.constTree(); }
-    static const TreeType& constTree(const TreeType& t) { return t; }
-    static const TreeType& constTree(const GridType& g) { return g.constTree(); }
+    static NonConstTreeType& tree(NonConstTreeType& t) { return t; }
+    static NonConstTreeType& tree(NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& tree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& tree(const NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& constTree(NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(const NonConstGridType& g) { return g.constTree(); }
+};
+
+/// Partial specialization for ValueAccessor types
+template<typename _TreeType>
+struct TreeAdapter<tree::ValueAccessor<_TreeType> >
+{
+    using TreeType             = _TreeType;
+    using NonConstTreeType     = typename std::remove_const<TreeType>::type;
+    using TreePtrType          = typename TreeType::Ptr;
+    using ConstTreePtrType     = typename TreeType::ConstPtr;
+    using NonConstTreePtrType  = typename NonConstTreeType::Ptr;
+    using GridType             = Grid<NonConstTreeType>;
+    using NonConstGridType     = Grid<NonConstTreeType>;
+    using GridPtrType          = typename GridType::Ptr;
+    using NonConstGridPtrType  = typename NonConstGridType::Ptr;
+    using ConstGridPtrType     = typename GridType::ConstPtr;
+    using ValueType            = typename TreeType::ValueType;
+    using AccessorType         = typename tree::ValueAccessor<TreeType>;
+    using ConstAccessorType    = typename tree::ValueAccessor<const NonConstTreeType>;
+    using NonConstAccessorType = typename tree::ValueAccessor<NonConstTreeType>;
+
+    static NonConstTreeType& tree(NonConstTreeType& t) { return t; }
+    static NonConstTreeType& tree(NonConstGridType& g) { return g.tree(); }
+    static NonConstTreeType& tree(NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& tree(const NonConstGridType& g) { return g.tree(); }
+    static const NonConstTreeType& tree(const NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& tree(const ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(ConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(const NonConstTreeType& t) { return t; }
+    static const NonConstTreeType& constTree(const NonConstGridType& g) { return g.constTree(); }
+    static const NonConstTreeType& constTree(const NonConstAccessorType& a) { return a.tree(); }
+    static const NonConstTreeType& constTree(const ConstAccessorType& a) { return a.tree(); }
 };
 
 //@}

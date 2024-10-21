@@ -51,7 +51,7 @@ public:
         OPENVDB_ASSERT(!mEncoder->list().empty());
         OPENVDB_ASSERT(!mDecoder->list().empty());
         OPENVDB_ASSERT(mEncoder->list().size() == mDecoder->list().size());
-        for (const auto& F : mEncoder->list()) {
+        for ([[maybe_unused]] const auto& F : mEncoder->list()) {
             OPENVDB_ASSERT(F->size() == 1 || F->size() == 2);
         }
 #endif

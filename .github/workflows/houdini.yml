@@ -13,6 +13,7 @@ on:
       - 'doc/**'
       - 'nanovdb/**'
       - 'openvdb_maya/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -24,6 +25,7 @@ on:
       - 'doc/**'
       - 'nanovdb/**'
       - 'openvdb_maya/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
@@ -73,22 +75,32 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test' }
+          - { cxx: clang++, image: '2023', hou_hash: '20_5', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2023', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2023', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: clang++, image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
-          - { cxx: clang++, image: '2021',   hou_hash: '19_5',        build: 'Release', components: 'core,hou' }
-          - { cxx: clang++, image: '2023.0', hou_hash: '20_0-newabi', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2023.0', hou_hash: '20_0-newabi', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: g++,     image: '2022',   hou_hash: '20_0-oldabi', build: 'Release', components: 'core,hou' }
       fail-fast: false
     steps:
       # See note on this step in the Houdini weekly.yml job
       # We can remove this when we no longer use < 2023 images
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - name: remove zstd
       run: yum -y remove zstd
     - uses: actions/checkout@v3
     - name: pybind11
       #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_pybind11.sh 2.10.0
+    - name: glfw
+      if: contains(matrix.config.image, '2023') == true
+      run: ./ci/install_glfw.sh 3.3.10
+    - name: cppunit
+      if: contains(matrix.config.image, '2022') == false
+      run: ./ci/install_cppunit.sh 1.15.1
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -159,21 +171,12 @@ jobs:
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_deps
-      run: |
-        # Remove Python3 symlinks in /usr/local/bin as workaround to brew update issues
-        # https://github.com/actions/setup-python/issues/577
-        rm /usr/local/bin/2to3* || :
-        rm /usr/local/bin/idle3* || :
-        rm /usr/local/bin/pydoc* || :
-        rm /usr/local/bin/python3* || :
-        brew update
-        brew install bash gnu-getopt cmake boost glfw googletest openexr pybind11 llvm@15 cppunit
-        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+      run: ./ci/install_macos.sh 15
     - name: build
       run: |
         ./ci/build.sh -v \
           --build-type=Release \
-          --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest" \
+          --components="core,hou,bin,view,render,python,test,axcore,axbin" \
           --cargs=\" \
             -DHOUDINI_ROOT=$HOME/houdini_install/hou \
             -DOPENVDB_BUILD_HOUDINI_ABITESTS=OFF \
@@ -181,7 +184,9 @@ jobs:
             -DDISABLE_CMAKE_SEARCH_PATHS=ON \
             -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON \
             -DUSE_EXPLICIT_INSTANTIATION=OFF \
-            -DLLVM_DIR=/usr/local/opt/llvm@15/lib/cmake/llvm \
+            -DTbb_INCLUDE_DIR=$HOME/houdini_install/hou/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include/tbb \
+            -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
             \"
     - name: test
       run: cd build && ctest -V

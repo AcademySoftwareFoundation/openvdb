@@ -40,6 +40,11 @@ public:
     using Ptr = openvdb::SharedPtr<ProxyTree>;
     using ConstPtr = openvdb::SharedPtr<const ProxyTree>;
 
+    using Accessor = void;
+    using ConstAccessor = void;
+    using UnsafeAccessor = void;
+    using ConstUnsafeAccessor = void;
+
     static const openvdb::Index DEPTH;
     static const ValueType backg;
 
@@ -510,5 +515,107 @@ TEST_F(TestGrid, testApply)
         EXPECT_TRUE( floatCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
         EXPECT_TRUE(doubleCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
         EXPECT_EQ(4, n);
+    }
+}
+
+TEST_F(TestGrid, testAdapter)
+{
+    openvdb::FloatGrid floatGrid;
+    const openvdb::FloatGrid constFloatGrid = floatGrid;
+    openvdb::FloatTree& floatTree = floatGrid.tree();
+    const openvdb::FloatTree& constFloatTree = floatGrid.constTree();
+    openvdb::tree::ValueAccessor<openvdb::FloatTree> floatAcc(floatGrid.tree());
+    openvdb::tree::ValueAccessor<const openvdb::FloatTree> constFloatAcc(floatGrid.constTree());
+
+    {
+        // test TreeAdapter<Tree>
+
+        using AdapterT = openvdb::TreeAdapter<openvdb::FloatTree>;
+
+        AdapterT::tree(floatTree);
+        AdapterT::tree(floatGrid);
+        AdapterT::tree(constFloatTree);
+        AdapterT::tree(constFloatGrid);
+        AdapterT::constTree(floatTree);
+        AdapterT::constTree(floatGrid);
+        AdapterT::constTree(constFloatTree);
+        AdapterT::constTree(constFloatGrid);
+
+        // test TreeAdapter<const Tree>
+
+        using ConstAdapterT = openvdb::TreeAdapter<const openvdb::FloatTree>;
+
+        ConstAdapterT::tree(floatTree);
+        ConstAdapterT::tree(floatGrid);
+        ConstAdapterT::tree(constFloatTree);
+        ConstAdapterT::tree(constFloatGrid);
+        ConstAdapterT::constTree(floatTree);
+        ConstAdapterT::constTree(floatGrid);
+        ConstAdapterT::constTree(constFloatTree);
+        ConstAdapterT::constTree(constFloatGrid);
+    }
+
+    {
+        // test TreeAdapter<Grid>
+
+        using AdapterT = openvdb::TreeAdapter<openvdb::FloatGrid>;
+
+        AdapterT::tree(floatTree);
+        AdapterT::tree(floatGrid);
+        AdapterT::tree(constFloatTree);
+        AdapterT::tree(constFloatGrid);
+        AdapterT::constTree(floatTree);
+        AdapterT::constTree(floatGrid);
+        AdapterT::constTree(constFloatTree);
+        AdapterT::constTree(constFloatGrid);
+
+        // test TreeAdapter<const Grid>
+
+        using ConstAdapterT = openvdb::TreeAdapter<const openvdb::FloatGrid>;
+
+        ConstAdapterT::tree(floatTree);
+        ConstAdapterT::tree(floatGrid);
+        ConstAdapterT::tree(constFloatTree);
+        ConstAdapterT::tree(constFloatGrid);
+        ConstAdapterT::constTree(floatTree);
+        ConstAdapterT::constTree(floatGrid);
+        ConstAdapterT::constTree(constFloatTree);
+        ConstAdapterT::constTree(constFloatGrid);
+    }
+
+    {
+        // test TreeAdapter<ValueAccessor<Tree>>
+
+        using AdapterT = openvdb::TreeAdapter<openvdb::tree::ValueAccessor<openvdb::FloatTree>>;
+
+        AdapterT::tree(floatTree);
+        AdapterT::tree(floatGrid);
+        AdapterT::tree(floatAcc);
+        AdapterT::tree(constFloatAcc);
+        AdapterT::tree(constFloatTree);
+        AdapterT::tree(constFloatGrid);
+        AdapterT::constTree(floatTree);
+        AdapterT::constTree(floatGrid);
+        AdapterT::constTree(floatAcc);
+        AdapterT::constTree(constFloatAcc);
+        AdapterT::constTree(constFloatTree);
+        AdapterT::constTree(constFloatGrid);
+
+        // test TreeAdapter<ValueAccessor<const Tree>>
+
+        using AdapterConstT = openvdb::TreeAdapter<openvdb::tree::ValueAccessor<const openvdb::FloatTree>>;
+
+        AdapterConstT::tree(floatTree);
+        AdapterConstT::tree(floatGrid);
+        AdapterConstT::tree(floatAcc);
+        AdapterConstT::tree(constFloatAcc);
+        AdapterConstT::tree(constFloatTree);
+        AdapterConstT::tree(constFloatGrid);
+        AdapterConstT::constTree(floatTree);
+        AdapterConstT::constTree(floatGrid);
+        AdapterConstT::constTree(floatAcc);
+        AdapterConstT::constTree(constFloatAcc);
+        AdapterConstT::constTree(constFloatTree);
+        AdapterConstT::constTree(constFloatGrid);
     }
 }
