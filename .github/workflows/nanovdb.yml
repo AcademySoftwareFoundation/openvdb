@@ -72,18 +72,11 @@ jobs:
         run: |
           echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
-      - name: install_cuda_11
+      - name: setup_cuda_12
         run: |
-          # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
-          # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
-          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
-          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
           yum -y install yum-utils
-          yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
-          echo "Installing cuda toolkit"
-          yum --enablerepo=epel -y install cuda-toolkit-11-6
-          echo "/usr/local/cuda-11.6/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-11.6/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
         run: >
           ./ci/build.sh -v
