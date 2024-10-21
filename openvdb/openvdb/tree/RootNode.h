@@ -486,6 +486,9 @@ public:
     Index32 leafCount() const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
+    Index32 tileCount() const;
+    Index32 activeTileCount() const;
+    Index32 inactiveTileCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -706,6 +709,11 @@ public:
     template<typename AccessorT>
     void addTileAndCache(Index level, const Coord& xyz, const ValueType&, bool state, AccessorT&);
 
+    /// @brief Delete any child or tile containing voxel (x, y, z) at the root level.
+    /// Do nothing if no child or tile was found.
+    /// @return @c true if child or tile was deleted
+    bool deleteChildOrTile(const Coord& xyz);
+
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, create one that preserves the values and
     /// active states of all voxels.
@@ -890,6 +898,12 @@ public:
     ///          other tools do not yet support variable offsets.
     void setOrigin(const Coord &origin);
 
+    /// Return a MapType key for the given coordinates, offset by the mOrigin.
+    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
+
+    /// Return @c true if this node's mTable contains the given key.
+    bool hasKey(const Coord& key) const { return mTable.find(key) != mTable.end(); }
+
 private:
     /// During topology-only construction, access is needed
     /// to protected/private members of other template instances.
@@ -898,27 +912,9 @@ private:
     template<typename, typename, bool> friend struct RootNodeCopyHelper;
     template<typename, typename, typename, bool> friend struct RootNodeCombineHelper;
 
-    /// Currently no-op, but can be used to define empty and delete keys for mTable
-    void initTable() {}
-    //@{
-    /// @internal Used by doVisit2().
-    void resetTable(MapType& table) { mTable.swap(table); table.clear(); }
-    void resetTable(const MapType&) const {}
-    //@}
-
-    Index getChildCount() const;
-    Index getTileCount() const;
-    Index getActiveTileCount() const;
-    Index getInactiveTileCount() const;
-
-    /// Return a MapType key for the given coordinates, offset by the mOrigin.
-    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
-
     /// Insert this node's mTable keys into the given set.
     void insertKeys(CoordSet&) const;
 
-    /// Return @c true if this node's mTable contains the given key.
-    bool hasKey(const Coord& key) const { return mTable.find(key) != mTable.end(); }
     //@{
     /// @brief Look up the given key in this node's mTable.
     /// @return an iterator pointing to the matching mTable entry or to mTable.end().
@@ -1025,7 +1021,6 @@ RootNode<ChildT>::RootNode()
     : mBackground(zeroVal<ValueType>())
     , mOrigin(0, 0, 0)
 {
-    this->initTable();
 }
 
 
@@ -1035,7 +1030,6 @@ RootNode<ChildT>::RootNode(const ValueType& background)
     : mBackground(background)
     , mOrigin(0, 0, 0)
 {
-    this->initTable();
 }
 
 
@@ -1057,7 +1051,6 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(foregd, true);
-    this->initTable();
 
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
         mTable[i->first] = OtherRootT::isTile(i)
@@ -1085,7 +1078,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(backgd, true);
-    this->initTable();
+
     for (typename OtherRootT::MapCIter i=other.mTable.begin(), e=other.mTable.end(); i != e; ++i) {
         mTable[i->first] = OtherRootT::isTile(i)
             ? NodeStruct(OtherRootT::isTileOn(i) ? fgTile : bgTile)
@@ -1144,7 +1137,6 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         self.mTransientData = other.mTransientData;
 
         self.clear();
-        self.initTable();
 
         for (OtherMapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
             if (other.isTile(i)) {
@@ -1175,7 +1167,6 @@ RootNode<ChildT>::operator=(const RootNode& other)
         mTransientData = other.mTransientData;
 
         this->clear();
-        this->initTable();
 
         for (MapCIter i = other.mTable.begin(), e = other.mTable.end(); i != e; ++i) {
             mTable[i->first] =
@@ -1499,49 +1490,6 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 
 
 template<typename ChildT>
-inline Index
-RootNode<ChildT>::getChildCount() const {
-    return this->childCount();
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTile(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getActiveTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTileOn(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
-inline Index
-RootNode<ChildT>::getInactiveTileCount() const
-{
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isTileOff(i)) ++sum;
-    }
-    return sum;
-}
-
-
-template<typename ChildT>
 inline Index32
 RootNode<ChildT>::leafCount() const
 {
@@ -1574,6 +1522,42 @@ RootNode<ChildT>::childCount() const
     Index sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::tileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTile(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::activeTileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTileOn(i)) ++sum;
+    }
+    return sum;
+}
+
+
+template<typename ChildT>
+inline Index32
+RootNode<ChildT>::inactiveTileCount() const
+{
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isTileOff(i)) ++sum;
     }
     return sum;
 }
@@ -2289,7 +2273,7 @@ RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
     }
     io::setGridBackgroundValuePtr(os, &mBackground);
 
-    const Index numTiles = this->getTileCount(), numChildren = this->childCount();
+    const Index numTiles = this->tileCount(), numChildren = this->childCount();
     os.write(reinterpret_cast<const char*>(&numTiles), sizeof(Index));
     os.write(reinterpret_cast<const char*>(&numChildren), sizeof(Index));
 
@@ -2336,7 +2320,6 @@ RootNode<ChildT>::readTopology(std::istream& is, bool fromHalf)
         is.read(reinterpret_cast<char*>(rangeMin.asPointer()), 3 * sizeof(Int32));
         is.read(reinterpret_cast<char*>(rangeMax.asPointer()), 3 * sizeof(Int32));
 
-        this->initTable();
         Index tableSize = 0, log2Dim[4] = { 0, 0, 0, 0 };
         Int32 offset[3];
         for (int i = 0; i < 3; ++i) {
@@ -2631,10 +2614,10 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::setOrigin(const Coord &origin)
 {
-    mOrigin = origin;
-    if (mOrigin != Coord(0,0,0)) {
+    if (origin != Coord(0,0,0)) {
         OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are currently not supported");
     }
+    mOrigin = origin;
 }
 
 template<typename ChildT>
@@ -2719,6 +2702,15 @@ RootNode<ChildT>::addTileAndCache(Index level, const Coord& xyz, const ValueType
             }
         }
     }
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::deleteChildOrTile(const Coord& xyz)
+{
+    Coord key = this->coordToKey(xyz);
+    return mTable.erase(key) == size_t(1);
 }
 
 
