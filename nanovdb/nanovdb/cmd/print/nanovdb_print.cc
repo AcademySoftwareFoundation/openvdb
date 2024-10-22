@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
     \file   nanovdb_print.cc
@@ -11,7 +11,7 @@
     \brief  Command-line tool that prints information about grids in a nanovdb file
 */
 
-#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
 #include <iomanip>
 #include <sstream>
 
@@ -31,7 +31,9 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
 
 void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
+    char str[8];
+    nanovdb::toStr(str, nanovdb::Version());
+    printf("\n%s was build against NanoVDB version %s\n", progName, str);
     exit(exitStatus);
 }
 
@@ -42,6 +44,7 @@ int main(int argc, char* argv[])
     enum Mode : int { Short = 0,
                       Default = 1,
                       Long = 2 } mode = Default;
+    char str[32];
     bool verbose = false;
     std::string              gridName;
     std::vector<std::string> fileNames;
@@ -109,7 +112,7 @@ int main(int argc, char* argv[])
         ss << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
         return ss.str();
     };
-    auto wbboxToStr = [](const nanovdb::BBox<nanovdb::Vec3d>& bbox) {
+    auto wbboxToStr = [](const nanovdb::math::BBox<nanovdb::Vec3d>& bbox) {
         std::stringstream ss;
         if (bbox.empty()) {
             ss << "empty grid";
@@ -174,15 +177,15 @@ int main(int argc, char* argv[])
             auto       resWidth = std::string("Resolution").length() + padding;
             for (auto& m : list) {
                 width(nameWidth, m.gridName);
-                width(typeWidth, nanovdb::toStr(m.gridType));
-                width(classWidth, nanovdb::toStr(m.gridClass));
-                width(codecWidth, nanovdb::io::toStr(m.codec));
+                width(typeWidth, nanovdb::toStr(str, m.gridType));
+                width(classWidth, nanovdb::toStr(str, m.gridClass));
+                width(codecWidth, nanovdb::io::toStr(str, m.codec));
                 width(wbboxWidth, wbboxToStr(m.worldBBox));
                 width(ibboxWidth, ibboxToStr(m.indexBBox));
                 width(resWidth, resToStr(m.indexBBox));
                 width(sizeWidth, format(m.gridSize));
                 width(fileWidth, format(m.fileSize));
-                width(versionWidth, std::string(m.version.c_str()));
+                width(versionWidth, nanovdb::toStr(str, m.version));
                 width(configWidth, nodesToStr(m.nodeCount));
                 width(tileWidth, nodesToStr(m.tileCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
@@ -220,11 +223,11 @@ int main(int argc, char* argv[])
                     continue;
                 std::cout << std::left << std::setw(numberWidth) << ++n
                           << std::left << std::setw(nameWidth) << m.gridName
-                          << std::left << std::setw(typeWidth) << nanovdb::toStr(m.gridType);
+                          << std::left << std::setw(typeWidth) << nanovdb::toStr(str, m.gridType);
                 if (mode != Short) {
-                    std::cout << std::left << std::setw(classWidth) << nanovdb::toStr(m.gridClass)
-                              << std::left << std::setw(versionWidth) << std::string(m.version.c_str())
-                              << std::left << std::setw(codecWidth) << nanovdb::io::toStr(m.codec)
+                    std::cout << std::left << std::setw(classWidth) << nanovdb::toStr(str, m.gridClass)
+                              << std::left << std::setw(versionWidth) << nanovdb::toStr(str+10, m.version)
+                              << std::left << std::setw(codecWidth) << nanovdb::io::toStr(str + 20, m.codec)
                               << std::left << std::setw(sizeWidth) << format(m.gridSize)
                               << std::left << std::setw(fileWidth) << format(m.fileSize)
                               << std::left << std::setw(voxelSizeWidth) << Vec3dToStr(m.voxelSize);
@@ -321,4 +324,4 @@ int main(int argc, char* argv[])
     }
 
     return exitStatus;
-}
+}// main

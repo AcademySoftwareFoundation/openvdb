@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file PrefixSum.h
+    \file nanovdb/util/PrefixSum.h
 
     \author Ken Museth
 
@@ -15,10 +15,10 @@
           last entry which is the sum of all the input elements.
 */
 
-#ifndef NANOVDB_PREFIX_SUM_H_HAS_BEEN_INCLUDED
-#define NANOVDB_PREFIX_SUM_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_PREFIX_SUM_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_PREFIX_SUM_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D
+#include <nanovdb/util/Range.h>// for Range1D
 #include <vector>
 #include <functional>// for std::plus
 
@@ -27,6 +27,8 @@
 #endif
 
 namespace nanovdb {
+
+namespace util {
 
 /// @brief Computes inclusive prefix sum of a vector
 /// @tparam T Type of the elements in the input/out vector
@@ -74,6 +76,15 @@ T prefixSum(std::vector<T> &vec, bool threaded, OpT op)
     return vec.back();// sum of all input elements
 }// prefixSum
 
+}// namespace util
+
+template<typename T, typename OpT = std::plus<T>>
+[[deprecated("Use nanovdb::util::prefixSum instead")]]
+T prefixSum(std::vector<T> &vec, bool threaded = true, OpT op = OpT())
+{
+    return util::prefixSum<T, OpT>(vec, threaded, op);
+}// prefixSum
+
 }// namespace nanovdb
 
-#endif // NANOVDB_PREFIX_SUM_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_PREFIX_SUM_H_HAS_BEEN_INCLUDED

@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/util/Primitives.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/HostBuffer.h>
+#include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/HostBuffer.h>
 #include <algorithm>
 
 //////////////////////////////////////////////
@@ -95,8 +95,8 @@ public:
     }
 
     uint64_t       size() const { return getBuffer(mId).size(); }
-    uint8_t*       data() { return getBuffer(mId).data(); }
-    const uint8_t* data() const { return getBuffer(mId).data(); }
+    void*          data() { return getBuffer(mId).data(); }
+    const void*    data() const { return getBuffer(mId).data(); }
 
     std::vector<uint64_t> getGridKeys() const
     {
@@ -148,8 +148,8 @@ int main()
         std::vector<nanovdb::GridHandle<MapPoolBuffer>> gridHdls;
 
         // create two grids...
-        gridHdls.push_back(nanovdb::createLevelSetSphere<float >(100.0, nanovdb::Vec3d(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "spheref", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
-        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0, nanovdb::Vec3d( 20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphered", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::tools::createLevelSetSphere<float >(100.0, nanovdb::Vec3d(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "spheref", nanovdb::tools::StatsMode::BBox, nanovdb::CheckMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::tools::createLevelSetSphere<double>(100.0, nanovdb::Vec3d( 20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphered", nanovdb::tools::StatsMode::BBox, nanovdb::CheckMode::Partial, bufferContext));
 
         // share grid[0]'s buffer into a parent-scope handle to prevent deletion.
         anotherHdl = nanovdb::GridHandle<MapPoolBuffer>(bufferContext.copy(gridHdls[0].buffer().mId));

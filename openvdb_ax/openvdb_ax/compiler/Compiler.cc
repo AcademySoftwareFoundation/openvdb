@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file compiler/Compiler.cc
 
@@ -449,7 +449,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
         if (!F.getName().startswith("ax.")) continue;
         const std::string mangled =
             getMangledName(llvm::cast<llvm::GlobalValue>(&F), engine);
-        const uint64_t address =
+        [[maybe_unused]] const uint64_t address =
             engine.getAddressToGlobalIfAvailable(mangled);
         OPENVDB_ASSERT(address != 0 && "Unbound function!");
     }

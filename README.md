@@ -10,7 +10,7 @@
 [Discussion Forum](https://github.com/AcademySoftwareFoundation/openvdb/discussions) |
 [Documentation](https://www.openvdb.org/documentation/doxygen) |
 [Releases](https://github.com/AcademySoftwareFoundation/openvdb/releases) |
-[License](https://www.mozilla.org/MPL/2.0) |
+[License](https://www.apache.org/licenses/LICENSE-2.0) |
 [Slack](https://slack.aswf.io/)
 
 OpenVDB is an open source C++ library comprising a novel hierarchical data
@@ -28,12 +28,14 @@ generally less stable than the [production releases](https://github.com/AcademyS
 
 ### License
 
-OpenVDB is released under the [Mozilla Public License Version 2.0](https://www.mozilla.org/MPL/2.0/),
+OpenVDB is released under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0),
 which is a free, open source software license developed and maintained by the
-Mozilla Foundation.
+Apache Software Foundation.
 
 The trademarks of any contributor to this project may not be used in
 association with the project without the contributor's express permission.
+
+NOTE: OpenVDB has completed re-licensing from [Mozilla Public License Version 2.0](https://www.mozilla.org/MPL/2.0/) to [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). Please see the file RE-LICENSE_NOTE.txt for more details.
 
 ### Contributing
 

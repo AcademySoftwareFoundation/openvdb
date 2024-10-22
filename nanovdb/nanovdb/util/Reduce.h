@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file Reduce.h
+    \file nanovdb/util/Reduce.h
 
     \author Ken Museth
 
@@ -11,10 +11,10 @@
     \brief A unified wrapper for tbb::parallel_reduce and a naive std::future analog
 */
 
-#ifndef NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
-#define NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_REDUCE_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_REDUCE_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D
+#include <nanovdb/util/Range.h>// for util::Range1D
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_reduce.h>
@@ -25,6 +25,8 @@
 #endif
 
 namespace nanovdb {
+
+namespace util {
 
 /// @return reduction
 ///
@@ -37,7 +39,6 @@ namespace nanovdb {
 ///     auto func = [&array](auto &r, int a){for (auto i=r.begin(); i!=r.end(); ++i) a+=array[i]; return a;};
 ///     int sum = reduce(array, 0, func, [](int a, int b){return a + b;});
 /// @endcode
-
 template <typename RangeT, typename T, typename FuncT, typename JoinT>
 inline T reduce(RangeT range, const T& identity, const FuncT &func, const JoinT &join)
 {
@@ -73,7 +74,7 @@ inline T reduce(RangeT range, const T& identity, const FuncT &func, const JoinT 
 }
 
 /// @brief Simple wrapper to the function defined above
-template <typename T, typename FuncT, typename JoinT >
+template <typename T, typename FuncT, typename JoinT>
 inline T reduce(size_t begin, size_t end, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
 {
     Range1D range(begin, end, grainSize);
@@ -97,6 +98,36 @@ inline T reduce(const ContainerT<ArgT...> &c, size_t grainSize, const T& identit
     return reduce( range, identity, func, join );
 }
 
+}// namespace util
+
+/// @brief Simple wrapper to the function defined above
+template <typename T, typename FuncT, typename JoinT>
+[[deprecated("Use nanovdb::util::reduce instead")]]
+inline T reduce(size_t begin, size_t end, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
+{
+    util::Range1D range(begin, end, grainSize);
+    return util::reduce( range, identity, func, join );
+}
+
+/// @brief Simple wrapper that works with std::containers
+template <template<typename...> class ContainerT, typename... ArgT, typename T, typename FuncT, typename JoinT >
+[[deprecated("Use nanovdb::util::reduce instead")]]
+inline T reduce(const ContainerT<ArgT...> &c, const T& identity, const FuncT& func, const JoinT& join)
+{
+    util::Range1D range(0, c.size(), 1);
+    return util::reduce( range, identity, func, join );
+
+}
+
+/// @brief Simple wrapper that works with std::containers
+template <template<typename...> class ContainerT, typename... ArgT, typename T, typename FuncT, typename JoinT >
+[[deprecated("Use nanovdb::util::reduce instead")]]
+T reduce(const ContainerT<ArgT...> &c, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
+{
+    util::Range1D range(0, c.size(), grainSize);
+    return util::reduce( range, identity, func, join );
+}
+
 }// namespace nanovdb
 
-#endif // NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_REDUCE_H_HAS_BEEN_INCLUDED

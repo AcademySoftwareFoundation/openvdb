@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #if defined(NANOVDB_USE_OPENVDB)
 
@@ -11,18 +11,18 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/tools/RayIntersector.h>
 
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-#include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/tools/NanoToOpenVDB.h>
 
 #include "common.h"
 
 #if defined(NANOVDB_USE_CUDA)
-using BufferT = nanovdb::CudaDeviceBuffer;
+using BufferT = nanovdb::cuda::DeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
 #endif
 
-void runOpenVDB(nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
+void runOpenVDB(nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
     using GridT = openvdb::FloatGrid;
     using CoordT = openvdb::Coord;
@@ -31,7 +31,7 @@ void runOpenVDB(nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>& handle, int numI
     using RayT = openvdb::math::Ray<RealT>;
 
 #if 1
-    auto srcGrid = nanovdb::nanoToOpenVDB(handle);
+    auto srcGrid = nanovdb::tools::nanoToOpenVDB(handle);
     std::cout << "Exporting to OpenVDB grid[" << srcGrid->getName() << "]...\n";
 #else
     openvdb::initialize();

@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -160,31 +160,66 @@ endif()
 # NanoVDB header files
 set(NANOVDB_INCLUDE_FILES
   CNanoVDB.h
+  GridHandle.h
+  HostBuffer.h
   NanoVDB.h
+  NodeManager.h
   PNanoVDB.h
 )
 
+# NanoVDB cuda header files
+set(NANOVDB_INCLUDE_CUDA_FILES
+  cuda/DeviceBuffer.h
+  cuda/GridHandle.cuh
+  cuda/NodeManager.cuh
+)
+
+# NanoVDB io header files
+set(NANOVDB_INCLUDE_IO_FILES
+  io/IO.h
+)
+
+# NanoVDB math header files
+set(NANOVDB_INCLUDE_MATH_FILES
+  math/CSampleFromVoxels.h
+  math/DitherLUT.h
+  math/HDDA.h
+  math/Math.h
+  math/Ray.h
+  math/SampleFromVoxels.h
+  math/Stencils.h
+)
+
+# NanoVDB tools header files
+set(NANOVDB_INCLUDE_TOOLS_FILES
+  tools/CreateNanoGrid.h
+  tools/CreatePrimitives.h
+  tools/GridBuilder.h
+  tools/GridChecksum.h
+  tools/GridStats.h
+  tools/GridValidator.h
+  tools/NanoToOpenVDB.h
+)
+
+# NanoVDB tools/cuda header files
+set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
+  tools/cuda/AddBlindData.cuh
+  tools/cuda/GridChecksum.cuh
+  tools/cuda/GridStats.cuh
+  tools/cuda/GridValidator.cuh
+  tools/cuda/IndexToGrid.cuh
+  tools/cuda/PointsToGrid.cuh
+  tools/cuda/SignedFloodFill.cuh
+)
+
 # NanoVDB util header files
-set(NANOVDB_INCLUDE_UTILFILES
+set(NANOVDB_INCLUDE_UTIL_FILES
   util/CpuTimer.h
   util/CreateNanoGrid.h
-  util/CSampleFromVoxels.h
-  util/cuda/CudaAddBlindData.cuh
-  util/cuda/CudaDeviceBuffer.h
-  util/cuda/CudaGridChecksum.cuh
-  util/cuda/CudaGridHandle.cuh
-  util/cuda/CudaGridStats.cuh
-  util/cuda/CudaIndexToGrid.cuh
-  util/cuda/CudaNodeManager.cuh
-  util/cuda/CudaPointsToGrid.cuh
-  util/cuda/CudaSignedFloodFill.cuh
-  util/cuda/CudaUtils.h
-  util/cuda/GpuTimer.h
   util/DitherLUT.h
   util/ForEach.h
   util/GridBuilder.h
   util/GridChecksum.h
-  util/GridHandle.h
   util/GridStats.h
   util/GridValidator.h
   util/HDDA.h
@@ -201,6 +236,26 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/Reduce.h
   util/SampleFromVoxels.h
   util/Stencils.h
+  util/Timer.h
+  util/Util.h
+)
+
+# NanoVDB util/cuda header files
+set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
+  util/cuda/CudaAddBlindData.cuh
+  util/cuda/CudaGridHandle.cuh
+  util/cuda/CudaIndexToGrid.cuh
+  util/cuda/CudaSignedFloodFill.cuh
+  util/cuda/Timer.h
+  util/cuda/CudaDeviceBuffer.h
+  util/cuda/CudaGridStats.cuh
+  util/cuda/CudaNodeManager.cuh
+  util/cuda/CudaUtils.h
+  util/cuda/Util.h
+  util/cuda/CudaGridChecksum.cuh
+  util/cuda/CudaGridValidator.cuh
+  util/cuda/CudaPointsToGrid.cuh
+  util/cuda/GpuTimer.h
 )
 
 add_library(nanovdb INTERFACE)
@@ -266,11 +321,23 @@ if(TARGET Threads::Threads)
   target_link_libraries(nanovdb INTERFACE Threads::Threads)
 endif()
 
-set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
-set(NANOVDB_INSTALL_UTILDIR ${NANOVDB_INSTALL_INCLUDEDIR}/util)
+set(NANOVDB_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
+set(NANOVDB_INSTALL_CUDA_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/cuda)
+set(NANOVDB_INSTALL_IO_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/io)
+set(NANOVDB_INSTALL_MATH_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/math)
+set(NANOVDB_INSTALL_TOOLS_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/tools)
+set(NANOVDB_INSTALL_TOOLS_CUDA_DIR ${NANOVDB_INSTALL_TOOLS_DIR}/cuda)
+set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/util)
+set(NANOVDB_INSTALL_UTIL_CUDA_DIR ${NANOVDB_INSTALL_UTIL_DIR}/cuda)
 
-install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR})
-install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_INSTALL_UTILDIR})
+install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDE_DIR})
+install(FILES ${NANOVDB_INCLUDE_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_CUDA_DIR})
+install(FILES ${NANOVDB_INCLUDE_IO_FILES} DESTINATION ${NANOVDB_INSTALL_IO_DIR})
+install(FILES ${NANOVDB_INCLUDE_MATH_FILES} DESTINATION ${NANOVDB_INSTALL_MATH_DIR})
+install(FILES ${NANOVDB_INCLUDE_TOOLS_FILES} DESTINATION ${NANOVDB_INSTALL_TOOLS_DIR})
+install(FILES ${NANOVDB_INCLUDE_TOOLS_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_TOOLS_CUDA_DIR})
+install(FILES ${NANOVDB_INCLUDE_UTIL_FILES} DESTINATION ${NANOVDB_INSTALL_UTIL_DIR})
+install(FILES ${NANOVDB_INCLUDE_UTIL_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_UTIL_CUDA_DIR})
 
 ###############################################################################
 # Options
