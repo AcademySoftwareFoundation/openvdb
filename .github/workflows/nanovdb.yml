@@ -14,6 +14,7 @@ on:
       - 'openvdb_ax/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -26,6 +27,7 @@ on:
       - 'openvdb_ax/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
@@ -65,9 +67,17 @@ jobs:
           - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
       fail-fast: false
     steps:
+      - name: Enable Node 16
+        if: contains(matrix.config.image, '2022')
+        run: |
+          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: install_cuda_11
         run: |
+          # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
+          # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
           yum -y install yum-utils
           yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
           echo "Installing cuda toolkit"
@@ -96,43 +106,32 @@ jobs:
       github.event.inputs.type == 'win'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
     env:
-      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      VCPKG_DEFAULT_TRIPLET: 'x64-windows'
       visual_studio: "Visual Studio 17 2022"
-      cuda: "11.6.2"
+      cuda: "12.4.0"
     strategy:
-      matrix:
-        config:
-          # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-          # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
-          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: install_cuda
       shell: powershell
       run: .\ci\install_windows_cuda.ps1
-    - name: install_deps
-      shell: bash
-      run: |
-        vcpkg update
-        vcpkg install zlib tbb gtest blosc boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+    - name: install
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       shell: bash
       run: >
         ./ci/build.sh -v
-        --config=${{ matrix.config.build }}
+        --config=Release
         --components=core,nano,nanotest,nanoexam,nanobench,nanotool
         --cargs=\'
-        ${{ matrix.config.cmake }}
+        -A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF
         -DMSVC_COMPRESS_PDB=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DNANOVDB_USE_CUDA=ON
@@ -155,13 +154,15 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-12', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh
+        run: |
+          ./ci/install_macos.sh
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
@@ -188,6 +189,6 @@ jobs:
           cd nanovdb/nanovdb
           sudo mkdir .build
           cd .build
-          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON ../
+          sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
           sudo make -j8 install
           sudo ctest -V

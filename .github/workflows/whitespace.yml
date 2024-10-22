@@ -36,5 +36,5 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!pendingchanges/*' ':!*.wlt'
+          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!pendingchanges/*' ':!*.wlt' ':!*.jpg' ':!*.gif' ':!*.mp4' ':!*.pt' ':!*.pth' ':!*.nvdb' ':!*.npz'
           test $? -eq 1

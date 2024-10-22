@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
-#include <nanovdb/util/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
+#include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
+#include <nanovdb/cuda/DeviceBuffer.h>
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,
@@ -18,7 +18,7 @@ int main(int, char**)
         auto srcGrid = openvdb::tools::createLevelSetSphere<SrcGridT>(100.0f, openvdb::Vec3f(0.0f), 1.0f);
 
         // Converts the OpenVDB to NanoVDB and returns a GridHandle that uses CUDA for memory management.
-        auto handle = nanovdb::createNanoGrid<SrcGridT, float, nanovdb::CudaDeviceBuffer>(*srcGrid);
+        auto handle = nanovdb::tools::createNanoGrid<SrcGridT, float, nanovdb::cuda::DeviceBuffer>(*srcGrid);
 
         cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
         cudaStreamCreate(&stream);

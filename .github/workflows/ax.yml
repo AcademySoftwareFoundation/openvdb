@@ -14,6 +14,7 @@ on:
       - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -26,6 +27,7 @@ on:
       - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
@@ -70,10 +72,12 @@ jobs:
           - { image: '2023-clang15', cxx: 'clang++', build: 'Debug',   cmake: '' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
+      - name: Enable Node 16
+        if: contains(matrix.config.image, '2022')
+        run: |
+          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: pybind11
         #if: contains(matrix.config.image, '2023') == false
@@ -123,14 +127,16 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '13' }
+          # Last macos runner befor M1 (macos-14)
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+        run: |
+          ./ci/install_macos.sh ${{ matrix.config.llvm }}
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
@@ -139,7 +145,8 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          -DLLVM_DIR=/opt/homebrew/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V

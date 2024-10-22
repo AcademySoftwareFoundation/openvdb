@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
     \file   nanovdb_convert.cc
@@ -15,9 +15,9 @@
 #include <algorithm>
 #include <cctype>
 
-#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/tools/NanoToOpenVDB.h>
 
 void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAILURE)
 {
@@ -47,7 +47,9 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
 
 void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
+    char str[8];
+    nanovdb::toStr(str, nanovdb::Version());
+    printf("\n%s was build against NanoVDB version %s\n", progName, str);
     exit(exitStatus);
 }
 
@@ -56,8 +58,8 @@ int main(int argc, char* argv[])
     int exitStatus = EXIT_SUCCESS;
 
     nanovdb::io::Codec       codec = nanovdb::io::Codec::NONE;// compression codec for the file
-    nanovdb::StatsMode       sMode = nanovdb::StatsMode::Default;
-    nanovdb::ChecksumMode    cMode = nanovdb::ChecksumMode::Default;
+    nanovdb::tools::StatsMode       sMode = nanovdb::tools::StatsMode::Default;
+    nanovdb::CheckMode    cMode = nanovdb::CheckMode::Default;
     nanovdb::GridType        qMode = nanovdb::GridType::Unknown;//specify the quantization mode
     bool                     verbose = false, overwrite = false, dither = false, absolute = true;
     float                    tolerance = -1.0f;
@@ -99,11 +101,11 @@ int main(int argc, char* argv[])
                     std::string str(argv[++i]);
                     toLowerCase(str);
                     if (str == "none") {
-                       cMode = nanovdb::ChecksumMode::Disable;
+                       cMode = nanovdb::CheckMode::Disable;
                     } else if (str == "partial") {
-                       cMode = nanovdb::ChecksumMode::Partial;
+                       cMode = nanovdb::CheckMode::Partial;
                     } else if (str == "full") {
-                       cMode = nanovdb::ChecksumMode::Full;
+                       cMode = nanovdb::CheckMode::Full;
                     } else {
                       std::cerr << "Expected one of the following checksum modes: {none, partial, full}\n" << std::endl;
                       usage(argv[0]);
@@ -117,13 +119,13 @@ int main(int argc, char* argv[])
                     std::string str(argv[++i]);
                     toLowerCase(str);
                     if (str == "none") {
-                       sMode = nanovdb::StatsMode::Disable;
+                       sMode = nanovdb::tools::StatsMode::Disable;
                     } else if (str == "bbox") {
-                       sMode = nanovdb::StatsMode::BBox;
+                       sMode = nanovdb::tools::StatsMode::BBox;
                     } else if (str == "extrema") {
-                       sMode = nanovdb::StatsMode::MinMax;
+                       sMode = nanovdb::tools::StatsMode::MinMax;
                     } else if (str == "all") {
-                       sMode = nanovdb::StatsMode::All;
+                       sMode = nanovdb::tools::StatsMode::All;
                     } else {
                       std::cerr << "Expected one of the following stats modes: {none, bbox, extrema, all}\n" << std::endl;
                       usage(argv[0]);
@@ -136,7 +138,7 @@ int main(int argc, char* argv[])
                 } else {
                     qMode = nanovdb::GridType::FpN;
                     absolute = true;
-                    tolerance = atof(argv[++i]);
+                    tolerance = static_cast<float>(atof(argv[++i]));
                 }
             } else if (arg == "-r" || arg == "--rel-error") {
                 if (i + 1 == argc) {
@@ -145,7 +147,7 @@ int main(int argc, char* argv[])
                 } else {
                     qMode = nanovdb::GridType::FpN;
                     absolute = false;
-                    tolerance = atof(argv[++i]);
+                    tolerance = static_cast<float>(atof(argv[++i]));
                 }
             } else if (arg == "-g" || arg == "--grid") {
                 if (i + 1 == argc) {
@@ -203,7 +205,7 @@ int main(int argc, char* argv[])
     {
         using SrcGridT = openvdb::FloatGrid;
         if (auto floatGrid = openvdb::GridBase::grid<SrcGridT>(base)) {
-            nanovdb::CreateNanoGrid<SrcGridT> s(*floatGrid);
+            nanovdb::tools::CreateNanoGrid<SrcGridT> s(*floatGrid);
             s.setStats(sMode);
             s.setChecksum(cMode);
             s.enableDithering(dither);
@@ -217,15 +219,15 @@ int main(int argc, char* argv[])
                 return s.getHandle<nanovdb::Fp16>();
             case nanovdb::GridType::FpN:
                 if (absolute) {
-                    return s.getHandle<nanovdb::FpN>(nanovdb::AbsDiff(tolerance));
+                    return s.getHandle<nanovdb::FpN>(nanovdb::tools::AbsDiff(tolerance));
                 } else {
-                    return s.getHandle<nanovdb::FpN>(nanovdb::RelDiff(tolerance));
+                    return s.getHandle<nanovdb::FpN>(nanovdb::tools::RelDiff(tolerance));
                 }
             default:
                 break;
             }// end of switch
         }
-        return nanovdb::openToNanoVDB(base, sMode, cMode, verbose ? 1 : 0);
+        return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose ? 1 : 0);
     };
     try {
         if (toNanoVDB) { // OpenVDB -> NanoVDB
@@ -275,7 +277,7 @@ int main(int argc, char* argv[])
                         for (uint32_t i = 0; i < h.gridCount(); ++i) {
                             if (verbose)
                                 std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
-                            grids->push_back(nanoToOpenVDB(h, 0, i));
+                            grids->push_back(nanovdb::tools::nanoToOpenVDB(h, 0, i));
                         }
                     }
                 } else {
@@ -286,7 +288,7 @@ int main(int argc, char* argv[])
                     }
                     if (verbose)
                         std::cout << "Converting NanoVDB grid named \"" << handle.gridMetaData()->shortGridName() << "\" to OpenVDB" << std::endl;
-                    grids->push_back(nanoToOpenVDB(handle));
+                    grids->push_back(nanovdb::tools::nanoToOpenVDB(handle));
                 }
             } // loop over input files
             file.write(*grids);
