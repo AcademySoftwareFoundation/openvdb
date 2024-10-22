@@ -76,16 +76,13 @@ jobs:
     strategy:
       matrix:
         config:
-          # @note  we specifically use clang15.0 (not clang15) here as the newest
-          #  versions of the clang15.X containers have some issues with the GLFW
-          #  installation
-          - { cxx: clang++, image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2023-clang15.0', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '11', build: 'Debug',   cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '10', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2022-clang11',   abi: '9',  build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: clang++, image: '2024', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2024', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2024', abi: '11', build: 'Debug',   cmake: '' }
+          - { cxx: clang++, image: '2023', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2023', abi: '11', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
     - name: Enable Node 16
@@ -97,6 +94,9 @@ jobs:
     - name: pybind11
       #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_pybind11.sh 2.10.0
+    - name: glfw
+      if: contains(matrix.config.image, '2023') == true
+      run: ./ci/install_glfw.sh 3.3.10
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -152,7 +152,8 @@ jobs:
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: install
-      run: ./ci/install_windows.sh
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       run: >
         ./ci/build.sh -v
