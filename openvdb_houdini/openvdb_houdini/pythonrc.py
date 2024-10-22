@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 
 # Startup script to set the visibility of (and otherwise customize)
 # open-source (ASWF) OpenVDB nodes and their native Houdini equivalents
