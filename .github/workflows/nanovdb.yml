@@ -78,6 +78,8 @@ jobs:
           echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
           echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
+      # NOTE: CMAKE_POSITION_INDEPENDENT_CODE set to fix default behaviour change in clang 14
+      #   https://github.com/AcademySoftwareFoundation/aswf-docker/issues/228
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
@@ -88,6 +90,7 @@ jobs:
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
           -DUSE_BLOSC=OFF
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
         run: cd build && sudo ctest -V -E ".*cuda.*"
