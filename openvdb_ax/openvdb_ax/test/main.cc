@@ -17,6 +17,8 @@
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 
+#include <gtest/gtest.h>
+
 #include <algorithm> // for std::shuffle()
 #include <cmath> // for std::round()
 #include <cstdlib> // for EXIT_SUCCESS
@@ -274,11 +276,14 @@ main(int argc, char *argv[])
     registerType<openvdb::math::Vec4<float>>();
     registerType<openvdb::math::Vec4<double>>();
 
-    auto value = run(argc, argv);
+    auto cppunit_result = run(argc, argv);
+
+    ::testing::InitGoogleTest(&argc, argv);
+    auto gtest_result = RUN_ALL_TESTS();
 
     openvdb::ax::uninitialize();
     openvdb::uninitialize();
 
-    return value;
+    return (cppunit_result == 0 ? gtest_result : cppunit_result);
 }
 
