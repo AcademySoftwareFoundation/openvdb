@@ -137,7 +137,7 @@ TEST_F(TestRoot, testUnsafe)
         auto* node1 = root.getChildUnsafe(Coord(0, 0, 4096));
         EXPECT_TRUE(node1);
         const RootNode& constRoot = root;
-        auto* node2 = root.getChildUnsafe(Coord(0, 0, 4096));
+        auto* node2 = constRoot.getChildUnsafe(Coord(0, 0, 4096));
         EXPECT_TRUE(node2);
         auto* node3 = root.getConstChildUnsafe(Coord(0, 0, 4096));
         EXPECT_TRUE(node3);
