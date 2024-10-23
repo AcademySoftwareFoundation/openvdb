@@ -557,7 +557,7 @@ void Geometry::readPLY(std::istream &is)
 
     if (!test(0, {"ply"})) error("vdb_tool::readPLY: not a ply file");
     int format = -1;// 0 is ascii, 1 is little endian and 2 is big endian
-    tokens = tokenize_line(); 
+    tokens = tokenize_line();
     if (!(test(0, {"format"}) && test(2, {"1.0"})) ) {
         error("vdb_tool::readPLY: expected format version 1.0");
     } else if (test(1, {"ascii"})) {
