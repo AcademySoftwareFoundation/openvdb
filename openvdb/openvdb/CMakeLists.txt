@@ -556,6 +556,15 @@ set(OPENVDB_LIBRARY_THREAD_INCLUDE_FILES
   thread/Threading.h
 )
 
+if(OPENVDB_BUILD_PYTHON_MODULE)
+  set(OPENVDB_LIBRARY_PYTHON_INCLUDE_FILES
+    python/pyAccessor.h
+    python/pyGrid.h
+    python/pyTypeCasters.h
+    python/pyutil.h
+  )
+endif()
+
 ##########################################################################
 
 # Configure auto-generation of explicit template definition translation units
@@ -744,3 +753,7 @@ install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)
 install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/thread)
+
+if(OPENVDB_BUILD_PYTHON_MODULE)
+  install(FILES ${OPENVDB_LIBRARY_PYTHON_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/python)
+endif()
