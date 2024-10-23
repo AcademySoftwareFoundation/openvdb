@@ -1224,7 +1224,7 @@ private:
     /// a bunch of short segments that approximate a smooth curve.
     ///
     /// Idea is similar to _open_ prisms and _open_ wedges speeding up
-    /// creation of thickened mesh level sets from finely triangulated meshes.
+    /// creation of dilated mesh level sets from finely triangulated meshes.
 
     inline void
     constantRadiusVoxelize(const tbb::blocked_range<size_t>& rng)

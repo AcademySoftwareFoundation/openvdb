@@ -3,16 +3,16 @@
 ///
 /// @author Greg Hurst
 ///
-/// @file LevelSetThickenedMesh.h
+/// @file LevelSetDilatedMesh.h
 ///
-/// @brief Generate a narrow-band level set of a thickened mesh.
+/// @brief Generate a narrow-band level set of a dilated surface mesh.
 ///
 /// @note By definition a level set has a fixed narrow band width
 /// (the half width is defined by LEVEL_SET_HALF_WIDTH in Types.h),
 /// whereas an SDF can have a variable narrow band width.
 
-#ifndef OPENVDB_TOOLS_LEVELSETTHICKENEDMESH_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_LEVELSETTHICKENEDMESH_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_LEVELSETDILATEDMESH_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_LEVELSETDILATEDMESH_HAS_BEEN_INCLUDED
 
 #include "ConvexVoxelizer.h"
 #include "LevelSetTubes.h"
@@ -34,56 +34,65 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
-/// representation of a thickened triangle mesh (thickened by a radius in all directions).
+/// representation of a dilated triangle surface mesh (dilated by a radius in all directions).
 ///
 /// @param vertices    Vertices of the mesh in world units.
 /// @param triangles    Triangle indices of the mesh.
-/// @param radius    Radius of the sphere in world units.
+/// @param radius    Dilation radius in world units.
 /// @param voxelSize    Voxel size in world units.
 /// @param halfWidth    Half the width of the narrow band, in voxel units.
 /// @param interrupter    Interrupter adhering to the util::NullInterrupter interface.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
+/// @note The input mesh is always treated as a surface, and so dilation occurs in every direction.
+/// This includes meshes that could represent valid BRep solids, dilation occurs both
+/// inward and outward, forming a 'shell' rather than only expanding outward.
 template <typename GridType, typename InterruptT = util::NullInterrupter>
 typename GridType::Ptr
-createLevelSetThickenedMesh(
+createLevelSetDilatedMesh(
     const std::vector<Vec3s>& vertices, const std::vector<Vec3I>& triangles,
     float radius, float voxelSize, float halfWidth = float(LEVEL_SET_HALF_WIDTH),
     InterruptT* interrupter = nullptr);
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
-/// representation of a thickened quad mesh (thickened by a radius in all directions).
+/// representation of a dilated quad surface mesh (dilated by a radius in all directions).
 ///
 /// @param vertices    Vertices of the mesh in world units.
 /// @param quads    Quad indices of the mesh.
-/// @param radius    Radius of the sphere in world units.
+/// @param radius    Dilation radius in world units.
 /// @param voxelSize    Voxel size in world units.
 /// @param halfWidth    Half the width of the narrow band, in voxel units.
 /// @param interrupter    Interrupter adhering to the util::NullInterrupter interface.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
+/// @note The input mesh is always treated as a surface, and so dilation occurs in every direction.
+/// This includes meshes that could represent valid BRep solids, dilation occurs both
+/// inward and outward, forming a 'shell' rather than only expanding outward.
 template <typename GridType, typename InterruptT = util::NullInterrupter>
 typename GridType::Ptr
-createLevelSetThickenedMesh(
+createLevelSetDilatedMesh(
     const std::vector<Vec3s>& vertices, const std::vector<Vec4I>& quads,
     float radius, float voxelSize, float halfWidth = float(LEVEL_SET_HALF_WIDTH),
     InterruptT* interrupter = nullptr);
 
 /// @brief Return a grid of type @c GridType containing a narrow-band level set
-/// representation of a thickened triangle & quad mesh (thickened by a radius in all directions).
+/// representation of a dilated triangle & quad  surface mesh (dilated by a radius in all directions).
 ///
 /// @param vertices    Vertices of the mesh in world units.
 /// @param triangles    Triangle indices of the mesh.
 /// @param quads    Quad indices of the mesh.
-/// @param radius    Radius of the sphere in world units.
+/// @param radius    Dilation radius in world units.
 /// @param voxelSize    Voxel size in world units.
 /// @param halfWidth    Half the width of the narrow band, in voxel units.
 /// @param interrupter    Interrupter adhering to the util::NullInterrupter interface.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
+/// @note The input mesh is always treated as a surface, and so dilation occurs in every direction.
+/// This includes meshes that could represent valid BRep solids, dilation occurs both
+/// inward and outward, forming a 'shell' rather than only expanding outward.
 template <typename GridType, typename InterruptT = util::NullInterrupter>
 typename GridType::Ptr
-createLevelSetThickenedMesh(const std::vector<Vec3s>& vertices,
+createLevelSetDilatedMesh(const std::vector<Vec3s>& vertices,
     const std::vector<Vec3I>& triangles, const std::vector<Vec4I>& quads,
     float radius, float voxelSize, float halfWidth = float(LEVEL_SET_HALF_WIDTH),
     InterruptT* interrupter = nullptr);
@@ -1214,11 +1223,11 @@ private:
 
 
 /// @brief Class used to generate a grid of type @c GridType containing a narrow-band level set
-/// representation of a thckened mesh (surface mesh thickened by a radius in all directions).
+/// representation of a dilated mesh (surface mesh dilated by a radius in all directions).
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
 template <typename GridT, typename InterruptT, bool PtPartition = true>
-class ThickenedMeshVoxelizer {
+class DilatedMeshVoxelizer {
 
     using GridPtr = typename GridT::Ptr;
     using TreeT = typename GridT::TreeType;
@@ -1243,7 +1252,7 @@ public:
     /// @param interrupter    pointer to optional interrupter. Use template
     /// argument util::NullInterrupter if no interruption is desired.
     /// @param grid    optional grid to populate into (grid need not be empty).
-    ThickenedMeshVoxelizer(const std::vector<Vec3s>& vertices, const std::vector<Vec3I>& triangles,
+    DilatedMeshVoxelizer(const std::vector<Vec3s>& vertices, const std::vector<Vec3I>& triangles,
         float radius, float voxelSize, float background,
         InterruptT* interrupter, GridPtr grid = nullptr)
     : mMesh(std::make_shared<const MeshConnectivity>(MeshConnectivity(vertices, triangles)))
@@ -1262,7 +1271,7 @@ public:
         mWVoxelizer = std::make_shared<WedgeVoxelizer>(mGrid, false);
     }
 
-    ThickenedMeshVoxelizer(ThickenedMeshVoxelizer& other, tbb::split)
+    DilatedMeshVoxelizer(DilatedMeshVoxelizer& other, tbb::split)
     : mMesh(other.mMesh)
     , mVox(other.mVox), mBg(other.mBg), mRad(other.mRad)
     , mInterrupter(other.mInterrupter)
@@ -1289,7 +1298,7 @@ public:
         }
     }
 
-    void join(ThickenedMeshVoxelizer& other)
+    void join(DilatedMeshVoxelizer& other)
     {
         tools::CsgUnionOp<TreeT> op(other.mGrid->tree(), Steal());
         tree::DynamicNodeManager<TreeT> nodeManager(mGrid->tree());
@@ -1525,26 +1534,26 @@ private:
     std::shared_ptr<PrismVoxelizer> mPVoxelizer;
     std::shared_ptr<WedgeVoxelizer> mWVoxelizer;
 
-}; // class ThickenedMeshVoxelizer
+}; // class DilatedMeshVoxelizer
 
 } // namespace lvlset
 
 
-// ------------ createLevelSetThickenedMesh ------------- //
+// ------------ createLevelSetDilatedMesh ------------- //
 
 template <typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetThickenedMesh(
+createLevelSetDilatedMesh(
     const std::vector<Vec3s>& vertices, const std::vector<Vec3I>& triangles,
     float radius, float voxelSize, float halfWidth, InterruptT* interrupter)
 {
     using GridPtr = typename GridType::Ptr;
     using ValueT = typename GridType::ValueType;
 
-    using Voxelizer = typename lvlset::ThickenedMeshVoxelizer<GridType, InterruptT>;
+    using Voxelizer = typename lvlset::DilatedMeshVoxelizer<GridType, InterruptT>;
 
     static_assert(std::is_floating_point<ValueT>::value,
-        "createLevelSetThickenedMesh must return a scalar grid");
+        "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
     if (halfWidth <= 0) OPENVDB_THROW(ValueError, "half-width must be positive");
@@ -1562,14 +1571,14 @@ createLevelSetThickenedMesh(
 
 template <typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetThickenedMesh(
+createLevelSetDilatedMesh(
     const std::vector<Vec3s>& vertices, const std::vector<Vec4I>& quads,
     float radius, float voxelSize, float halfWidth, InterruptT* interrupter)
 {
     using ValueT = typename GridType::ValueType;
 
     static_assert(std::is_floating_point<ValueT>::value,
-        "createLevelSetThickenedMesh must return a scalar grid");
+        "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
     if (halfWidth <= 0) OPENVDB_THROW(ValueError, "half-width must be positive");
@@ -1586,27 +1595,27 @@ createLevelSetThickenedMesh(
             }
         });
 
-    return createLevelSetThickenedMesh<GridType, InterruptT>(vertices, triangles, radius,
-                                                             voxelSize, halfWidth, interrupter);
+    return createLevelSetDilatedMesh<GridType, InterruptT>(vertices, triangles, radius,
+                                                           voxelSize, halfWidth, interrupter);
 }
 
 template <typename GridType, typename InterruptT>
 typename GridType::Ptr
-createLevelSetThickenedMesh(const std::vector<Vec3s>& vertices,
+createLevelSetDilatedMesh(const std::vector<Vec3s>& vertices,
     const std::vector<Vec3I>& triangles, const std::vector<Vec4I>& quads,
     float radius, float voxelSize, float halfWidth, InterruptT* interrupter)
 {
     using ValueT = typename GridType::ValueType;
 
     static_assert(std::is_floating_point<ValueT>::value,
-        "createLevelSetThickenedMesh must return a scalar grid");
+        "createLevelSetDilatedMesh must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
     if (halfWidth <= 0) OPENVDB_THROW(ValueError, "half-width must be positive");
 
     if (quads.empty())
-        return createLevelSetThickenedMesh<GridType, InterruptT>(vertices, triangles, radius,
-                                                                 voxelSize, halfWidth, interrupter);
+        return createLevelSetDilatedMesh<GridType, InterruptT>(vertices, triangles, radius,
+                                                               voxelSize, halfWidth, interrupter);
 
     const Index64 tn = triangles.size(), qn = quads.size();
     const Index64 qn2 = tn + qn;
@@ -1628,8 +1637,8 @@ createLevelSetThickenedMesh(const std::vector<Vec3s>& vertices,
             }
         });
 
-    return createLevelSetThickenedMesh<GridType, InterruptT>(vertices, tris, radius,
-                                                             voxelSize, halfWidth, interrupter);
+    return createLevelSetDilatedMesh<GridType, InterruptT>(vertices, tris, radius,
+                                                           voxelSize, halfWidth, interrupter);
 }
 
 
@@ -1640,24 +1649,24 @@ createLevelSetThickenedMesh(const std::vector<Vec3s>& vertices,
 
 #ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
 
-#ifdef OPENVDB_INSTANTIATE_LEVELSETTHICKENEDMESH
+#ifdef OPENVDB_INSTANTIATE_LEVELSETDILATEDMESH
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetThickenedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
+    Grid<TreeT>::Ptr createLevelSetDilatedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
         const std::vector<Vec3I>&, float, float, float, util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetThickenedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
+    Grid<TreeT>::Ptr createLevelSetDilatedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
         const std::vector<Vec4I>&, float, float, float, util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetThickenedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
+    Grid<TreeT>::Ptr createLevelSetDilatedMesh<Grid<TreeT>>(const std::vector<Vec3s>&, \
         const std::vector<Vec3I>&, const std::vector<Vec4I>&, float, float, float, \
         util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
@@ -1669,4 +1678,4 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_TOOLS_LEVELSETTHICKENEDMESH_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_LEVELSETDILATEDMESH_HAS_BEEN_INCLUDED

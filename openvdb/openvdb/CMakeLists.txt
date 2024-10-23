@@ -485,6 +485,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/GridTransformer.h
   tools/Interpolation.h
   tools/LevelSetAdvect.h
+  tools/LevelSetDilatedMesh.h
   tools/LevelSetFilter.h
   tools/LevelSetFracture.h
   tools/LevelSetMeasure.h
@@ -492,7 +493,6 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetPlatonic.h
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h
-  tools/LevelSetThickenedMesh.h
   tools/LevelSetTracker.h
   tools/LevelSetTubes.h
   tools/LevelSetUtil.h

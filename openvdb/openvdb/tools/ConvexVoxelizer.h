@@ -114,7 +114,8 @@ private:
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
 ///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
-///             mXYData.expandYRange(x, BaseT::circleBottom(x), BaseT::circleTop(x));
+///             mXYData.expandYRange(x, BaseT::circleBottom(mX, mY, mORad, x),
+///                 BaseT::circleTop(mX, mY, mORad, x));
 ///     }
 ///
 ///     std::function<bool(float&, float&, const float&, const float&)> sphereBottomTop =
@@ -283,7 +284,7 @@ protected:
     ///
     /// @param p The point at the center of the tile in 3D space.
     /// @note This can be useful for cases that build objects from multiple primitives, e.g.
-    /// thickened mesh is built by constructing and unioning _open_ prisms and _open_ tube wedges.
+    /// dilated mesh is built by constructing and unioning _open_ prisms and _open_ tube wedges.
     /// A tile might not fully fit in an open prism but might fit in the union of a prism and wedge,
     /// and so in this case it might make sense to use the sdf for an offset triangle on tiles
     /// during the open prism scan.

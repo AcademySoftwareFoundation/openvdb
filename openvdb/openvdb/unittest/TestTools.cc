@@ -9,7 +9,7 @@
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/LevelSetThickenedMesh.h>
+#include <openvdb/tools/LevelSetDilatedMesh.h>
 #include <openvdb/tools/LevelSetTubes.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetMeasure.h>
@@ -219,7 +219,7 @@ TEST_F(TestTools, testLevelSetPlatonic)
 
 }// testLevelSetPlatonic
 
-TEST_F(TestTools, testLevelSetThickenedMesh)
+TEST_F(TestTools, testLevelSetDilatedMesh)
 {
     using namespace openvdb;
 
@@ -240,8 +240,8 @@ TEST_F(TestTools, testLevelSetThickenedMesh)
                     int(p1[1]/voxelSize),
                     int(p1[2]/voxelSize));// inside
 
-    {// test thickened triangle mesh
-        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+    {// test dilated triangle mesh
+        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
             vertices, triangles1, r, voxelSize, width);
 
         EXPECT_TRUE(ls->activeVoxelCount() > 0);
@@ -251,8 +251,8 @@ TEST_F(TestTools, testLevelSetThickenedMesh)
         EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
-    {// test thickened quad mesh
-        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+    {// test dilated quad mesh
+        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
             vertices, quads1, r, voxelSize, width);
 
         EXPECT_TRUE(ls->activeVoxelCount() > 0);
@@ -262,8 +262,8 @@ TEST_F(TestTools, testLevelSetThickenedMesh)
         EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
-    {// test thickened mixed triangle & quad mesh
-        FloatGrid::Ptr ls = tools::createLevelSetThickenedMesh<FloatGrid>(
+    {// test dilated mixed triangle & quad mesh
+        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
             vertices, triangles2, quads2, r, voxelSize, width);
 
         EXPECT_TRUE(ls->activeVoxelCount() > 0);
@@ -274,7 +274,7 @@ TEST_F(TestTools, testLevelSetThickenedMesh)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
-}// testLevelSetThickenedMesh
+}// testLevelSetDilatedMesh
 
 TEST_F(TestTools, testLevelSetTubes)
 {
