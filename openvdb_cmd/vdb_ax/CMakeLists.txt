@@ -34,4 +34,4 @@ set(SOURCE_FILES main.cc)
 add_executable(vdb_ax ${SOURCE_FILES})
 target_link_libraries(vdb_ax ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
-install(TARGETS vdb_ax RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_ax RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})

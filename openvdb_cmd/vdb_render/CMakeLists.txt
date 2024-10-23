@@ -51,4 +51,4 @@ target_link_libraries(vdb_render
   $<TARGET_NAME_IF_EXISTS:PNG::PNG>
 )
 
-install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_render RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
