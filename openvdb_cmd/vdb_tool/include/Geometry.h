@@ -45,6 +45,14 @@
 #include <Alembic/Util/All.h>
 #endif
 
+#ifdef VDB_TOOL_USE_PDAL
+#include "pdal/pdal.hpp"
+#include "pdal/PipelineManager.hpp"
+#include "pdal/PipelineReaderJSON.hpp"
+#include "pdal/util/FileUtils.hpp"
+#include <sstream>
+#endif
+
 #if defined(_WIN32)
 #include <io.h>
 #else
@@ -82,9 +90,13 @@ public:
     const std::vector<Vec3s>& vtx() const  { return mVtx; }
     const std::vector<Vec3I>& tri() const  { return mTri; }
     const std::vector<Vec4I>& quad() const { return mQuad; }
+    const std::vector<Vec3s>& rgb() const  { return mRGB; }
+
     std::vector<Vec3s>& vtx()  { return mVtx; }
     std::vector<Vec3I>& tri()  { return mTri; }
     std::vector<Vec4I>& quad() { return mQuad; }
+    std::vector<Vec3s>& rgb()  { return mRGB; }
+
     const BBoxT& bbox() const;
 
     void clear();
@@ -108,6 +120,7 @@ public:
     void readPTS(const std::string &fileName);
     void readGEO(const std::string &fileName);
     void readABC(const std::string &fileName);
+    void readPDAL(const std::string &fileName);
     void readVDB(const std::string &fileName);
     void readNVDB(const std::string &fileName);
 
@@ -138,6 +151,7 @@ private:
     std::vector<PosT>  mVtx;
     std::vector<Vec3I> mTri;
     std::vector<Vec4I> mQuad;
+    std::vector<Vec3s> mRGB;
     mutable BBoxT      mBBox;
     std::string        mName;
 
@@ -393,8 +407,16 @@ void Geometry::read(const std::string &fileName)
         this->readGEO(fileName);
         break;
     default:
-      throw std::invalid_argument("Geometry::read: File \""+fileName+"\" has an invalid extension");
-      break;
+#if VDB_TOOL_USE_PDAL
+        pdal::StageFactory factory;
+        const std::string driver = factory.inferReaderDriver(fileName);
+        if (driver != "") {
+            this->readPDAL(fileName);
+            break;
+        }
+#endif
+        throw std::invalid_argument("Geometry::read: File \""+fileName+"\" has an invalid extension");
+        break;
     }
 }// Geometry::read
 
@@ -441,6 +463,61 @@ void Geometry::readOBJ(std::istream &is)
     }
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readOBJ
+
+void Geometry::readPDAL(const std::string &fileName)
+{
+ #if VDB_TOOL_USE_PDAL
+    if (!pdal::FileUtils::fileExists(fileName)) throw std::invalid_argument("Error opening file \""+fileName+"\"  - it doesn't exist!");
+
+    pdal::StageFactory factory;
+    std::string type = factory.inferReaderDriver(fileName);
+    std::string pipelineJson = R"({
+        "pipeline" : [
+            {
+                "type" : ")" + type + R"(",
+                "filename" : ")" + fileName + R"("
+            }
+        ]
+    })";
+
+    Vec3f p;
+    Vec3s rgb;
+    try {
+        pdal::PipelineManager manager;
+        std::stringstream s(pipelineJson);
+        manager.readPipeline(s);
+        manager.execute(pdal::ExecMode::Standard);
+
+        for (const std::shared_ptr<pdal::PointView>& view : manager.views()) {
+            bool hasColor = false;
+            if (view->hasDim(pdal::Dimension::Id::Red) && view->hasDim(pdal::Dimension::Id::Green) && view->hasDim(pdal::Dimension::Id::Blue))
+                hasColor = true;
+            for (const pdal::PointRef& point : *view) {
+                p[0] = point.getFieldAs<float>(pdal::Dimension::Id::X);
+                p[1] = point.getFieldAs<float>(pdal::Dimension::Id::Y);
+                p[2] = point.getFieldAs<float>(pdal::Dimension::Id::Z);
+                mVtx.push_back(p);
+                if (hasColor) {
+                    rgb[0] = point.getFieldAs<float>(pdal::Dimension::Id::Red);
+                    rgb[1] = point.getFieldAs<float>(pdal::Dimension::Id::Green);
+                    rgb[2] = point.getFieldAs<float>(pdal::Dimension::Id::Blue);
+                    mRGB.push_back(rgb);
+                }
+            }
+        }
+
+    }
+    catch (const pdal::pdal_error& e) {
+        throw std::runtime_error("PDAL failed: " + std::string(e.what()));
+    }
+    catch (const std::exception& e) {
+        throw std::runtime_error("Reading file failed: " + std::string(e.what()));
+    }
+#else
+    throw std::runtime_error("Cannot read file \"" + fileName + "\".  PDAL support is not enabled in this build, please recompile with PDAL support");
+#endif
+    mBBox = BBoxT(); //invalidate BBox
+}// Geometry::readPDAL
 
 void Geometry::readPLY(const std::string &fileName)
 {
@@ -753,6 +830,8 @@ void Geometry::readPTS(const std::string &fileName)
     if (!infile.is_open()) throw std::runtime_error("Error opening particle file \""+fileName+"\"");
     std::string line;
     std::istringstream iss;
+    bool readColor = false;
+    Vec3s rgb;
     while(std::getline(infile, line)) {
         const size_t n = mVtx.size(), m = std::stoi(line);
         mVtx.resize(n + m);
@@ -764,6 +843,18 @@ void Geometry::readPTS(const std::string &fileName)
             if (!(iss >> p[0] >> p[1] >> p[2])) {;//ignore intensity, r, g, b
                 throw std::invalid_argument("Geometry::readPTS: error parsing line: \""+line+"\"");
             }
+            if (readColor) {
+                if (!(iss >> i) ) { // converting intensity to a multiplier on rgb might be appropriate, but i can't find a good spec for it
+                    readColor = false;
+                    continue;
+                }
+                if (!(iss >> rgb[0] >> rgb[1] >> rgb[2])) {
+                    readColor = false;
+                    continue;
+                }
+                mRGB.push_back(rgb/255.0);
+            }
+
         }// loop over points
     }// loop over scans
     mBBox = BBoxT();//invalidate BBox
