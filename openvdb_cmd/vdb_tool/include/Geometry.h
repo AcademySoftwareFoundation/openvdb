@@ -513,6 +513,8 @@ void Geometry::readPDAL(const std::string &fileName)
     catch (const std::exception& e) {
         throw std::runtime_error("Reading file failed: " + std::string(e.what()));
     }
+#else
+    throw std::runtime_error("Cannot read file \"" + fileName + "\".  PDAL support is not enabled in this build, please recompile with PDAL support");
 #endif
     mBBox = BBoxT(); //invalidate BBox
 }// Geometry::readPDAL
@@ -829,7 +831,6 @@ void Geometry::readPTS(const std::string &fileName)
     std::string line;
     std::istringstream iss;
     bool readColor = false;
-    int i = 0;
     Vec3s rgb;
     while(std::getline(infile, line)) {
         const size_t n = mVtx.size(), m = std::stoi(line);
