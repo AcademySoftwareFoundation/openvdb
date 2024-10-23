@@ -6,6 +6,7 @@ $VerbosePreference = "Continue"
 $vcpkgPackages = @(
     "zlib",
     "libpng",
+    "libpdal",
     "openexr",
     "tbb",
     "gtest",
