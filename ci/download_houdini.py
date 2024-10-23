@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 # Python script to download the latest Houdini builds
 # using the SideFX download API:

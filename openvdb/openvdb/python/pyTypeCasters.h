@@ -1,29 +1,30 @@
 #ifndef OPENVDB_PYTYPECASTERS_HAS_BEEN_INCLUDED
 #define OPENVDB_PYTYPECASTERS_HAS_BEEN_INCLUDED
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/MetaMap.h>
 
 // Custom type casters must be defined consistently in EVERY translation unit of
-// pybind11 code. Thus, we define them in this header file and include it in every
+// nanobind code. Thus, we define them in this header file and include it in every
 // implementation file.
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
-namespace pybind11 { namespace detail {
+namespace nanobind { namespace detail {
     template <> struct type_caster<openvdb::Coord> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Coord, const_name("openvdb::Coord"));
+        NB_TYPE_CASTER(openvdb::Coord, const_name("openvdb::Coord"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
 
             Py_ssize_t length = PySequence_Length(source);
             if (length == 1) {
-                openvdb::Coord::Int32 items[1];
+                openvdb::Coord::Int32 items[1] = { 0 }; // init required to workaround gcc warning
                 for (Py_ssize_t i = 0; i < length; ++i) {
                     PyObject* item = PySequence_GetItem(source, i);
                     if (item) {
@@ -43,7 +44,7 @@ namespace pybind11 { namespace detail {
             }
             else if (length == 3)
             {
-                openvdb::Coord::Int32 items[3];
+                openvdb::Coord::Int32 items[3] = { 0, 0, 0 }; // init required to workaround gcc warning
                 for (Py_ssize_t i = 0; i < length; ++i) {
                     PyObject* item = PySequence_GetItem(source, i);
                     if (item) {
@@ -67,17 +68,17 @@ namespace pybind11 { namespace detail {
             }
         }
 
-        static handle cast(openvdb::Coord src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2]);
+        static handle from_cpp(openvdb::Coord src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec2i> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2i, const_name("openvdb::Vec2i"));
+        NB_TYPE_CASTER(openvdb::Vec2i, const_name("openvdb::Vec2i"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -103,17 +104,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec2i src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1]);
+        static handle from_cpp(openvdb::Vec2i src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec2I> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2I, const_name("openvdb::Vec2I"));
+        NB_TYPE_CASTER(openvdb::Vec2I, const_name("openvdb::Vec2I"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -139,17 +140,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec2I src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1]);
+        static handle from_cpp(openvdb::Vec2I src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec2s> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2s, const_name("openvdb::Vec2s"));
+        NB_TYPE_CASTER(openvdb::Vec2s, const_name("openvdb::Vec2s"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -175,17 +176,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec2s src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1]);
+        static handle from_cpp(openvdb::Vec2s src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec2d> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2d, const_name("openvdb::Vec2d"));
+        NB_TYPE_CASTER(openvdb::Vec2d, const_name("openvdb::Vec2d"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -211,17 +212,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec2d src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1]);
+        static handle from_cpp(openvdb::Vec2d src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec3i> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3i, const_name("openvdb::Vec3i"));
+        NB_TYPE_CASTER(openvdb::Vec3i, const_name("openvdb::Vec3i"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -247,17 +248,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec3i src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2]);
+        static handle from_cpp(openvdb::Vec3i src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec3I> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3I, const_name("openvdb::Vec3I"));
+        NB_TYPE_CASTER(openvdb::Vec3I, const_name("openvdb::Vec3I"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -283,17 +284,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec3I src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2]);
+        static handle from_cpp(openvdb::Vec3I src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec3s> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3s, const_name("openvdb::Vec3s"));
+        NB_TYPE_CASTER(openvdb::Vec3s, const_name("openvdb::Vec3s"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -319,17 +320,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec3s src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2]);
+        static handle from_cpp(openvdb::Vec3s src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec3d> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3d, const_name("openvdb::Vec3d"));
+        NB_TYPE_CASTER(openvdb::Vec3d, const_name("openvdb::Vec3d"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -355,17 +356,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec3d src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2]);
+        static handle from_cpp(openvdb::Vec3d src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec4i> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4i, const_name("openvdb::Vec4i"));
+        NB_TYPE_CASTER(openvdb::Vec4i, const_name("openvdb::Vec4i"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -391,17 +392,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec4i src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2], src[3]);
+        static handle from_cpp(openvdb::Vec4i src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2], src[3]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec4I> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4I, const_name("openvdb::Vec4I"));
+        NB_TYPE_CASTER(openvdb::Vec4I, const_name("openvdb::Vec4I"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -427,17 +428,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec4I src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2], src[3]);
+        static handle from_cpp(openvdb::Vec4I src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2], src[3]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec4s> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4s, const_name("openvdb::Vec4s"));
+        NB_TYPE_CASTER(openvdb::Vec4s, const_name("openvdb::Vec4s"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -463,17 +464,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec4s src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2], src[3]);
+        static handle from_cpp(openvdb::Vec4s src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2], src[3]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec4d> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4d, const_name("openvdb::Vec4d"));
+        NB_TYPE_CASTER(openvdb::Vec4d, const_name("openvdb::Vec4d"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -499,17 +500,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Vec4d src, return_value_policy, handle) {
-            py::tuple tuple = py::make_tuple(src[0], src[1], src[2], src[3]);
+        static handle from_cpp(openvdb::Vec4d src, rv_policy, cleanup_list*) noexcept {
+            nb::tuple tuple = nb::make_tuple(src[0], src[1], src[2], src[3]);
             return tuple.release();
         }
     };
 
     template <> struct type_caster<openvdb::Mat4s> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Mat4s, const_name("openvdb::Mat4s"));
+        NB_TYPE_CASTER(openvdb::Mat4s, const_name("openvdb::Mat4s"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -552,10 +553,10 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Mat4s src, return_value_policy, handle) {
-            py::list list;
+        static handle from_cpp(openvdb::Mat4s src, rv_policy, cleanup_list*) noexcept {
+            nb::list list;
             for (int i = 0; i < 4; ++i) {
-                py::list sublist;
+                nb::list sublist;
                 for (int j = 0; j < 4; ++j) {
                     sublist.append(src(i, j));
                 }
@@ -567,9 +568,9 @@ namespace pybind11 { namespace detail {
 
     template <> struct type_caster<openvdb::Mat4d> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Mat4d, const_name("openvdb::Mat4d"));
+        NB_TYPE_CASTER(openvdb::Mat4d, const_name("openvdb::Mat4d"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             if (!PySequence_Check(source))
                 return false;
@@ -612,10 +613,10 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::Mat4d src, return_value_policy, handle) {
-            py::list list;
+        static handle from_cpp(openvdb::Mat4d src, rv_policy, cleanup_list*) noexcept {
+            nb::list list;
             for (int i = 0; i < 4; ++i) {
-                py::list sublist;
+                nb::list sublist;
                 for (int j = 0; j < 4; ++j) {
                     sublist.append(src(i, j));
                 }
@@ -627,9 +628,9 @@ namespace pybind11 { namespace detail {
 
     template <> struct type_caster<openvdb::PointIndex32> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::PointIndex32, const_name("openvdb::PointIndex32"));
+        NB_TYPE_CASTER(openvdb::PointIndex32, const_name("openvdb::PointIndex32"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
@@ -643,17 +644,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::PointIndex32 src, return_value_policy, handle) {
-            py::int_ integer(static_cast<openvdb::PointIndex32::IntType>(src));
+        static handle from_cpp(openvdb::PointIndex32 src, rv_policy, cleanup_list*) noexcept {
+            nb::int_ integer(static_cast<openvdb::PointIndex32::IntType>(src));
             return integer.release();
         }
     };
 
     template <> struct type_caster<openvdb::PointIndex64> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::PointIndex64, const_name("openvdb::PointIndex64"));
+        NB_TYPE_CASTER(openvdb::PointIndex64, const_name("openvdb::PointIndex64"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
@@ -667,17 +668,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::PointIndex64 src, return_value_policy, handle) {
-            py::int_ integer(static_cast<openvdb::PointIndex64::IntType>(src));
+        static handle from_cpp(openvdb::PointIndex64 src, rv_policy, cleanup_list*) noexcept {
+            nb::int_ integer(static_cast<openvdb::PointIndex64::IntType>(src));
             return integer.release();
         }
     };
 
     template <> struct type_caster<openvdb::PointDataIndex32> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::PointDataIndex32, const_name("openvdb::PointDataIndex32"));
+        NB_TYPE_CASTER(openvdb::PointDataIndex32, const_name("openvdb::PointDataIndex32"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
@@ -691,17 +692,17 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::PointDataIndex32 src, return_value_policy, handle) {
-            py::int_ integer(static_cast<openvdb::PointDataIndex32::IntType>(src));
+        static handle from_cpp(openvdb::PointDataIndex32 src, rv_policy, cleanup_list*) noexcept {
+            nb::int_ integer(static_cast<openvdb::PointDataIndex32::IntType>(src));
             return integer.release();
         }
     };
 
     template <> struct type_caster<openvdb::PointDataIndex64> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::PointDataIndex64, const_name("openvdb::PointDataIndex64"));
+        NB_TYPE_CASTER(openvdb::PointDataIndex64, const_name("openvdb::PointDataIndex64"))
 
-        bool load(handle src, bool) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
             PyObject* source = src.ptr();
             PyObject* number = PyNumber_Long(source);
             if (number) {
@@ -715,308 +716,308 @@ namespace pybind11 { namespace detail {
             return true;
         }
 
-        static handle cast(openvdb::PointDataIndex64 src, return_value_policy, handle) {
-            py::int_ integer(static_cast<openvdb::PointDataIndex64::IntType>(src));
+        static handle from_cpp(openvdb::PointDataIndex64 src, rv_policy, cleanup_list*) noexcept {
+            nb::int_ integer(static_cast<openvdb::PointDataIndex64::IntType>(src));
             return integer.release();
         }
     };
 
     template <> struct type_caster<openvdb::StringMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::StringMetadata, _("openvdb::StringMetadata"));
+        NB_TYPE_CASTER(openvdb::StringMetadata, const_name("openvdb::StringMetadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::str>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::str>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<std::string>(src));
+            value.setValue(nb::cast<std::string>(src));
             return true;
         }
 
-        static handle cast(openvdb::StringMetadata src, return_value_policy, handle) {
-            return py::str(src.value()).release();
+        static handle from_cpp(openvdb::StringMetadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::str(src.value().c_str()).release();
         }
     };
 
     template <> struct type_caster<openvdb::BoolMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::BoolMetadata, _("openvdb::BoolMetadata"));
+        NB_TYPE_CASTER(openvdb::BoolMetadata, const_name("openvdb::BoolMetadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::bool_>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::bool_>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<bool>(src));
+            value.setValue(nb::cast<bool>(src));
             return true;
         }
 
-        static handle cast(openvdb::BoolMetadata src, return_value_policy, handle) {
-            return py::bool_(src.value()).release();
+        static handle from_cpp(openvdb::BoolMetadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::bool_(src.value()).release();
         }
     };
 
     template <> struct type_caster<openvdb::Int32Metadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Int32Metadata, _("openvdb::Int32Metadata"));
+        NB_TYPE_CASTER(openvdb::Int32Metadata, const_name("openvdb::Int32Metadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::int_>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::int_>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<openvdb::Int32>(src));
+            value.setValue(nb::cast<openvdb::Int32>(src));
             return true;
         }
 
-        static handle cast(openvdb::Int32Metadata src, return_value_policy, handle) {
-            return py::int_(src.value()).release();
+        static handle from_cpp(openvdb::Int32Metadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::int_(src.value()).release();
         }
     };
 
     template <> struct type_caster<openvdb::Int64Metadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Int64Metadata, _("openvdb::Int64Metadata"));
+        NB_TYPE_CASTER(openvdb::Int64Metadata, const_name("openvdb::Int64Metadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::int_>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::int_>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<openvdb::Int64>(src));
+            value.setValue(nb::cast<openvdb::Int64>(src));
             return true;
         }
 
-        static handle cast(openvdb::Int64Metadata src, return_value_policy, handle) {
-            return py::int_(src.value()).release();
+        static handle from_cpp(openvdb::Int64Metadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::int_(src.value()).release();
         }
     };
 
     template <> struct type_caster<openvdb::FloatMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::FloatMetadata, _("openvdb::FloatMetadata"));
+        NB_TYPE_CASTER(openvdb::FloatMetadata, const_name("openvdb::FloatMetadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::float_>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::float_>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<float>(src));
+            value.setValue(nb::cast<float>(src));
             return true;
         }
 
-        static handle cast(openvdb::FloatMetadata src, return_value_policy, handle) {
-            return py::float_(src.value()).release();
+        static handle from_cpp(openvdb::FloatMetadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::float_(src.value()).release();
         }
     };
 
     template <> struct type_caster<openvdb::DoubleMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::DoubleMetadata, _("openvdb::DoubleMetadata"));
+        NB_TYPE_CASTER(openvdb::DoubleMetadata, const_name("openvdb::DoubleMetadata"))
 
-        bool load(handle src, bool) {
-            if (!py::isinstance<py::float_>(src)) {
+        bool from_python(handle src, uint8_t, cleanup_list*) noexcept {
+            if (!nb::isinstance<nb::float_>(src)) {
                 return false;
             }
 
-            value.setValue(py::cast<double>(src));
+            value.setValue(nb::cast<double>(src));
             return true;
         }
 
-        static handle cast(openvdb::DoubleMetadata src, return_value_policy, handle) {
-            return py::float_(src.value()).release();
+        static handle from_cpp(openvdb::DoubleMetadata src, rv_policy, cleanup_list*) noexcept {
+            return nb::float_(src.value()).release();
         }
     };
 
     template <> struct type_caster<openvdb::Vec2IMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2IMetadata, _("openvdb::Vec2IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec2IMetadata, const_name("openvdb::Vec2IMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec2i> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec2i> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec2i&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec2i>());
             return true;
         }
 
-        static handle cast(openvdb::Vec2IMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec2i>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec2IMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec2i>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Vec3IMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3IMetadata, _("openvdb::Vec3IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec3IMetadata, const_name("openvdb::Vec3IMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec3i> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec3i> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec3i&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec3i>());
             return true;
         }
 
-        static handle cast(openvdb::Vec3IMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec3i>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec3IMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec3i>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Vec4IMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4IMetadata, _("openvdb::Vec4IMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec4IMetadata, const_name("openvdb::Vec4IMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec4i> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec4i> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec4i&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec4i>());
             return true;
         }
 
-        static handle cast(openvdb::Vec4IMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec4i>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec4IMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec4i>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Vec2DMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec2DMetadata, _("openvdb::Vec2DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec2DMetadata, const_name("openvdb::Vec2DMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec2d> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec2d> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec2d&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec2d>());
             return true;
         }
 
-        static handle cast(openvdb::Vec2DMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec2d>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec2DMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec2d>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Vec3DMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec3DMetadata, _("openvdb::Vec3DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec3DMetadata, const_name("openvdb::Vec3DMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec3d> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec3d> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec3d&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec3d>());
             return true;
         }
 
-        static handle cast(openvdb::Vec3DMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec3d>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec3DMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec3d>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Vec4DMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Vec4DMetadata, _("openvdb::Vec4DMetadata"));
+        NB_TYPE_CASTER(openvdb::Vec4DMetadata, const_name("openvdb::Vec4DMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::tuple>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::tuple>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Vec4d> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Vec4d> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Vec4d&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Vec4d>());
             return true;
         }
 
-        static handle cast(openvdb::Vec4DMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Vec4d>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Vec4DMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Vec4d>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Mat4SMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Mat4SMetadata, _("openvdb::Mat4SMetadata"));
+        NB_TYPE_CASTER(openvdb::Mat4SMetadata, const_name("openvdb::Mat4SMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::list>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::list>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Mat4s> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Mat4s> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Mat4s&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Mat4s>());
             return true;
         }
 
-        static handle cast(openvdb::Mat4SMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Mat4s>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Mat4SMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Mat4s>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::Mat4DMetadata> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::Mat4DMetadata, _("openvdb::Mat4DMetadata"));
+        NB_TYPE_CASTER(openvdb::Mat4DMetadata, const_name("openvdb::Mat4DMetadata"))
 
-        bool load(handle src, bool convert) {
-            if (!py::isinstance<py::list>(src)) {
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            if (!nb::isinstance<nb::list>(src)) {
                 return false;
             }
 
-            make_caster<openvdb::Mat4d> conv;
-            if (!conv.load(src, convert))
+            make_caster<openvdb::Mat4d> caster;
+            if (!caster.from_python(src, flags, cleanup))
                 return false;
 
-            value.setValue(cast_op<openvdb::Mat4d&&>(std::move(conv)));
+            value.setValue(caster.operator cast_t<openvdb::Mat4d>());
             return true;
         }
 
-        static handle cast(openvdb::Mat4DMetadata src, return_value_policy policy, handle parent) {
-            return make_caster<openvdb::Mat4d>::cast(src.value(), policy, parent);
+        static handle from_cpp(openvdb::Mat4DMetadata src, rv_policy policy, cleanup_list* cleanup) {
+            return make_caster<openvdb::Mat4d>::from_cpp(src.value(), policy, cleanup);
         }
     };
 
     template <> struct type_caster<openvdb::MetaMap> {
     public:
-        PYBIND11_TYPE_CASTER(openvdb::MetaMap, _("openvdb::MetaMap"));
+        NB_TYPE_CASTER(openvdb::MetaMap, const_name("openvdb::MetaMap"))
 
-        bool load(handle src, bool convert) {
-            py::dict dictionary = py::reinterpret_borrow<py::dict>(src);
+        bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) {
+            nb::dict dictionary = nb::borrow<nb::dict>(src);
             for (auto [key, val] : dictionary) {
                 std::string name;
-                if (py::isinstance<py::str>(key)) {
-                    name = py::cast<std::string>(key);
+                if (nb::isinstance<nb::str>(key)) {
+                    name = nb::cast<std::string>(key);
                 } else {
-                    throw py::type_error("Expected string as metadata name");
+                    throw nb::type_error("Expected string as metadata name");
                 }
 
                 // Note: the order of the following tests is significant, as it
@@ -1025,69 +1026,69 @@ namespace pybind11 { namespace detail {
                 // all floating point metadata is promoted to doubles.
 
                 bool success = false;
-                if (py::isinstance<py::str>(val)) {
-                    make_caster<openvdb::StringMetadata> conv;
-                    if(conv.load(val, convert)) {
-                        value.insertMeta(name, cast_op<openvdb::StringMetadata&&>(std::move(conv)));
+                if (nb::isinstance<nb::str>(val)) {
+                    make_caster<openvdb::StringMetadata> caster;
+                    if(caster.from_python(val, flags, cleanup)) {
+                        value.insertMeta(name, caster.operator cast_t<openvdb::StringMetadata>());
                         success = true;
                     }
-                } else if (py::isinstance<py::bool_>(val)) {
-                    make_caster<openvdb::BoolMetadata> conv;
-                    if(conv.load(val, convert)) {
-                        value.insertMeta(name, cast_op<openvdb::BoolMetadata&&>(std::move(conv)));
+                } else if (nb::isinstance<nb::bool_>(val)) {
+                    make_caster<openvdb::BoolMetadata> caster;
+                    if(caster.from_python(val, flags, cleanup)) {
+                        value.insertMeta(name, caster.operator cast_t<openvdb::BoolMetadata>());
                         success = true;
                     }
-                } else if (py::isinstance<py::int_>(val)) {
-                    const openvdb::Int64 n = py::cast<openvdb::Int64>(val);
+                } else if (nb::isinstance<nb::int_>(val)) {
+                    const openvdb::Int64 n = nb::cast<openvdb::Int64>(val);
                     if (n <= std::numeric_limits<openvdb::Int32>::max() && n >= std::numeric_limits<openvdb::Int32>::min()) {
-                        make_caster<openvdb::Int32Metadata> conv;
-                        if(conv.load(val, convert)) {
-                            value.insertMeta(name, cast_op<openvdb::Int32Metadata&&>(std::move(conv)));
+                        make_caster<openvdb::Int32Metadata> caster;
+                        if(caster.from_python(val, flags, cleanup)) {
+                            value.insertMeta(name, caster.operator cast_t<openvdb::Int32Metadata>());
                             success = true;
                         }
                     } else {
-                        make_caster<openvdb::Int64Metadata> conv;
-                        if(conv.load(val, convert)) {
-                            value.insertMeta(name, cast_op<openvdb::Int64Metadata&&>(std::move(conv)));
+                        make_caster<openvdb::Int64Metadata> caster;
+                        if(caster.from_python(val, flags, cleanup)) {
+                            value.insertMeta(name, caster.operator cast_t<openvdb::Int64Metadata>());
                             success = true;
                         }
                     }
-                } else if (py::isinstance<py::float_>(val)) {
-                    make_caster<openvdb::DoubleMetadata> conv;
-                    if(conv.load(val, convert)) {
-                        value.insertMeta(name, cast_op<openvdb::DoubleMetadata&&>(std::move(conv)));
+                } else if (nb::isinstance<nb::float_>(val)) {
+                    make_caster<openvdb::DoubleMetadata> caster;
+                    if(caster.from_python(val, flags, cleanup)) {
+                        value.insertMeta(name, caster.operator cast_t<openvdb::DoubleMetadata>());
                         success = true;
                     }
-                } else if (py::isinstance<py::tuple>(val)) {
-                    py::tuple t = py::cast<py::tuple>(val);
+                } else if (nb::isinstance<nb::tuple>(val)) {
+                    nb::tuple t = nb::cast<nb::tuple>(val);
                     size_t size = t.size();
                     bool isIntegerTuple = true;
                     for (size_t i = 0; i < size; ++i) {
-                        isIntegerTuple &= py::isinstance<py::int_>(t[i]);
+                        isIntegerTuple &= nb::isinstance<nb::int_>(t[i]);
                     }
 
                     if (isIntegerTuple) {
                         switch(size) {
                             case 2: {
-                                make_caster<openvdb::Vec2IMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec2IMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec2IMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec2IMetadata>());
                                     success = true;
                                 }
                                 break;
                                 }
                             case 3: {
-                                make_caster<openvdb::Vec3IMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec3IMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec3IMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec3IMetadata>());
                                     success = true;
                                 }
                                 break;
                                 }
                             case 4: {
-                                make_caster<openvdb::Vec4IMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec4IMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec4IMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec4IMetadata>());
                                     success = true;
                                 }
                                 break;
@@ -1098,25 +1099,25 @@ namespace pybind11 { namespace detail {
                     } else {
                         switch(size) {
                             case 2: {
-                                make_caster<openvdb::Vec2DMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec2DMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec2DMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec2DMetadata>());
                                     success = true;
                                 }
                                 break;
                                 }
                             case 3: {
-                                make_caster<openvdb::Vec3DMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec3DMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec3DMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec3DMetadata>());
                                     success = true;
                                 }
                                 break;
                                 }
                             case 4: {
-                                make_caster<openvdb::Vec4DMetadata> conv;
-                                if (conv.load(val, convert)) {
-                                    value.insertMeta(name, cast_op<openvdb::Vec4DMetadata&&>(std::move(conv)));
+                                make_caster<openvdb::Vec4DMetadata> caster;
+                                if (caster.from_python(val, flags, cleanup)) {
+                                    value.insertMeta(name, caster.operator cast_t<openvdb::Vec4DMetadata>());
                                     success = true;
                                 }
                                 break;
@@ -1125,14 +1126,14 @@ namespace pybind11 { namespace detail {
                                 break;
                         }
                     }
-                } else if (py::isinstance<py::list>(val)) {
-                    make_caster<openvdb::Mat4DMetadata> conv;
-                    if (conv.load(val, convert)) {
-                        value.insertMeta(name, cast_op<openvdb::Mat4DMetadata&&>(std::move(conv)));
+                } else if (nb::isinstance<nb::list>(val)) {
+                    make_caster<openvdb::Mat4DMetadata> caster;
+                    if (caster.from_python(val, flags, cleanup)) {
+                        value.insertMeta(name, caster.operator cast_t<openvdb::Mat4DMetadata>());
                         success = true;
                     }
-                } else if (py::isinstance<openvdb::Metadata::Ptr>(val)) {
-                    openvdb::Metadata::Ptr metadata = py::cast<openvdb::Metadata::Ptr>(val);
+                } else if (nb::isinstance<openvdb::Metadata::Ptr>(val)) {
+                    openvdb::Metadata::Ptr metadata = nb::cast<openvdb::Metadata::Ptr>(val);
                     if (metadata) {
                         value.insertMeta(name, *metadata);
                     }
@@ -1140,57 +1141,57 @@ namespace pybind11 { namespace detail {
                 }
 
                 if (!success) {
-                    const std::string valAsStr = py::cast<std::string>(val.attr("__str__")());
-                    const std::string valType = py::cast<std::string>(val.attr("__class__").attr("__name__"));
-                    throw py::type_error(std::string("metadata value " + valAsStr + " of type " + valType + " is not allowed"));
+                    const std::string valAsStr = nb::cast<std::string>(val.attr("__str__")());
+                    const std::string valType = nb::cast<std::string>(val.attr("__class__").attr("__name__"));
+                    throw nb::type_error(std::string("metadata value " + valAsStr + " of type " + valType + " is not allowed").c_str());
                 }
             }
 
             return true;
         }
 
-        static handle cast(openvdb::MetaMap src, return_value_policy policy, handle parent) {
-            py::dict dict;
+        static handle from_cpp(openvdb::MetaMap src, rv_policy policy, cleanup_list* cleanup) {
+            nb::dict dict;
             for (openvdb::MetaMap::ConstMetaIterator it = src.beginMeta(); it != src.endMeta(); ++it) {
                 if (openvdb::Metadata::Ptr meta = it->second) {
-                    py::object obj(py::cast(meta));
+                    nb::object obj(nb::cast(meta));
                     const std::string typeName = meta->typeName();
                     if (typeName == openvdb::StringMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::StringMetadata>::cast(static_cast<openvdb::StringMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::StringMetadata>::from_cpp(static_cast<openvdb::StringMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::DoubleMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::DoubleMetadata>::cast(static_cast<openvdb::DoubleMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::DoubleMetadata>::from_cpp(static_cast<openvdb::DoubleMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::FloatMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::FloatMetadata>::cast(static_cast<openvdb::FloatMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::FloatMetadata>::from_cpp(static_cast<openvdb::FloatMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Int32Metadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Int32Metadata>::cast(static_cast<openvdb::Int32Metadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Int32Metadata>::from_cpp(static_cast<openvdb::Int32Metadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Int64Metadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Int64Metadata>::cast(static_cast<openvdb::Int64Metadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Int64Metadata>::from_cpp(static_cast<openvdb::Int64Metadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::BoolMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::BoolMetadata>::cast(static_cast<openvdb::BoolMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::BoolMetadata>::from_cpp(static_cast<openvdb::BoolMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec2DMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2DMetadata>::cast(static_cast<openvdb::Vec2DMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec2DMetadata>::from_cpp(static_cast<openvdb::Vec2DMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec2IMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2IMetadata>::cast(static_cast<openvdb::Vec2IMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec2IMetadata>::from_cpp(static_cast<openvdb::Vec2IMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec2SMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec2SMetadata>::cast(static_cast<openvdb::Vec2SMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec2SMetadata>::from_cpp(static_cast<openvdb::Vec2SMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec3DMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3DMetadata>::cast(static_cast<openvdb::Vec3DMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec3DMetadata>::from_cpp(static_cast<openvdb::Vec3DMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec3IMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3IMetadata>::cast(static_cast<openvdb::Vec3IMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec3IMetadata>::from_cpp(static_cast<openvdb::Vec3IMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec3SMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec3SMetadata>::cast(static_cast<openvdb::Vec3SMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec3SMetadata>::from_cpp(static_cast<openvdb::Vec3SMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec4DMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4DMetadata>::cast(static_cast<openvdb::Vec4DMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec4DMetadata>::from_cpp(static_cast<openvdb::Vec4DMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec4IMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4IMetadata>::cast(static_cast<openvdb::Vec4IMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec4IMetadata>::from_cpp(static_cast<openvdb::Vec4IMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Vec4SMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Vec4SMetadata>::cast(static_cast<openvdb::Vec4SMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Vec4SMetadata>::from_cpp(static_cast<openvdb::Vec4SMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Mat4SMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Mat4SMetadata>::cast(static_cast<openvdb::Mat4SMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Mat4SMetadata>::from_cpp(static_cast<openvdb::Mat4SMetadata&>(*meta), policy, cleanup));
                     } else if (typeName == openvdb::Mat4DMetadata::staticTypeName()) {
-                        obj = reinterpret_steal<py::object>(make_caster<openvdb::Mat4DMetadata>::cast(static_cast<openvdb::Mat4DMetadata&>(*meta), policy, parent));
+                        obj = steal<nb::object>(make_caster<openvdb::Mat4DMetadata>::from_cpp(static_cast<openvdb::Mat4DMetadata&>(*meta), policy, cleanup));
                     }
-                    dict[py::str(it->first)] = obj;
+                    dict[nb::str(it->first.c_str())] = obj;
                 }
             }
             return dict.release();

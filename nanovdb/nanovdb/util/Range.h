@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file Range.h
+    \file nanovdb/util/Range.h
 
     \author Ken Museth
 
@@ -11,16 +11,19 @@
     \brief Custom Range class that is compatible with the tbb::blocked_range classes
 */
 
-#ifndef NANOVDB_RANGE_H_HAS_BEEN_INCLUDED
-#define NANOVDB_RANGE_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_RANGE_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_RANGE_H_HAS_BEEN_INCLUDED
 
 #include <cassert>
+#include <cstddef>// for size_t
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/blocked_range.h>// for tbb::split
 #endif
 
 namespace nanovdb {
+
+namespace util {
 
 class Split {};// Dummy class used by split constructors
 
@@ -144,6 +147,12 @@ public:
     const Range<1, T>& operator[](int i) const { assert(i==0 || i==1 || i==2); return mRange[i]; }
 };// Range<3, T>
 
+}// namespace util
+
+using Range1D [[deprecated("Use nanovdb::util::Range1D instead")]] = util::Range<1, size_t>;
+using Range2D [[deprecated("Use nanovdb::util::Range2D instead")]] = util::Range<2, size_t>;
+using Range3D [[deprecated("Use nanovdb::util::Range3D instead")]] = util::Range<3, size_t>;
+
 }// namespace nanovdb
 
-#endif // NANOVDB_RANGE_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_RANGE_H_HAS_BEEN_INCLUDED

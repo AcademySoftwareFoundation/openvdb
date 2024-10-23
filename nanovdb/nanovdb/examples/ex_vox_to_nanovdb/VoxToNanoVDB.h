@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
-#include <nanovdb/util/GridBuilder.h>
-#include <nanovdb/util/CreateNanoGrid.h>
+#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
 
 #define OGT_VOX_IMPLEMENTATION
 #include "ogt_vox.h"
@@ -132,7 +132,7 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
     try {
         if (const auto* scene = detail::load_vox_scene(inFilename.c_str())) {
             // we just merge into one grid...
-            nanovdb::build::Grid<nanovdb::Rgba8> grid(nanovdb::Rgba8(),modelName,nanovdb::GridClass::VoxelVolume);
+            nanovdb::tools::build::Grid<nanovdb::math::Rgba8> grid(nanovdb::math::Rgba8(),modelName,nanovdb::GridClass::VoxelVolume);
             auto acc = grid.getAccessor();
 
             auto processModelFn = [&](int modelIndex, const ogt_vox_transform& xform) {
@@ -145,7 +145,7 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
                             if (uint8_t color_index = model->voxel_data[voxel_index]) {
                                 ogt_vox_rgba rgba = scene->palette.color[color_index];
                                 auto ijk = nanovdb::Coord::Floor(detail::matMult4x4((float*)&xform, nanovdb::Vec4f(x, y, z, 1)));
-                                acc.setValue(nanovdb::Coord(ijk[0], ijk[2], -ijk[1]), *reinterpret_cast<nanovdb::PackedRGBA8*>(&rgba));
+                                acc.setValue(nanovdb::Coord(ijk[0], ijk[2], -ijk[1]), *reinterpret_cast<nanovdb::math::Rgba8*>(&rgba));
                             }
                         }
                     }
@@ -185,7 +185,7 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
 
             printf("scene processing end.\n");
             ogt_vox_destroy_scene(scene);
-            return nanovdb::createNanoGrid(grid);
+            return nanovdb::tools::createNanoGrid(grid);
         } else {
             std::ostringstream ss;
             ss << "Invalid file \"" << inFilename << "\"";

@@ -42,16 +42,24 @@ jobs:
       # need to re-write the python docs to use sphinx
       image: aswf/ci-openvdb:2022
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
-    - name: pybind11
+    - name: nanobind
       #if: contains(matrix.config.image, '2023') == false
-      run: ./ci/install_pybind11.sh 2.10.0
+      run: ./ci/install_nanobind.sh 2.0.0
     # - name: install_epydoc
     #   run: pip install epydoc
     - name: install_latex
-      run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+      run: |
+        # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
+        # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
+        sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+        sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+        yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
     - name: build
       run: >
         ./ci/build.sh -v

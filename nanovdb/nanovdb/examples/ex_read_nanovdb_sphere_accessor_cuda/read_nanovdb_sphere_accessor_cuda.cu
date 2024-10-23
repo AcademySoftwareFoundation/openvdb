@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h> // required for CUDA memory management
-#include <nanovdb/util/GridHandle.h>
+#include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <nanovdb/cuda/DeviceBuffer.h> // required for CUDA memory management
+#include <nanovdb/GridHandle.h>
 
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>*,
                                const nanovdb::NanoGrid<float>*,

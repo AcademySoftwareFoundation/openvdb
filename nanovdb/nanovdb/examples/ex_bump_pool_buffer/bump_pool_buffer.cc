@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/util/Primitives.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/HostBuffer.h>
+#include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/HostBuffer.h>
 #include <algorithm>
 
 //////////////////////////////////////////////
@@ -83,11 +83,11 @@ public:
 
     // Mandatory.
     // Return non-const pointer to the buffer data.
-    uint8_t*       data() { return mState->mPoolSlab.data() + mOffset; }
+    void*       data() { return nanovdb::util::PtrAdd(mState->mPoolSlab.data(), mOffset); }
 
     // Mandatory.
     // Return const pointer to the buffer data.
-    const uint8_t* data() const { return mState->mPoolSlab.data() + mOffset; }
+    const void* data() const { return nanovdb::util::PtrAdd(mState->mPoolSlab.data(), mOffset); }
 };
 
 // we specify this trait to avoid declaring the "device...(...)" convenience methods.
@@ -110,8 +110,8 @@ int main()
         std::vector<nanovdb::GridHandle<PoolBuffer>> gridHdls;
 
         // create two grids...
-        gridHdls.push_back(nanovdb::createLevelSetSphere<float >(100.0, nanovdb::Vec3d(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "spheref", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
-        gridHdls.push_back(nanovdb::createLevelSetSphere<double>(100.0, nanovdb::Vec3d( 20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphered", nanovdb::StatsMode::BBox, nanovdb::ChecksumMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::tools::createLevelSetSphere<float >(100.0, nanovdb::Vec3d(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "spheref", nanovdb::tools::StatsMode::BBox, nanovdb::CheckMode::Partial, bufferContext));
+        gridHdls.push_back(nanovdb::tools::createLevelSetSphere<double>(100.0, nanovdb::Vec3d( 20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphered", nanovdb::tools::StatsMode::BBox, nanovdb::CheckMode::Partial, bufferContext));
 
         // Get a (raw) pointer to the NanoVDB grid form the GridManager.
         auto* dstGrid = gridHdls[0].grid<float>();

@@ -40,10 +40,10 @@ details of VDB are described in the paper
 <a href="http://www.museth.org/Ken/Publications.html" target="_blank">"VDB: High-Resolution Sparse Volumes with Dynamic Topology"</a>.
 
 @section sWhatLicense What license is OpenVDB distributed under?
-OpenVDB is released under the Mozilla Public License Version 2.0, which is a
-free, open source software license developed and maintained by the Mozilla
-Foundation. For more information about this license, see the
-<a href="https://www.mozilla.org/en-US/MPL/" target="_blank">Mozilla FAQ</a>.
+OpenVDB is released under the Apache License Version 2.0, which is a
+free, open source software license developed and maintained by the Apache Software
+Foundation. For more information about this license, see
+<a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank">Apache License, Version 2</a>.
 
 @section sWhatCLA Is there a Contributor License Agreement for OpenVDB?
 Yes, developers who wish to contribute code to be considered for inclusion
