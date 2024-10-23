@@ -77,6 +77,11 @@ fillToGridCPU(const GridBatchImpl::Accessor<GridType>   &fromGridHandle,
     }
 }
 
+
+template <torch::DeviceType DeviceType>
+void dispatchFillToGrid(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
+                        const torch::Tensor &fromFeatures, torch::Tensor &toFeatures);
+
 template <>
 void
 dispatchFillToGrid<torch::kCUDA>(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
