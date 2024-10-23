@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #undef NANOVDB_USE_OPENVDB // Prevents include/openvdb/points/AttributeArray.h:1841:25: error: ‘stride’ cannot be used as a function
 
