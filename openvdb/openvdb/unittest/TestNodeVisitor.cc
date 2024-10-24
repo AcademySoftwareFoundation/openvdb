@@ -144,7 +144,7 @@ TEST_F(TestNodeVisitor, testOriginArray)
 
     std::vector<Index64> nodeCount = grid->tree().nodeCount();
     Index64 totalNodeCount(0);
-    for (Index32 count : nodeCount)     totalNodeCount += count;
+    for (Index64 count : nodeCount)     totalNodeCount += count;
 
     // use an offset
     size_t offset = 10;
