@@ -2036,7 +2036,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     }
 
     const auto nodeCount = this->nodeCount();//fast
-    const Index32 leafCount = nodeCount.front();// leaf is the first element
+    const Index64 leafCount = nodeCount.front();// leaf is the first element
     OPENVDB_ASSERT(dims.size() == nodeCount.size());
 
     Index64 totalNodeCount = 0;
