@@ -22,7 +22,7 @@ struct NodeCountOp
         counts[level]++;
     }
 
-    std::vector<openvdb::Index32> counts;
+    std::vector<openvdb::Index64> counts;
 }; // struct NodeCountOp
 
 
@@ -35,8 +35,8 @@ TEST_F(TestNodeVisitor, testNodeCount)
     NodeCountOp nodeCountOp;
     tools::visitNodesDepthFirst(grid->tree(), nodeCountOp);
 
-    std::vector<Index32> nodeCount1 = nodeCountOp.counts;
-    std::vector<Index32> nodeCount2 = grid->tree().nodeCount();
+    std::vector<Index64> nodeCount1 = nodeCountOp.counts;
+    std::vector<Index64> nodeCount2 = grid->tree().nodeCount();
 
     EXPECT_EQ(nodeCount1.size(), nodeCount2.size());
 
@@ -55,7 +55,7 @@ struct LeafCountOp
     void operator()(const NodeT&, size_t) { }
     void operator()(const LeafT&, size_t) { count++; }
 
-    openvdb::Index32 count{0};
+    openvdb::Index64 count{0};
 }; // struct LeafCountOp
 
 
@@ -142,8 +142,8 @@ TEST_F(TestNodeVisitor, testOriginArray)
 
     FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
 
-    std::vector<Index32> nodeCount = grid->tree().nodeCount();
-    Index32 totalNodeCount(0);
+    std::vector<Index64> nodeCount = grid->tree().nodeCount();
+    Index64 totalNodeCount(0);
     for (Index32 count : nodeCount)     totalNodeCount += count;
 
     // use an offset
@@ -203,12 +203,12 @@ TEST_F(TestNodeVisitor, testPartialDeactivate)
     DeactivateOp<FloatTree> deactivateOp;
     tools::DepthFirstNodeVisitor<NodeT>::visit(*iter, deactivateOp);
 
-    EXPECT_EQ(Index32(1413), grid->tree().leafCount());
+    EXPECT_EQ(Index64(1413), grid->tree().leafCount());
 
     tools::pruneInactive(grid->tree());
 
     // a subset of the leaf nodes have now been deactivated and removed
-    EXPECT_EQ(Index32(1195), grid->tree().leafCount());
+    EXPECT_EQ(Index64(1195), grid->tree().leafCount());
 }
 
 

@@ -483,7 +483,7 @@ public:
     template<typename OtherChildType>
     static bool hasCompatibleValueType(const RootNode<OtherChildType>& other);
 
-    Index32 leafCount() const;
+    Index64 leafCount() const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
@@ -491,7 +491,7 @@ public:
     Index64 onLeafVoxelCount() const;
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
-    void nodeCount(std::vector<Index32> &vec) const;
+    void nodeCount(std::vector<Index64> &vec) const;
 
     bool isValueOn(const Coord& xyz) const;
 
@@ -1567,10 +1567,10 @@ RootNode<ChildT>::getInactiveTileCount() const
 
 
 template<typename ChildT>
-inline Index32
+inline Index64
 RootNode<ChildT>::leafCount() const
 {
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) sum += getChild(i).leafCount();
     }
@@ -1676,10 +1676,10 @@ RootNode<ChildT>::onTileCount() const
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
+RootNode<ChildT>::nodeCount(std::vector<Index64> &vec) const
 {
     OPENVDB_ASSERT(vec.size() > LEVEL);
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {
             ++sum;

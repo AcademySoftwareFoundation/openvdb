@@ -1866,7 +1866,7 @@ TEST_F(TestFile, testMultiPassIO)
         file.open();
         const auto newGrid = GridBase::grid<MultiPassGrid>(
             file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
-        EXPECT_EQ(Index32(1), newGrid->tree().leafCount());
+        EXPECT_EQ(Index64(1), newGrid->tree().leafCount());
 
         auto leafIter = newGrid->tree().beginLeaf();
         EXPECT_EQ(3, int(leafIter->mReadPasses.size()));

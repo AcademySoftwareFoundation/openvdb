@@ -102,7 +102,7 @@ public:
     /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
     /// Return the total number of unallocated leaf nodes residing in this tree.
-    virtual Index32 unallocatedLeafCount() const = 0;
+    virtual Index64 unallocatedLeafCount() const = 0;
 
 
     //
@@ -113,11 +113,11 @@ public:
     /// A tree with only a root node and leaf nodes has depth 2, for example.
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
-    virtual Index32 leafCount() const = 0;
+    virtual Index64 leafCount() const = 0;
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
-    virtual std::vector<Index32> nodeCount() const = 0;
+    virtual std::vector<Index64> nodeCount() const = 0;
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
     /// Return the number of active voxels stored in leaf nodes.
@@ -343,13 +343,13 @@ public:
     /// A tree with only a root node and leaf nodes has depth 2, for example.
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
-    Index32 leafCount() const override { return mRoot.leafCount(); }
+    Index64 leafCount() const override { return mRoot.leafCount(); }
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
-    std::vector<Index32> nodeCount() const override
+    std::vector<Index64> nodeCount() const override
     {
-        std::vector<Index32> vec(DEPTH, 0);
+        std::vector<Index64> vec(DEPTH, 0);
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
@@ -469,7 +469,7 @@ public:
     void clipUnallocatedNodes() override;
 
     /// Return the total number of unallocated leaf nodes residing in this tree.
-    Index32 unallocatedLeafCount() const override;
+    Index64 unallocatedLeafCount() const override;
 
     //@{
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
@@ -1674,10 +1674,10 @@ Tree<RootNodeType>::clipUnallocatedNodes()
 }
 
 template<typename RootNodeType>
-inline Index32
+inline Index64
 Tree<RootNodeType>::unallocatedLeafCount() const
 {
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
     return sum;
 }
