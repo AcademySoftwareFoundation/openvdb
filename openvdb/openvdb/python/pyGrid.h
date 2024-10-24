@@ -218,7 +218,7 @@ treeDepth(const GridType& grid)
 
 
 template<typename GridType>
-inline Index32
+inline Index64
 leafCount(const GridType& grid)
 {
     return grid.tree().leafCount();

@@ -274,8 +274,8 @@ public:
     /// Set the transient data value.
     void setTransientData(Index32 transientData) { mTransientData = transientData; }
 
-    Index32 leafCount() const;
-    void nodeCount(std::vector<Index32> &vec) const;
+    Index64 leafCount() const;
+    void nodeCount(std::vector<Index64> &vec) const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
@@ -988,11 +988,11 @@ InternalNode<ChildT, Log2Dim>::~InternalNode()
 
 
 template<typename ChildT, Index Log2Dim>
-inline Index32
+inline Index64
 InternalNode<ChildT, Log2Dim>::leafCount() const
 {
     if (ChildNodeType::getLevel() == 0) return mChildMask.countOn();
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         sum += iter->leafCount();
     }
@@ -1001,7 +1001,7 @@ InternalNode<ChildT, Log2Dim>::leafCount() const
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
+InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index64> &vec) const
 {
     OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
     const auto count = mChildMask.countOn();

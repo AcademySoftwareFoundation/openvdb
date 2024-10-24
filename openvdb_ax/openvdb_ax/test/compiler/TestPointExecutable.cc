@@ -545,7 +545,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::NullCodec, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index64(1));
 
         // collapsed uniform 0 attributes
         points::appendAttribute<float, points::NullCodec>(points->tree(), "f");
@@ -641,7 +641,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::NullCodec, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index64(1));
 
         // collapsed uniform 0 attributes
         points::appendAttribute<Vec3f, points::FixedPointCodec<true, points::UnitRange>>(points->tree(), "fpu8");
@@ -728,7 +728,7 @@ TestPointExecutable::testAttributeCodecs()
             points = points::createPointDataGrid
                 <points::FixedPointCodec<true, points::PositionRange>, points::PointDataGrid>
                     (twoPoints, *defaultTransform);
-        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index32(1));
+        CPPUNIT_ASSERT_EQUAL(points->tree().leafCount(), Index64(1));
 
         points::appendAttribute<float, points::TruncateCodec>(points->tree(), "t");
         points::appendAttribute<Vec3f, points::FixedPointCodec<false, points::PositionRange>>(points->tree(), "f");

@@ -508,7 +508,7 @@ TEST_F(TestLeaf, testCount)
     EXPECT_EQ(Index(512), leaf.numValues());
     EXPECT_EQ(Index(0), leaf.getLevel());
     EXPECT_EQ(Index(1), leaf.getChildDim());
-    EXPECT_EQ(Index(1), leaf.leafCount());
+    EXPECT_EQ(Index64(1), leaf.leafCount());
     EXPECT_EQ(Index(0), leaf.nonLeafCount());
     EXPECT_EQ(Index(0), leaf.childCount());
 
