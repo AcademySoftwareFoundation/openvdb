@@ -1,0 +1,2 @@
+Improvements:
+    - Small optimizations to RootNode to eliminate redundant key conversion and to create map values in-place.
