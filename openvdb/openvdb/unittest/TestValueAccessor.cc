@@ -665,8 +665,6 @@ TEST_F(TestValueAccessor, testGetNode)
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 10
-
 template <typename TreeT> struct AssertBypass
 {
     inline void operator()() {
@@ -703,5 +701,3 @@ TEST_F(TestValueAccessor, testBypassLeafAPI)
     static_assert(!ValueAccessor2<FloatTree, true, 1, 2>::BypassLeafAPI);
     static_assert(!ValueAccessor3<MaskTree, true, 0, 1, 2>::BypassLeafAPI);
 }
-
-#endif
