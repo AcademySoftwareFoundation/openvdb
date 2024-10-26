@@ -1791,7 +1791,7 @@ inline void
 RootNode<ChildT>::setActiveState(const Coord& xyz, bool on)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (on) {
@@ -1815,7 +1815,7 @@ inline void
 RootNode<ChildT>::setActiveStateAndCache(const Coord& xyz, bool on, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (on) {
@@ -1842,7 +1842,7 @@ inline void
 RootNode<ChildT>::setValueOff(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (!math::isExactlyEqual(mBackground, value)) {
@@ -1864,7 +1864,7 @@ inline void
 RootNode<ChildT>::setValueOffAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (!math::isExactlyEqual(mBackground, value)) {
@@ -1889,7 +1889,7 @@ inline void
 RootNode<ChildT>::setValueOn(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -1909,7 +1909,7 @@ inline void
 RootNode<ChildT>::setValueAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -1932,7 +1932,7 @@ inline void
 RootNode<ChildT>::setValueOnly(const Coord& xyz, const ValueType& value)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -1952,7 +1952,7 @@ inline void
 RootNode<ChildT>::setValueOnlyAndCache(const Coord& xyz, const ValueType& value, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -1976,7 +1976,7 @@ inline void
 RootNode<ChildT>::modifyValue(const Coord& xyz, const ModifyOp& op)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -2009,7 +2009,7 @@ inline void
 RootNode<ChildT>::modifyValueAndCache(const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -2046,7 +2046,7 @@ inline void
 RootNode<ChildT>::modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -2075,7 +2075,7 @@ RootNode<ChildT>::modifyValueAndActiveStateAndCache(
     const Coord& xyz, const ModifyOp& op, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground);
@@ -2588,7 +2588,7 @@ RootNode<ChildT>::addLeaf(LeafNodeType* leaf)
     if (leaf == nullptr) return;
     ChildT* child = nullptr;
     const Coord& xyz = leaf->origin();
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (ChildT::LEVEL>0) {
@@ -2624,7 +2624,7 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
     if (leaf == nullptr) return;
     ChildT* child = nullptr;
     const Coord& xyz = leaf->origin();
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         if (ChildT::LEVEL>0) {
@@ -2658,7 +2658,7 @@ RootNode<ChildT>::addChild(ChildT* child)
 {
     if (!child) return false;
     const Coord& xyz = child->origin();
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {//background
         mTable.emplace(key, *child);
@@ -2684,7 +2684,7 @@ template<typename ChildT>
 inline void
 RootNode<ChildT>::addTile(const Coord& xyz, const ValueType& value, bool state)
 {
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {//background
         mTable.emplace(key, Tile(value, state));
@@ -2699,7 +2699,7 @@ RootNode<ChildT>::addTile(Index level, const Coord& xyz,
                           const ValueType& value, bool state)
 {
     if (LEVEL >= level) {
-        Coord key = this->coordToKey(xyz);
+        const Coord key = this->coordToKey(xyz);
         MapIter iter = this->findKey(key);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
@@ -2735,7 +2735,7 @@ RootNode<ChildT>::addTileAndCache(Index level, const Coord& xyz, const ValueType
                                   bool state, AccessorT& acc)
 {
     if (LEVEL >= level) {
-        Coord key = this->coordToKey(xyz);
+        const Coord key = this->coordToKey(xyz);
         MapIter iter = this->findKey(key);
         if (iter == mTable.end()) {//background
             if (LEVEL > level) {
@@ -2776,7 +2776,7 @@ inline typename ChildT::LeafNodeType*
 RootNode<ChildT>::touchLeaf(const Coord& xyz)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground, false);
@@ -2797,7 +2797,7 @@ inline typename ChildT::LeafNodeType*
 RootNode<ChildT>::touchLeafAndCache(const Coord& xyz, AccessorT& acc)
 {
     ChildT* child = nullptr;
-    Coord key = this->coordToKey(xyz);
+    const Coord key = this->coordToKey(xyz);
     MapIter iter = this->findKey(key);
     if (iter == mTable.end()) {
         child = new ChildT(xyz, mBackground, false);
