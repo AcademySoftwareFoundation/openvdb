@@ -477,9 +477,9 @@ public:
     /// Return @c true if the voxel at the given offset is active.
     bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOn(offset); }
     /// Return @c true if the voxel at the given coordinates is inactive.
-    bool isValueOff(const Coord& xyz) const { OPENVDB_ASSERT(offset < SIZE); return this->isValueOff(LeafNode::coordToOffset(xyz)); }
+    bool isValueOff(const Coord& xyz) const { return this->isValueOff(LeafNode::coordToOffset(xyz)); }
     /// Return @c true if the voxel at the given offset is inactive.
-    bool isValueOff(Index offset) const { return mValueMask.isOff(offset); }
+    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOff(offset); }
 
     /// Return @c false since leaf nodes never contain tiles.
     static bool hasActiveTiles() { return false; }

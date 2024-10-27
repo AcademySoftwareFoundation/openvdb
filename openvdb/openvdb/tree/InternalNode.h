@@ -331,11 +331,11 @@ public:
     /// Return @c true if the voxel at the given coordinates is active.
     bool isValueOn(const Coord& xyz) const;
     /// Return @c true if the voxel at the given offset is active.
-    bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOn(offset); }
+    bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < NUM_VALUES); return mValueMask.isOn(offset); }
     /// Return @c true if the voxel at the given coordinates is inactive.
     bool isValueOff(const Coord& xyz) const;
     /// Return @c true if the voxel at the given offset is inactive.
-    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < SIZE); return mValueMask.isOff(offset); }
+    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < NUM_VALUES); return mValueMask.isOff(offset); }
 
     /// Return @c true if this node or any of its child nodes have any active tiles.
     bool hasActiveTiles() const;
