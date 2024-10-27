@@ -766,11 +766,11 @@ public:
     /// @brief Return the tile value at the given coordinate.
     /// @note Use cbeginValueAll() for a safer alternative.
     /// @warning This method should only be used by experts seeking low-level optimizations.
-    const ValueType& getValueUnsafe(const Coord& xyz) const;
+    const ValueType& getTileValueUnsafe(const Coord& xyz) const;
     /// @brief Return the tile value and active state at the given coordinate.
     /// @note Use cbeginValueAll() for a safer alternative.
     /// @warning This method should only be used by experts seeking low-level optimizations.
-    bool getValueUnsafe(const Coord& xyz, ValueType& value) const;
+    bool getTileValueUnsafe(const Coord& xyz, ValueType& value) const;
     /// @brief Return the child node at the given coordinate.
     /// @note Use beginChildAll() for a safer alternative.
     /// @warning This method should only be used by experts seeking low-level optimizations.
@@ -2919,7 +2919,7 @@ RootNode<ChildT>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
 
 template<typename ChildT>
 inline const typename ChildT::ValueType&
-RootNode<ChildT>::getValueUnsafe(const Coord& xyz) const
+RootNode<ChildT>::getTileValueUnsafe(const Coord& xyz) const
 {
     MapCIter iter = this->findCoord(xyz);
     OPENVDB_ASSERT(iter != mTable.end());
@@ -2930,7 +2930,7 @@ RootNode<ChildT>::getValueUnsafe(const Coord& xyz) const
 
 template<typename ChildT>
 inline bool
-RootNode<ChildT>::getValueUnsafe(const Coord& xyz, ValueType& value) const
+RootNode<ChildT>::getTileValueUnsafe(const Coord& xyz, ValueType& value) const
 {
     MapCIter iter = this->findCoord(xyz);
     OPENVDB_ASSERT(iter != mTable.end());

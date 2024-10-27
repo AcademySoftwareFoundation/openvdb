@@ -124,12 +124,12 @@ TEST_F(TestRoot, testUnsafe)
     EXPECT_TRUE(root.addChild(child)); // always returns true
 
     { // get value
-        EXPECT_EQ(root.getValueUnsafe(Coord(1, 2, 3)), 2.0f);
-        EXPECT_EQ(root.getValueUnsafe(Coord(4096, 2, 3)), 3.0f);
+        EXPECT_EQ(root.getTileValueUnsafe(Coord(1, 2, 3)), 2.0f);
+        EXPECT_EQ(root.getTileValueUnsafe(Coord(4096, 2, 3)), 3.0f);
         float value = -1.0f;
-        EXPECT_TRUE(root.getValueUnsafe(Coord(1, 2, 3), value));
+        EXPECT_TRUE(root.getTileValueUnsafe(Coord(1, 2, 3), value));
         EXPECT_EQ(value, 2.0f); value = -1.0f;
-        EXPECT_FALSE(root.getValueUnsafe(Coord(4096, 2, 3), value));
+        EXPECT_FALSE(root.getTileValueUnsafe(Coord(4096, 2, 3), value));
         EXPECT_EQ(value, 3.0f); value = -1.0f;
     }
 
