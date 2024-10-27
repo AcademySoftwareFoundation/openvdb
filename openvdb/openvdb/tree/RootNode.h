@@ -735,7 +735,7 @@ public:
     /// return @c nullptr.
     bool probe(const Coord& xyz, ChildNodeType*& child, ValueType& value, bool& active);
     bool probeConst(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const;
-    bool probe(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const;
+    bool probe(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const { return this->probeConst(xyz, child, value, active); }
     //}
 
     //@{
@@ -752,7 +752,7 @@ public:
     /// If no such node exists, return @c nullptr.
     ChildNodeType* probeChild(const Coord& xyz);
     const ChildNodeType* probeConstChild(const Coord& xyz) const;
-    const ChildNodeType* probeChild(const Coord& xyz) const;
+    const ChildNodeType* probeChild(const Coord& xyz) const { return this->probeConstChild(xyz); }
     //@}
 
     //@{
@@ -760,7 +760,7 @@ public:
     /// If no such node exists, return @c nullptr.
     LeafNodeType* probeLeaf(const Coord& xyz);
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
-    const LeafNodeType* probeLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
     //@}
 
     //@{
@@ -2873,26 +2873,10 @@ RootNode<ChildT>::probeConst(const Coord& xyz, const ChildNodeType*& child, Valu
 
 
 template<typename ChildT>
-inline bool
-RootNode<ChildT>::probe(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const
-{
-    return this->probeConst(xyz, child, value, active);
-}
-
-
-template<typename ChildT>
 inline ChildT*
 RootNode<ChildT>::probeChild(const Coord& xyz)
 {
     return this->template probeNode<ChildT>(xyz);
-}
-
-
-template<typename ChildT>
-inline const ChildT*
-RootNode<ChildT>::probeChild(const Coord& xyz) const
-{
-    return this->template probeConstNode<ChildT>(xyz);
 }
 
 
