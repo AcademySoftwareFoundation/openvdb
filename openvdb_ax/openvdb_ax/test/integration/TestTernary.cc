@@ -3,28 +3,14 @@
 
 #include "TestHarness.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestTernary : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestTernary);
-    CPPUNIT_TEST(testTernary);
-    CPPUNIT_TEST(testTernaryVoid);
-    CPPUNIT_TEST(testTernaryErrors);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testTernary();
-    void testTernaryVoid();
-    void testTernaryErrors();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestTernary);
 
-void
-TestTernary::testTernary()
+TEST_F(TestTernary, testTernary)
 {
     mHarness.addAttribute<bool>("ternary_test1", true);
     mHarness.addAttribute<bool>("ternary_test2", true);
@@ -79,8 +65,7 @@ TestTernary::testTernary()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestTernary::testTernaryVoid()
+TEST_F(TestTernary, testTernaryVoid)
 {
     mHarness.testVolumes(false);
     mHarness.addExpectedGroups({"notdead"}, {true});
@@ -89,10 +74,9 @@ TestTernary::testTernaryVoid()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestTernary::testTernaryErrors()
+TEST_F(TestTernary, testTernaryErrors)
 {
     const bool success = mHarness.executeCode("test/snippets/ternary/ternaryErrors");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 

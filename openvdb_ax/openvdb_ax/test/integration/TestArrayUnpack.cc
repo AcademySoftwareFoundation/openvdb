@@ -9,29 +9,15 @@
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestArrayUnpack : public unittest_util::AXTestCase
 {
 public:
-
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestArrayUnpack);
-    CPPUNIT_TEST(componentVectorAssignment);
-    CPPUNIT_TEST(componentMatrixAssignment);
-    CPPUNIT_TEST_SUITE_END();
-
-    void componentVectorAssignment();
-    void componentMatrixAssignment();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestArrayUnpack);
-
-void
-TestArrayUnpack::componentVectorAssignment()
+TEST_F(TestArrayUnpack, componentVectorAssignment)
 {
     const std::string code = R"(
 vec2@test1[0] = vec2@test2[1];
@@ -51,7 +37,7 @@ vec4@test6[1] = vec4@test6[0];
         for (const auto& s : suffixes) {
             std::string repl = code;
             const std::string type = (s == 'i' ? "int" : (s == 'f' ? "float" : (s == 'd' ? "double" : "")));
-            CPPUNIT_ASSERT(!type.empty());
+            ASSERT_TRUE(!type.empty());
 
             unittest_util::replace(repl, "vec2", std::string("vec2").append(1, s));
             unittest_util::replace(repl, "vec3", std::string("vec3").append(1, s));
@@ -113,8 +99,7 @@ vec4@test6[1] = vec4@test6[0];
     }
 }
 
-void
-TestArrayUnpack::componentMatrixAssignment()
+TEST_F(TestArrayUnpack, componentMatrixAssignment)
 {
     const std::string code = R"(
 mat3@test1[0] = mat3@test2[4];
@@ -178,7 +163,7 @@ mat4@test8[3,3] = mat4@test7[2,1];
             unittest_util::replace(repl, "mat3", std::string("mat3").append(1,s));
             unittest_util::replace(repl, "mat4", std::string("mat4").append(1,s));
             const std::string type = s == 'f' ? "float" : s == 'd' ? "double" : "";
-            CPPUNIT_ASSERT(!type.empty());
+            ASSERT_TRUE(!type.empty());
             this->registerTest(repl, "array_unpack.mat." + type + ".ax");
         }
     };

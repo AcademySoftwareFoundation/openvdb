@@ -9,8 +9,6 @@
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 // Configuration values for assignment code
@@ -73,36 +71,9 @@ class TestAssign : public unittest_util::AXTestCase
 public:
 
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestAssign);
-    CPPUNIT_TEST(directAssignment);
-    CPPUNIT_TEST(compoundIntegralAssignment);
-    CPPUNIT_TEST(compoundFloatingAssignment);
-    CPPUNIT_TEST(compoundVectorAssignment);
-    CPPUNIT_TEST(compoundMatrixAssignment);
-    CPPUNIT_TEST(compoundStringAssignment);
-    CPPUNIT_TEST(implicitScalarAssignment);
-    CPPUNIT_TEST(implicitContainerAssignment);
-    CPPUNIT_TEST(implicitContainerScalarAssignment);
-    CPPUNIT_TEST(scopedAssign);
-    CPPUNIT_TEST_SUITE_END();
-
-    void directAssignment();
-    void compoundIntegralAssignment();
-    void compoundFloatingAssignment();
-    void compoundVectorAssignment();
-    void compoundMatrixAssignment();
-    void compoundStringAssignment();
-    void implicitScalarAssignment();
-    void implicitContainerAssignment();
-    void implicitContainerScalarAssignment();
-    void scopedAssign();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAssign);
-
-void
-TestAssign::directAssignment()
+TEST_F(TestAssign, directAssignment)
 {
     const std::string code = R"(
 _T1_@test1 = _l1_;
@@ -354,8 +325,7 @@ _T1_@test8 = _l1_;
     }
 }
 
-void
-TestAssign::compoundIntegralAssignment()
+TEST_F(TestAssign, compoundIntegralAssignment)
 {
     const std::string code = R"(
 _T1_@test1 += _l1_;
@@ -436,8 +406,7 @@ _T1_@test14 += local2;
     }
 }
 
-void
-TestAssign::compoundFloatingAssignment()
+TEST_F(TestAssign, compoundFloatingAssignment)
 {
     const std::string code = R"(
 _T1_@test1 += _l1_;
@@ -508,8 +477,7 @@ _T1_@test9 += local2;
 }
 
 
-void
-TestAssign::compoundVectorAssignment()
+TEST_F(TestAssign, compoundVectorAssignment)
 {
     const std::string code = R"(
 _T1_@test1 += _l1_;
@@ -870,8 +838,7 @@ _T1_@test9 += local2;
 }
 
 
-void
-TestAssign::compoundMatrixAssignment()
+TEST_F(TestAssign, compoundMatrixAssignment)
 {
     const std::string code = R"(
 _T1_@test1 += _l1_;
@@ -1051,8 +1018,7 @@ _T1_@test7 += local2;
 }
 
 
-void
-TestAssign::compoundStringAssignment()
+TEST_F(TestAssign, compoundStringAssignment)
 {
     const std::string code = R"(
 _T1_@test1 += _l1_;
@@ -1111,8 +1077,7 @@ _T1_@test5 += local2;
 }
 
 
-void
-TestAssign::implicitScalarAssignment()
+TEST_F(TestAssign, implicitScalarAssignment)
 {
     auto generate = [this](const auto& source, const auto& targets) {
         for (const auto& t1 : source) {
@@ -1185,8 +1150,7 @@ TestAssign::implicitScalarAssignment()
 }
 
 
-void
-TestAssign::implicitContainerAssignment()
+TEST_F(TestAssign, implicitContainerAssignment)
 {
     auto generate = [this](const auto& source, const auto& target) {
         for (const auto& t1 : source) {
@@ -1304,8 +1268,7 @@ TestAssign::implicitContainerAssignment()
 }
 
 
-void
-TestAssign::implicitContainerScalarAssignment()
+TEST_F(TestAssign, implicitContainerScalarAssignment)
 {
     auto generate = [this](const auto& source, const auto& targets) {
         for (const auto& t1 : source) {
@@ -1440,8 +1403,7 @@ TestAssign::implicitContainerScalarAssignment()
 }
 
 
-void
-TestAssign::scopedAssign()
+TEST_F(TestAssign, scopedAssign)
 {
     const std::string code = R"(
 float var = 30.0f;
@@ -1488,6 +1450,6 @@ float@test1 = var;
     mHarness.addAttributes<float>(names, {30.0f, 1.0f, -10.0f, -15.0f, 50.0f, 50.0f, 1.0f});
     this->execute("assign_scoped.float.ax");
 
-    CPPUNIT_ASSERT(mHarness.mLogger.hasWarning());
+    ASSERT_TRUE(mHarness.mLogger.hasWarning());
 }
 

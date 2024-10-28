@@ -118,8 +118,6 @@ static const unittest_util::CodeTests tests =
 
 class TestArrayPack : public ::testing::Test
 {
-    void testSyntax() { TEST_SYNTAX_PASSES(tests); }
-    void testASTNode();
 };
 
 TEST_F(TestArrayPack, testSyntax)
