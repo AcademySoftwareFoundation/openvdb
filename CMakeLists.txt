@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -449,6 +449,33 @@ endif()
 if(NOT OPENVDB_BUILD_NANOVDB AND
    USE_NANOVDB)
   find_package(OpenVDB REQUIRED COMPONENTS nanovdb)
+endif()
+
+# Locate Python and nanobind if necessary
+if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
+
+  # Call find_package(Python ...)
+  find_package(Python 3.8 REQUIRED COMPONENTS Development Interpreter)
+  find_package(nanobind REQUIRED)
+
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
+    if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
+      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+
+  if(NOT DEFINED VDB_PYTHON_INSTALL_DIRECTORY)
+    if(DEFINED Python_SITELIB)
+      get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+    else()
+      set(Python_PACKAGES_DIR "site-packages")
+    endif()
+    set(VDB_PYTHON_INSTALL_DIRECTORY
+      ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
+      CACHE STRING "The directory to install the openvdb and nanovdb Python modules."
+    )
+  endif()
 endif()
 
 

@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -26,6 +26,7 @@ option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" OFF)
 #option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
+option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
@@ -353,4 +354,8 @@ endif()
 
 if(NANOVDB_BUILD_EXAMPLES)
   add_subdirectory(examples)
+endif()
+
+if(NANOVDB_BUILD_PYTHON_MODULE)
+  add_subdirectory(python)
 endif()

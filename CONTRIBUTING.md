@@ -22,7 +22,7 @@ open source software best practice policies of the Linux Foundation.
 
 #### License
 
-OpenVDB is licensed under the [Mozilla Public License, version 2.0](LICENSE.md)
+OpenVDB is licensed under the [Apache License, version 2.0](LICENSE.md)
 license. Contributions to OpenVDB should abide by that standard
 license.
 
@@ -54,7 +54,7 @@ Every commit must be signed off.  That is, every commit log message
 must include a “`Signed-off-by`” line (generated, for example, with
 “`git commit --signoff`”), indicating that the committer wrote the
 code and has the right to release it under the
-[Mozilla Public License, version 2.0](LICENSE.md)
+[Apache License, version 2.0](LICENSE.md)
 license. See the [TAC documentation on contribution sign off](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off) for more information on this requirement.
 
 ## Maintainer

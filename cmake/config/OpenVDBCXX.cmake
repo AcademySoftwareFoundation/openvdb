@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -184,20 +184,23 @@ if(OPENVDB_CXX_STRICT)
   add_compile_options("$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,9.3.0>>:-Wimplicit-fallthrough>")
   # Only check global constructors for libraries (we should really check for
   # executables too but gtest relies on these types of constructors for its
-  # framework).
-  add_compile_options("$<$<AND:$<NOT:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
+  # framework). nanobind also incorporates these constructors so skip it as well.
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>>>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-Wglobal-constructors>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-sign-conversion>")
   # GNU
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Werror>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wall>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wextra>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-pedantic>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wcast-align>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wcast-qual>")
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wconversion>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wdisabled-optimization>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Woverloaded-virtual>")
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wnon-virtual-dtor>")
+  # Disable select warnings for the nanobind static library
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-pedantic>")
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wcast-qual>")
+  add_compile_options("$<$<AND:$<NOT:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wconversion>")
+  add_compile_options("$<$<AND:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wno-unused-variable>")
+  add_compile_options("$<$<AND:$<OR:$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanobind-static>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,openvdb_python>,$<STREQUAL:$<TARGET_PROPERTY:NAME>,nanovdb_python>>,$<COMPILE_LANG_AND_ID:CXX,GNU>>:-Wno-unused-but-set-parameter>")
 else()
   # NO OPENVDB_CXX_STRICT, suppress some warnings
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
