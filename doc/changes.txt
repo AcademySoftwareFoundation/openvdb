@@ -31,7 +31,7 @@ OpenVDB:
 
 - Bug Fixes:
     - Fix potential crash reading corrupt .vdb files with invalid
-      blosc or zip chunks.  
+      blosc or zip chunks.
       [Fix thanks to Matthias Ueberheide]
     - Fix a bug in RootNode::setOrigin() where the origin was updated
       before the error was thrown potentially leaving the root in an
