@@ -29,7 +29,7 @@ target_compile_definitions(nanovdb_python PRIVATE ${NANOVDB_USE_CUDA_FLAG} ${NAN
 set_target_properties(nanovdb_python PROPERTIES OUTPUT_NAME "nanovdb")
 if(SKBUILD)
   set_target_properties(nanovdb_python PROPERTIES INSTALL_RPATH "$ORIGIN/../../openvdb/lib")
-  install(TARGETS nanovdb_python DESTINATION nanovdb/${CMAKE_INSTALL_LIBDIR})
+  install(TARGETS nanovdb_python DESTINATION ${NANOVDB_INSTALL_LIBDIR})
   install(FILES __init__.py DESTINATION nanovdb)
 else()
   install(TARGETS nanovdb_python DESTINATION ${VDB_PYTHON_INSTALL_DIRECTORY})

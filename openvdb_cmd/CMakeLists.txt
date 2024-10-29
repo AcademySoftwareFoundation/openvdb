@@ -59,12 +59,6 @@ endif()
 
 ##########################################################################
 
-if(SKBUILD)
-  set(OPENVDB_INSTALL_BINDIR openvdb/${CMAKE_INSTALL_BINDIR})
-else()
-  set(OPENVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
-endif()
-
 if (OPENVDB_BUILD_VDB_PRINT)
   add_subdirectory(vdb_print)
 endif()

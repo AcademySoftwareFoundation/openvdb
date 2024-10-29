@@ -27,12 +27,6 @@ endif()
 
 # -----------------------------------------------------------------------------
 
-if(SKBUILD)
-  set(NANOVDB_INSTALL_BINDIR nanovdb/${CMAKE_INSTALL_BINDIR})
-else()
-  set(NANOVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
-endif()
-
 if(NOT NANOVDB_USE_OPENVDB)
   message(WARNING " - OpenVDB required to build nanovdb_convert. Skipping.")
 else()
