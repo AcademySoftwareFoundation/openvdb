@@ -724,8 +724,19 @@ public:
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz);
     template <typename NodeT>
+    const NodeT* probeNode(const Coord& xyz) const;
+    template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const;
     //@}
+
+    //@{
+    /// @brief Return a pointer to the root child node that contains voxel (x, y, z).
+    /// If no such node exists, query and set the tile value and active status and
+    /// return @c nullptr.
+    bool probe(const Coord& xyz, ChildNodeType*& child, ValueType& value, bool& active);
+    bool probeConst(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const;
+    bool probe(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const { return this->probeConst(xyz, child, value, active); }
+    //}
 
     //@{
     /// @brief Same as probeNode() but, if necessary, update the given accessor with pointers
@@ -737,11 +748,19 @@ public:
     //@}
 
     //@{
+    /// @brief Return a pointer to the root child node that contains voxel (x, y, z).
+    /// If no such node exists, return @c nullptr.
+    ChildNodeType* probeChild(const Coord& xyz);
+    const ChildNodeType* probeConstChild(const Coord& xyz) const;
+    const ChildNodeType* probeChild(const Coord& xyz) const { return this->probeConstChild(xyz); }
+    //@}
+
+    //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return @c nullptr.
     LeafNodeType* probeLeaf(const Coord& xyz);
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
-    const LeafNodeType* probeLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
     //@}
 
     //@{
@@ -2818,6 +2837,15 @@ RootNode<ChildT>::probeNode(const Coord& xyz)
 template<typename ChildT>
 template<typename NodeT>
 inline const NodeT*
+RootNode<ChildT>::probeNode(const Coord& xyz) const
+{
+    return this->template probeConstNode<NodeT>(xyz);
+}
+
+
+template<typename ChildT>
+template<typename NodeT>
+inline const NodeT*
 RootNode<ChildT>::probeConstNode(const Coord& xyz) const
 {
     if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
@@ -2830,6 +2858,62 @@ RootNode<ChildT>::probeConstNode(const Coord& xyz) const
         ? reinterpret_cast<const NodeT*>(child)
         : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::probe(const Coord& xyz, ChildNodeType*& child, ValueType& value, bool& active)
+{
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = nullptr;
+        return false;
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+        return true;
+    }
+    const Tile& tile = getTile(iter);
+    child = nullptr;
+    value = tile.value;
+    active = tile.active;
+    return true;
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::probeConst(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = nullptr;
+        return false;
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+        return true;
+    }
+    const Tile& tile = getTile(iter);
+    child = nullptr;
+    value = tile.value;
+    active = tile.active;
+    return true;
+}
+
+
+template<typename ChildT>
+inline ChildT*
+RootNode<ChildT>::probeChild(const Coord& xyz)
+{
+    return this->template probeNode<ChildT>(xyz);
+}
+
+
+template<typename ChildT>
+inline const ChildT*
+RootNode<ChildT>::probeConstChild(const Coord& xyz) const
+{
+    return this->template probeConstNode<ChildT>(xyz);
 }
 
 
