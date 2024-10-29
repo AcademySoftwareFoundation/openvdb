@@ -712,6 +712,7 @@ public:
 
     /// @brief Delete any child or tile containing voxel (x, y, z) at the root level.
     /// Do nothing if no child or tile was found.
+    /// @warning This method will invalidate any existing RootNode iterators.
     /// @return @c true if child or tile was deleted
     bool deleteChildOrTile(const Coord& xyz);
 
@@ -2777,7 +2778,14 @@ inline bool
 RootNode<ChildT>::deleteChildOrTile(const Coord& xyz)
 {
     Coord key = this->coordToKey(xyz);
-    return mTable.erase(key) == size_t(1);
+    MapIter iter = this->findKey(key);
+    if (iter != mTable.end()) {
+        // the child must be deleted to prevent a memory leak
+        if (isChild(iter))  delete iter->second.child;
+        mTable.erase(iter);
+        return true;
+    }
+    return false;
 }
 
 
