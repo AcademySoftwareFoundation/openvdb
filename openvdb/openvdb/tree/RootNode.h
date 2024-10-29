@@ -733,8 +733,19 @@ public:
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz);
     template <typename NodeT>
+    const NodeT* probeNode(const Coord& xyz) const;
+    template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const;
     //@}
+
+    //@{
+    /// @brief Return a pointer to the root child node that contains voxel (x, y, z).
+    /// If no such node exists, query and set the tile value and active status and
+    /// return @c nullptr.
+    bool probe(const Coord& xyz, ChildNodeType*& child, ValueType& value, bool& active);
+    bool probeConst(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const;
+    bool probe(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const { return this->probeConst(xyz, child, value, active); }
+    //}
 
     //@{
     /// @brief Same as probeNode() but, if necessary, update the given accessor with pointers
@@ -746,11 +757,19 @@ public:
     //@}
 
     //@{
+    /// @brief Return a pointer to the root child node that contains voxel (x, y, z).
+    /// If no such node exists, return @c nullptr.
+    ChildNodeType* probeChild(const Coord& xyz);
+    const ChildNodeType* probeConstChild(const Coord& xyz) const;
+    const ChildNodeType* probeChild(const Coord& xyz) const { return this->probeConstChild(xyz); }
+    //@}
+
+    //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
     /// If no such node exists, return @c nullptr.
     LeafNodeType* probeLeaf(const Coord& xyz);
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
-    const LeafNodeType* probeLeaf(const Coord& xyz) const;
+    const LeafNodeType* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
     //@}
 
     //@{
@@ -763,6 +782,35 @@ public:
     template<typename AccessorT>
     const LeafNodeType* probeLeafAndCache(const Coord& xyz, AccessorT& acc) const;
     //@}
+
+    //
+    // Unsafe methods
+    //
+    // WARNING: For improved performance, these unsafe methods assume that the tile
+    // or child exists. If used incorrectly, this can cause the application to crash.
+    // Always use the safer alternative method(s) unless you really know what you're doing.
+    // Enabling OpenVDB asserts will catch where assumptions are incorrectly invalidated.
+
+    /// @brief Return the tile value at the given coordinate.
+    /// @note Use cbeginValueAll() for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ValueType& getTileValueUnsafe(const Coord& xyz) const;
+    /// @brief Return the tile value and active state at the given coordinate.
+    /// @note Use cbeginValueAll() for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    bool getTileValueUnsafe(const Coord& xyz, ValueType& value) const;
+    /// @brief Return the child node at the given coordinate.
+    /// @note Use beginChildAll() for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    ChildNodeType* getChildUnsafe(const Coord& xyz);
+    /// @brief Return the child node at the given coordinate.
+    /// @note Use cbeginChildAll() for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ChildNodeType* getConstChildUnsafe(const Coord& xyz) const;
+    /// @brief Return the child node at the given coordinate.
+    /// @note Use cbeginChildAll() for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ChildNodeType* getChildUnsafe(const Coord& xyz) const;
 
 
     //
@@ -2802,6 +2850,15 @@ RootNode<ChildT>::probeNode(const Coord& xyz)
 template<typename ChildT>
 template<typename NodeT>
 inline const NodeT*
+RootNode<ChildT>::probeNode(const Coord& xyz) const
+{
+    return this->template probeConstNode<NodeT>(xyz);
+}
+
+
+template<typename ChildT>
+template<typename NodeT>
+inline const NodeT*
 RootNode<ChildT>::probeConstNode(const Coord& xyz) const
 {
     if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
@@ -2814,6 +2871,62 @@ RootNode<ChildT>::probeConstNode(const Coord& xyz) const
         ? reinterpret_cast<const NodeT*>(child)
         : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::probe(const Coord& xyz, ChildNodeType*& child, ValueType& value, bool& active)
+{
+    MapIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = nullptr;
+        return false;
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+        return true;
+    }
+    const Tile& tile = getTile(iter);
+    child = nullptr;
+    value = tile.value;
+    active = tile.active;
+    return true;
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::probeConst(const Coord& xyz, const ChildNodeType*& child, ValueType& value, bool& active) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    if (iter == mTable.end()) {
+        child = nullptr;
+        return false;
+    } else if (isChild(iter)) {
+        child = &getChild(iter);
+        return true;
+    }
+    const Tile& tile = getTile(iter);
+    child = nullptr;
+    value = tile.value;
+    active = tile.active;
+    return true;
+}
+
+
+template<typename ChildT>
+inline ChildT*
+RootNode<ChildT>::probeChild(const Coord& xyz)
+{
+    return this->template probeNode<ChildT>(xyz);
+}
+
+
+template<typename ChildT>
+inline const ChildT*
+RootNode<ChildT>::probeConstChild(const Coord& xyz) const
+{
+    return this->template probeConstNode<ChildT>(xyz);
 }
 
 
@@ -2899,6 +3012,64 @@ RootNode<ChildT>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
 
 
 ////////////////////////////////////////
+
+
+template<typename ChildT>
+inline const typename ChildT::ValueType&
+RootNode<ChildT>::getTileValueUnsafe(const Coord& xyz) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    OPENVDB_ASSERT(iter != mTable.end());
+    OPENVDB_ASSERT(isTile(iter));
+    return getTile(iter).value;
+}
+
+
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::getTileValueUnsafe(const Coord& xyz, ValueType& value) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    OPENVDB_ASSERT(iter != mTable.end());
+    OPENVDB_ASSERT(isTile(iter));
+    const Tile& tile = getTile(iter);
+    value = tile.value;
+    return tile.active;
+}
+
+
+template<typename ChildT>
+inline ChildT*
+RootNode<ChildT>::getChildUnsafe(const Coord& xyz)
+{
+    MapIter iter = this->findCoord(xyz);
+    OPENVDB_ASSERT(iter != mTable.end());
+    OPENVDB_ASSERT(isChild(iter));
+    return &getChild(iter);
+}
+
+
+template<typename ChildT>
+inline const ChildT*
+RootNode<ChildT>::getConstChildUnsafe(const Coord& xyz) const
+{
+    MapCIter iter = this->findCoord(xyz);
+    OPENVDB_ASSERT(iter != mTable.end());
+    OPENVDB_ASSERT(isChild(iter));
+    return &getChild(iter);
+}
+
+
+template<typename ChildT>
+inline const ChildT*
+RootNode<ChildT>::getChildUnsafe(const Coord& xyz) const
+{
+    return this->getConstChildUnsafe(xyz);
+}
+
+
+////////////////////////////////////////
+
 
 template<typename ChildT>
 template<typename ArrayT>

@@ -331,7 +331,11 @@ public:
     /// Return @c true if the voxel at the given coordinates is active.
     bool isValueOn(const Coord& xyz) const;
     /// Return @c true if the voxel at the given offset is active.
-    bool isValueOn(Index offset) const { return mValueMask.isOn(offset); }
+    bool isValueOn(Index offset) const { OPENVDB_ASSERT(offset < NUM_VALUES); return mValueMask.isOn(offset); }
+    /// Return @c true if the voxel at the given coordinates is inactive.
+    bool isValueOff(const Coord& xyz) const;
+    /// Return @c true if the voxel at the given offset is inactive.
+    bool isValueOff(Index offset) const { OPENVDB_ASSERT(offset < NUM_VALUES); return mValueMask.isOff(offset); }
 
     /// Return @c true if this node or any of its child nodes have any active tiles.
     bool hasActiveTiles() const;
@@ -457,6 +461,79 @@ public:
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
 
+
+    //
+    // Unsafe methods
+    //
+    // WARNING: For improved performance, these unsafe methods do not check the value or
+    // child masks. If used incorrectly, at best they will leave the InternalNode in an
+    // invalid state and at worst cause the application to crash. Always use the safer
+    // alternative method(s) unless you really know what you're doing.
+    // Enabling OpenVDB asserts will catch where assumptions are incorrectly invalidated.
+
+    /// @brief Return the tile value at offset.
+    /// @note Use getValue(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ValueType& getValueUnsafe(Index offset) const;
+    /// @brief Return the tile value and active state at offset.
+    /// @note Use probeValue(const Coord&, ValueType&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    bool getValueUnsafe(Index offset, ValueType& value) const;
+
+    /// @brief Return the child node at offset.
+    /// @note Use probeChild(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    ChildNodeType* getChildUnsafe(Index offset);
+    /// @brief Return the child node at offset.
+    /// @note Use probeConstChild(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ChildNodeType* getConstChildUnsafe(Index offset) const;
+    /// @brief Return the child node at offset.
+    /// @note Use probeChild(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    const ChildNodeType* getChildUnsafe(Index offset) const;
+
+    /// @brief Set the tile active state at offset but don't change its value.
+    /// @note Use setActiveState(const Coord&, bool) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setActiveStateUnsafe(Index offset, bool on);
+    /// @brief Set the tile value at offset but don't change its value.
+    /// @note Use setValueOnly(const Coord&, const ValueType&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueOnlyUnsafe(Index offset, const ValueType& value);
+    /// @brief Mark the tile active at offset but don't change its value.
+    /// @note Use setValueOn(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueOnUnsafe(Index offset);
+    /// @brief Set the tile value at offset and mark the voxel as active.
+    /// @note Use setValueOn(const Coord&, const ValueType&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueOnUnsafe(Index offset, const ValueType& value);
+    /// @brief Mark the tile inactive at offset but don't change its value.
+    /// @note Use setValueOff(const Coord&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueOffUnsafe(Index offset);
+    /// @brief Set the tile value at offset and mark the voxel as inactive.
+    /// @note Use setValueOff(const Coord&, const ValueType&) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setValueOffUnsafe(Index offset, const ValueType& value);
+
+    /// @brief Replace a tile at offset with the given child node.
+    /// @note Use addChild(ChildNodeType*) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void setChildUnsafe(Index offset, ChildNodeType* child);
+    /// @brief Replace a child node at offset with the given child node.
+    /// @note Use addChild(ChildNodeType*) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void resetChildUnsafe(Index offset, ChildNodeType* child);
+    /// @brief Replace a child node at offset with the given value and active state.
+    /// @note Use addChild(ChildNodeType*) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    ChildNodeType* stealChildUnsafe(Index offset, const ValueType& value, bool active);
+    /// @brief Delete a child node at offset and replace with the given value and active state.
+    /// @note Use addTile(Index, const ValueType&, bool) for a safer alternative.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    void deleteChildUnsafe(Index offset, const ValueType& value, bool active);
 
     //
     // Aux methods
@@ -620,6 +697,43 @@ public:
     /// If no such node exists, return nullptr.
     template<typename NodeType> NodeType* probeNode(const Coord& xyz);
     template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
+    template<typename NodeType> const NodeType* probeNode(const Coord& xyz) const { return this->probeConstNode<NodeType>(xyz); }
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node that contains voxel (x, y, z).
+    /// If no such node exists, return nullptr.
+    ChildNodeType* probeChild(const Coord& xyz);
+    const ChildNodeType* probeConstChild(const Coord& xyz) const;
+    const ChildNodeType* probeChild(const Coord& xyz) const { return this->probeConstChild(xyz); }
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node that contains voxel (x, y, z).
+    /// If no such node exists, return nullptr.
+    ChildNodeType* probeChild(const Coord& xyz, ValueType& value, bool& active);
+    const ChildNodeType* probeConstChild(const Coord& xyz, ValueType& value, bool& active) const;
+    const ChildNodeType* probeChild(const Coord& xyz, ValueType& value, bool& active) const  { return this->probeConstChild(xyz, value, active); }
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node for a specific offset.
+    /// If no such node exists, return nullptr.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    /// @note Out-of-bounds memory access attempts will wrap around using modulo indexing.
+    ChildNodeType* probeChildUnsafe(Index offset);
+    const ChildNodeType* probeConstChildUnsafe(Index offset) const;
+    const ChildNodeType* probeChildUnsafe(Index offset) const { return this->probeConstChildUnsafe(offset); }
+    //@}
+
+    //@{
+    /// @brief Return a pointer to the child node for a specific offset.
+    /// If no such node exists, return nullptr.
+    /// @warning This method should only be used by experts seeking low-level optimizations.
+    /// @note Out-of-bounds memory access attempts will wrap around using modulo indexing.
+    ChildNodeType* probeChildUnsafe(Index offset, ValueType& value, bool& active);
+    const ChildNodeType* probeConstChildUnsafe(Index offset, ValueType& value, bool& active) const;
+    const ChildNodeType* probeChildUnsafe(Index offset, ValueType& value, bool& active) const { return this->probeConstChildUnsafe(offset, value, active); }
     //@}
 
     //@{
@@ -1249,6 +1363,82 @@ InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, Accessor
 
 
 template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz)
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeChildUnsafe(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(const Coord& xyz) const
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeConstChildUnsafe(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChild(const Coord& xyz, ValueType& value, bool& active)
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeChildUnsafe(n, value, active);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChild(const Coord& xyz, ValueType& value, bool& active) const
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->probeConstChildUnsafe(n, value, active);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChildUnsafe(Index offset)
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChildUnsafe(Index offset) const
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::probeChildUnsafe(Index offset, ValueType& value, bool& active)
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    value = mNodes[offset].getValue();
+    active = mValueMask.isOn(offset);
+    return nullptr;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::probeConstChildUnsafe(Index offset, ValueType& value, bool& active) const
+{
+    OPENVDB_ASSERT(offset < NUM_VALUES);
+    if (mChildMask.isOn(offset))    return mNodes[offset].getChild();
+    value = mNodes[offset].getValue();
+    active = mValueMask.isOn(offset);
+    return nullptr;
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
 inline typename ChildT::LeafNodeType*
 InternalNode<ChildT, Log2Dim>::probeLeaf(const Coord& xyz)
 {
@@ -1550,8 +1740,17 @@ inline bool
 InternalNode<ChildT, Log2Dim>::isValueOn(const Coord& xyz) const
 {
     const Index n = this->coordToOffset(xyz);
-    if (this->isChildMaskOff(n)) return this->isValueMaskOn(n);
-    return mNodes[n].getChild()->isValueOn(xyz);
+    return this->isChildMaskOff(n) ? this->isValueMaskOn(n)
+        : mNodes[n].getChild()->isValueOn(xyz);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::isValueOff(const Coord& xyz) const
+{
+    const Index n = this->coordToOffset(xyz);
+    return this->isChildMaskOff(n) ? this->isValueMaskOn(n)
+        : mNodes[n].getChild()->isValueOff(xyz);
 }
 
 template<typename ChildT, Index Log2Dim>
@@ -2266,6 +2465,156 @@ InternalNode<ChildT, Log2Dim>::getLastValue() const
 {
     const Index n = NUM_VALUES - 1;
     return (this->isChildMaskOn(n) ? mNodes[n].getChild()->getLastValue() : mNodes[n].getValue());
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline const typename ChildT::ValueType&
+InternalNode<ChildT, Log2Dim>::getValueUnsafe(Index n) const
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    return mNodes[n].getValue();
+}
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::getValueUnsafe(Index n, ValueType& value) const
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    value = mNodes[n].getValue();
+    return mValueMask.isOn(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::getChildUnsafe(Index n)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOn(n));
+    return mNodes[n].getChild();
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::getConstChildUnsafe(Index n) const
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOn(n));
+    return mNodes[n].getChild();
+}
+
+template<typename ChildT, Index Log2Dim>
+inline const ChildT*
+InternalNode<ChildT, Log2Dim>::getChildUnsafe(Index n) const
+{
+    return this->getConstChildUnsafe(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setActiveStateUnsafe(Index n, bool on)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mValueMask.set(n, on);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueOnlyUnsafe(Index n, const ValueType& value)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mNodes[n].setValue(value);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueOnUnsafe(Index n)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mValueMask.setOn(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueOnUnsafe(Index n, const ValueType& value)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mNodes[n].setValue(value);
+    mValueMask.setOn(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueOffUnsafe(Index n)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mValueMask.setOff(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setValueOffUnsafe(Index n, const ValueType& value)
+{
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mNodes[n].setValue(value);
+    mValueMask.setOff(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::setChildUnsafe(Index n, ChildNodeType* child)
+{
+    // replace tile with child
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOff(n));
+    mNodes[n].setChild(child);
+    mChildMask.setOn(n);
+    mValueMask.setOff(n);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::resetChildUnsafe(Index n, ChildNodeType* child)
+{
+    // replace child with child
+    OPENVDB_ASSERT(child);
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOn(n));
+    delete mNodes[n].getChild();
+    mNodes[n].setChild(child);
+}
+
+template<typename ChildT, Index Log2Dim>
+inline ChildT*
+InternalNode<ChildT, Log2Dim>::stealChildUnsafe(Index n, const ValueType& value, bool active)
+{
+    // replace child with tile (and return child)
+    OPENVDB_ASSERT(n < NUM_VALUES);
+    OPENVDB_ASSERT(mChildMask.isOn(n));
+    auto* child = mNodes[n].getChild();
+    mChildMask.setOff(n);
+    mValueMask.set(n, active);
+    mNodes[n].setValue(value);
+    return child;
+}
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::deleteChildUnsafe(Index n, const ValueType& value, bool active)
+{
+    // replace child with tile (and delete child)
+    delete this->stealChildUnsafe(n, value, active);
 }
 
 
