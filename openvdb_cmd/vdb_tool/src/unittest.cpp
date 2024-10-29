@@ -409,7 +409,7 @@ TEST_F(Test_vdb_tool, Geometry)
     EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
   }
   #ifdef VDB_TOOL_USE_PDAL
-  {// read from PDAL-supported ASCII format file 
+  {// read from PDAL-supported ASCII format file
    // (NOTE: PDAL also supports other formats e.g. LAS, LAZ, E57, Draco, FBX, NumPy, OBJ,…)
 
    // write a test file
