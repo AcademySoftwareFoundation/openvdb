@@ -49,9 +49,6 @@ elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
   list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS TBB::tbbmalloc)
 endif()
 
-find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
-list(APPEND OPENVDB_AX_TEST_DEPENDENT_LIBS CppUnit::cppunit)
-
 find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
 if(TARGET GTest::gtest_main)
