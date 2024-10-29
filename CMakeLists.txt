@@ -466,7 +466,11 @@ if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHO
   endif()
 
   if(NOT DEFINED VDB_PYTHON_INSTALL_DIRECTORY)
-    get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+    if(DEFINED Python_SITELIB)
+      get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+    else()
+      set(Python_PACKAGES_DIR "site-packages")
+    endif()
     set(VDB_PYTHON_INSTALL_DIRECTORY
       ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
       CACHE STRING "The directory to install the openvdb and nanovdb Python modules."
