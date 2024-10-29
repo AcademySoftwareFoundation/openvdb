@@ -25,4 +25,4 @@ cmake \
     ..
 
 make -j8
-make install
+sudo make install
