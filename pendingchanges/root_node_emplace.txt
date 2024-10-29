@@ -1,0 +1,2 @@
+Improvements:
+    - RootNode code cleanup to eliminate redundant key conversion and to create map values in-place.
