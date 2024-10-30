@@ -599,14 +599,14 @@ TEST_F(TestValueAccessor, testAccessorRegistration)
     // the cache is populated.
     acc.setValue(c0, value);
     EXPECT_EQ(Index64(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Reset the voxel to the background value and verify that no nodes
     // have been deleted and that the cache is still populated.
     tree->setValueOff(c0, background);
     EXPECT_EQ(Index64(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Prune the tree and verify that only the root node remains and that
@@ -614,13 +614,13 @@ TEST_F(TestValueAccessor, testAccessorRegistration)
     openvdb::tools::prune(*tree);
     //tree->prune();
     EXPECT_EQ(Index64(0), tree->leafCount());
-    EXPECT_EQ(Index(1), tree->nonLeafCount()); // root node only
+    EXPECT_EQ(Index64(1), tree->nonLeafCount()); // root node only
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 
     // Set the leaf voxel again and verify that the cache is repopulated.
     acc.setValue(c0, value);
     EXPECT_EQ(Index64(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Delete the tree and verify that the cache has been cleared.

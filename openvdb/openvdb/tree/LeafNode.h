@@ -132,8 +132,13 @@ public:
     static Index64 leafCount() { return 1; }
     /// no-op
     void nodeCount(std::vector<Index64> &) const {}
+#if OPENVDB_ABI_VERSION_NUMBER < 12
+    /// no-op
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
+    void nodeCount(std::vector<Index32> &) const {}
+#endif
     /// Return the non-leaf count for this node, which is zero.
-    static Index32 nonLeafCount() { return 0; }
+    static Index64 nonLeafCount() { return 0; }
     /// Return the child count for this node, which is zero.
     static Index32 childCount() { return 0; }
 

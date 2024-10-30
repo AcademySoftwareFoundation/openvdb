@@ -1344,14 +1344,14 @@ TEST_F(TestTree, testTopologyUnion)
         tree1.touchLeaf(xyz)->setValueOn(0); // single leaf
         tree0.topologyUnion(tree1, true); // single tile
         EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(LeafT::NUM_VOXELS), tree0.activeVoxelCount());
 
         tree1.addTile(1, xyz + openvdb::Coord(8), true, true); // leaf + tile
         tree0.topologyUnion(tree1, true); // two tiles
         EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(2), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(LeafT::NUM_VOXELS*2), tree0.activeVoxelCount());
 
@@ -1360,7 +1360,7 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.addTile(2, xyz, true, true);
         tree0.topologyUnion(tree1, true); // all topology in tree1 is already active. no change
         EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(2), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(2), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(InternalT1::NUM_VOXELS), tree0.activeVoxelCount());
 
@@ -1369,7 +1369,7 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.addTile(3, xyz, true, true);
         tree0.topologyUnion(tree1, true);
         EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(1), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(1), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(InternalT2::NUM_VOXELS), tree0.activeVoxelCount());
 
@@ -1380,7 +1380,7 @@ TEST_F(TestTree, testTopologyUnion)
         tree1.addTile(2, xyz, true, true);
         tree0.topologyUnion(tree1, true);
         EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         openvdb::Index64 tiles = openvdb::Index64(InternalT1::DIM) / InternalT1::getChildDim();
         tiles = tiles * tiles * tiles;
         EXPECT_EQ(tiles, tree0.activeTileCount());

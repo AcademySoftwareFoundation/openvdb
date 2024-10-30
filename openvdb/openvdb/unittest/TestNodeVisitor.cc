@@ -94,7 +94,7 @@ struct DescendOp
     }
 
     openvdb::Index32 previousLevel{0};
-    openvdb::Index32 count{0};
+    openvdb::Index64 count{0};
 }; // struct DescendOp
 
 

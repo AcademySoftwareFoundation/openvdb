@@ -295,7 +295,7 @@ TEST_F(TestNodeManager, testDynamic)
 
     EXPECT_TRUE(sourceTree.root().addChild(child.release()));
     EXPECT_EQ(Index64(0), sourceTree.leafCount());
-    EXPECT_EQ(Index32(2), sourceTree.nonLeafCount());
+    EXPECT_EQ(Index64(2), sourceTree.nonLeafCount());
 
     ExpandOp<Int32Tree> expandOp;
 

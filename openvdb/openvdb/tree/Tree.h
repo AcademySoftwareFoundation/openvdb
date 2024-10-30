@@ -102,7 +102,11 @@ public:
     /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
     /// Return the total number of unallocated leaf nodes residing in this tree.
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 unallocatedLeafCount() const = 0;
+#else
+    virtual Index32 unallocatedLeafCount() const = 0;
+#endif
 
 
     //
@@ -111,15 +115,31 @@ public:
     /// @brief Return the depth of this tree.
     ///
     /// A tree with only a root node and leaf nodes has depth 2, for example.
-    virtual Index treeDepth() const = 0;
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
+    virtual Index64 treeDepth() const = 0;
+#else
+    virtual Index32 treeDepth() const = 0;
+#endif
     /// Return the number of leaf nodes.
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 leafCount() const = 0;
+#else
+    virtual Index32 leafCount() const = 0;
+#endif
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual std::vector<Index64> nodeCount() const = 0;
+#else
+    virtual std::vector<Index32> nodeCount() const = 0;
+#endif
     /// Return the number of non-leaf nodes.
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
+    virtual Index64 nonLeafCount() const = 0;
+#else
     virtual Index32 nonLeafCount() const = 0;
+#endif
     /// Return the number of active voxels stored in leaf nodes.
     virtual Index64 activeLeafVoxelCount() const = 0;
     /// Return the number of inactive voxels stored in leaf nodes.
@@ -341,7 +361,7 @@ public:
     /// @brief Return the depth of this tree.
     ///
     /// A tree with only a root node and leaf nodes has depth 2, for example.
-    Index treeDepth() const override { return DEPTH; }
+    Index64 treeDepth() const override { return Index64(DEPTH); }
     /// Return the number of leaf nodes.
     Index64 leafCount() const override { return mRoot.leafCount(); }
     /// Return a vector with node counts. The number of nodes of type NodeType
@@ -354,7 +374,7 @@ public:
         return vec;// Named Return Value Optimization
     }
     /// Return the number of non-leaf nodes.
-    Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
+    Index64 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
     Index64 activeLeafVoxelCount() const override { return tools::countActiveLeafVoxels(*this); }
     /// Return the number of inactive voxels stored in leaf nodes.

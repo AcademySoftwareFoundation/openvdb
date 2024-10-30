@@ -1708,7 +1708,7 @@ TEST_F(TestTools, testPrune)
 
         FloatTree tree(value);
         EXPECT_EQ(Index64(0), tree.leafCount());
-        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_EQ(Index64(1), tree.nonLeafCount()); // root node
         EXPECT_TRUE(tree.empty());
 
         tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
@@ -1717,7 +1717,7 @@ TEST_F(TestTools, testPrune)
         tools::prune(tree);
 
         EXPECT_EQ(Index64(0), tree.leafCount());
-        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_EQ(Index64(1), tree.nonLeafCount()); // root node
         EXPECT_TRUE(tree.empty());
     }
 
@@ -1740,17 +1740,17 @@ TEST_F(TestTools, testPrune)
         tree.addLeaf(leaf);
 
         EXPECT_EQ(Index64(1), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree);// tolerance is zero
 
         EXPECT_EQ(Index64(1), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree, tol);
 
         EXPECT_EQ(Index64(0), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         std::sort(data.begin(), data.end());
         const float median = data[(LeafNodeT::NUM_VALUES-1)>>1];

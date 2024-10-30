@@ -484,7 +484,7 @@ public:
     static bool hasCompatibleValueType(const RootNode<OtherChildType>& other);
 
     Index64 leafCount() const;
-    Index32 nonLeafCount() const;
+    Index64 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -492,6 +492,10 @@ public:
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
     void nodeCount(std::vector<Index64> &vec) const;
+#if OPENVDB_ABI_VERSION_NUMBER < 12
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
+    void nodeCount(std::vector<Index32> &vec) const;
+#endif
 
     bool isValueOn(const Coord& xyz) const;
 
@@ -1579,10 +1583,10 @@ RootNode<ChildT>::leafCount() const
 
 
 template<typename ChildT>
-inline Index32
+inline Index64
 RootNode<ChildT>::nonLeafCount() const
 {
-    Index32 sum = 1;
+    Index64 sum = 1;
     if (ChildT::LEVEL != 0) {
         for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
             if (isChild(i)) sum += getChild(i).nonLeafCount();
@@ -1689,6 +1693,24 @@ RootNode<ChildT>::nodeCount(std::vector<Index64> &vec) const
     vec[LEVEL] = 1;// one root node
     vec[ChildNodeType::LEVEL] = sum;
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER < 12
+template<typename ChildT>
+inline void
+RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
+{
+    OPENVDB_ASSERT(vec.size() > LEVEL);
+    Index32 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isChild(i)) {
+            ++sum;
+            getChild(i).nodeCount(vec);
+        }
+    }
+    vec[LEVEL] = 1;// one root node
+    vec[ChildNodeType::LEVEL] = sum;
+}
+#endif
 
 ////////////////////////////////////////
 
