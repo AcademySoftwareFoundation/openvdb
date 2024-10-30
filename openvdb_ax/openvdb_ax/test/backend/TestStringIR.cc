@@ -289,10 +289,8 @@ TestStringIR::testStringStringIR()
 {
     static auto setInvalidString = [](String& S) {
 #if defined(__GNUC__) && !defined(__clang__)
-#if OPENVDB_CHECK_GCC(8, 0)
         _Pragma("GCC diagnostic push")
         _Pragma("GCC diagnostic ignored \"-Wclass-memaccess\"")
-#endif
 #endif
         // zero out the data held by a String object (expected to not hold heap memory).
         // This is used to test the IR methods work as expected with the allocated, but
@@ -300,9 +298,7 @@ TestStringIR::testStringStringIR()
         OPENVDB_ASSERT(S.isLocal());
         std::memset(&S, 0, sizeof(String)); // uninit string, invalid class memory
 #if defined(__GNUC__) && !defined(__clang__)
-#if OPENVDB_CHECK_GCC(8, 0)
         _Pragma("GCC diagnostic pop")
-#endif
 #endif
     };
 

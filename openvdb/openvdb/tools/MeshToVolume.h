@@ -16,7 +16,7 @@
 #ifndef OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h> // for OPENVDB_HAS_CXX11
+#include <openvdb/Platform.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
