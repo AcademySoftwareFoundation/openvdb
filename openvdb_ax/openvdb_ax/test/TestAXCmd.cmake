@@ -33,7 +33,7 @@ set(SPHERE_VDB ${CMAKE_BINARY_DIR}/sphere.vdb)
 set(TORUS_VDB ${CMAKE_BINARY_DIR}/torus.vdb)
 
 if(DOWNLOAD_VDBS)
-  find_package(Python COMPONENTS Interpreter REQUIRED)
+  find_package(Python ${MINIMUM_PYTHON_VERSION} COMPONENTS Interpreter REQUIRED)
   if(NOT EXISTS ${SPHERE_VDB} OR
      NOT EXISTS ${TORUS_VDB} OR
      NOT EXISTS ${SPHERE_POINTS_VDB})
