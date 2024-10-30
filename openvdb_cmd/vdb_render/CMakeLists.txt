@@ -17,11 +17,11 @@ if(USE_PNG)
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(Imath CONFIG REQUIRED)
+  find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
 endif()
 
 if(USE_EXR)
-  find_package(OpenEXR CONFIG REQUIRED)
+  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} CONFIG REQUIRED)
 endif()
 
 set(SOURCE_FILES main.cc)
