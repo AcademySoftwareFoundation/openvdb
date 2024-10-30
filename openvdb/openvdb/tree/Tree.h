@@ -386,7 +386,9 @@ public:
     std::vector<Index32> nodeCount() const override
     {
         std::vector<Index32> vec(DEPTH, 0);
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
         mRoot.nodeCount( vec );
+        OPENVDB_NO_DEPRECATION_WARNING_END
         return vec;// Named Return Value Optimization
     }
 #endif
