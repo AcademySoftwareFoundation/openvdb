@@ -1,2 +1,0 @@
-Build:
-    - Fixed an issue with the Blosc CMake FindPackage for the OpenVDB Windows static library.

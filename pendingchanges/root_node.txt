@@ -1,9 +1,0 @@
-API Changes:
-    - RootNode::tileCount(), RootNode::activeTileCount() and RootNode::inactiveTileCount() are now public.
-    - RootNode::hasKey() and RootNode::coordToKey() are now public.
-
-Improvements:
-    - Add RootNode::deleteChildOrTile() to delete a child or tile of the root node.
-
-Bug Fixes:
-    - Fix a bug in RootNode::setOrigin() where the origin was updated before the error was thrown potentially leaving the root in an invalid state.

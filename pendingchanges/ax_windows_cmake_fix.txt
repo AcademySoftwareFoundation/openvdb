@@ -1,3 +1,0 @@
-Build:
-    - Fixed an issue with OpenVDB AX's CMake on Windows where the static and shared library targets would have the same name
-    [Reported by Nicholas Yue]
