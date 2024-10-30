@@ -1745,7 +1745,9 @@ RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {
             ++sum;
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             getChild(i).nodeCount(vec);
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
     }
     vec[LEVEL] = 1;// one root node

@@ -1156,7 +1156,11 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
     OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
     const auto count = mChildMask.countOn();
     if (ChildNodeType::LEVEL > 0 && count > 0) {
-        for (auto iter = this->cbeginChildOn(); iter; ++iter) iter->nodeCount(vec);
+        for (auto iter = this->cbeginChildOn(); iter; ++iter) {
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+            iter->nodeCount(vec);
+            OPENVDB_NO_DEPRECATION_WARNING_END
+        }
     }
     vec[ChildNodeType::LEVEL] += count;
 }
