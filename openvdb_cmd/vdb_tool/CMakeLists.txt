@@ -181,7 +181,7 @@ target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${
 add_executable(vdb_tool src/main.cpp)
 target_include_directories(vdb_tool PRIVATE vdb_tool_common)
 target_link_libraries(vdb_tool PRIVATE vdb_tool_common)
-install(TARGETS vdb_tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 
 
 # unit test
