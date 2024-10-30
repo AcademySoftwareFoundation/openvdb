@@ -766,7 +766,7 @@ TEST_F(TestPointMove, testCustomDeformer)
         PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
         PointDataGrid::Ptr cachedPoints = points->deepCopy();
 
-        const int leafCount = points->tree().leafCount();
+        const int leafCount = int(points->tree().leafCount());
         const int pointCount = int(positions.size());
 
         std::atomic<int> resetCalls, applyCalls;

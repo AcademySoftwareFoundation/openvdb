@@ -129,11 +129,13 @@ public:
     /// Return the dimension of child nodes of this LeafNode, which is one for voxels.
     static Index getChildDim() { return 1; }
     /// Return the leaf count for this node, which is one.
-    static Index32 leafCount() { return 1; }
+    static Index64 leafCount() { return 1; }
     /// no-op
+    void nodeCount(std::vector<Index64> &) const {}
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &) const {}
     /// Return the non-leaf count for this node, which is zero.
-    static Index32 nonLeafCount() { return 0; }
+    static Index64 nonLeafCount() { return 0; }
     /// Return the child count for this node, which is zero.
     static Index32 childCount() { return 0; }
 

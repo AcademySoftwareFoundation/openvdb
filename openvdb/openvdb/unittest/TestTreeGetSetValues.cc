@@ -224,108 +224,108 @@ TEST_F(TestTreeGetSetValues, testFill)
     // The following tests assume a [3,2,3] tree configuration.
 
     tree.clear();
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount()); // root node
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount()); // root node
 
     // Partially fill a single leaf node.
     tree.fill(CoordBBox(Coord(8), Coord(14)), 0.0);
-    EXPECT_EQ(openvdb::Index32(1), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     // Completely fill the leaf node, replacing it with a tile.
     tree.fill(CoordBBox(Coord(8), Coord(15)), 0.0);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     {
         const int activeVoxelCount = int(tree.activeVoxelCount());
 
         // Fill a single voxel of the tile with a different (active) value.
         tree.fill(CoordBBox(Coord(10), Coord(10)), 1.0);
-        EXPECT_EQ(openvdb::Index32(1), tree.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(1), tree.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
         EXPECT_EQ(activeVoxelCount, int(tree.activeVoxelCount()));
         // Fill the voxel with an inactive value.
         tree.fill(CoordBBox(Coord(10), Coord(10)), 1.0, /*active=*/false);
-        EXPECT_EQ(openvdb::Index32(1), tree.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(1), tree.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
         EXPECT_EQ(activeVoxelCount - 1, int(tree.activeVoxelCount()));
 
         // Completely fill the leaf node, replacing it with a tile again.
         tree.fill(CoordBBox(Coord(8), Coord(15)), 0.0);
-        EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
     }
 
     // Expand by one voxel, creating seven neighboring leaf nodes.
     tree.fill(CoordBBox(Coord(8), Coord(16)), 0.0);
-    EXPECT_EQ(openvdb::Index32(7), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(7), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     // Completely fill the internal node containing the tile, replacing it with
     // a tile at the next level of the tree.
     tree.fill(CoordBBox(Coord(0), Coord(31)), 0.0);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(2), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(2), tree.nonLeafCount());
 
     // Expand by one voxel, creating a layer of leaf nodes on three faces.
     tree.fill(CoordBBox(Coord(0), Coord(32)), 0.0);
-    EXPECT_EQ(openvdb::Index32(5*5 + 4*5 + 4*4), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(2 + 7), tree.nonLeafCount()); // +7 internal nodes
+    EXPECT_EQ(openvdb::Index64(5*5 + 4*5 + 4*4), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(2 + 7), tree.nonLeafCount()); // +7 internal nodes
 
     // Completely fill the second-level internal node, replacing it with a root-level tile.
     tree.fill(CoordBBox(Coord(0), Coord(255)), 0.0);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount());
 
     // Repeat, filling with an inactive value.
 
     tree.clear();
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount()); // root node
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount()); // root node
 
     // Partially fill a single leaf node.
     tree.fill(CoordBBox(Coord(8), Coord(14)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(1), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     // Completely fill the leaf node, replacing it with a tile.
     tree.fill(CoordBBox(Coord(8), Coord(15)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     // Expand by one voxel, creating seven neighboring leaf nodes.
     tree.fill(CoordBBox(Coord(8), Coord(16)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(7), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(3), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(7), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(3), tree.nonLeafCount());
 
     // Completely fill the internal node containing the tile, replacing it with
     // a tile at the next level of the tree.
     tree.fill(CoordBBox(Coord(0), Coord(31)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(2), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(2), tree.nonLeafCount());
 
     // Expand by one voxel, creating a layer of leaf nodes on three faces.
     tree.fill(CoordBBox(Coord(0), Coord(32)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(5*5 + 4*5 + 4*4), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(2 + 7), tree.nonLeafCount()); // +7 internal nodes
+    EXPECT_EQ(openvdb::Index64(5*5 + 4*5 + 4*4), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(2 + 7), tree.nonLeafCount()); // +7 internal nodes
 
     // Completely fill the second-level internal node, replacing it with a root-level tile.
     tree.fill(CoordBBox(Coord(0), Coord(255)), 0.0, /*active=*/false);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount());
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount());
 
     tree.clear();
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount()); // root node
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount()); // root node
     EXPECT_TRUE(tree.empty());
 
     // Partially fill a region with inactive background values.
     tree.fill(CoordBBox(Coord(27), Coord(254)), background, /*active=*/false);
     // Confirm that after pruning, the tree is empty.
     openvdb::tools::prune(tree);
-    EXPECT_EQ(openvdb::Index32(0), tree.leafCount());
-    EXPECT_EQ(openvdb::Index32(1), tree.nonLeafCount()); // root node
+    EXPECT_EQ(openvdb::Index64(0), tree.leafCount());
+    EXPECT_EQ(openvdb::Index64(1), tree.nonLeafCount()); // root node
     EXPECT_TRUE(tree.empty());
 }
 

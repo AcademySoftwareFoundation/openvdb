@@ -210,7 +210,7 @@ getNodeLog2Dims(const GridType& grid)
 
 
 template<typename GridType>
-inline Index
+inline Index64
 treeDepth(const GridType& grid)
 {
     return grid.tree().treeDepth();
@@ -218,7 +218,7 @@ treeDepth(const GridType& grid)
 
 
 template<typename GridType>
-inline Index32
+inline Index64
 leafCount(const GridType& grid)
 {
     return grid.tree().leafCount();
@@ -226,7 +226,7 @@ leafCount(const GridType& grid)
 
 
 template<typename GridType>
-inline Index32
+inline Index64
 nonLeafCount(const GridType& grid)
 {
     return grid.tree().nonLeafCount();

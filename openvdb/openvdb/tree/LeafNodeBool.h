@@ -131,10 +131,12 @@ public:
     static void getNodeLog2Dims(std::vector<Index>& dims) { dims.push_back(Log2Dim); }
     static Index getChildDim() { return 1; }
 
-    static Index32 leafCount() { return 1; }
+    static Index64 leafCount() { return 1; }
     /// no-op
+    void nodeCount(std::vector<Index64> &) const {}
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &) const {}
-    static Index32 nonLeafCount() { return 0; }
+    static Index64 nonLeafCount() { return 0; }
 
     /// Return the number of active voxels.
     Index64 onVoxelCount() const { return mValueMask.countOn(); }

@@ -484,8 +484,8 @@ public:
     template<typename OtherChildType>
     static bool hasCompatibleValueType(const RootNode<OtherChildType>& other);
 
-    Index32 leafCount() const;
-    Index32 nonLeafCount() const;
+    Index64 leafCount() const;
+    Index64 nonLeafCount() const;
     Index32 childCount() const;
     Index32 tileCount() const;
     Index32 activeTileCount() const;
@@ -495,6 +495,8 @@ public:
     Index64 onLeafVoxelCount() const;
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
+    void nodeCount(std::vector<Index64> &vec) const;
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &vec) const;
 
     bool isValueOn(const Coord& xyz) const;
@@ -1540,10 +1542,10 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 
 
 template<typename ChildT>
-inline Index32
+inline Index64
 RootNode<ChildT>::leafCount() const
 {
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) sum += getChild(i).leafCount();
     }
@@ -1552,10 +1554,10 @@ RootNode<ChildT>::leafCount() const
 
 
 template<typename ChildT>
-inline Index32
+inline Index64
 RootNode<ChildT>::nonLeafCount() const
 {
-    Index32 sum = 1;
+    Index64 sum = 1;
     if (ChildT::LEVEL != 0) {
         for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
             if (isChild(i)) sum += getChild(i).nonLeafCount();
@@ -1685,6 +1687,22 @@ RootNode<ChildT>::onTileCount() const
 
 template<typename ChildT>
 inline void
+RootNode<ChildT>::nodeCount(std::vector<Index64> &vec) const
+{
+    OPENVDB_ASSERT(vec.size() > LEVEL);
+    Index64 sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isChild(i)) {
+            ++sum;
+            getChild(i).nodeCount(vec);
+        }
+    }
+    vec[LEVEL] = 1;// one root node
+    vec[ChildNodeType::LEVEL] = sum;
+}
+
+template<typename ChildT>
+inline void
 RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
 {
     OPENVDB_ASSERT(vec.size() > LEVEL);
@@ -1692,7 +1710,9 @@ RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {
             ++sum;
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             getChild(i).nodeCount(vec);
+            OPENVDB_NO_DEPRECATION_WARNING_END
         }
     }
     vec[LEVEL] = 1;// one root node

@@ -146,7 +146,7 @@ TEST_F(TestLevelSetUtil, testSegmentationTools)
         openvdb::tools::segmentSDF(*sdfGrid, segments);
 
         EXPECT_EQ(size_t(1), segments.size());
-        EXPECT_EQ(openvdb::Index32(0), segments[0]->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(0), segments[0]->tree().leafCount());
         EXPECT_EQ(10.2f, segments[0]->background());
     }
 
@@ -173,7 +173,7 @@ TEST_F(TestLevelSetUtil, testSegmentationTools)
         openvdb::tools::segmentSDF(*sdfGrid, segments);
 
         EXPECT_EQ(size_t(1), segments.size());
-        EXPECT_EQ(openvdb::Index32(0), segments[0]->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(0), segments[0]->tree().leafCount());
         EXPECT_EQ(sdfGrid->background(), segments[0]->background());
     }
 
@@ -195,14 +195,14 @@ TEST_F(TestLevelSetUtil, testSegmentationTools)
 
         openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(/*background=*/3.1f);
 
-        EXPECT_EQ(openvdb::Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(0), grid->tree().leafCount());
 
         std::vector<FloatGrid::Ptr> segments;
         openvdb::tools::segmentActiveVoxels(*grid, segments);
 
         // note that an empty volume should segment into an empty volume
         EXPECT_EQ(size_t(1), segments.size());
-        EXPECT_EQ(openvdb::Index32(0), segments[0]->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(0), segments[0]->tree().leafCount());
         EXPECT_EQ(3.1f, segments[0]->background());
     }
 
@@ -213,14 +213,14 @@ TEST_F(TestLevelSetUtil, testSegmentationTools)
         grid->tree().touchLeaf(openvdb::Coord(0,0,0));
         grid->tree().touchLeaf(openvdb::Coord(100,100,100));
 
-        EXPECT_EQ(openvdb::Index32(2), grid->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(2), grid->tree().leafCount());
         EXPECT_EQ(openvdb::Index64(0), grid->tree().activeVoxelCount());
 
         std::vector<FloatGrid::Ptr> segments;
         openvdb::tools::segmentActiveVoxels(*grid, segments);
 
         EXPECT_EQ(size_t(1), segments.size());
-        EXPECT_EQ(openvdb::Index32(0), segments[0]->tree().leafCount());
+        EXPECT_EQ(openvdb::Index64(0), segments[0]->tree().leafCount());
     }
 }
 

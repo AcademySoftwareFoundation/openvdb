@@ -274,9 +274,11 @@ public:
     /// Set the transient data value.
     void setTransientData(Index32 transientData) { mTransientData = transientData; }
 
-    Index32 leafCount() const;
+    Index64 leafCount() const;
+    Index64 nonLeafCount() const;
+    void nodeCount(std::vector<Index64> &vec) const;
+    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &vec) const;
-    Index32 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -1102,11 +1104,11 @@ InternalNode<ChildT, Log2Dim>::~InternalNode()
 
 
 template<typename ChildT, Index Log2Dim>
-inline Index32
+inline Index64
 InternalNode<ChildT, Log2Dim>::leafCount() const
 {
     if (ChildNodeType::getLevel() == 0) return mChildMask.countOn();
-    Index32 sum = 0;
+    Index64 sum = 0;
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         sum += iter->leafCount();
     }
@@ -1115,7 +1117,7 @@ InternalNode<ChildT, Log2Dim>::leafCount() const
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
+InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index64> &vec) const
 {
     OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
     const auto count = mChildMask.countOn();
@@ -1125,12 +1127,28 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
     vec[ChildNodeType::LEVEL] += count;
 }
 
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
+{
+    OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
+    const auto count = mChildMask.countOn();
+    if (ChildNodeType::LEVEL > 0 && count > 0) {
+        for (auto iter = this->cbeginChildOn(); iter; ++iter) {
+            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+            iter->nodeCount(vec);
+            OPENVDB_NO_DEPRECATION_WARNING_END
+        }
+    }
+    vec[ChildNodeType::LEVEL] += count;
+}
+
 
 template<typename ChildT, Index Log2Dim>
-inline Index32
+inline Index64
 InternalNode<ChildT, Log2Dim>::nonLeafCount() const
 {
-    Index32 sum = 1;
+    Index64 sum = 1;
     if (ChildNodeType::getLevel() == 0) return sum;
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         sum += iter->nonLeafCount();
