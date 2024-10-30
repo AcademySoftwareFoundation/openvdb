@@ -98,11 +98,15 @@ public:
     /// @brief One iteration of filleting on the level set.
     /// @param mask Optional alpha mask.
     ///
-    /// @note This filter rounds off concave edges to create a smoother transition between surfaces
-    /// Fillets a level set by
-    ///   offsetting at locations with a negative principal curvature, proportional to its magnitude
-    ///   leaves locations with non-negative principal curvatures untouched
-    /// This filter converges to the convex hull if iterated enough times
+    /// @note This filter rounds off concave edges to create a smoother
+    /// transition between surfaces. Fillets a level set by offsetting
+    /// at locations with a negative principal curvature, proportional
+    /// to its magnitude leaves locations with non-negative principal
+    /// curvatures untouched. This filter converges to the convex hull
+    /// if iterated enough times.
+    ///
+    /// @details See also Level Set Methods and Fast Marching Methods
+    /// by James Sethian, pp. 204.
     void fillet(const MaskType* mask = nullptr)
     {
         Filter f(this, mask); f.fillet();
@@ -409,10 +413,10 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
     }
 }
 
-/// Fillets a level set by
-///   offsetting at locations with a negative principal curvature, proportional to its magnitude
-///   leaves locations with non-negative principal curvatures untouched
-/// This filter converges to the convex hull if iterated enough times
+/// Fillets a level set by offsetting at locations with a negative principal
+/// curvature, proportional to its magnitude. Leaves locations with non-negative
+/// principal curvatures untouched. This filter converges to the convex hull if
+/// iterated enough times.
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::Filter::filletImpl(const LeafRange& range)
