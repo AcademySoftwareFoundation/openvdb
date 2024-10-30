@@ -362,7 +362,7 @@ public:
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 leafCount() const override { return mRoot.leafCount(); }
 #else
-    Index32 leafCount() const override { return mRoot.leafCount(); }
+    Index32 leafCount() const override { return static_cast<Index32>(mRoot.leafCount()); }
 #endif
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
@@ -388,7 +388,7 @@ public:
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 nonLeafCount() const override { return mRoot.nonLeafCount(); }
 #else
-    Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
+    Index32 nonLeafCount() const override { return static_cast<Index32>(mRoot.nonLeafCount()); }
 #endif
     /// Return the number of active voxels stored in leaf nodes.
     Index64 activeLeafVoxelCount() const override { return tools::countActiveLeafVoxels(*this); }

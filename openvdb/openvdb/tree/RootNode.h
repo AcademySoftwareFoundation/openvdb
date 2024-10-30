@@ -484,13 +484,8 @@ public:
     template<typename OtherChildType>
     static bool hasCompatibleValueType(const RootNode<OtherChildType>& other);
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 leafCount() const;
     Index64 nonLeafCount() const;
-#else
-    Index32 leafCount() const;
-    Index32 nonLeafCount() const;
-#endif
     Index32 childCount() const;
     Index32 tileCount() const;
     Index32 activeTileCount() const;
@@ -1545,7 +1540,6 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
 template<typename ChildT>
 inline Index64
 RootNode<ChildT>::leafCount() const
@@ -1556,21 +1550,8 @@ RootNode<ChildT>::leafCount() const
     }
     return sum;
 }
-#else
-template<typename ChildT>
-inline Index32
-RootNode<ChildT>::leafCount() const
-{
-    Index32 sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isChild(i)) sum += getChild(i).leafCount();
-    }
-    return sum;
-}
-#endif
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
 template<typename ChildT>
 inline Index64
 RootNode<ChildT>::nonLeafCount() const
@@ -1583,20 +1564,6 @@ RootNode<ChildT>::nonLeafCount() const
     }
     return sum;
 }
-#else
-template<typename ChildT>
-inline Index32
-RootNode<ChildT>::nonLeafCount() const
-{
-    Index32 sum = 1;
-    if (ChildT::LEVEL != 0) {
-        for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-            if (isChild(i)) sum += getChild(i).nonLeafCount();
-        }
-    }
-    return sum;
-}
-#endif
 
 
 template<typename ChildT>
