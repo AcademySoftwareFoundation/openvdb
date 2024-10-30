@@ -78,7 +78,7 @@ function(NANOVDB_EXAMPLE)
   target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util)
   target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb)
 
-  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
+  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${NANOVDB_INSTALL_DOCDIR}/examples)
 endfunction()
 
 # -----------------------------------------------------------------------

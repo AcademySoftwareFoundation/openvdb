@@ -1,0 +1,2 @@
+New Feature:
+- Added fillet() method in tools::LevelSetFilter to round off concave edges to create smoother transition between surfaces. [Contributed by Greg Hurst]
