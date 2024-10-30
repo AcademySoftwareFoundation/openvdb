@@ -501,10 +501,8 @@ public:
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
     void nodeCount(std::vector<Index64> &vec) const;
-#if OPENVDB_ABI_VERSION_NUMBER < 12
     OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &vec) const;
-#endif
 
     bool isValueOn(const Coord& xyz) const;
 
@@ -1735,7 +1733,6 @@ RootNode<ChildT>::nodeCount(std::vector<Index64> &vec) const
     vec[ChildNodeType::LEVEL] = sum;
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER < 12
 template<typename ChildT>
 inline void
 RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
@@ -1753,7 +1750,6 @@ RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
     vec[LEVEL] = 1;// one root node
     vec[ChildNodeType::LEVEL] = sum;
 }
-#endif
 
 ////////////////////////////////////////
 

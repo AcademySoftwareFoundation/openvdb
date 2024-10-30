@@ -282,10 +282,8 @@ public:
     Index32 nonLeafCount() const;
 #endif
     void nodeCount(std::vector<Index64> &vec) const;
-#if OPENVDB_ABI_VERSION_NUMBER < 12
     OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &vec) const;
-#endif
     Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -1148,7 +1146,6 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index64> &vec) const
     vec[ChildNodeType::LEVEL] += count;
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER < 12
 template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
@@ -1164,7 +1161,6 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
     }
     vec[ChildNodeType::LEVEL] += count;
 }
-#endif
 
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
