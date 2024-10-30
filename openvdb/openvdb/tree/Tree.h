@@ -115,11 +115,7 @@ public:
     /// @brief Return the depth of this tree.
     ///
     /// A tree with only a root node and leaf nodes has depth 2, for example.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
-    virtual Index64 treeDepth() const = 0;
-#else
-    virtual Index32 treeDepth() const = 0;
-#endif
+    virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 leafCount() const = 0;
@@ -361,11 +357,7 @@ public:
     /// @brief Return the depth of this tree.
     ///
     /// A tree with only a root node and leaf nodes has depth 2, for example.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
-    Index64 treeDepth() const override { return Index64(DEPTH); }
-#else
-    Index32 treeDepth() const override { return DEPTH; }
-#endif
+    Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 leafCount() const override { return mRoot.leafCount(); }

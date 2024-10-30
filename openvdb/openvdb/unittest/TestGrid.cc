@@ -91,14 +91,13 @@ public:
     bool evalLeafDim(openvdb::Coord& dim) const override
         { dim = openvdb::Coord(0, 0, 0); return false; }
 
+    openvdb::Index treeDepth() const override { return 0; }
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
-    openvdb::Index64 treeDepth() const override { return 0; }
     openvdb::Index64 leafCount() const override { return 0; }
     std::vector<openvdb::Index64> nodeCount() const override
         { return std::vector<openvdb::Index64>(DEPTH, 0); }
     openvdb::Index64 nonLeafCount() const override { return 0; }
 #else
-    openvdb::Index32 treeDepth() const override { return 0; }
     openvdb::Index32 leafCount() const override { return 0; }
     std::vector<openvdb::Index32> nodeCount() const override
         { return std::vector<openvdb::Index32>(DEPTH, 0); }

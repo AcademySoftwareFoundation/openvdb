@@ -58,7 +58,7 @@ TEST_F(TestNodeIterator, testSinglePositive)
 
         EXPECT_TRUE(iter);
         EXPECT_EQ(0U, iter.getDepth());
-        EXPECT_EQ(tree.treeDepth(), openvdb::Index64(1 + iter.getLevel()));
+        EXPECT_EQ(tree.treeDepth(), 1 + iter.getLevel());
         openvdb::CoordBBox range, bbox;
         tree.getIndexRange(range);
         iter.getBoundingBox(bbox);
@@ -108,7 +108,7 @@ TEST_F(TestNodeIterator, testSinglePositive)
 
         EXPECT_TRUE(iter);
         EXPECT_EQ(0U, iter.getDepth());
-        EXPECT_EQ(tree.treeDepth(), openvdb::Index64(1 + iter.getLevel()));
+        EXPECT_EQ(tree.treeDepth(), 1 + iter.getLevel());
         openvdb::CoordBBox range, bbox;
         tree.getIndexRange(range);
         iter.getBoundingBox(bbox);
@@ -163,7 +163,7 @@ TEST_F(TestNodeIterator, testSingleNegative)
 
     EXPECT_TRUE(iter);
     EXPECT_EQ(0U, iter.getDepth());
-    EXPECT_EQ(tree.treeDepth(), openvdb::Index64(1 + iter.getLevel()));
+    EXPECT_EQ(tree.treeDepth(), 1 + iter.getLevel());
     openvdb::CoordBBox range, bbox;
     tree.getIndexRange(range);
     iter.getBoundingBox(bbox);
@@ -217,7 +217,7 @@ TEST_F(TestNodeIterator, testMultipleBlocks)
 
     EXPECT_TRUE(iter);
     EXPECT_EQ(0U, iter.getDepth());
-    EXPECT_EQ(tree.treeDepth(), openvdb::Index64(1 + iter.getLevel()));
+    EXPECT_EQ(tree.treeDepth(), 1 + iter.getLevel());
 
     // Descend to the depth-1 internal node with bounding box
     // (-256, -256, -256) -> (-1, -1, -1) containing voxel (-1, -1, -1).
