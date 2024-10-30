@@ -145,7 +145,7 @@ TEST_F(TestNodeVisitor, testOriginArray)
     using namespace openvdb;
 
     FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
-    
+
     Index64 totalNodeCount(0);
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     std::vector<Index64> nodeCount = grid->tree().nodeCount();
