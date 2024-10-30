@@ -7,7 +7,6 @@ $vcpkgPackages = @(
     "zlib",
     "libpng",
     "openexr",
-    "pdal",
     "tbb",
     "gtest",
     "cppunit",
