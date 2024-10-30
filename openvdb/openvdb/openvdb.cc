@@ -26,14 +26,20 @@
         #error ABI = 10 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_10 suppresses this error
     #endif
 #endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_11
+    #if OPENVDB_ABI_VERSION_NUMBER == 11
+        PRAGMA(message("NOTE: ABI = 11 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_11 "
+            "to suppress this message"))
+    #endif
+#endif
 
 // If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
 // This can be optionally suppressed by defining:
 //   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_FUTURE_ABI_12
-    #if OPENVDB_ABI_VERSION_NUMBER == 12
+#ifndef OPENVDB_USE_FUTURE_ABI_13
+    #if OPENVDB_ABI_VERSION_NUMBER == 13
         #error ABI = 12 is still in active development and has not been finalized, \
-CMake option OPENVDB_USE_FUTURE_ABI_12 suppresses this error
+CMake option OPENVDB_USE_FUTURE_ABI_13 suppresses this error
     #endif
 #endif
 
