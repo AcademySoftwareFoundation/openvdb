@@ -36,9 +36,13 @@ TEST_F(TestNodeVisitor, testNodeCount)
     tools::visitNodesDepthFirst(grid->tree(), nodeCountOp);
 
     std::vector<Index64> nodeCount1 = nodeCountOp.counts;
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     std::vector<Index64> nodeCount2 = grid->tree().nodeCount();
+#else
+    std::vector<Index32> nodeCount2 = grid->tree().nodeCount();
+#endif
 
-    EXPECT_EQ(nodeCount1.size(), nodeCount2.size());
+    EXPECT_EQ(nodeCount1.size(), Index64(nodeCount2.size()));
 
     for (size_t i = 0; i < nodeCount1.size(); i++) {
         EXPECT_EQ(nodeCount1[i], nodeCount2[i]);
@@ -141,10 +145,15 @@ TEST_F(TestNodeVisitor, testOriginArray)
     using namespace openvdb;
 
     FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
-
-    std::vector<Index64> nodeCount = grid->tree().nodeCount();
+    
     Index64 totalNodeCount(0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
+    std::vector<Index64> nodeCount = grid->tree().nodeCount();
     for (Index64 count : nodeCount)     totalNodeCount += count;
+#else
+    std::vector<Index32> nodeCount = grid->tree().nodeCount();
+    for (Index32 count : nodeCount)     totalNodeCount += Index64(count);
+#endif
 
     // use an offset
     size_t offset = 10;
