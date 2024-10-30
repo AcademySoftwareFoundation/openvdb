@@ -1498,7 +1498,6 @@ struct FloatToVec
 
 }
 
-
 TEST_F(TestTools, testTransformValues)
 {
     using openvdb::CoordBBox;

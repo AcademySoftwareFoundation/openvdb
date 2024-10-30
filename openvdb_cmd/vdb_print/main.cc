@@ -210,31 +210,15 @@ printShortListing(const StringVec& filenames, bool metadata)
             // Print the grid's size, in bytes
 
             // no support for memUsageIfLoaded until ABI >= 10 for points::PointDataGrid types
-#if OPENVDB_ABI_VERSION_NUMBER < 10
-            using ListT = openvdb::GridTypes::Remove<openvdb::points::PointDataGrid>;
-#else
             using ListT = openvdb::GridTypes;
-#endif
-            const bool success =
-                grid->apply<ListT>([&](const auto& typed){
-                    // @todo combine these methods to avoid iterating across the tree twice
-                    const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
-                    const openvdb::Index64 total = openvdb::tools::memUsageIfLoaded(typed.tree());
+            grid->apply<ListT>([&](const auto& typed){
+                // @todo combine these methods to avoid iterating across the tree twice
+                const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
+                const openvdb::Index64 total = openvdb::tools::memUsageIfLoaded(typed.tree());
 
-                    std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
-                    std::cout << " " << std::right << std::setw(6) << bytesAsString(total) << " (Total)";
-                });
-
-            (void)success;
-#if OPENVDB_ABI_VERSION_NUMBER < 10
-            if (!success) {
-                // could be a points grid, print in-core memory only
-                grid->apply<openvdb::GridTypes>([&](const auto& typed){
-                    const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
-                    std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
-                });
-            }
-#endif
+                std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
+                std::cout << " " << std::right << std::setw(6) << bytesAsString(total) << " (Total)";
+            });
 
             std::cout << std::endl;
 

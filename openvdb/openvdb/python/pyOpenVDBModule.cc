@@ -6,9 +6,10 @@
 #include <limits>
 #include <string>
 #include <utility> // for std::make_pair()
-#include <pybind11/pybind11.h>
-#include <pybind11/operators.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/operators.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/tuple.h>
 #include <openvdb/openvdb.h>
 #include "pyGrid.h"
 #include "pyutil.h"
@@ -18,16 +19,16 @@
 #include <openvdb_ax/ax.h>
 #endif
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 // Forward declarations
-void exportTransform(py::module_ m);
-void exportMetadata(py::module_ m);
-void exportGridBase(py::module_ m);
-void exportFloatGrid(py::module_ m);
-void exportIntGrid(py::module_ m);
-void exportVec3Grid(py::module_ m);
-void exportPointGrid(py::module_ m);
+void exportTransform(nb::module_ m);
+void exportMetadata(nb::module_ m);
+void exportGridBase(nb::module_ m);
+void exportFloatGrid(nb::module_ m);
+void exportIntGrid(nb::module_ m);
+void exportVec3Grid(nb::module_ m);
+void exportPointGrid(nb::module_ m);
 
 namespace _openvdbmodule {
 
@@ -83,7 +84,7 @@ readFromFile(const std::string& filename, const std::string& gridName)
     if (!vdbFile.hasGrid(gridName)) {
         std::ostringstream os;
         os << "file " << filename << " has no grid named \"" << gridName << "\"";
-        throw py::key_error(os.str());
+        throw nb::key_error(os.str().c_str());
     }
 
     GridBase::Ptr grid = vdbFile.readGrid(gridName);
@@ -129,7 +130,7 @@ readGridMetadataFromFile(const std::string& filename, const std::string& gridNam
     if (!vdbFile.hasGrid(gridName)) {
         std::ostringstream os;
         os << "file " << filename << " has no grid named \"" << gridName <<"\"";
-        throw py::key_error(os.str());
+        throw nb::key_error(os.str().c_str());
     }
 
     return vdbFile.readGridMetadata(gridName);
@@ -241,7 +242,7 @@ setLoggingLevel(const std::string& loggingLevel)
     PyErr_Format(PyExc_ValueError,
         "expected logging level \"debug\", \"info\", \"warn\", \"error\", or \"fatal\","
         " got \"%s\"", levelStr.c_str());
-    throw py::error_already_set();
+    throw nb::python_error();
 }
 
 
@@ -325,22 +326,8 @@ struct VecTypeDescr
 
 ////////////////////////////////////////
 
-
-#ifdef DWA_OPENVDB
-#define PY_OPENVDB_MODULE_NAME  _openvdb
-extern "C" { void init_openvdb(); }
-#else
-#define PY_OPENVDB_MODULE_NAME  pyopenvdb
-extern "C" { void initpyopenvdb(); }
-#endif
-
-PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
+NB_MODULE(openvdb, m)
 {
-    // Don't auto-generate ugly, C++-style function signatures.
-    py::options docOptions;
-    docOptions.disable_function_signatures();
-    docOptions.enable_user_defined_docstrings();
-
     using namespace openvdb::OPENVDB_VERSION_NAME;
 
     // Initialize OpenVDB.
@@ -349,12 +336,12 @@ PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
     openvdb::ax::initialize();
 #endif
 
-#define PYOPENVDB_TRANSLATE_EXCEPTION(_classname)                \
-    py::register_exception_translator([](std::exception_ptr p) { \
-        try {                                                    \
-            if (p) std::rethrow_exception(p);                    \
-        } catch (const _classname &e) {                          \
-            _openvdbmodule::translateException<_classname>(e);   \
+#define PYOPENVDB_TRANSLATE_EXCEPTION(_classname)                              \
+    nb::register_exception_translator([](const std::exception_ptr &p, void*) { \
+        try {                                                                  \
+            std::rethrow_exception(p);                                         \
+        } catch (const _classname &e) {                                        \
+            _openvdbmodule::translateException<_classname>(e);                 \
         } \
     });
 
@@ -383,83 +370,71 @@ PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
 
     m.def("read",
         &_openvdbmodule::readFromFile,
-        "read(filename, gridname) -> Grid\n\n"
         "Read a single grid from a .vdb file.",
-        py::arg("filename"), py::arg("gridname"));
+        nb::arg("filename"), nb::arg("gridname"));
 
 #ifdef PY_OPENVDB_USE_AX
     m.def("ax",
-        py::overload_cast<const std::string&, GridBase::Ptr>(&_openvdbmodule::axrun),
-        "ax(code, grids) -> Grid\n\n"
+        nb::overload_cast<const std::string&, GridBase::Ptr>(&_openvdbmodule::axrun),
         "Run AX code on a VDB grid.",
-        py::arg("code"), py::arg("grid"));
+        nb::arg("code"), nb::arg("grid"));
 
     m.def("ax",
-        py::overload_cast<const std::string&, GridPtrVec&>(&_openvdbmodule::axrun),
-        "ax(code, grids) -> Grid\n\n"
+        nb::overload_cast<const std::string&, GridPtrVec&>(&_openvdbmodule::axrun),
         "Run AX code on some VDB grids.",
-        py::arg("code"), py::arg("grids"));
+        nb::arg("code"), nb::arg("grids"));
 #endif
 
     m.def("readAll",
         &_openvdbmodule::readAllFromFile,
-        "readAll(filename) -> list, dict\n\n"
-        "Read a .vdb file and return a list of grids and\n"
+        "Read a .vdb file and return a list of grids and "
         "a dict of file-level metadata.",
-        py::arg("filename"));
+        nb::arg("filename"));
 
     m.def("readMetadata",
         &_openvdbmodule::readFileMetadata,
-        "readMetadata(filename) -> dict\n\n"
         "Read file-level metadata from a .vdb file.",
-        py::arg("filename"));
+        nb::arg("filename"));
 
     m.def("readGridMetadata",
         &_openvdbmodule::readGridMetadataFromFile,
-        "readGridMetadata(filename, gridname) -> Grid\n\n"
-        "Read a single grid's metadata and transform (but not its tree)\n"
+        "Read a single grid's metadata and transform (but not its tree) "
         "from a .vdb file.",
-        py::arg("filename"), py::arg("gridname"));
+        nb::arg("filename"), nb::arg("gridname"));
 
     m.def("readAllGridMetadata",
         &_openvdbmodule::readAllGridMetadataFromFile,
-        "readAllGridMetadata(filename) -> list\n\n"
-        "Read a .vdb file and return a list of grids populated with\n"
+        "Read a .vdb file and return a list of grids populated with "
         "their metadata and transforms, but not their trees.",
-        py::arg("filename"));
+        nb::arg("filename"));
 
     m.def("write",
-        py::overload_cast<const std::string&, GridBase::ConstPtr, MetaMap>(&_openvdbmodule::writeToFile),
-        "write(filename, grids, metadata=None)\n\n"
-        "Write a grid and (optionally) a dict\n"
+        nb::overload_cast<const std::string&, GridBase::ConstPtr, MetaMap>(&_openvdbmodule::writeToFile),
+        "Write a grid and (optionally) a dict "
         "of (name, value) metadata pairs to a .vdb file.",
-        py::arg("filename"), py::arg("grid"), py::arg("metadata") = py::dict());
+        nb::arg("filename"), nb::arg("grid"), nb::arg("metadata") = nb::dict());
 
     m.def("write",
-        py::overload_cast<const std::string&, const GridCPtrVec&, MetaMap>(&_openvdbmodule::writeToFile),
-        "write(filename, grids, metadata=None)\n\n"
-        "Write a sequence of grids and (optionally) a dict\n"
+        nb::overload_cast<const std::string&, const GridCPtrVec&, MetaMap>(&_openvdbmodule::writeToFile),
+        "Write a sequence of grids and (optionally) a dict "
         "of (name, value) metadata pairs to a .vdb file.",
-        py::arg("filename"), py::arg("grids"), py::arg("metadata") = py::dict());
+        nb::arg("filename"), nb::arg("grids"), nb::arg("metadata") = nb::dict());
 
     m.def("getLoggingLevel", &_openvdbmodule::getLoggingLevel,
-        "getLoggingLevel() -> str\n\n"
-        "Return the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
+        "Return the severity threshold (\"debug\", \"info\", \"warn\", \"error\", "
         "or \"fatal\") for error messages.");
     m.def("setLoggingLevel", &_openvdbmodule::setLoggingLevel,
-        "setLoggingLevel(level)\n\n"
-        "Specify the severity threshold (\"debug\", \"info\", \"warn\", \"error\",\n"
-        "or \"fatal\") for error messages.  Messages of lower severity\n"
+        "Specify the severity threshold (\"debug\", \"info\", \"warn\", \"error\", "
+        "or \"fatal\") for error messages.  Messages of lower severity "
         "will be suppressed.",
-        py::arg("level"));
+        nb::arg("level"));
     m.def("setProgramName", &_openvdbmodule::setProgramName,
-        "setProgramName(name, color=True)\n\n"
-        "Specify the program name to be displayed in error messages,\n"
+        "Specify the program name to be displayed in error messages, "
         "and optionally specify whether to print error messages in color.",
-        py::arg("name"), py::arg("color") = true);
+        nb::arg("name"), nb::arg("color") = true);
 
     // Add some useful module-level constants.
-    m.attr("LIBRARY_VERSION") = py::make_tuple(
+    m.attr("LIBRARY_VERSION") = std::make_tuple(
         openvdb::OPENVDB_LIBRARY_MAJOR_VERSION,
         openvdb::OPENVDB_LIBRARY_MINOR_VERSION,
         openvdb::OPENVDB_LIBRARY_PATCH_VERSION);
@@ -471,4 +446,4 @@ PYBIND11_MODULE(PY_OPENVDB_MODULE_NAME, m)
     pyutil::StringEnum<_openvdbmodule::GridClassDescr>::wrap(m);
     pyutil::StringEnum<_openvdbmodule::VecTypeDescr>::wrap(m);
 
-} // PYBIND11_MODULE
+} // NB_MODULE
