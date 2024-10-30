@@ -131,7 +131,11 @@ public:
     static void getNodeLog2Dims(std::vector<Index>& dims) { dims.push_back(Log2Dim); }
     static Index getChildDim() { return 1; }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     static Index64 leafCount() { return 1; }
+#else
+    static Index32 leafCount() { return 1; }
+#endif
     /// no-op
     void nodeCount(std::vector<Index64> &) const {}
 #if OPENVDB_ABI_VERSION_NUMBER < 12
@@ -139,7 +143,12 @@ public:
     OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &) const {}
 #endif
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     static Index64 nonLeafCount() { return 0; }
+#else
+    static Index32 nonLeafCount() { return 0; }
+#endif
 
     /// Return the number of active voxels.
     Index64 onVoxelCount() const { return mValueMask.countOn(); }

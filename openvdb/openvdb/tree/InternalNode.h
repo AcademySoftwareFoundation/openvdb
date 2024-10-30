@@ -274,13 +274,18 @@ public:
     /// Set the transient data value.
     void setTransientData(Index32 transientData) { mTransientData = transientData; }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 leafCount() const;
+    Index64 nonLeafCount() const;
+#else
+    Index32 leafCount() const;
+    Index32 nonLeafCount() const;
+#endif
     void nodeCount(std::vector<Index64> &vec) const;
 #if OPENVDB_ABI_VERSION_NUMBER < 12
     OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
     void nodeCount(std::vector<Index32> &vec) const;
 #endif
-    Index64 nonLeafCount() const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -1105,6 +1110,7 @@ InternalNode<ChildT, Log2Dim>::~InternalNode()
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
 template<typename ChildT, Index Log2Dim>
 inline Index64
 InternalNode<ChildT, Log2Dim>::leafCount() const
@@ -1116,6 +1122,19 @@ InternalNode<ChildT, Log2Dim>::leafCount() const
     }
     return sum;
 }
+#else
+template<typename ChildT, Index Log2Dim>
+inline Index32
+InternalNode<ChildT, Log2Dim>::leafCount() const
+{
+    if (ChildNodeType::getLevel() == 0) return mChildMask.countOn();
+    Index32 sum = 0;
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        sum += iter->leafCount();
+    }
+    return sum;
+}
+#endif
 
 template<typename ChildT, Index Log2Dim>
 inline void
@@ -1144,6 +1163,7 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
 #endif
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
 template<typename ChildT, Index Log2Dim>
 inline Index64
 InternalNode<ChildT, Log2Dim>::nonLeafCount() const
@@ -1155,6 +1175,19 @@ InternalNode<ChildT, Log2Dim>::nonLeafCount() const
     }
     return sum;
 }
+#else
+template<typename ChildT, Index Log2Dim>
+inline Index32
+InternalNode<ChildT, Log2Dim>::nonLeafCount() const
+{
+    Index32 sum = 1;
+    if (ChildNodeType::getLevel() == 0) return sum;
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        sum += iter->nonLeafCount();
+    }
+    return sum;
+}
+#endif
 
 
 template<typename ChildT, Index Log2Dim>
