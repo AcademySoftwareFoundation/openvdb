@@ -12,7 +12,7 @@
 class TestVolumeExecutable : public CppUnit::TestCase
 {
 public:
-    
+
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     using LeafIndexType = openvdb::Index64;
 #else
