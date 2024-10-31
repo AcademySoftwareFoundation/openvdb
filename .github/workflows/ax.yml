@@ -120,9 +120,9 @@ jobs:
     strategy:
       matrix:
         config:
-          #@note llvm15 never got its own brew formula...
-          # Last macos runner befor M1 (macos-14)
+          # Last macos runner before M1 (macos-14)
           - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '15' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
