@@ -38,7 +38,7 @@
 //   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
 #ifndef OPENVDB_USE_FUTURE_ABI_13
     #if OPENVDB_ABI_VERSION_NUMBER == 13
-        #error ABI = 12 is still in active development and has not been finalized, \
+        #error ABI = 13 is still in active development and has not been finalized, \
 CMake option OPENVDB_USE_FUTURE_ABI_13 suppresses this error
     #endif
 #endif
