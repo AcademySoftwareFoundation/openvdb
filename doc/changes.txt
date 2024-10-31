@@ -21,11 +21,11 @@ GCC 9 is no longer supported.
 
 @par
 OpenVDB:
-  New features:
+- New features:
   - Added tools::LevelSetFilter::fillet() method to round off concave edges
     to create smoother transition between surfaces.
 
-  Improvements:
+- Improvements:
   - Added openvdb::assertAbort to replace cassert and a
     @c OPENVDB_ENABLE_ASSERTS cmake argument/compile define to toggle
     assertions in OpenVDB code, independantly of NDEBUG. Asserts are
@@ -67,12 +67,12 @@ OpenVDB:
     LeafNode::setValueOnlyUnsafe(), LeafNode::setValueOnUnsafe(),
     LeafNode::setValueOffUnsafe().
 
-  ABI changes:
+- ABI changes:
   - Tree::leafCount(), Tree::unallocatedLeafCount(),
     Tree::nonLeafCount() and Tree::nodeCount() now use Index64 in their
     return types instead of Index32.
 
-  API Changes:
+- API Changes:
   - RootNode::tileCount(), RootNode::activeTileCount() and
     RootNode::inactiveTileCount() are now public.
   - RootNode::hasKey() and RootNode::coordToKey() are now public.
@@ -84,7 +84,7 @@ OpenVDB:
   - LeafNode::leafCount() and LeafNode::nonLeafCount() now use Index64 instead
     of Index32. The Index32 variant is deprecated.
 
-  Bug Fixes:
+- Bug Fixes:
   - Fix potential crash reading corrupt .vdb files with invalid
     blosc or zip chunks.
     <I>[Reported&nbsp;by&nbsp;Matthias&nbsp;Ueberheide]</I>
