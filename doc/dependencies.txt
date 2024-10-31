@@ -70,7 +70,7 @@ LLVM           | 13.0.0  | 15.0.0*     | Target-independent code generation     
 Bison          | 3.7.0   | 3.7.0       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6.4   | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 3.10    | 3.11        | The python interpreter and libraries                              | Y       | Y        | https://www.python.org
-nanobind       | 2.0.0   | Latest      | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
+nanobind       | 2.0.0   | 2.1.0       | C++/python bindings                                               | Y       | Y        | https://nanobind.readthedocs.io
 NumPy          | 1.23.0  | 1.26.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit

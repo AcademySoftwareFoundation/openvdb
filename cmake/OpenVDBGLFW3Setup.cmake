@@ -109,18 +109,6 @@ endif()
 set(glfw3_FIND_VERSION ${MINIMUM_GLFW_VERSION})
 find_package(glfw3 ${MINIMUM_GLFW_VERSION} REQUIRED)
 
-# We only use find_package_handle_standard_args to verify and print
-# appropriate messages. This now explicitly errors in 3.19...
-# @todo Improve this entire GLFW3 search
-#  https://gitlab.kitware.com/cmake/cmake/-/issues/21505
-if(${CMAKE_VERSION} VERSION_LESS 3.19)
-  find_package(PackageHandleStandardArgs)
-  find_package_handle_standard_args(glfw3
-    REQUIRED_VARS glfw3_DIR glfw3_FOUND
-    VERSION_VAR glfw3_VERSION
-  )
-endif()
-
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_GLFW_VERSION)
   if(glfw3_VERSION VERSION_LESS ${FUTURE_MINIMUM_GLFW_VERSION})
     message(DEPRECATION "Support for GLFW versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
