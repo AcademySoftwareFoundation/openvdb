@@ -7,15 +7,32 @@
 <B>Version 12.0.0</B> - <I>October 31, 2024</I>
 
 @par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 10 for Houdini&nbsp;20.0 and 11 for Houdini&nbsp;20.5.
+</BLOCKQUOTE>
+
+<BLOCKQUOTE>
+GCC 9 is no longer supported.
+</BLOCKQUOTE>
+
+@par
 OpenVDB:
 - Improvements:
+    New features:
+    - Added fillet() method in tools::LevelSetFilter to round off concave edges
+      to create smoother transition between surfaces.
+
+    Improvements:
     - Added openvdb::assertAbort to replace cassert and a
-      OPENVDB_ENABLE_ASSERTS cmake argument/compile define to toggle
+      @c OPENVDB_ENABLE_ASSERTS cmake argument/compile define to toggle
       assertions in OpenVDB code, independantly of NDEBUG. Asserts are
       no longer enabled by default in when NDEBUG is absent (e.g.
       Debug builds).
-    - Removed last traces of Boost when OPENVDB_USE_DELAYED_LOADING is OFF
-      [Reported by Brian McKinnon]
+    - Removed last traces of Boost when @c OPENVDB_USE_DELAYED_LOADING is OFF
+      <I>[Reported&nbsp;by&nbsp;Brian&nbsp;McKinnon]</I>
     - RootNode code cleanup to eliminate redundant key conversion and
       to create map values in-place.
     - Add RootNode::deleteChildOrTile() to delete a child or tile of
@@ -23,22 +40,61 @@ OpenVDB:
     - ValueAccessors are now defined and created in the Tree class
       instead of in the Grid class so that custom Tree implementations
       may define and create their own ValueAccessors if desired.
+    - Added support for PDAL to vdb_tool [Contributed by Tom Matterson]
+    - LeafManager and NodeManager now use Index64 for leaf counts internally.
+    - Added RootNode::probeChild() const.
+    - Added RootNode::probeChild() and RootNode::probeConstChild().
+    - Added RootNode::probe() and RootNode::probeConst() to query key presence,
+      child node, value and active state.
+    - Added InternalNode::probeChild() const.
+    - Added InternalNode::probeChild() and probeChildConst() with coord access
+      and optionally value and active state.
+    - Added InternalNode::probeChild() and probeChildConst() with index access
+      and optionally value and active state.
+    - Added InternalNode::isValueOff(), LeafNode::isValueOff(),
+      LeafNodeBool::isValueOff(), LeafNodeMask::isValueOff().
+    - Added LeafNodeMask::probeValue(Index,val), LeafNodeBool::probeValue(Index,val).
+    - Added RootNode::getValueUnsafe(), RootNode::getChildUnsafe(),
+      RootNode::getConstChildUnsafe().
+    - Added InternalNode::getValueUnsafe(), InternalNode::getChildUnsafe(),
+      InternalNode::getConstChildUnsafe().
+    - Added InternalNode::setActiveStateUnsafe(), InternalNode::setValueOnlyUnsafe(),
+      InternalNode::setValueOnUnsafe(), InternalNode::setValueOffUnsafe().
+    - Added InternalNode::setChildUnsafe(), InternalNode::resetChildUnsafe(),
+      InternalNode::stealChildUnsafe(), InternalNode::deleteChildUnsafe().
+    - For LeafNode, LeafNodeBool and LeafNodeMask - added
+      LeafNode::getValueUnsafe(), LeafNode::setActiveStateunsafe(),
+      LeafNode::setValueOnlyUnsafe(), LeafNode::setValueOnUnsafe(),
+      LeafNode::setValueOffUnsafe().
 
-- API Changes:
+    ABI changes:
+    - Tree::leafCount(), Tree::unallocatedLeafCount(),
+      Tree::nonLeafCount() and Tree::nodeCount() now use Index64 in their
+      return types instead of Index32.
+
+    API Changes:
     - RootNode::tileCount(), RootNode::activeTileCount() and
       RootNode::inactiveTileCount() are now public.
     - RootNode::hasKey() and RootNode::coordToKey() are now public.
+    - RootNode::leafCount(), RootNode::nonLeafCount() and RootNode::nodeCount()
+      now use Index64 instead of Index32. The Index32 variant is deprecated.
+    - InternalNode::leafCount(), InternalNode::nonLeafCount() and
+      InternalNode::nodeCount() now use Index64 instead of Index32. The Index32
+      variant is deprecated.
+    - LeafNode::leafCount() and LeafNode::nonLeafCount() now use Index64 instead
+      of Index32. The Index32 variant is deprecated.
 
-- Bug Fixes:
+    Bug Fixes:
     - Fix potential crash reading corrupt .vdb files with invalid
       blosc or zip chunks.
-      [Fix thanks to Matthias Ueberheide]
+      <I>[Reported&nbsp;by&nbsp;Matthias&nbsp;Ueberheide]</I>
+
     - Fix a bug in RootNode::setOrigin() where the origin was updated
       before the error was thrown potentially leaving the root in an
       invalid state.
     - Fixed a thread sanitizer issue which could cause undefined
       behaviour in VolumeToSpheres::fillWithSpheres
-      [Reported by Jérémie Dumas]
+      <I>[Reported&nbsp;by&nbsp;Jérémie&nbsp;Dumas]</I>
     - Fixed an occurance of undefined behaviour in tools::activate
       (though this would typically not have manifested with any
       unintended behaviour)
@@ -75,7 +131,7 @@ NanoVDB:
 - API Changes:
     - Change mapToGridType to toGridType.
     - Change mapToMagic to toMagic.
-    - Change CpuTimer.h to Timer.h.
+    - Change <TT>CpuTimer.h</TT> to <TT>Timer.h</TT>.
 
 - API Changes (details):
     - These APIs are now under the math namespace: Ray, DDA, HDDA,
@@ -108,33 +164,33 @@ NanoVDB:
     - Move nanovdb::GpuTimer to nanovdb::util::cuda::Timer.
     - Move and rename nanovdb::CountOn to nanovdb::util::countOn.
 
-    - Move util/GridHandle.h to GridHandle.h.
-    - Move util/BuildGrid.h to tools/GridBuilder.h.
-    - Move util/GridBuilder.h to tools/GridBuilder.h.
-    - Move util/IO.h to io/IO.h.
-    - Move util/CSampleFromVoxels.h to math/CSampleFromVoxels.h.
-    - Move util/DitherLUT.h to math/DitherLUT.h.
-    - Move util/HDDA.h to math/HDDA.h.
-    - Move util/Ray.h to math/Ray.h.
-    - Move util/SampleFromVoxels.h to math/SampleFromVoxels.h.
-    - Move util/Stencils.h to nanovdb/math/Stencils.h.
-    - Move util/CreateNanoGrid.h to tools/CreateNanoGrid.h.
-    - Move and rename util/Primitives.h to tools/CreatePrimitives.h.
-    - Move util/GridChecksum.h to tools/GridChecksum.h.
-    - Move util/GridStats.h to tools/GridStats.h.
-    - Move util/GridChecksum.h to tools/GridChecksum.h.
-    - Move util/GridValidator.h to tools/GridValidator.h.
-    - Move util/NanoToOpenVDB.h to tools/NanoToOpenVDB.h.
-    - Move util/cuda/CudaGridChecksum.cuh to tools/cuda/CudaGridChecksum.cuh.
-    - Move util/cuda/CudaGridStats.cuh to tools/cuda/CudaGridStats.cuh.
-    - Move util/cuda/CudaGridValidator.cuh to tools/cuda/CudaGridValidator.cuh.
-    - Move util/cuda/CudaIndexToGrid.cuh to tools/cuda/CudaIndexToGrid.cuh.
-    - Move and rename util/cuda/CudaPointsToGrid.cuh to tools/cuda/PointsToGrid.cuh.
-    - Move util/cuda/CudaSignedFloodFill.cuh to tools/cuda/CudaSignedFloodFill.cuh.
-    - Move and rename util/cuda/CudaDeviceBuffer.h to cuda/DeviceBuffer.h.
-    - Move and rename util/cuda/CudaGridHandle.cuh to cuda/GridHandle.cuh.
-    - Move and rename util/cuda/CudaUtils.h to util/cuda/Util.h.
-    - Move and consolidate util/cuda/GpuTimer.h to util/cuda/Timer.h.
+    - Move <TT>util/GridHandle.h</TT> to <TT>GridHandle.h</TT>.
+    - Move <TT>util/BuildGrid.h</TT> to <TT>tools/GridBuilder.h</TT>.
+    - Move <TT>util/GridBuilder.h</TT> to <TT>tools/GridBuilder.h</TT>.
+    - Move <TT>util/IO.h</TT> to <TT>io/IO.h</TT>.
+    - Move <TT>util/CSampleFromVoxels.h</TT> to <TT>math/CSampleFromVoxels.h</TT>.
+    - Move <TT>util/DitherLUT.h</TT> to <TT>math/DitherLUT.h</TT>.
+    - Move <TT>util/HDDA.h</TT> to <TT>math/HDDA.h</TT>.
+    - Move <TT>util/Ray.h</TT> to <TT>math/Ray.h</TT>.
+    - Move <TT>util/SampleFromVoxels.h</TT> to <TT>math/SampleFromVoxels.h</TT>.
+    - Move <TT>util/Stencils.h</TT> to <TT>nanovdb/math/Stencils.h</TT>.
+    - Move <TT>util/CreateNanoGrid.h</TT> to <TT>tools/CreateNanoGrid.h</TT>.
+    - Move and rename <TT>util/Primitives.h</TT> to <TT>tools/CreatePrimitives.h</TT>.
+    - Move <TT>util/GridChecksum.h</TT> to <TT>tools/GridChecksum.h</TT>.
+    - Move <TT>util/GridStats.h</TT> to <TT>tools/GridStats.h</TT>.
+    - Move <TT>util/GridChecksum.h</TT> to <TT>tools/GridChecksum.h</TT>.
+    - Move <TT>util/GridValidator.h</TT> to <TT>tools/GridValidator.h</TT>.
+    - Move <TT>util/NanoToOpenVDB.h</TT> to <TT>tools/NanoToOpenVDB.h</TT>.
+    - Move <TT>util/cuda/CudaGridChecksum.cuh to tools/cuda/CudaGridChecksum.cuh.
+    - Move <TT>util/cuda/CudaGridStats.cuh to tools/cuda/CudaGridStats.cuh.
+    - Move <TT>util/cuda/CudaGridValidator.cuh to tools/cuda/CudaGridValidator.cuh.
+    - Move <TT>util/cuda/CudaIndexToGrid.cuh to tools/cuda/CudaIndexToGrid.cuh.
+    - Move and rename <TT>util/cuda/CudaPointsToGrid.cuh to tools/cuda/PointsToGrid.cuh.
+    - Move <TT>util/cuda/CudaSignedFloodFill.cuh to tools/cuda/CudaSignedFloodFill.cuh.
+    - Move and rename <TT>util/cuda/CudaDeviceBuffer.h</TT> to <TT>cuda/DeviceBuffer.h</TT>.
+    - Move and rename <TT>util/cuda/CudaGridHandle.cuh to cuda/GridHandle.cuh.
+    - Move and rename <TT>util/cuda/CudaUtils.h</TT> to <TT>util/cuda/Util.h</TT>.
+    - Move and consolidate <TT>util/cuda/GpuTimer.h</TT> to <TT>util/cuda/Timer.h</TT>.
 
 @par
 Python:
@@ -145,7 +201,7 @@ Python:
 
 @par
 Houdini:
-    - When OPENVDB_ENABLE_RPATH is ON, the location of
+    - When @c OPENVDB_ENABLE_RPATH is ON, the location of
       libopenvdb_houdini is now added to the rpath of all Houdini
       dsos.
 
@@ -153,11 +209,11 @@ Houdini:
 Build:
     - Fixed an issue with OpenVDB AX's CMake on Windows where the
       static and shared library targets would have the same name
-      [Reported by Nicholas Yue]
-    - USE_EXPLICIT_INSTANTIATION is now disabled on Windows by default
+      <I>[Reported&nbsp;by&nbsp;Nicholas&nbsp;Yue]</I>
+    - @c USE_EXPLICIT_INSTANTIATION is now disabled on Windows by default
       due to OOM linker issues.
     - Jemalloc is now the preferred allocator of choice on all
-      platforms when CONCURRENT_MALLOC is set to Auto.
+      platforms when @c CONCURRENT_MALLOC is set to Auto.
     - Fixed an issue with the Blosc CMake FindPackage for the OpenVDB
       Windows static library.
 
