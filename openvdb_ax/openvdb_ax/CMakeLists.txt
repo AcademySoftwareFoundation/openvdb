@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # There is a bug introduced with LLVM 14 config files which causes CMake to
 # complain if the project is not init-ted with LANGUAGES C

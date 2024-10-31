@@ -514,7 +514,7 @@ You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
 OpenVDB as a dependency:
 
 @code{.cmake}
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)

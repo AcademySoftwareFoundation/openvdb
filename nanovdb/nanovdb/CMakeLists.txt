@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
@@ -81,11 +81,9 @@ if(NANOVDB_USE_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-    # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-      set(CMAKE_CUDA_ARCHITECTURES 75)
-    endif()
+  # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
+  if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
   endif()
 
   enable_language(CUDA)
