@@ -238,10 +238,8 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 19.5              | 9           |
 Houdini  | 20.0              | 10          |
-Maya     | 2018              | Any         |
-Maya     | 2019              | Any         |
+Houdini  | 20.5              | 11          |
 
 @subsection buildBuildHou Building Against Houdini
 
