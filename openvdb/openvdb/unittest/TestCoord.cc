@@ -19,6 +19,22 @@ TEST_F(TestCoord, testCoord)
 {
     using openvdb::Coord;
 
+    // Test min max consexpr
+    static_assert(Coord::min() == Coord(std::numeric_limits<Coord::Int32>::min()));
+    static_assert(Coord::max() == Coord(std::numeric_limits<Coord::Int32>::max()));
+
+    // Test constexpr construction and x(), y(), z() constexprness
+    constexpr Coord coord{1, 2, 3};
+    static_assert(coord.x() ==  1);
+    static_assert(coord.y() ==  2);
+    static_assert(coord.z() ==  3);
+
+    // Test constexpr default construction and x(), y(), z() constexprness
+    constexpr Coord coordOrigin{};
+    static_assert(coordOrigin.x() ==  0);
+    static_assert(coordOrigin.y() ==  0);
+    static_assert(coordOrigin.z() ==  0);
+
     for (int i=0; i<3; ++i) {
         EXPECT_EQ(Coord::min()[i], std::numeric_limits<Coord::Int32>::min());
         EXPECT_EQ(Coord::max()[i], std::numeric_limits<Coord::Int32>::max());
