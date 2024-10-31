@@ -75,10 +75,13 @@ private:
 /// class SphereVoxelizer : public ConvexVoxelizer<GridType, SphereVoxelizer<GridType>>
 /// {
 ///     using GridPtr = typename GridType::Ptr;
-///     using BaseT = ConvexVoxelizer<GridType, SphereVoxelizer<GridType>>;
 ///
+///     using BaseT = ConvexVoxelizer<GridType, SphereVoxelizer<GridType>>;
 ///     using BaseT::mXYData;
 ///     using BaseT::tileCeil;
+///
+///     using ValueT = typename BaseT::ValueT;
+///     using Vec3T  = typename BaseT::Vec3T;
 ///
 /// public:
 ///
@@ -89,21 +92,24 @@ private:
 ///     {
 ///     }
 ///
+///     template <typename ScalarT>
 ///     void
-///     operator()(const Vec3s& pt, const float& r)
+///     operator()(const math::Vec3<ScalarT>& pt, const ScalarT& r)
 ///     {
-///         if (r <= 0.0f)
+///         static_assert(std::is_floating_point<ScalarT>::value);
+///
+///         if (r <= 0)
 ///             return;
 ///
-///         initialize(pt, r);
+///         initialize<ScalarT>(pt, r);
 ///
 ///         BaseT::iterate();
 ///     }
 ///
 /// private:
 ///
-///     inline float
-///     signedDistance(const Vec3s& p) const
+///     inline ValueT
+///     signedDistance(const Vec3T& p) const
 ///     {
 ///         return (p - mPt).length() - mRad;
 ///     }
@@ -113,13 +119,13 @@ private:
 ///     {
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
-///         for (float x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
+///         for (ValueT x = tileCeil(mX - mORad, step); x <= mX + mORad; x += step)
 ///             mXYData.expandYRange(x, BaseT::circleBottom(mX, mY, mORad, x),
 ///                 BaseT::circleTop(mX, mY, mORad, x));
 ///     }
 ///
-///     std::function<bool(float&, float&, const float&, const float&)> sphereBottomTop =
-///     [this](float& zb, float& zt, const float& x, const float& y)
+///     std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> sphereBottomTop =
+///     [this](ValueT& zb, ValueT& zt, const ValueT& x, const ValueT& y)
 ///     {
 ///         zb = BaseT::sphereBottom(mX, mY, mZ, mORad, x, y);
 ///         zt = BaseT::sphereTop(mX, mY, mZ, mORad, x, y);
@@ -127,15 +133,16 @@ private:
 ///         return std::isfinite(zb) && std::isfinite(zt);
 ///     };
 ///
+///     template <typename ScalarT>
 ///     inline void
-///     initialize(const Vec3s& pt, const float& r)
+///     initialize(const math::Vec3<ScalarT>& pt, const ScalarT& r)
 ///     {
-///         const float vx = BaseT::voxelSize(),
-///                     hw = BaseT::halfWidth();
+///         const ValueT vx = BaseT::voxelSize(),
+///                      hw = BaseT::halfWidth();
 ///
 ///         // sphere data in index space
-///         mPt = pt/vx;
-///         mRad = r/vx;
+///         mPt = Vec3T(pt)/vx;
+///         mRad = ValueT(r)/vx;
 ///
 ///         mX = mPt.x(); mY = mPt.y(); mZ = mPt.z();
 ///
@@ -145,8 +152,8 @@ private:
 ///         BaseT::bottomTop = sphereBottomTop;
 ///     }
 ///
-///     Vec3s mPt;
-///     float mRad, mORad, mX, mY, mZ;
+///     Vec3T mPt;
+///     ValueT mRad, mORad, mX, mY, mZ;
 /// };
 ///
 /// // usage:
@@ -163,7 +170,6 @@ template <typename GridType, typename Derived, typename InterruptType = util::Nu
 class ConvexVoxelizer
 {
     using GridPtr = typename GridType::Ptr;
-    using ValueT  = typename GridType::ValueType;
 
     using TreeT = typename GridType::TreeType;
     using RootT = typename TreeT::RootNodeType;
@@ -172,6 +178,14 @@ class ConvexVoxelizer
     using NodeChainT = typename RootT::NodeChainType;
 
     using AccessorT = typename GridType::Accessor;
+
+protected:
+
+    using ValueT = typename GridType::ValueType;
+    using Vec3T  = math::Vec3<ValueT>;
+    using Vec2T  = math::Vec2<ValueT>;
+
+    static_assert(std::is_floating_point<ValueT>::value);
 
 public:
 
@@ -186,10 +200,10 @@ public:
     /// meaning the voxel size and background value need to be set prior to voxelization
     ConvexVoxelizer(GridPtr& grid, const bool& threaded = false, InterruptType* interrupter = nullptr)
     : mTree(grid->tree())
-    , mVox(float((grid->voxelSize())[0]))
-    , mBgF(float(grid->background()))
-    , mNegBgF(float(-(grid->background())))
-    , mHw(float(grid->background())/float((grid->voxelSize())[0]))
+    , mVox(ValueT((grid->voxelSize())[0]))
+    , mBgF(ValueT(grid->background()))
+    , mNegBgF(ValueT(-(grid->background())))
+    , mHw(ValueT(grid->background()/(grid->voxelSize())[0]))
     , mBg(grid->background())
     , mNegBg(-(grid->background()))
     , mSerial(!threaded)
@@ -200,10 +214,10 @@ public:
     virtual ~ConvexVoxelizer() = default;
 
     /// @brief Return the voxel size of the grid.
-    inline float voxelSize() const { return mVox; }
+    inline ValueT voxelSize() const { return mVox; }
 
     /// @brief Return the half width of the narrow-band level set.
-    inline float halfWidth() const { return mHw; }
+    inline ValueT halfWidth() const { return mHw; }
 
 private:
 
@@ -257,7 +271,7 @@ protected:
     /// @param step The step size for setting the XY range data, defaults to 1.
     /// @note Function to be implemented by derived classes to set XY range data.
     /// This function is called at most 4 times within @c iterate().
-    void setXYRangeData(const Index& step = 1) {}
+    void setXYRangeData(const Index&) {}
 
     /// @brief Checks if the tile of a given dimension can possibly fit within the region.
     ///
@@ -275,7 +289,7 @@ protected:
     /// @brief Computes the signed distance from a point to the convex region in index space.
     ///
     /// @param p The point in 3D space for which to compute the signed distance.
-    inline float signedDistance(const Vec3s&) const { return 0.0f; }
+    inline ValueT signedDistance(const Vec3T&) const { return ValueT(0); }
 
     /// @brief Computes the signed distance for tiles in index space,
     /// considering the center of the tile.
@@ -287,8 +301,8 @@ protected:
     /// A tile might not fully fit in an open prism but might fit in the union of a prism and wedge,
     /// and so in this case it might make sense to use the sdf for an offset triangle on tiles
     /// during the open prism scan.
-    inline float
-    tilePointSignedDistance(const Vec3s& p) const
+    inline ValueT
+    tilePointSignedDistance(const Vec3T& p) const
     {
         return static_cast<const Derived*>(this)->signedDistance(p);
     }
@@ -302,8 +316,8 @@ protected:
     /// @param[in] y The y ordinate of the infinte line.
     /// @return true if an intersection occurs; otherwise false.
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
-    std::function<bool(float&, float&, const float&, const float&)> bottomTop =
-        [](float&, float&, const float&, const float&) { return false; };
+    std::function<bool(ValueT&, ValueT&, const ValueT&, const ValueT&)> bottomTop =
+        [](ValueT&, ValueT&, const ValueT&, const ValueT&) { return false; };
 
     // ------------ utilities ------------
 
@@ -311,14 +325,14 @@ protected:
     /// @param x Input value.
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
-    inline static float
-    tileCeil(const float& x, const float& step)
+    inline static ValueT
+    tileCeil(const ValueT& x, const ValueT& step)
     {
-        const float offset = 0.5f * (step - 1.0f);
+        const ValueT offset = ValueT(0.5) * (step - ValueT(1));
 
-        return step == 1.0f
-            ? static_cast<float>(math::Ceil(perturbDown(x)))
-            : step * static_cast<float>(math::Ceil(perturbDown((x - offset)/step))) + offset;
+        return step == ValueT(1)
+            ? static_cast<ValueT>(math::Ceil(perturbDown(x)))
+            : step * static_cast<ValueT>(math::Ceil(perturbDown((x - offset)/step))) + offset;
     }
 
     /// @brief Rounds an input scalar up to the nearest valid ordinate of tile of a specified size.
@@ -327,12 +341,12 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     template <typename T>
-    inline static float
-    tileCeil(const float& x, const T& step)
+    inline static ValueT
+    tileCeil(const ValueT& x, const T& step)
     {
         static_assert(std::is_integral<T>::value, "Index must be an integral type");
 
-        const float s = static_cast<float>(step);
+        const ValueT s = static_cast<ValueT>(step);
 
         return tileCeil(x, s);
     }
@@ -341,14 +355,14 @@ protected:
     /// @param x Input value.
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
-    inline static float
-    tileFloor(const float& x, const float& step)
+    inline static ValueT
+    tileFloor(const ValueT& x, const ValueT& step)
     {
-        const float offset = 0.5f * (step - 1.0f);
+        const ValueT offset = ValueT(0.5) * (step - ValueT(1));
 
-        return step == 1.0f
-            ? static_cast<float>(math::Floor(perturbUp(x)))
-            : step * static_cast<float>(math::Floor(perturbUp((x - offset)/step))) + offset;
+        return step == ValueT(1)
+            ? static_cast<ValueT>(math::Floor(perturbUp(x)))
+            : step * static_cast<ValueT>(math::Floor(perturbUp((x - offset)/step))) + offset;
     }
 
     /// @brief Rounds an input scalar down to the nearest valid ordinate of tile of a specified size.
@@ -357,12 +371,12 @@ protected:
     /// @param step Tile step size.
     /// @return The ceiling of the value based on the tile size.
     template <typename T>
-    inline static float
-    tileFloor(const float& x, const T& step)
+    inline static ValueT
+    tileFloor(const ValueT& x, const T& step)
     {
         static_assert(std::is_integral<T>::value, "Index must be an integral type");
 
-        const float s = static_cast<float>(step);
+        const ValueT s = static_cast<ValueT>(step);
 
         return tileFloor(x, s);
     }
@@ -373,9 +387,9 @@ protected:
     /// @param r Radius of the circle.
     /// @param x X-coordinate for which to compute the bottom y-coordinate.
     /// @return The y-coordinate at the bottom of the circle for the given x position.
-    inline static float
-    circleBottom(const float& x0, const float& y0,
-                 const float& r, const float& x)
+    inline static ValueT
+    circleBottom(const ValueT& x0, const ValueT& y0,
+                 const ValueT& r, const ValueT& x)
     {
         return y0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
     }
@@ -386,9 +400,9 @@ protected:
     /// @param r Radius of the circle.
     /// @param x X-coordinate for which to compute the top y-coordinate.
     /// @return The y-coordinate at the top of the circle for the given x position.
-    inline static float
-    circleTop(const float& x0, const float& y0,
-              const float& r, const float& x)
+    inline static ValueT
+    circleTop(const ValueT& x0, const ValueT& y0,
+              const ValueT& r, const ValueT& x)
     {
         return y0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0));
     }
@@ -401,9 +415,9 @@ protected:
     /// @param x X-coordinate for which to compute the bottom z-coordinate.
     /// @param y Y-coordinate for which to compute the bottom z-coordinate.
     /// @return The z-coordinate at the bottom of the sphere for the given (x, y) position.
-    inline static float
-    sphereBottom(const float& x0, const float& y0, const float& z0,
-                 const float& r, const float& x, const float& y)
+    inline static ValueT
+    sphereBottom(const ValueT& x0, const ValueT& y0, const ValueT& z0,
+                 const ValueT& r, const ValueT& x, const ValueT& y)
     {
         return z0 - math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
     }
@@ -416,9 +430,9 @@ protected:
     /// @param x X-coordinate for which to compute the top z-coordinate.
     /// @param y Y-coordinate for which to compute the top z-coordinate.
     /// @return The z-coordinate at the top of the sphere for the given (x, y) position.
-    inline static float
-    sphereTop(const float& x0, const float& y0, const float& z0,
-              const float& r, const float& x, const float& y)
+    inline static ValueT
+    sphereTop(const ValueT& x0, const ValueT& y0, const ValueT& z0,
+              const ValueT& r, const ValueT& x, const ValueT& y)
     {
         return z0 + math::Sqrt(math::Pow2(r) - math::Pow2(x-x0) - math::Pow2(y-y0));
     }
@@ -430,11 +444,8 @@ protected:
     /// using a configurable step size.
     /// It allows updating, expanding, and resetting the y ranges, as well as merging data from other instances
     /// and trimming invalid entries.
-    /// @note @c ValueType must be a scalar or integral type.
-    template <typename ValueType>
     class XYRangeData
     {
-        static_assert(std::is_arithmetic_v<ValueType>, "Not an arithmetic type");
 
     public:
 
@@ -445,7 +456,7 @@ protected:
         /// @param xmin The lower bound of the x range.
         /// @param xmax The upper bound of the x range.
         /// @param step The step size between x values. Defaults to 1.
-        XYRangeData(const ValueType& xmin, const ValueType& xmax, const Index& step = 1)
+        XYRangeData(const ValueT& xmin, const ValueT& xmax, const Index& step = 1)
         {
             reset(xmin, xmax, step);
         }
@@ -458,7 +469,7 @@ protected:
         /// @param ymax The new maximum y value to compare with and possibly update
         /// the current maximum at x.
         inline void
-        expandYRange(const ValueType& x, const ValueType& ymin, const ValueType& ymax)
+        expandYRange(const ValueT& x, const ValueT& ymin, const ValueT& ymax)
         {
             expandYMin(x, ymin);
             expandYMax(x, ymax);
@@ -469,7 +480,7 @@ protected:
         /// @param x The x value.
         /// @param ymin The minimum y value to possibly be set.
         inline void
-        expandYMin(const ValueType& x, const ValueType& ymin)
+        expandYMin(const ValueT& x, const ValueT& ymin)
         {
             const Index i = worldToIndex(x);
 
@@ -482,7 +493,7 @@ protected:
         /// @param x The x value.
         /// @param ymax The maximum y value to possibly be set.
         inline void
-        expandYMax(const ValueType& x, const ValueType& ymax)
+        expandYMax(const ValueT& x, const ValueT& ymax)
         {
             const Index i = worldToIndex(x);
 
@@ -495,7 +506,7 @@ protected:
         /// @param x The x value.
         /// @param y The y value to use for expanding the range.
         inline void
-        expandYRange(const ValueType& x, const ValueType& y)
+        expandYRange(const ValueT& x, const ValueT& y)
         {
             if (std::isfinite(y)) {
                 const Index i = worldToIndex(x);
@@ -513,7 +524,7 @@ protected:
         /// @param x The x value.
         /// @param ymin The minimum y value to reset.
         inline void
-        setYMin(const ValueType& x, const ValueType& ymin)
+        setYMin(const ValueT& x, const ValueT& ymin)
         {
             const Index i = worldToIndex(x);
 
@@ -525,7 +536,7 @@ protected:
         /// @param x The x value.
         /// @param ymax The maximum y value to reset.
         inline void
-        setYMax(const ValueType& x, const ValueType& ymax)
+        setYMax(const ValueT& x, const ValueT& ymax)
         {
             const Index i = worldToIndex(x);
 
@@ -535,7 +546,7 @@ protected:
         /// @brief Clears the y range for a given x value, setting it to an empty interval.
         /// @param x The x value.
         inline void
-        clearYRange(const ValueType& x)
+        clearYRange(const ValueT& x)
         {
             const Index i = worldToIndex(x);
 
@@ -549,12 +560,12 @@ protected:
         /// @param xmax The upper bound of the x range.
         /// @param step The step size between x values. Defaults to 1.
         inline void
-        reset(const ValueType& xmin, const ValueType& xmax, const Index& step = 1)
+        reset(const ValueT& xmin, const ValueT& xmax, const Index& step = 1)
         {
             assert(step != 0);
 
             mStep = step;
-            mStepInv = ValueType(1)/static_cast<ValueType>(mStep);
+            mStepInv = ValueT(1)/static_cast<ValueT>(mStep);
 
             mXStart = tileCeil(xmin, mStep);
             mXEnd = tileFloor(xmax, mStep);
@@ -575,38 +586,38 @@ protected:
 
         /// @brief Retrieves the starting x value in the range.
         /// @return The start of the x range.
-        inline ValueType start() const { return mXStart; }
+        inline ValueT start() const { return mXStart; }
 
         /// @brief Retrieves the ending x value in the range.
         /// @return The end of the x range.
-        inline ValueType end() const { return mXEnd; }
+        inline ValueT end() const { return mXEnd; }
 
         /// @brief Converts an index to its corresponding x value.
         /// @param i The index value.
         /// @return The corresponding x value.
-        inline ValueType getX(const Index& i) const { return indexToWorld(i); }
+        inline ValueT getX(const Index& i) const { return indexToWorld(i); }
 
         /// @brief Gets the minimum y value for a given index.
         /// @param i The index value.
         /// @return The minimum y value.
-        inline ValueType getYMin(const Index& i) const { assert(i < mSize); return mYMins[i]; }
+        inline ValueT getYMin(const Index& i) const { assert(i < mSize); return mYMins[i]; }
 
         /// @brief Gets the maximum y value for a given index.
         /// @param i The index value.
         /// @return The maximum y value.
-        inline ValueType getYMax(const Index& i) const { assert(i < mSize); return mYMaxs[i]; }
+        inline ValueT getYMax(const Index& i) const { assert(i < mSize); return mYMaxs[i]; }
 
         /// @brief Gets the minimum y value for a given x value.
         /// @param x The x value.
         /// @return The minimum y value at the given x.
         /// @note @c x is rounded to the nearest value in the x range.
-        inline ValueType getYMin(const float& x) const { return mYMins[worldToIndex(x)]; }
+        inline ValueT getYMin(const ValueT& x) const { return mYMins[worldToIndex(x)]; }
 
         /// @brief Gets the maximum y value for a given x value.
         /// @param x The x value.
         /// @return The maximum y value at the given x.
         /// @note @c x is rounded to the nearest value in the x range.
-        inline ValueType getYMax(const float& x) const { return mYMaxs[worldToIndex(x)]; }
+        inline ValueT getYMax(const ValueT& x) const { return mYMaxs[worldToIndex(x)]; }
 
         /// @brief Retrieves the x, ymin, and ymax values for a given index.
         /// @param x Output parameter for the x value.
@@ -614,7 +625,7 @@ protected:
         /// @param ymax Output parameter for the maximum y value.
         /// @param i The index to query.
         inline void
-        XYData(ValueType& x, ValueType& ymin, ValueType& ymax, const Index& i) const
+        XYData(ValueT& x, ValueT& ymin, ValueT& ymax, const Index& i) const
         {
             x = indexToWorld(i);
             ymin = mYMins[i];
@@ -625,14 +636,14 @@ protected:
         /// over the overlapping x range.
         /// @param xydata The XYRangeData to merge with.
         inline void
-        merge(const XYRangeData<ValueType>& xydata)
+        merge(const XYRangeData& xydata)
         {
             assert(mStep == xydata.step());
 
-            const ValueType start = xydata.start(), end = xydata.end();
+            const ValueT start = xydata.start(), end = xydata.end();
 
-            const std::vector<ValueType>& ymins = xydata.mYMins;
-            const std::vector<ValueType>& ymaxs = xydata.mYMaxs;
+            const std::vector<ValueT>& ymins = xydata.mYMins;
+            const std::vector<ValueT>& ymaxs = xydata.mYMaxs;
 
             if (start < mXStart) {
                 const Index n = indexDistance(mXStart, start);
@@ -669,7 +680,7 @@ protected:
             }
 
             if (i == mSize) {
-                mSize = 0; mXStart = ValueType(0); mXEnd = ValueType(0);
+                mSize = 0; mXStart = ValueT(0); mXEnd = ValueT(0);
                 mYMins.clear(); mYMaxs.clear();
                 return;
             }
@@ -685,8 +696,8 @@ protected:
                 return;
 
             mSize -= i + j;
-            mXStart += ValueType(i * mStep);
-            mXEnd -= ValueType(j * mStep);
+            mXStart += ValueT(i * mStep);
+            mXEnd -= ValueT(j * mStep);
 
             if (i > 0) {
                 mYMins.erase(mYMins.begin(), mYMins.begin() + i);
@@ -701,18 +712,18 @@ protected:
 
     private:
 
-        inline static const float
-            MINVALUE = std::numeric_limits<ValueType>::lowest(),
-            MAXVALUE = std::numeric_limits<ValueType>::max();
+        inline static const ValueT
+            MINVALUE = std::numeric_limits<ValueT>::lowest(),
+            MAXVALUE = std::numeric_limits<ValueT>::max();
 
         inline Index
-        indexDistance(const ValueType& a, const ValueType& b)
+        indexDistance(const ValueT& a, const ValueT& b)
         {
             return Index(math::Round(mStepInv*math::Abs(a - b)));
         }
 
         inline Index
-        worldToIndex(const ValueType& x) const
+        worldToIndex(const ValueT& x) const
         {
             const Index i = Index(math::Round(mStepInv*(x - mXStart)));
             assert(i < mSize);
@@ -720,43 +731,43 @@ protected:
             return i;
         }
 
-        inline ValueType
+        inline ValueT
         indexToWorld(const Index i) const
         {
             assert(i < mSize);
 
-            return mXStart + ValueType(i * mStep);
+            return mXStart + ValueT(i * mStep);
         }
 
         Index mStep, mSize;
 
-        ValueType mStepInv, mXStart, mXEnd;
+        ValueT mStepInv, mXStart, mXEnd;
 
-        std::vector<ValueType> mYMins, mYMaxs;
+        std::vector<ValueT> mYMins, mYMaxs;
 
     }; // class XYRangeData
 
     // ------------ protected members ------------
 
-    XYRangeData<float> mXYData;
+    XYRangeData mXYData;
 
 private:
 
 #define EPS 0.0005f
-    inline static float perturbDown(const float& x) { return x - EPS; }
-    inline static float perturbUp(const float& x) { return x + EPS; }
+    inline static ValueT perturbDown(const ValueT& x) { return x - ValueT(EPS); }
+    inline static ValueT perturbUp(const ValueT& x) { return x + ValueT(EPS); }
 #undef EPS
 
-    inline static float
-    voxelCeil(const float& x)
+    inline static ValueT
+    voxelCeil(const ValueT& x)
     {
-        return static_cast<float>(math::Ceil(perturbDown(x)));
+        return static_cast<ValueT>(math::Ceil(perturbDown(x)));
     }
 
-    inline static float
-    voxelFloor(const float& x)
+    inline static ValueT
+    voxelFloor(const ValueT& x)
     {
-        return static_cast<float>(math::Floor(perturbUp(x)));
+        return static_cast<ValueT>(math::Floor(perturbUp(x)));
     }
 
     // skips the need for negative tile population and internal leap frogging
@@ -858,27 +869,27 @@ private:
     iterateYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
-        float x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
         if (!std::isfinite(yb) || !std::isfinite(yt))
             return;
 
-        float zb, zt;
+        ValueT zb, zt;
 
-        for (float y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
+        for (ValueT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3s p(x, y, 0.0f);
+            Vec3T p(x, y, ValueT(0));
 
             ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
 
-            for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
+            for (ValueT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
-                const float val = float(acc.template getValue<1>(ijk));
+                const ValueT val = acc.template getValue<1>(ijk);
 
                 if (val == mNegBgF) {
                     if constexpr (LeapFrog) acc.template leapUp<false>(ijk, z);
@@ -886,12 +897,12 @@ private:
                 }
 
                 p[2] = z;
-                const float dist = mVox * invokeSignedDistance(p);
+                const ValueT dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBgF) {
                     acc.template setValueOff<1,false>(ijk, mNegBg);
                 } else if (dist < val) {
-                    acc.template setValueOn<1,false>(ijk, ValueT(dist));
+                    acc.template setValueOn<1,false>(ijk, dist);
                 } else { // dist >= val
                     acc.template checkReset<1>(ijk);
                 }
@@ -906,37 +917,37 @@ private:
     iterateNoTilesYZ(const Index& i, CacheLastLeafAccessor& acc)
     {
         // initialize x value and y-range
-        float x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
         if (!std::isfinite(yb) || !std::isfinite(yt))
             return;
 
-        float zb, zt;
+        ValueT zb, zt;
 
-        for (float y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
+        for (ValueT y = voxelCeil(yb); y <= perturbUp(yt); ++y) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3s p(x, y, 0.0f);
+            Vec3T p(x, y, ValueT(0));
 
             bool early_break = false;
-            float z_stop;
+            ValueT z_stop;
 
             ijk[2] = Int32(voxelCeil(zb))-1;
             acc.reset(ijk);
-            for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
+            for (ValueT z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
                 p[2] = z;
-                const float dist = mVox * invokeSignedDistance(p);
+                const ValueT dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBgF) {
                     early_break = true;
                     z_stop = z;
                     break;
                 } else if (dist < mBgF) {
-                    acc.template setValueOn<1>(ijk, ValueT(dist));
+                    acc.template setValueOn<1>(ijk, dist);
                 } else { // dist >= mBg
                     acc.template checkReset<1>(ijk);
                 }
@@ -944,15 +955,15 @@ private:
             if (early_break) {
                 ijk[2] = Int32(voxelFloor(zt))+1;
                 acc.reset(ijk);
-                for (float z = voxelFloor(zt); z > z_stop; --z) {
+                for (ValueT z = voxelFloor(zt); z > z_stop; --z) {
                     ijk[2] = Int32(z);
                     p[2] = z;
-                    const float dist = mVox * invokeSignedDistance(p);
+                    const ValueT dist = mVox * invokeSignedDistance(p);
 
                     if (dist <= mNegBgF) {
                         break;
                     } else if (dist < mBgF) {
-                        acc.template setValueOn<-1>(ijk, ValueT(dist));
+                        acc.template setValueOn<-1>(ijk, dist);
                     } else { // dist >= mBg
                         acc.template checkReset<-1>(ijk);
                     }
@@ -979,7 +990,7 @@ private:
     tileIterateYZ(const Index& i, AccessorT& acc)
     {
         // initialize x value and y-range
-        float x, yb, yt;
+        ValueT x, yb, yt;
         mXYData.XYData(x, yb, yt, i);
 
         if (!std::isfinite(yb) || !std::isfinite(yt))
@@ -987,17 +998,17 @@ private:
 
         static const Index TILESIZE = NodeT::DIM;
 
-        float zb, zt;
+        ValueT zb, zt;
 
-        for (float y = tileCeil(yb, TILESIZE); y <= perturbUp(yt); y += TILESIZE) {
+        for (ValueT y = tileCeil(yb, TILESIZE); y <= perturbUp(yt); y += TILESIZE) {
             if (!bottomTop(zb, zt, x, y))
                 continue;
 
             Coord ijk(Int32(x), Int32(y), Int32(0));
-            Vec3s p(x, y, 0.0f);
+            Vec3T p(x, y, ValueT(0));
 
             bool tiles_added = false;
-            float z = tileCeil(zb, TILESIZE) - 2*TILESIZE;
+            ValueT z = tileCeil(zb, TILESIZE) - 2*TILESIZE;
             while (z <= tileFloor(zt, TILESIZE) + TILESIZE) {
                 ijk[2] = Int32(z);
                 p[2] = z;
@@ -1013,7 +1024,7 @@ private:
 
     template <typename NodeT, int dir>
     inline bool
-    leapFrogToNextTile(const Coord& ijk, float& z, AccessorT& acc) const
+    leapFrogToNextTile(const Coord& ijk, ValueT& z, AccessorT& acc) const
     {
         static const int offset  = NodeT::DIM;
         static const int nodeDepth = int(TreeT::DEPTH - NodeT::LEVEL - 1);
@@ -1032,11 +1043,11 @@ private:
             return false;
         }
 
-        const float sz = (float)mTileSizes[depth];
+        const ValueT sz = ValueT(mTileSizes[depth]);
 
         z = dir > 0
-            ? sz * float(math::Ceil(z/sz)) + 0.5f * (offset - 1.0f)
-            : sz * float(math::Floor(z/sz)) - 0.5f * (offset + 1.0f);
+            ? sz * ValueT(math::Ceil(z/sz)) + ValueT(0.5)*(offset-1)
+            : sz * ValueT(math::Floor(z/sz)) - ValueT(0.5)*(offset+1);
 
         return true;
     }
@@ -1044,7 +1055,7 @@ private:
     // add negative background tile inside the object if it fits and return true iff it was added
     template<typename NodeT>
     inline bool
-    addTile(const Vec3s& p, const Coord& ijk, AccessorT& acc)
+    addTile(const Vec3T& p, const Coord& ijk, AccessorT& acc)
     {
         static const Index LEVEL = NodeT::LEVEL + 1;
 
@@ -1058,14 +1069,14 @@ private:
 
     template <typename NodeT>
     inline bool
-    tileFits(const Vec3s& p) const
+    tileFits(const Vec3T& p) const
     {
         static const Index TILESIZE = NodeT::DIM;
 
-        static const float R1 = 0.500f * (TILESIZE-1),
-                           R2 = 0.866f * (TILESIZE-1);
+        static const ValueT R1 = ValueT(0.500)*(TILESIZE-1),
+                            R2 = ValueT(0.866)*(TILESIZE-1);
 
-        const float dist = invokeTilePointSignedDistance(p);
+        const ValueT dist = invokeTilePointSignedDistance(p);
 
         // fast positive criterion: circumsribed ball is in the object
         if (dist <= -R2-mHw)
@@ -1076,36 +1087,36 @@ private:
             return false;
 
         // convexity: the tile is in the object iff all corners are in the object
-        return invokeTilePointSignedDistance(p + Vec3s(-R1, -R1, -R1)) < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(-R1, -R1, R1))  < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(-R1, R1, -R1))  < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(-R1, R1, R1))   < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(R1, -R1, -R1))  < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(R1, -R1, R1))   < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(R1, R1, -R1))   < -mHw
-            && invokeTilePointSignedDistance(p + Vec3s(R1, R1, R1))    < -mHw;
+        return invokeTilePointSignedDistance(p + Vec3T(-R1, -R1, -R1)) < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(-R1, -R1, R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(-R1, R1, -R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(-R1, R1, R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(R1, -R1, -R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(R1, -R1, R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(R1, R1, -R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3T(R1, R1, R1))    < -mHw;
     }
-    
+
     inline void
     invokeSetXYRangeData(const Index& step = 1)
     {
         static_cast<Derived*>(this)->setXYRangeData(step);
     }
-    
+
     inline bool
     invokeTileCanFit(const Index& dim) const
     {
         return static_cast<const Derived*>(this)->tileCanFit(dim);
     }
 
-    inline float
-    invokeSignedDistance(const Vec3s& p) const
+    inline ValueT
+    invokeSignedDistance(const Vec3T& p) const
     {
         return static_cast<const Derived*>(this)->signedDistance(p);
     }
 
-    inline float
-    invokeTilePointSignedDistance(const Vec3s& p) const
+    inline ValueT
+    invokeTilePointSignedDistance(const Vec3T& p) const
     {
         return static_cast<const Derived*>(this)->tilePointSignedDistance(p);
     }
@@ -1262,15 +1273,15 @@ private:
         /// @param ijk The coordinate to be examined.
         /// @param z The Z-coordinate to be adjusted.
         template<bool Check = true>
-        inline void leapUp(const Coord& ijk, float& z)
+        inline void leapUp(const Coord& ijk, ValueT& z)
         {
             if (isVoxel<1,Check>(ijk))
                 return;
 
             const int depth = mAcc.getValueDepth(ijk);
-            const float sz = (float)mTileSizes[depth];
+            const ValueT sz = ValueT(mTileSizes[depth]);
 
-            z = sz * float(math::Ceil((z+1.0f)/sz)) - 1.0f;
+            z = sz * ValueT(math::Ceil((z+ValueT(1))/sz)) - ValueT(1);
         }
 
     private:
@@ -1333,9 +1344,7 @@ private:
 
     const std::vector<int> mTileSizes = treeTileSizes();
 
-    const float mVox, mBgF, mNegBgF, mHw;
-
-    const ValueT mBg, mNegBg;
+    const ValueT mVox, mBgF, mNegBgF, mHw, mBg, mNegBg;
 
     // misc
 
