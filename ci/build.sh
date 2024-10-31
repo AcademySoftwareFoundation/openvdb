@@ -185,6 +185,7 @@ set -x
 #   regardless of the 'test' component being enabled or not (see the OPENVDB_BUILD_PYTHON_UNITTESTS option).
 cmake \
     -DOPENVDB_USE_DEPRECATED_ABI_10=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_11=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_TOOL=ON \
