@@ -3,6 +3,8 @@ OpenVDB Version History
 
 Version 12.0.0 - October 31, 2024
 
+      OpenVDB is now licensed under the Apache 2.0 license, instead of the MPL 2.0 license.
+
       This version introduces ABI changes relative to older major releases,
       so to preserve ABI compatibility it might be necessary to define the
       macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 10 for

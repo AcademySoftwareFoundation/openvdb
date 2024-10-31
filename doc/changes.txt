@@ -8,6 +8,11 @@
 
 @par
 <BLOCKQUOTE>
+OpenVDB is now licensed under the Apache&nbsp;2.0 license, instead of the MPL&nbsp;2.0 license.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
 This version introduces ABI changes relative to older major releases, so to
 preserve ABI compatibility it might be necessary to define the macro
 <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
