@@ -2201,7 +2201,7 @@ RootNode<ChildT>::fill(const CoordBBox& bbox, const ValueType& value, bool activ
                         // with the tile's value and active state.
                         const Tile& tile = getTile(iter);
                         child = new ChildT(xyz, tile.value, tile.active);
-                        mTable.emplace(tileMin, *child);
+                        setChild(iter, *child);
                     } else if (isChild(iter)) {
                         child = &getChild(iter);
                     }
