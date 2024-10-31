@@ -605,13 +605,6 @@ OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_
 for all its dependencies. For imported Boost compatibility, the following
 versions of CMake are required:
 
-  - Boost 1.73 requires CMake 3.17.2 or newer.
-  - Boost 1.74 requires CMake 3.19 or newer.
-  - Boost 1.75 requires CMake 3.19.5 or newer.
-  - Boost 1.76 requires CMake 3.20.3 or newer.
-  - Boost 1.77 requires CMake 3.21.3 or newer.
-  - Boost 1.78 requires CMake 3.22.2 or newer.
-  - Boost 1.79 requires CMake 3.23.2 or newer.
   - Boost 1.80 requires CMake 3.24.2 or newer.
   - Boost 1.81 requires CMake 3.25.2 or newer.
   - Boost 1.82 requires CMake 3.27.0 or newer.
