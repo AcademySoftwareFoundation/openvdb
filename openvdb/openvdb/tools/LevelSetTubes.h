@@ -292,7 +292,7 @@ private:
     //    but, for examples, it's possible for a2 and a3 to swap if the stadium is more vertical
 
     inline void
-    setXYRangeData(const Index& step = 1) override
+    setXYRangeData(const Index& step = 1)
     {
         const float stepf = float(step);
 
@@ -384,7 +384,7 @@ private:
     }
 
     inline bool
-    tileCanFit(const Index& dim) const override
+    tileCanFit(const Index& dim) const
     {
         return mRad >= BaseT::halfWidth() + 0.70711f * (float(dim)-1.0f);
     }
@@ -520,7 +520,8 @@ private:
 
     // world space points and radius inputs
     // initializes class members in index space
-    inline void initialize(const Vec3s& pt1, const Vec3s& pt2, const float& r)
+    inline void
+    initialize(const Vec3s& pt1, const Vec3s& pt2, const float& r)
     {
         const float vx = BaseT::voxelSize(),
                     hw = BaseT::halfWidth();
@@ -656,7 +657,7 @@ public:
 private:
 
     inline void
-    setXYRangeData(const Index& step = 1) override
+    setXYRangeData(const Index& step = 1)
     {
         const float stepf = float(step);
 
@@ -824,7 +825,7 @@ private:
     }
 
     inline bool
-    tileCanFit(const Index& dim) const override
+    tileCanFit(const Index& dim) const
     {
         return math::Max(mRad1, mRad2) >= BaseT::halfWidth() + 0.70711f * (float(dim)-1.0f);
     }

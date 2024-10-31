@@ -109,7 +109,7 @@ private:
 ///     }
 ///
 ///     inline void
-///     setXYRangeData(const Index& step = 1) override
+///     setXYRangeData(const Index& step = 1)
 ///     {
 ///         mXYData.reset(mX - mORad, mX + mORad, step);
 ///
@@ -226,7 +226,7 @@ protected:
         static const Index LEAFDIM = LeafT::DIM;
 
         // objects too thin to have negative background tiles
-        if (!tileCanFit(LEAFDIM)) {
+        if (!invokeTileCanFit(LEAFDIM)) {
             thinIterate();
             return;
         }
@@ -255,22 +255,21 @@ protected:
     /// This function should store the data in @c mXYData.
     ///
     /// @param step The step size for setting the XY range data, defaults to 1.
-    /// @note Virtual function to be implemented by derived classes to set XY range data.
+    /// @note Function to be implemented by derived classes to set XY range data.
     /// This function is called at most 4 times within @c iterate().
-    virtual void setXYRangeData(const Index& step = 1) = 0;
+    void setXYRangeData(const Index& step = 1) {}
 
     /// @brief Checks if the tile of a given dimension can possibly fit within the region.
     ///
-    /// This is a virtual function and can be overridden by derived classes. However, the derived
-    /// class does not need to implement it if the default behavior is acceptable, which assumes a
-    /// tile can always possibly fit.
+    /// The derived class does not need to implement it if the default behavior is acceptable,
+    /// which assumes a tile can always possibly fit.
     ///
     /// @param dim The dimension of the tile in which to check if the tile fits.
     /// @note This is meant as a short-circuting method: if a tile of a given dimension
     /// can't fit then @c iterate will not try to populate the level set with background
     /// tiles of this dimension.
     /// @return true if the tile can possibly fit; otherwise false.
-    virtual inline bool tileCanFit(const Index&) const { return true; }
+    inline bool tileCanFit(const Index&) const { return true; }
 
     // distance in index space
     /// @brief Computes the signed distance from a point to the convex region in index space.
@@ -303,7 +302,6 @@ protected:
     /// @param[in] y The y ordinate of the infinte line.
     /// @return true if an intersection occurs; otherwise false.
     /// @note The derived class can override this lambda to implement different behavior for degenerate cases.
-    /// This function is called many times, so a lambda is used to avoid virtual table overhead.
     std::function<bool(float&, float&, const float&, const float&)> bottomTop =
         [](float&, float&, const float&, const float&) { return false; };
 
@@ -764,7 +762,7 @@ private:
     // skips the need for negative tile population and internal leap frogging
     inline void thinIterate()
     {
-        setXYRangeData();
+        invokeSetXYRangeData();
 
         // false means disable internal leap frogging
         iterateXYZ<false>();
@@ -779,8 +777,8 @@ private:
         static const Index DIM = NodeT::DIM;
 
         // only attempt to add negative background tiles at this level if they can fit
-        if (tileCanFit(DIM)) {
-            setXYRangeData(DIM);
+        if (invokeTileCanFit(DIM)) {
+            invokeSetXYRangeData(DIM);
 
             tileIterateXYZ<NodeT>();
         }
@@ -793,7 +791,7 @@ private:
     inline void
     iterateLeaf()
     {
-        setXYRangeData();
+        invokeSetXYRangeData();
 
         // true means enable internal leap frogging
         iterateXYZ<true>();
@@ -888,7 +886,7 @@ private:
                 }
 
                 p[2] = z;
-                const float dist = mVox * sDist(p);
+                const float dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBgF) {
                     acc.template setValueOff<1,false>(ijk, mNegBg);
@@ -931,7 +929,7 @@ private:
             for (float z = voxelCeil(zb); z <= perturbUp(zt); ++z) {
                 ijk[2] = Int32(z);
                 p[2] = z;
-                const float dist = mVox * sDist(p);
+                const float dist = mVox * invokeSignedDistance(p);
 
                 if (dist <= mNegBgF) {
                     early_break = true;
@@ -949,7 +947,7 @@ private:
                 for (float z = voxelFloor(zt); z > z_stop; --z) {
                     ijk[2] = Int32(z);
                     p[2] = z;
-                    const float dist = mVox * sDist(p);
+                    const float dist = mVox * invokeSignedDistance(p);
 
                     if (dist <= mNegBgF) {
                         break;
@@ -1067,7 +1065,7 @@ private:
         static const float R1 = 0.500f * (TILESIZE-1),
                            R2 = 0.866f * (TILESIZE-1);
 
-        const float dist = tpDist(p);
+        const float dist = invokeTilePointSignedDistance(p);
 
         // fast positive criterion: circumsribed ball is in the object
         if (dist <= -R2-mHw)
@@ -1078,24 +1076,36 @@ private:
             return false;
 
         // convexity: the tile is in the object iff all corners are in the object
-        return tpDist(p + Vec3s(-R1, -R1, -R1)) < -mHw
-            && tpDist(p + Vec3s(-R1, -R1, R1))  < -mHw
-            && tpDist(p + Vec3s(-R1, R1, -R1))  < -mHw
-            && tpDist(p + Vec3s(-R1, R1, R1))   < -mHw
-            && tpDist(p + Vec3s(R1, -R1, -R1))  < -mHw
-            && tpDist(p + Vec3s(R1, -R1, R1))   < -mHw
-            && tpDist(p + Vec3s(R1, R1, -R1))   < -mHw
-            && tpDist(p + Vec3s(R1, R1, R1))    < -mHw;
+        return invokeTilePointSignedDistance(p + Vec3s(-R1, -R1, -R1)) < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(-R1, -R1, R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(-R1, R1, -R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(-R1, R1, R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(R1, -R1, -R1))  < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(R1, -R1, R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(R1, R1, -R1))   < -mHw
+            && invokeTilePointSignedDistance(p + Vec3s(R1, R1, R1))    < -mHw;
+    }
+    
+    inline void
+    invokeSetXYRangeData(const Index& step = 1)
+    {
+        static_cast<Derived*>(this)->setXYRangeData(step);
+    }
+    
+    inline bool
+    invokeTileCanFit(const Index& dim) const
+    {
+        return static_cast<const Derived*>(this)->tileCanFit(dim);
     }
 
     inline float
-    sDist(const Vec3s& p) const
+    invokeSignedDistance(const Vec3s& p) const
     {
         return static_cast<const Derived*>(this)->signedDistance(p);
     }
 
     inline float
-    tpDist(const Vec3s& p) const
+    invokeTilePointSignedDistance(const Vec3s& p) const
     {
         return static_cast<const Derived*>(this)->tilePointSignedDistance(p);
     }

@@ -166,7 +166,7 @@ public:
 private:
 
     inline void
-    setXYRangeData(const Index& step = 1) override
+    setXYRangeData(const Index& step = 1)
     {
         const float &x1 = mPts[0].x(), &x2 = mPts[1].x(), &x3 = mPts[2].x(),
                     &x4 = mPts[3].x(), &x5 = mPts[4].x(), &x6 = mPts[5].x();
@@ -247,7 +247,7 @@ private:
     }
 
     inline bool
-    tileCanFit(const Index& dim) const override
+    tileCanFit(const Index& dim) const
     {
         return mRad >= BaseT::halfWidth() + 0.5f * (float(dim)-1.0f);
     }
@@ -469,7 +469,7 @@ private:
 
     // computes *approximate* xy-range data: the projected caps might contain over-inclusive values
     inline void
-    setXYRangeData(const Index& step = 1) override
+    setXYRangeData(const Index& step = 1)
     {
         const float stepf = float(step);
 
@@ -688,7 +688,7 @@ private:
     }
 
     inline bool
-    tileCanFit(const Index& dim) const override
+    tileCanFit(const Index& dim) const
     {
         return mRad >= BaseT::halfWidth() + 0.5f * (float(dim)-1.0f);
     }
