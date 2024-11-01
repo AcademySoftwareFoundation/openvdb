@@ -199,10 +199,8 @@ public:
     /// @note The voxel size and half width are determined from the input grid,
     /// meaning the voxel size and background value need to be set prior to voxelization
     ConvexVoxelizer(GridPtr& grid, const bool& threaded = false, InterruptType* interrupter = nullptr)
-    : mTree(grid->tree())
+    : mGrid(grid)
     , mVox(ValueT((grid->voxelSize())[0]))
-    , mBgF(ValueT(grid->background()))
-    , mNegBgF(ValueT(-(grid->background())))
     , mHw(ValueT(grid->background()/(grid->voxelSize())[0]))
     , mBg(grid->background())
     , mNegBg(-(grid->background()))
@@ -259,7 +257,7 @@ protected:
             return;
 
         if (!mSerial)
-            tools::signedFloodFill(mTree);
+            tools::signedFloodFill(getTree());
     }
 
     // ------------ derived classes need to implement these ------------
@@ -817,7 +815,7 @@ private:
         const Index n = mXYData.size();
 
         if (mSerial) {
-            CacheLastLeafAccessor acc(mTree);
+            CacheLastLeafAccessor acc(getTree());
             for (Index i = 0; i < n; ++i) {
                 if (mInterrupter && !(i & ((1 << 7) - 1)) && !checkInterrupter())
                     return;
@@ -825,7 +823,7 @@ private:
                 iterateYZ<LeapFrog>(i, acc);
             }
         } else {
-            tbb::enumerable_thread_specific<TreeT> pool(mTree);
+            tbb::enumerable_thread_specific<TreeT> pool(getTree());
 
             auto kernel = [&](const tbb::blocked_range<Index>& rng) {
                 TreeT &tree = pool.local();
@@ -853,7 +851,7 @@ private:
                 void operator()(RangeT &r) { for (auto i=r.begin(); i!=r.end(); ++i) this->merge(*i);}
                 void join(Op &other) { this->merge(*(other.mTree)); }
                 void merge(TreeT &tree) { mTree->merge(tree, MERGE_ACTIVE_STATES); }
-            } op( mTree );
+            } op( getTree() );
             tbb::parallel_reduce(RangeT(pool.begin(), pool.end(), 4), op);
         }
     }
@@ -891,7 +889,7 @@ private:
                 ijk[2] = Int32(z);
                 const ValueT val = acc.template getValue<1>(ijk);
 
-                if (val == mNegBgF) {
+                if (val == mNegBg) {
                     if constexpr (LeapFrog) acc.template leapUp<false>(ijk, z);
                     continue;
                 }
@@ -899,7 +897,7 @@ private:
                 p[2] = z;
                 const ValueT dist = mVox * invokeSignedDistance(p);
 
-                if (dist <= mNegBgF) {
+                if (dist <= mNegBg) {
                     acc.template setValueOff<1,false>(ijk, mNegBg);
                 } else if (dist < val) {
                     acc.template setValueOn<1,false>(ijk, dist);
@@ -942,11 +940,11 @@ private:
                 p[2] = z;
                 const ValueT dist = mVox * invokeSignedDistance(p);
 
-                if (dist <= mNegBgF) {
+                if (dist <= mNegBg) {
                     early_break = true;
                     z_stop = z;
                     break;
-                } else if (dist < mBgF) {
+                } else if (dist < mBg) {
                     acc.template setValueOn<1>(ijk, dist);
                 } else { // dist >= mBg
                     acc.template checkReset<1>(ijk);
@@ -960,9 +958,9 @@ private:
                     p[2] = z;
                     const ValueT dist = mVox * invokeSignedDistance(p);
 
-                    if (dist <= mNegBgF) {
+                    if (dist <= mNegBg) {
                         break;
-                    } else if (dist < mBgF) {
+                    } else if (dist < mBg) {
                         acc.template setValueOn<-1>(ijk, dist);
                     } else { // dist >= mBg
                         acc.template checkReset<-1>(ijk);
@@ -976,7 +974,7 @@ private:
     void
     tileIterateXYZ()
     {
-        AccessorT acc(mTree);
+        AccessorT acc(getTree());
         for (Index i = 0; i < mXYData.size(); ++i) {
             if (mInterrupter && !(i & ((1 << 7) - 1)) && !checkInterrupter())
                 return;
@@ -1159,6 +1157,8 @@ private:
         return true;
     }
 
+    inline TreeT& getTree() { return mGrid->tree(); }
+
     // ------------ private nested classes ------------
 
     /// @brief A class that caches access to the last leaf node.
@@ -1338,13 +1338,11 @@ private:
 
     // ------------ private members ------------
 
-    // grid & tree data
-
-    TreeT &mTree;
+    GridPtr mGrid;
 
     const std::vector<int> mTileSizes = treeTileSizes();
 
-    const ValueT mVox, mBgF, mNegBgF, mHw, mBg, mNegBg;
+    const ValueT mVox, mHw, mBg, mNegBg;
 
     // misc
 
