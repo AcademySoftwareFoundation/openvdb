@@ -76,23 +76,15 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2024', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2024', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2024', abi: '11', build: 'Debug',   cmake: '' }
-          - { cxx: clang++, image: '2023', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: g++,     image: '2023', abi: '11', build: 'Release', cmake: '' }
-          - { cxx: clang++, image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { cxx: g++,     image: '2022', abi: '10', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: clang++, image: '2024', abi: '12', build: 'Release', cmake: '' }
+          - { cxx: g++,     image: '2024', abi: '12', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2024', abi: '12', build: 'Debug',   cmake: '' }
+          - { cxx: clang++, image: '2023', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
+          - { cxx: g++,     image: '2023', abi: '11', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
-    - name: Enable Node 16
-      # Solution taken from https://github.blog/changelog/2024-03-07-github-actions-all-actions-will-run-on-node20-instead-of-node16-by-default
-      if: contains(matrix.config.image, '2022')
-      run: |
-        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: nanobind
-      #if: contains(matrix.config.image, '2023') == false
       run: ./ci/install_nanobind.sh 2.0.0
     - name: glfw
       if: contains(matrix.config.image, '2023') == true

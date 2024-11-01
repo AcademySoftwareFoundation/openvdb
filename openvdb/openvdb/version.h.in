@@ -175,10 +175,10 @@
     // This can be suppressed by defining OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
     // Note that, whilst the VDB CMake does not allow this option to be hit,
     // it exists to propagate this message to downstream targets
-    #if OPENVDB_ABI_VERSION_NUMBER == 12
-        #ifndef OPENVDB_USE_FUTURE_ABI_12
-            PRAGMA(message("NOTE: ABI = 12 is still in active development and has not been finalized, "
-                "define OPENVDB_USE_FUTURE_ABI_11 to suppress this message"))
+    #if OPENVDB_ABI_VERSION_NUMBER == 13
+        #ifndef OPENVDB_USE_FUTURE_ABI_13
+            PRAGMA(message("NOTE: ABI = 13 is still in active development and has not been finalized, "
+                "define OPENVDB_USE_FUTURE_ABI_13 to suppress this message"))
         #endif
     #else
         #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
@@ -192,6 +192,12 @@
 #ifndef OPENVDB_USE_DEPRECATED_ABI_10
     #if OPENVDB_ABI_VERSION_NUMBER == 10
         PRAGMA(message("NOTE: ABI = 10 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_10 "
+            "to suppress this message"))
+    #endif
+#endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_11
+    #if OPENVDB_ABI_VERSION_NUMBER == 11
+        PRAGMA(message("NOTE: ABI = 11 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_11 "
             "to suppress this message"))
     #endif
 #endif
