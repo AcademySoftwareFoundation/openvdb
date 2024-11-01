@@ -70,17 +70,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '19.5', platform: 'linux_x86_64_gcc9.3',  hou_hash: '19_5' }
-          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc9.3',  hou_hash: '20_0-oldabi' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
       image: aswf/ci-base:2024
     steps:
-    - name: Enable Node 16
-      run: |
-        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
     # with the Houdini download script. In so doing we broke some of the caching
@@ -172,9 +167,6 @@ jobs:
           - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
-    - name: Enable Node 16
-      run: |
-        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: nanobind
       #if: contains(container.image, '2023') == false
@@ -224,7 +216,7 @@ jobs:
           ./ci/build.sh -v
           --build-type=Release
           --components=\"core,axcore,python,bin,render,test,axbin\"
-          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
+          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DOPENVDB_USE_DELAYED_LOADING=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
       - name: test
         run: cd build && ctest -V
 
@@ -303,20 +295,10 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2023-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2023-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          # Standalone
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core', cmake: '' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core', cmake: '' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core', cmake: '' }
+          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
-      - name: Enable Node 16
-        if: contains(matrix.config.image, '2022')
-        run: |
-          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: nanobind
         #f: contains(matrix.config.image, '2023') == false
@@ -364,9 +346,7 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: 'clang++', build: 'Release', llvm: '14' }
           - { cxx: 'clang++', build: 'Release', llvm: '15' }
-          #- { cxx: 'clang++', build: 'Release', llvm: '16' } - not supported yet
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -522,9 +502,6 @@ jobs:
         blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
       fail-fast: false
     steps:
-    - name: Enable Node 16
-      run: |
-        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
     - name: install_blosc
       run: sudo ./ci/install_blosc.sh ${{ matrix.blosc }}

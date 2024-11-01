@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 11)
+set(OpenVDB_MAJOR_VERSION 12)
 set(OpenVDB_MINOR_VERSION 0)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -479,8 +479,8 @@ endif()
 if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
 
   # Call find_package(Python ...)
-  find_package(Python 3.8 REQUIRED COMPONENTS Development Interpreter)
-  find_package(nanobind REQUIRED)
+  find_package(Python ${MINIMUM_PYTHON_VERSION} REQUIRED COMPONENTS Development Interpreter)
+  find_package(nanobind ${MINIMUM_NANOBIND_VERSION} REQUIRED)
 
   if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
     if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})

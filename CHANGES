@@ -1,9 +1,22 @@
 OpenVDB Version History
 =======================
 
-Version 12.0.0 - In development
+Version 12.0.0 - October 31, 2024
+
+      OpenVDB is now licensed under the Apache 2.0 license, instead of the MPL 2.0 license.
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 10 for
+      Houdini 20.0 and 11 for Houdini 20.5.
+
+      GCC 9 is no longer supported.
 
   OpenVDB:
+    New features:
+    - Added fillet() method in tools::LevelSetFilter to round off concave edges
+      to create smoother transition between surfaces.
+
     Improvements:
     - Added openvdb::assertAbort to replace cassert and a
       OPENVDB_ENABLE_ASSERTS cmake argument/compile define to toggle
@@ -19,11 +32,49 @@ Version 12.0.0 - In development
     - ValueAccessors are now defined and created in the Tree class
       instead of in the Grid class so that custom Tree implementations
       may define and create their own ValueAccessors if desired.
+    - Added support for PDAL to vdb_tool [Contributed by Tom Matterson]
+    - LeafManager and NodeManager now use Index64 for leaf counts internally.
+    - Added RootNode::probeChild() const.
+    - Added RootNode::probeChild() and RootNode::probeConstChild().
+    - Added RootNode::probe() and RootNode::probeConst() to query key presence,
+      child node, value and active state.
+    - Added InternalNode::probeChild() const.
+    - Added InternalNode::probeChild() and probeChildConst() with coord access
+      and optionally value and active state.
+    - Added InternalNode::probeChild() and probeChildConst() with index access
+      and optionally value and active state.
+    - Added InternalNode::isValueOff(), LeafNode::isValueOff(),
+      LeafNodeBool::isValueOff(), LeafNodeMask::isValueOff().
+    - Added LeafNodeMask::probeValue(Index,val), LeafNodeBool::probeValue(Index,val).
+    - Added RootNode::getValueUnsafe(), RootNode::getChildUnsafe(),
+      RootNode::getConstChildUnsafe().
+    - Added InternalNode::getValueUnsafe(), InternalNode::getChildUnsafe(),
+      InternalNode::getConstChildUnsafe().
+    - Added InternalNode::setActiveStateUnsafe(), InternalNode::setValueOnlyUnsafe(),
+      InternalNode::setValueOnUnsafe(), InternalNode::setValueOffUnsafe().
+    - Added InternalNode::setChildUnsafe(), InternalNode::resetChildUnsafe(),
+      InternalNode::stealChildUnsafe(), InternalNode::deleteChildUnsafe().
+    - For LeafNode, LeafNodeBool and LeafNodeMask - added
+      LeafNode::getValueUnsafe(), LeafNode::setActiveStateunsafe(),
+      LeafNode::setValueOnlyUnsafe(), LeafNode::setValueOnUnsafe(),
+      LeafNode::setValueOffUnsafe().
+
+    ABI changes:
+    - Tree::leafCount(), Tree::unallocatedLeafCount(),
+      Tree::nonLeafCount() and Tree::nodeCount() now use Index64 in their
+      return types instead of Index32.
 
     API Changes:
     - RootNode::tileCount(), RootNode::activeTileCount() and
       RootNode::inactiveTileCount() are now public.
     - RootNode::hasKey() and RootNode::coordToKey() are now public.
+    - RootNode::leafCount(), RootNode::nonLeafCount() and RootNode::nodeCount()
+      now use Index64 instead of Index32. The Index32 variant is deprecated.
+    - InternalNode::leafCount(), InternalNode::nonLeafCount() and
+      InternalNode::nodeCount() now use Index64 instead of Index32. The Index32
+      variant is deprecated.
+    - LeafNode::leafCount() and LeafNode::nonLeafCount() now use Index64 instead
+      of Index32. The Index32 variant is deprecated.
 
     Bug Fixes:
     - Fix potential crash reading corrupt .vdb files with invalid
@@ -549,7 +600,6 @@ Version 9.1.0 - June 9, 2022
       Positional arguments as input files are deprecated.
     - Added tools::minMax() which supports multithreaded evaluation of active
       minimum and maximum values. Grid::evalMinMax() has been deprecated.
-      [Contributed by Greg Hurst]
     - Significant performance improvements to AX point kernels, primarily due to
       providing AX access to attribute buffers for superior code generation.
     - vdb_print now prints both the in-core memory and total memory usage for

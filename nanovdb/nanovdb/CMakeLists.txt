@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
@@ -74,18 +74,16 @@ endif()
 
 #if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
 if(NANOVDB_BUILD_UNITTESTS)
-  find_package(GTest REQUIRED)
+  find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-    # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-      set(CMAKE_CUDA_ARCHITECTURES 75)
-    endif()
+  # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
+  if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
   endif()
 
   enable_language(CUDA)
@@ -124,15 +122,15 @@ if(NANOVDB_USE_OPENVDB)
 endif()
 
 if(NANOVDB_USE_TBB AND NOT TARGET TBB::tbb)
-  find_package(TBB REQUIRED)
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_BLOSC AND NOT TARGET Blosc::blosc)
-  find_package(Blosc REQUIRED)
+  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
-  find_package(ZLIB REQUIRED)
+  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)

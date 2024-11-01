@@ -92,7 +92,7 @@ jobs:
         github.event.inputs.deploy == 'docs'
       uses: peaceiris/actions-gh-pages@v3
       with:
-        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+        deploy_key: ${{ secrets.PRIVATE_KEY }}
         publish_dir: /usr/local/share/doc/OpenVDB/html
         destination_dir: documentation/doxygen
         external_repository: AcademySoftwareFoundation/openvdb-website
