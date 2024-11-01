@@ -1620,7 +1620,6 @@ struct FloatToVec
 
 }
 
-
 TEST_F(TestTools, testTransformValues)
 {
     using openvdb::CoordBBox;
@@ -1829,8 +1828,8 @@ TEST_F(TestTools, testPrune)
         const float value = 5.345f;
 
         FloatTree tree(value);
-        EXPECT_EQ(Index32(0), tree.leafCount());
-        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_EQ(Index64(0), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.nonLeafCount()); // root node
         EXPECT_TRUE(tree.empty());
 
         tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
@@ -1838,8 +1837,8 @@ TEST_F(TestTools, testPrune)
 
         tools::prune(tree);
 
-        EXPECT_EQ(Index32(0), tree.leafCount());
-        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_EQ(Index64(0), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.nonLeafCount()); // root node
         EXPECT_TRUE(tree.empty());
     }
 
@@ -1861,18 +1860,18 @@ TEST_F(TestTools, testPrune)
         FloatTree tree(val);
         tree.addLeaf(leaf);
 
-        EXPECT_EQ(Index32(1), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(1), tree.leafCount());
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree);// tolerance is zero
 
-        EXPECT_EQ(Index32(1), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(1), tree.leafCount());
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree, tol);
 
-        EXPECT_EQ(Index32(0), tree.leafCount());
-        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index64(0), tree.leafCount());
+        EXPECT_EQ(Index64(3), tree.nonLeafCount()); // root+2*internal
 
         std::sort(data.begin(), data.end());
         const float median = data[(LeafNodeT::NUM_VALUES-1)>>1];
@@ -1887,7 +1886,7 @@ TEST_F(TestTools, testPrune)
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
         sourceFile.open(false);//disable delayed loading
         FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
-        const Index32 leafCount = grid->tree().leafCount();
+        const Index64 leafCount = grid->tree().leafCount();
 
         timer.start("\nSerial tolerance prune");
         grid->tree().prune();
@@ -1900,7 +1899,7 @@ TEST_F(TestTools, testPrune)
         io::File sourceFile("/usr/pic1/Data/OpenVDB/LevelSetModels/crawler.vdb");
         sourceFile.open(false);//disable delayed loading
         FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(sourceFile.getGrids()->at(0));
-        const Index32 leafCount = grid->tree().leafCount();
+        const Index64 leafCount = grid->tree().leafCount();
 
         timer.start("\nParallel tolerance prune");
         tools::prune(grid->tree());

@@ -245,7 +245,7 @@ TEST_F(TestFilter, testFilterTiles)
                 openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(0.0f);
                 auto& tree = ref->tree();
                 tree.addTile(test.mLevel, Coord(0), 1.0f, true);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -262,7 +262,7 @@ TEST_F(TestFilter, testFilterTiles)
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.offset(1.0f);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -271,7 +271,7 @@ TEST_F(TestFilter, testFilterTiles)
                 // enable
                 filter.setProcessTiles(true);
                 filter.offset(1.0f);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(2.0f, tree.getValue(Coord(0)));
@@ -285,7 +285,7 @@ TEST_F(TestFilter, testFilterTiles)
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.mean(width, iter);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -308,7 +308,7 @@ TEST_F(TestFilter, testFilterTiles)
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.median(width, iter);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -339,7 +339,7 @@ TEST_F(TestFilter, testFilterTiles)
                 openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
                 auto& tree = ref->tree();
                 tree.addTile(test.mLevel, Coord(0), 1.0f, true);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -355,7 +355,7 @@ TEST_F(TestFilter, testFilterTiles)
                 openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
                 filter.setProcessTiles(true);
                 filter.mean(width, iter);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -368,7 +368,7 @@ TEST_F(TestFilter, testFilterTiles)
                 openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
                 filter.setProcessTiles(true);
                 filter.median(width, iter);
-                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(0), tree.leafCount());
                 EXPECT_EQ(Index64(1), tree.activeTileCount());
                 EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -387,7 +387,7 @@ TEST_F(TestFilter, testFilterTiles)
             openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
             auto& tree = ref->tree();
             tree.addTile(1, Coord(0), 1.0f, true);
-            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(0), tree.leafCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
             EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
             EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -402,7 +402,7 @@ TEST_F(TestFilter, testFilterTiles)
             //
             filter.setProcessTiles(true);
             filter.mean(1, 1);
-            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(0), tree.leafCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
             EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
             EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
@@ -410,11 +410,11 @@ TEST_F(TestFilter, testFilterTiles)
 
             // create leaf neighbour
             tree.touchLeaf(Coord(-1,0,0));
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
 
             filter.mean(1, 1);
-            EXPECT_EQ(Index32(2), tree.leafCount());
+            EXPECT_EQ(Index64(2), tree.leafCount());
             EXPECT_EQ(Index64(0), tree.activeTileCount());
             EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
         }
@@ -426,18 +426,18 @@ TEST_F(TestFilter, testFilterTiles)
             openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
             auto& tree = ref->tree();
             tree.addTile(level, Coord(0), 1.0f, true);
-            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(0), tree.leafCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
             EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
             EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
             // create a leaf and tile neighbour
             tree.touchLeaf(Coord(-int(LeafT::DIM),0,0));
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
             // create tile level 1 neighbour with a different value
             tree.addTile(1, Coord(-int(LeafT::DIM),0,LeafT::DIM*3), 2.0f, true);
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index64(2), tree.activeTileCount());
             return ref;
         };
@@ -453,7 +453,7 @@ TEST_F(TestFilter, testFilterTiles)
             // (+ itself becomes a leaf)
             filter.mean(/*width*/LeafT::DIM+1, /*iter*/1);
             // 2 leaf nodes from the tile/leaf neighbours + their neighbours
-            EXPECT_EQ(Index32(2+4+5), tree.leafCount());
+            EXPECT_EQ(Index64(2+4+5), tree.leafCount());
             EXPECT_EQ((Index64(InternalNode1::NUM_VALUES) - 1) +
                 (Index64(InternalNode2::NUM_VALUES) - (4+5)), tree.activeTileCount());
             EXPECT_EQ(Index64(InternalNode1::NUM_VOXELS) +
@@ -467,7 +467,7 @@ TEST_F(TestFilter, testFilterTiles)
             filter.setProcessTiles(true);
             // with width = 2 and iter = 2, edge/vertex neighbours should also be voxelized
             filter.mean(/*width*/2, /*iter*/2);
-            EXPECT_EQ(Index32(2+4+6), tree.leafCount());
+            EXPECT_EQ(Index64(2+4+6), tree.leafCount());
             EXPECT_EQ((Index64(InternalNode1::NUM_VALUES) - 1) +
                 (Index64(InternalNode2::NUM_VALUES) - (4+6)), tree.activeTileCount());
             EXPECT_EQ(Index64(InternalNode1::NUM_VOXELS) +
@@ -481,7 +481,7 @@ TEST_F(TestFilter, testFilterTiles)
             filter.setProcessTiles(true);
             // with width = 1 and iter = 9 - checks an iter count > LeafT::DIM
             filter.mean(/*width*/1, /*iter*/LeafT::DIM+1);
-            EXPECT_EQ(Index32(38), tree.leafCount());
+            EXPECT_EQ(Index64(38), tree.leafCount());
             EXPECT_EQ((Index64(InternalNode2::NUM_VALUES) - 36), tree.activeTileCount());
             EXPECT_EQ(Index64(InternalNode2::NUM_VOXELS) +
                 Index64(LeafT::NUM_VOXELS), tree.activeVoxelCount());

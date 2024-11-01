@@ -408,6 +408,30 @@ TEST_F(Test_vdb_tool, Geometry)
 
     EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
   }
+  #ifdef VDB_TOOL_USE_PDAL
+  {// read from PDAL-supported ASCII format file
+   // (NOTE: PDAL also supports other formats e.g. LAS, LAZ, E57, Draco, FBX, NumPy, OBJ,…)
+
+   // write a test file
+    std::ofstream os("data/test.txt");
+    os << "X,Y,Z\n";
+    for (size_t i=0; i<geo.vtxCount(); ++i) {
+      os << geo.vtx()[i][0] << "," << geo.vtx()[i][1] << "," << geo.vtx()[i][2] << "\n";
+    }
+    os.close();
+
+    // read the test file
+    openvdb::vdb_tool::Geometry geo2;
+    geo2.read("data/test.txt");
+    EXPECT_EQ(4, geo2.vtxCount());
+
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
+
+  }
+  #endif
 }// Geometry
 
 TEST_F(Test_vdb_tool, Memory)

@@ -47,6 +47,7 @@
 #include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/MultiResGrid.h>
 #include <openvdb/tools/SignedFloodFill.h>
+#include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointCount.h>
 
@@ -67,6 +68,10 @@
 
 #ifdef VDB_TOOL_USE_PNG
 #include <png.h>
+#endif
+
+#ifdef VDB_TOOL_USE_PDAL
+#include <pdal/pdal.hpp>
 #endif
 
 #ifdef VDB_TOOL_USE_JPG
@@ -969,6 +974,14 @@ void Tool::read()
       this->readNVDB(fileName);
       break;
     default:
+#if VDB_TOOL_USE_PDAL
+    pdal::StageFactory factory;
+    if (factory.inferReaderDriver(fileName) != "")
+    {
+      this->readGeo(fileName);
+      break;
+    }
+#endif
       throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
       break;
     }
@@ -1421,6 +1434,7 @@ void Tool::pointsToVdb()
     const int bits = mParser.get<int>("bits");
     std::string grid_name = mParser.get<std::string>("name");
     using GridT = points::PointDataGrid;
+    using IdGridT = tools::PointIndexGrid;
     if (mParser.verbose) mTimer.start("Points to VDB");
     auto it = this->getGeom(age);
     Points points((*it)->vtx());
@@ -1428,18 +1442,47 @@ void Tool::pointsToVdb()
     auto xform = math::Transform::createLinearTransform(voxelSize);
 
     GridT::Ptr grid;
+    IdGridT::Ptr indexGrid;
+
+    points::PointAttributeVector<openvdb::Vec3s> positionsWrapper((*it)->vtx());
+    openvdb::NamePair rgbAttribute ;
     switch (bits) {
     case 8:
-      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/true>, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/true>, GridT>(*indexGrid, positionsWrapper, *xform);
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     case 16:
-      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/false>, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::FixedPointCodec</*1-byte=*/false>, GridT>(*indexGrid, positionsWrapper, *xform);
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     case 32:
-      grid = points::createPointDataGrid<points::NullCodec, GridT>((*it)->vtx(), *xform);
+      indexGrid = tools::createPointIndexGrid<tools::PointIndexGrid>(positionsWrapper, *xform);
+      grid = points::createPointDataGrid<points::NullCodec, GridT>(*indexGrid, positionsWrapper, *xform);
+
+      openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::registerType();
+      rgbAttribute =
+        openvdb::points::TypedAttributeArray<Vec3s, points::NullCodec>::attributeType();
+      openvdb::points::appendAttribute(grid->tree(), "Cd", rgbAttribute);
       break;
     default:
       throw std::invalid_argument("pointsToVdb: unsupported bit-width: "+std::to_string(bits));
+    }
+
+    if ((*it)->rgb().size() == (*it)->vtx().size()) {
+
+      points::PointAttributeVector<Vec3s> rgbWrapper((*it)->rgb());
+      points::populateAttribute<openvdb::points::PointDataTree,
+        openvdb::tools::PointIndexTree, openvdb::points::PointAttributeVector<Vec3s>>(
+            grid->tree(), indexGrid->tree(), "Cd", rgbWrapper);
+
     }
     if (grid_name.empty()) grid_name = "points2vdb_"+(*it)->getName();
     grid->setName(grid_name);

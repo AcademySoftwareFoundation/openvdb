@@ -2,24 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 /// @file pyPointGrid.cc
-/// @brief pybind11 wrappers for point openvdb::Grid types
+/// @brief nanobind wrappers for point openvdb::Grid types
 
-#include <pybind11/pybind11.h>
+#include <nanobind/nanobind.h>
 
 #include "pyGrid.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 
 
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
 void
-exportPointGrid(py::module_ m)
+exportPointGrid(nb::module_ m)
 {
     pyGrid::exportGrid<points::PointDataGrid>(m);
 }
 #else
 void
-exportPointGrid(py::module_)
+exportPointGrid(nb::module_)
 {
 }
 #endif

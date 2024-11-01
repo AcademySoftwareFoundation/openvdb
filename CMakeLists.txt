@@ -285,6 +285,30 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add cmake modules to installation command
 
+if(SKBUILD)
+  set(OPENVDB_INSTALL_BINDIR openvdb/${CMAKE_INSTALL_BINDIR})
+  set(OPENVDB_INSTALL_LIBDIR openvdb/${CMAKE_INSTALL_LIBDIR})
+  set(OPENVDB_INSTALL_INCLUDEDIR openvdb/${CMAKE_INSTALL_INCLUDEDIR})
+
+  if(OPENVDB_BUILD_NANOVDB)
+    set(NANOVDB_INSTALL_BINDIR nanovdb/${CMAKE_INSTALL_BINDIR})
+    set(NANOVDB_INSTALL_LIBDIR nanovdb/${CMAKE_INSTALL_LIBDIR})
+    set(NANOVDB_INSTALL_INCLUDEDIR nanovdb/${CMAKE_INSTALL_INCLUDEDIR})
+    set(NANOVDB_INSTALL_DOCDIR nanovdb/${CMAKE_INSTALL_DOCDIR})
+  endif()
+else()
+  set(OPENVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
+  set(OPENVDB_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+  set(OPENVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+
+  if(OPENVDB_BUILD_NANOVDB)
+    set(NANOVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
+    set(NANOVDB_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
+    set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+    set(NANOVDB_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR})
+  endif()
+endif()
+
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
@@ -298,7 +322,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBMayaSetup.cmake
     cmake/OpenVDBUtils.cmake
   )
-  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
+  install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB)
 endif()
 
 # Configure component dependencies by loading the Houdini/Maya setup
@@ -449,6 +473,33 @@ endif()
 if(NOT OPENVDB_BUILD_NANOVDB AND
    USE_NANOVDB)
   find_package(OpenVDB REQUIRED COMPONENTS nanovdb)
+endif()
+
+# Locate Python and nanobind if necessary
+if(OPENVDB_BUILD_PYTHON_MODULE OR (OPENVDB_BUILD_NANOVDB AND NANOVDB_BUILD_PYTHON_MODULE))
+
+  # Call find_package(Python ...)
+  find_package(Python 3.8 REQUIRED COMPONENTS Development Interpreter)
+  find_package(nanobind REQUIRED)
+
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_PYTHON_VERSION)
+    if(Python_VERSION VERSION_LESS ${FUTURE_MINIMUM_PYTHON_VERSION})
+      message(DEPRECATION "Support for Python versions < ${FUTURE_MINIMUM_GLFW_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
+  endif()
+
+  if(NOT DEFINED VDB_PYTHON_INSTALL_DIRECTORY)
+    if(DEFINED Python_SITELIB)
+      get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+    else()
+      set(Python_PACKAGES_DIR "site-packages")
+    endif()
+    set(VDB_PYTHON_INSTALL_DIRECTORY
+      ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
+      CACHE STRING "The directory to install the openvdb and nanovdb Python modules."
+    )
+  endif()
 endif()
 
 
