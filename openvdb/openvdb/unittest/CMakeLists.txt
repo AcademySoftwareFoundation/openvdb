@@ -121,6 +121,7 @@ else()
     TestLeafOrigin.cc
     TestLevelSetFilter.cc
     TestLevelSetRayIntersector.cc
+    TestLevelSetTubes.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
     TestMaps.cc
