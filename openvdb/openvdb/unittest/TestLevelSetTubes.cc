@@ -80,9 +80,10 @@ testTaperedCapsuleMeasures(const openvdb::Vec3s& p1, const openvdb::Vec3s& p2,
     EXPECT_NEAR(m.totMeanCurvature(true), totMeanCurv,  totMeanCurv*error);
 
     // objects with sharp corners or edges tend to give answers far from the analytical solution
-    // in cases like these we can toggle this test off
-    if (test_gauss_curvature)
+    // in cases like these, e.g. cone-tip, we can toggle this test off
+    if (test_gauss_curvature) {
         EXPECT_NEAR(m.totGaussianCurvature(true), totGaussCurv, totGaussCurv*error);
+    }
 }
 
 }
@@ -299,7 +300,7 @@ TEST_F(TestLevelSetTubes, testTaperedCapsule)
         testTaperedCapsuleMeasures<FloatGrid>(p1, p2, r1, r2, ls, 0.05f, false);
     }
 
-    // degenerate case: cone with sphere cap (tear drop) with tip between endpoints
+    // degenerate case: cone with sphere cap (tear drop) and tip between endpoints
     {
         const Vec3s p1(0.0f, 0.0f, 0.0f), p2(4.0f, 0.0f, 0.0f), p2_equiv(2.0f, 0.0f, 0.0f);
         const float r1 = 1.0f, r2 = -1.0f, r2_equiv = 0.0f;
@@ -456,7 +457,7 @@ TEST_F(TestLevelSetTubes, testTubeComplexConstantRadius)
 
         GridPtr ls = tools::createLevelSetTubeComplex<GridT>(vertices, segments, r, voxelSize);
 
-        // smooth slightly to ensure numerical integration of the genus is correct
+        // smooth slightly to ensure numerical integration when determining the genus is correct
         FilterT filter(*ls);
         for (Index i = 0; i < 5; ++i)
             filter.meanCurvature();
@@ -516,11 +517,11 @@ TEST_F(TestLevelSetTubes, testTubeComplexVariableRadius)
         testTaperedCapsuleMeasures<GridT>(vertices[0], vertices[3], radii[0], radii[3], ls, 0.02f);
     }
 
-    // test genus of an approximate a torus with per-vertex radii
+    // test genus of a torus with per-vertex radii
     {
         using FilterT = tools::LevelSetFilter<GridT>;
 
-        const float pi = math::pi<float>(), error = 0.05f,
+        const float pi = math::pi<float>(),
                     a = 1.2f, c = 3.0f, voxelSize = 0.1f, width = 3.0f;
 
         const Index32 n = 128;
@@ -550,11 +551,11 @@ TEST_F(TestLevelSetTubes, testTubeComplexVariableRadius)
         EXPECT_EQ(tools::levelSetGenus(*ls), int(1));
     }
 
-    // test genus of an approximate a torus with per-segment radii
+    // test genus of a torus with per-segment radii
     {
         using FilterT = tools::LevelSetFilter<GridT>;
 
-        const float pi = math::pi<float>(), error = 0.05f,
+        const float pi = math::pi<float>(),
                     a = 1.2f, c = 3.0f, voxelSize = 0.1f, width = 3.0f;
 
         const Index32 n = 10;
