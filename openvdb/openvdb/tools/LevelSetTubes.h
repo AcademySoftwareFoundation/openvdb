@@ -1461,47 +1461,49 @@ createLevelSetTubeComplex(const std::vector<math::Vec3<ScalarType>>& vertices,
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
     if (halfWidth <= 0) OPENVDB_THROW(ValueError, "half-width must be positive");
 
-    switch(radii_policy) {
-        case TUBE_AUTOMATIC : {
-            if (vertices.size() != radii.size() && segments.size() != radii.size())
-                OPENVDB_THROW(ValueError,
-                    "createLevelSetTubeComplex requires equal number of vertices and radii, or segments and radii, with automatic radii policy.");
-            break;
-        }
+    if (radii_policy == TUBE_AUTOMATIC) {
+        if (vertices.size() != radii.size() && segments.size() != radii.size())
+            OPENVDB_THROW(ValueError,
+                "createLevelSetTubeComplex requires equal number of vertices and radii, or segments and radii, with automatic radii policy.");
+    }
+
+    TubeRadiiPolicy resolved_radii_policy = radii_policy == TUBE_AUTOMATIC
+        ? (vertices.size() == radii.size() ? TUBE_VERTEX_RADII : TUBE_SEGMENT_RADII)
+        : radii_policy;
+
+    GridPtr tubegrid;
+
+    switch(resolved_radii_policy) {
         case TUBE_VERTEX_RADII : {
             if (vertices.size() != radii.size())
                 OPENVDB_THROW(ValueError,
                     "createLevelSetTubeComplex requires equal number of vertices and radii with per-vertex radii policy.");
+
+            TaperedCapsuleComplexVoxelizer op(vertices, segments, radii,
+                                         voxelSize, halfWidth, interrupter);
+
+            const tbb::blocked_range<size_t> segmentRange(0, op.bucketSize());
+            tbb::parallel_reduce(segmentRange, op);
+
+            tubegrid = op.getGrid();
             break;
         }
         case TUBE_SEGMENT_RADII : {
             if (segments.size() != radii.size())
                 OPENVDB_THROW(ValueError,
                     "createLevelSetTubeComplex requires equal number of segments and radii with per-segment radii policy.");
+
+            CapsuleComplexVoxelizer op(vertices, segments, radii,
+                                       voxelSize, halfWidth, interrupter);
+
+            const tbb::blocked_range<size_t> segmentRange(0, op.bucketSize());
+            tbb::parallel_reduce(segmentRange, op);
+
+            tubegrid = op.getGrid();
             break;
         }
         default:
             OPENVDB_THROW(ValueError, "Invalid tube radii policy.");
-    }
-
-    GridPtr tubegrid;
-
-    if (vertices.size() == radii.size()) {
-        TaperedCapsuleComplexVoxelizer op(vertices, segments, radii,
-                                     voxelSize, halfWidth, interrupter);
-
-        const tbb::blocked_range<size_t> segmentRange(0, op.bucketSize());
-        tbb::parallel_reduce(segmentRange, op);
-
-        tubegrid = op.getGrid();
-    } else {
-        CapsuleComplexVoxelizer op(vertices, segments, radii,
-                                   voxelSize, halfWidth, interrupter);
-
-        const tbb::blocked_range<size_t> segmentRange(0, op.bucketSize());
-        tbb::parallel_reduce(segmentRange, op);
-
-        tubegrid = op.getGrid();
     }
 
     tools::pruneLevelSet(tubegrid->tree());

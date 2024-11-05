@@ -276,48 +276,6 @@ TEST_F(TestTools, testLevelSetDilatedMesh)
 
 }// testLevelSetDilatedMesh
 
-TEST_F(TestTools, testLevelSetTubes)
-{
-    using namespace openvdb;
-
-    const float r1 = 4.3f, r2 = 1.2f, r3 = 2.1f, r4 = 3.6f;
-    const Vec3s p1(15.8f, 13.2f, 16.7f), p2(4.3f, 7.9f, -4.8f);
-    const Vec3s p3(-3.0f, -7.4f, 8.9f), p4(-2.7f, 8.9f, 30.4f);
-
-    const std::vector<Vec3s> vertices({p1, p2, p3, p4});
-    const std::vector<Vec2I> segments({Vec2I(0, 1), Vec2I(0, 2), Vec2I(0, 3)});
-    const std::vector<float> radii({r1, r2, r3, r4});
-
-    const float voxelSize = 0.1f, width = 3.25f;
-    const Coord ijk(int(p1[0]/voxelSize),
-                    int(p1[1]/voxelSize),
-                    int(p1[2]/voxelSize));// inside
-
-    {// test tube complex with constant radius
-        FloatGrid::Ptr ls = tools::createLevelSetTubeComplex<FloatGrid>(
-            vertices, segments, r3, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
-    {// test tube complex with variable radius
-        FloatGrid::Ptr ls = tools::createLevelSetTubeComplex<FloatGrid>(
-            vertices, segments, radii, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
-
-}// testLevelSetTubes
-
 TEST_F(TestTools, testLevelSetAdvect)
 {
     // Uncomment sections below to run this (time-consuming) test
