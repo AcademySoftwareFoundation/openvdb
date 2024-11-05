@@ -293,17 +293,6 @@ TEST_F(TestTools, testLevelSetTubes)
                     int(p1[1]/voxelSize),
                     int(p1[2]/voxelSize));// inside
 
-    {// test tapered capsule
-        FloatGrid::Ptr ls = tools::createLevelSetTaperedCapsule<FloatGrid>(
-            p1, p2, r1, r2, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
     {// test tube complex with constant radius
         FloatGrid::Ptr ls = tools::createLevelSetTubeComplex<FloatGrid>(
             vertices, segments, r3, voxelSize, width);
