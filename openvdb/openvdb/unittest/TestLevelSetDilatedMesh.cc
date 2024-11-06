@@ -60,7 +60,7 @@ testDilatedConvexPolygonMeasures(const std::vector<openvdb::Vec3s>& points,
 
 }
 
-TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshGeneric)
+TEST_F(TestLevelSetDilatedMesh, testGeneric)
 {
     using namespace openvdb;
 
@@ -160,9 +160,9 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshGeneric)
         EXPECT_NEAR(ls->background(), ls->tree().getValue(Coord(0, 0, 0)), 1e-6);
     }
 
-}// testLevelSetDilatedMeshGeneric
+}// testGeneric
 
-TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshMeasures)
+TEST_F(TestLevelSetDilatedMesh, testMeasures)
 {
     using namespace openvdb;
 
@@ -245,9 +245,9 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshMeasures)
         EXPECT_NEAR(m.totMeanCurvature(true),     totMeanCurv,  totMeanCurv*error);
     }
 
-}// testLevelSetDilatedMeshMeasures
+}// testMeasures
 
-TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshDegeneracies)
+TEST_F(TestLevelSetDilatedMesh, testDegeneracies)
 {
     using namespace openvdb;
 
@@ -364,9 +364,9 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshDegeneracies)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
-}// testLevelSetDilatedMeshDegeneracies
+}// testDegeneracies
 
-TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshFaceTopologies)
+TEST_F(TestLevelSetDilatedMesh, testFaceTopologies)
 {
     using namespace openvdb;
 
@@ -475,5 +475,5 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshFaceTopologies)
         EXPECT_NEAR(tools::levelSetVolume(*ls_int), tools::levelSetVolume(*ls_split), 1e-6);
     }
 
-}// testLevelSetDilatedMeshFaceTopologies
+}// testFaceTopologies
 

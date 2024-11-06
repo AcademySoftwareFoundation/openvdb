@@ -314,8 +314,6 @@ private:
         mC = Vec3T(pt3)/vx;
 
         mRad = ValueT(r)/vx;
-        if (math::isApproxZero(mRad) || mRad < 0)
-            return false; // nothing to voxelize, prism has no volume
 
         mBA = mB-mA;
         mCB = mC-mB;
@@ -339,6 +337,9 @@ private:
         }
 
         const ValueT hwRad = mRad + hw;
+        if (math::isApproxZero(hwRad) || hwRad < 0)
+            return false; // nothing to voxelize, prism has no volume
+
         mPts = {
             mA + hwRad * mTriNrml, mB + hwRad * mTriNrml, mC + hwRad * mTriNrml,
             mA - hwRad * mTriNrml, mB - hwRad * mTriNrml, mC - hwRad * mTriNrml
@@ -491,6 +492,12 @@ private:
     setXYRangeData(const Index& step = 1)
     {
         const ValueT stepv = ValueT(step);
+
+        // degenerate
+        if (mX1 - mORad > mX2 + mORad) {
+            mXYData.clear();
+            return;
+        }
 
         // short circuit a vertical cylinder
         if (mIsVertical) {
@@ -908,13 +915,13 @@ private:
 
         mRad = ValueT(r)/vx;
 
-        // tube has no volume
-        if (math::isApproxZero(mRad))
-            return false;
-
         // padded radius used to populate the outer halfwidth of the sdf
         mORad  = mRad + hw;
         mORad2 = mORad * mORad;
+
+        // tube has no volume
+        if (math::isApproxZero(mORad) || mORad < 0)
+            return false;
 
         mV = mPt2 - mPt1;
         mVLenSqr = mV.lengthSqr();

@@ -551,6 +551,22 @@ protected:
             mYMins[i] = MAXVALUE;
             mYMaxs[i] = MINVALUE;
         }
+        
+        /// @brief Clears the data container
+        inline void
+        clear()
+        {
+            mStep = 1;
+            mStepInv = ValueT(1);
+
+            mXStart = MAXVALUE;
+            mXEnd = MINVALUE;
+
+            mSize = 0;
+
+            mYMins.assign(mSize, MAXVALUE);
+            mYMaxs.assign(mSize, MINVALUE);
+        }
 
         /// @brief Resets the x range to span a given interval with a specific step size.
         /// This initializes all y ranges as empty.
@@ -628,6 +644,20 @@ protected:
             x = indexToWorld(i);
             ymin = mYMins[i];
             ymax = mYMaxs[i];
+        }
+        
+        /// @brief Returns @c true if the container has no x values or if all y ranges are empty.
+        inline bool isEmpty() const
+        {
+            if (mSize == 0)
+                return true;
+
+            for (Index i = 0; i < mSize; ++i) {
+                if (mYMins[i] <= mYMaxs[i])
+                    return false;
+            }
+
+            return true;
         }
 
         /// @brief Merges another XYRangeData into the current instance by combining y ranges
@@ -810,6 +840,9 @@ private:
     void
     iterateXYZ()
     {
+        if (mXYData.isEmpty())
+            return;
+
         // borrowing parallel logic from tools/LevelSetSphere.h
 
         const Index n = mXYData.size();
@@ -974,6 +1007,9 @@ private:
     void
     tileIterateXYZ()
     {
+        if (mXYData.isEmpty())
+            return;
+
         AccessorT acc(getTree());
         for (Index i = 0; i < mXYData.size(); ++i) {
             if (mInterrupter && !(i & ((1 << 7) - 1)) && !checkInterrupter())
@@ -1098,6 +1134,7 @@ private:
     inline void
     invokeSetXYRangeData(const Index& step = 1)
     {
+        mXYData.clear();
         static_cast<Derived*>(this)->setXYRangeData(step);
     }
 

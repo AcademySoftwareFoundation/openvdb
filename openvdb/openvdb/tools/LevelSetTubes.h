@@ -319,6 +319,12 @@ private:
     {
         const ValueT stepv = ValueT(step);
 
+        // degenerate
+        if (mX1 - mORad > mX2 + mORad) {
+            mXYData.clear();
+            return;
+        }
+
         // short circuit a vertical cylinder
         if (mIsVertical) {
             mXYData.reset(mX1 - mORad, mX1 + mORad, step);
