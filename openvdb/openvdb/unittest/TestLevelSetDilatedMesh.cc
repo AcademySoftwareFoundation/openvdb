@@ -60,14 +60,14 @@ testDilatedConvexPolygonMeasures(const std::vector<openvdb::Vec3s>& points,
 
 }
 
-TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
+TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshGeneric)
 {
     using namespace openvdb;
 
     using GridT = FloatGrid;
     using GridPtr = typename GridT::Ptr;
 
-    // generic tests for triangle mesh
+    // triangle mesh
     {
         const float r = 2.9f;
         const Vec3s p0(15.8f, 13.2f, 16.7f), p1(4.3f, 7.9f, -4.8f), p2(-3.0f, -7.4f, 8.9f),
@@ -91,7 +91,7 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
-    // generic tests for quad mesh
+    // quad mesh
     {
         const float r = 2.9f;
         const Vec3s p0(15.8f, 13.2f, 16.7f), p1(4.3f, 7.9f, -4.8f),    p2(-3.0f, -7.4f, 8.9f),
@@ -116,7 +116,7 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
-    // generic tests for mixed triangle and quad mesh
+    // mixed triangle and quad mesh
     {
         const float r = 2.9f;
         const Vec3s p0(15.8f, 13.2f, 16.7f), p1(4.3f, 7.9f, -4.8f), p2(-3.0f, -7.4f, 8.9f),
@@ -142,6 +142,33 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
+    // test closed surface mesh has a void (non-zero Betti number b2)
+    {
+        const float r = 0.3f, voxelSize = 0.05f, width = 2.0f;
+
+        const std::vector<Vec3s> vertices({
+            Vec3s(-0.5f, 0.5f, -0.5f),  Vec3s(0.5f, 0.5f, -0.5f), Vec3s(0.5f, -0.5f, -0.5f),
+            Vec3s(-0.5f, -0.5f, -0.5f), Vec3s(-0.5f, 0.5f, 0.5f), Vec3s(0.5f, 0.5f, 0.5f),
+            Vec3s(0.5f, -0.5f, 0.5f), Vec3s(-0.5f, -0.5f, 0.5f)
+        });
+
+        const std::vector<Vec4I> quads({Vec4I(0, 1, 2, 3), Vec4I(4, 5, 1, 0), Vec4I(5, 6, 2, 1),
+                                        Vec4I(6, 7, 3, 2), Vec4I(7, 4, 0, 3), Vec4I(7, 6, 5, 4)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, quads, r, voxelSize, width);
+
+        EXPECT_NEAR(ls->background(), ls->tree().getValue(Coord(0, 0, 0)), 1e-6);
+    }
+
+}// testLevelSetDilatedMeshGeneric
+
+TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshMeasures)
+{
+    using namespace openvdb;
+
+    using GridT = FloatGrid;
+    using GridPtr = typename GridT::Ptr;
+
     // test measures of a dilated triangle
     {
         const float r = 1.1f, voxelSize = 0.05f;
@@ -151,23 +178,6 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         const std::vector<Vec3I> tri({Vec3I(0, 1, 2)});
 
         GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri, r, voxelSize);
-
-        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
-
-        // change in face orientation doesn't effect result
-
-        const std::vector<Vec3I> tri2({Vec3I(0, 2, 1)});
-
-        ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri2, r, voxelSize);
-
-        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
-
-        // nor does multiple copies of the same face
-
-        const std::vector<Vec3I> tri3({Vec3I(0, 1, 2), Vec3I(0, 1, 2),
-                                       Vec3I(0, 1, 2), Vec3I(0, 1, 2)});
-
-        ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri3, r, voxelSize);
 
         testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
     }
@@ -199,6 +209,50 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
 
         testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls, 0.02f);
     }
+
+    // test measures of a rigatoni noodle
+    {
+        const float pi = math::pi<float>(), a = 0.25, c = 1.4f,
+                    z1 = 0.0f, z2 = 8.0f, voxelSize = 0.05f;
+
+        const Index n = 256;
+        std::vector<Vec3s> vertices(2*n);
+        std::vector<Vec4I> quads(n);
+        const float delta = 2.0f*pi/static_cast<float>(n);
+
+        float theta = 0.0f;
+        for (Index32 i = 0; i < n; ++i, theta += delta) {
+            const float x = c*math::Cos(theta), y = c*math::Sin(theta);
+            vertices[i]   = Vec3s(x, y, z1);
+            vertices[i+n] = Vec3s(x, y, z2);
+            quads[i]      = Vec4I(i, (i+1)%n, n + ((i+1)%n), n + (i%n));
+        }
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, quads, a, voxelSize);
+
+        const float error = 0.02f, h = math::Abs(z2-z1);
+
+        const float area         = 4.0f*pi*c * (h + pi*a),
+                    volume       = 2.0f*a*c*pi * (2.0f*h + a*pi),
+                    totGaussCurv = 0.0f, // Gauss-Bonnet
+                    totMeanCurv  = 2.0f*c*math::Pow2(pi);
+
+        tools::LevelSetMeasure<GridT> m(*ls);
+
+        EXPECT_NEAR(m.area(true),                 area,         area*error);
+        EXPECT_NEAR(m.volume(true),               volume,       volume*error);
+        EXPECT_NEAR(m.totGaussianCurvature(true), totGaussCurv, 10.0f*error);
+        EXPECT_NEAR(m.totMeanCurvature(true),     totMeanCurv,  totMeanCurv*error);
+    }
+
+}// testLevelSetDilatedMeshMeasures
+
+TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshDegeneracies)
+{
+    using namespace openvdb;
+
+    using GridT = FloatGrid;
+    using GridPtr = typename GridT::Ptr;
 
     // degenerate case: capsule
     {
@@ -310,57 +364,43 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
     }
 
-    // test closed surface mesh has a void (non-zero Betti number b2)
+}// testLevelSetDilatedMeshDegeneracies
+
+TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMeshFaceTopologies)
+{
+    using namespace openvdb;
+
+    using GridT = FloatGrid;
+    using GridPtr = typename GridT::Ptr;
+
+    // test measures of a dilated triangle
     {
-        const float r = 0.3f, voxelSize = 0.05f, width = 2.0f;
+        const float r = 1.1f, voxelSize = 0.05f;
+        const Vec3s p0(9.4f, 7.6f, -0.9f), p1(-1.4f, -3.5f, -1.4f), p2(-8.5f, 9.7f, -5.6f);
 
-        const std::vector<Vec3s> vertices({
-            Vec3s(-0.5f, 0.5f, -0.5f),  Vec3s(0.5f, 0.5f, -0.5f), Vec3s(0.5f, -0.5f, -0.5f),
-            Vec3s(-0.5f, -0.5f, -0.5f), Vec3s(-0.5f, 0.5f, 0.5f), Vec3s(0.5f, 0.5f, 0.5f),
-            Vec3s(0.5f, -0.5f, 0.5f), Vec3s(-0.5f, -0.5f, 0.5f)
-        });
+        const std::vector<Vec3s> vertices({p0, p1, p2});
+        const std::vector<Vec3I> tri1({Vec3I(0, 1, 2)});
 
-        const std::vector<Vec4I> quads({Vec4I(0, 1, 2, 3), Vec4I(4, 5, 1, 0), Vec4I(5, 6, 2, 1),
-                                        Vec4I(6, 7, 3, 2), Vec4I(7, 4, 0, 3), Vec4I(7, 6, 5, 4)});
+        GridPtr ls1 = tools::createLevelSetDilatedMesh<GridT>(vertices, tri1, r, voxelSize);
 
-        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, quads, r, voxelSize, width);
+        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls1);
 
-        EXPECT_NEAR(ls->background(), ls->tree().getValue(Coord(0, 0, 0)), 1e-6);
-    }
+        // change in face orientation doesn't effect result
 
-    // test measures of a rigatoni noodle
-    {
-        const float pi = math::pi<float>(), a = 0.25, c = 1.4f,
-                    z1 = 0.0f, z2 = 8.0f, voxelSize = 0.05f;
+        const std::vector<Vec3I> tri2({Vec3I(0, 2, 1)});
 
-        const Index n = 256;
-        std::vector<Vec3s> vertices(2*n);
-        std::vector<Vec4I> quads(n);
-        const float delta = 2.0f*pi/static_cast<float>(n);
+        GridPtr ls2 = tools::createLevelSetDilatedMesh<GridT>(vertices, tri2, r, voxelSize);
 
-        float theta = 0.0f;
-        for (Index32 i = 0; i < n; ++i, theta += delta) {
-            const float x = c*math::Cos(theta), y = c*math::Sin(theta);
-            vertices[i]   = Vec3s(x, y, z1);
-            vertices[i+n] = Vec3s(x, y, z2);
-            quads[i]      = Vec4I(i, (i+1)%n, n + ((i+1)%n), n + (i%n));
-        }
+        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls2);
 
-        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, quads, a, voxelSize);
+        // nor does multiple copies of the same face
 
-        const float error = 0.02f, h = math::Abs(z2-z1);
+        const std::vector<Vec3I> tri3({Vec3I(0, 1, 2), Vec3I(0, 1, 2),
+                                       Vec3I(0, 1, 2), Vec3I(0, 1, 2)});
 
-        const float area         = 4.0f*pi*c * (h + pi*a),
-                    volume       = 2.0f*a*c*pi * (2.0f*h + a*pi),
-                    totGaussCurv = 0.0f, // Gauss-Bonnet
-                    totMeanCurv  = 2.0f*c*math::Pow2(pi);
+        GridPtr ls3 = tools::createLevelSetDilatedMesh<GridT>(vertices, tri3, r, voxelSize);
 
-        tools::LevelSetMeasure<GridT> m(*ls);
-
-        EXPECT_NEAR(m.area(true),                 area,         area*error);
-        EXPECT_NEAR(m.volume(true),               volume,       volume*error);
-        EXPECT_NEAR(m.totGaussianCurvature(true), totGaussCurv, 10.0f*error);
-        EXPECT_NEAR(m.totMeanCurvature(true),     totMeanCurv,  totMeanCurv*error);
+        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls3);
     }
 
     // test singular edge
@@ -435,4 +475,5 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_NEAR(tools::levelSetVolume(*ls_int), tools::levelSetVolume(*ls_split), 1e-6);
     }
 
-}// testLevelSetDilatedMesh
+}// testLevelSetDilatedMeshFaceTopologies
+
