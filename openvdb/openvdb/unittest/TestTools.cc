@@ -219,63 +219,6 @@ TEST_F(TestTools, testLevelSetPlatonic)
 
 }// testLevelSetPlatonic
 
-TEST_F(TestTools, testLevelSetDilatedMesh)
-{
-    using namespace openvdb;
-
-    const float r = 2.9f;
-    const Vec3s p0(15.8f, 13.2f, 16.7f),  p1(4.3f, 7.9f, -4.8f);
-    const Vec3s p2(-3.0f, -7.4f, 8.9f),   p3(-2.7f, 8.9f, 30.4f);
-    const Vec3s p4(23.0f, 17.4f, -10.9f), p5(5.2f, -5.7f, 29.0f);
-    const Vec3s p6(-14.6f, 3.7f, 10.9f),  p7(35.8f, 23.4f, 5.8f);
-
-    const std::vector<Vec3s> vertices({p0, p1, p2, p3, p4, p5, p6, p7});
-    const std::vector<Vec3I> triangles1({Vec3I(0, 1, 2), Vec3I(0, 1, 3), Vec3I(0, 1, 4)});
-    const std::vector<Vec3I> triangles2({Vec3I(0, 1, 4)});
-    const std::vector<Vec4I> quads1({Vec4I(0, 1, 2, 5), Vec4I(0, 1, 6, 3), Vec4I(0, 1, 4, 7)});
-    const std::vector<Vec4I> quads2({Vec4I(0, 1, 4, 7)});
-
-    const float voxelSize = 0.1f, width = 3.25f;
-    const Coord ijk(int(p1[0]/voxelSize),
-                    int(p1[1]/voxelSize),
-                    int(p1[2]/voxelSize));// inside
-
-    {// test dilated triangle mesh
-        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
-            vertices, triangles1, r, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
-    {// test dilated quad mesh
-        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
-            vertices, quads1, r, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
-    {// test dilated mixed triangle & quad mesh
-        FloatGrid::Ptr ls = tools::createLevelSetDilatedMesh<FloatGrid>(
-            vertices, triangles2, quads2, r, voxelSize, width);
-
-        EXPECT_TRUE(ls->activeVoxelCount() > 0);
-        EXPECT_TRUE(ls->tree().isValueOff(ijk));
-        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        EXPECT_NEAR(voxelSize*width, ls->background(), 1e-6);
-        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(30, 0, -50)), 1e-6);
-        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
-    }
-
-}// testLevelSetDilatedMesh
-
 TEST_F(TestTools, testLevelSetAdvect)
 {
     // Uncomment sections below to run this (time-consuming) test

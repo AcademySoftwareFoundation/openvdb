@@ -426,7 +426,7 @@ TEST_F(TestLevelSetTubes, testTubeComplexConstantRadius)
         EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
 
         const float area         = 4.0f*math::Pow2(pi)*a*c,
-                    volume       = 2.0f*math::Pow2(pi)*math::Pow2(a)*c,
+                    volume       = 2.0f*math::Pow2(pi*a)*c,
                     totGaussCurv = 0.0f, // Gauss-Bonnet
                     totMeanCurv  = 2.0f*c*math::Pow2(pi);
 
