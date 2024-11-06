@@ -424,8 +424,8 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
                     q6(0.5f, 0.0f, 0.0f),   q7(0.0f, 0.5f, 0.0f);
 
         const std::vector<Vec3s> vertices2({q0, q1, q2, q3, q4, q5, q6, q7});
-        const std::vector<Vec3I> tris2({Vec3s(7, 0, 6), Vec3s(2, 6, 1), Vec3s(6, 2, 7),
-                                        Vec3s(7, 3, 6), Vec3s(7, 4, 5), Vec3s(4, 7, 6)});
+        const std::vector<Vec3I> tris2({Vec3I(7, 0, 6), Vec3I(2, 6, 1), Vec3I(6, 2, 7),
+                                        Vec3I(7, 3, 6), Vec3I(7, 4, 5), Vec3I(4, 7, 6)});
 
         // level set from split triangles that resolve the intersections
         GridPtr ls_split = tools::createLevelSetDilatedMesh<GridT>(vertices2, tris2, r, voxelSize);
