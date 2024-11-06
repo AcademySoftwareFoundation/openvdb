@@ -4,10 +4,12 @@
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 
+#include <openvdb/tools/Composite.h>
 #include <openvdb/tools/Count.h>
 #include <openvdb/tools/LevelSetDilatedMesh.h>
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetMeasure.h>
+#include <openvdb/tools/LevelSetTubes.h>
 
 #include <gtest/gtest.h>
 
@@ -151,6 +153,23 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri, r, voxelSize);
 
         testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
+
+        // change in face orientation doesn't effect result
+
+        const std::vector<Vec3I> tri2({Vec3I(0, 2, 1)});
+
+        ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri2, r, voxelSize);
+
+        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
+
+        // nor does multiple copies of the same face
+
+        const std::vector<Vec3I> tri3({Vec3I(0, 1, 2), Vec3I(0, 1, 2),
+                                       Vec3I(0, 1, 2), Vec3I(0, 1, 2)});
+
+        ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri3, r, voxelSize);
+
+        testDilatedConvexPolygonMeasures<GridT>(vertices, r, ls);
     }
 
     // test measures of a dilated quad
@@ -232,6 +251,65 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_NEAR(m.totMeanCurvature(true),     totMeanCurv,  totMeanCurv*error);
     }
 
+    // degenerate case: polygon
+    {
+        const float r = 0.0f, voxelSize = 0.1f, width = 2.0f;
+        const Vec3s p0(9.4f, 7.6f, -0.9f), p1(-1.4f, -3.5f, -1.4f), p2(-8.5f, 9.7f, -5.6f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2});
+        const std::vector<Vec3I> tri({Vec3I(0, 1, 2)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri, r, voxelSize, width);
+
+        EXPECT_TRUE(tools::minMax(ls->tree()).min() >= 0.0f); // no zero crossings
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
+    // degenerate case: line
+    {
+        const float r = 0.0f, voxelSize = 0.1f, width = 2.0f;
+        const Vec3s p0(0.0f, 0.0f, 0.0f),  p1(0.5f, 0.0f, 0.0f),
+                    p2(0.75f, 0.0f, 0.0f), p3(1.0f, 0.0f, 0.0f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2, p3});
+        const std::vector<Vec4I> quad({Vec4I(0, 1, 2, 3)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, quad, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() == 117 /* 90 + 27 */);
+        EXPECT_TRUE(tools::minMax(ls->tree()).min() >= 0.0f); // no zero crossings
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
+    // degenerate case: point
+    {
+        const float r = 0.0f, voxelSize = 0.1f, width = 2.0f;
+        const Vec3s p0(0.0f, 0.0f, 0.0f), p1(0.0f, 0.0f, 0.0f), p2(0.0f, 0.0f, 0.0f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2});
+        const std::vector<Vec3I> tri({Vec3I(0, 1, 2)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() == 27 /* 3x3x3 grid */);
+        EXPECT_TRUE(tools::minMax(ls->tree()).min() >= 0.0f); // no zero crossings
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
+    // degenerate case: negative radius --> empty grid
+    {
+        const float r = -10.0f, voxelSize = 0.1f, width = 2.0f;
+        const Vec3s p0(9.4f, 7.6f, -0.9f), p1(-1.4f, -3.5f, -1.4f), p2(-8.5f, 9.7f, -5.6f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2});
+        const std::vector<Vec3I> tri({Vec3I(0, 1, 2)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tri, r, voxelSize, width);
+
+        EXPECT_TRUE(ls->activeVoxelCount() == 0);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+    }
+
     // test closed surface mesh has a void (non-zero Betti number b2)
     {
         const float r = 0.3f, voxelSize = 0.05f, width = 2.0f;
@@ -283,6 +361,78 @@ TEST_F(TestLevelSetDilatedMesh, testLevelSetDilatedMesh)
         EXPECT_NEAR(m.volume(true),               volume,       volume*error);
         EXPECT_NEAR(m.totGaussianCurvature(true), totGaussCurv, 10.0f*error);
         EXPECT_NEAR(m.totMeanCurvature(true),     totMeanCurv,  totMeanCurv*error);
+    }
+
+    // test singular edge
+    {
+        const float r = 0.1f, voxelSize = 0.025f;
+        const Vec3s p0(0.0f, 0.0f, 0.0f), p1(0.0f, 1.0f, 0.0f), p2(0.0f, 0.5f, 0.6f),
+                    p3(-0.5f, 0.5f, -0.2f), p4(0.5f, 0.5f, -0.2f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2, p3, p4});
+        const std::vector<Vec3I> tris({Vec3I(0, 1, 2), Vec3I(0, 1, 3), Vec3I(0, 1, 4)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tris, r, voxelSize);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+
+        // The dilated mesh should contain the capsule along the singular edge
+
+        GridPtr capsule = tools::createLevelSetCapsule<GridT>(p0, p1, r, voxelSize);
+        tools::csgDifference(*capsule, *ls);
+
+        EXPECT_TRUE(tools::minMax(capsule->tree()).min() >= 0.0f); // no zero crossings
+    }
+
+    // test singular vertex
+    {
+        const float r = 0.1f, voxelSize = 0.025f;
+        const Vec3s p0(-1.0f, -1.0f, 0.0f), p1(1.0f, -1.0f, 0.0f), p2(0.0f, 0.0f, 0.0f),
+                    p3(-1.0f, 1.0f, -0.2f), p4(1.0f, 1.0f, 0.2f);
+
+        const std::vector<Vec3s> vertices({p0, p1, p2, p3, p4});
+        const std::vector<Vec3I> tris({Vec3I(0, 1, 2), Vec3I(2, 3, 4)});
+
+        GridPtr ls = tools::createLevelSetDilatedMesh<GridT>(vertices, tris, r, voxelSize);
+
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_EQ(int(GRID_LEVEL_SET), int(ls->getGridClass()));
+
+        // The dilated mesh should contain the sphere at the singular vertex
+
+        GridPtr sphere = tools::createLevelSetCapsule<GridT>(p2, p2, r, voxelSize);
+        tools::csgDifference(*sphere, *ls);
+
+        EXPECT_TRUE(tools::minMax(sphere->tree()).min() >= 0.0f); // no zero crossings
+    }
+
+    // test self-intersecting faces
+    {
+        const float r = 0.2f, voxelSize = 0.025f;
+        const Vec3s p0(0.0f, 0.0f, 0.0f),   p1(1.0f, 0.0f, 0.0f),     p2(0.0f, 1.0f, 0.0f),
+                    p3(0.25f, 0.25f, 0.5f), p4(0.75f, -0.25f, -0.5f), p5(-0.25f, 0.75f, -0.5f);
+
+        const std::vector<Vec3s> vertices1({p0, p1, p2, p3, p4, p5});
+        const std::vector<Vec3I> tris1({Vec3I(0, 1, 2), Vec3I(3, 4, 5)});
+
+        // level set from self-intersecting triangles
+        GridPtr ls_int = tools::createLevelSetDilatedMesh<GridT>(vertices1, tris1, r, voxelSize);
+
+        const Vec3s q0(0.0f, 0.0f, 0.0f),   q1(1.0f, 0.0f, 0.0f),     q2(0.0f, 1.0f, 0.0f),
+                    q3(0.25f, 0.25f, 0.5f), q4(0.75f, -0.25f, -0.5f), q5(-0.25f, 0.75f, -0.5f),
+                    q6(0.5f, 0.0f, 0.0f),   q7(0.0f, 0.5f, 0.0f);
+
+        const std::vector<Vec3s> vertices2({q0, q1, q2, q3, q4, q5, q6, q7});
+        const std::vector<Vec3I> tris2({Vec3s(7, 0, 6), Vec3s(2, 6, 1), Vec3s(6, 2, 7),
+                                        Vec3s(7, 3, 6), Vec3s(7, 4, 5), Vec3s(4, 7, 6)});
+
+        // level set from split triangles that resolve the intersections
+        GridPtr ls_split = tools::createLevelSetDilatedMesh<GridT>(vertices2, tris2, r, voxelSize);
+
+        EXPECT_EQ(ls_int->activeVoxelCount(),       ls_split->activeVoxelCount());
+        EXPECT_NEAR(tools::levelSetArea(*ls_int),   tools::levelSetArea(*ls_split),   1e-6);
+        EXPECT_NEAR(tools::levelSetVolume(*ls_int), tools::levelSetVolume(*ls_split), 1e-6);
     }
 
 }// testLevelSetDilatedMesh

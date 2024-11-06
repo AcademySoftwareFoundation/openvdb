@@ -31,7 +31,7 @@ testCapsuleMeasures(const openvdb::Vec3s& p1, const openvdb::Vec3s& p2, const fl
                 l = (p2-p1).length();
 
     const float area         = 2.0f*l*pi*r + 4.0f*pi*math::Pow2(r),
-                volume       = l*pi*math::Pow2(r) + 4.0f*pi*math::Pow(r,3)/3.0f,
+                volume       = l*pi*math::Pow2(r) + 4.0f*pi*math::Pow3(r)/3.0f,
                 totGaussCurv = 4.0f*pi, // Gauss-Bonnet
                 totMeanCurv  = pi*l + 4.0f*pi*r;
 
@@ -404,7 +404,7 @@ TEST_F(TestLevelSetTubes, testTubeComplexConstantRadius)
         testCapsuleMeasures<GridT>(vertices[0], vertices[3], r, ls);
     }
 
-    // test measures of an approximate a torus
+    // test measures of an approximate torus
     {
         const float pi = math::pi<float>(), error = 0.05f,
                     a = 1.2f, c = 3.0f, voxelSize = 0.1f;
