@@ -9,8 +9,6 @@
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/LevelSetDilatedMesh.h>
-#include <openvdb/tools/LevelSetTubes.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetMeasure.h>
 #include <openvdb/tools/LevelSetMorph.h>
