@@ -27,18 +27,18 @@ testDilatedConvexPolygonMeasures(const std::vector<openvdb::Vec3s>& points,
 {
     using namespace openvdb;
 
-    const int n = points.size();
+    const size_t n = points.size();
     const float pi = math::pi<float>(), r2 = math::Pow2(r), r3 = math::Pow3(r);
 
     float l = 0.0f;
-    for (int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         const Vec3s &p = points[i], &q = points[(i+1) % n];
         l += (p - q).length();
     }
 
     const Vec3s &p = points[0];
     float a = 0.0f;
-    for (int i = 1; i < n-1; ++i) {
+    for (size_t i = 1; i < n-1; ++i) {
         const Vec3s &q = points[i], &r = points[i+1];
         a += 0.5f * (q - p).cross(r - p).length();
     }
