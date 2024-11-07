@@ -551,7 +551,7 @@ protected:
             mYMins[i] = MAXVALUE;
             mYMaxs[i] = MINVALUE;
         }
-        
+
         /// @brief Clears the data container
         inline void
         clear()
@@ -645,7 +645,7 @@ protected:
             ymin = mYMins[i];
             ymax = mYMaxs[i];
         }
-        
+
         /// @brief Returns @c true if the container has no x values or if all y ranges are empty.
         inline bool isEmpty() const
         {
