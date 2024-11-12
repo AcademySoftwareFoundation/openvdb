@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #include "GsplatUtils.cuh"
 
@@ -8,10 +8,11 @@
 #include <ATen/cuda/Atomic.cuh>
 #include <cooperative_groups.h>
 
+constexpr int NUM_THREADS = 256;
+
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
 
 namespace cg = cooperative_groups;
 
@@ -331,7 +332,6 @@ fully_fused_projection_jagged_bwd_kernel(
         }
     }
 }
-} // namespace gsplat
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -371,7 +371,7 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCUDA>(
     int64_t       nnz      = n_indptr[-1].item<int64_t>(); // total number of elements
     n_indptr               = n_indptr - n_sizes;
 
-    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
     torch::Tensor radii   = torch::empty({ nnz }, means.options().dtype(torch::kInt32));
     torch::Tensor means2d = torch::empty({ nnz, 2 }, means.options());
@@ -383,8 +383,8 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCUDA>(
         compensations = torch::zeros({ nnz }, means.options());
     }
     if (nnz) {
-        gsplat::fully_fused_projection_jagged_fwd_kernel<float>
-            <<<(nnz + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS, 0, stream>>>(
+        fully_fused_projection_jagged_fwd_kernel<float>
+            <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
                 B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
                 g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
                 n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
@@ -471,7 +471,7 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCUDA>(
     torch::Tensor n_sizes  = c_sizes * g_sizes; // element size = Ci * Ni
     torch::Tensor n_indptr = torch::cumsum(n_sizes, 0, torch::kInt64) - n_sizes;
 
-    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
     torch::Tensor v_means = torch::zeros_like(means);
     torch::Tensor v_covars, v_quats, v_scales; // optional
@@ -486,8 +486,8 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCUDA>(
         v_viewmats = torch::zeros_like(viewmats);
     }
     if (nnz) {
-        gsplat::fully_fused_projection_jagged_bwd_kernel<float>
-            <<<(nnz + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS, 0, stream>>>(
+        fully_fused_projection_jagged_bwd_kernel<float>
+            <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
                 B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
                 g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
                 n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),

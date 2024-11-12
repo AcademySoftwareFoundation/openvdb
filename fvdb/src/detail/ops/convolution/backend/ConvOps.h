@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_DETAIL_OPS_CONVOLUTION_BACKEND_CONVOPS_H
 #define FVDB_DETAIL_OPS_CONVOLUTION_BACKEND_CONVOPS_H

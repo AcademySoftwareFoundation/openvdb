@@ -1,10 +1,11 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import glob
-import os.path
 import os
+import os.path
 from pathlib import Path
+
 import torch
 from torch.utils.cpp_extension import load
 

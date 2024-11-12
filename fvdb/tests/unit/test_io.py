@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import tempfile
@@ -11,8 +11,7 @@ import torch
 from parameterized import parameterized
 
 import fvdb
-
-from .common import get_fvdb_test_data_path, random_drop_points_if_mutable
+from fvdb.utils.tests import get_fvdb_test_data_path, random_drop_points_if_mutable
 
 standard_dtypes_and_dims = [
     (torch.float16, 1),

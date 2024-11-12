@@ -1,19 +1,19 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
+import logging
 import os
 import time
-import logging
 import timeit
 
 import numpy as np
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
-from fvdb import GridBatch, JaggedTensor
-import fvdb
 
-from common import load_dragon_mesh, make_ray_grid, plot_ray_segments
+import fvdb
+from fvdb import GridBatch, JaggedTensor
+from fvdb.utils.examples import load_dragon_mesh, make_ray_grid, plot_ray_segments
 
 
 def main():

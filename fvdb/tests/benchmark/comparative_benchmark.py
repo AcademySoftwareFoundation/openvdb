@@ -1,32 +1,32 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import os
-import numpy as np
-from tqdm import tqdm
-import pandas as pd
-import rich
 from argparse import ArgumentParser
 from collections import defaultdict
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
+import rich
 import torch
 import torchsparse
 import torchsparse.nn.functional
-import fvdb.nn as fvnn
-from pathlib import Path
-from torch.profiler import profile, record_function, ProfilerActivity
-
+from fvdb_benchmark.configs import BaseConfig, all_configs
 from fvdb_benchmark.dataset import CoordsDataset
-from fvdb_benchmark.configs import all_configs, BaseConfig
 from fvdb_benchmark.utils import (
-    current_gpu_memory_usage,
     create_l2_cache,
-    flush_l2_cache,
-    df_to_table,
+    current_gpu_memory_usage,
     decode_range_name,
+    df_to_table,
     encode_range_name,
+    flush_l2_cache,
     is_range_name,
 )
+from torch.profiler import ProfilerActivity, profile, record_function
+from tqdm import tqdm
+
+import fvdb.nn as fvnn
 
 
 @torch.no_grad()

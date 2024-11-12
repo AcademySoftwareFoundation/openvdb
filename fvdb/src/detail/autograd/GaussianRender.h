@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_DETAIL_AUTOGRAD_GAUSSIANRENDER_H
 #define FVDB_DETAIL_AUTOGRAD_GAUSSIANRENDER_H
@@ -16,8 +16,9 @@ struct SphericalHarmonics : public torch::autograd::Function<SphericalHarmonics>
     using Variable        = torch::autograd::Variable;
 
     static variable_list forward(AutogradContext *ctx, const int sh_degree_to_use,
-                                 const Variable &dirs,     // (N, 3)
-                                 const Variable &sh_coeffs // (N, K, 3)
+                                 const Variable &dirs,      // (N, 3)
+                                 const Variable &sh_coeffs, // (N, K, 3)
+                                 const Variable &radii      // (N,)
     );
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
@@ -37,7 +38,7 @@ struct GaussianFullyFusedProjection
                                  const Variable  &Ks,       // [C, 3, 3]
                                  const uint32_t image_width, const uint32_t image_height,
                                  const float eps2d, const float near_plane, const float far_plane,
-                                 const float radius_clip);
+                                 const float radius_clip, const bool calc_compensations);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
@@ -48,11 +49,12 @@ struct GaussianRasterizeToPixels : public torch::autograd::Function<GaussianRast
     using Variable        = torch::autograd::Variable;
 
     static variable_list forward(AutogradContext *ctx,
-                                 const Variable  &means2d,     // [C, N, 2]
-                                 const Variable  &conics,      // [C, N, 3]
-                                 const Variable  &colors,      // [C, N, 3]
-                                 const Variable  &opacities,   // [N]
+                                 const Variable  &means2d,   // [C, N, 2]
+                                 const Variable  &conics,    // [C, N, 3]
+                                 const Variable  &colors,    // [C, N, 3]
+                                 const Variable  &opacities, // [N]
                                  const uint32_t image_width, const uint32_t image_height,
+                                 const uint32_t image_origin_w, const uint32_t image_origin_h,
                                  const uint32_t  tile_size,
                                  const Variable &tile_offsets, // [C, tile_height, tile_width]
                                  const Variable &flatten_ids,  // [n_isects]

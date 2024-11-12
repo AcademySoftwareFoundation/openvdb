@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import os
@@ -11,10 +11,8 @@ import torch
 from parameterized import parameterized
 
 import fvdb
-
-from fvdb import GridBatch, gridbatch_from_ijk, JaggedTensor, volume_render
-
-from .common import random_drop_points_if_mutable
+from fvdb import GridBatch, JaggedTensor, gridbatch_from_ijk, volume_render
+from fvdb.utils.tests import random_drop_points_if_mutable
 
 all_device_dtype_combos = [
     ["cuda", torch.float16, False],

@@ -1,14 +1,14 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import time
 
 import numpy as np
 import torch
 import tqdm
-from common import load_dragon_mesh
 
 from fvdb import GridBatch
+from fvdb.utils.examples import load_dragon_mesh
 
 
 def benchmark_inplace_conv(grid: GridBatch, in_feature, in_kernel):

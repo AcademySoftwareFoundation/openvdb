@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Script to download benchmark dataset(s)"""
 
 import os

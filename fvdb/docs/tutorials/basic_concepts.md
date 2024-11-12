@@ -40,15 +40,14 @@ First, we construct a minibatch of grids using the input points. These input poi
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import point_cloud_utils as pcu
 
 # We're going to create a minibatch of two point clouds each of which
 # has a different number of points
-pts1, clrs1 = pcu.load_mesh_vn("points1.ply")
-pts2, clrs2 = pcu.load_mesh_vn("points2.ply")
-pts1, clrs1 = torch.from_numpy(pts1).cuda(), torch.from_numpy(clrs1).cuda()
-pts2, clrs2 = torch.from_numpy(pts2).cuda(), torch.from_numpy(clrs2).cuda()
+pts1, clrs1 = load_car_1_mesh(mode = "vn")
+pts2, clrs2 = load_car_2_mesh(mode = "vn")
 
 # Creating JaggedTensors: one for points and one for colors
 points = fvdb.JaggedTensor([pts1, pts2])
@@ -66,7 +65,7 @@ print(points[1].jdata.shape)
 
 Next, we splat the colors at the points to the constructed grid, yielding per-voxel colors.
 
-```python
+```python continuation
 # Splat the colors into the grid with trilinear interpolation
 # vox_colors is a JaggedTensor of per-voxel normas
 vox_colors = grid.splat_trilinear(points, colors)
@@ -76,7 +75,7 @@ vox_colors = grid.splat_trilinear(points, colors)
 
 Finally, we generate a new set of noisy points and sample the grid to recover colors at those new samples.
 
-```python
+```python continuation
 # Now let's generate some random points and sample the grid at those points
 sample_points = fvdb.JaggedTensor([torch.rand(10_000, 3), torch.rand(11_000, 3)]).cuda()
 

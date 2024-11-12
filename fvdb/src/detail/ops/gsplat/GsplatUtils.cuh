@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_DETAIL_OPS_GSPLAT_GSPLATUTILS_CUH
 #define FVDB_DETAIL_OPS_GSPLAT_GSPLATUTILS_CUH
@@ -9,7 +9,6 @@
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
 
 template <class T>
 inline __device__ uint32_t
@@ -342,7 +341,6 @@ inverse_vjp(const T Minv, const T v_Minv, T &v_M) {
     v_M += -Minv * v_Minv * Minv;
 }
 
-} // namespace gsplat
 } // namespace ops
 } // namespace detail
 } // namespace fvdb

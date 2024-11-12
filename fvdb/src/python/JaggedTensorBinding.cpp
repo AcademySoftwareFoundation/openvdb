@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #include "TypeCasters.h"
 
@@ -34,7 +34,7 @@ bind_jagged_tensor(py::module &m) {
         .def_property_readonly("jidx", [](const fvdb::JaggedTensor& self) {
             // FIXME: (@fwilliams) This is a bit ugly and the abstraction leaks
             if (self.jidx().numel() == 0 && self.jdata().numel() > 0) {
-                return torch::zeros({self.jdata().size(0)}, torch::TensorOptions().device(self.device()).dtype(torch::kInt16));
+                return torch::zeros({self.jdata().size(0)}, torch::TensorOptions().device(self.device()).dtype(fvdb::JIdxScalarType));
             } else {
                 return self.jidx();
             }

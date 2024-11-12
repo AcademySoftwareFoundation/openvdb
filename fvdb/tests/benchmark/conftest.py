@@ -1,15 +1,13 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import gc
-import sys
 import logging
+import sys
 
 import torch
-
-from pytest_benchmark.fixture import BenchmarkFixture
-
 from fvdb_benchmark.utils import create_l2_cache, flush_l2_cache
+from pytest_benchmark.fixture import BenchmarkFixture
 
 # pytest_plugins = ["pytest_fvdbench.plugin"]
 

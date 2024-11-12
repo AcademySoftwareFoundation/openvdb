@@ -3,11 +3,14 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.10
   - jupyterlab
-  - pytorch-cuda=12.1
-  - pytorch=2.4.0
+  - pytorch::pytorch=2.4.0
+  - pytorch::pytorch-cuda=12.1
+  - pytorch::pytorch-mutex=*=cuda
+  - pytorch::torchvision
   - tensorboard
   - pip
   - git
@@ -27,7 +30,15 @@ dependencies:
   - numpy<2
   - pyrender
   - linkify-it-py
+  ## 3dgs
+  - imageio
+  - torchmetrics
+  - py-opencv
+  - tyro
+  - pillow
+  - pyyaml
+  - scikit-learn
   - pip:
-    - gsplat
     - point-cloud-utils
-    - python-pycg
+    ## 3dgs
+    - viser

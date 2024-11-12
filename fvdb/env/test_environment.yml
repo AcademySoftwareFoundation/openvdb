@@ -3,10 +3,12 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.10
   - pytorch::pytorch=2.4.0
   - pytorch::pytorch-cuda=12.1
+  - pytorch::pytorch-mutex=*=cuda
   - tensorboard
   - pip>=23.3.1
   - git
@@ -44,8 +46,13 @@ dependencies:
   - py-openimageio
   - linkify-it-py
   - glm
+  - polyscope
+  - py-opencv
+  - imageio
+  - scikit-learn
   - pip:
-    - python-pycg
     - gsplat
+    - pytest-markdown-docs
+    - point-cloud-utils
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse_20-2.0.0b0-cp310-cp310-linux_x86_64.whl
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu121/torchsparse-2.1.0-cp310-cp310-linux_x86_64.whl

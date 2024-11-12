@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import tempfile
@@ -12,8 +12,7 @@ import torch_scatter
 from parameterized import parameterized
 
 import fvdb
-
-from .common import get_fvdb_test_data_path
+from fvdb.utils.tests import get_fvdb_test_data_path, probabilistic_test
 
 all_device_dtype_combos = [
     ["cuda", torch.float16],
@@ -1094,6 +1093,14 @@ class TestJaggedTensor(unittest.TestCase):
         self.assertEqual(jt.joffsets.shape, torch.Size([2]))
 
     @parameterized.expand(all_device_dtype_combos)
+    @probabilistic_test(
+        iterations=20,
+        pass_percentage=80,
+        conditional_args=[
+            ["cuda"],
+            [torch.float16],
+        ],
+    )
     def test_jsum(self, device, dtype):
         torch.random.manual_seed(111)
         if dtype == torch.float16:
@@ -1458,7 +1465,7 @@ class TestJaggedTensor(unittest.TestCase):
         self.assertTrue(torch.allclose(sum_ours_jdata, sum_res_ptscatter, **tol))
         self.assertTrue(torch.allclose(grad_ours, grad_ptscatter, **tol))
 
-    @parameterized.expand([torch.float16, torch.float32, torch.float64])
+    @parameterized.expand([(torch.float16,), (torch.float32,), (torch.float64,)])
     def test_sdpa(self, dtype):
         torch.random.manual_seed(0)
 

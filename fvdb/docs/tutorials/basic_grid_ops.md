@@ -8,19 +8,17 @@ You can differentiably sample data stored at the voxels of a grid using *triline
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
-import point_cloud_utils as pcu
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vn("mesh1.ply")
-v2, f2 = pcu.load_mesh_vn("mesh2.ply")
-v1, f1  = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(pts2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
 
 # Build a GridBatch from two meshes
-mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
-mesh_f_jagged = fvdb.JaggedTensor([f1, f2]).cuda()
+mesh_v_jagged = fvdb.JaggedTensor([v1, v2])
+mesh_f_jagged = fvdb.JaggedTensor([f1, f2]).int()
 grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=0.1)
 
 # Generate some sample points by adding random gaussian noise to the center of each voxel
@@ -46,22 +44,20 @@ Grid with color attributes            |  Points with sampled colors
 :------------------------------------:|:------------------------------------:
 ![](../imgs/fig/sampling_1.png)       |  ![](../imgs/fig/sampling_2.png)
 
-
 ## Splatting point data to a grid
 
 You can differentiably splat data at a set of points into voxels in a grid using *trilinear* or *Bézier* interpolation as follows:
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import point_cloud_utils as pcu
 
 # We're going to create a minibatch of two point clouds each of which
 # has a different number of points
-pts1, clrs1 = pcu.load_mesh_vn("points1.ply")
-pts2, clrs2 = pcu.load_mesh_vn("points2.ply")
-pts1, clrs1 = torch.from_numpy(pts1).cuda(), torch.from_numpy(clrs1).cuda()
-pts2, clrs2 = torch.from_numpy(pts2).cuda(), torch.from_numpy(clrs2).cuda()
+pts1, clrs1 = load_car_1_mesh(mode="vn")
+pts2, clrs2 = load_car_2_mesh(mode="vn")
 
 # JaggedTensors of points and normals
 points = fvdb.JaggedTensor([pts1, pts2])
@@ -80,22 +76,21 @@ Input grid and points with colors                     |  Splat colors onto the g
 :----------------------------------------------------:|:----------------------------------------------------:
 ![](../imgs/fig/screenshot_000000.png.trim.png)       |  ![](../imgs/fig/screenshot_000006.png.trim.png)
 
-
 ## Checking if points are in a grid
 
 You can query whether points lie in a grid as follows:
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vn("mesh1.ply")
-v2, f2 = pcu.load_mesh_vn("mesh2.ply")
-v1, f1  = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
@@ -106,8 +101,8 @@ grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=0.1)
 bbox_sizes = grid.bbox[:, 1] - grid.bbox[:, 0]
 bbox_origins = grid.bbox[:, 0]
 pts = fvdb.JaggedTensor([
-    (torch.randn(10_000, 3, device='cuda') - bbox_origins) * bbox_sizes,
-    (torch.randn(11_000, 3, device='cuda') - bbox_origins) * bbox_sizes,
+    (torch.randn(10_000, 3, device='cuda') - bbox_origins[0]) * bbox_sizes[0],
+    (torch.randn(11_000, 3, device='cuda') - bbox_origins[0]) * bbox_sizes[0],
 ])
 
 # Get a mask indicating which points lie in the grid
@@ -117,13 +112,13 @@ mask = grid.points_in_active_voxel(pts)
 We visualize the points which intersect the grid (yellow points intersect and purple points do not).
 ![](../imgs/fig/pts_in_grid.png)
 
-
 ## Checking if ijk coordinates are in a grid
 
 Similar to querying whether world space points lie in a grid, you can query whether the index space `ijk` integer coordinates lie in a grid as follows:
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -132,10 +127,9 @@ import os
 
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vn("mesh1.ply")
-v2, f2 = pcu.load_mesh_vn("mesh2.ply")
-v1, f1  = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
@@ -147,15 +141,14 @@ for b, b_grid in enumerate(grid.bbox):
     pts = [torch.randint(int(b_grid[0][i]), int(b_grid[1][i]), size=(2_000 * (b+1),), device='cuda') for i in range(3)]
     rand_idx_pts.append(torch.stack(pts, dim=1))
 
-
 pts = fvdb.JaggedTensor(rand_idx_pts)
 
 coords_in_grid = grid.coords_in_active_voxel(pts)
-
 ```
 
 We visualize the coordinates which intersect the grid (yellow coordinates intersect and purple coordinates do not).
 ![](../imgs/fig/coords_in_grid.png)
+
 
 ## Checking if axis aligned cubes intersect a grid
 
@@ -165,6 +158,7 @@ In this example we create some random points to represent the centers of cubes o
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -172,10 +166,9 @@ import polyscope as ps
 import os
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vn("mesh1.ply")
-v2, f2 = pcu.load_mesh_vn("mesh2.ply")
-v1, f1 = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
@@ -215,6 +208,7 @@ There is a convenient method to convert ijk values, which are integer coordinate
 ```python
 
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -237,10 +231,9 @@ def generate_random_points(bounding_box, num_points):
     return random_points
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vf("mesh1.ply")
-v2, f2 = pcu.load_mesh_vf("mesh2.ply")
-v1, f1 = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_1_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
@@ -262,8 +255,27 @@ tensor([  -1,   -1,  121,  ..., 4614, 5695,   -1], device='cuda:0')
 If we have the value of an index into the feature data and want to obtain its corresponding ijk value, this is as simple as indexing into the `ijk` attribute of the grid which is itself just a `JaggedTensor` representing the `ijk` values of each index.  Here we get the `ijk` values for 1000 random indexes of a `GridBatch`.
 
 ```python
+import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
+import torch
+import numpy as np
+import point_cloud_utils as pcu
+import polyscope as ps
+import os
+
+# We're going to create a minibatch of two meshes
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
+
+# Build a GridBatch from two meshes
+mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
+mesh_f_jagged = fvdb.JaggedTensor([f1, f2]).cuda()
+grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=0.025)
+
 rand_indexes = torch.randint(0, grid.total_voxels, size=(1000,)).cuda()
 print(grid.ijk.jdata[rand_indexes])
+print(grid.ijk.jidx[rand_indexes])
 ```
 ```bash
 tensor([[-11,   5,   7],
@@ -277,7 +289,7 @@ tensor([[-11,   5,   7],
 
 However, you may also want to obtain the batch index of the grid that the `ijk` coordinate belongs to.  This is just as simple by using the `jidx` attribute of the `JaggedTensor` which represents the batch index of each element in the `JaggedTensor`.  Using the same random indexes as above, we can get the batch index of the grid for each random index.
 
-```python
+```python continuation
 print(grid.ijk.jidx[rand_indexes])
 ```
 ```bash
@@ -299,17 +311,17 @@ Note:  If any `ijk` values in the grid are not present in the input to `ijk_to_i
 
 In this example, let's illustrate the more useful case where we have corresponding features and `ijk` values from a grid that are ordered differently from another reference grid and we want to re-order the features to match the order they should be in the reference grid.
 
-```python
+```python continuation
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vf("mesh1.ply")
-v2, f2 = pcu.load_mesh_vf("mesh2.ply")
-v1, f1 = torch.from_numpy(v1).float().cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).float().cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
@@ -352,6 +364,7 @@ In this example we create a set of 24 random ijk values per grid and get the ind
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -359,24 +372,22 @@ import polyscope as ps
 import os
 
 # We're going to create a minibatch of two meshes
-v1, f1 = pcu.load_mesh_vn("mesh1.ply")
-v2, f2 = pcu.load_mesh_vn("mesh2.ply")
-v1, f1 = torch.from_numpy(v1).cuda(), torch.from_numpy(f1.astype(np.int32)).cuda()
-v2, f2 = torch.from_numpy(v2).cuda(), torch.from_numpy(f2.astype(np.int32)).cuda()
+v1, f1 = load_car_1_mesh(mode="vf")
+v2, f2 = load_car_2_mesh(mode="vf")
+f1, f2 = f1.to(torch.int32), f2.to(torch.int32)
 
 # Build a GridBatch from two meshes
 mesh_v_jagged = fvdb.JaggedTensor([v1, v2]).cuda()
 mesh_f_jagged = fvdb.JaggedTensor([f1, f2]).cuda()
 grid = fvdb.gridbatch_from_mesh(mesh_v_jagged, mesh_f_jagged, voxel_sizes=0.025)
 
-
 # Build a set of 24 randomly selected ijk values per grid
 rand_ijks = fvdb.JaggedTensor(
     [
         grid.ijk.jdata[
-            torch.randint(int(grid.ijk.joffsets[b][0]), int(grid.ijk.joffsets[b][1]), (24,))
+            torch.randint(int(grid.ijk.joffsets[b]), int(grid.ijk.joffsets[b + 1]), (24,))
         ]
-        for b in range(grid.grid_count)
+        for b in range(grid.grid_count - 1)
     ],
 )
 
@@ -401,6 +412,7 @@ In this example we clip a batch of grids to independent bounding boxes and visua
 ```python
 import os
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh, load_car_3_mesh, load_car_4_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -408,13 +420,12 @@ import point_cloud_utils as pcu
 device = 'cuda'
 mesh_vs = []
 mesh_fs = []
-mesh_files = ("car-25.ply", "car-24.ply", "car-68.ply", "car-194.ply")
+mesh_load_funcs = [load_car_1_mesh, load_car_2_mesh, load_car_3_mesh, load_car_4_mesh]
 
-for fname in mesh_files:
-    v, f = pcu.load_mesh_vf(fname)
-    v, f = torch.from_numpy(v.astype(np.float32)).to(device), torch.from_numpy(f.astype(np.int32)).to(device)
+for func in mesh_load_funcs:
+    v, f = func(mode="vf")
     mesh_vs.append(v)
-    mesh_fs.append(f)
+    mesh_fs.append(f.to(torch.int32))
 
 mesh_vs = fvdb.JaggedTensor(mesh_vs)
 mesh_fs = fvdb.JaggedTensor(mesh_fs)
@@ -452,6 +463,7 @@ In this example, we create a grid from a mesh and then perform max and mean pool
 ```python
 import os
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -459,14 +471,13 @@ import point_cloud_utils as pcu
 vox_size = 0.02
 num_pts = 10_000
 
-mesh_files = ["car-25.ply",]
+mesh_load_funcs = [load_car_1_mesh]
 
 points = []
 normals = []
 
-for fname in mesh_files:
-    pts, nms = pcu.load_mesh_vn(fname)
-    pts, nms = torch.from_numpy(pts.astype(np.float32)).cuda(), torch.from_numpy(nms.astype(np.float32)).cuda()
+for func in mesh_load_funcs:
+    pts, nms = func(mode="vn")
     pmt = torch.randperm(pts.shape[0])[:num_pts]
     pts, nms = pts[pmt], nms[pmt]
     points.append(pts)
@@ -502,6 +513,7 @@ The most straightforward way to use the `subdivide` method is to provide an inte
 ```python
 import os
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
@@ -509,14 +521,13 @@ import point_cloud_utils as pcu
 vox_size = 0.02
 num_pts = 10_000
 
-mesh_files = ["car-25.ply",]
+mesh_load_funcs = [load_car_1_mesh]
 
 points = []
 normals = []
 
-for fname in mesh_files:
-    pts, nms = pcu.load_mesh_vn(fname)
-    pts, nms = torch.from_numpy(pts.astype(np.float32)).cuda(), torch.from_numpy(nms.astype(np.float32)).cuda()
+for func in mesh_load_funcs:
+    pts, nms = func(mode="vn")
     pmt = torch.randperm(pts.shape[0])[:num_pts]
     pts, nms = pts[pmt], nms[pmt]
     points.append(pts)
@@ -545,7 +556,7 @@ In practice, in a deep neural network like a U-Net architecture, the resolution 
 
 Take this simple example to illustrate the difficulties created by changing the grid topology in this way.  We take the grid created from our mesh, perform Pooling by a factor of 2 and then try to Subdivide by an equal factor of 2 to invert the Pooling operation.
 
-```python
+```python continuation
 max_normals, max_grid = grid.max_pool(2, vox_normals)
 
 subdiv_normals, subdiv_grid = max_grid.subdivide(2, max_normals)
@@ -561,7 +572,7 @@ Notice how we have not obtained the topology of the original grid and have obtai
 
 To correctly invert the Pooling operation, we can provide the `subdivide` function with a `fine_grid` optional argument which describes the topology we want the grid to have after the subdivision.  The original grid before the Pooling operation can be used as this `fine_grid`.
 
-```python
+```python continuation
 max_normals, max_grid = grid.max_pool(2, vox_normals)
 
 # Providing the original grid as our fine_grid target
@@ -579,7 +590,7 @@ The optional `mask` argument to `subdivide` is a `JaggedTensor` of boolean value
 
 Let's illustrate a very simple example of how to use the `mask` argument to only subdivide the voxels which have a feature value greater than a certain threshold.
 
-```python
+```python continuation
 # Mask the grid with the normals where only the normals with a value greater than 0.5 on the x-axis are subdivided
 mask = vox_normals.jdata[:, 0] > 0.5
 
@@ -616,7 +627,7 @@ Grid 3 has 34378 voxels
 
 If the grid is *mutable* and the number of enabled voxels has changed, you can use `num_enabled_voxels` to get the number of *enabled* voxels.  If a grid is not mutable, `num_enabled_voxels` will return the same value as `num_voxels`.
 
-```python
+```python continuation
 # Create a mutable GridBatch of random points
 grid = fvdb.GridBatch(mutable=True)
 grid.set_from_points(pts, voxel_sizes=0.02)
@@ -655,9 +666,9 @@ When `voxel_sizes` and `origins` are not defined, it is assumed all grids have a
 
 We can use `GridBatch`'s `grid_to_world` function to convert between `ijk` index coordinates and their corresponding world-space `xyz` coordinates.  In this example, let's obtain the world-space position that would lie at the index-space `[1, 1, 1]` point of each grid:
 
-```python
+```python continuation
 # Convert ijk coordinates to world coordinates
-ijk = fvdb.JaggedTensor([torch.ones(1,3, dtype=torch.int) for _ in range(batch_size)])
+ijk = fvdb.JaggedTensor([torch.ones(1,3, dtype=torch.float) for _ in range(batch_size)])
 world_coords = grid.grid_to_world(ijk)
 for i in range(grid.grid_count):
     print(f"World-space point that lies at index [1,1,1] for Grid {i} is positioned at {world_coords.jdata[world_coords.jidx==i].tolist()}")
@@ -671,7 +682,7 @@ World-space point that lies at index [1,1,1] for Grid 3 is positioned at [[0.25,
 
 We can also do the inverse operation and convert world-space `xyz` coordinates to their corresponding `ijk` index-space coordinates using `world_to_grid`.  In this example, let's find the `ijk` index coordinates of the voxel which would contain the world-space point located at `[1.0, 1.0, 1.0]` for each grid in our `GridBatch`:
 
-```python
+```python continuation
 # Convert world coordinates to ijk coordinates
 xyz = fvdb.JaggedTensor([torch.ones(1,3, dtype=torch.float) for _ in range(batch_size)])
 ijk_coords = grid.world_to_grid(xyz)
@@ -687,7 +698,7 @@ Index-space voxel that contains the point [1.0, 1.0, 1.0] for Grid 3 [[16, 24, 1
 
 While `grid_to_world` and `world_to_grid` are convenient functions for these purposes, the row-major transformation matrices used for these calculations can be obtained directly from a `GridBatch` for use in your own logic:
 
-```python
+```python continuation
 print(f"Grid to world matrices:\n{grid.grid_to_world_matrices}")
 print(f"World to grid matrices:\n{grid.grid_to_world_matrices}")
 ```
@@ -750,21 +761,21 @@ A simple example of using `fvdb.nn.SparseConv3d` is as follows:
 ```python
 import fvdb
 import fvdb.nn as fvdbnn
+from fvdb.utils.examples import load_car_1_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
 
-voxnum_pts = 10_000
-_size = 0.02
+num_pts = 10_000
+vox_size = 0.02
 
-mesh_files = ["car-25.ply",]
+mesh_load_funcs = [load_car_1_mesh]
 
 points = []
 normals = []
 
-for fname in mesh_files:
-    pts, nms = pcu.load_mesh_vn(fname)
-    pts, nms = torch.from_numpy(pts.astype(np.float32)).cuda(), torch.from_numpy(nms.astype(np.float32)).cuda()
+for func in mesh_load_funcs:
+    pts, nms = func(mode="vn")
     pmt = torch.randperm(pts.shape[0])[:num_pts]
     pts, nms = pts[pmt], nms[pmt]
     points.append(pts)
@@ -793,7 +804,7 @@ Let's visualize the original grid with normals visualized as colours alongside t
 
 For stride values greater than 1, the output of the convolution will be a grid with a smaller resolution than the input grid (similar in topological effect to the output of a Pooling operator).  Let's illustrate this:
 
-```python
+```python continuation
 # We would expect for stride=2 that the output grid would have half the resolution (or twice the world-space size) of the input grid
 conv = fvdbnn.SparseConv3d(in_channels=3, out_channels=3, kernel_size=3, stride=2, bias=False).to(vdbtensor.device)
 
@@ -805,7 +816,7 @@ output = conv(vdbtensor)
 
 Transposed convolution can be performed with `fvdb.nn.SparseConv3d` which can increase the resolution of the grid.  It only really makes sense to perform transposed sparse convolution with a target grid topology we wish to produce with this operation (see the [Pooling Operators](#maxmean-pooling) for an explanation).  Therefore, an `out_grid` argument must be provided in this case to specify the target grid topology:
 
-```python
+```python continuation
 # Tranposed convolution operator, stride=2
 transposed_conv = fvdbnn.SparseConv3d(in_channels=3, out_channels=3, kernel_size=3, stride=2, bias=False, transposed=True).to(vdbtensor.device)
 
@@ -829,21 +840,21 @@ The kernel map, as well as the functionality for using it to compute the convolu
 ```python
 import fvdb
 import fvdb.nn as fvdbnn
+from fvdb.utils.examples import load_car_1_mesh
 import torch
 import numpy as np
 import point_cloud_utils as pcu
 
-voxnum_pts = 10_000
-_size = 0.02
+num_pts = 10_000
+vox_size = 0.02
 
-mesh_files = ["car-25.ply",]
+mesh_load_funcs = [load_car_1_mesh]
 
 points = []
 normals = []
 
-for fname in mesh_files:
-    pts, nms = pcu.load_mesh_vn(fname)
-    pts, nms = torch.from_numpy(pts.astype(np.float32)).cuda(), torch.from_numpy(nms.astype(np.float32)).cuda()
+for func in mesh_load_funcs:
+    pts, nms = func(mode="vn")
     pmt = torch.randperm(pts.shape[0])[:num_pts]
     pts, nms = pts[pmt], nms[pmt]
     points.append(pts)

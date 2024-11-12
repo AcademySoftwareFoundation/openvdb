@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #include "GaussianRender.h"
 
@@ -11,15 +11,18 @@ namespace detail {
 namespace autograd {
 
 SphericalHarmonics::variable_list
-SphericalHarmonics::forward(SphericalHarmonics::AutogradContext *ctx, const int sh_degree_to_use,
-                            const SphericalHarmonics::Variable &dirs,     // (N, 3)
-                            const SphericalHarmonics::Variable &sh_coeffs // (N, K, 3)
+SphericalHarmonics::forward(
+    SphericalHarmonics::AutogradContext *ctx, const int sh_degree_to_use,
+    const SphericalHarmonics::Variable &dirs,      // (C, N, 3) or (N, 3)
+    const SphericalHarmonics::Variable &sh_coeffs, // (C, M, K, D) or (N, K, D)
+    const SphericalHarmonics::Variable &radii      // (C, N) or (N,) (optional)
 ) {
     Variable colors = FVDB_DISPATCH_KERNEL_DEVICE(dirs.device(), [&]() {
-        return ops::dispatchSphericalHarmonicsForward<DeviceTag>(sh_degree_to_use, dirs, sh_coeffs);
+        return ops::dispatchSphericalHarmonicsForward<DeviceTag>(sh_degree_to_use, dirs, sh_coeffs,
+                                                                 radii);
     });
 
-    ctx->save_for_backward({ dirs, sh_coeffs });
+    ctx->save_for_backward({ dirs, sh_coeffs, radii });
     ctx->saved_data["sh_degree_to_use"] = (int64_t)sh_degree_to_use;
     return { colors };
 }
@@ -30,19 +33,21 @@ SphericalHarmonics::backward(SphericalHarmonics::AutogradContext *ctx,
     Variable v_colors = grad_output.at(0);
 
     // ensure the gradients are contiguous if they are not None
-    if (v_colors.defined())
+    if (v_colors.defined()) {
         v_colors = v_colors.contiguous();
+    }
 
     variable_list saved     = ctx->get_saved_variables();
     Variable      dirs      = saved.at(0);
     Variable      sh_coeffs = saved.at(1);
+    Variable      radii     = saved.at(2);
 
     const int  sh_degree_to_use = (int)ctx->saved_data["sh_degree_to_use"].toInt();
     const bool compute_v_dirs   = ctx->needs_input_grad(1);
 
     auto     variables   = FVDB_DISPATCH_KERNEL_DEVICE(dirs.device(), [&]() {
         return ops::dispatchSphericalHarmonicsBackward<DeviceTag>(sh_degree_to_use, dirs, sh_coeffs,
-                                                                        v_colors, compute_v_dirs);
+                                                                        v_colors, radii, compute_v_dirs);
     });
     Variable v_sh_coeffs = std::get<0>(variables);
     Variable v_dirs;
@@ -52,7 +57,7 @@ SphericalHarmonics::backward(SphericalHarmonics::AutogradContext *ctx,
         v_dirs = Variable();
     }
 
-    return { Variable(), v_dirs, v_sh_coeffs };
+    return { Variable(), v_dirs, v_sh_coeffs, Variable() };
 }
 
 GaussianFullyFusedProjection::variable_list
@@ -64,7 +69,8 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
                                       const GaussianFullyFusedProjection::Variable  &Ks,
                                       const uint32_t image_width, const uint32_t image_height,
                                       const float eps2d, const float near_plane,
-                                      const float far_plane, const float radius_clip) {
+                                      const float far_plane, const float radius_clip,
+                                      const bool calc_compensations) {
     TORCH_CHECK(means.dim() == 2, "means must have shape (N, 3)");
     TORCH_CHECK(viewmats.dim() == 3, "viewmats must have shape (C, 4, 4)");
     TORCH_CHECK(Ks.dim() == 3, "Ks must have shape (C, 3, 3)");
@@ -72,19 +78,27 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionForward<DeviceTag>(
             means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane,
-            far_plane, radius_clip);
+            far_plane, radius_clip, calc_compensations);
     });
     Variable radii     = std::get<0>(variables);
     Variable means2d   = std::get<1>(variables);
     Variable depths    = std::get<2>(variables);
     Variable conics    = std::get<3>(variables);
 
-    ctx->save_for_backward({ means, quats, scales, viewmats, Ks, radii, conics });
-    ctx->saved_data["image_width"]  = (int64_t)image_width;
-    ctx->saved_data["image_height"] = (int64_t)image_height;
-    ctx->saved_data["eps2d"]        = (double)eps2d;
+    ctx->saved_data["image_width"]        = (int64_t)image_width;
+    ctx->saved_data["image_height"]       = (int64_t)image_height;
+    ctx->saved_data["eps2d"]              = (double)eps2d;
+    ctx->saved_data["calc_compensations"] = (bool)calc_compensations;
 
-    return { radii, means2d, depths, conics };
+    if (calc_compensations) {
+        Variable compensations = std::get<4>(variables);
+        ctx->save_for_backward(
+            { means, quats, scales, viewmats, Ks, radii, conics, compensations });
+        return { radii, means2d, depths, conics, compensations };
+    } else {
+        ctx->save_for_backward({ means, quats, scales, viewmats, Ks, radii, conics });
+        return { radii, means2d, depths, conics };
+    }
 }
 
 GaussianFullyFusedProjection::variable_list
@@ -96,14 +110,18 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     Variable v_conics  = grad_output.at(3);
 
     // ensure the gradients are contiguous if they are not None
-    if (v_radii.defined())
+    if (v_radii.defined()) {
         v_radii = v_radii.contiguous();
-    if (v_means2d.defined())
+    }
+    if (v_means2d.defined()) {
         v_means2d = v_means2d.contiguous();
-    if (v_depths.defined())
+    }
+    if (v_depths.defined()) {
         v_depths = v_depths.contiguous();
-    if (v_conics.defined())
+    }
+    if (v_conics.defined()) {
         v_conics = v_conics.contiguous();
+    }
 
     variable_list saved    = ctx->get_saved_variables();
     Variable      means    = saved.at(0);
@@ -114,14 +132,27 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     Variable      radii    = saved.at(5);
     Variable      conics   = saved.at(6);
 
+    const bool calc_compensations = ctx->saved_data["calc_compensations"].toBool();
+
+    at::optional<Variable> compensations, v_compensations;
+    if (calc_compensations) {
+        Variable vcomp = grad_output.at(4);
+        if (vcomp.defined()) {
+            vcomp = vcomp.contiguous();
+        }
+        v_compensations = vcomp;
+        compensations   = saved.at(7);
+    }
+
     const int   image_width  = (int)ctx->saved_data["image_width"].toInt();
     const int   image_height = (int)ctx->saved_data["image_height"].toInt();
     const float eps2d        = (float)ctx->saved_data["eps2d"].toDouble();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionBackward<DeviceTag>(
-            means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, radii, conics,
-            v_means2d, v_depths, v_conics, ctx->needs_input_grad(4));
+            means, quats, scales, viewmats, Ks, compensations, image_width, image_height, eps2d,
+            radii, conics, v_means2d, v_depths, v_conics, v_compensations,
+            ctx->needs_input_grad(4));
     });
     Variable v_means   = std::get<0>(variables);
     // Variable v_covars = std::get<1>(variables);
@@ -142,18 +173,19 @@ GaussianRasterizeToPixels::forward(
     const GaussianRasterizeToPixels::Variable &colors,    // [C, N, 3]
     const GaussianRasterizeToPixels::Variable &opacities, // [N]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const GaussianRasterizeToPixels::Variable &tile_offsets, // [C, tile_height, tile_width]
     const GaussianRasterizeToPixels::Variable &flatten_ids,  // [n_isects]
     const bool                                 absgrad) {
-    const int C = means2d.size(0);
-    const int N = means2d.size(1);
+    // const int C = means2d.size(0);
+    // const int N = means2d.size(1);
 
     auto     variables     = FVDB_DISPATCH_KERNEL_DEVICE(means2d.device(), [&]() {
-        return ops::dispatchRasterizeToPixelsForward<DeviceTag>(
-            means2d, conics, colors, opacities, image_width, image_height, tile_size, tile_offsets,
-            flatten_ids);
+        return ops::dispatchGaussianRasterizeForward<DeviceTag>(
+            means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
+            image_origin_h, tile_size, tile_offsets, flatten_ids);
     });
     Variable render_colors = std::get<0>(variables);
     Variable render_alphas = std::get<1>(variables);
@@ -161,10 +193,12 @@ GaussianRasterizeToPixels::forward(
 
     ctx->save_for_backward(
         { means2d, conics, colors, opacities, tile_offsets, flatten_ids, render_alphas, last_ids });
-    ctx->saved_data["image_width"]  = (int64_t)image_width;
-    ctx->saved_data["image_height"] = (int64_t)image_height;
-    ctx->saved_data["tile_size"]    = (int64_t)tile_size;
-    ctx->saved_data["absgrad"]      = absgrad;
+    ctx->saved_data["image_width"]    = (int64_t)image_width;
+    ctx->saved_data["image_height"]   = (int64_t)image_height;
+    ctx->saved_data["tile_size"]      = (int64_t)tile_size;
+    ctx->saved_data["image_origin_w"] = (int64_t)image_origin_w;
+    ctx->saved_data["image_origin_h"] = (int64_t)image_origin_h;
+    ctx->saved_data["absgrad"]        = absgrad;
 
     return { render_colors, render_alphas };
 }
@@ -191,15 +225,18 @@ GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *
     Variable      render_alphas = saved.at(6);
     Variable      last_ids      = saved.at(7);
 
-    const int  image_width  = (int)ctx->saved_data["image_width"].toInt();
-    const int  image_height = (int)ctx->saved_data["image_height"].toInt();
-    const int  tile_size    = (int)ctx->saved_data["tile_size"].toInt();
-    const bool absgrad      = ctx->saved_data["absgrad"].toBool();
+    const int  image_width    = (int)ctx->saved_data["image_width"].toInt();
+    const int  image_height   = (int)ctx->saved_data["image_height"].toInt();
+    const int  tile_size      = (int)ctx->saved_data["tile_size"].toInt();
+    const int  image_origin_w = (int)ctx->saved_data["image_origin_w"].toInt();
+    const int  image_origin_h = (int)ctx->saved_data["image_origin_h"].toInt();
+    const bool absgrad        = ctx->saved_data["absgrad"].toBool();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means2d.device(), [&]() {
-        return ops::dispatchRasterizeToPixelsBackward<DeviceTag>(
-            means2d, conics, colors, opacities, image_width, image_height, tile_size, tile_offsets,
-            flatten_ids, render_alphas, last_ids, v_render_colors, v_render_alphas, absgrad);
+        return ops::dispatchGaussianRasterizeBackward<DeviceTag>(
+            means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
+            image_origin_h, tile_size, tile_offsets, flatten_ids, render_alphas, last_ids,
+            v_render_colors, v_render_alphas, absgrad);
     });
     Variable v_means2d_abs;
     if (absgrad) {
@@ -214,8 +251,8 @@ GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *
     Variable v_opacities = std::get<4>(variables);
 
     return {
-        v_means2d,  v_conics,   v_colors,   v_opacities, Variable(),
-        Variable(), Variable(), Variable(), Variable(),  Variable(),
+        v_means2d,  v_conics,   v_colors,   v_opacities, Variable(), Variable(),
+        Variable(), Variable(), Variable(), Variable(),  Variable(), Variable(),
     };
 }
 

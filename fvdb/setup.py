@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import logging
 import os
@@ -161,6 +161,8 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             ],
         )
 
+        self.download_external_dep(name="glm", git_url="https://github.com/g-truc/glm.git", git_tag="1.0.1")
+
         self.old_inplace = self.inplace
         super().run()
 
@@ -305,6 +307,7 @@ if __name__ == "__main__":
             cwd / "external/cutlass/include",
             cwd / "external/c-blosc/install/include",
             cwd / "external/cudnn_fe/include",
+            cwd / "external/glm",
         ]
         + cudnn_include_dirs,
         extra_objects=[
@@ -323,6 +326,7 @@ if __name__ == "__main__":
             cwd / get_nanovdb_source_dir(),
             cwd / "external/cutlass/include",
             cwd / "external/c-blosc/install/include",
+            cwd / "external/glm",
         ],
         library_dirs=[str(cwd / "fvdb")],
         libraries=["fvdb"],
@@ -342,7 +346,15 @@ if __name__ == "__main__":
         name="fvdb",
         version=retrieve_version(),
         ext_modules=[lib_ext, bind_ext],
-        packages=["fvdb", "fvdb.nn", "fvdb.utils"],
+        packages=[
+            "fvdb",
+            "fvdb.nn",
+            "fvdb.utils",
+            "fvdb.utils.examples",
+            "fvdb.utils.tests",
+            "fvdb.utils.data",
+            "fvdb.utils.data._colmap_utils",
+        ],
         include_package_data=True,
         package_data={"fvdb": ["_Cpp.pyi", "py.typed"]},
         cmdclass={"build_ext": FVDBBuildCommand},

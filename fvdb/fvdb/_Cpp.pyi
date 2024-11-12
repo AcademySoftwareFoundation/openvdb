@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterator, List, Optional, Sequence, Tuple, Union, overload
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple, Union, overload
 
 import numpy
 import torch
@@ -509,7 +509,58 @@ def volume_render(
     packInfo: torch.Tensor,
     transmittanceThresh: float,
 ) -> List[torch.Tensor]: ...
+def gaussian_fully_fused_projection(
+    means: torch.Tensor,
+    quats: torch.Tensor,
+    scales: torch.Tensor,
+    viewmats: torch.Tensor,
+    Ks: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    near_plane: float = 0.01,
+    far_plane: float = 1e10,
+    radius_clip: float = 0.0,
+    eps2d: float = 0.3,
+    antialias: bool = False,
+) -> List[torch.Tensor]: ...
 def gaussian_render(
+    means: JaggedTensorOrTensor,
+    quats: JaggedTensorOrTensor,
+    scales: JaggedTensorOrTensor,
+    opacities: JaggedTensorOrTensor,
+    sh_coeffs: JaggedTensorOrTensor,
+    viewmats: JaggedTensorOrTensor,
+    Ks: JaggedTensorOrTensor,
+    image_width: int,
+    image_height: int,
+    near_plane: float = 0.01,
+    far_plane: float = 1e10,
+    sh_degree_to_use: int = 3,
+    tile_size: int = 16,
+    radius_clip: float = 0.0,
+    eps2d: float = 0.3,
+    antialias: bool = False,
+    render_depth_channel: bool = False,
+    return_debug_info=False,
+) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
+def gaussian_render_depth(
+    means: JaggedTensorOrTensor,
+    quats: JaggedTensorOrTensor,
+    scales: JaggedTensorOrTensor,
+    opacities: JaggedTensorOrTensor,
+    viewmats: JaggedTensorOrTensor,
+    Ks: JaggedTensorOrTensor,
+    image_width: int,
+    image_height: int,
+    near_plane: float = 0.01,
+    far_plane: float = 1e10,
+    tile_size: int = 16,
+    radius_clip: float = 0.0,
+    eps2d: float = 0.3,
+    antialias: bool = False,
+    return_debug_info=False,
+) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
+def precompute_gaussian_render_state(
     means: torch.Tensor,
     quats: torch.Tensor,
     scales: torch.Tensor,
@@ -519,13 +570,35 @@ def gaussian_render(
     Ks: torch.Tensor,
     image_width: int,
     image_height: int,
-    eps2d: float = 0.3,
     near_plane: float = 0.01,
     far_plane: float = 1e10,
-    radius_clip: float = 0.0,
     sh_degree_to_use: int = 3,
     tile_size: int = 16,
-) -> List[torch.Tensor]: ...
+    radius_clip: float = 0.0,
+    eps2d: float = 0.3,
+    antialias: bool = False,
+    render_depth_channel: bool = False,
+    return_debug_info=False,
+) -> Dict[str, torch.Tensor | Any]: ...
+def render_pixels_from_precomputed_gaussian_render_state(
+    means2d: torch.Tensor,
+    conics: torch.Tensor,
+    colors: torch.Tensor,
+    opacities: torch.Tensor,
+    image_width: int,
+    image_height: int,
+    image_origin_w: int,
+    image_origin_h: int,
+    tile_size: int,
+    isect_offsets: torch.Tensor,
+    flatten_ids: torch.Tensor,
+) -> Tuple[torch.Tensor, torch.Tensor]: ...
+def scaled_dot_product_attention(
+    query: JaggedTensorOrTensor,
+    key: JaggedTensorOrTensor,
+    value: JaggedTensorOrTensor,
+    scale: float,
+) -> JaggedTensor: ...
 def load(
     path: str, grid_id: Optional[GridIdentifier] = None, device: TorchDeviceOrString = "cpu", verbose: bool = False
 ) -> Tuple[GridBatch, JaggedTensor, list[str]]: ...

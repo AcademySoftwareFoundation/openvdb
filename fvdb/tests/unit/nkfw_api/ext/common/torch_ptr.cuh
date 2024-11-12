@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef TORCH_PTR_CUH
 #define TORCH_PTR_CUH
@@ -27,4 +27,4 @@ using Long1Accessor = torch::PackedTensorAccessor32<int64_t, 1, torch::RestrictP
 using Long2Accessor = torch::PackedTensorAccessor32<int64_t, 2, torch::RestrictPtrTraits>;
 using Long3Accessor = torch::PackedTensorAccessor32<int64_t, 3, torch::RestrictPtrTraits>;
 
-#endif //TORCH_PTR_CUH
+#endif // TORCH_PTR_CUH

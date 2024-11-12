@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import unittest
 
@@ -8,8 +8,7 @@ import torch
 from parameterized import parameterized
 
 from fvdb import GridBatch
-
-from .common import gridbatch_from_dense_cube, random_drop_points_if_mutable
+from fvdb.utils.tests import gridbatch_from_dense_cube, random_drop_points_if_mutable
 
 all_device_dtype_combos = [
     ["cpu", torch.float16, False],

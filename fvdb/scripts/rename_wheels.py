@@ -1,11 +1,11 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
-import sys
+import glob
 import os
 import os.path
-import glob
 import shutil
+import sys
 
 torch_version = sys.argv[1]
 cuda_version = sys.argv[2]

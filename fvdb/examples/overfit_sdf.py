@@ -1,17 +1,17 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
-import os
 import logging
+import os
 
 import numpy as np
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
 import tqdm
-from common import load_happy_mesh
 
 from fvdb import GridBatch
+from fvdb.utils.examples import load_happy_mesh
 
 
 def prepare_sdf(npts, ng):

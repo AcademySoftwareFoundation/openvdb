@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import math
@@ -14,8 +14,7 @@ import torchsparse_20.nn.functional as spF
 from parameterized import parameterized
 
 from fvdb import ConvPackBackend, GridBatch, JaggedTensor
-
-from .common import expand_tests, random_drop_points_if_mutable
+from fvdb.utils.tests import expand_tests, random_drop_points_if_mutable
 
 all_device_dtype_combos = [
     ["cuda", torch.bfloat16, False, "gather_scatter"],

@@ -10,12 +10,14 @@ Additionally, you will have to specify the voxel sizes and voxel origins for the
 An example is as follows:
 
 ```python
-import torch
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 
-coords_jagged = JaggedTensor([
-    torch.from_numpy(coords_1).long().cuda(),
-    torch.from_numpy(coords_2).long().cuda()
+coords_1, _ = load_car_1_mesh()
+coords_2, _ = load_car_2_mesh()
+coords_jagged = fvdb.JaggedTensor([
+    coords_1.long().cuda(),
+    coords_2.long().cuda()
 ])
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
 
@@ -33,10 +35,16 @@ The grid will be constructed on the same device as `coords_jagged`, which is a `
 You could either choose to quantize the coordinates of your point cloud into `ijk` coordinates yourself (e.g. using `np.unique((xyz / voxel_size).floor(), axis=0)`), or let `fvdb` handle this logic. Specifically, you could do:
 
 ```python
+import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
+
+coords_1, _ = load_car_1_mesh()
+coords_2, _ = load_car_2_mesh()
+
 # Assemble point clouds into JaggedTensor
-pcd_jagged = JaggedTensor([
-    torch.from_numpy(pcd_1).float().cuda(),
-    torch.from_numpy(pcd_2).float().cuda()
+pcd_jagged = fvdb.JaggedTensor([
+    coords_1.cuda(),
+    coords_2.cuda()
 ])
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
 
@@ -55,6 +63,19 @@ Above we show two methods of building grids from points. Similar functions exist
 In some applications, you may want to build a dilated version of the grid by ensuring that all $2\times 2 \times 2$ voxels around each point are included in the built grid. That said, you could build the grid by:
 
 ```python
+import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
+
+coords_1, _ = load_car_1_mesh()
+coords_2, _ = load_car_2_mesh()
+
+# Assemble point clouds into JaggedTensor
+pcd_jagged = fvdb.JaggedTensor([
+    coords_1.cuda(),
+    coords_2.cuda()
+])
+voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
+
 # Build grid from containing nearest voxels to the points
 grid_b = fvdb.gridbatch_from_nearest_voxels_to_points(pcd_jagged, voxel_sizes=voxel_sizes, origins=[0.0] * 3)
 ```
@@ -68,13 +89,19 @@ We allow building grids enclosing a triangle mesh easily. The given triangle mes
 An example to build grids from meshes is shown as follows:
 
 ```python
-mesh_v_jagged = JaggedTensor([
-    torch.from_numpy(mesh_1_v).float().cuda(),
-    torch.from_numpy(mesh_2_v).float().cuda()
+import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
+
+mesh_1_v, mesh_1_f = load_car_1_mesh(mode='vf')
+mesh_2_v, mesh_2_f = load_car_2_mesh(mode='vf')
+
+mesh_v_jagged = fvdb.JaggedTensor([
+    mesh_1_v.float().cuda(),
+    mesh_2_v.float().cuda()
 ])
-mesh_f_jagged = JaggedTensor([
-    torch.from_numpy(mesh_1_f.astype(np.int64)).long().cuda(),
-    torch.from_numpy(mesh_2_f.astype(np.int64)).long().cuda()
+mesh_f_jagged = fvdb.JaggedTensor([
+    mesh_1_f.long().cuda(),
+    mesh_2_f.long().cuda()
 ])
 
 voxel_sizes = [[0.1, 0.1, 0.1], [0.15, 0.15, 0.15]]
@@ -90,6 +117,8 @@ Here `mesh_1_v` and `mesh_1_f` are the vertex array and triangle array of the me
 We have APIs for you to build dense grids of shape $(D, H, W)$ containing the full $D\times H \times W$ voxels.
 
 ```python
+import fvdb
+
 grid = fvdb.gridbatch_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="cuda")
 ```
 
@@ -98,11 +127,13 @@ grid = fvdb.gridbatch_from_dense(num_grids=1, dense_dims=[32, 32, 32], device="c
 If you are comparing the performance of dense pytorch 3D tensors vs sparse grids, it is usually very helpful to build the exact same input (including grid and features). In `fvdb.nn`, we provide a thin wrapper class `VDBTensor` that works like a `torch.Tensor`, yet enclosing the grid topology. To convert data back and forth from dense PyTorch `Tensor`s, we could do:
 
 ```python
+import torch
+import fvdb
 from fvdb.nn import VDBTensor
 
 # Easy way to initialize a VDBTensor from a torch 3D tensor [B, D, H, W, C]
 dense_data = torch.ones(2, 32, 32, 32, 16).cuda()
-sparse_data = VDBTensor.from_dense(dense_data, voxel_sizes=[0.1] * 3)
+sparse_data = fvdb.nn.vdbtensor_from_dense(dense_data, voxel_sizes=[0.1] * 3)
 dense_data_back = sparse_data.to_dense()
 assert torch.all(dense_data == dense_data_back)
 ```
@@ -120,9 +151,16 @@ In the picture below, green grid is the primal grid while purple grid is its dua
 
 ![build_dual.png](../imgs/fig/build_dual.png)
 
-To create a dual grid from a given primal grid, use the following code:
+To create a dual grid from a given primal grid, use `GridBatch.dual_grid()`:
 
 ```python
+import fvdb
+from fvdb.utils.examples import load_dragon_mesh
+
+coords_1, _ = load_dragon_mesh()
+
+grid_primal = fvdb.gridbatch_from_points(fvdb.JaggedTensor([coords_1]))
+
 grid_dual = grid_primal.dual_grid()
 ```
 
@@ -131,8 +169,15 @@ grid_dual = grid_primal.dual_grid()
 The grid could be subdivided or coarsened with a subdivision/coarsening factor provided:
 
 ```python
-grid_subdivided = grid_origin.subdivided_grid(2)
-grid_coarsened = grid_origin.coarsened_grid(2)
+import fvdb
+from fvdb.utils.examples import load_happy_mesh
+
+coords_1, _ = load_happy_mesh(mode='vf')
+
+grid = fvdb.gridbatch_from_points(fvdb.JaggedTensor([coords_1]))
+
+grid_subdivided = grid.subdivided_grid(2)
+grid_coarsened = grid.coarsened_grid(2)
 ```
 
 ![build_coarse_subdivide.png](../imgs/fig/build_coarse_subdivide.png)

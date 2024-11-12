@@ -15,6 +15,9 @@ Batches of sparse grids can be serialized to a NanoVDB file using the `fvdb.save
 ```python
 import torch
 import fvdb
+import tempfile
+import os
+import subprocess
 
 p = fvdb.JaggedTensor(
     [
@@ -27,7 +30,7 @@ grid = fvdb.gridbatch_from_points(
 )
 
 # save the grid and features to a compressed nvdb file
-path = os.path.join(save_dir, "two_random_grids.nvdb")
+path = os.path.join(tempfile.gettempdir(), "two_random_grids.nvdb")
 fvdb.save(path, grid, names=["taco1", "taco2"], compressed=True)
 ```
 
@@ -43,12 +46,12 @@ The file "/tmp/tmpwnu7qc_7/two_random_grids.nvdb" contains the following 2 grids
 
 We can include N-dimensional features by passing a JaggedTensor as the second argument (or `data` kwarg) to `fvdb.save`.  Here, we create a grid with a single, float feature channel for our grids and save it to a `nvdb` file.
 
-```python
+```python continuation
 # a single, scalar float feature per grid
 feats = fvdb.JaggedTensor([torch.randn(x, 1) for x in grid.num_voxels])
 
 # save the grid and features to a compressed nvdb file
-path = os.path.join(save_dir, "two_random_grids.nvdb")
+path = os.path.join(tempfile.gettempdir(), "two_random_grids.nvdb")
 fvdb.save(path, grid, feats, names=["taco1", "taco2"], compressed=True)
 ```
 
@@ -65,13 +68,13 @@ Note how our serialized NanoVDB grids are now of type `float`.  fVDB will automa
 
 Let's try to save the same two grids with a `Vec3d` type by creating a JaggedTensor of 3-dimensional double-precision features.
 
-```python
+```python continuation
 # a 3-vector double feature per grid
 feats = fvdb.JaggedTensor([torch.randn(x, 3, dtype=torch.float64) for x in grid.num_voxels])
 
 # save the grid and features to a compressed nvdb file
-path = os.path.join(save_dir, "two_random_vec3d_grids.nvdb")
-fvdb.save(path, grid, feats, names=["taco1", "taco2"], compressed=True)
+saved_nvdb = os.path.join(tempfile.gettempdir(), "two_random_vec3d_grids.nvdb")
+fvdb.save(saved_nvdb, grid, feats, names=["taco1", "taco2"], compressed=True)
 ```
 
 ```bash
@@ -85,7 +88,7 @@ The file "/tmp/tmpwnu7qc_7/two_random_grids.nvdb" contains the following 2 grids
 
 Loading NanoVDB files is as simple as calling `fvdb.load`.  You can optionally supply a PyTorch device you'd like the grids and features loaded onto.  Here, we load the two grids we saved in the previous section onto our GPU.
 
-```python
+```python continuation
 # Load the grid and features from the compressed nvdb file
 grid_batch, features, names = fvdb.load(saved_nvdb, device=torch.device("cuda:0"))
 print("Loaded grid batch total number of voxels: ", grid_batch.total_voxels)
@@ -101,8 +104,8 @@ Loaded grid batch data type: torch.float64, device: cuda:0
 
 While saving and loading from OpenVDB files is not directly supported by fVDB, it is possible to easily convert between NanoVDB and OpenVDB files using the `nanovdb_convert` command line tool.  Here, we convert our previously saved NanoVDB file to an OpenVDB file.
 
-```python
-vdb_path = os.path.join(tmpdir, "two_random_grids.vdb")
+```python notest
+vdb_path = os.path.join(tempfile.gettempdir(), "two_random_grids.vdb")
 convert_cmd = "nanovdb_convert -v %s %s" % (saved_nvdb, vdb_path)
 print("nanovdb_convert our nvdb to vdb: ", convert_cmd)
 print(subprocess.check_output(convert_cmd.split()).decode("utf-8"))
@@ -121,7 +124,7 @@ From here, our grid can be loaded by OpenVDB tools.  Roundtripping our converted
 Loading the converted OpenVDB file into fVDB shows our familiar grids and features as we expect:
 
 
-```python
+```python notest
 convert_cmd = "nanovdb_convert -v -f %s %s" % (  # -f flag forces overwriting existing file
     vdb_path,
     saved_nvdb,

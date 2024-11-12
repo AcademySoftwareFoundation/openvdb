@@ -1,19 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
-#include "GsplatTypes.cuh"
-
 #include <detail/ops/Ops.h>
 
 #include <ATen/cuda/Atomic.cuh>
-#include <cooperative_groups.h>
+
+#include "VectorTypes.cuh"
+
+constexpr int NUM_THREADS = 1024;
 
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
-
-namespace cg = cooperative_groups;
 
 namespace {
 // Evaluate spherical harmonics bases at unit direction for high orders using
@@ -22,13 +20,15 @@ namespace {
 // implementation
 template <typename T>
 inline __device__ void
-sh_coeffs_to_color_fast(const uint32_t degree, // degree of SH to be evaluated
-                        const uint32_t c,      // color channel
-                        const vec3<T> &dir,    // [3]
-                        const T       *coeffs, // [K, 3]
-                        // output
-                        T *colors // [3]
+sh_coeffs_to_color(const uint32_t                    degree, // degree of SH to be evaluated
+                   const uint32_t                    c,      // color channel
+                   const typename Vec3Type<T>::type &dir,    // [3]
+                   const T                          *coeffs, // [K, 3]
+                   // output
+                   T *colors // [3]
 ) {
+    // FIXME (Francis): This is a terrible way to read from coeffs, since we're not going to do any
+    //                  memory coalescing. We should instead read from coeffs in a coalesced manner
     T result = 0.2820947917738781f * coeffs[c];
     if (degree >= 1) {
         // Normally rsqrt is faster than sqrt, but --use_fast_math will optimize
@@ -102,16 +102,29 @@ sh_coeffs_to_color_fast(const uint32_t degree, // degree of SH to be evaluated
     colors[c] = result;
 }
 
+// We repeat this code everywhere in sh_coeffs_to_color_vjp to compute the gradient of the
+// direction and write it out, so pull this into a function.
+template <typename T>
+__device__ inline void
+write_v_dir(T x, T y, T z, T v_x, T v_y, T v_z, T inorm, typename Vec3Type<T>::type *v_dir) {
+    using vec3t               = typename Vec3Type<T>::type;
+    const T v_dir_n_dot_dir_n = x * v_x + y * v_y + z * v_z;
+
+    v_dir->x = (v_x - v_dir_n_dot_dir_n * x) * inorm;
+    v_dir->y = (v_y - v_dir_n_dot_dir_n * y) * inorm;
+    v_dir->z = (v_z - v_dir_n_dot_dir_n * z) * inorm;
+}
+
 template <typename T>
 inline __device__ void
-sh_coeffs_to_color_fast_vjp(const uint32_t degree,   // degree of SH to be evaluated
-                            const uint32_t c,        // color channel
-                            const vec3<T> &dir,      // [3]
-                            const T       *coeffs,   // [K, 3]
-                            const T       *v_colors, // [3]
-                            // output
-                            T       *v_coeffs, // [K, 3]
-                            vec3<T> *v_dir     // [3] optional
+sh_coeffs_to_color_vjp(const uint32_t                    degree,   // degree of SH to be evaluated
+                       const uint32_t                    c,        // color channel
+                       const typename Vec3Type<T>::type &dir,      // [3]
+                       const T                          *coeffs,   // [K, 3]
+                       const T                          *v_colors, // [3]
+                       // output
+                       T                          *v_coeffs, // [K, 3]
+                       typename Vec3Type<T>::type *v_dir     // [3] optional
 ) {
     T v_colors_local = v_colors[c];
 
@@ -136,13 +149,7 @@ sh_coeffs_to_color_fast_vjp(const uint32_t degree,   // degree of SH to be evalu
     }
     if (degree < 2) {
         if (v_dir != nullptr) {
-            vec3<T> dir_n   = vec3<T>(x, y, z);
-            vec3<T> v_dir_n = vec3<T>(v_x, v_y, v_z);
-            vec3<T> v_d     = (v_dir_n - glm::dot(v_dir_n, dir_n) * dir_n) * inorm;
-
-            v_dir->x = v_d.x;
-            v_dir->y = v_d.y;
-            v_dir->z = v_d.z;
+            write_v_dir(x, y, z, v_x, v_y, v_z, inorm, v_dir);
         }
         return;
     }
@@ -190,13 +197,7 @@ sh_coeffs_to_color_fast_vjp(const uint32_t degree,   // degree of SH to be evalu
 
     if (degree < 3) {
         if (v_dir != nullptr) {
-            vec3<T> dir_n   = vec3<T>(x, y, z);
-            vec3<T> v_dir_n = vec3<T>(v_x, v_y, v_z);
-            vec3<T> v_d     = (v_dir_n - glm::dot(v_dir_n, dir_n) * dir_n) * inorm;
-
-            v_dir->x = v_d.x;
-            v_dir->y = v_d.y;
-            v_dir->z = v_d.z;
+            write_v_dir(x, y, z, v_x, v_y, v_z, inorm, v_dir);
         }
         return;
     }
@@ -260,13 +261,7 @@ sh_coeffs_to_color_fast_vjp(const uint32_t degree,   // degree of SH to be evalu
 
     if (degree < 4) {
         if (v_dir != nullptr) {
-            vec3<T> dir_n   = vec3<T>(x, y, z);
-            vec3<T> v_dir_n = vec3<T>(v_x, v_y, v_z);
-            vec3<T> v_d     = (v_dir_n - glm::dot(v_dir_n, dir_n) * dir_n) * inorm;
-
-            v_dir->x = v_d.x;
-            v_dir->y = v_d.y;
-            v_dir->z = v_d.z;
+            write_v_dir(x, y, z, v_x, v_y, v_z, inorm, v_dir);
         }
         return;
     }
@@ -341,154 +336,327 @@ sh_coeffs_to_color_fast_vjp(const uint32_t degree,   // degree of SH to be evalu
                                  pSH18_z * coeffs[18 * 3 + c] + pSH23_z * coeffs[23 * 3 + c] +
                                  pSH17_z * coeffs[17 * 3 + c]);
 
-        vec3<T> dir_n   = vec3<T>(x, y, z);
-        vec3<T> v_dir_n = vec3<T>(v_x, v_y, v_z);
-        vec3<T> v_d     = (v_dir_n - glm::dot(v_dir_n, dir_n) * dir_n) * inorm;
-
-        v_dir->x = v_d.x;
-        v_dir->y = v_d.y;
-        v_dir->z = v_d.z;
+        write_v_dir(x, y, z, v_x, v_y, v_z, inorm, v_dir);
     }
 }
 } // namespace
 
-template <typename T>
+// Evalute Spherical Harmonic functions at the given directions, assuming a uniform minibatch
+// of C cameras, each with N gaussians, and K SH coefficients per gaussian.
+template <typename T, uint32_t D>
 __global__ void
-compute_sh_fwd_kernel(const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
-                      const vec3<T> *__restrict__ dirs, // [N, 3]
-                      const T *__restrict__ coeffs,     // [N, K, 3]
-                      const bool *__restrict__ masks,   // [N]
-                      T *__restrict__ colors            // [N, 3]
+compute_sh_fwd_kernel(
+    const uint32_t C, const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> dirs,   // [C, N, 3]
+    const torch::PackedTensorAccessor32<T, 4, torch::RestrictPtrTraits> coeffs, // [C, N, K, D]
+    const int *__restrict__ radii,                                              // [C, N]
+    T *__restrict__ out_colors                                                  // [C, N, D]
 ) {
-    // parallelize over N * 3
-    uint32_t idx = cg::this_grid().thread_rank();
-    if (idx >= N * 3) {
-        return;
-    }
-    uint32_t elem_id = idx / 3;
-    uint32_t c       = idx % 3; // color channel
-    if (masks != nullptr && !masks[elem_id]) {
-        return;
-    }
-    sh_coeffs_to_color_fast(degree_to_use, c, dirs[elem_id], coeffs + elem_id * K * 3,
-                            colors + elem_id * 3);
-}
-
-template <typename T>
-__global__ void
-gsplat::compute_sh_bwd_kernel(const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
-                              const vec3<T> *__restrict__ dirs, // [N, 3]
-                              const T *__restrict__ coeffs,     // [N, K, 3]
-                              const bool *__restrict__ masks,   // [N]
-                              const T *__restrict__ v_colors,   // [N, 3
-                              T *__restrict__ v_coeffs,         // [N, K, 3]
-                              T *__restrict__ v_dirs            // [N, 3] optional
-) {
-    // parallelize over N * 3
-    uint32_t idx = cg::this_grid().thread_rank();
-    if (idx >= N * 3) {
-        return;
-    }
-    uint32_t elem_id = idx / 3;
-    uint32_t c       = idx % 3; // color channel
-    if (masks != nullptr && !masks[elem_id]) {
+    // parallelize over C * N * D
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x; // cidx * N * D + gidx * D + kidx
+    if (idx >= C * N * D) {
         return;
     }
 
-    vec3<T> v_dir = { 0.f, 0.f, 0.f };
-    sh_coeffs_to_color_fast_vjp(degree_to_use, c, dirs[elem_id], coeffs + elem_id * K * 3,
-                                v_colors + elem_id * 3, v_coeffs + elem_id * K * 3,
-                                v_dirs == nullptr ? nullptr : &v_dir);
-    if (v_dirs != nullptr) {
-        gpuAtomicAdd(v_dirs + elem_id * 3, v_dir.x);
-        gpuAtomicAdd(v_dirs + elem_id * 3 + 1, v_dir.y);
-        gpuAtomicAdd(v_dirs + elem_id * 3 + 2, v_dir.z);
+    const uint32_t eid = idx / D; // cidx * N + gidx
+    const uint32_t cid = eid / N; // camera index
+    const uint32_t gid = eid % N; // gaussian index
+    const uint32_t c   = idx % D; // color channel
+    if (radii != nullptr && radii[eid] <= 0) {
+        return;
+    }
+
+    using vec3t               = typename Vec3Type<T>::type;
+    const T    *coeffs_ptr    = coeffs[cid][gid].data();
+    const vec3t dir           = *reinterpret_cast<vec3t *>(dirs[cid][gid].data());
+    T          *out_color_ptr = out_colors + eid * D;
+    sh_coeffs_to_color(degree_to_use, c, dir, coeffs_ptr, out_color_ptr);
+}
+
+// Evalute Spherical Harmonic functions at the given directions, assuming a N gaussians with K SH
+// coefficients per gaussian.
+template <typename T, uint32_t D>
+__global__ void
+compute_sh_fwd_kernel_packed(
+    const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
+    const torch::PackedTensorAccessor32<T, 2, torch::RestrictPtrTraits> dirs,   // [N, 3]
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> coeffs, // [N, K, D]
+    const int *__restrict__ radii,                                              // [N]
+    T *__restrict__ out_colors                                                  // [N, D]
+) {
+    // parallelize over N * D
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x; // gidx * D + kidx
+    if (idx >= N * D) {
+        return;
+    }
+
+    const uint32_t gid = idx / D; // gidx
+    const uint32_t c   = idx % D; // color channel
+    if (radii != nullptr && radii[gid] <= 0) {
+        return;
+    }
+
+    using vec3t               = typename Vec3Type<T>::type;
+    const T    *coeffs_ptr    = coeffs[gid].data();
+    const vec3t dir           = *reinterpret_cast<vec3t *>(dirs[gid].data());
+    T          *out_color_ptr = out_colors + gid * D;
+    sh_coeffs_to_color(degree_to_use, c, dir, coeffs_ptr, out_color_ptr);
+}
+
+template <typename T, uint32_t D>
+__global__ void
+compute_sh_bwd_kernel(
+    const uint32_t C, const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> dirs,     // [C, N, 3]
+    const torch::PackedTensorAccessor32<T, 4, torch::RestrictPtrTraits> coeffs,   // [C, N, K, 3]
+    const int *__restrict__ radii,                                                // [C, N]
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> v_colors, // [C, N, 3]
+    T *__restrict__ out_v_coeffs,                                                 // [C, N, K, 3]
+    T *__restrict__ out_v_dirs // [C, N, 3] optional
+) {
+    // parallelize over C * N * D
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x; // cidx * N * D + gidx * D + c
+    if (idx >= C * N * D) {
+        return;
+    }
+
+    const uint32_t eid = idx / D; // cidx * N + gidx
+    const uint32_t cid = eid / N; // camera index
+    const uint32_t gid = eid % N; // gaussian index
+    const uint32_t c   = idx % D; // color channel
+    if (radii != nullptr && radii[eid] <= 0) {
+        return;
+    }
+
+    using vec3t = typename Vec3Type<T>::type;
+
+    const T    *coeffs_ptr       = coeffs[cid][gid].data();
+    const vec3t dir              = *reinterpret_cast<vec3t *>(dirs[cid][gid].data());
+    const T    *v_color_ptr      = v_colors[cid][gid].data();
+    T          *out_v_coeffs_ptr = out_v_coeffs + eid * K * D;
+
+    vec3t  v_dir{ 0.f, 0.f, 0.f };
+    vec3t *out_v_dir_ptr = out_v_dirs == nullptr ? nullptr : &v_dir;
+
+    sh_coeffs_to_color_vjp(degree_to_use, c, dir, coeffs_ptr, v_color_ptr, out_v_coeffs_ptr,
+                           out_v_dir_ptr);
+    if (out_v_dirs != nullptr) {
+        gpuAtomicAdd(out_v_dirs + eid * 3, v_dir.x);
+        gpuAtomicAdd(out_v_dirs + eid * 3 + 1, v_dir.y);
+        gpuAtomicAdd(out_v_dirs + eid * 3 + 2, v_dir.z);
     }
 }
-} // namespace gsplat
+
+template <typename T, uint32_t D>
+__global__ void
+compute_sh_bwd_kernel_packed(
+    const uint32_t N, const uint32_t K, const uint32_t degree_to_use,
+    const torch::PackedTensorAccessor32<T, 2, torch::RestrictPtrTraits> dirs,     // [N, 3]
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> coeffs,   // [N, K, 3]
+    const int *__restrict__ radii,                                                // [N]
+    const torch::PackedTensorAccessor32<T, 2, torch::RestrictPtrTraits> v_colors, // [N, 3]
+    T *__restrict__ out_v_coeffs,                                                 // [N, K, 3]
+    T *__restrict__ out_v_dirs                                                    // [N, 3] optional
+) {
+    // parallelize over N * D
+    const uint32_t idx = blockIdx.x * blockDim.x + threadIdx.x; // gidx * D + c
+    if (idx >= N * D) {
+        return;
+    }
+
+    const uint32_t gid = idx / D; // gidx
+    const uint32_t c   = idx % D; // color channel
+    if (radii != nullptr && radii[gid] <= 0) {
+        return;
+    }
+
+    using vec3t = typename Vec3Type<T>::type;
+
+    const T    *coeffs_ptr       = coeffs[gid].data();
+    const vec3t dir              = *reinterpret_cast<vec3t *>(dirs[gid].data());
+    const T    *v_color_ptr      = v_colors[gid].data();
+    T          *out_v_coeffs_ptr = out_v_coeffs + gid * K * D;
+
+    vec3t  v_dir{ 0.f, 0.f, 0.f };
+    vec3t *out_v_dir_ptr = out_v_dirs == nullptr ? nullptr : &v_dir;
+
+    sh_coeffs_to_color_vjp(degree_to_use, c, dir, coeffs_ptr, v_color_ptr, out_v_coeffs_ptr,
+                           out_v_dir_ptr);
+    if (out_v_dirs != nullptr) {
+        gpuAtomicAdd(out_v_dirs + gid * 3, v_dir.x);
+        gpuAtomicAdd(out_v_dirs + gid * 3 + 1, v_dir.y);
+        gpuAtomicAdd(out_v_dirs + gid * 3 + 2, v_dir.z);
+    }
+}
 
 template <>
 torch::Tensor
-dispatchSphericalHarmonicsForward<torch::kCUDA>(const int            sh_degree_to_use,
-                                                const torch::Tensor &dirs,     // [N, 3]
-                                                const torch::Tensor &sh_coeffs // [N, ...]
+dispatchSphericalHarmonicsForward<torch::kCUDA>(
+    const int            sh_degree_to_use,
+    const torch::Tensor &dirs,      // [N, 3] or [C, N, 3]
+    const torch::Tensor &sh_coeffs, // [N, K, 3] or [C, N, K, 3]
+    const torch::Tensor &radii      // [N]
 ) {
-    using gsplat::vec3;
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(dirs));
 
-    // This is supported by the underlying kernel, but it is not exposed
-    const at::optional<torch::Tensor> masks = std::nullopt;
+    TORCH_CHECK_VALUE(dirs.is_cuda(), "dirs must be a CUDA tensor");
+    TORCH_CHECK_VALUE(sh_coeffs.is_cuda(), "sh_coeffs must be a CUDA tensor");
+    TORCH_CHECK_VALUE(radii.is_cuda(), "radii must be a CUDA tensor");
+    TORCH_CHECK_VALUE(radii.is_contiguous(), "radii must be a contiguous");
 
-    GSPLAT_DEVICE_GUARD(dirs);
-    GSPLAT_CHECK_INPUT(dirs);
-    GSPLAT_CHECK_INPUT(sh_coeffs);
-    if (masks.has_value()) {
-        GSPLAT_CHECK_INPUT(masks.value());
+    const bool is_packed = sh_coeffs.dim() == 3;
+    if (is_packed) {
+        TORCH_CHECK_VALUE(dirs.dim() == 2,
+                          "sh_coeffs must have shape [N, K, 3] and dirs must have shape [N, 3]");
+        TORCH_CHECK_VALUE(sh_coeffs.size(0) == dirs.size(0),
+                          "sh_coeffs must have shape [N, K, 3] and dirs must have shape [N, 3]");
+    } else {
+        TORCH_CHECK_VALUE(
+            dirs.dim() == 3,
+            "sh_coeffs must have shape [C, N, K, 3] and dirs must have shape [C, N, 3]");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.dim() == 4,
+            "sh_coeffs must have shape [C, N, K, 3] and dirs must have shape [C, N, 3]");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(0) == dirs.size(0),
+            "sh_coeffs must have shape [C, N, K, 3] and dirs must have shape [C, N, 3]");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(1) == dirs.size(1),
+            "sh_coeffs must have shape [C, N, K, 3] and dirs must have shape [C, N, 3]");
     }
+
     TORCH_CHECK(sh_coeffs.size(-1) == 3, "sh_coeffs must have last dimension 3");
     TORCH_CHECK(dirs.size(-1) == 3, "dirs must have last dimension 3");
-    const uint32_t K      = sh_coeffs.size(-2);
-    const uint32_t N      = dirs.numel() / 3;
-    torch::Tensor  colors = torch::empty_like(dirs); // [..., 3]
+    const uint32_t K = sh_coeffs.size(-2);
+    const uint32_t N = is_packed ? dirs.size(0) : dirs.size(1);
+    const uint32_t C = is_packed ? 1 : dirs.size(0);
+
+    const uint32_t TOTAL_ELEMS = C * N * 3;
+    const uint32_t NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
+
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(dirs.device().index());
+
+    // TODO (Francis): Might need to do zeros_like here
+    torch::Tensor colors = torch::empty_like(dirs); // [..., 3]
+
+    using scalar_t = float;
+
     // parallelize over N * 3
-    if (N) {
-        gsplat::compute_sh_fwd_kernel<float>
-            <<<(N * 3 + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS>>>(
-                N, K, sh_degree_to_use, reinterpret_cast<vec3<float> *>(dirs.data_ptr<float>()),
-                sh_coeffs.data_ptr<float>(),
-                masks.has_value() ? masks.value().data_ptr<bool>() : nullptr,
-                colors.data_ptr<float>());
+    if (!N) {
+        return colors; // [..., 3]
     }
+    if (is_packed) {
+        compute_sh_fwd_kernel_packed<scalar_t, 3><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            N, K, sh_degree_to_use, dirs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            sh_coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radii.data_ptr<int>(), colors.data_ptr<scalar_t>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    } else {
+        compute_sh_fwd_kernel<scalar_t, 3><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            C, N, K, sh_degree_to_use,
+            dirs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            sh_coeffs.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>(),
+            radii.data_ptr<int>(), colors.data_ptr<scalar_t>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    }
+
     return colors; // [..., 3]
 }
 
 template <>
 torch::Tensor
 dispatchSphericalHarmonicsForward<torch::kCPU>(const int            sh_degree_to_use,
-                                               const torch::Tensor &dirs,     // [N, 3]
-                                               const torch::Tensor &sh_coeffs // [N, K, 3]
+                                               const torch::Tensor &dirs,      // [N, 3]
+                                               const torch::Tensor &sh_coeffs, // [N, K, 3]
+                                               const torch::Tensor &radii      // [N]
 ) {
     TORCH_CHECK(false, "CPU implementation not available");
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor>
-dispatchSphericalHarmonicsBackward<torch::kCUDA>(const int            sh_degree_to_use,
-                                                 const torch::Tensor &dirs,      // [..., 3]
-                                                 const torch::Tensor &sh_coeffs, // [..., K, 3]
-                                                 const torch::Tensor &v_colors,
-                                                 const bool           compute_v_dirs) {
-    using gsplat::vec3;
+dispatchSphericalHarmonicsBackward<torch::kCUDA>(
+    const int            sh_degree_to_use,
+    const torch::Tensor &dirs,      // [C, N, 3] or [N, 3]
+    const torch::Tensor &sh_coeffs, // [C, N, K, 3] or [N, K, 3]
+    const torch::Tensor &v_colors,  // [C, N, 3] or [N, 3]
+    const torch::Tensor &radii,     // [C, N] or [N]
+    const bool           compute_v_dirs) {
+    const at::cuda::OptionalCUDAGuard device_guard(at::device_of(dirs));
 
-    // This is supported by the underlying kernel, but it is not exposed
-    const at::optional<torch::Tensor> masks = std::nullopt;
+    TORCH_CHECK_VALUE(dirs.is_cuda(), "dirs must be a CUDA tensor");
+    TORCH_CHECK_VALUE(sh_coeffs.is_cuda(), "sh_coeffs must be a CUDA tensor");
+    TORCH_CHECK_VALUE(v_colors.is_cuda(), "radii must be a CUDA tensor");
+    TORCH_CHECK_VALUE(radii.is_cuda(), "radii must be a CUDA tensor");
+    TORCH_CHECK_VALUE(radii.is_contiguous(), "radii must be a contiguous");
 
-    const int K = sh_coeffs.size(-2);
-
-    GSPLAT_DEVICE_GUARD(dirs);
-    GSPLAT_CHECK_INPUT(dirs);
-    GSPLAT_CHECK_INPUT(sh_coeffs);
-    GSPLAT_CHECK_INPUT(v_colors);
-    if (masks.has_value()) {
-        GSPLAT_CHECK_INPUT(masks.value());
+    const bool is_packed = sh_coeffs.dim() == 3;
+    if (is_packed) {
+        TORCH_CHECK_VALUE(dirs.dim() == 2, "dirs must have shape [N, 3]");
+        TORCH_CHECK_VALUE(v_colors.dim() == 2, "v_colors must have shape [N, 3]");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(0) == dirs.size(0),
+            "sh_coeffs and dirs must have the same number of elements in dimension 0");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(0) == v_colors.size(0),
+            "sh_coeffs and v_colors must have the same number of elements in dimension 0");
+    } else {
+        TORCH_CHECK_VALUE(dirs.dim() == 3, " dirs must have shape [C, N, 3]");
+        TORCH_CHECK_VALUE(sh_coeffs.dim() == 4, "sh_coeffs must have shape [C, N, K, 3]");
+        TORCH_CHECK_VALUE(v_colors.dim() == 3, "v_colors must have shape [C, N, 3]");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(0) == dirs.size(0),
+            "sh_coeffs and dirs must have the same number of elements in dimension 0");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(0) == v_colors.size(0),
+            "sh_coeffs and v_colors must have the same number of elements in dimension 0");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(1) == dirs.size(1),
+            "sh_coeffs and dirs must have the same number of elements in dimension 1");
+        TORCH_CHECK_VALUE(
+            sh_coeffs.size(1) == v_colors.size(1),
+            "sh_coeffs and v_colors must have the same number of elements in dimension 1");
     }
-    TORCH_CHECK(v_colors.size(-1) == 3, "v_colors must have last dimension 3");
+
     TORCH_CHECK(sh_coeffs.size(-1) == 3, "sh_coeffs must have last dimension 3");
     TORCH_CHECK(dirs.size(-1) == 3, "dirs must have last dimension 3");
-    const uint32_t N = dirs.numel() / 3;
+    TORCH_CHECK(v_colors.size(-1) == 3, "v_colors must have last dimension 3");
+    const uint32_t K = sh_coeffs.size(-2);
+    const uint32_t N = is_packed ? dirs.size(0) : dirs.size(1);
+    const uint32_t C = is_packed ? 1 : dirs.size(0);
+
+    const uint32_t TOTAL_ELEMS = C * N * 3;
+    const uint32_t NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
+
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(dirs.device().index());
 
     torch::Tensor v_coeffs = torch::zeros_like(sh_coeffs);
     torch::Tensor v_dirs;
     if (compute_v_dirs) {
         v_dirs = torch::zeros_like(dirs);
     }
-    if (N) {
-        gsplat::compute_sh_bwd_kernel<float>
-            <<<(N * 3 + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS>>>(
-                N, K, sh_degree_to_use, reinterpret_cast<vec3<float> *>(dirs.data_ptr<float>()),
-                sh_coeffs.data_ptr<float>(),
-                masks.has_value() ? masks.value().data_ptr<bool>() : nullptr,
-                v_colors.data_ptr<float>(), v_coeffs.data_ptr<float>(),
-                compute_v_dirs ? v_dirs.data_ptr<float>() : nullptr);
+    if (!N) {
+        std::make_tuple(v_coeffs, v_dirs); // [..., K, 3], [..., 3]
+    }
+
+    using scalar_t = float;
+    if (is_packed) {
+        compute_sh_bwd_kernel_packed<scalar_t, 3><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            N, K, sh_degree_to_use, dirs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            sh_coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radii.data_ptr<int>(),
+            v_colors.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
+            v_coeffs.data_ptr<scalar_t>(), compute_v_dirs ? v_dirs.data_ptr<scalar_t>() : nullptr);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+    } else {
+        compute_sh_bwd_kernel<scalar_t, 3><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            C, N, K, sh_degree_to_use,
+            dirs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            sh_coeffs.packed_accessor32<scalar_t, 4, torch::RestrictPtrTraits>(),
+            radii.data_ptr<int>(),
+            v_colors.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            v_coeffs.data_ptr<scalar_t>(), compute_v_dirs ? v_dirs.data_ptr<scalar_t>() : nullptr);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(v_coeffs, v_dirs); // [..., K, 3], [..., 3]
 }
@@ -499,6 +667,7 @@ dispatchSphericalHarmonicsBackward<torch::kCPU>(const int            sh_degree_t
                                                 const torch::Tensor &dirs,      // [N, 3]
                                                 const torch::Tensor &sh_coeffs, // [N, K, 3]
                                                 const torch::Tensor &v_colors,
+                                                const torch::Tensor &radii,     // [N]
                                                 const bool           compute_v_dirs) {
     TORCH_CHECK(false, "CPU implementation not available");
 }

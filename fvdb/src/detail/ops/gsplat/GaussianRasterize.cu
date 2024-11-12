@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #include "GsplatTypes.cuh"
 
@@ -12,304 +12,8 @@
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
 
 namespace cg = cooperative_groups;
-
-/****************************************************************************
- * Gaussian Tile Intersection
- ****************************************************************************/
-
-template <typename T>
-__global__ void
-isect_tiles(
-    // if the data is [C, N, ...] or [nnz, ...] (packed)
-    const bool packed,
-    // parallelize over C * N, only used if packed is False
-    const uint32_t C, const uint32_t N,
-    // parallelize over nnz, only used if packed is True
-    const uint32_t nnz,
-    const int64_t *__restrict__ camera_ids,   // [nnz] optional
-    const int64_t *__restrict__ gaussian_ids, // [nnz] optional
-    // data
-    const T *__restrict__ means2d,                   // [C, N, 2] or [nnz, 2]
-    const int32_t *__restrict__ radii,               // [C, N] or [nnz]
-    const T *__restrict__ depths,                    // [C, N] or [nnz]
-    const int64_t *__restrict__ cum_tiles_per_gauss, // [C, N] or [nnz]
-    const uint32_t tile_size, const uint32_t tile_width, const uint32_t tile_height,
-    const uint32_t tile_n_bits,
-    int32_t *__restrict__ tiles_per_gauss,           // [C, N] or [nnz]
-    int64_t *__restrict__ isect_ids,                 // [n_isects]
-    int32_t *__restrict__ flatten_ids                // [n_isects]
-) {
-    // For now we'll upcast float16 and bfloat16 to float32
-    using OpT = typename OpType<T>::type;
-
-    // parallelize over C * N.
-    uint32_t idx        = cg::this_grid().thread_rank();
-    bool     first_pass = cum_tiles_per_gauss == nullptr;
-    if (idx >= (packed ? nnz : C * N)) {
-        return;
-    }
-
-    const OpT radius = radii[idx];
-    if (radius <= 0) {
-        if (first_pass) {
-            tiles_per_gauss[idx] = 0;
-        }
-        return;
-    }
-
-    vec2<OpT> mean2d = glm::make_vec2(means2d + 2 * idx);
-
-    OpT tile_radius = radius / static_cast<OpT>(tile_size);
-    OpT tile_x      = mean2d.x / static_cast<OpT>(tile_size);
-    OpT tile_y      = mean2d.y / static_cast<OpT>(tile_size);
-
-    // tile_min is inclusive, tile_max is exclusive
-    uint2 tile_min, tile_max;
-    tile_min.x = min(max(0, (uint32_t)floor(tile_x - tile_radius)), tile_width);
-    tile_min.y = min(max(0, (uint32_t)floor(tile_y - tile_radius)), tile_height);
-    tile_max.x = min(max(0, (uint32_t)ceil(tile_x + tile_radius)), tile_width);
-    tile_max.y = min(max(0, (uint32_t)ceil(tile_y + tile_radius)), tile_height);
-
-    if (first_pass) {
-        // first pass only writes out tiles_per_gauss
-        tiles_per_gauss[idx] =
-            static_cast<int32_t>((tile_max.y - tile_min.y) * (tile_max.x - tile_min.x));
-        return;
-    }
-
-    int64_t cid; // camera id
-    if (packed) {
-        // parallelize over nnz
-        cid = camera_ids[idx];
-        // gid = gaussian_ids[idx];
-    } else {
-        // parallelize over C * N
-        cid = idx / N;
-        // gid = idx % N;
-    }
-    const int64_t cid_enc = cid << (32 + tile_n_bits);
-
-    int64_t depth_id_enc = (int64_t) * (int32_t *)&(depths[idx]);
-    int64_t cur_idx      = (idx == 0) ? 0 : cum_tiles_per_gauss[idx - 1];
-    for (int32_t i = tile_min.y; i < tile_max.y; ++i) {
-        for (int32_t j = tile_min.x; j < tile_max.x; ++j) {
-            int64_t tile_id = i * tile_width + j;
-            // e.g. tile_n_bits = 22:
-            // camera id (10 bits) | tile id (22 bits) | depth (32 bits)
-            isect_ids[cur_idx] = cid_enc | (tile_id << 32) | depth_id_enc;
-            // the flatten index in [C * N] or [nnz]
-            flatten_ids[cur_idx] = static_cast<int32_t>(idx);
-            ++cur_idx;
-        }
-    }
-}
-
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-isect_tiles_tensor(const torch::Tensor               &means2d,      // [C, N, 2] or [nnz, 2]
-                   const torch::Tensor               &radii,        // [C, N] or [nnz]
-                   const torch::Tensor               &depths,       // [C, N] or [nnz]
-                   const at::optional<torch::Tensor> &camera_ids,   // [nnz]
-                   const at::optional<torch::Tensor> &gaussian_ids, // [nnz]
-                   const uint32_t C, const uint32_t tile_size, const uint32_t tile_width,
-                   const uint32_t tile_height, const bool sort, const bool double_buffer) {
-    GSPLAT_DEVICE_GUARD(means2d);
-    GSPLAT_CHECK_INPUT(means2d);
-    GSPLAT_CHECK_INPUT(radii);
-    GSPLAT_CHECK_INPUT(depths);
-    if (camera_ids.has_value()) {
-        GSPLAT_CHECK_INPUT(camera_ids.value());
-    }
-    if (gaussian_ids.has_value()) {
-        GSPLAT_CHECK_INPUT(gaussian_ids.value());
-    }
-    bool packed = means2d.dim() == 2;
-
-    uint32_t N = 0, nnz = 0, total_elems = 0;
-    int64_t *camera_ids_ptr   = nullptr;
-    int64_t *gaussian_ids_ptr = nullptr;
-    if (packed) {
-        nnz         = means2d.size(0);
-        total_elems = nnz;
-        TORCH_CHECK(camera_ids.has_value() && gaussian_ids.has_value(),
-                    "When packed is set, camera_ids and gaussian_ids must be provided.");
-        camera_ids_ptr   = camera_ids.value().data_ptr<int64_t>();
-        gaussian_ids_ptr = gaussian_ids.value().data_ptr<int64_t>();
-    } else {
-        N           = means2d.size(1); // number of gaussians
-        total_elems = C * N;
-    }
-
-    uint32_t             n_tiles = tile_width * tile_height;
-    at::cuda::CUDAStream stream  = at::cuda::getCurrentCUDAStream();
-
-    // the number of bits needed to encode the camera id and tile id
-    // Note: std::bit_width requires C++20
-    // uint32_t tile_n_bits = std::bit_width(n_tiles);
-    // uint32_t cam_n_bits = std::bit_width(C);
-    uint32_t tile_n_bits = (uint32_t)floor(log2(n_tiles)) + 1;
-    uint32_t cam_n_bits  = (uint32_t)floor(log2(C)) + 1;
-    // the first 32 bits are used for the camera id and tile id altogether, so
-    // check if we have enough bits for them.
-    assert(tile_n_bits + cam_n_bits <= 32);
-
-    // first pass: compute number of tiles per gaussian
-    torch::Tensor tiles_per_gauss =
-        torch::empty_like(depths, depths.options().dtype(torch::kInt32));
-
-    int64_t       n_isects;
-    torch::Tensor cum_tiles_per_gauss;
-    if (total_elems) {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, means2d.scalar_type(),
-            "isect_tiles_total_elems", [&]() {
-                isect_tiles<<<(total_elems + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS,
-                              GSPLAT_N_THREADS, 0, stream>>>(
-                    packed, C, N, nnz, camera_ids_ptr, gaussian_ids_ptr,
-                    reinterpret_cast<scalar_t *>(means2d.data_ptr<scalar_t>()),
-                    radii.data_ptr<int32_t>(), depths.data_ptr<scalar_t>(), nullptr, tile_size,
-                    tile_width, tile_height, tile_n_bits, tiles_per_gauss.data_ptr<int32_t>(),
-                    nullptr, nullptr);
-            });
-        cum_tiles_per_gauss = torch::cumsum(tiles_per_gauss.view({ -1 }), 0);
-        n_isects            = cum_tiles_per_gauss[-1].item<int64_t>();
-    } else {
-        n_isects = 0;
-    }
-
-    // second pass: compute isect_ids and flatten_ids as a packed tensor
-    torch::Tensor isect_ids   = torch::empty({ n_isects }, depths.options().dtype(torch::kInt64));
-    torch::Tensor flatten_ids = torch::empty({ n_isects }, depths.options().dtype(torch::kInt32));
-    if (n_isects) {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, means2d.scalar_type(),
-            "isect_tiles_n_isects", [&]() {
-                isect_tiles<<<(total_elems + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS,
-                              GSPLAT_N_THREADS, 0, stream>>>(
-                    packed, C, N, nnz, camera_ids_ptr, gaussian_ids_ptr,
-                    reinterpret_cast<scalar_t *>(means2d.data_ptr<scalar_t>()),
-                    radii.data_ptr<int32_t>(), depths.data_ptr<scalar_t>(),
-                    cum_tiles_per_gauss.data_ptr<int64_t>(), tile_size, tile_width, tile_height,
-                    tile_n_bits, nullptr, isect_ids.data_ptr<int64_t>(),
-                    flatten_ids.data_ptr<int32_t>());
-            });
-    }
-
-    // optionally sort the Gaussians by isect_ids
-    if (n_isects && sort) {
-        torch::Tensor isect_ids_sorted   = torch::empty_like(isect_ids);
-        torch::Tensor flatten_ids_sorted = torch::empty_like(flatten_ids);
-
-        // https://nvidia.github.io/cccl/cub/api/structcub_1_1DeviceRadixSort.html
-        // DoubleBuffer reduce the auxiliary memory usage from O(N+P) to O(P)
-        if (double_buffer) {
-            // Create a set of DoubleBuffers to wrap pairs of device pointers
-            cub::DoubleBuffer<int64_t> d_keys(isect_ids.data_ptr<int64_t>(),
-                                              isect_ids_sorted.data_ptr<int64_t>());
-            cub::DoubleBuffer<int32_t> d_values(flatten_ids.data_ptr<int32_t>(),
-                                                flatten_ids_sorted.data_ptr<int32_t>());
-            GSPLAT_CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, d_keys, d_values, n_isects, 0,
-                               32 + tile_n_bits + cam_n_bits, stream);
-            switch (d_keys.selector) {
-            case 0: // sorted items are stored in isect_ids
-                isect_ids_sorted = isect_ids;
-                break;
-            case 1: // sorted items are stored in isect_ids_sorted
-                break;
-            }
-            switch (d_values.selector) {
-            case 0: // sorted items are stored in flatten_ids
-                flatten_ids_sorted = flatten_ids;
-                break;
-            case 1: // sorted items are stored in flatten_ids_sorted
-                break;
-            }
-            // printf("DoubleBuffer d_keys selector: %d\n", d_keys.selector);
-            // printf("DoubleBuffer d_values selector: %d\n",
-            // d_values.selector);
-        } else {
-            GSPLAT_CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, isect_ids.data_ptr<int64_t>(),
-                               isect_ids_sorted.data_ptr<int64_t>(),
-                               flatten_ids.data_ptr<int32_t>(),
-                               flatten_ids_sorted.data_ptr<int32_t>(), n_isects, 0,
-                               32 + tile_n_bits + cam_n_bits, stream);
-        }
-        return std::make_tuple(tiles_per_gauss, isect_ids_sorted, flatten_ids_sorted);
-    } else {
-        return std::make_tuple(tiles_per_gauss, isect_ids, flatten_ids);
-    }
-}
-
-__global__ void
-isect_offset_encode(const uint32_t n_isects, const int64_t *__restrict__ isect_ids,
-                    const uint32_t C, const uint32_t n_tiles, const uint32_t tile_n_bits,
-                    int32_t *__restrict__ offsets // [C, n_tiles]
-) {
-    // e.g., ids: [1, 1, 1, 3, 3], n_tiles = 6
-    // counts: [0, 3, 0, 2, 0, 0]
-    // cumsum: [0, 3, 3, 5, 5, 5]
-    // offsets: [0, 0, 3, 3, 5, 5]
-    uint32_t idx = cg::this_grid().thread_rank();
-    if (idx >= n_isects)
-        return;
-
-    int64_t isect_id_curr = isect_ids[idx] >> 32;
-    int64_t cid_curr      = isect_id_curr >> tile_n_bits;
-    int64_t tid_curr      = isect_id_curr & ((1 << tile_n_bits) - 1);
-    int64_t id_curr       = cid_curr * n_tiles + tid_curr;
-
-    if (idx == 0) {
-        // write out the offsets until the first valid tile (inclusive)
-        for (uint32_t i = 0; i < id_curr + 1; ++i)
-            offsets[i] = static_cast<int32_t>(idx);
-    }
-    if (idx == n_isects - 1) {
-        // write out the rest of the offsets
-        for (uint32_t i = id_curr + 1; i < C * n_tiles; ++i)
-            offsets[i] = static_cast<int32_t>(n_isects);
-    }
-
-    if (idx > 0) {
-        // visit the current and previous isect_id and check if the (cid,
-        // tile_id) pair changes.
-        int64_t isect_id_prev = isect_ids[idx - 1] >> 32; // shift out the depth
-        if (isect_id_prev == isect_id_curr)
-            return;
-
-        // write out the offsets between the previous and current tiles
-        int64_t cid_prev = isect_id_prev >> tile_n_bits;
-        int64_t tid_prev = isect_id_prev & ((1 << tile_n_bits) - 1);
-        int64_t id_prev  = cid_prev * n_tiles + tid_prev;
-        for (uint32_t i = id_prev + 1; i < id_curr + 1; ++i)
-            offsets[i] = static_cast<int32_t>(idx);
-    }
-}
-
-torch::Tensor
-isect_offset_encode_tensor(const torch::Tensor &isect_ids, // [n_isects]
-                           const uint32_t C, const uint32_t tile_width,
-                           const uint32_t tile_height) {
-    GSPLAT_DEVICE_GUARD(isect_ids);
-    GSPLAT_CHECK_INPUT(isect_ids);
-
-    uint32_t      n_isects = isect_ids.size(0);
-    torch::Tensor offsets =
-        torch::empty({ C, tile_height, tile_width }, isect_ids.options().dtype(torch::kInt32));
-    if (n_isects) {
-        uint32_t             n_tiles     = tile_width * tile_height;
-        uint32_t             tile_n_bits = (uint32_t)floor(log2(n_tiles)) + 1;
-        at::cuda::CUDAStream stream      = at::cuda::getCurrentCUDAStream();
-        isect_offset_encode<<<(n_isects + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS,
-                              GSPLAT_N_THREADS, 0, stream>>>(
-            n_isects, isect_ids.data_ptr<int64_t>(), C, n_tiles, tile_n_bits,
-            offsets.data_ptr<int32_t>());
-    } else {
-        offsets.fill_(0);
-    }
-    return offsets;
-}
 
 /****************************************************************************
  * Rasterization to Pixels Forward Pass
@@ -319,14 +23,19 @@ template <uint32_t COLOR_DIM, typename S>
 __global__ void
 rasterize_to_pixels_fwd_kernel(
     const uint32_t C, const uint32_t N, const uint32_t n_isects, const bool packed,
-    const vec2<S> *__restrict__ means2d,      // [C, N, 2] or [nnz, 2]
-    const vec3<S> *__restrict__ conics,       // [C, N, 3] or [nnz, 3]
-    const S *__restrict__ colors,             // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    const S *__restrict__ opacities,          // [C, N] or [nnz]
-    const S *__restrict__ backgrounds,        // [C, COLOR_DIM]
-    const bool *__restrict__ masks,           // [C, tile_height, tile_width]
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
-    const uint32_t tile_width, const uint32_t tile_height,
+    const vec2<S> *__restrict__ means2d, // [C, N, 2] or [nnz, 2]
+    const vec3<S> *__restrict__ conics,  // [C, N, 3] or [nnz, 3]
+    const S *__restrict__ colors,        // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    const S *__restrict__ opacities,     // [C, N] or [nnz]
+    const S *__restrict__ backgrounds,   // [C, COLOR_DIM]
+    const bool *__restrict__ masks,      // [C, tile_height, tile_width]
+    const uint32_t image_width, const uint32_t image_height,
+
+    const uint32_t image_origin_w, const uint32_t image_origin_h,
+
+    const uint32_t tile_origin_w, const uint32_t tile_origin_h,
+
+    const uint32_t tile_size, const uint32_t tile_width, const uint32_t tile_height,
     const int32_t *__restrict__ tile_offsets, // [C, tile_height, tile_width]
     const int32_t *__restrict__ flatten_ids,  // [n_isects]
     S *__restrict__ render_colors,            // [C, image_height, image_width, COLOR_DIM]
@@ -336,11 +45,16 @@ rasterize_to_pixels_fwd_kernel(
     // each thread draws one pixel, but also timeshares caching gaussians in a
     // shared tile
 
-    auto     block     = cg::this_thread_block();
-    int32_t  camera_id = block.group_index().x;
-    int32_t  tile_id   = block.group_index().y * tile_width + block.group_index().z;
-    uint32_t i         = block.group_index().y * tile_size + block.thread_index().y;
-    uint32_t j         = block.group_index().z * tile_size + block.thread_index().x;
+    // printf("tile_origin_h = %u, tile_origin_w = %u\n", tile_origin_h, tile_origin_w);
+    auto          block     = cg::this_thread_block();
+    const int32_t camera_id = block.group_index().x;
+
+    // blockIdx runs from [0, num_tiles_h] x [0, num_tiles_w]
+    const int32_t tile_id = (block.group_index().y + tile_origin_h) * tile_width +
+                            block.group_index().z + tile_origin_w;
+    // Pixel coordinates run from [0, height] x [0, width]
+    const uint32_t i = block.group_index().y * tile_size + block.thread_index().y;
+    const uint32_t j = block.group_index().z * tile_size + block.thread_index().x;
 
     tile_offsets += camera_id * tile_height * tile_width;
     render_colors += camera_id * image_height * image_width * COLOR_DIM;
@@ -353,14 +67,14 @@ rasterize_to_pixels_fwd_kernel(
         masks += camera_id * tile_height * tile_width;
     }
 
-    S       px     = (S)j + 0.5f;
-    S       py     = (S)i + 0.5f;
-    int32_t pix_id = i * image_width + j;
+    const S       px     = (S)(j + image_origin_w) + 0.5f;
+    const S       py     = (S)(i + image_origin_h) + 0.5f;
+    const int32_t pix_id = i * image_width + j;
 
     // return if out of bounds
     // keep not rasterizing threads around for reading data
-    bool inside = (i < image_height && j < image_width);
-    bool done   = !inside;
+    const bool inside = (i < image_height && j < image_width);
+    bool       done   = !inside;
 
     // when the mask is provided, render the background color and return
     // if this tile is labeled as False
@@ -374,12 +88,12 @@ rasterize_to_pixels_fwd_kernel(
     // have all threads in tile process the same gaussians in batches
     // first collect gaussians between range.x and range.y in batches
     // which gaussians to look through in this tile
-    int32_t        range_start = tile_offsets[tile_id];
-    int32_t        range_end   = (camera_id == C - 1) && (tile_id == tile_width * tile_height - 1)
+    const int32_t  range_start = tile_offsets[tile_id];
+    const int32_t  range_end   = (camera_id == C - 1) && (tile_id == tile_width * tile_height - 1)
                                      ? n_isects
                                      : tile_offsets[tile_id + 1];
     const uint32_t block_size  = block.size();
-    uint32_t       num_batches = (range_end - range_start + block_size - 1) / block_size;
+    const uint32_t num_batches = (range_end - range_start + block_size - 1) / block_size;
 
     extern __shared__ int s[];
     int32_t              *id_batch = (int32_t *)s;                      // [block_size]
@@ -477,7 +191,7 @@ rasterize_to_pixels_fwd_kernel(
 
 template <uint32_t CDIM>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-call_kernel_with_dim(
+call_fwd_kernel_with_dim(
     // Gaussian parameters
     const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
     const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
@@ -486,7 +200,8 @@ call_kernel_with_dim(
     const at::optional<torch::Tensor> &backgrounds, // [C, channels]
     const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids   // [n_isects]
@@ -513,10 +228,14 @@ call_kernel_with_dim(
     uint32_t tile_width  = tile_offsets.size(2);
     uint32_t n_isects    = flatten_ids.size(0);
 
-    // Each block covers a tile on the image. In total there are
-    // C * tile_height * tile_width blocks.
+    const uint32_t tile_origin_w = image_origin_w / tile_size;
+    const uint32_t tile_origin_h = image_origin_h / tile_size;
+    const uint32_t tile_extent_w = (image_width + tile_size - 1) / tile_size;
+    const uint32_t tile_extent_h = (image_height + tile_size - 1) / tile_size;
+
+    // tile_width blocks.
     dim3 threads = { tile_size, tile_size, 1 };
-    dim3 blocks  = { C, tile_height, tile_width };
+    dim3 blocks  = { C, tile_extent_h, tile_extent_w };
 
     torch::Tensor renders = torch::empty({ C, image_height, image_width, channels },
                                          means2d.options().dtype(torch::kFloat32));
@@ -544,9 +263,10 @@ call_kernel_with_dim(
         opacities.data_ptr<float>(),
         backgrounds.has_value() ? backgrounds.value().data_ptr<float>() : nullptr,
         masks.has_value() ? masks.value().data_ptr<bool>() : nullptr, image_width, image_height,
-        tile_size, tile_width, tile_height, tile_offsets.data_ptr<int32_t>(),
-        flatten_ids.data_ptr<int32_t>(), renders.data_ptr<float>(), alphas.data_ptr<float>(),
-        last_ids.data_ptr<int32_t>());
+        image_origin_w, image_origin_h, tile_origin_w, tile_origin_h, tile_size, tile_width,
+        tile_height, tile_offsets.data_ptr<int32_t>(), flatten_ids.data_ptr<int32_t>(),
+        renders.data_ptr<float>(), alphas.data_ptr<float>(), last_ids.data_ptr<int32_t>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return std::make_tuple(renders, alphas, last_ids);
 }
@@ -561,7 +281,8 @@ rasterize_to_pixels_fwd_tensor(
     const at::optional<torch::Tensor> &backgrounds, // [C, channels]
     const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids   // [n_isects]
@@ -569,35 +290,35 @@ rasterize_to_pixels_fwd_tensor(
     GSPLAT_CHECK_INPUT(colors);
     uint32_t channels = colors.size(-1);
 
-#define __GS__CALL_(N)                                                                         \
-    case N:                                                                                    \
-        return call_kernel_with_dim<N>(means2d, conics, colors, opacities, backgrounds, masks, \
-                                       image_width, image_height, tile_size, tile_offsets,     \
-                                       flatten_ids);
+#define __GS__CALL_FWD_(N)                                                                         \
+    case N:                                                                                        \
+        return call_fwd_kernel_with_dim<N>(means2d, conics, colors, opacities, backgrounds, masks, \
+                                           image_width, image_height, image_origin_w,              \
+                                           image_origin_h, tile_size, tile_offsets, flatten_ids);
 
     // TODO: an optimization can be done by passing the actual number of
     // channels into the kernel functions and avoid necessary global memory
     // writes. This requires moving the channel padding from python to C side.
     switch (channels) {
-        __GS__CALL_(1)
-        __GS__CALL_(2)
-        __GS__CALL_(3)
-        __GS__CALL_(4)
-        __GS__CALL_(5)
-        __GS__CALL_(8)
-        __GS__CALL_(9)
-        __GS__CALL_(16)
-        __GS__CALL_(17)
-        __GS__CALL_(32)
-        __GS__CALL_(33)
-        __GS__CALL_(64)
-        __GS__CALL_(65)
-        __GS__CALL_(128)
-        __GS__CALL_(129)
-        __GS__CALL_(256)
-        __GS__CALL_(257)
-        __GS__CALL_(512)
-        __GS__CALL_(513)
+        __GS__CALL_FWD_(1)
+        __GS__CALL_FWD_(2)
+        __GS__CALL_FWD_(3)
+        __GS__CALL_FWD_(4)
+        __GS__CALL_FWD_(5)
+        __GS__CALL_FWD_(8)
+        __GS__CALL_FWD_(9)
+        __GS__CALL_FWD_(16)
+        __GS__CALL_FWD_(17)
+        __GS__CALL_FWD_(32)
+        __GS__CALL_FWD_(33)
+        __GS__CALL_FWD_(64)
+        __GS__CALL_FWD_(65)
+        __GS__CALL_FWD_(128)
+        __GS__CALL_FWD_(129)
+        __GS__CALL_FWD_(256)
+        __GS__CALL_FWD_(257)
+        __GS__CALL_FWD_(512)
+        __GS__CALL_FWD_(513)
     default:
         AT_ERROR("Unsupported number of channels: ", channels);
     }
@@ -612,14 +333,15 @@ __global__ void
 rasterize_to_pixels_bwd_kernel(
     const uint32_t C, const uint32_t N, const uint32_t n_isects, const bool packed,
     // fwd inputs
-    const vec2<S> *__restrict__ means2d,      // [C, N, 2] or [nnz, 2]
-    const vec3<S> *__restrict__ conics,       // [C, N, 3] or [nnz, 3]
-    const S *__restrict__ colors,             // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    const S *__restrict__ opacities,          // [C, N] or [nnz]
-    const S *__restrict__ backgrounds,        // [C, COLOR_DIM] or [nnz, COLOR_DIM]
-    const bool *__restrict__ masks,           // [C, tile_height, tile_width]
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
-    const uint32_t tile_width, const uint32_t tile_height,
+    const vec2<S> *__restrict__ means2d, // [C, N, 2] or [nnz, 2]
+    const vec3<S> *__restrict__ conics,  // [C, N, 3] or [nnz, 3]
+    const S *__restrict__ colors,        // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    const S *__restrict__ opacities,     // [C, N] or [nnz]
+    const S *__restrict__ backgrounds,   // [C, COLOR_DIM] or [nnz, COLOR_DIM]
+    const bool *__restrict__ masks,      // [C, tile_height, tile_width]
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_origin_w, const uint32_t tile_origin_h,
+    const uint32_t tile_size, const uint32_t tile_width, const uint32_t tile_height,
     const int32_t *__restrict__ tile_offsets, // [C, tile_height, tile_width]
     const int32_t *__restrict__ flatten_ids,  // [n_isects]
     // fwd outputs
@@ -638,9 +360,13 @@ rasterize_to_pixels_bwd_kernel(
 ) {
     auto     block     = cg::this_thread_block();
     uint32_t camera_id = block.group_index().x;
-    uint32_t tile_id   = block.group_index().y * tile_width + block.group_index().z;
-    uint32_t i         = block.group_index().y * tile_size + block.thread_index().y;
-    uint32_t j         = block.group_index().z * tile_size + block.thread_index().x;
+
+    // blockIdx runs from [0, num_tiles_h] x [0, num_tiles_w]
+    const int32_t tile_id = (block.group_index().y + tile_origin_h) * tile_width +
+                            block.group_index().z + tile_origin_w;
+    // Pixel coordinates run from [0, height] x [0, width]
+    const uint32_t i = block.group_index().y * tile_size + block.thread_index().y;
+    const uint32_t j = block.group_index().z * tile_size + block.thread_index().x;
 
     tile_offsets += camera_id * tile_height * tile_width;
     render_alphas += camera_id * image_height * image_width;
@@ -660,13 +386,14 @@ rasterize_to_pixels_bwd_kernel(
         return;
     }
 
-    const S px = (S)j + 0.5f;
-    const S py = (S)i + 0.5f;
+    const S px = (S)(j + image_origin_w) + 0.5f;
+    const S py = (S)(i + image_origin_h) + 0.5f;
+
     // clamp this value to the last pixel
     const int32_t pix_id = min(i * image_width + j, image_width * image_height - 1);
 
     // keep not rasterizing threads around for reading data
-    bool inside = (i < image_height && j < image_width);
+    const bool inside = (i < image_height && j < image_width);
 
     // have all threads in tile process the same gaussians in batches
     // first collect gaussians between range.x and range.y in batches
@@ -853,7 +580,7 @@ rasterize_to_pixels_bwd_kernel(
 
 template <uint32_t CDIM>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-call_kernel_with_dim(
+call_bwd_kernel_with_dim(
     // Gaussian parameters
     const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
     const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
@@ -862,7 +589,8 @@ call_kernel_with_dim(
     const at::optional<torch::Tensor> &backgrounds, // [C, 3]
     const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids,  // [n_isects]
@@ -901,10 +629,22 @@ call_kernel_with_dim(
     uint32_t tile_height = tile_offsets.size(1);
     uint32_t tile_width  = tile_offsets.size(2);
 
+    const uint32_t tile_origin_w = image_origin_w / tile_size;
+    const uint32_t tile_origin_h = image_origin_h / tile_size;
+    const uint32_t tile_extent_w = (image_width + tile_size - 1) / tile_size;
+    const uint32_t tile_extent_h = (image_height + tile_size - 1) / tile_size;
+
+    // std::cerr << "RASTERIZE TO PIXELS BACKWARD " << std::endl;
+    // std::cerr << "  BLOCKS = (" << C << ", " << tile_extent_h << ", " << tile_extent_w << ")"
+    //           << std::endl;
+    // std::cerr << "  THREADS = (" << tile_size << ", " << tile_size << ". " << 1 << ")" <<
+    // std::endl; std::cerr << "  TILE WIDTH = " << tile_width << ", TILE HEIGHT = " << tile_height
+    // << std::endl;
+
     // Each block covers a tile on the image. In total there are
     // C * tile_height * tile_width blocks.
     dim3 threads = { tile_size, tile_size, 1 };
-    dim3 blocks  = { C, tile_height, tile_width };
+    dim3 blocks  = { C, tile_extent_h, tile_extent_w };
 
     torch::Tensor v_means2d   = torch::zeros_like(means2d);
     torch::Tensor v_conics    = torch::zeros_like(conics);
@@ -933,14 +673,15 @@ call_kernel_with_dim(
             opacities.data_ptr<float>(),
             backgrounds.has_value() ? backgrounds.value().data_ptr<float>() : nullptr,
             masks.has_value() ? masks.value().data_ptr<bool>() : nullptr, image_width, image_height,
-            tile_size, tile_width, tile_height, tile_offsets.data_ptr<int32_t>(),
-            flatten_ids.data_ptr<int32_t>(), render_alphas.data_ptr<float>(),
-            last_ids.data_ptr<int32_t>(), v_render_colors.data_ptr<float>(),
-            v_render_alphas.data_ptr<float>(),
+            image_origin_w, image_origin_h, tile_origin_w, tile_origin_h, tile_size, tile_width,
+            tile_height, tile_offsets.data_ptr<int32_t>(), flatten_ids.data_ptr<int32_t>(),
+            render_alphas.data_ptr<float>(), last_ids.data_ptr<int32_t>(),
+            v_render_colors.data_ptr<float>(), v_render_alphas.data_ptr<float>(),
             absgrad ? reinterpret_cast<vec2<float> *>(v_means2d_abs.data_ptr<float>()) : nullptr,
             reinterpret_cast<vec2<float> *>(v_means2d.data_ptr<float>()),
             reinterpret_cast<vec3<float> *>(v_conics.data_ptr<float>()), v_colors.data_ptr<float>(),
             v_opacities.data_ptr<float>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
 
     return std::make_tuple(v_means2d_abs, v_means2d, v_conics, v_colors, v_opacities);
@@ -956,7 +697,8 @@ rasterize_to_pixels_bwd_tensor(
     const at::optional<torch::Tensor> &backgrounds, // [C, 3]
     const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids,  // [n_isects]
@@ -971,117 +713,71 @@ rasterize_to_pixels_bwd_tensor(
     GSPLAT_CHECK_INPUT(colors);
     uint32_t COLOR_DIM = colors.size(-1);
 
-#define __GS__CALL_(N)                                                                         \
-    case N:                                                                                    \
-        return call_kernel_with_dim<N>(means2d, conics, colors, opacities, backgrounds, masks, \
-                                       image_width, image_height, tile_size, tile_offsets,     \
-                                       flatten_ids, render_alphas, last_ids, v_render_colors,  \
-                                       v_render_alphas, absgrad);
+#define __GS__CALL_BWD_(N)                                                                       \
+    case N:                                                                                      \
+        return call_bwd_kernel_with_dim<N>(                                                      \
+            means2d, conics, colors, opacities, backgrounds, masks, image_width, image_height,   \
+            image_origin_w, image_origin_h, tile_size, tile_offsets, flatten_ids, render_alphas, \
+            last_ids, v_render_colors, v_render_alphas, absgrad);
 
     switch (COLOR_DIM) {
-        __GS__CALL_(1)
-        __GS__CALL_(2)
-        __GS__CALL_(3)
-        __GS__CALL_(4)
-        __GS__CALL_(5)
-        __GS__CALL_(8)
-        __GS__CALL_(9)
-        __GS__CALL_(16)
-        __GS__CALL_(17)
-        __GS__CALL_(32)
-        __GS__CALL_(33)
-        __GS__CALL_(64)
-        __GS__CALL_(65)
-        __GS__CALL_(128)
-        __GS__CALL_(129)
-        __GS__CALL_(256)
-        __GS__CALL_(257)
-        __GS__CALL_(512)
-        __GS__CALL_(513)
+        __GS__CALL_BWD_(1)
+        __GS__CALL_BWD_(2)
+        __GS__CALL_BWD_(3)
+        __GS__CALL_BWD_(4)
+        __GS__CALL_BWD_(5)
+        __GS__CALL_BWD_(8)
+        __GS__CALL_BWD_(9)
+        __GS__CALL_BWD_(16)
+        __GS__CALL_BWD_(17)
+        __GS__CALL_BWD_(32)
+        __GS__CALL_BWD_(33)
+        __GS__CALL_BWD_(64)
+        __GS__CALL_BWD_(65)
+        __GS__CALL_BWD_(128)
+        __GS__CALL_BWD_(129)
+        __GS__CALL_BWD_(256)
+        __GS__CALL_BWD_(257)
+        __GS__CALL_BWD_(512)
+        __GS__CALL_BWD_(513)
     default:
         AT_ERROR("Unsupported number of channels: ", COLOR_DIM);
     }
 }
 
-} // namespace gsplat
-
-// isect_tiles
-
-template <>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchIsectTiles<torch::kCUDA>(const torch::Tensor &means2d, // [C, N, 2] or [nnz, 2]
-                                 const torch::Tensor &radii,   // [C, N] or [nnz]
-                                 const torch::Tensor &depths,  // [C, N] or [nnz]
-                                 const at::optional<torch::Tensor> &camera_ids,   // [nnz]
-                                 const at::optional<torch::Tensor> &gaussian_ids, // [nnz]
-                                 const uint32_t C, const uint32_t tile_size,
-                                 const uint32_t tile_width, const uint32_t tile_height,
-                                 const bool sort, const bool double_buffer) {
-    return gsplat::isect_tiles_tensor(means2d, radii, depths, camera_ids, gaussian_ids, C,
-                                      tile_size, tile_width, tile_height, sort, double_buffer);
-}
-
-template <>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchIsectTiles<torch::kCPU>(const torch::Tensor               &means2d, // [C, N, 2] or [nnz, 2]
-                                const torch::Tensor               &radii,   // [C, N] or [nnz]
-                                const torch::Tensor               &depths,  // [C, N] or [nnz]
-                                const at::optional<torch::Tensor> &camera_ids,   // [nnz]
-                                const at::optional<torch::Tensor> &gaussian_ids, // [nnz]
-                                const uint32_t C, const uint32_t tile_size,
-                                const uint32_t tile_width, const uint32_t tile_height,
-                                const bool sort, const bool double_buffer) {
-    TORCH_CHECK(false, "CPU implementation not available");
-}
-
-// isect_offset_encode
-
-template <>
-torch::Tensor
-dispatchIsectOffsetEncode<torch::kCUDA>(const torch::Tensor &isect_ids, // [n_isects]
-                                        const uint32_t C, const uint32_t tile_width,
-                                        const uint32_t tile_height) {
-    return gsplat::isect_offset_encode_tensor(isect_ids, C, tile_width, tile_height);
-}
-
-template <>
-torch::Tensor
-dispatchIsectOffsetEncode<torch::kCPU>(const torch::Tensor &isect_ids, // [n_isects]
-                                       const uint32_t C, const uint32_t tile_width,
-                                       const uint32_t tile_height) {
-    TORCH_CHECK(false, "CPU implementation not available");
-}
-
 // rasterize_to_pixels
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchRasterizeToPixelsForward<torch::kCUDA>(
+dispatchGaussianRasterizeForward<torch::kCUDA>(
     // Gaussian parameters
     const torch::Tensor &means2d,   // [C, N, 2]
     const torch::Tensor &conics,    // [C, N, 3]
     const torch::Tensor &colors,    // [C, N, D]
     const torch::Tensor &opacities, // [N]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids   // [n_isects]
 ) {
-    return gsplat::rasterize_to_pixels_fwd_tensor(
-        means2d, conics, colors, opacities, std::nullopt /*backgrounds*/, std::nullopt /*mask*/,
-        image_width, image_height, tile_size, tile_offsets, flatten_ids);
+    return rasterize_to_pixels_fwd_tensor(means2d, conics, colors, opacities,
+                                          std::nullopt /*backgrounds*/, std::nullopt /*mask*/,
+                                          image_width, image_height, image_origin_w, image_origin_h,
+                                          tile_size, tile_offsets, flatten_ids);
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchRasterizeToPixelsForward<torch::kCPU>(
+dispatchGaussianRasterizeForward<torch::kCPU>(
     // Gaussian parameters
     const torch::Tensor &means2d,   // [C, N, 2]
     const torch::Tensor &conics,    // [C, N, 3]
     const torch::Tensor &colors,    // [C, N, D]
     const torch::Tensor &opacities, // [N]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids   // [n_isects]
@@ -1091,14 +787,17 @@ dispatchRasterizeToPixelsForward<torch::kCPU>(
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchRasterizeToPixelsBackward<torch::kCUDA>(
+dispatchGaussianRasterizeBackward<torch::kCUDA>(
     // Gaussian parameters
     const torch::Tensor &means2d,   // [C, N, 2]
     const torch::Tensor &conics,    // [C, N, 3]
     const torch::Tensor &colors,    // [C, N, 3]
     const torch::Tensor &opacities, // [N]
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h,
+
+    const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids,  // [n_isects]
@@ -1110,22 +809,24 @@ dispatchRasterizeToPixelsBackward<torch::kCUDA>(
     const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
     // options
     bool absgrad) {
-    return gsplat::rasterize_to_pixels_bwd_tensor(
+    return rasterize_to_pixels_bwd_tensor(
         means2d, conics, colors, opacities, std::nullopt /*backgrounds*/, std::nullopt /*mask*/,
-        image_width, image_height, tile_size, tile_offsets, flatten_ids, render_alphas, last_ids,
-        v_render_colors, v_render_alphas, absgrad);
+        image_width, image_height, image_origin_w, image_origin_h, tile_size, tile_offsets,
+        flatten_ids, render_alphas, last_ids, v_render_colors, v_render_alphas, absgrad);
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchRasterizeToPixelsBackward<torch::kCPU>(
+dispatchGaussianRasterizeBackward<torch::kCPU>(
     // Gaussian parameters
     const torch::Tensor &means2d,   // [C, N, 2]
     const torch::Tensor &conics,    // [C, N, 3]
     const torch::Tensor &colors,    // [C, N, 3]
     const torch::Tensor &opacities, // [N]
+
     // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t tile_size,
+    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
+    const uint32_t image_origin_h, const uint32_t tile_size,
     // intersections
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids,  // [n_isects]

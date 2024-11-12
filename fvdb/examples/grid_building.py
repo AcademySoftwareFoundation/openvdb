@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 from pathlib import Path
 
@@ -7,11 +7,11 @@ import numpy as np
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
-from common import load_car_1, load_car_2
 
 import fvdb
 from fvdb import JaggedTensor
 from fvdb.nn import VDBTensor
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 
 voxel_size_1 = 0.02
 voxel_size_2 = 0.03
@@ -132,8 +132,8 @@ if __name__ == "__main__":
 
     base_path = Path(__file__).parent.parent
 
-    mesh_1_v, mesh_1_f = load_car_1(mode="vf", device=torch.device("cpu"))
-    mesh_2_v, mesh_2_f = load_car_2(mode="vf", device=torch.device("cpu"))
+    mesh_1_v, mesh_1_f = load_car_1_mesh(mode="vf", device=torch.device("cpu"))
+    mesh_2_v, mesh_2_f = load_car_2_mesh(mode="vf", device=torch.device("cpu"))
 
     mesh_1_v, mesh_1_f = mesh_1_v.numpy(), mesh_1_f.numpy().astype(np.int64)
     mesh_2_v, mesh_2_f = mesh_2_v.numpy(), mesh_2_f.numpy().astype(np.int64)

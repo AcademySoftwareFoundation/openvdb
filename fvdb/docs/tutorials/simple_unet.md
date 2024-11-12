@@ -10,6 +10,7 @@ First, we import basic `fvdb` libraries:
 import fvdb
 import fvdb.nn as fvnn
 from fvdb.nn import VDBTensor
+import torch
 ```
 
 Here `fvdb.nn` is a namespace similar to `torch.nn`, containing a broad definition of different neural layers.
@@ -18,8 +19,8 @@ It also overloads a bunch of operators such as arithmetic computations. Please r
 
 We could then build a basic block as follows:
 
-```python
-class BasicBlock(nn.Module):
+```python continuation
+class BasicBlock(torch.nn.Module):
     expansion = 1
 
     def __init__(self, in_channels: int, out_channels: int, downsample=None, bn_momentum: float = 0.1):
@@ -52,11 +53,11 @@ class BasicBlock(nn.Module):
 
 This defines a similar block as `MinkowskiEngine`:
 
-```python
+```python notest
 import MinkowskiEngine as ME
 
 
-class BasicBlock(nn.Module):
+class BasicBlock(torch.nn.Module):
     expansion = 1
 
     def __init__(self, in_channels: int, out_channels: int, downsample=None, bn_momentum: float = 0.1):
@@ -92,8 +93,8 @@ class BasicBlock(nn.Module):
 All the network layers are fully compatible with `torch.nn`. The only difference is that they take `VDBTensor` as input and return a `VDBTensor`.
 A full network definition could then be built as:
 
-```python
-class FVDBUNetBase(nn.Module):
+```python continuation
+class FVDBUNetBase(torch.nn.Module):
     LAYERS = (2, 2, 2, 2, 2, 2, 2, 2)
     CHANNELS = (32, 64, 128, 256, 256, 128, 96, 96)
     INIT_DIM = 32
@@ -160,7 +161,7 @@ class FVDBUNetBase(nn.Module):
     def _make_layer(self, block, planes, blocks):
         downsample = None
         if self.inplanes != planes * block.expansion:
-            downsample = nn.Sequential(
+            downsample = torch.nn.Sequential(
                 fvnn.SparseConv3d(
                     self.inplanes,
                     planes * block.expansion,
@@ -180,7 +181,7 @@ class FVDBUNetBase(nn.Module):
         for _ in range(1, blocks):
             layers.append(BasicBlock(self.inplanes, planes))
 
-        return nn.Sequential(*layers)
+        return torch.nn.Sequential(*layers)
 
     def forward(self, x):
         out = self.conv0p1s1(x)
@@ -217,7 +218,7 @@ class FVDBUNetBase(nn.Module):
         out = self.bntr4(out)
         out = self.relu(out)
 
-        out = fvnn.cat([out, out_b3p8], dim=1)
+        out = fvdb.jcat([out, out_b3p8], dim=1)
         out = self.block5(out)
 
         # tensor_stride=4
@@ -225,7 +226,7 @@ class FVDBUNetBase(nn.Module):
         out = self.bntr5(out)
         out = self.relu(out)
 
-        out = fvnn.cat([out, out_b2p4], dim=1)
+        out = fvdb.jcat([out, out_b2p4], dim=1)
         out = self.block6(out)
 
         # tensor_stride=2
@@ -233,7 +234,7 @@ class FVDBUNetBase(nn.Module):
         out = self.bntr6(out)
         out = self.relu(out)
 
-        out = fvnn.cat([out, out_b1p2], dim=1)
+        out = fvdb.jcat([out, out_b1p2], dim=1)
         out = self.block7(out)
 
         # tensor_stride=1
@@ -241,7 +242,7 @@ class FVDBUNetBase(nn.Module):
         out = self.bntr7(out)
         out = self.relu(out)
 
-        out = fvnn.cat([out, out_p1], dim=1)
+        out = fvdb.jcat([out, out_p1], dim=1)
         out = self.block8(out)
 
         return self.final(out)
@@ -253,11 +254,17 @@ Note that fVDB will NOT cache the grids to maintain maximum flexibility.
 
 To perform inference with the network, you could simply create a VDBTensor and feed it into the model:
 
-```python
-xyz: JaggedTensor, features: JaggedTensor = ...
-grid = fvdb.gridbatch_from_points(coords, voxel_sizes=[voxel_size] * 3)
-features: JaggedTensor = grid.splat_trilinear(xyz, features)
+```python continuation
+coords = fvdb.JaggedTensor([
+    (torch.randn(10_000, 3, device='cuda')),
+    (torch.randn(11_000, 3, device='cuda')),
+])
+
+grid = fvdb.gridbatch_from_points(coords)
+features = grid.jagged_like(torch.randn(grid.total_voxels, 32, device='cuda'))
 sinput = fvnn.VDBTensor(grid, features)
+
+model = FVDBUNetBase(32, 1).to('cuda')
 soutput = model(sinput)
 ```
 

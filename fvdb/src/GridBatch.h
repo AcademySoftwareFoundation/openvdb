@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_GRIDBATCH_H
 #define FVDB_GRIDBATCH_H
@@ -199,8 +199,8 @@ struct GridBatch : torch::CustomClassHolder {
         detail::RAIIDeviceGuard guard(device());
         const torch::Tensor     ret = impl()->jlidx(true);
         if (ret.numel() == 0) {
-            return torch::arange({ grid_count() },
-                                 torch::TensorOptions().device(device()).dtype(torch::kInt64));
+            return torch::arange({ grid_count() }, torch::TensorOptions().device(device()).dtype(
+                                                       fvdb::JLIdxScalarType));
         } else {
             return ret;
         }
@@ -214,8 +214,8 @@ struct GridBatch : torch::CustomClassHolder {
         detail::RAIIDeviceGuard guard(device());
         const torch::Tensor     ret = impl()->jidx(true);
         if (grid_count() == 1 && ret.numel() == 0) {
-            return torch::zeros({ total_voxels() },
-                                torch::TensorOptions().device(device()).dtype(torch::kInt16));
+            return torch::zeros({ total_voxels() }, torch::TensorOptions().device(device()).dtype(
+                                                        fvdb::JIdxScalarType));
         } else {
             return ret;
         }

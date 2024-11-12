@@ -3,10 +3,12 @@ channels:
   - pytorch
   - nvidia
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.10
   - pytorch::pytorch=2.4.0
   - pytorch::pytorch-cuda=12.1
+  - pytorch::pytorch-mutex=*=cuda
   - git
   - gitpython
   - ca-certificates
@@ -31,4 +33,3 @@ dependencies:
   - linkify-it-py
   - numpy<2
   - tqdm
-  - glm

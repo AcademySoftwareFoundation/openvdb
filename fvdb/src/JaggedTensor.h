@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_JAGGEDTENSOR_H
 #define FVDB_JAGGEDTENSOR_H
@@ -338,7 +338,7 @@ class JaggedTensor : public torch::CustomClassHolder {
     ///          tensor if jt represents a list of tensors)
     ///       2. Indexing with a slice jt[2:5] will return a JaggedTensor containing the 2nd, 3rd,
     ///       and 4th lists in this tensor
-    ///          Note: We currently only support cotiguous slices (i.e. stride = 1)
+    ///          Note: We currently only support contiguous slices (i.e. stride = 1)
     ///       3. Indexing with another JaggedTensor of boolean mask values jt[mask]
     ///          will return a JaggedTensor containing tensors masked by the boolean mask
     ///          i.e. jt[mask][i][j].jdata = jt[i][j].jdata[mask[i][j].jdata]

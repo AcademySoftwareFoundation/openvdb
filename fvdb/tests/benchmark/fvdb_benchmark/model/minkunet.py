@@ -1,11 +1,10 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import torch.nn as nn
-from torch.profiler import record_function
-
-from fvdb_benchmark.wrapper import Wrapper
 from fvdb_benchmark.utils import encode_range_name
+from fvdb_benchmark.wrapper import Wrapper
+from torch.profiler import record_function
 
 
 class SparseResBlock(nn.Module):

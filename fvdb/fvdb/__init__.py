@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 from __future__ import annotations
 
@@ -26,6 +26,11 @@ from ._Cpp import (
     jzeros,
     jempty,
     volume_render,
+    gaussian_fully_fused_projection,
+    gaussian_render,
+    precompute_gaussian_render_state,
+    render_pixels_from_precomputed_gaussian_render_state,
+    gaussian_render_depth,
 )
 
 # The following import needs to come after the GridBatch and JaggedTensor imports
@@ -56,8 +61,8 @@ def jcat(things_to_cat, dim=None):
         raise ValueError("jcat() can only cat GridBatch, JaggedTensor, or VDBTensor")
 
 
-__version__ = "0.1.0"
-__version_info__ = (0, 1, 0)
+__version__ = "0.2.0"
+__version_info__ = (0, 2, 0)
 
 __all__ = [
     "GridBatch",
@@ -80,4 +85,9 @@ __all__ = [
     "jzeros",
     "jempty",
     "volume_render",
+    "gaussian_fully_fused_projection",
+    "gaussian_render",
+    "precompute_gaussian_render_state",
+    "render_pixels_from_precomputed_gaussian_render_state",
+    "gaussian_render_depth",
 ]

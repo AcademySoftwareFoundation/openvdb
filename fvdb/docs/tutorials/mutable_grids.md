@@ -20,6 +20,12 @@ For example:
 
 ```python
 import fvdb
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
+
+v1, f1 = load_car_1_mesh(mode = "vf")
+v2, f2 = load_car_2_mesh(mode = "vf")
+mesh_v_jagged = fvdb.JaggedTensor([v1, v2])
+mesh_f_jagged = fvdb.JaggedTensor([f1, f2]).int()
 
 # Create mutable grid
 grid = fvdb.gridbatch_from_mesh(
@@ -38,7 +44,7 @@ feature.jdata = (feature.jdata - feature.jdata.min(dim=0).values) / \
 
 Voxels can be disabled in batches via `disable_ijk`:
 
-```python
+```python continuation
 # Get the IJK coordinates to be disabled
 disable_ijk: fvdb.JaggedTensor = grid.ijk.rmask(feature.jdata[:, 0] > 0.5)
 
@@ -49,7 +55,7 @@ grid.disable_ijk(disable_ijk)
 Once disabled, those voxels will virtually disappear, meaning that all subsequent grid operations such as sampling, splatting, or ray marching, will treat those voxels as they do not exist.
 One can visualize the enable mask via:
 
-```python
+```python continuation
 enabled_mask = grid.enabled_mask
 ```
 
@@ -58,8 +64,8 @@ enabled_mask = grid.enabled_mask
 Note that in the above figure, white voxels are those still enabled, while black voxels are disabled voxels.
 To verify, we try to sample features from the grid to a set of sampled points:
 
-```python
-pts_feature = grid.sample_trilinear(pcd_jagged, feature)
+```python continuation
+pts_feature = grid.sample_trilinear(mesh_v_jagged, feature)
 ```
 
 ![mg_pts_after.png](../imgs/fig/mg_pts_after.png)
@@ -68,7 +74,7 @@ Because the disabled voxels will be treated as non-existing, no voxels will cont
 
 The disabled voxels could be revived at any time using `enable_ijk`:
 
-```python
+```python continuation
 grid.enable_ijk(disable_ijk)
 ```
 
@@ -92,6 +98,8 @@ A simple L1 loss is compared between the given ground-truth mask and the predict
 To begin, we create a mutable grid and the corresponding opacity (`alpha`) by:
 ```python
 import fvdb
+import torch
+import math
 
 init_resolution = 96
 
@@ -102,12 +110,15 @@ grid = fvdb.gridbatch_from_dense(
     device="cuda",
     mutable=True
 )
+
+def inv_sigmoid(x) -> float:
+    return -math.log(1 / x - 1)
 alpha = torch.full((grid.total_voxels, ), inv_sigmoid(0.1), device=grid.device, requires_grad=True)
 ```
 
 The structure optimization is done via `torch`'s Adam optimizer, with the loop being:
 
-```python
+```python notest
 optimizer = torch.optim.Adam([alpha], lr=1.0)
 
 # Optimization loop
@@ -130,7 +141,7 @@ for it in range(100):
 
 Here `render_opacity` is an approximate differentiable rendering algorithm like:
 
-```python
+```python notest
 pack_info, voxel_inds, out_times = grid.voxels_along_rays(ray_orig, ray_dir, 128, 0.0)
 voxel_inds = grid.ijk_to_index(voxel_inds).jdata
 
@@ -146,7 +157,7 @@ rgb, depth, opacity, _, _ = fvdb.utils.volume_render(
 During the optimization, the voxels of the grid could be disabled or enabled freely.
 In this example, we demonstrate the following strategy similar to Instant-NGP.
 
-```python
+```python notest
 if it > 0 and it % 5 == 0:
     # Disable voxels that are transparent
     bad_mask = torch.sigmoid(alpha) < 0.1

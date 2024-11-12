@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import unittest
@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from parameterized import parameterized
 
-from .common import (
+from fvdb.utils.tests import (
     gridbatch_from_dense_cube,
     make_dense_grid_and_point_data,
     make_gridbatch_and_point_data,

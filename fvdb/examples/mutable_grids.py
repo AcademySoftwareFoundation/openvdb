@@ -1,15 +1,15 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 from pathlib import Path
 
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
-from common import load_car_1, load_car_2
 
 import fvdb
 from fvdb import GridBatch, JaggedTensor
+from fvdb.utils.examples import load_car_1_mesh, load_car_2_mesh
 
 
 def visualize_grid_color(grid: GridBatch, rgb: JaggedTensor, ignore_disabled: bool = False):
@@ -35,8 +35,8 @@ if __name__ == "__main__":
 
     base_path = Path(__file__).parent.parent
 
-    mesh_1_v, mesh_1_f = load_car_1(mode="vf")
-    mesh_2_v, mesh_2_f = load_car_2(mode="vf")
+    mesh_1_v, mesh_1_f = load_car_1_mesh(mode="vf")
+    mesh_2_v, mesh_2_f = load_car_2_mesh(mode="vf")
 
     mesh_1_f, mesh_2_f = mesh_1_f.long(), mesh_2_f.long()
     mesh_2_v[:, 2] += 0.8

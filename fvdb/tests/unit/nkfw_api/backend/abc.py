@@ -1,9 +1,10 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
-import torch
-from typing import Callable, Union
 from abc import ABC, abstractmethod
+from typing import Callable, Union
+
+import torch
 
 
 class BaseBackend(ABC):
@@ -249,28 +250,3 @@ class BaseBackend(ABC):
         :return:
         """
         pass
-
-    def get_visualization(self, stylized: bool = False, render_level: bool = False):
-        from pycg import vis
-
-        tree_wireframes = []
-        for d in range(self.depth):
-            is_solid = stylized and d == 0
-            d_min, d_max = 0, self.get_stride(d)
-            if is_solid:
-                d_min, d_max = 0.1 * self.get_stride(d), 0.9 * self.get_stride(d)
-            if self.get_coords(d).size(0) == 0:
-                continue
-            blk_wireframe = vis.wireframe_bbox(
-                (self.get_coords(d) + d_min) * self.voxel_size,
-                (self.get_coords(d) + d_max) * self.voxel_size,
-                solid=is_solid,
-                ucid=d if stylized else -1,
-                tube=render_level,
-                tube_radius=0.001,
-            )
-            if render_level and d == 0:
-                blk_wireframe = vis.transparent(blk_wireframe, alpha=0.5)
-            tree_wireframes.append(blk_wireframe)
-
-        return tree_wireframes

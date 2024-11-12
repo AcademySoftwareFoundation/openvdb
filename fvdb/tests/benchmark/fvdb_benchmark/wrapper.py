@@ -1,22 +1,20 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 from typing import Optional
 
 import torch
 import torch.nn as nn
-from torch.profiler import record_function
-
 import torchsparse
 import torchsparse.nn as spnn
-from torchsparse.nn.utils import get_kernel_offsets
+from fvdb_benchmark.utils import encode_range_name
+from torch.profiler import record_function
 from torchsparse import SparseTensor
 from torchsparse.nn import functional as spF
+from torchsparse.nn.utils import get_kernel_offsets
 
 import fvdb
 import fvdb.nn as fvnn
-
-from fvdb_benchmark.utils import encode_range_name
 
 
 class TorchsparseMaxPool(torch.nn.Module):

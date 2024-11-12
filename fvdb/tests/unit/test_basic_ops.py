@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import itertools
 import pickle
@@ -12,8 +12,7 @@ from parameterized import parameterized
 import fvdb
 import fvdb.nn as fvnn
 from fvdb import GridBatch, JaggedTensor
-
-from .common import (
+from fvdb.utils.tests import (
     dtype_to_atol,
     expand_tests,
     make_dense_grid_and_point_data,
@@ -1391,6 +1390,42 @@ class TestBasicOps(unittest.TestCase):
 
             # ensure output of ijk_to_inv_index appears in ascending order in ijks
             assert check_order(grid.ijk.jdata[grid.ijk.jidx == i], inv_ijks.jdata)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_ijk_to_inv_index_batched_noncumulative(self, device, dtype, mutable):
+        batch_size = 5
+
+        ijks = [torch.randint(-10, 10, (int(torch.randint(1_000, 10_000, (1,))), 3)) for i in range(batch_size)]
+        ijks = fvdb.JaggedTensor([i.to(device) for i in ijks])
+
+        gridbatch = fvdb.gridbatch_from_ijk(ijks, mutable=mutable)
+
+        inv_idx = gridbatch.ijk_to_inv_index(ijks, cumulative=False)
+
+        assert torch.equal(ijks[inv_idx].jdata, gridbatch.ijk.jdata)
+
+        # Test whether when the ijks > grid.ijks, and duplicate entries appear in the ijks, result is still valid
+        double_ijks = fvdb.JaggedTensor([torch.cat([i, i]) for i in ijks.unbind()])
+        d_inv_idx = gridbatch.ijk_to_inv_index(double_ijks, cumulative=False)
+        assert torch.equal(double_ijks[d_inv_idx].jdata, gridbatch.ijk.jdata)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_ijk_to_index_batched_noncumulative(self, device, dtype, mutable):
+        batch_size = 5
+
+        ijks = [torch.randint(-10, 10, (int(torch.randint(1_000, 10_000, (1,))), 3)) for i in range(batch_size)]
+        ijks = fvdb.JaggedTensor([i.to(device) for i in ijks])
+
+        gridbatch = fvdb.gridbatch_from_ijk(ijks, mutable=mutable)
+
+        idx = gridbatch.ijk_to_index(ijks, cumulative=False)
+
+        assert torch.equal(ijks.jdata, gridbatch.ijk[idx].jdata)
+
+        # Test whether when the ijks > grid.ijks, and duplicate entries appear in the ijks, result is still valid
+        double_ijks = fvdb.JaggedTensor([torch.cat([i, i]) for i in ijks.unbind()])
+        d_idx = gridbatch.ijk_to_index(double_ijks, cumulative=False)
+        assert torch.equal(double_ijks.jdata, gridbatch.ijk[d_idx].jdata)
 
     @parameterized.expand(all_device_dtype_combos)
     def test_no_use_after_free_on_backward(self, device, dtype, mutable):

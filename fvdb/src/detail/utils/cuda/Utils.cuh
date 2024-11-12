@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
 #define FVDB_DETAIL_UTILS_CUDA_UTILS_CUH

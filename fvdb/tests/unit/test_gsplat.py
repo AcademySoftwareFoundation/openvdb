@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import unittest
 from pathlib import Path
@@ -9,10 +9,8 @@ import numpy as np
 import OpenImageIO as oiio
 import torch
 
-from fvdb import JaggedTensor
-from fvdb.utils import gaussian_fully_fused_projection, gaussian_render
-
-from .common import get_fvdb_test_data_path
+from fvdb import JaggedTensor, gaussian_fully_fused_projection, gaussian_render
+from fvdb.utils.tests import get_fvdb_test_data_path
 
 
 def compare_images(pixels_or_path_a, pixels_or_path_b):
@@ -24,10 +22,10 @@ def compare_images(pixels_or_path_a, pixels_or_path_b):
 
     Populated entries of the `CompareResults` objects are `maxerror`, `maxx`, `maxy`, `maxz`, and `nfail`,
     """
-    img_a = oiio.ImageBuf(pixels_or_path_a)
-    img_b = oiio.ImageBuf(pixels_or_path_b)
-    cmp = oiio.CompareResults()
-    differ = oiio.ImageBufAlgo.compare_Yee(img_a, img_b, cmp)
+    img_a = oiio.ImageBuf(pixels_or_path_a)  # type: ignore
+    img_b = oiio.ImageBuf(pixels_or_path_b)  # type: ignore
+    cmp = oiio.CompareResults()  # type: ignore
+    differ = oiio.ImageBufAlgo.compare_Yee(img_a, img_b, cmp)  # type: ignore
     return differ, cmp
 
 
@@ -74,7 +72,18 @@ class TestGaussianRender(unittest.TestCase):
 
     def test_fully_fused_projection(self):
         radii, means2d, depths, conics = gaussian_fully_fused_projection(
-            self.means, self.quats, self.scales, self.viewmats, self.Ks, self.width, self.height, 0.3, 0.01, 1e10, 0.0
+            self.means,
+            self.quats,
+            self.scales,
+            self.viewmats,
+            self.Ks,
+            self.width,
+            self.height,
+            0.01,
+            1e10,
+            0.0,
+            0.3,
+            False,  # Calculate compensations
         )
 
         if self.save_regression_data:
@@ -112,7 +121,7 @@ class TestGaussianRender(unittest.TestCase):
     def test_gaussian_render(self):
 
         # single scene rendering
-        render_colors, render_alphas, means2d = gaussian_render(
+        render_colors, render_alphas, _ = gaussian_render(
             self.means.contiguous(),
             self.quats.contiguous(),
             self.scales.contiguous(),
@@ -122,12 +131,15 @@ class TestGaussianRender(unittest.TestCase):
             self.Ks.contiguous(),
             self.width,
             self.height,
-            0.3,
-            0.01,
-            1e10,
-            0.0,
-            self.sh_degree,
-            16,
+            0.01,  # near_plane
+            1e10,  # far_plane
+            self.sh_degree,  # sh_degree_to_use
+            16,  # tile_size
+            0.0,  # radius_clip
+            0.3,  # eps2d
+            False,  # antialias
+            False,  # return depth
+            False,  # return debug info
         )
 
         pixels = self._tensors_to_pixel(render_colors, render_alphas)
@@ -168,7 +180,7 @@ class TestGaussianRender(unittest.TestCase):
         # gaussian_ids = torch.arange(len(camera_ids), device=device)  # [0, 1, 2, ..., 2999]
         # gaussian_ids = gaussian_ids + shifts_cumsum.repeat_interleave(tt, dim=0)
 
-        render_colors, render_alphas, means2d, camera_ids, gaussian_ids = gaussian_render(
+        render_colors, render_alphas, _ = gaussian_render(
             jt_means,
             jt_quats,
             jt_scales,
@@ -178,12 +190,15 @@ class TestGaussianRender(unittest.TestCase):
             jt_Ks,
             self.width,
             self.height,
-            0.3,
-            0.01,
-            1e10,
-            0.0,
-            self.sh_degree,
-            16,
+            0.01,  # near_plane
+            1e10,  # far_plane
+            self.sh_degree,  # sh_degree_to_use
+            16,  # tile_size
+            0.0,  # radius_clip
+            0.3,  # eps2d
+            False,  # antialias
+            False,  # return depth
+            False,  # return debug info
         )
         torch.cuda.synchronize()
 
@@ -202,9 +217,4 @@ class TestGaussianRender(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    test = TestGaussianRender()
-    test.setUp()
-
-    test.test_gaussian_render()
-    test.test_gaussian_render_jagged()
-    test.test_fully_fused_projection()
+    unittest.main()

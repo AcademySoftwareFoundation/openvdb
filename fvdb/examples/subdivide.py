@@ -1,14 +1,14 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
-import time
 import logging
+import time
 
 import polyscope as ps
 import torch
-from fvdb import GridBatch
 
-from common import load_dragon_mesh
+from fvdb import GridBatch
+from fvdb.utils.examples import load_dragon_mesh
 
 
 def main():

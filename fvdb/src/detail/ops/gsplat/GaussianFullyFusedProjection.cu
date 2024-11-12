@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #include "GsplatUtils.cuh"
 
@@ -8,10 +8,11 @@
 #include <ATen/cuda/Atomic.cuh>
 #include <cooperative_groups.h>
 
+constexpr int NUM_THREADS = 256;
+
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
 
 namespace cg = cooperative_groups;
 
@@ -310,8 +311,6 @@ fully_fused_projection_bwd_kernel(
     }
 }
 
-} // namespace gsplat
-
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
@@ -321,10 +320,11 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
     const torch::Tensor &viewmats, // [C, 4, 4]
     const torch::Tensor &Ks,       // [C, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip) {
+    const float near_plane, const float far_plane, const float radius_clip,
+    const bool calc_compensations) {
     // These are supported by the underlying kernel, but they are not exposed
-    const at::optional<torch::Tensor> &covars             = std::nullopt;
-    const bool                         calc_compensations = false;
+    const at::optional<torch::Tensor> &covars = std::nullopt;
+    // const bool                         calc_compensations = false;
 
     GSPLAT_DEVICE_GUARD(means);
     GSPLAT_CHECK_INPUT(means);
@@ -339,7 +339,7 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
 
     uint32_t             N      = means.size(0);    // number of gaussians
     uint32_t             C      = viewmats.size(0); // number of cameras
-    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
     torch::Tensor radii   = torch::empty({ C, N }, means.options().dtype(torch::kInt32));
     torch::Tensor means2d = torch::empty({ C, N, 2 }, means.options());
@@ -351,8 +351,8 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
         compensations = torch::zeros({ C, N }, means.options());
     }
     if (C && N) {
-        gsplat::fully_fused_projection_fwd_kernel<float>
-            <<<(C * N + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS, 0, stream>>>(
+        fully_fused_projection_fwd_kernel<float>
+            <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
                 C, N, means.data_ptr<float>(),
                 covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                 covars.has_value() ? nullptr : quats.data_ptr<float>(),
@@ -376,32 +376,35 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCPU>(const torch::Tensor &me
                                                          const uint32_t       image_height,
                                                          const float eps2d, const float near_plane,
                                                          const float far_plane,
-                                                         const float radius_clip) {
-    TORCH_CHECK(false, "CPU implementation not available");
+                                                         const float radius_clip,
+                                                         const bool  calc_compensations) {
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
     // fwd inputs
-    const torch::Tensor &means,    // [N, 3]
-    const torch::Tensor &quats,    // [N, 4]
-    const torch::Tensor &scales,   // [N, 3]
-    const torch::Tensor &viewmats, // [C, 4, 4]
-    const torch::Tensor &Ks,       // [C, 3, 3]
+    const torch::Tensor               &means,         // [N, 3]
+    const torch::Tensor               &quats,         // [N, 4]
+    const torch::Tensor               &scales,        // [N, 3]
+    const torch::Tensor               &viewmats,      // [C, 4, 4]
+    const torch::Tensor               &Ks,            // [C, 3, 3]
+    const at::optional<torch::Tensor> &compensations, // [N, 6] optional
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
     // fwd outputs
     const torch::Tensor &radii,  // [C, N]
     const torch::Tensor &conics, // [C, N, 3]
     // grad outputs
-    const torch::Tensor &v_means2d, // [C, N, 2]
-    const torch::Tensor &v_depths,  // [C, N]
-    const torch::Tensor &v_conics,  // [C, N, 3]
-    const bool           viewmats_requires_grad) {
+    const torch::Tensor               &v_means2d,       // [C, N, 2]
+    const torch::Tensor               &v_depths,        // [C, N]
+    const torch::Tensor               &v_conics,        // [C, N, 3]
+    const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
+    const bool                         viewmats_requires_grad) {
     // These are supported by the underlying kernel, but they are not exposed
-    const at::optional<torch::Tensor> &covars          = std::nullopt;
-    const at::optional<torch::Tensor> &compensations   = std::nullopt;
-    const at::optional<torch::Tensor> &v_compensations = std::nullopt;
+    const at::optional<torch::Tensor> &covars = std::nullopt;
+    // const at::optional<torch::Tensor> &compensations = std::nullopt;
+    // const at::optional<torch::Tensor> &v_compensations = std::nullopt;
 
     GSPLAT_DEVICE_GUARD(means);
     GSPLAT_CHECK_INPUT(means);
@@ -428,7 +431,7 @@ dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
 
     uint32_t             N      = means.size(0);    // number of gaussians
     uint32_t             C      = viewmats.size(0); // number of cameras
-    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
     torch::Tensor v_means = torch::zeros_like(means);
     torch::Tensor v_covars, v_quats, v_scales; // optional
@@ -443,8 +446,8 @@ dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
         v_viewmats = torch::zeros_like(viewmats);
     }
     if (C && N) {
-        gsplat::fully_fused_projection_bwd_kernel<float>
-            <<<(C * N + GSPLAT_N_THREADS - 1) / GSPLAT_N_THREADS, GSPLAT_N_THREADS, 0, stream>>>(
+        fully_fused_projection_bwd_kernel<float>
+            <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
                 C, N, means.data_ptr<float>(),
                 covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                 covars.has_value() ? nullptr : quats.data_ptr<float>(),
@@ -466,19 +469,24 @@ dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianFullyFusedProjectionBackward<torch::kCPU>(
-    const torch::Tensor &means,     // [N, 3]
-    const torch::Tensor &quats,     // [N, 4]
-    const torch::Tensor &scales,    // [N, 3]
-    const torch::Tensor &viewmats,  // [C, 4, 4]
-    const torch::Tensor &Ks,        // [C, 3, 3]
+    // fwd inputs
+    const torch::Tensor               &means,         // [N, 3]
+    const torch::Tensor               &quats,         // [N, 4]
+    const torch::Tensor               &scales,        // [N, 3]
+    const torch::Tensor               &viewmats,      // [C, 4, 4]
+    const torch::Tensor               &Ks,            // [C, 3, 3]
+    const at::optional<torch::Tensor> &compensations, // [N, 6] optional
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const torch::Tensor &radii,     // [C, N]
-    const torch::Tensor &conics,    // [C, N, 3]
-    const torch::Tensor &v_means2d, // [C, N, 2]
-    const torch::Tensor &v_depths,  // [C, N]
-    const torch::Tensor &v_conics,  // [C, N, 3]
-    const bool           viewmats_requires_grad) {
-    TORCH_CHECK(false, "CPU implementation not available");
+    // fwd outputs
+    const torch::Tensor &radii,  // [C, N]
+    const torch::Tensor &conics, // [C, N, 3]
+    // grad outputs
+    const torch::Tensor               &v_means2d,       // [C, N, 2]
+    const torch::Tensor               &v_depths,        // [C, N]
+    const torch::Tensor               &v_conics,        // [C, N, 3]
+    const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
+    const bool                         viewmats_requires_grad) {
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 } // namespace ops

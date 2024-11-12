@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_DETAIL_OPS_GSPLAT_GSPLATTYPES_CUH
 #define FVDB_DETAIL_OPS_GSPLAT_GSPLATTYPES_CUH
@@ -15,7 +15,6 @@
 namespace fvdb {
 namespace detail {
 namespace ops {
-namespace gsplat {
 
 // ----------------------------------------------------------------
 // --- TODO: replace these with types from nvdb -------------------
@@ -101,7 +100,6 @@ warpSum(mat2<ScalarT> &val, WarpT &warp) {
     warpSum(val[1], warp);
 }
 
-} // namespace gsplat
 } // namespace ops
 } // namespace detail
 } // namespace fvdb

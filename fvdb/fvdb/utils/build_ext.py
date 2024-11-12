@@ -1,9 +1,10 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import os
 
 from torch.utils import cpp_extension
+
 import fvdb
 
 

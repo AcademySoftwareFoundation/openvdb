@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import functools
 import itertools
@@ -13,8 +13,7 @@ from parameterized import parameterized
 import fvdb
 import fvdb.nn as fvnn
 from fvdb import GridBatch
-
-from .common import expand_tests
+from fvdb.utils.tests import expand_tests
 
 all_device_dtype_combos = [
     ["cuda", torch.float16, False],

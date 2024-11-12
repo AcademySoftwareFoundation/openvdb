@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import uuid
 
@@ -7,9 +7,9 @@ import numpy as np
 import point_cloud_utils as pcu
 import polyscope as ps
 import torch
-from common import load_dragon_mesh
 
 import fvdb
+from fvdb.utils.examples import load_dragon_mesh
 
 
 def visualize_grid(a: fvdb.GridBatch, offset: float):

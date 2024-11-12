@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 import unittest
 
@@ -9,8 +9,7 @@ from parameterized import parameterized
 
 import fvdb
 from fvdb import GridBatch, gridbatch_from_ijk, volume_render
-
-from .common import (
+from fvdb.utils.tests import (
     dtype_to_atol,
     get_fvdb_test_data_path,
     make_dense_grid_and_point_data,

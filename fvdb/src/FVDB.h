@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 #ifndef FVDB_FVDB_H
 #define FVDB_FVDB_H
@@ -16,25 +16,6 @@ namespace fvdb {
 std::vector<torch::Tensor> volumeRender(const torch::Tensor &sigmas, const torch::Tensor &rgbs,
                                         const torch::Tensor &deltaTs, const torch::Tensor &ts,
                                         const torch::Tensor &packInfo, double transmittanceThresh);
-
-std::vector<torch::Tensor>
-gaussianFullyFusedProjection(const torch::Tensor &means, const torch::Tensor &quats,
-                             const torch::Tensor &scales, const torch::Tensor &viewmats,
-                             const torch::Tensor &Ks, const uint32_t image_width,
-                             const uint32_t image_height, const float eps2d, const float near_plane,
-                             const float far_plane, const float radius_clip);
-
-std::vector<torch::Tensor> gaussianRender(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
-                                          const JaggedTensor &quats,     // [N1 + N2 + ..., 4]
-                                          const JaggedTensor &scales,    // [N1 + N2 + ..., 3]
-                                          const JaggedTensor &opacities, // [N1 + N2 + ...]
-                                          const JaggedTensor &sh_coeffs, // [N1 + N2 + ..., K, 3]
-                                          const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
-                                          const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
-                                          const uint32_t image_width, const uint32_t image_height,
-                                          const float eps2d, const float near_plane,
-                                          const float far_plane, const float radius_clip,
-                                          const int sh_degree_to_use, const int tile_size);
 
 JaggedTensor scaledDotProductAttention(const JaggedTensor &query, const JaggedTensor &key,
                                        const JaggedTensor &value, float scale);
@@ -140,7 +121,7 @@ GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor       &poin
                                                   const Vec3dBatch &origins = torch::zeros({ 3 }),
                                                   bool              is_mutable = false);
 
-/// @brief REturn a grid batch with the specified voxel coordinates (possibly with padding)
+/// @brief Return a grid batch with the specified voxel coordinates (possibly with padding)
 /// @param coords A JaggedTensor of shape [B, -1, 3] specifying the coordinates of each voxel to
 /// insert
 /// @param pad_min A tensor of shape [3,] containing the number of voxels to pad each inserted voxel

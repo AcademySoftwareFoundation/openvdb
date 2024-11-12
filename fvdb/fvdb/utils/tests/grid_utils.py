@@ -1,72 +1,13 @@
-# Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
-#
-import functools
-from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Union
 
-import git
-import git.repo
 import numpy as np
 import torch
-from git.exc import InvalidGitRepositoryError
-from parameterized import parameterized
 
 from fvdb import GridBatch, gridbatch_from_dense
+from fvdb.types import Vec3d, Vec3i
 
-Vec3i = Union[torch.Tensor, np.ndarray, List[int], Tuple[int, int, int]]
-Vec3d = Union[torch.Tensor, np.ndarray, List[float], Tuple[float, float, float]]
 NumberOrVec3 = Union[Vec3i, Vec3d, int, float]
 Vec3 = Union[Vec3i, Vec3d]
-
-git_tag_for_data = "main"
-
-
-def set_testing_git_tag(git_tag):
-    global git_tag_for_data
-    git_tag_for_data = git_tag
-
-
-def _clone_fvdb_test_data() -> Tuple[Path, git.repo.Repo]:
-    global git_tag_for_data
-
-    def is_git_repo(repo_path: str) -> bool:
-        is_repo = False
-        try:
-            _ = git.repo.Repo(repo_path)
-            is_repo = True
-        except InvalidGitRepositoryError:
-            is_repo = False
-
-        return is_repo
-
-    git_url = "https://github.com/voxel-foundation/fvdb-test-data.git"
-    tests_root = Path(__file__).resolve().parent.parent
-    repo_path = tests_root / "data"
-
-    if repo_path.exists() and repo_path.is_dir():
-        if is_git_repo(str(repo_path)):
-            repo = git.repo.Repo(repo_path)
-        else:
-            raise ValueError(f"A path {repo_path} exists but is not a git repo")
-    else:
-        repo = git.repo.Repo.clone_from(git_url, repo_path)
-    repo.remotes.origin.fetch()
-    repo.git.checkout(git_tag_for_data)
-
-    return repo_path, repo
-
-
-def get_fvdb_test_data_path() -> Path:
-    repo_path, _ = _clone_fvdb_test_data()
-    return repo_path / "unit_tests"
-
-
-# Hack parameterized to use the function name and the expand parameters as the test name
-expand_tests = functools.partial(
-    parameterized.expand,
-    name_func=lambda f, n, p: f'{f.__name__}_{parameterized.to_safe_name("_".join(str(x) for x in p.args))}',
-)
 
 
 def gridbatch_from_dense_cube(
@@ -185,15 +126,3 @@ def make_gridbatch_and_point_data(
     assert not torch.all(~mask)
 
     return grid, grid_d, samples
-
-
-def dtype_to_atol(dtype: torch.dtype) -> float:
-    if dtype == torch.bfloat16:
-        return 1e-1
-    if dtype == torch.float16:
-        return 1e-1
-    if dtype == torch.float32:
-        return 1e-5
-    if dtype == torch.float64:
-        return 1e-5
-    raise ValueError("dtype must be a valid torch floating type")
