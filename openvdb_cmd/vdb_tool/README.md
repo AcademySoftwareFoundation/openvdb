@@ -10,8 +10,8 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
-| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, abc or vdb file |
+| **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, vdb or nvdb files |
+| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a polygon mesh to a narrow-band level set |
 | **points2ls** | Convert points into a narrow-band level set |
@@ -59,9 +59,10 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | Extension | Actions | Description |
 |-------|-------|-------|
 | vdb | read and write | OpenVDB sparse volume files with float, Vec3f and points |
-| obj | read and write | ASCII OBJ mesh files with triangle, quad or points |
-| ply | read and write | Binary and ASCII PLY mesh files with triangle, quad or points |
+| obj | read and write | ASCII OBJ mesh files with triangles, quads or points |
+| ply | read and write | Binary and ASCII PLY mesh files with triangles, quads or points |
 | stl | read and write | Binary STL mesh files with triangles |
+| off | read and write | ASCI OFF mesh files with triangles, quads or points |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
 | nvdb| optional read and write | NanoVDB file with voxels or points |

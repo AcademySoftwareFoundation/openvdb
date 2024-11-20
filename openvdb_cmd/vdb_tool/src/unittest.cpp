@@ -371,18 +371,18 @@ TEST_F(Test_vdb_tool, Geometry)
     EXPECT_EQ(4, geo2.vtxCount());
     EXPECT_EQ(2, geo2.triCount());
     EXPECT_EQ(1, geo2.quadCount());
-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.bbox().min());
-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.bbox().max());
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
 
-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
 
-    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo.tri()[0]);
-    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo.tri()[1]);
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
+    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
 
-    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
+    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
   }
   {// write to file
     std::ofstream os("data/test.geo", std::ios_base::binary);
@@ -395,18 +395,38 @@ TEST_F(Test_vdb_tool, Geometry)
     EXPECT_EQ(4, geo2.vtxCount());
     EXPECT_EQ(2, geo2.triCount());
     EXPECT_EQ(1, geo2.quadCount());
-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.bbox().min());
-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.bbox().max());
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
 
-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
 
-    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo.tri()[0]);
-    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo.tri()[1]);
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
+    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
 
-    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo.quad()[0]);
+    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
+  }
+  {// test readOFF and writeOFF
+    geo.write("data/test.off");
+    openvdb::vdb_tool::Geometry geo2;
+    EXPECT_TRUE(geo2.read("data/test.off"));
+    EXPECT_EQ(4, geo2.vtxCount());
+    EXPECT_EQ(2, geo2.triCount());
+    EXPECT_EQ(1, geo2.quadCount());
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.bbox().min());
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.bbox().max());
+
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
+
+    EXPECT_EQ(openvdb::Vec3I(0,1,2), geo2.tri()[0]);
+    EXPECT_EQ(openvdb::Vec3I(1,2,3), geo2.tri()[1]);
+
+    EXPECT_EQ(openvdb::Vec4I(0,1,2,3), geo2.quad()[0]);
   }
   #ifdef VDB_TOOL_USE_PDAL
   {// read from PDAL-supported ASCII format file
@@ -425,11 +445,10 @@ TEST_F(Test_vdb_tool, Geometry)
     geo2.read("data/test.txt");
     EXPECT_EQ(4, geo2.vtxCount());
 
-    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo.vtx()[0]);
-    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo.vtx()[1]);
-    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo.vtx()[2]);
-    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo.vtx()[3]);
-
+    EXPECT_EQ(openvdb::Vec3f(1,2,3), geo2.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(4,5,6), geo2.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(7,8,9), geo2.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3f(10,11,12), geo2.vtx()[3]);
   }
   #endif
 }// Geometry

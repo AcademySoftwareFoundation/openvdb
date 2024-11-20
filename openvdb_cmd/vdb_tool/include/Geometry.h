@@ -104,17 +104,20 @@ public:
     // Reads all the vertices in the file and treats them as Geometry
     void write(const std::string &fileName) const;
     void writeOBJ(const std::string &fileName) const;
+    void writeOFF(const std::string &fileName) const;
     void writePLY(const std::string &fileName) const;
     void writeSTL(const std::string &fileName) const;
     void writeGEO(const std::string &fileName) const;
     void writeABC(const std::string &fileName) const;
 
     void writeOBJ(std::ostream &os) const;
+    void writeOFF(std::ostream &os) const;
     void writePLY(std::ostream &os) const;
     void writeSTL(std::ostream &os) const;
 
     void read(const std::string &fileName);
     void readOBJ(const std::string &fileName);
+    void readOFF(const std::string &fileName);
     void readPLY(const std::string &fileName);
     void readSTL(const std::string &fileName);
     void readPTS(const std::string &fileName);
@@ -125,6 +128,7 @@ public:
     void readNVDB(const std::string &fileName);
 
     void readOBJ(std::istream &is);
+    void readOFF(std::istream &is);
     void readPLY(std::istream &is);
 
     size_t vtxCount() const { return mVtx.size(); }
@@ -229,7 +233,7 @@ const math::BBox<Vec3s>& Geometry::bbox() const
 
 void Geometry::write(const std::string &fileName) const
 {
-    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc"})) {
+    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc", "off"})) {
     case 1:
         this->writeGEO(fileName);
         break;
@@ -244,6 +248,9 @@ void Geometry::write(const std::string &fileName) const
         break;
     case 5:
         this->writeABC(fileName);
+        break;
+    case 6:
+        this->writeOFF(fileName);
         break;
     default:
         throw std::invalid_argument("Geometry file \"" + fileName + "\" has an invalid extension");
@@ -323,16 +330,31 @@ void Geometry::writeOBJ(const std::string &fileName) const
 void Geometry::writeOBJ(std::ostream &os) const
 {
     os << "# Created by vdb_tool\n";
-    for (auto &v : mVtx) {
-        os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
-    }
-    for (auto &t : mTri) {
-        os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
-    }
-    for (auto &q : mQuad) {
-        os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
-    }
+    for (auto &v : mVtx) os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+    for (auto &t : mTri) os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
+    for (auto &q : mQuad) os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
 }// Geometry::writeOBJ
+
+void Geometry::writeOFF(const std::string &fileName) const
+{
+    if (fileName=="stdout.off") {
+        this->writeOFF(std::cout);
+    } else {
+        std::ofstream outfile(fileName);
+        if (!outfile.is_open()) throw std::invalid_argument("Error writing to off file \""+fileName+"\"");
+        this->writeOFF(outfile);;
+    }
+}// Geometry::writeOFF
+
+void Geometry::writeOFF(std::ostream &os) const
+{
+    os << "OFF\n";
+    os << "# Created by vdb_tool\n";
+    os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
+    for (auto &v : mVtx) os << v[0] << " " << v[1] << " " << v[2] << "\n";
+    for (auto &t : mTri) os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+    for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
+}// Geometry::writeOFF
 
 void Geometry::writeSTL(const std::string &fileName) const
 {
@@ -381,7 +403,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 
 void Geometry::read(const std::string &fileName)
 {
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -405,6 +427,9 @@ void Geometry::read(const std::string &fileName)
         break;
     case 8:
         this->readGEO(fileName);
+        break;
+    case 9:
+        this->readOFF(fileName);
         break;
     default:
 #if VDB_TOOL_USE_PDAL
@@ -518,6 +543,52 @@ void Geometry::readPDAL(const std::string &fileName)
 #endif
     mBBox = BBoxT(); //invalidate BBox
 }// Geometry::readPDAL
+
+void Geometry::readOFF(const std::string &fileName)
+{
+    if (fileName == "stdin.off") {
+        this->readOFF(std::cin);
+    } else {
+        std::ifstream infile(fileName);
+        if (!infile.is_open()) throw std::invalid_argument("Error opening Geometry file \""+fileName+"\"");
+        this->readOFF(infile);
+    }
+}// Geometry::readOFF
+
+void Geometry::readOFF(std::istream &is)
+{
+    std::string line;
+    std::getline(is, line);
+    if (line!="OFF") throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
+    int vtxCount=0, faceCount=0, edgeCount=0;
+    while (vtxCount==0 && std::getline(is, line)) {
+        if (line[0]=='#') continue;
+        std::istringstream iss(line);
+        iss >> vtxCount >> faceCount >> edgeCount;
+    }
+    Vec3f p;
+    for (int i=0; i<vtxCount && std::getline(is, line); ++i) {
+        std::istringstream iss(line);
+        iss >> p[0] >> p[1] >> p[2];
+        mVtx.push_back(p);
+    }
+    int f[4];
+    for (int i=0; i<faceCount && std::getline(is, line); ++i) {
+        std::istringstream iss(line);
+        int n=0;
+        iss >> n;
+        if (n==3) {
+            iss >> f[0] >> f[1] >> f[2];
+            mTri.emplace_back(f[0],f[1],f[2]);
+        } else if(n==4) {
+            iss >> f[0] >> f[1] >> f[2] >> f[3];
+            mQuad.emplace_back(f[0],f[1],f[2],f[3]);
+        } else {
+            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(n) + "-gons are not supported");
+        }
+    }
+    mBBox = BBoxT();//invalidate BBox
+}// Geometry::readOFF
 
 void Geometry::readPLY(const std::string &fileName)
 {
