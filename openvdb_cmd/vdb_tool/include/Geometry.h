@@ -33,7 +33,7 @@
 
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/IO.h>
+#include <nanovdb/io/IO.h>
 #endif
 
 #ifdef VDB_TOOL_USE_ABC

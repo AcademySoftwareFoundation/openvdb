@@ -411,7 +411,7 @@ TEST_F(Test_vdb_tool, Geometry)
   {// test readOFF and writeOFF
     geo.write("data/test.off");
     openvdb::vdb_tool::Geometry geo2;
-    EXPECT_TRUE(geo2.read("data/test.off"));
+    geo2.read("data/test.off");
     EXPECT_EQ(4, geo2.vtxCount());
     EXPECT_EQ(2, geo2.triCount());
     EXPECT_EQ(1, geo2.quadCount());
@@ -820,7 +820,7 @@ TEST_F(Test_vdb_tool, ToolParser)
     float beta = 0.0f, beta_sum = 0.0f;
     std::string path, base, ext;
 
-    Parser p({{"alpha", "64"}, {"beta", "4.56"}});
+    Parser p({{"alpha", "64", "", ""}, {"beta", "4.56", "", ""}});
     p.addAction("process_a", "a", "docs",
               {{"alpha", "", "", ""},{"beta", "", "", ""}},
                [&](){p.setDefaults();},
@@ -843,7 +843,7 @@ TEST_F(Test_vdb_tool, ToolParser)
     p.finalize();
 
     auto args = getArgs("vdb_tool -quiet -process_a alpha=128 -for v=0.1,0.4,0.1 -b alpha={$#v:++} beta={$v} -end");
-    p.parse(args.size(), args.data());
+    p.parse(int(args.size()), args.data());
     EXPECT_EQ(0, alpha);
     EXPECT_EQ(0.0f, beta);
     EXPECT_EQ(0, alpha_sum);
@@ -855,7 +855,7 @@ TEST_F(Test_vdb_tool, ToolParser)
     EXPECT_EQ(0.1f + 0.2f + 0.3f, beta_sum);// derived from loop
 
     args = getArgs("vdb_tool -quiet -each file=path1/base1.ext1,path2/base2.ext2 -c alpha={$file:path} beta={$file:name} gamma={$file:ext} -end");
-    p.parse(args.size(), args.data());
+    p.parse(int(args.size()), args.data());
     p.run();
     EXPECT_EQ(path, "path1,path2");
     EXPECT_EQ(base, "base1,base2");
@@ -875,7 +875,7 @@ TEST_F(Test_vdb_tool, ToolBasic)
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1.1 -ls2mesh -write data/sphere.ply data/config.txt");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 
@@ -896,7 +896,7 @@ TEST_F(Test_vdb_tool, Counter)
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -eval {1:@G} -sphere r=1.1 -ls2mesh -write data/sphere_{$G}.ply data/config_{$G:++}.txt");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 
@@ -919,7 +919,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
     // test single for-loop
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -for i=0,3 -sphere r=1.{$i} dim=128 name=sphere_{$i} -ls2mesh -write data/sphere_{$#i:++}.ply -end");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 
@@ -928,7 +928,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
     // test two nested for-loops
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -for v=0.1,0.3,0.1 -each s=sphere_1,sphere_3 -read ./data/{$s}.ply -mesh2ls voxel={$v} -end -end -write data/test.vdb");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 
@@ -948,7 +948,7 @@ TEST_F(Test_vdb_tool, ToolError)
 
     EXPECT_THROW({
       auto args = getArgs("vdb_tool -sphere bla=3 -ls2mesh -write data/sphere.ply data/config.txt -quiet");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     }, std::invalid_argument);
 
@@ -971,7 +971,7 @@ TEST_F(Test_vdb_tool, ToolKeep)
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -default keep=1 -sphere r=2 -ls2mesh vdb=0 -write vdb=0 geo=0 data/sphere.vdb data/sphere.ply data/config.txt");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 
@@ -994,7 +994,7 @@ TEST_F(Test_vdb_tool, ToolConfig)
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -config data/config.txt");
-      Tool vdb_tool(args.size(), args.data());
+      Tool vdb_tool(int(args.size()), args.data());
       vdb_tool.run();
     });
 

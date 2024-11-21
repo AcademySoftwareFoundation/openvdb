@@ -53,9 +53,9 @@
 
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/tools/NanoToOpenVDB.h>
 #endif
 
 #ifdef VDB_TOOL_USE_EXR
@@ -1062,7 +1062,7 @@ void Tool::readNVDB(const std::string &fileName)
   const size_t count = mGrid.size();
   if (grids.size()) {
     for (const auto& gridHandle : grids) {
-      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::nanoToOpenVDB(gridHandle));
+      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::tools::nanoToOpenVDB(gridHandle));
     }
   } else if (mParser.verbose>0) {
     std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
@@ -1262,26 +1262,26 @@ void Tool::writeNVDB(const std::string &fileName)
       throw std::invalid_argument("writeNVDB: unsupported bits \""+bits+"\"");
     }
 
-    nanovdb::StatsMode sMode = nanovdb::StatsMode::Default;
+    nanovdb::tools::StatsMode sMode = nanovdb::tools::StatsMode::Default;
     if (stats == "none") {
-      sMode = nanovdb::StatsMode::Disable;
+      sMode = nanovdb::tools::StatsMode::Disable;
     } else if (stats == "bbox") {
-      sMode = nanovdb::StatsMode::BBox;
+      sMode = nanovdb::tools::StatsMode::BBox;
     } else if (stats == "extrema") {
-      sMode = nanovdb::StatsMode::MinMax;
+      sMode = nanovdb::tools::StatsMode::MinMax;
     } else if (stats == "all") {
-      sMode = nanovdb::StatsMode::All;
+      sMode = nanovdb::tools::StatsMode::All;
     } else if (stats != "") {
       throw std::invalid_argument("writeNVDB: unsupported stats \""+stats+"\"");
     }
 
-    nanovdb::ChecksumMode cMode = nanovdb::ChecksumMode::Default;
+    nanovdb::CheckMode cMode = nanovdb::CheckMode::Default;
     if (checksum == "none") {
-      cMode = nanovdb::ChecksumMode::Disable;
+      cMode = nanovdb::CheckMode::Disable;
     } else if (checksum == "partial") {
-      cMode = nanovdb::ChecksumMode::Partial;
+      cMode = nanovdb::CheckMode::Partial;
     } else if (checksum == "full") {
-      cMode = nanovdb::ChecksumMode::Full;
+      cMode = nanovdb::CheckMode::Full;
     } else if (checksum != "") {
       throw std::invalid_argument("writeNVDB: unsupported checksum \""+checksum+"\"");
     }
@@ -1302,21 +1302,21 @@ void Tool::writeNVDB(const std::string &fileName)
         using SrcGridT = openvdb::FloatGrid;
         switch (qMode){
         case nanovdb::GridType::Fp4:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp8:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp16:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::FpN:
           if (absolute) {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::AbsDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::AbsDiff(tolerance));
           } else {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::RelDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::RelDiff(tolerance));
           }
         default: break;// 32 bit float grids are handled below
         }// end of switch
       }
-      return nanovdb::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
+      return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
     };// openToNano
 
     if (fileName=="stdout.nvdb") {
