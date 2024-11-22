@@ -557,34 +557,45 @@ void Geometry::readOFF(const std::string &fileName)
 
 void Geometry::readOFF(std::istream &is)
 {
+    // read header
     std::string line;
-    std::getline(is, line);
-    if (line!="OFF") throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
-    int vtxCount=0, faceCount=0, edgeCount=0;
-    while (vtxCount==0 && std::getline(is, line)) {
-        if (line[0]=='#') continue;
+    if (!std::getline(is, line) || line != "OFF") {
+        throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
+    }
+
+    // read vertex and face counts
+    size_t vtxCount=0, faceCount=0, edgeCount=0, nGon=0;
+    while (vtxCount == 0 && std::getline(is, line)) {
+        if (line.empty() || line[0] == '#') continue;
         std::istringstream iss(line);
         iss >> vtxCount >> faceCount >> edgeCount;
     }
+
+    // read vertices
     Vec3f p;
-    for (int i=0; i<vtxCount && std::getline(is, line); ++i) {
+    vtxCount += mVtx.size();
+    while (mVtx.size() < vtxCount && std::getline(is, line)) {
+        if (line.empty() || line[0] == '#') continue;
         std::istringstream iss(line);
         iss >> p[0] >> p[1] >> p[2];
         mVtx.push_back(p);
     }
+
+    // read faces
     int f[4];
-    for (int i=0; i<faceCount && std::getline(is, line); ++i) {
+    faceCount += mTri.size() + mQuad.size();
+    while (mTri.size() + mQuad.size() < faceCount && std::getline(is, line)) {
+        if (line.empty() || line[0] == '#') continue;
         std::istringstream iss(line);
-        int n=0;
-        iss >> n;
-        if (n==3) {
+        iss >> nGon;
+        if (nGon == 3) {
             iss >> f[0] >> f[1] >> f[2];
             mTri.emplace_back(f[0],f[1],f[2]);
-        } else if(n==4) {
+        } else if (nGon == 4) {
             iss >> f[0] >> f[1] >> f[2] >> f[3];
             mQuad.emplace_back(f[0],f[1],f[2],f[3]);
         } else {
-            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(n) + "-gons are not supported");
+            throw std::invalid_argument("Geometry::readOFF: " + std::to_string(nGon) + "-gons are not supported");
         }
     }
     mBBox = BBoxT();//invalidate BBox
