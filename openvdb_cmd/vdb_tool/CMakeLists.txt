@@ -26,7 +26,7 @@ list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
 add_library(vdb_tool_common INTERFACE)
 
 # Optional components
-option(BUILD_TEST "Build unit tests" OFF)
+option(OPENVDB_BUILD_VDB_TOOL_UNITTESTS "Build unit tests" OFF)
 
 option(OPENVDB_TOOL_USE_NANO "Compile with NanoVDB support" OFF)
 option(OPENVDB_TOOL_NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
@@ -185,7 +185,7 @@ install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 
 
 # unit test
-if(BUILD_TEST)
+if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
   find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
 
   add_executable(vdb_tool_test src/unittest.cpp)
