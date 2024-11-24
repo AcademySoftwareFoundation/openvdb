@@ -301,6 +301,52 @@ TEST_F(Test_vdb_tool, Util)
       }
       EXPECT_EQ(size, tmp.size());
     }
+  
+    {//swapBytes
+      const int i = 4, j = openvdb::vdb_tool::swapBytes(i);
+      EXPECT_NE(i, j);
+      EXPECT_EQ(i, openvdb::vdb_tool::swapBytes(j));
+
+      const float a = 4, b = openvdb::vdb_tool::swapBytes(a);
+      EXPECT_NE(a, b);
+      EXPECT_EQ(a, openvdb::vdb_tool::swapBytes(b));
+
+      const double x = 4, y = openvdb::vdb_tool::swapBytes(x);
+      EXPECT_NE(x, y);
+      EXPECT_EQ(x, openvdb::vdb_tool::swapBytes(y));
+
+      int vec_i[3]={3,4,5}, vec_j[3];
+      for (int n=0; n<3; ++n) {
+        vec_j[n] = openvdb::vdb_tool::swapBytes(vec_i[n]);
+        EXPECT_NE(vec_i[n], vec_j[n]);
+      }
+      openvdb::vdb_tool::swapBytes(vec_j, 3);
+      for (int n=0; n<3; ++n) EXPECT_EQ(vec_i[n], vec_j[n]);
+
+      float vec_a[3]={3,4,5}, vec_b[3];
+      for (int n=0; n<3; ++n) {
+        vec_b[n] = openvdb::vdb_tool::swapBytes(vec_a[n]);
+        EXPECT_NE(vec_a[n], vec_b[n]);
+      }
+      openvdb::vdb_tool::swapBytes(vec_b, 3);
+      for (int n=0; n<3; ++n) EXPECT_EQ(vec_a[n], vec_b[n]);
+
+      double vec_x[3]={3,4,5}, vec_y[3];
+      for (int n=0; n<3; ++n) {
+        vec_y[n] = openvdb::vdb_tool::swapBytes(vec_x[n]);
+        EXPECT_NE(vec_x[n], vec_y[n]);
+      }
+      openvdb::vdb_tool::swapBytes(vec_y, 3);
+      for (int n=0; n<3; ++n) EXPECT_EQ(vec_x[n], vec_y[n]);
+    }
+    {// weird pointer behaviour
+      float vec[4], *p = vec;
+      EXPECT_EQ(vec, p);// of course
+      EXPECT_EQ((char*)(vec),  (char*)p);// sure
+      EXPECT_EQ((char*)(&vec), (char*)p);// wait, what?!
+      EXPECT_NE((char*)(vec),  (char*)(&p));// yep
+      EXPECT_NE((char*)(&p),   (char*)p);// of course
+    }
 }// Util
 
 TEST_F(Test_vdb_tool, getArgs)

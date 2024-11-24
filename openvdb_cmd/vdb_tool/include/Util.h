@@ -377,6 +377,34 @@ inline bool isLittleEndian()
     return (*(char *)&tmp == 1);
 }
 
+/// @brief invert endianess of a type
+/// @tparam T Template type to be inverted
+/// @param val value to be inverted
+/// @return value with reverse bytes
+template <typename T>
+inline T swapBytes(T val)
+{
+    T tmp;
+    char *src=(char*)&val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
+    while (src != end) *dst-- = *src++;
+    return tmp;
+}
+
+/// @brief invert endianess of an array of values of a specific type
+/// @tparam T Template type to be inverted
+/// @param val pointer to array with values to be inverted
+/// @param n number of elements in the array
+template <typename T>
+inline void swapBytes(T *val, int n)
+{
+    T tmp, *stop = val + n;
+    while(val < stop) {
+        char *src=(char*)val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
+        while (src != end) *dst-- = *src++;
+        *val++ = tmp;
+    }
+}
+
 /// @brief return a pseudo random uuid string.
 ///
 /// @details this function approximates a uuid version 4, variant 1 as detailed
