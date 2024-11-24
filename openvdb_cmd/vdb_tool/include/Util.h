@@ -385,8 +385,7 @@ template <typename T>
 inline T swapBytes(T val)
 {
     T tmp;
-    char *src=(char*)&val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
-    while (src != end) *dst-- = *src++;
+    for (char *src=(char*)&val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T);src!=end; *dst-- = *src++);
     return tmp;
 }
 
@@ -397,11 +396,9 @@ inline T swapBytes(T val)
 template <typename T>
 inline void swapBytes(T *val, int n)
 {
-    T tmp, *stop = val + n;
-    while(val < stop) {
-        char *src=(char*)val, *dst=(char*)(&tmp) + sizeof(T) - 1, *end=src + sizeof(T);
-        while (src != end) *dst-- = *src++;
-        *val++ = tmp;
+    for (T tmp, *last = val + n; val < last; ++val) {
+        for (char *src=(char*)val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T); src!=end; *dst-- = *src++);
+        *val = tmp;
     }
 }
 
