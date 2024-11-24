@@ -760,7 +760,7 @@ void Geometry::readPLY(std::istream &is)
             }
             std::free(buffer);
         }
-        
+
     } else {// ascii vertices
         for (auto &v : mVtx) {
             tokens = tokenize_line();

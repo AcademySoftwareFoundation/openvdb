@@ -301,7 +301,7 @@ TEST_F(Test_vdb_tool, Util)
       }
       EXPECT_EQ(size, tmp.size());
     }
-  
+
     {//swapBytes
       const int i = 4, j = openvdb::vdb_tool::swapBytes(i);
       EXPECT_NE(i, j);
