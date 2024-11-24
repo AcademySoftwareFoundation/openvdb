@@ -66,6 +66,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace vdb_tool {
 
+#define MY_CLEAN_VERSION
+
 /// @brief Class that encapsulates (explicit) geometry, i.e. vertices/points,
 ///        triangles and quads. It is used to represent points and polygon meshes
 class Geometry
@@ -265,7 +267,7 @@ void Geometry::writePLY(const std::string &fileName) const
     } else {
         std::ofstream outfile(fileName, std::ios_base::binary);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to ply file \""+fileName+"\"");
-        this->writePLY(outfile);;
+        this->writePLY(outfile);
     }
 }// Geometry::writePLY
 
@@ -323,7 +325,7 @@ void Geometry::writeOBJ(const std::string &fileName) const
     } else {
         std::ofstream outfile(fileName);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to obj file \""+fileName+"\"");
-        this->writeOBJ(outfile);;
+        this->writeOBJ(outfile);
     }
 }// Geometry::writeOBJ
 
@@ -342,7 +344,7 @@ void Geometry::writeOFF(const std::string &fileName) const
     } else {
         std::ofstream outfile(fileName);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to off file \""+fileName+"\"");
-        this->writeOFF(outfile);;
+        this->writeOFF(outfile);
     }
 }// Geometry::writeOFF
 
@@ -364,7 +366,7 @@ void Geometry::writeSTL(const std::string &fileName) const
     } else {
         std::ofstream outfile(fileName, std::ios::out | std::ios_base::binary);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to stl file \""+fileName+"\"");
-        this->writeSTL(outfile);;
+        this->writeSTL(outfile);
     }
 }// Geometry::writeSTL
 
@@ -627,9 +629,7 @@ void Geometry::readPLY(std::istream &is)
     auto tokens = tokenize_line();
     auto test = [&tokens](int i, std::vector<std::string> str) {
         if (i >= static_cast<int>(tokens.size())) return false;
-        for (auto &s : str) {
-            if (tokens[i] == s) return true;
-        }
+        for (auto &s : str) if (tokens[i] == s) return true;
         return false;
     };
     auto error = [&tokens](const std::string &msg){
@@ -637,6 +637,14 @@ void Geometry::readPLY(std::istream &is)
         for (auto &t : tokens) std::cerr << t << " ";
         std::cerr << "\"\n";
         throw std::invalid_argument(msg);
+    };
+    auto sizeOf = [&tokens, test, error](int i){
+        if ( test(i, {"float", "float32", "int", "int32"}) ) return 4;
+        if ( test(i, {"double", "float64"}) ) return 8;
+        if ( test(i, {"int16", "uint16"}) )   return 2;
+        if ( test(i, {"uchar", "int8"}) )     return 1;
+        error("vdb_tool::readPLY: unsupported type");
+        return 0;
     };
 
     if (!test(0, {"ply"})) error("vdb_tool::readPLY: not a ply file");
@@ -655,18 +663,20 @@ void Geometry::readPLY(std::istream &is)
     }
     const bool reverseBytes = format && format != (isLittleEndian() ? 1 : 2);
     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
-    size_t vtxCount = 0, polyCount = 0;
-    struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};
+    size_t vtxCount = 0, polyCount = 0, sizeOfVertex = 0, vertexStride=0;
+    struct Triplet {int offset, id, size; } xyz[3];// byte offset, id, size
+    struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};// head, {x,y,z}, tail
     tokens = tokenize_line();
     bool run = true;
     while(run) {
         if ( test(0, {"element"}) ) {
             if ( test(1, {"vertex"}) ) {
                 vtxCount = std::stoll(tokens[2]);
+                int offset = 0, count = 0;
                 int n = 0;
                 const std::string axis[3] = {"x", "y", "z"};
                 while(true) {
-                    const int m = n>0 ? 1 : 0;
+                    const int m = n>0 ? 1 : 0;// indicates before and after vertices
                     tokens = tokenize_line();
                     if ( test(0, {"end_header"}) ) {
                         run = false;
@@ -674,13 +684,34 @@ void Geometry::readPLY(std::istream &is)
                     } else if ( test(0, {"element"}) ) {
                         break;
                     } else if ( test(0, {"property"}) ) {
+#ifdef MY_CLEAN_VERSION
+                        Triplet t{offset, count++, sizeOf(1)};
+                        for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
+                        vertexStride = (offset += t.size);
+                    }
+                }
+                for (int i=0; i<3; ++i) if (xyz[i].size!=4 && xyz[i].size!=8) error("vdb_tool::readPLY: missing "+axis[i]+
+                                                                                    " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
+#else
                         if ( test(1, {"float", "float32"}) ) {
-                            if ( test(2, {"x", "y", "z"}) ) {// nx,ny.nz
+                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
+                                if (sizeOfVertex == sizeof(double)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
+                                sizeOfVertex = sizeof(float);
                                 if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
                             } else {// e.g. nx, ny, nz, intensity, s, t etc
                                 if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
                                 vtx_skip[m].count += 1;
                                 vtx_skip[m].bytes += static_cast<int>(sizeof(float));
+                            }
+                        } else if ( test(1, {"double", "float64"}) ) {
+                            if ( test(2, {"x", "y", "z"}) ) {// vertex coordinates
+                                if (sizeOfVertex == sizeof(float)) error("vdb_tool::readPLY: mixed float and double precision of vertices is not allowed");
+                                sizeOfVertex = sizeof(double);
+                                if (n>2 || !test(2, {axis[n++]}) ) error("vdb_tool::readPLY: expected x or y or z");
+                            } else {// e.g. nx, ny, nz, intensity, s, t etc
+                                if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
+                                vtx_skip[m].count += 1;
+                                vtx_skip[m].bytes += static_cast<int>(sizeof(double));
                             }
                         } else if ( test(1, {"int16", "uint16"}) ) {// e.g. material_index etc
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int16 property interlaced with coordinates is not supported");
@@ -700,6 +731,7 @@ void Geometry::readPLY(std::istream &is)
                     }
                 }
                 if (n!=3) error("vdb_tool::readPLY: missing vertex coordinates");
+#endif
             } else if ( test(1, {"face"}) ) {
                 polyCount = std::stoll(tokens[2]);
                 int n = 0;
@@ -747,19 +779,56 @@ void Geometry::readPLY(std::istream &is)
     // read vertex coordinates
     mVtx.resize(vtxCount);
     if (format) {// binary
-        if (vtx_skip[0].count == 0 && vtx_skip[1].count == 0) {//faster
+#ifdef MY_CLEAN_VERSION
+        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vertexStride==12) {
             is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
         } else {
-            const size_t bSize = vtx_skip[0].bytes + 3*sizeof(float) + vtx_skip[1].bytes;
+            char *buffer = static_cast<char*>(std::malloc(vtxCount*vertexStride)), *p=buffer;// uninitialized
+            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+            is.read(buffer, vtxCount*vertexStride);
+            for (Vec3f &vtx : mVtx) {
+                for (int i=0; i<3; ++i) {
+                    float* v = (float*)(p + xyz[i].offset);
+                    vtx[i] = (xyz[i].size == 4) ?  *v : float(*(double*)(v));
+                }
+                p += vertexStride;
+            }
+            std::free(buffer);
+        }
+#else
+        if (vtx_skip[0].count == 0 && vtx_skip[1].count == 0) {//faster
+            if (sizeOfVertex == sizeof(float)) {
+                is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
+            } else if (sizeOfVertex == sizeof(double)) {
+                double *buffer = new double[vtxCount * 3], *ptr = buffer;
+                if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate double buffer");
+                is.read((char *)(buffer), vtxCount * 3 * sizeof(double));
+                for (size_t i=0; i<vtxCount; ++i) {
+                    mVtx[i][0] = float(*ptr++);
+                    mVtx[i][1] = float(*ptr++);
+                    mVtx[i][2] = float(*ptr++);
+                }
+                std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
+                delete [] buffer;
+            } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
+        } else {
+            const size_t bSize = vtx_skip[0].bytes + 3*sizeOfVertex + vtx_skip[1].bytes;
             char *buffer = static_cast<char*>(std::malloc(vtxCount*bSize));// uninitialized
             if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
             is.read(buffer, vtxCount*bSize);
             for (size_t i=0; i<vtxCount; ++i) {
-                const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
-                mVtx[i] = Vec3f(p);
+                if (sizeOfVertex == sizeof(float)) {
+                    const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
+                    mVtx[i] = Vec3f(p);
+                } else if (sizeOfVertex == sizeof(double)) {
+                    const double *p = reinterpret_cast<const double*>(buffer + i*bSize + vtx_skip[0].bytes);
+                    mVtx[i] = Vec3f(float(p[0]), float(p[1]), float(p[2]));
+                } else throw std::invalid_argument("Geometry::readPLY: expected float or double precision vertex coordinates");
             }
+            std::cout << "Geometry::readPLY: Warning, vertex coordinates in binary ply file were stored in double but got converted to float\n";
             std::free(buffer);
         }
+#endif
         if (reverseBytes) {
             auto flipBytes = [](float v)->float{
                float tmp;
