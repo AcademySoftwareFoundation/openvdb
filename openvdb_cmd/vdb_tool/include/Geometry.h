@@ -288,7 +288,7 @@ void Geometry::writePLY(std::ostream &os) const
     os << "property list uchar int vertex_index\n";
     os << "end_header\n";
     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
-    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));
+    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
     if (mTri.size()>0) {
         const size_t size = sizeof(char) + 3*sizeof(uint32_t);
         char *buffer = static_cast<char*>(std::malloc(mTri.size()*size)), *p = buffer;// uninitialized
@@ -353,8 +353,8 @@ void Geometry::writeOFF(std::ostream &os) const
     os << "OFF\n";
     os << "# Created by vdb_tool\n";
     os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
-    for (auto &v : mVtx) os << v[0] << " " << v[1] << " " << v[2] << "\n";
-    for (auto &t : mTri) os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+    for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
+    for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
     for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
 }// Geometry::writeOFF
 
@@ -670,6 +670,8 @@ void Geometry::readPLY(std::istream &is)
     int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
     struct Triplet {int offset, id, size;} xyz[3];// byte offset, id#, byte size
     struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
+
+    // parse header with vertex, face and property information
     tokens = tokenize_line();
     bool run = true;
     while(run) {
@@ -694,7 +696,7 @@ void Geometry::readPLY(std::istream &is)
                                                                                     " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
             } else if ( test(1, {"face"}) ) {
                 faceCount = std::stoll(tokens[2]);
-                int n = 0;
+                int n = 0;// 0 is head and 1 is tail
                 while (true) {
                     tokens = tokenize_line();
                     if ( test(0, {"end_header"}) ) {
@@ -702,13 +704,13 @@ void Geometry::readPLY(std::istream &is)
                         break;
                     } else if (test(0, {"element"}) ) {
                         break;
-                    } else if (test(0, {"property"}) ) {
+                    } else if (test(0, {"property"}) ) {// eg: "property list uchar int vertex_indices"
                         if (test(1, {"list"}) &&// list of vertex ID belonging to a polygon
                             test(2, {"uchar", "uint8"}) &&// size of polygon, e.g. 3 or 4
                             test(3, {"int", "uint", "int32"}) &&// type of vertex id
                             test(4, {"vertex_index", "vertex_indices"}) ) {
-                            n = 1;
-                        } else if ( test(1, {"uchar", "uint8"}) ) {
+                            n = 1;// change from head to tail
+                        } else if ( test(1, {"uchar", "uint8"}) ) {// eg: "property uchar intensity"
                             faceSkip[n].count += 1;
                             faceSkip[n].bytes += 1;
                         } else {
@@ -729,7 +731,7 @@ void Geometry::readPLY(std::istream &is)
             } else {
                 error("vdb_tool::readPLY: invalid element");
             }
-        } else if ( test(0, {"comment", "obj_info"}) ) {
+        } else if ( test(0, {"comment", "obj_info"}) ) {// eq: "obj_info 3D colored patch boundaries" and "comment author: Paraform"
             tokens = tokenize_line();
         } else {
             error("vdb_tool::readPLY: unexpected entry in header");
