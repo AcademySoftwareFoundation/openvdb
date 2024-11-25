@@ -174,8 +174,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: install_gtest
         run: |
-          sudo apt-get update
-          sudo apt-get -q install -y libgtest-dev
+          sudo yum install -y gtest-devel
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb

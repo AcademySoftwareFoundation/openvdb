@@ -78,8 +78,7 @@ jobs:
         run: ./ci/install_nanobind.sh 2.0.0
       - name: install_gtest
         run: |
-          sudo apt-get update
-          sudo apt-get -q install -y libgtest-dev
+          sudo yum install -y gtest-devel
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
