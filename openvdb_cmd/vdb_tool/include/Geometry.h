@@ -638,7 +638,7 @@ void Geometry::readPLY(std::istream &is)
         std::cerr << "\"\n";
         throw std::invalid_argument(msg);
     };
-    auto sizeOf = [&tokens, test, error](int i){
+    auto sizeOf = [test, error](int i){
         if ( test(i, {"float", "float32", "int", "int32"}) ) return 4;
         if ( test(i, {"double", "float64"}) ) return 8;
         if ( test(i, {"int16", "uint16"}) )   return 2;
