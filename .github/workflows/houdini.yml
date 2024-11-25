@@ -94,8 +94,7 @@ jobs:
     - name: cppunit
       run: ./ci/install_cppunit.sh 1.15.1
     - name: install_gtest
-      run: |
-        sudo yum install -y gtest-devel
+      run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT

@@ -90,8 +90,7 @@ jobs:
       if: contains(matrix.config.image, '2023') == true
       run: ./ci/install_glfw.sh 3.3.10
     - name: install_gtest
-      run: |
-        sudo yum install -y gtest-devel
+      run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
