@@ -170,12 +170,12 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    container:
+      image: aswf/ci-openvdb:2024
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
-        run: |
-          sudo apt-get update
-          sudo apt-get -q install -y libgtest-dev
+        run: ./ci/install_gtest.sh 1.15.2
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb
