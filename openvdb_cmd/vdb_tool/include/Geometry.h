@@ -107,14 +107,14 @@ public:
     void write(const std::string &fileName) const;
     void writeOBJ(const std::string &fileName) const;
     void writeOFF(const std::string &fileName) const;
-    void writePLY(const std::string &fileName) const;
+    void writePLY(const std::string &fileName, bool binary = true) const;
     void writeSTL(const std::string &fileName) const;
     void writeGEO(const std::string &fileName) const;
     void writeABC(const std::string &fileName) const;
 
     void writeOBJ(std::ostream &os) const;
     void writeOFF(std::ostream &os) const;
-    void writePLY(std::ostream &os) const;
+    void writePLY(std::ostream &os, bool binary = true) const;
     void writeSTL(std::ostream &os) const;
 
     void read(const std::string &fileName);
@@ -259,25 +259,25 @@ void Geometry::write(const std::string &fileName) const
     }
 }// Geometry::write
 
-void Geometry::writePLY(const std::string &fileName) const
+void Geometry::writePLY(const std::string &fileName, bool binary) const
 {
     if (fileName == "stdout.ply") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writePLY: stdout is not connected to the terminal!");
-        this->writePLY(std::cout);
+        this->writePLY(std::cout, binary);
     } else {
         std::ofstream outfile(fileName, std::ios_base::binary);
         if (!outfile.is_open()) throw std::invalid_argument("Error writing to ply file \""+fileName+"\"");
-        this->writePLY(outfile);
+        this->writePLY(outfile, binary);
     }
 }// Geometry::writePLY
 
-void Geometry::writePLY(std::ostream &os) const
+void Geometry::writePLY(std::ostream &os, bool binary) const
 {
-    os << "ply\n";
-    if (isLittleEndian()) {
-        os << "format binary_little_endian 1.0\n";
+    os << "ply\nformat ";
+    if (binary) {
+        os << "binary_" << (isLittleEndian() ? "little" : "big") << "_endian 1.0\n";
     } else {
-        os << "format binary_big_endian 1.0\n";
+        os << "ascii 1.0\n";
     }
     os << "comment created by vdb_tool" << std::endl;
     os << "element vertex " << mVtx.size() << std::endl;
@@ -288,32 +288,26 @@ void Geometry::writePLY(std::ostream &os) const
     os << "property list uchar int vertex_index\n";
     os << "end_header\n";
     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
-    os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
-    if (mTri.size()>0) {
-        const size_t size = sizeof(char) + 3*sizeof(uint32_t);
-        char *buffer = static_cast<char*>(std::malloc(mTri.size()*size)), *p = buffer;// uninitialized
-        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
-        static_assert(sizeof(Vec3I) == 3 * sizeof(uint32_t), "Unexpected sizeof(Vec3I)");
-        for (const Vec3I *t = mTri.data(), *e = t + mTri.size(); t!=e; ++t) {
-            *p = 3;
-            std::memcpy(p + 1, t, 3*sizeof(uint32_t));
-            p += size;
-        }
-        os.write(buffer, mTri.size()*size);
-        std::free(buffer);
-    }
-    if (mQuad.size()>0) {
-        const size_t size = sizeof(char) + 4*sizeof(uint32_t);
-        char *buffer = static_cast<char*>(std::malloc(mQuad.size()*size)), *p = buffer;// uninitialized
-        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
-        static_assert(sizeof(Vec4I) == 4 * sizeof(uint32_t), "Unexpected sizeof(Vec4I)");
-        for (const Vec4I *q = mQuad.data(), *e = q + mQuad.size(); q!=e; ++q) {
-            *p = 4;
-            std::memcpy(p + 1, q, 4*sizeof(uint32_t));
-            p += size;
-        }
-        os.write(buffer, mQuad.size()*size);
-        std::free(buffer);
+    if (binary) {
+        os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
+        auto writeFaces = [&](auto &faces, int n) {
+            if (faces.size()==0) return;
+            const size_t size = sizeof(char) + n*sizeof(uint32_t);
+            char *buffer = static_cast<char*>(std::malloc(faces.size()*size)), *p = buffer;// uninitialized
+            if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
+            for (const auto *f = faces.data(), *e = f + faces.size(); f!=e; ++f, p+= size) {
+                *p = n;
+                std::memcpy(p + 1, f, n*sizeof(uint32_t));
+            }
+            os.write(buffer, faces.size()*size);
+            std::free(buffer);
+        };
+        writeFaces(mTri,  3);
+        writeFaces(mQuad, 4);
+    } else {// ascii
+        for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
+        for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
+        for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
     }
 }// Geometry::writePLY
 
@@ -331,9 +325,9 @@ void Geometry::writeOBJ(const std::string &fileName) const
 
 void Geometry::writeOBJ(std::ostream &os) const
 {
-    os << "# Created by vdb_tool\n";
-    for (auto &v : mVtx) os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
-    for (auto &t : mTri) os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
+    os << "# obj file created by vdb_tool\n";
+    for (auto &v : mVtx)  os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+    for (auto &t : mTri)  os << "f " << t[0]+1 << " " << t[1]+1 << " " << t[2]+1 << "\n";// obj is 1-based
     for (auto &q : mQuad) os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
 }// Geometry::writeOBJ
 
@@ -350,8 +344,7 @@ void Geometry::writeOFF(const std::string &fileName) const
 
 void Geometry::writeOFF(std::ostream &os) const
 {
-    os << "OFF\n";
-    os << "# Created by vdb_tool\n";
+    os << "OFF\n# Created by vdb_tool\n";
     os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
     for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
     for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
