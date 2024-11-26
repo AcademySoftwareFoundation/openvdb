@@ -290,20 +290,20 @@ void Geometry::writePLY(std::ostream &os, bool binary) const
     static_assert(sizeof(Vec3s) == 3 * sizeof(float), "Unexpected sizeof(Vec3s)");
     if (binary) {
         os.write((const char *)mVtx.data(), mVtx.size() * 3 * sizeof(float));// write x,y,z vertex coordinates
-        auto writeFaces = [&](auto &faces, int n) {
-            if (faces.size()==0) return;
-            const size_t size = sizeof(char) + n*sizeof(uint32_t);
-            char *buffer = static_cast<char*>(std::malloc(faces.size()*size)), *p = buffer;// uninitialized
+        auto writeFaces = [](std::ostream &os, const uint32_t *faces, size_t count, uint8_t n) {
+            if (count==0) return;
+            const int size = 1 + 4*n;
+            char *buffer = (char*)std::malloc(count*size), *p = buffer;// uninitialized
             if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
-            for (const auto *f = faces.data(), *e = f + faces.size(); f!=e; ++f, p+= size) {
-                *p = n;
-                std::memcpy(p + 1, f, n*sizeof(uint32_t));
+            for (const uint32_t *f = faces, *e = f + n*count; f!=e; f+=n, p += size) {
+                *p = (char)n;
+                std::memcpy(p + 1, f, 4*n);
             }
-            os.write(buffer, faces.size()*size);
+            os.write(buffer, count*size);
             std::free(buffer);
         };
-        writeFaces(mTri,  3);
-        writeFaces(mQuad, 4);
+        writeFaces(os, (const uint32_t*)mTri.data(),  mTri.size(),  3);
+        writeFaces(os, (const uint32_t*)mQuad.data(), mQuad.size(), 4);
     } else {// ascii
         for (auto &v : mVtx)  os << v[0] << " " << v[1] << " " << v[2] << "\n";
         for (auto &t : mTri)  os << "3 " << t[0] << " " << t[1] << " " << t[2] << "\n";
