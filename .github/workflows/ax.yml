@@ -76,6 +76,8 @@ jobs:
       - name: nanobind
         #if: contains(matrix.config.image, '2023') == false
         run: ./ci/install_nanobind.sh 2.0.0
+      - name: install_gtest
+        run: ./ci/install_gtest.sh 1.15.2
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
