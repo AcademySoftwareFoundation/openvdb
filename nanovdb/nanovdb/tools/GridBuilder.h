@@ -1158,7 +1158,7 @@ struct LeafNode
         ValueIterator& operator=(const ValueIterator&) = default;
         ValueType operator*() const { NANOVDB_ASSERT(*this); return mParent->mValues[mPos];}
         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
-        bool isActive() const { NANOVDB_ASSERT(*this); return mParent->isActive(mPos);}
+        bool isActive() const { NANOVDB_ASSERT(*this); return mParent->mValueMask.isOn(mPos);}
         operator bool() const {return mPos < SIZE;}
         ValueIterator& operator++() {++mPos; return *this;}
         ValueIterator operator++(int) {
