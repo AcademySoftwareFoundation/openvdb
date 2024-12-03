@@ -107,7 +107,7 @@ JaggedReduce(const torch::Tensor &jdataRaw, const torch::Tensor &jidx,
 
     auto joffsetsAccessor = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(joffsets);
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(jdata.scalar_type(), "JaggedReduce", [&]() {
+    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, jdata.scalar_type(), "JaggedReduce", [&]() {
         out.fill_(Reducer<scalar_t, REDUCE>::init());
         auto outAccessor = tensorAccessor<DeviceTag, scalar_t, 2>(out);
 

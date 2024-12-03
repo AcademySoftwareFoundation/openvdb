@@ -36,12 +36,13 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
+        const int64_t joffset = coarseBatchHdl.cumVoxels(bidx);
         for (auto it = ActiveVoxelIterator<GridType, -1>(coarseTree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk(it->first[0] * subdivisionFactor[0],
                                          it->first[1] * subdivisionFactor[1],
                                          it->first[2] * subdivisionFactor[2]);
 
-            if (subdivMaskAcc.size(0) > 0 && !subdivMaskAcc[it->second]) {
+            if (subdivMaskAcc.size(0) > 0 && !subdivMaskAcc[it->second + joffset]) {
                 continue;
             }
 

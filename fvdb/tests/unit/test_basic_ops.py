@@ -42,6 +42,42 @@ class TestBasicOps(unittest.TestCase):
         np.random.seed(0)
         pass
 
+    @parameterized.expand(all_device_dtype_combos)
+    def test_subdivide_1x_with_mask(self, device, dtype, mutable):
+        def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
+            batch_size = len(npc)
+            plist = []
+            for i in range(batch_size):
+                ni = npc[i]
+                plist.append(torch.randn((ni, 3), dtype=torch.float32, device=device, requires_grad=False))
+            return plist
+
+        batch_size = 5
+        vxl_size = 0.4
+        npc = torch.randint(low=0, high=100, size=(batch_size,), device=device).tolist()
+        plist = get_point_list(npc, device)
+        pc_jagged = fvdb.JaggedTensor(plist)
+        grid_batch = fvdb.gridbatch_from_points(pc_jagged, voxel_sizes=[[vxl_size] * 3] * batch_size)
+
+        random_mask = (
+            torch.randn(grid_batch.total_voxels, device=device)
+        ) > 0.5  # random mask that selects voxels randomly from different grids
+        random_mask = grid_batch.jagged_like(random_mask)
+        filtered_grid_batch = grid_batch.subdivided_grid(1, random_mask)
+        sum = 0
+        for i in range(batch_size):
+            si = grid_batch.joffsets[i]
+            ei = grid_batch.joffsets[i + 1]
+            ri = random_mask.jdata[si:ei]
+            self.assertEqual(ri.sum().item(), filtered_grid_batch.num_voxels_at(i))
+            sum += torch.sum(ri)
+
+        self.assertEqual(sum, torch.sum(random_mask.jdata))
+        self.assertEqual(torch.sum(random_mask.jdata), filtered_grid_batch.total_voxels)
+        self.assertTrue(
+            torch.all(random_mask.int().jsum().jdata == filtered_grid_batch.num_voxels.int()).item(),
+        )
+
     @parameterized.expand(["cpu", "cuda"])
     def test_is_same(self, device):
         grid = GridBatch(device=device)

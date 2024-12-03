@@ -782,7 +782,7 @@ dispatchGaussianRasterizeForward<torch::kCPU>(
     const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
     const torch::Tensor &flatten_ids   // [n_isects]
 ) {
-    TORCH_CHECK(false, "CPU implementation not available");
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 template <>
@@ -838,7 +838,7 @@ dispatchGaussianRasterizeBackward<torch::kCPU>(
     const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
     // options
     bool absgrad) {
-    TORCH_CHECK(false, "CPU implementation not available");
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 } // namespace ops

@@ -428,12 +428,45 @@ class BatchNorm(nn.BatchNorm1d):
         return VDBTensor(input.grid, input.grid.jagged_like(result_data), input.kmap)
 
 
+# Non-linear Activations
+
+
 @fvnn_module
 class ElementwiseMixin:
     def forward(self, input: VDBTensor) -> VDBTensor:
         assert isinstance(input, VDBTensor), "Input should have type VDBTensor"
         res = super().forward(input.data.jdata)  # type: ignore
         return VDBTensor(input.grid, input.data.jagged_like(res), input.kmap)
+
+
+class ELU(ElementwiseMixin, nn.ELU):
+    r"""
+    Applies the Exponential Linear Unit function element-wise:
+    .. math::
+    \text{ELU}(x) = \begin{cases}
+    x, & \text{ if } x > 0\\
+    \alpha * (\exp(x) - 1), & \text{ if } x \leq 0
+    \end{cases}
+    """
+
+
+class CELU(ElementwiseMixin, nn.CELU):
+    r"""
+    Applies the CELU function element-wise.
+
+    .. math::
+        \text{CELU}(x) = \max(0,x) + \min(0, \alpha * (\exp(x/\alpha) - 1))
+    """
+
+
+class GELU(ElementwiseMixin, nn.GELU):
+    r"""
+    Applies the Gaussian Error Linear Units function.
+
+    .. math:: \text{GELU}(x) = x * \Phi(x)
+
+    where :math:`\Phi(x)` is the Cumulative Distribution Function for Gaussian Distribution.
+    """
 
 
 class Linear(ElementwiseMixin, nn.Linear):
@@ -481,6 +514,9 @@ class Sigmoid(ElementwiseMixin, nn.Sigmoid):
     r"""
     Applies element-wise, :math:`\text{Sigmoid}(x) = \frac{1}{1 + \exp(-x)}`
     """
+
+
+# Dropout Layers
 
 
 class Dropout(ElementwiseMixin, nn.Dropout):

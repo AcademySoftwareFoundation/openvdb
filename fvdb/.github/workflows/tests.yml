@@ -10,6 +10,11 @@ on:
       - 'notebooks/**'
       - 'scripts/**'
 
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   deployments: write
@@ -21,37 +26,43 @@ jobs:
     runs-on:
       - self-hosted
     container:
-      image: aswf/ci-openvdb:2023-clang15.0
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up fvdb_build Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniconda-version: "latest"
-          channels: conda-forge
-          channel-priority: strict
+          miniforge-version: latest
+          conda-remove-defaults: "true"
           activate-environment: fvdb_build
           environment-file: env/build_environment.yml
 
 
       - name: Buid fvdb
         run: |
-          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) python setup.py bdist_wheel --dist-dir=dist
-        shell:
-          bash -el {0}
+          TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) conda run --no-capture-output -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
 
       - name: Upload package
         uses: actions/upload-artifact@v4
         with:
             name: fvdb-test-package
             path: dist/*.whl
+            retention-days: 2
 
-      - name: Clean Conda
+      - name: Cleanup
+        if: always()
         run: |
-          conda clean -pty
-        shell:
-          bash -el {0}
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
+
 
   fvdb-unit-test:
     needs: [fvdb-build]
@@ -59,15 +70,20 @@ jobs:
     runs-on:
       - self-hosted
     container:
-      image: aswf/ci-openvdb:2023-clang15.0
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniconda-version: "latest"
-          channels: conda-forge
-          channel-priority: strict
+          miniforge-version: latest
+          conda-remove-defaults: "true"
           activate-environment: fvdb_test
           environment-file: env/test_environment.yml
 
@@ -81,21 +97,63 @@ jobs:
         run: |
             conda activate fvdb_test
             pip install ./dist/*.whl
-        shell:
-              bash -el {0}
 
       - name: Run tests
         run: |
             cd tests;
             pytest -v unit
-        shell:
-              bash -el {0}
 
-      - name: Clean Conda
+      - name: Cleanup
+        if: always()
         run: |
-            conda clean -pty
-        shell:
-            bash -el {0}
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
+
+  fvdb-docs-test:
+    needs: [fvdb-build]
+    name: fVDB Documentation Tests
+    runs-on:
+      - self-hosted
+    container:
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: "true"
+          activate-environment: fvdb_test
+          environment-file: env/test_environment.yml
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+            name: fvdb-test-package
+            path: ./dist
+
+      - name: Install package
+        run: |
+            conda activate fvdb_test
+            pip install ./dist/*.whl
+
+      - name: Run tests
+        run: |
+            cd .. && pytest --markdown-docs fvdb/docs
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
 
   fvdb-benchmarks:
     needs: [fvdb-build]
@@ -103,16 +161,20 @@ jobs:
     runs-on:
       - self-hosted
     container:
-      image: aswf/ci-openvdb:2023-clang15.0
-
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniconda-version: "latest"
-          channels: conda-forge
-          channel-priority: strict
+          miniforge-version: latest
+          conda-remove-defaults: "true"
           activate-environment: fvdb_test
           environment-file: env/test_environment.yml
 
@@ -126,21 +188,15 @@ jobs:
         run: |
             conda activate fvdb_test
             pip install ./dist/*.whl
-        shell:
-          bash -el {0}
 
       - name: Disable git ownership verification
         run: |
           git config --global --add safe.directory "$(pwd)"
-        shell:
-          bash -el {0}
 
       - name: Run benchmarks
         run: |
           cd tests;
           pytest benchmark --benchmark-json benchmark/output.json
-        shell:
-          bash -el {0}
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
@@ -157,8 +213,9 @@ jobs:
             fail-on-alert: true
             alert-comment-cc-users: '@swahtz'
 
-      - name: Clean Conda
+      - name: Cleanup
+        if: always()
         run: |
-            conda clean -pty
-        shell:
-            bash -el {0}
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"

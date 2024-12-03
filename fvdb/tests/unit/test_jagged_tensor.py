@@ -401,8 +401,8 @@ class TestJaggedTensor(unittest.TestCase):
         data_path = get_fvdb_test_data_path()
         ray_o_path = data_path / "jagged_tensor" / "ray_orig.pt"
         ray_d_path = data_path / "jagged_tensor" / "ray_dir.pt"
-        ray_o = torch.load(ray_o_path).to(device=device, dtype=dtype)
-        ray_d = torch.load(ray_d_path).to(device=device, dtype=dtype)
+        ray_o = torch.load(ray_o_path, weights_only=True).to(device=device, dtype=dtype)
+        ray_d = torch.load(ray_d_path, weights_only=True).to(device=device, dtype=dtype)
         ray_orig = fvdb.JaggedTensor([ray_o])
         ray_dir = fvdb.JaggedTensor([ray_d])
         self.check_lshape(ray_orig, [ray_o])
@@ -1098,11 +1098,12 @@ class TestJaggedTensor(unittest.TestCase):
         pass_percentage=80,
         conditional_args=[
             ["cuda"],
-            [torch.float16],
+            [torch.float16, torch.float32],
         ],
     )
     def test_jsum(self, device, dtype):
         torch.random.manual_seed(111)
+        np.random.seed(111)
         if dtype == torch.float16:
             min_num = 100
         else:

@@ -135,19 +135,6 @@
         },
         "editor.rulers": [ 120 ]
     },
-    "python.linting.pylintArgs": [
-        "--disable", "C0114",
-        "--disable", "C0115",
-        "--disable", "C0116",
-        "--disable", "C0103",
-        "--disable", "C0209",
-        "--disable", "C0301",
-        "--disable", "R0914",
-        "--disable", "R0913",
-        "--disable", "W0622",
-        "--disable", "E1102",
-        "--generated-members=numpy.* ,torch.*"
-    ],
     "python.analysis.typeCheckingMode": "basic",
     "python.testing.unittestArgs": [
         "-v", "-s", "."
@@ -158,9 +145,13 @@
         "--target-version=py311",
         "--line-length=120"
     ],
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportPrivateImportUsage": "none",
+    },
     "isort.args": [
         "--profile", "black"
     ],
     "json.format.keepLines": true,
     "C_Cpp.formatting": "clangFormat",
+    "C_Cpp.clang_format_path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clang-format-18",
 }

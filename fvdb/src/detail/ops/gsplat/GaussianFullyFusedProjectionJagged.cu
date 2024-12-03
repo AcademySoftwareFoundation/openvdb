@@ -411,7 +411,7 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCPU>(
     const torch::Tensor &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
     const float near_plane, const float far_plane, const float radius_clip) {
-    TORCH_CHECK(false, "CPU implementation not available");
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 template <>
@@ -525,7 +525,7 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCPU>(
     const torch::Tensor &v_depths,  // [nnz]
     const torch::Tensor &v_conics,  // [nnz, 3]
     const bool           viewmats_requires_grad) {
-    TORCH_CHECK(false, "CPU implementation not available");
+    TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
 } // namespace ops

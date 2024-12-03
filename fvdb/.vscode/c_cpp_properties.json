@@ -7,6 +7,7 @@
                 "${env:CONDA_PREFIX}/envs/fvdb/include/cuda",
                 "${workspaceFolder}/src",
                 "${workspaceFolder}/external/openvdb/nanovdb",
+                "${workspaceFolder}/external/glm",
                 "${workspaceFolder}/external/cudnn_fe/include",
                 "${workspaceFolder}/external/cutlass/include",
                 "${env:CONDA_PREFIX}/envs/fvdb/include/python3.10",

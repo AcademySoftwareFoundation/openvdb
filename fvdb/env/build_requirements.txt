@@ -1,4 +1,3 @@
-torch >= 2.2.0+cu121
 pip >= 23.3.1
 setuptools >= 68.2.2
 wheel

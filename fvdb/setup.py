@@ -261,6 +261,13 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
 
 
 if __name__ == "__main__":
+    # check we will be compiling for a supported compute architecture
+    for arch_flag in cpp_extension._get_cuda_arch_flags():
+        match = re.search(r"code=sm_(\d+)", arch_flag)
+        if match:
+            if int(match.group(1)) < 80:
+                raise RuntimeError("ƒVDB requires a minimum compute capability of 8.0 (Ampere)")
+
     external_dir = get_external_dir()
 
     # Use new C++ standard for newer NVCC versions

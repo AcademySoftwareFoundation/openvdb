@@ -77,7 +77,7 @@ Cpp11BracedListStyle: false
 IncludeBlocks: Preserve
 IncludeIsMainRegex: "$"
 IncludeCategories:
-  - Regex: '^<.*\.h>'
+  - Regex: '^<.*\.(h|cuh)>'
     Priority: 1
   - Regex: ".*"
     Priority: 2

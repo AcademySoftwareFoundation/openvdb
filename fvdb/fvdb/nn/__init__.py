@@ -3,6 +3,9 @@
 #
 from .gaussian_splatting import GaussianSplat3D
 from .modules import (
+    CELU,
+    ELU,
+    GELU,
     SELU,
     AvgPool,
     BatchNorm,
@@ -14,6 +17,7 @@ from .modules import (
     MaxPool,
     ReLU,
     Sigmoid,
+    SiLU,
     SparseConv3d,
     Tanh,
     UpsamplingNearest,
@@ -34,7 +38,11 @@ __all__ = [
     "Linear",
     "ReLU",
     "LeakyReLU",
+    "ELU",
+    "CELU",
+    "GELU",
     "SELU",
+    "SiLU",
     "Tanh",
     "Sigmoid",
     "Dropout",

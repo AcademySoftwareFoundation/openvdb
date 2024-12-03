@@ -21,13 +21,15 @@ Lastly, our [documentation](docs) provides deeper details on the concepts as wel
 
 During the project's initial stage of release, it is necessary to [run the build steps](#building-fvdb-from-source) to install ƒVDB. Eventually, ƒVDB will be provided as a pre-built, installable package from anaconda.  We support building the latest ƒVDB version for the following dependent library configurations:
 
-|   PyTorch      | Python     | CUDA |
-| -------------- | ---------- | ------- |
-|  2.4.0-2.4.1   | 3.10 - 3.12 |  12.1   |
+|   PyTorch      | Python      | CUDA |
+| -------------- | ----------- | ------------ |
+|  2.4.0-2.4.1   | 3.10 - 3.12 | 12.1 - 12.4 |
 
 
 
-***Note:** Linux is the only platform currently supported (Ubuntu >= 20.04 recommended).
+** Notes:**
+* Linux is the only platform currently supported (Ubuntu >= 20.04 recommended).
+* A CUDA-capable GPU with Ampere architecture or newer (i.e. compute capability >=8.0) is required to run the CUDA-accelerated operations in ƒVDB.
 
 
 ## Building *f*VDB from Source
@@ -63,6 +65,12 @@ docker run -it --gpus all --rm \
   /bin/bash
 ```
 
+When running the docker container in `dev` mode and when you are ready to build ƒVDB, you can run the following command to build ƒVDB for the recommended set of CUDA architectures:
+```shell
+MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')  \
+     TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9+PTX" \
+     python setup.py install
+```
 
 #### Setting up a Conda Environment
 
@@ -98,14 +106,17 @@ conda config --set solver libmamba
 
 Next, create the `fvdb` conda environment by running the following command from the root of this repository, and then grabbing a ☕:
 ```shell
-conda env create -f env/test_environment.yml
+conda env create -f env/dev_environment.yml
 ```
 
-**Note:**  You can optionally use the `env/build_environment.yml` environment file if you want a minimum set of dependencies needed to build *f*VDB and don't intend to run the tests or the `env/learn_environment` if you would like the additional packages needed to run the examples and view their visualizations.  If you intend to use our learning material such as the [notebooks](notebooks) or [examples](examples), we recommend you start from the `fvdb_learn` conda environment which contains all the dependencies needed to run the learning material as well as build *f*VDB from source.
+**Notes:**
+* You can optionally use the `env/build_environment.yml` environment file if you want a minimum set of dependencies needed just to build/package *f*VDB (note this environment won't have all the runtime dependencies needed to `import fvdb`).
+* If you would like a runtime environment which has only the packages required to run the unit tests after building ƒVDB, you can use the `env/test_environment.yml`.  This is the environment used by the CI pipeline to run the tests after building ƒVDB in the `fvdb_build` environment.
+* Use the `fvdb_learn` environment defined in `env/learn_environment.yml` if you would like an environment with the runtime requirements and the additional packages needed to run the [notebooks](notebooks) or [examples](examples) and view their visualizations.
 
 Now activate the environment:
 ```shell
-conda activate fvdb_test
+conda activate fvdb
 ```
 
 
@@ -117,22 +128,27 @@ conda activate fvdb_test
 export MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')
 ```
 
-You could either do an editable install with setuptools:
+You could either perform an editable install with setuptools:
 ```shell
 python setup.py develop
 ```
-or directly install it to your site package folder if you are developing extensions:
+or install a 'read-only' copy to your site package folder:
 ```shell
 pip install .
 ```
 
+If you would like to build a packaged wheel for installing in other environments, you can run the following command:
+```shell
+python setup.py bdist_wheel
+```
 
 
 ### Running Tests
 
 To make sure that everything works by running tests:
 ```shell
-pytest tests/unit
+cd tests
+pytest unit
 ```
 
 ### Building Documentation

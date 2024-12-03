@@ -24,6 +24,7 @@ dependencies:
   - cuda-cccl=12.1
   - cuda-libraries-static=12.1
   - cuda-cudart-static=12.1
+  - libcurand-dev
   - gcc_linux-64=11
   - gxx_linux-64=11
   - cxx-compiler
