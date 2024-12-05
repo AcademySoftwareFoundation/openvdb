@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Prune.h>
@@ -587,6 +587,7 @@ TEST_F(TestValueAccessor, testMultiThreadedRWAccessors)
 TEST_F(TestValueAccessor, testAccessorRegistration)
 {
     using openvdb::Index;
+    using openvdb::Index64;
 
     const float background = 5.0f, value = -9.345f;
     const openvdb::Coord c0(5, 10, 20);
@@ -597,29 +598,29 @@ TEST_F(TestValueAccessor, testAccessorRegistration)
     // Set a single leaf voxel via the accessor and verify that
     // the cache is populated.
     acc.setValue(c0, value);
-    EXPECT_EQ(Index(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(1), tree->leafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Reset the voxel to the background value and verify that no nodes
     // have been deleted and that the cache is still populated.
     tree->setValueOff(c0, background);
-    EXPECT_EQ(Index(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(1), tree->leafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Prune the tree and verify that only the root node remains and that
     // the cache has been cleared.
     openvdb::tools::prune(*tree);
     //tree->prune();
-    EXPECT_EQ(Index(0), tree->leafCount());
-    EXPECT_EQ(Index(1), tree->nonLeafCount()); // root node only
+    EXPECT_EQ(Index64(0), tree->leafCount());
+    EXPECT_EQ(Index64(1), tree->nonLeafCount()); // root node only
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 
     // Set the leaf voxel again and verify that the cache is repopulated.
     acc.setValue(c0, value);
-    EXPECT_EQ(Index(1), tree->leafCount());
-    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_EQ(Index64(1), tree->leafCount());
+    EXPECT_EQ(Index64(tree->root().getLevel()), tree->nonLeafCount());
     EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Delete the tree and verify that the cache has been cleared.
@@ -665,8 +666,6 @@ TEST_F(TestValueAccessor, testGetNode)
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 10
-
 template <typename TreeT> struct AssertBypass
 {
     inline void operator()() {
@@ -703,5 +702,3 @@ TEST_F(TestValueAccessor, testBypassLeafAPI)
     static_assert(!ValueAccessor2<FloatTree, true, 1, 2>::BypassLeafAPI);
     static_assert(!ValueAccessor3<MaskTree, true, 0, 1, 2>::BypassLeafAPI);
 }
-
-#endif

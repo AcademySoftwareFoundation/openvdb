@@ -61,30 +61,21 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++,     image: '2022-clang11', build: 'Release' }
-          - { cxx: g++,     image: '2022-clang11', build: 'Debug' }
-          - { cxx: clang++, image: '2022-clang11', build: 'Release' }
-          - { cxx: clang++, image: '2022-clang11', build: 'Debug' }
+          - { cxx: g++,     image: '2024', build: 'Release' }
+          - { cxx: g++,     image: '2024', build: 'Debug' }
+          - { cxx: clang++, image: '2024', build: 'Release' }
+          - { cxx: clang++, image: '2024', build: 'Debug' }
       fail-fast: false
     steps:
-      - name: Enable Node 16
-        if: contains(matrix.config.image, '2022')
-        run: |
-          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
-      - name: install_cuda_11
+      - name: setup_cuda_12
         run: |
-          # Fix error: Cannot prepare internal mirrorlist: No URLs in mirrorlist. CentOS 8 reached EOL means need to replace the official mirror to vault.centos.org
-          # Comment out mirrorlist and replace #baseurl=...mirror.centos.org with baseurl=...vault.centos.org in files starting with CentOS- in /etc/yum.repos.d folder
-          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
-          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
           yum -y install yum-utils
-          yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
-          echo "Installing cuda toolkit"
-          yum --enablerepo=epel -y install cuda-toolkit-11-6
-          echo "/usr/local/cuda-11.6/bin" >> $GITHUB_PATH
-          echo "LD_LIBRARY_PATH=/usr/local/cuda-11.6/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "/usr/local/cuda-12/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12/lib64:$LD_LIBRARY_PATH" >> $GITHUB_ENV
       - name: build
+      # NOTE: CMAKE_POSITION_INDEPENDENT_CODE set to fix default behaviour change in clang 14
+      #   https://github.com/AcademySoftwareFoundation/aswf-docker/issues/228
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
@@ -95,6 +86,7 @@ jobs:
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
           -DUSE_BLOSC=OFF
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
         run: cd build && sudo ctest -V -E ".*cuda.*"
@@ -121,9 +113,9 @@ jobs:
     - name: install_cuda
       shell: powershell
       run: .\ci\install_windows_cuda.ps1
-    - name: install_deps
-      shell: bash
-      run: ./ci/install_windows.sh
+    - name: install
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       shell: bash
       run: >
@@ -154,8 +146,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-12', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-12', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -178,12 +170,12 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    container:
+      image: aswf/ci-openvdb:2024
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
-        run: |
-          sudo apt-get update
-          sudo apt-get -q install -y libgtest-dev
+        run: ./ci/install_gtest.sh 1.15.2
       - name: build_and_test
         run: |
           cd nanovdb/nanovdb

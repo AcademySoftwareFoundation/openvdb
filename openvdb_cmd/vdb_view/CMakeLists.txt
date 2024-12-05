@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(VDBView LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -45,4 +45,4 @@ endif()
 
 target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
 
-install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_view RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})

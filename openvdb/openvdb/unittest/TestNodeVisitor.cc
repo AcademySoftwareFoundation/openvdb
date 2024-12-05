@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
@@ -22,7 +22,7 @@ struct NodeCountOp
         counts[level]++;
     }
 
-    std::vector<openvdb::Index32> counts;
+    std::vector<openvdb::Index64> counts;
 }; // struct NodeCountOp
 
 
@@ -35,10 +35,14 @@ TEST_F(TestNodeVisitor, testNodeCount)
     NodeCountOp nodeCountOp;
     tools::visitNodesDepthFirst(grid->tree(), nodeCountOp);
 
-    std::vector<Index32> nodeCount1 = nodeCountOp.counts;
+    std::vector<Index64> nodeCount1 = nodeCountOp.counts;
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
+    std::vector<Index64> nodeCount2 = grid->tree().nodeCount();
+#else
     std::vector<Index32> nodeCount2 = grid->tree().nodeCount();
+#endif
 
-    EXPECT_EQ(nodeCount1.size(), nodeCount2.size());
+    EXPECT_EQ(nodeCount1.size(), Index64(nodeCount2.size()));
 
     for (size_t i = 0; i < nodeCount1.size(); i++) {
         EXPECT_EQ(nodeCount1[i], nodeCount2[i]);
@@ -55,7 +59,7 @@ struct LeafCountOp
     void operator()(const NodeT&, size_t) { }
     void operator()(const LeafT&, size_t) { count++; }
 
-    openvdb::Index32 count{0};
+    openvdb::Index64 count{0};
 }; // struct LeafCountOp
 
 
@@ -94,7 +98,7 @@ struct DescendOp
     }
 
     openvdb::Index32 previousLevel{0};
-    openvdb::Index32 count{0};
+    openvdb::Index64 count{0};
 }; // struct DescendOp
 
 
@@ -142,9 +146,14 @@ TEST_F(TestNodeVisitor, testOriginArray)
 
     FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
 
+    Index64 totalNodeCount(0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 12
+    std::vector<Index64> nodeCount = grid->tree().nodeCount();
+    for (Index64 count : nodeCount)     totalNodeCount += count;
+#else
     std::vector<Index32> nodeCount = grid->tree().nodeCount();
-    Index32 totalNodeCount(0);
-    for (Index32 count : nodeCount)     totalNodeCount += count;
+    for (Index32 count : nodeCount)     totalNodeCount += Index64(count);
+#endif
 
     // use an offset
     size_t offset = 10;
@@ -203,12 +212,12 @@ TEST_F(TestNodeVisitor, testPartialDeactivate)
     DeactivateOp<FloatTree> deactivateOp;
     tools::DepthFirstNodeVisitor<NodeT>::visit(*iter, deactivateOp);
 
-    EXPECT_EQ(Index32(1413), grid->tree().leafCount());
+    EXPECT_EQ(Index64(1413), grid->tree().leafCount());
 
     tools::pruneInactive(grid->tree());
 
     // a subset of the leaf nodes have now been deactivated and removed
-    EXPECT_EQ(Index32(1195), grid->tree().leafCount());
+    EXPECT_EQ(Index64(1195), grid->tree().leafCount());
 }
 
 

@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[.rst:
 
@@ -57,7 +57,7 @@ The following functions are provided:
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 
 function(OPENVDB_GET_VERSION_DEFINE HEADER KEY VALUE)

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointScatter.h>
@@ -36,7 +36,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         BoolGrid grid;
         grid.sparseFill(boxBounds, false, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -44,7 +44,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         DoubleGrid grid;
         grid.sparseFill(boxBounds, 0.0, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -52,7 +52,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         FloatGrid grid;
         grid.sparseFill(boxBounds, 0.0f, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -60,7 +60,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         Int32Grid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -68,7 +68,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         Int64Grid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -76,7 +76,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         MaskGrid grid;
         grid.sparseFill(boxBounds, /*maskBuffer*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -84,7 +84,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         Vec3DGrid grid;
         grid.sparseFill(boxBounds, Vec3d(), /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -92,7 +92,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         Vec3IGrid grid;
         grid.sparseFill(boxBounds, Vec3i(), /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -100,7 +100,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         Vec3SGrid grid;
         grid.sparseFill(boxBounds, Vec3f(), /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -108,7 +108,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         PointDataGrid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::uniformPointScatter(grid, total);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(total, pointCount(points->tree()));
     }
@@ -128,7 +128,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
         BoolGrid grid;
         grid.sparseFill(boxBounds, false, /*active*/true);
         auto points = points::uniformPointScatter(grid, 1);
-        EXPECT_EQ(Index32(1), points->tree().leafCount());
+        EXPECT_EQ(Index64(1), points->tree().leafCount());
         EXPECT_EQ(Index64(1), points->activeVoxelCount());
         EXPECT_EQ(Index64(1), pointCount(points->tree()));
     }
@@ -145,7 +145,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
     auto points = points::uniformPointScatter(grid, total);
 
     EXPECT_EQ(Index64(0), points->tree().activeTileCount());
-    EXPECT_EQ(Index32(1), points->tree().leafCount());
+    EXPECT_EQ(Index64(1), points->tree().leafCount());
     EXPECT_TRUE(Index64(NUM_VALUES) > points->tree().activeVoxelCount());
     EXPECT_EQ(total, pointCount(points->tree()));
 
@@ -226,7 +226,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
 
     points = points::uniformPointScatter<BoolGrid, mt11213b>(grid, total);
 
-    EXPECT_EQ(Index32(1), points->tree().leafCount());
+    EXPECT_EQ(Index64(1), points->tree().leafCount());
     EXPECT_TRUE(Index64(NUM_VALUES) > points->tree().activeVoxelCount());
     EXPECT_EQ(total, pointCount(points->tree()));
 
@@ -234,7 +234,7 @@ TEST_F(TestPointScatter, testUniformPointScatter)
 
     points = points::uniformPointScatter(grid, Index64(NUM_VALUES));
 
-    EXPECT_EQ(Index32(1), points->tree().leafCount());
+    EXPECT_EQ(Index64(1), points->tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES), points->activeVoxelCount());
     EXPECT_EQ(Index64(NUM_VALUES), pointCount(points->tree()));
 
@@ -262,7 +262,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         BoolGrid grid;
         grid.sparseFill(boxBounds, false, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -270,7 +270,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         DoubleGrid grid;
         grid.sparseFill(boxBounds, 0.0, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -278,7 +278,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         FloatGrid grid;
         grid.sparseFill(boxBounds, 0.0f, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -286,7 +286,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         Int32Grid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -294,7 +294,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         Int64Grid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -302,7 +302,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         MaskGrid grid;
         grid.sparseFill(boxBounds, /*maskBuffer*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -310,7 +310,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         Vec3DGrid grid;
         grid.sparseFill(boxBounds, Vec3d(), /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -318,7 +318,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         Vec3IGrid grid;
         grid.sparseFill(boxBounds, Vec3i(), /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -326,7 +326,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         Vec3SGrid grid;
         grid.sparseFill(boxBounds, Vec3f(), /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -334,7 +334,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         PointDataGrid grid;
         grid.sparseFill(boxBounds, 0, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -354,7 +354,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
         BoolGrid grid;
         grid.sparseFill(boxBounds, false, /*active*/true);
         auto points = points::denseUniformPointScatter(grid, 0.8f);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         // Note that a value of 22 is precomputed as the number of active
         // voxels/points produced by a value of 0.8
         EXPECT_EQ(Index64(22), points->activeVoxelCount());
@@ -373,7 +373,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
 
     const Index32 NUM_VALUES = BoolGrid::TreeType::LeafNodeType::NUM_VALUES;
 
-    EXPECT_EQ(Index32(1), grid.tree().leafCount());
+    EXPECT_EQ(Index64(1), grid.tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), grid.activeVoxelCount());
 
     auto points = points::denseUniformPointScatter(grid, pointsPerVoxel);
@@ -381,7 +381,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
     const Index64 expectedCount = Index64(pointsPerVoxel * (NUM_VALUES + 1));
 
     EXPECT_EQ(Index64(0), points->tree().activeTileCount());
-    EXPECT_EQ(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index64(2), points->tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     EXPECT_EQ(expectedCount, pointCount(points->tree()));
 
@@ -462,7 +462,7 @@ TEST_F(TestPointScatter, testDenseUniformPointScatter)
 
     points = points::denseUniformPointScatter<BoolGrid, mt11213b>(grid, pointsPerVoxel);
 
-    EXPECT_EQ(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index64(2), points->tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     EXPECT_EQ(expectedCount, pointCount(points->tree()));
 }
@@ -480,7 +480,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, false, /*active*/true);
         grid.sparseFill(activeBoxBounds, true, /*active*/true);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -489,7 +489,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, 0.0, /*active*/true);
         grid.sparseFill(activeBoxBounds, 1.0, /*active*/true);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -498,7 +498,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, 0.0f, /*active*/true);
         grid.sparseFill(activeBoxBounds, 1.0f, /*active*/true);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -507,7 +507,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, 0, /*active*/true);
         grid.sparseFill(activeBoxBounds, 1, /*active*/true);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -516,7 +516,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, 0, /*active*/true);
         grid.sparseFill(activeBoxBounds, 1, /*active*/true);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -525,7 +525,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
         grid.sparseFill(totalBoxBounds, /*maskBuffer*/0);
         grid.sparseFill(activeBoxBounds, /*maskBuffer*/1);
         auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
-        EXPECT_EQ(Index32(8), points->tree().leafCount());
+        EXPECT_EQ(Index64(8), points->tree().leafCount());
         EXPECT_EQ(Index64(27), points->activeVoxelCount());
         EXPECT_EQ(Index64(pointsPerVoxel * 27), pointCount(points->tree()));
     }
@@ -543,7 +543,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
 
     const Index32 NUM_VALUES = BoolGrid::TreeType::LeafNodeType::NUM_VALUES;
 
-    EXPECT_EQ(Index32(1), grid.tree().leafCount());
+    EXPECT_EQ(Index64(1), grid.tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), grid.activeVoxelCount());
 
     auto points = points::nonUniformPointScatter(grid, pointsPerVoxel);
@@ -551,7 +551,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
     const Index64 expectedCount = Index64(pointsPerVoxel * (NUM_VALUES + 1));
 
     EXPECT_EQ(Index64(0), points->tree().activeTileCount());
-    EXPECT_EQ(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index64(2), points->tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     EXPECT_EQ(expectedCount, pointCount(points->tree()));
 
@@ -637,7 +637,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
 
     points = points::nonUniformPointScatter(countGrid, pointsPerVoxel);
 
-    EXPECT_EQ(Index32(1), points->tree().leafCount());
+    EXPECT_EQ(Index64(1), points->tree().leafCount());
     EXPECT_EQ(Index64(7), points->activeVoxelCount());
     EXPECT_EQ(Index64(pointsPerVoxel * 28), pointCount(points->tree()));
 
@@ -656,7 +656,7 @@ TEST_F(TestPointScatter, testNonUniformPointScatter)
 
     points = points::nonUniformPointScatter<BoolGrid, mt11213b>(grid, pointsPerVoxel);
 
-    EXPECT_EQ(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index64(2), points->tree().leafCount());
     EXPECT_EQ(Index64(NUM_VALUES + 1), points->activeVoxelCount());
     EXPECT_EQ(expectedCount, pointCount(points->tree()));
 }

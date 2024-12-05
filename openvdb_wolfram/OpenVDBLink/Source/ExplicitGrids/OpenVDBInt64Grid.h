@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDBLINK_EXPLICITGRIDS_OPENVDBINT64GRID_HAS_BEEN_INCLUDED
 #define OPENVDBLINK_EXPLICITGRIDS_OPENVDBINT64GRID_HAS_BEEN_INCLUDED

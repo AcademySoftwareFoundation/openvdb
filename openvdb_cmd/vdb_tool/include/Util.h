@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 ////////////////////////////////////////////////////////////////////////////////
 ///
@@ -375,6 +375,31 @@ inline bool isLittleEndian()
 {
     unsigned int tmp = 1;
     return (*(char *)&tmp == 1);
+}
+
+/// @brief invert endianess of a type
+/// @tparam T Template type to be inverted
+/// @param val value to be inverted
+/// @return value with reverse bytes
+template <typename T>
+inline T swapBytes(T val)
+{
+    T tmp;
+    for (char *src=(char*)&val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T);src!=end; *dst-- = *src++);
+    return tmp;
+}
+
+/// @brief invert endianess of an array of values of a specific type
+/// @tparam T Template type to be inverted
+/// @param val pointer to array with values to be inverted
+/// @param n number of elements in the array
+template <typename T>
+inline void swapBytes(T *val, int n)
+{
+    for (T tmp, *last = val + n; val < last; ++val) {
+        for (char *src=(char*)val, *dst=(char*)(&tmp)+sizeof(T)-1, *end=src+sizeof(T); src!=end; *dst-- = *src++);
+        *val = tmp;
+    }
 }
 
 /// @brief return a pseudo random uuid string.

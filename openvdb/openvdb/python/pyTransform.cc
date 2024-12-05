@@ -1,26 +1,19 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
-#include <pybind11/pybind11.h>
-#include <pybind11/operators.h>
-#include <pybind11/cast.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/operators.h>
+#include <nanobind/stl/string.h>
+#include <nanobind/stl/vector.h>
+#include <nanobind/stl/shared_ptr.h>
+#include <nanobind/stl/tuple.h>
 #include <openvdb/openvdb.h>
 #include "pyTypeCasters.h"
 
-namespace py = pybind11;
+namespace nb = nanobind;
 using namespace openvdb::OPENVDB_VERSION_NAME;
 
 namespace pyTransform {
-
-inline void scale1(math::Transform& t, double s) { t.preScale(s); }
-inline void scale3(math::Transform& t, const Vec3d& xyz) { t.preScale(xyz); }
-
-inline Vec3d voxelDim0(math::Transform& t) { return t.voxelSize(); }
-inline Vec3d voxelDim1(math::Transform& t, const Vec3d& p) { return t.voxelSize(p); }
-
-inline double voxelVolume0(math::Transform& t) { return t.voxelVolume(); }
-inline double voxelVolume1(math::Transform& t, const Vec3d& p) { return t.voxelVolume(p); }
 
 inline Vec3d indexToWorld(math::Transform& t, const Vec3d& p) { return t.indexToWorld(p); }
 inline Vec3d worldToIndex(math::Transform& t, const Vec3d& p) { return t.worldToIndex(p); }
@@ -67,7 +60,7 @@ createLinearTransform(const std::vector<std::vector<double> >& sequence)
         }
     }
     if (!is4x4Seq) {
-        throw py::value_error("expected a 4 x 4 sequence of numeric values");
+        throw nb::value_error("expected a 4 x 4 sequence of numeric values");
     }
 
     return math::Transform::createLinearTransform(m);
@@ -91,17 +84,18 @@ struct PickleSuite
     enum { STATE_MAJOR = 0, STATE_MINOR, STATE_FORMAT, STATE_XFORM };
 
     /// Return a tuple representing the state of the given Transform.
-    static py::tuple getState(const math::Transform& xform)
+    static std::tuple<uint32_t, uint32_t, uint32_t, nb::bytes> getState(const math::Transform& xform)
     {
         std::ostringstream ostr(std::ios_base::binary);
         // Serialize the Transform to a string.
         xform.write(ostr);
 
+        nb::bytes bytesObj(ostr.str().c_str(), ostr.str().length());
+
         // Construct a state tuple comprising the version numbers of
         // the serialization format and the serialized Transform.
         // Convert the byte string to a "bytes" sequence.
-        py::bytes bytesObj(ostr.str());
-        return py::make_tuple(
+        return std::make_tuple(
             uint32_t(OPENVDB_LIBRARY_MAJOR_VERSION),
             uint32_t(OPENVDB_LIBRARY_MINOR_VERSION),
             uint32_t(OPENVDB_FILE_VERSION),
@@ -109,48 +103,23 @@ struct PickleSuite
     }
 
     /// Restore the given Transform to a saved state.
-    static math::Transform setState(py::tuple state)
+    static void setState(math::Transform& xform, const std::tuple<uint32_t, uint32_t, uint32_t, nb::bytes>& state)
     {
-        bool badState = (py::len(state) != 4);
-
         openvdb::VersionId libVersion;
         uint32_t formatVersion = 0;
-        if (!badState) {
-            // Extract the serialization format version numbers.
-            const int idx[3] = { STATE_MAJOR, STATE_MINOR, STATE_FORMAT };
-            uint32_t version[3] = { 0, 0, 0 };
-            for (int i = 0; i < 3 && !badState; ++i) {
-                if (py::isinstance<py::int_>(state[idx[i]]))
-                    version[i] = py::cast<uint32_t>(state[idx[i]]);
-                else badState = true;
-            }
-            libVersion.first = version[0];
-            libVersion.second = version[1];
-            formatVersion = version[2];
-        }
 
-        std::string serialized;
-        if (!badState) {
-            // Extract the sequence containing the serialized Transform.
-            py::object bytesObj = state[int(STATE_XFORM)];
-            if (py::isinstance<py::bytes>(bytesObj))
-                serialized = py::cast<py::bytes>(bytesObj);
-            else badState = true;
-        }
+        libVersion.first = std::get<0>(state);
+        libVersion.second = std::get<1>(state);
+        formatVersion = std::get<2>(state);
 
-        if (badState) {
-            std::ostringstream os;
-            os << "expected (int, int, int, bytes) tuple in call to __setstate__; found ";
-            os << py::cast<std::string>(state.attr("__repr__")());
-            throw py::value_error(os.str());
-        }
+        nb::bytes bytesObj = std::get<3>(state);
+        std::string serialized(bytesObj.c_str(), bytesObj.c_str() + bytesObj.size());
 
         // Restore the internal state of the C++ object.
         std::istringstream istr(serialized, std::ios_base::binary);
         io::setVersion(istr, libVersion, formatVersion);
-        math::Transform xform;
+        new (&xform) math::Transform;
         xform.read(istr);
-        return xform;
     }
 }; // struct PickleSuite
 
@@ -158,102 +127,97 @@ struct PickleSuite
 
 
 void
-exportTransform(py::module_ m)
+exportTransform(nb::module_ m)
 {
-    py::enum_<math::Axis>(m, "Axis")
+    nb::enum_<math::Axis>(m, "Axis")
         .value("X", math::X_AXIS)
         .value("Y", math::Y_AXIS)
         .value("Z", math::Z_AXIS)
         .export_values();
 
-    py::class_<math::Transform, math::Transform::Ptr>(m, "Transform")
-        .def(py::init<>())
+    nb::class_<math::Transform>(m, "Transform")
+        .def(nb::init<>())
 
         .def("deepCopy", &math::Transform::copy,
-            "deepCopy() -> Transform\n\n"
             "Return a copy of this transform.")
 
         /// @todo Should this also be __str__()?
         .def("info", &pyTransform::info,
-            "info() -> str\n\n"
-            "Return a string containing a description of this transform.\n")
+            "Return a string containing a description of this transform.")
 
-        .def(py::pickle(&pyTransform::PickleSuite::getState, &pyTransform::PickleSuite::setState))
+        .def("__getstate__", &pyTransform::PickleSuite::getState)
+        .def("__setstate__", &pyTransform::PickleSuite::setState)
 
-        .def_property_readonly("typeName", &math::Transform::mapType,
+        .def_prop_ro("typeName", &math::Transform::mapType,
             "name of this transform's type")
-        .def_property_readonly("isLinear", &math::Transform::isLinear,
+        .def_prop_ro("isLinear", &math::Transform::isLinear,
             "True if this transform is linear")
 
-        .def("rotate", &math::Transform::preRotate,
-            py::arg("radians"), py::arg("axis") = math::X_AXIS,
-            "rotate(radians, axis)\n\n"
-            "Accumulate a rotation about either Axis.X, Axis.Y or Axis.Z.")
-        .def("translate", &math::Transform::postTranslate, py::arg("xyz"),
-            "translate((x, y, z))\n\n"
-            "Accumulate a translation.")
-        .def("scale", &pyTransform::scale1, py::arg("s"),
-            "scale(s)\n\n"
-            "Accumulate a uniform scale.")
-        .def("scale", &pyTransform::scale3, py::arg("sxyz"),
-            "scale((sx, sy, sz))\n\n"
-            "Accumulate a nonuniform scale.")
-        .def("shear", &math::Transform::preShear,
-            py::arg("s"), py::arg("axis0"), py::arg("axis1"),
-            "shear(s, axis0, axis1)\n\n"
-            "Accumulate a shear (axis0 and axis1 are either\n"
-            "Axis.X, Axis.Y or Axis.Z).")
+        .def("preRotate", &math::Transform::preRotate,
+            nb::arg("radians"), nb::arg("axis") = math::X_AXIS,
+            "Prepend a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("preTranslate", &math::Transform::preTranslate, nb::arg("xyz"),
+            "Prepend a translation.")
+        .def("preScale", nb::overload_cast<double>(&math::Transform::preScale), nb::arg("s"),
+            "Prepend a uniform scale.")
+        .def("preScale", nb::overload_cast<const Vec3d&>(&math::Transform::preScale), nb::arg("sxyz"),
+            "Prepend a nonuniform scale.")
+        .def("preShear", &math::Transform::preShear,
+            nb::arg("s"), nb::arg("axis0"), nb::arg("axis1"),
+            "Prepend a shear (axis0 and axis1 are either Axis.X, Axis.Y or Axis.Z).")
 
-        .def("voxelSize", &pyTransform::voxelDim0,
-            "voxelSize() -> (dx, dy, dz)\n\n"
+        .def("postRotate", &math::Transform::postRotate,
+            nb::arg("radians"), nb::arg("axis") = math::X_AXIS,
+            "Postfix a rotation about either Axis.X, Axis.Y or Axis.Z.")
+        .def("postTranslate", &math::Transform::postTranslate, nb::arg("xyz"),
+            "Postfix a translation.")
+        .def("postScale", nb::overload_cast<double>(&math::Transform::postScale), nb::arg("s"),
+            "Postfix a uniform scale.")
+        .def("postScale", nb::overload_cast<const Vec3d&>(&math::Transform::postScale), nb::arg("sxyz"),
+            "Postfix a nonuniform scale.")
+        .def("postShear", &math::Transform::postShear,
+            nb::arg("s"), nb::arg("axis0"), nb::arg("axis1"),
+            "Postfix a shear (axis0 and axis1 are either Axis.X, Axis.Y or Axis.Z).")
+
+        .def("voxelSize", nb::overload_cast<>(&math::Transform::voxelSize, nb::const_),
             "Return the size of voxels of the linear component of this transform.")
-        .def("voxelSize", &pyTransform::voxelDim1, py::arg("xyz"),
-            "voxelSize((x, y, z)) -> (dx, dy, dz)\n\n"
+        .def("voxelSize", nb::overload_cast<const Vec3d&>(&math::Transform::voxelSize, nb::const_), nb::arg("xyz"),
             "Return the size of the voxel at position (x, y, z).")
 
-        .def("voxelVolume", &pyTransform::voxelVolume0,
-            "voxelVolume() -> float\n\n"
+        .def("voxelVolume", nb::overload_cast<>(&math::Transform::voxelVolume, nb::const_),
             "Return the voxel volume of the linear component of this transform.")
-        .def("voxelVolume", &pyTransform::voxelVolume1, py::arg("xyz"),
-            "voxelVolume((x, y, z)) -> float\n\n"
+        .def("voxelVolume", nb::overload_cast<const Vec3d&>(&math::Transform::voxelVolume, nb::const_), nb::arg("xyz"),
             "Return the voxel volume at position (x, y, z).")
 
-        .def("indexToWorld", &pyTransform::indexToWorld, py::arg("xyz"),
-            "indexToWorld((x, y, z)) -> (x', y', z')\n\n"
+        .def("indexToWorld", &pyTransform::indexToWorld, nb::arg("xyz"),
             "Apply this transformation to the given coordinates.")
-        .def("worldToIndex", &pyTransform::worldToIndex, py::arg("xyz"),
-            "worldToIndex((x, y, z)) -> (x', y', z')\n\n"
+        .def("worldToIndex", &pyTransform::worldToIndex, nb::arg("xyz"),
             "Apply the inverse of this transformation to the given coordinates.")
         .def("worldToIndexCellCentered", &pyTransform::worldToIndexCellCentered,
-            py::arg("xyz"),
-            "worldToIndexCellCentered((x, y, z)) -> (i, j, k)\n\n"
+            nb::arg("xyz"),
             "Apply the inverse of this transformation to the given coordinates\n"
             "and round the result to the nearest integer coordinates.")
         .def("worldToIndexNodeCentered", &pyTransform::worldToIndexNodeCentered,
-            py::arg("xyz"),
-            "worldToIndexNodeCentered((x, y, z)) -> (i, j, k)\n\n"
+            nb::arg("xyz"),
             "Apply the inverse of this transformation to the given coordinates\n"
             "and round the result down to the nearest integer coordinates.")
 
         // Allow Transforms to be compared for equality and inequality.
-        .def(py::self == py::self)
-        .def(py::self != py::self);
+        .def(nb::self == nb::self)
+        .def(nb::self != nb::self);
 
-    m.def("createLinearTransform", py::overload_cast<double>(&pyTransform::createLinearTransform),
-        py::arg("voxelSize") = 1.0,
-        "createLinearTransform(voxelSize) -> Transform\n\n"
+    m.def("createLinearTransform", nb::overload_cast<double>(&pyTransform::createLinearTransform),
+        nb::arg("voxelSize") = 1.0,
         "Create a new linear transform with the given uniform voxel size.");
 
-    m.def("createLinearTransform", py::overload_cast<const std::vector<std::vector<double> >&>(&pyTransform::createLinearTransform), py::arg("matrix"),
-        "createLinearTransform(matrix) -> Transform\n\n"
+    m.def("createLinearTransform", nb::overload_cast<const std::vector<std::vector<double> >&>(&pyTransform::createLinearTransform), nb::arg("matrix"),
         "Create a new linear transform from a 4 x 4 matrix given as a sequence\n"
         "of the form [[a, b, c, d], [e, f, g, h], [i, j, k, l], [m, n, o, p]],\n"
         "where [m, n, o, p] is the translation component.");
 
     m.def("createFrustumTransform", &pyTransform::createFrustum,
-        py::arg("xyzMin"), py::arg("xyzMax"),
-         py::arg("taper"), py::arg("depth"), py::arg("voxelSize") = 1.0,
-        "createFrustumTransform(xyzMin, xyzMax, taper, depth, voxelSize) -> Transform\n\n"
+        nb::arg("xyzMin"), nb::arg("xyzMax"),
+         nb::arg("taper"), nb::arg("depth"), nb::arg("voxelSize") = 1.0,
         "Create a new frustum transform with unit bounding box (xyzMin, xyzMax)\n"
         "and the given taper, depth and uniform voxel size.");
 }

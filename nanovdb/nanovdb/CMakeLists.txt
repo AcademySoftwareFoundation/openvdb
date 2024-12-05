@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
@@ -26,6 +26,7 @@ option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" OFF)
 #option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
+option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
@@ -73,18 +74,16 @@ endif()
 
 #if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
 if(NANOVDB_BUILD_UNITTESTS)
-  find_package(GTest REQUIRED)
+  find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_CUDA)
   set(CMAKE_CUDA_STANDARD 17)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-    # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-      set(CMAKE_CUDA_ARCHITECTURES 75)
-    endif()
+  # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
+  if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    set(CMAKE_CUDA_ARCHITECTURES 75)
   endif()
 
   enable_language(CUDA)
@@ -123,15 +122,15 @@ if(NANOVDB_USE_OPENVDB)
 endif()
 
 if(NANOVDB_USE_TBB AND NOT TARGET TBB::tbb)
-  find_package(TBB REQUIRED)
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_BLOSC AND NOT TARGET Blosc::blosc)
-  find_package(Blosc REQUIRED)
+  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
-  find_package(ZLIB REQUIRED)
+  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)
@@ -321,16 +320,16 @@ if(TARGET Threads::Threads)
   target_link_libraries(nanovdb INTERFACE Threads::Threads)
 endif()
 
-set(NANOVDB_INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
-set(NANOVDB_INSTALL_CUDA_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/cuda)
-set(NANOVDB_INSTALL_IO_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/io)
-set(NANOVDB_INSTALL_MATH_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/math)
-set(NANOVDB_INSTALL_TOOLS_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/tools)
+set(NANOVDB_INSTALL_ROOT_DIR ${NANOVDB_INSTALL_INCLUDEDIR}/nanovdb)
+set(NANOVDB_INSTALL_CUDA_DIR ${NANOVDB_INSTALL_ROOT_DIR}/cuda)
+set(NANOVDB_INSTALL_IO_DIR ${NANOVDB_INSTALL_ROOT_DIR}/io)
+set(NANOVDB_INSTALL_MATH_DIR ${NANOVDB_INSTALL_ROOT_DIR}/math)
+set(NANOVDB_INSTALL_TOOLS_DIR ${NANOVDB_INSTALL_ROOT_DIR}/tools)
 set(NANOVDB_INSTALL_TOOLS_CUDA_DIR ${NANOVDB_INSTALL_TOOLS_DIR}/cuda)
-set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_INCLUDE_DIR}/util)
+set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_ROOT_DIR}/util)
 set(NANOVDB_INSTALL_UTIL_CUDA_DIR ${NANOVDB_INSTALL_UTIL_DIR}/cuda)
 
-install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDE_DIR})
+install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_ROOT_DIR})
 install(FILES ${NANOVDB_INCLUDE_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_CUDA_DIR})
 install(FILES ${NANOVDB_INCLUDE_IO_FILES} DESTINATION ${NANOVDB_INSTALL_IO_DIR})
 install(FILES ${NANOVDB_INCLUDE_MATH_FILES} DESTINATION ${NANOVDB_INSTALL_MATH_DIR})
@@ -353,4 +352,8 @@ endif()
 
 if(NANOVDB_BUILD_EXAMPLES)
   add_subdirectory(examples)
+endif()
+
+if(NANOVDB_BUILD_PYTHON_MODULE)
+  add_subdirectory(python)
 endif()

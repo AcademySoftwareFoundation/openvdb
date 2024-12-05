@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(VDBRender LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -17,11 +17,11 @@ if(USE_PNG)
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(Imath CONFIG REQUIRED)
+  find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
 endif()
 
 if(USE_EXR)
-  find_package(OpenEXR CONFIG REQUIRED)
+  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} CONFIG REQUIRED)
 endif()
 
 set(SOURCE_FILES main.cc)
@@ -51,4 +51,4 @@ target_link_libraries(vdb_render
   $<TARGET_NAME_IF_EXISTS:PNG::PNG>
 )
 
-install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_render RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})

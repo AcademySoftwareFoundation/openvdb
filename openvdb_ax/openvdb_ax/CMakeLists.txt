@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # There is a bug introduced with LLVM 14 config files which causes CMake to
 # complain if the project is not init-ted with LANGUAGES C
@@ -354,23 +354,23 @@ if(OPENVDB_AX_SHARED)
   endif()
 endif()
 
-install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
-install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
-install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
-install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
+install(FILES ax.h Exceptions.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb_ax/)
+install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
+install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
+install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
 
 if(OPENVDB_AX_STATIC)
   install(TARGETS openvdb_ax_static
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
   )
 endif()
 
 if(OPENVDB_AX_SHARED)
   install(TARGETS openvdb_ax_shared
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
   )
 endif()

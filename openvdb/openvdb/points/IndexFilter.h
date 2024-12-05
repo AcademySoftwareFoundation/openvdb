@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file points/IndexFilter.h
 ///
@@ -245,7 +245,7 @@ public:
         std::mt19937 generator(seed);
         std::uniform_int_distribution<unsigned int> dist(0, std::numeric_limits<unsigned int>::max() - 1);
 
-        Index32 leafCounter = 0;
+        Index64 leafCounter = 0;
         float totalPointsFloat = 0.0f;
         int totalPoints = 0;
         for (auto iter = tree.cbeginLeaf(); iter; ++iter) {
