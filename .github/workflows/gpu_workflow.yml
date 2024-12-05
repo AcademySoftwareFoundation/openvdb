@@ -7,9 +7,9 @@ on:
       - RB-0.*
       - RB-1.*
       - gh-pages
-    tags-ignore:
-      - v0.*
-      - v1.*
+  pull_request:
+    branches:
+        - '**'
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -19,7 +19,6 @@ jobs:
   linux_gpu:
     name: 'Linux CentOS 7 VFX CY2020 GPU <GCC 6.3.1>'
     # Don't run on OCIO forks
-    if: github.repository == 'AcademySoftwareFoundation/openvdb'
     # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in 
     # AWS CodeBuild project.
     # TODO: Add support for dynamic GH Action defined CodeBuild 
