@@ -1,3 +1,6 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
 # Running a Github Action Runner, the first argument
 
 # Starting a dockerd

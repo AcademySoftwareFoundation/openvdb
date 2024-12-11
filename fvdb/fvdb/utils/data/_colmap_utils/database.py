@@ -1,4 +1,6 @@
-import os
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
 import sqlite3
 
 import numpy as np

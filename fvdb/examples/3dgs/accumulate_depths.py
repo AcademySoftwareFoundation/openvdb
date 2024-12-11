@@ -1,4 +1,6 @@
-import matplotlib.pyplot as plt
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
 import numpy as np
 import point_cloud_utils as pcu
 import torch

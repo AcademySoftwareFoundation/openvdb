@@ -1,4 +1,6 @@
 # Author: True Price <jtprice at cs.unc.edu>
+# SPDX-License-Identifier: Apache-2.0
+#
 
 import numpy as np
 from scipy.optimize import root

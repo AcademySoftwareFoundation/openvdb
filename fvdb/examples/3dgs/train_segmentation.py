@@ -1,9 +1,12 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import itertools
 import time
 from dataclasses import dataclass
 from typing import Union
 
-import matplotlib.pyplot as plt
 import torch
 import tqdm
 import tyro

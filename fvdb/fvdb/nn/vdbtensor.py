@@ -2,13 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Optional, Tuple, Union
 
 import torch
 
 import fvdb
 from fvdb import GridBatch, JaggedTensor, SparseConvPackInfo
 from fvdb.types import Vec3dBatch, Vec3dBatchOrScalar, Vec3i
+
+JaggedTensorOrTensor = Union[torch.Tensor, JaggedTensor]
 
 
 @dataclass
@@ -203,6 +205,22 @@ class VDBTensor:
         else:
             op(self.data, other)
             return self
+
+    # -----------------------
+    # Interpolation functions
+    # -----------------------
+
+    def sample_bezier(self, points: JaggedTensorOrTensor) -> JaggedTensor:
+        return self.grid.sample_bezier(points, self.data)
+
+    def sample_bezier_with_grad(self, points: JaggedTensorOrTensor) -> Tuple[JaggedTensor, JaggedTensor]:
+        return self.grid.sample_bezier_with_grad(points, self.data)
+
+    def sample_trilinear(self, points: JaggedTensorOrTensor) -> JaggedTensor:
+        return self.grid.sample_trilinear(points, self.data)
+
+    def sample_trilinear_with_grad(self, points: JaggedTensorOrTensor) -> Tuple[JaggedTensor, JaggedTensor]:
+        return self.grid.sample_trilinear_with_grad(points, self.data)
 
     def cpu(self):
         return VDBTensor(self.grid.to("cpu"), self.data.cpu(), self.kmap.cpu() if self.kmap is not None else None)

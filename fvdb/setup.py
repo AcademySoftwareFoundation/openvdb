@@ -265,8 +265,12 @@ if __name__ == "__main__":
     for arch_flag in cpp_extension._get_cuda_arch_flags():
         match = re.search(r"code=sm_(\d+)", arch_flag)
         if match:
-            if int(match.group(1)) < 80:
-                raise RuntimeError("ƒVDB requires a minimum compute capability of 8.0 (Ampere)")
+            cuda_arch = int(match.group(1))
+            if cuda_arch < 70:
+                raise RuntimeError(
+                    f"""A CUDA arch build target of {cuda_arch/10} was specified but ƒVDB must be built for at least compute capability 7.0 (Volta generation).
+                    Please set TORCH_CUDA_ARCH_LIST to a list of supported architectures >=7.0."""
+                )
 
     external_dir = get_external_dir()
 
@@ -356,6 +360,7 @@ if __name__ == "__main__":
         packages=[
             "fvdb",
             "fvdb.nn",
+            "fvdb.optim",
             "fvdb.utils",
             "fvdb.utils.examples",
             "fvdb.utils.tests",

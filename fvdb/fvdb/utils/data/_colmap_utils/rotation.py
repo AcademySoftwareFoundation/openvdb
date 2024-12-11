@@ -1,4 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
 # Author: True Price <jtprice at cs.unc.edu>
+#
 
 import numpy as np
 

@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
 """Script to download benchmark dataset(s)"""
 
 import os

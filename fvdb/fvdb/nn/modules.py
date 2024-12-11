@@ -268,10 +268,26 @@ class SparseConv3d(nn.Module):
 
         backend = self.backend
 
+        sm_arch = torch.cuda.get_device_capability()[0] + torch.cuda.get_device_capability()[1] / 10
+        # tf32 requires compute capability >= 8.0 (Ampere)
         if self.allow_tf32 and self.weight.is_cuda:
             assert (
-                torch.cuda.get_device_capability()[0] >= 8
+                sm_arch >= 8
             ), "TF32 requires GPU with compute capability >= 8.0. Please set fvdb.nn.SparseConv3d.allow_tf32 = False."
+
+        # bf16 requires compute capability >= 8.0 (Ampere)
+        if self.weight.is_cuda and self.weight.dtype == torch.bfloat16:
+            assert sm_arch >= 8, "BF16 requires GPU with compute capability >= 8.0."
+
+        # float16 requires compute capability >= 7.5 (Turing)
+        if self.weight.is_cuda and self.weight.dtype == torch.float16:
+            assert sm_arch >= 7.5, "FP16 requires GPU with compute capability >= 7.5."
+
+        # cutlass, lggs, halo backends require compute capability >= 8.0 (Ampere)
+        if backend in ["cutlass", "lggs", "halo"]:
+            assert (
+                torch.cuda.get_device_capability()[0] >= 8
+            ), "cutlass, LGGS and Halo backends require GPU with compute capability >= 8.0."
 
         if backend == "cutlass" and (
             (not self.weight.is_cuda) or (self.in_channels, self.out_channels) not in self.CUTLASS_SUPPORTED_CHANNELS

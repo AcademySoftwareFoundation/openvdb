@@ -1,9 +1,11 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+
 import itertools
 import sys
 
 sys.path.append("..")
-
-import numpy as np
 
 from .. import Quaternion, SceneManager
 

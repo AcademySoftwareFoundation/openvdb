@@ -1,5 +1,10 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+
 from __future__ import annotations
-from typing import List, Tuple, Union, Iterable
+
+from typing import Iterable, List, Tuple, Union
 
 import numpy
 import torch

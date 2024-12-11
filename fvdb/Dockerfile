@@ -12,6 +12,6 @@ RUN  pip install --no-cache-dir -r env/build_requirements.txt
 
 RUN if [ "$MODE" = "production" ]; then \
      MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')  \
-     TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9+PTX" \
+     TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" \
      python setup.py install; \
     fi

@@ -29,7 +29,7 @@ During the project's initial stage of release, it is necessary to [run the build
 
 ** Notes:**
 * Linux is the only platform currently supported (Ubuntu >= 20.04 recommended).
-* A CUDA-capable GPU with Ampere architecture or newer (i.e. compute capability >=8.0) is required to run the CUDA-accelerated operations in ƒVDB.
+* A CUDA-capable GPU with Ampere architecture or newer (i.e. compute capability >=8.0) is recommended to run the CUDA-accelerated operations in ƒVDB.  A GPU with compute capabililty >=7.0 (Volta architecture) is the minimum requirement but some operations and data types are not supported.
 
 
 ## Building *f*VDB from Source
@@ -60,7 +60,7 @@ docker build --build-arg  MODE=dev -t fvdb/dev .
 Running the docker container is done with the following command:
 ```shell
 # Run an interactive bash shell (or replace with your command)
-docker run -it --gpus all --rm \
+docker run -it --ipc=host --gpus all --rm \
   fvdb/dev:latest \
   /bin/bash
 ```
@@ -68,57 +68,42 @@ docker run -it --gpus all --rm \
 When running the docker container in `dev` mode and when you are ready to build ƒVDB, you can run the following command to build ƒVDB for the recommended set of CUDA architectures:
 ```shell
 MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')  \
-     TORCH_CUDA_ARCH_LIST="8.0;8.6;8.9+PTX" \
+     TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" \
      python setup.py install
 ```
 
 #### Setting up a Conda Environment
 
-In order to get resolved package versions in your conda environment consistent with our testing, it is necessary to configure your `.condarc` since not all package resolving behaviour can be controlled with an `environment.yml` file.  We recommend using `strict` channel priority in your conda configuration.  This can be done by running the following command:
+*f*VDB can be used with any Conda distribution. Below is an installation guide using
+[miniforge](https://github.com/conda-forge/miniforge). You can skip steps 1-3 if you already have a Conda installation.
+
+1. Download and Run Install Script. Copy the command below to download and run the [miniforge install script](https://github.com/conda-forge/miniforge?tab=readme-ov-file#unix-like-platforms-macos--linux):
 
 ```shell
-conda config --set channel_priority strict
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
 ```
 
-Further, it is recommend to not mix the `defaults` and `conda-forge` package channels when resolving environments.  We have generally used `conda-forge` as the primary channel for our dependencies.  You can remove the `defaults` channel and add `conda-forge` with the following command:
+2. Follow the prompts to customize Conda and run the install. Note, we recommend saying yes to enable `conda-init`.
 
-```shell
-conda config --remove channels defaults
-conda config --add channels conda-forge
-```
+3. Start Conda. Open a new terminal window, which should now show Conda initialized to the `(base)` environment.
 
-With these changes, it is recommended that your `.condarc` file looks like the following:
+4. Create the `fvdb` conda environment. Run the following command from the root of this repository:
 
-```yaml
-channel_priority: strict
-channels:
-  - conda-forge
-```
-
-
-**(Optional) Install libMamba for a huge quality of life improvement when using Conda**
-```
-conda update -n base conda
-conda install -n base conda-libmamba-solver
-conda config --set solver libmamba
-```
-
-
-Next, create the `fvdb` conda environment by running the following command from the root of this repository, and then grabbing a ☕:
 ```shell
 conda env create -f env/dev_environment.yml
 ```
 
-**Notes:**
-* You can optionally use the `env/build_environment.yml` environment file if you want a minimum set of dependencies needed just to build/package *f*VDB (note this environment won't have all the runtime dependencies needed to `import fvdb`).
-* If you would like a runtime environment which has only the packages required to run the unit tests after building ƒVDB, you can use the `env/test_environment.yml`.  This is the environment used by the CI pipeline to run the tests after building ƒVDB in the `fvdb_build` environment.
-* Use the `fvdb_learn` environment defined in `env/learn_environment.yml` if you would like an environment with the runtime requirements and the additional packages needed to run the [notebooks](notebooks) or [examples](examples) and view their visualizations.
+5. Activate the *f*VDB environment:
 
-Now activate the environment:
 ```shell
 conda activate fvdb
 ```
 
+#### Other available environments
+* `fvdb_build`: Use `env/build_environment.yml` for a minimum set of dependencies needed just to build/package *f*VDB (note this environment won't have all the runtime dependencies needed to `import fvdb`).
+* `fvdb_test`: Use `env/test_environment.yml` for a runtime environment which has only the packages required to run the unit tests after building ƒVDB. This is the environment used by the CI pipeline to run the tests after building ƒVDB in the `fvdb_build` environment.
+* `fvdb_learn`: Use `env/learn_environment.yml` for additional runtime requirements and packages needed to run the [notebooks](notebooks) or [examples](examples) and view their visualizations.
 
 ### Building *f*VDB
 
