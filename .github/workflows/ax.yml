@@ -160,7 +160,7 @@ jobs:
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ax_grammar
         path: ./build/openvdb_ax/openvdb_ax/openvdb_ax/grammar
