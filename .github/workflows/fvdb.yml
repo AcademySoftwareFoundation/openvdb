@@ -218,7 +218,7 @@ jobs:
         with:
             name: Python Benchmark with pytest-benchmark
             tool: 'pytest'
-            output-file-path: fvdb/fvdb/tests/benchmark/output.json
+            output-file-path: fvdb/tests/benchmark/output.json
             # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
             github-token: ${{ secrets.GITHUB_TOKEN }}
             auto-push: true
