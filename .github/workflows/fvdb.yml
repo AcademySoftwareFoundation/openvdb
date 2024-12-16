@@ -1,0 +1,236 @@
+name: fVDB Unit Tests
+
+on:
+  pull_request:
+    branches:
+        - 'master'
+        - 'feature/**'
+        - 'pr/**'
+    paths-ignore:
+        - 'CHANGES'
+        - 'CODEOWNERS'
+        - 'doc/**'
+        - 'openvdb/**'
+        - 'openvdb_cmd/**'
+        - 'openvdb_ax/**'
+        - 'openvdb_maya/**'
+        - 'openvdb_houdini/**'
+        - 'nanovdb/**'
+        - 'pendingchanges/**'
+        - '**.md'
+        - 'fvdb/debug/**'
+        - 'fvdb/docs/**'
+        - 'fvdb/examples/**'
+        - 'fvdb/notebooks/**'
+        - 'fvdb/scripts/**'
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  deployments: write
+
+jobs:
+  fvdb-build:
+    if: ${{ !startsWith(github.event.pull_request.title, 'Draft:') }}
+    name: fVDB Build
+    runs-on:
+      - self-hosted
+    container:
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up fvdb_build Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: "true"
+          activate-environment: fvdb_build
+          environment-file: fvdb/env/build_environment.yml
+
+
+      - name: Buid fvdb
+        run: |
+          cd fvdb;
+          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) conda run --no-capture-output -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+            name: fvdb-test-package
+            path: fvdb/dist/*.whl
+            retention-days: 2
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
+
+
+  fvdb-unit-test:
+    needs: [fvdb-build]
+    name: fVDB Unit Tests
+    runs-on:
+      - self-hosted
+    container:
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: "true"
+          activate-environment: fvdb_test
+          environment-file: fvdb/env/test_environment.yml
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+            name: fvdb-test-package
+            path: ./dist
+
+      - name: Install package
+        run: |
+            conda activate fvdb_test
+            pip install ./dist/*.whl
+
+      - name: Run tests
+        run: |
+            cd fvdb/tests;
+            pytest -v unit
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
+
+  fvdb-docs-test:
+    needs: [fvdb-build]
+    name: fVDB Documentation Tests
+    runs-on:
+      - self-hosted
+    container:
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: "true"
+          activate-environment: fvdb_test
+          environment-file: fvdb/env/test_environment.yml
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+            name: fvdb-test-package
+            path: ./dist
+
+      - name: Install package
+        run: |
+            conda activate fvdb_test
+            pip install ./dist/*.whl
+
+      - name: Run tests
+        run: |
+            pytest --markdown-docs fvdb/docs
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"
+
+  fvdb-benchmarks:
+    needs: [fvdb-build]
+    name: fVDB Continuous Benchmarking
+    runs-on:
+      - self-hosted
+    container:
+      image: aswf/ci-openvdb:2024
+      env:
+        PYTHONPATH: ""
+      options: --rm
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up fvdb_test Conda env
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: "true"
+          activate-environment: fvdb_test
+          environment-file: fvdb/env/test_environment.yml
+
+      - name: Download package
+        uses: actions/download-artifact@v4
+        with:
+            name: fvdb-test-package
+            path: ./dist
+
+      - name: Install package
+        run: |
+            conda activate fvdb_test
+            pip install ./dist/*.whl
+
+      - name: Disable git ownership verification
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+
+      - name: Run benchmarks
+        run: |
+          cd fvdb/tests;
+          pytest benchmark --benchmark-json benchmark/output.json
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+            name: Python Benchmark with pytest-benchmark
+            tool: 'pytest'
+            output-file-path: fvdb/tests/benchmark/output.json
+            # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            auto-push: true
+            # Show alert with commit comment on detecting possible performance regression
+            alert-threshold: '200%'
+            comment-on-alert: true
+            fail-on-alert: true
+            alert-comment-cc-users: '@swahtz'
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up /__w/_temp directory"
+          sudo rm -rf /__w/_temp/*
+          echo "Cleanup completed"

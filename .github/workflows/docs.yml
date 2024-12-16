@@ -110,7 +110,7 @@ jobs:
     env:
       CXX: g++
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install_gcovr
       run: pip install gcovr
     - name: build
