@@ -68,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
             name: fvdb-test-package
-            path: dist/*.whl
+            path: fvdb/dist/*.whl
             retention-days: 2
 
       - name: Cleanup
