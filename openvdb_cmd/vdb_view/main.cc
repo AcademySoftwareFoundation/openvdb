@@ -36,6 +36,7 @@ usage [[noreturn]] (const char* progName, int status)
 "    G                  (\"geometry\") look at center of geometry\n" <<
 "    H                  (\"home\") look at origin\n" <<
 "    I                  toggle on-screen grid info on/off\n" <<
+"    P                  print camera transformation matrix\n" <<
 "    left mouse         tumble\n" <<
 "    right mouse        pan\n" <<
 "    mouse wheel        zoom\n" <<
