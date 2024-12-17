@@ -1,0 +1,41 @@
+name: Code Formatting
+
+on:
+  pull_request:
+    branches:
+        - 'master'
+        - 'feature/**'
+        - 'pr/**'
+    paths-ignore:
+        - 'CHANGES'
+        - 'CODEOWNERS'
+        - 'doc/**'
+        - 'tsc/**'
+        - 'pendingchanges/**'
+        - '**.md'
+        - 'fvdb/docs/**'
+        - 'fvdb/env/**'
+        - 'fvdb/notebooks/**'
+
+
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+    check-spdx-identifiers:
+        name: Check SPDX identifiers
+        runs-on: ubuntu-latest
+        steps:
+        - name: checkout
+          uses: actions/checkout@v4
+        - uses: swahtz/spdx@feature/ignore_paths
+          with:
+            licenses: |-
+              Apache-2.0
+            ignore-paths: |-
+                openvdb/openvdb/math/Half.cc
+                openvdb/openvdb/math/Half.h
+                openvdb_wolfram/OpenVDBLink
