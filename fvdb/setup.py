@@ -236,7 +236,7 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
         if cudnn_hash != cudnn_hash_output:
             raise RuntimeError("Hash of cudnn.tar.xz does not match")
 
-    if not folder_filepath.exists():
+    if (not folder_filepath.exists()) or (len(os.listdir(folder_filepath)) == 0):
         logging.info("Extracting cudnn…")
         with tarfile.open(tar_filepath, "r:xz") as tar:
             tar.extractall(folder_filepath)
