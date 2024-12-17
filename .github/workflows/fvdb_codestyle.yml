@@ -40,7 +40,7 @@ jobs:
       - uses: psf/black@stable
         with:
           options: "--check --verbose --target-version=py311 --line-length=120"
-          src: "."
+          src: "fvdb/"
           version: "~= 24.0"
 
   test-cpp-clang-format-lint:
@@ -50,7 +50,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: DoozyX/clang-format-lint-action@v0.18.2
       with:
-        source: 'src/'
+        source: 'fvdb/src/'
         extensions: 'h,cpp,cc,cu,ch'
         clangFormatVersion: 18
         style: file
@@ -62,7 +62,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: swahtz/include-guards-check-action@master
       with:
-        path: 'src/'
+        path: 'fvdb/src/'
         pattern: 'FVDB_{path}'
 
   check-spdx-identifiers:
@@ -70,7 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
     - uses: enarx/spdx@master
       with:
         licenses: |-
