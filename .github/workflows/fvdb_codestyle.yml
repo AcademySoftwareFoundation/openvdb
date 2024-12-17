@@ -51,7 +51,7 @@ jobs:
     - uses: DoozyX/clang-format-lint-action@v0.18.2
       with:
         source: 'fvdb/src/'
-        extensions: 'h,cpp,cc,cu,ch'
+        extensions: 'h,cpp,cc,cu,cuh'
         clangFormatVersion: 18
         style: file
 
