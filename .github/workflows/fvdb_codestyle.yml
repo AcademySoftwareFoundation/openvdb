@@ -71,7 +71,12 @@ jobs:
     steps:
     - name: checkout
       uses: actions/checkout@v4
-    - uses: enarx/spdx@master
+    - uses: swahtz/spdx@feature/ignore_paths
       with:
         licenses: |-
           Apache-2.0
+        ignore-paths: |-
+            openvdb/openvdb/math/Half.cc
+            openvdb/openvdb/math/Half.h
+            openvdb_wolfram/OpenVDBLink
+            openvdb_ax/openvdb_ax/grammar/generated
