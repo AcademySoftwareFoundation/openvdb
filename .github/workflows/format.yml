@@ -39,3 +39,4 @@ jobs:
                 openvdb/openvdb/math/Half.cc
                 openvdb/openvdb/math/Half.h
                 openvdb_wolfram/OpenVDBLink
+                openvdb_ax/openvdb_ax/grammar/generated
