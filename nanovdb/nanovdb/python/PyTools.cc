@@ -1,3 +1,5 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
 #include "PyTools.h"
 
 #include <nanovdb/NanoVDB.h>

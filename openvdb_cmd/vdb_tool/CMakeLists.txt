@@ -1,3 +1,5 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.20)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY

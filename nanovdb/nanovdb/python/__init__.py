@@ -1,3 +1,5 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 import sys
 if sys.platform == "win32":
     import os

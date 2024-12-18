@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Various tests to test the FindOpenVDB CMake modules and
