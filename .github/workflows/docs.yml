@@ -12,6 +12,7 @@ on:
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
       - '**.md'
+      - 'fvdb/**'
   pull_request:
     branches:
       - '**'
@@ -20,6 +21,7 @@ on:
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
       - '**.md'
+      - 'fvdb/**'
   workflow_dispatch:
     inputs:
       deploy:
