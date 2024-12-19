@@ -113,6 +113,8 @@ if(NANOVDB_USE_CUDA)
       get_target_property(VDB_MSVC_RUNTIME_SELECTION openvdb MSVC_RUNTIME_LIBRARY)
     endif()
   endif()
+
+  find_package(CUDAToolkit)
 endif()
 
 if(NANOVDB_USE_OPENVDB)
@@ -169,8 +171,10 @@ set(NANOVDB_INCLUDE_FILES
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/DeviceBuffer.h
+  cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
   cuda/NodeManager.cuh
+  cuda/UnifiedBuffer.h
 )
 
 # NanoVDB io header files

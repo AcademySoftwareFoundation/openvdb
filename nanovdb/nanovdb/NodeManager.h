@@ -316,7 +316,7 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
     }
 
     return handle;// // is converted to r-value so return value is move constructed!
-}
+}// createNodeManager
 
 } // namespace nanovdb
 

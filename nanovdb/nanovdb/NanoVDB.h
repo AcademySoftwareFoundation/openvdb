@@ -1159,6 +1159,21 @@ public:
     __hostdev__ uint64_t*       words() { return mWords; }
     __hostdev__ const uint64_t* words() const { return mWords; }
 
+    template<typename WordT>
+    __hostdev__ WordT getWord(uint32_t n) const
+    {
+        static_assert(util::is_same<WordT, uint8_t, uint16_t, uint32_t, uint64_t>::value);
+        NANOVDB_ASSERT(n*8*sizeof(WordT) < WORD_COUNT);
+        return reinterpret_cast<WordT*>(mWords)[n];
+    }
+    template<typename WordT>
+    __hostdev__ void setWord(WordT w, uint32_t n)
+    {
+        static_assert(util::is_same<WordT, uint8_t, uint16_t, uint32_t, uint64_t>::value);
+        NANOVDB_ASSERT(n*8*sizeof(WordT) < WORD_COUNT);
+        reinterpret_cast<WordT*>(mWords)[n] = w;
+    }
+
     /// @brief Assignment operator that works with openvdb::util::NodeMask
     template<typename MaskT = Mask>
     __hostdev__ typename util::enable_if<!util::is_same<MaskT, Mask>::value, Mask&>::type operator=(const MaskT& other)
@@ -1228,6 +1243,25 @@ public:
     {
         on ? this->setOnAtomic(n) : this->setOffAtomic(n);
     }
+/*
+    template<typename WordT>
+    __device__ inline void setWordAtomic(WordT w, uint32_t n)
+    {
+        static_assert(util::is_same<WordT, uint8_t, uint16_t, uint32_t, uint64_t>::value);
+        NANOVDB_ASSERT(n*8*sizeof(WordT) < WORD_COUNT);
+        if constexpr(util::is_same<WordT,uint8_t>::value) {
+            mask <<= x;
+        } else if constexpr(util::is_same<WordT,uint16_t>::value) {
+            unsigned int mask = w;
+            if (n >> 1) mask <<= 16;
+            atomicOr(reinterpret_cast<unsigned int*>(this) + n, mask);
+        } else if constexpr(util::is_same<WordT,uint32_t>::value) {
+            atomicOr(reinterpret_cast<unsigned int*>(this) + n, w);
+        } else {
+            atomicOr(reinterpret_cast<unsigned long long int*>(this) + n, w);
+        }
+    }
+*/
 #endif
     /// @brief Set the specified bit on or off.
     __hostdev__ void set(uint32_t n, bool on)

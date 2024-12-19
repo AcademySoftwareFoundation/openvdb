@@ -14,13 +14,20 @@
 
     \note  This file does NOT depend on OpenVDB, but optionally on ZIP and BLOSC
 
-    \details NanoVDB files take on of two formats:
+    \details NanoVDB files take on one of two following formats:
              1) multiple segments each with multiple grids (segments have easy to access metadata about its grids)
              2) starting with verion 32.6.0 nanovdb files also support a raw buffer with one or more grids (just a
              dump of a raw grid buffer, so no new metadata in headers as when using segments mentioned above).
 
-    // 1: Segment:  FileHeader, MetaData0, gridName0...MetaDataN, gridNameN, compressed Grid0, ... compressed GridN
-    // 2: Raw: Grid0, ... GridN
+    Example of case 1:
+        | <------------------------------------ segment 1 with N grids --------------------------------------> | <--- segment 2 ...
+        FileHeader, FileMetaData0, gridName0...FileMetaDataN, gridNameN, compressed Grid0, ... compressed GridN FileHeader ...
+    Example of case 2:
+        | <-- grid buffer ---> |
+        Grid0, Grid1, ... GridN
+
+    Note that FileHeader and FileMetaData (both defined in NanoVDB.h) have fixed sizes of respectively 16B and 176B.
+    However, GridNameX and GridX have variable sizes!
 */
 
 #ifndef NANOVDB_IO_H_HAS_BEEN_INCLUDED
@@ -722,9 +729,13 @@ inline uint64_t stringHash(const char* c_str)
 
 } // namespace io ======================================================================
 
+} // namespace nanovdb ===================================================================
+
+// the following stream specializations should not be namespaced!
+
 template<typename T>
 inline std::ostream&
-operator<<(std::ostream& os, const math::BBox<math::Vec3<T>>& b)
+operator<<(std::ostream& os, const nanovdb::math::BBox<nanovdb::math::Vec3<T>>& b)
 {
     os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
        << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
@@ -732,7 +743,7 @@ operator<<(std::ostream& os, const math::BBox<math::Vec3<T>>& b)
 }
 
 inline std::ostream&
-operator<<(std::ostream& os, const CoordBBox& b)
+operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
 {
     os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
        << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
@@ -740,7 +751,7 @@ operator<<(std::ostream& os, const CoordBBox& b)
 }
 
 inline std::ostream&
-operator<<(std::ostream& os, const Coord& ijk)
+operator<<(std::ostream& os, const nanovdb::Coord& ijk)
 {
     os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
     return os;
@@ -748,7 +759,7 @@ operator<<(std::ostream& os, const Coord& ijk)
 
 template<typename T>
 inline std::ostream&
-operator<<(std::ostream& os, const math::Vec3<T>& v)
+operator<<(std::ostream& os, const nanovdb::math::Vec3<T>& v)
 {
     os << "(" << v[0] << "," << v[1] << "," << v[2] << ")";
     return os;
@@ -756,12 +767,10 @@ operator<<(std::ostream& os, const math::Vec3<T>& v)
 
 template<typename T>
 inline std::ostream&
-operator<<(std::ostream& os, const math::Vec4<T>& v)
+operator<<(std::ostream& os, const nanovdb::math::Vec4<T>& v)
 {
     os << "(" << v[0] << "," << v[1] << "," << v[2] << "," << v[3] << ")";
     return os;
 }
-
-} // namespace nanovdb ===================================================================
 
 #endif // NANOVDB_IO_H_HAS_BEEN_INCLUDED
