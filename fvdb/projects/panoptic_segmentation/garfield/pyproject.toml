@@ -1,0 +1,22 @@
+[project]
+name = "garfield"
+version = "0.1.0"
+
+dependencies=[
+    "nerfstudio>=1.0.0",
+    "transformers",
+    "gsplat",
+    "trimesh",
+    "viser",
+    "torch",
+    "scikit-learn",
+    "torchtyping",
+    # "cuml",
+]
+
+[tool.setuptools.packages.find]
+include = ["garfield"]
+
+[project.entry-points.'nerfstudio.method_configs']
+garfield = 'garfield.garfield_config:garfield_method'
+garfield_gauss = 'garfield.garfield_config:garfield_gauss_method'
