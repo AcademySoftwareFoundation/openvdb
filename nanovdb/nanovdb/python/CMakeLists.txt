@@ -1,3 +1,5 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 option(NANOVDB_BUILD_PYTHON_UNITTESTS [=[
   "Include the NanoVDB Python unit test. Requires a python interpreter]=]
 ${NANOVDB_BUILD_UNITTESTS})

@@ -1,3 +1,5 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
 #include "PySignedFloodFill.h"
 
 #include <nanovdb/tools/cuda/SignedFloodFill.cuh>
