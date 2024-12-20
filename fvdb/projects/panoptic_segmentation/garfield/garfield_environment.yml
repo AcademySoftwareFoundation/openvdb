@@ -1,0 +1,57 @@
+name: fvdb_garfield
+channels:
+  - pytorch
+  - nvidia/label/cuda-12.1.0
+  - rapidsai
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pytorch::pytorch=2.4.0
+  - pytorch::pytorch-cuda=12.1
+  - pytorch::pytorch-mutex=*=cuda
+  - cuda-toolkit
+  - cuda-compiler
+  - cuda-nvcc=12.1
+  - cuda-cccl=12.1
+  - cuda-libraries-static
+  # specifically need these 12.1.1 versions of cudart 
+  #  because of awkward overwriting with conda-forge versions that get picked up
+  - nvidia/label/cuda-12.1.1::cuda-cudart-static
+  - nvidia/label/cuda-12.1.1::cuda-cudart
+  - nvidia/label/cuda-12.1.1::cuda-cudart-dev
+  - gcc_linux-64=11
+  - gxx_linux-64=11
+  - cxx-compiler
+  - pip
+  - git
+  - gitpython
+  - ipython
+  - tqdm
+  - numpy<2
+  - tyro
+  ##  nerfstudio
+  - tensorboard
+  - torchvision
+  - open3d>=0.16.0
+  - transformers
+  - trimesh
+  - ninja
+  - fastai::opencv-python-headless
+  - imageio
+  - torchmetrics
+  - protobuf
+  ##  garfield
+  - scikit-learn
+  - rapidsai::cuml
+  - rapidsai::libcumlprims
+  - pip:
+    ##  nerfstudio
+    # NOTE: have to build tiny-cuda-nn and nerfacc from source for CUDA 12
+    - git+https://github.com/nerfstudio-project/nerfacc.git@v0.5.2
+    - git+https://github.com/swahtz/tiny-cuda-nn/@cuda_libdir_fix#subdirectory=bindings/torch
+    - gsplat
+    - viser
+    - nerfstudio>=1.0.0
+    ##  garfield
+    - torchtyping
