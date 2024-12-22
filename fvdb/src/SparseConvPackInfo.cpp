@@ -3,9 +3,9 @@
 //
 #include "SparseConvPackInfo.h"
 
-#include "detail/autograd/Autograd.h"
-#include "detail/ops/Ops.h"
-#include "detail/ops/convolution/pack_info/PackInfoOps.h"
+#include <detail/autograd/Autograd.h>
+#include <detail/ops/Ops.h>
+#include <detail/ops/convolution/pack_info/PackInfoOps.h>
 
 namespace fvdb {
 

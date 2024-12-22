@@ -4,7 +4,7 @@
 #ifndef FVDB_JAGGEDTENSOR_H
 #define FVDB_JAGGEDTENSOR_H
 
-#include "detail/utils/Utils.h"
+#include <detail/utils/Utils.h>
 
 #include <torch/all.h>
 #include <torch/custom_class.h>

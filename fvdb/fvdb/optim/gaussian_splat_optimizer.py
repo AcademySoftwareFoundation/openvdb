@@ -445,23 +445,39 @@ class GaussianSplatOptimizer:
 
         def param_fn(name: str, p: torch.Tensor) -> torch.Tensor:
             repeats = [split_factor] + [1] * (p.dim() - 1)
+            cat_dim = 0
             if name == "means":
                 p_split = (p[sel] + samples).reshape(-1, 3)  # [S*N, 3]
+                p_rest = p[rest]
             elif name == "scales":
                 # TODO: Adjust scale factor for splitting
                 p_split = torch.log(scales / 1.6).repeat(split_factor, 1)  # [2N, 3]
+                p_rest = p[rest]
             elif name == "opacities" and revised_opacity:
                 new_opacities = 1.0 - torch.sqrt(1.0 - torch.sigmoid(p[sel]))
                 p_split = torch.logit(new_opacities).repeat(repeats)  # [2N]
+                p_rest = p[rest]
+            elif name == "sh0" or name == "shN":
+                repeats = [1] + [split_factor] + [1] * (p.dim() - 2)
+                p_split = p[:, sel, ...].repeat(repeats)  # [K, 2N, D]
+                p_rest = p[:, rest, ...]
+                cat_dim = 1
             else:
                 p_split = p[sel].repeat(repeats)
-            p_new = torch.cat([p[rest], p_split])
-            p_new = torch.nn.Parameter(p_new)
+                p_rest = p[rest]
+            p_new = torch.nn.Parameter(torch.cat([p_rest, p_split], dim=cat_dim))
             return p_new
 
-        def optimizer_fn(_: str, v: torch.Tensor) -> torch.Tensor:
-            v_split = torch.zeros((split_factor * len(sel), *v.shape[1:]), device=device)
-            return torch.cat([v[rest], v_split])
+        def optimizer_fn(name: str, key: str, v: torch.Tensor) -> torch.Tensor:
+            if name == "sh0" or name == "shN":
+                v_split = torch.zeros((v.shape[0], split_factor * len(sel), *v.shape[2:]), device=device)
+                v_rest = v[:, rest, ...]
+                cat_dim = 1
+            else:
+                v_split = torch.zeros((split_factor * len(sel), *v.shape[1:]), device=device)
+                v_rest = v[rest]
+                cat_dim = 0
+            return torch.cat([v_rest, v_split], dim=cat_dim)
 
         # update the parameters and the state in the optimizers
         self._update_param_with_optimizer(param_fn, optimizer_fn)
@@ -483,12 +499,25 @@ class GaussianSplatOptimizer:
         device = mask.device
         sel = torch.where(mask)[0]
 
-        def param_fn(_: str, p: torch.Tensor) -> torch.Tensor:
-            return torch.nn.Parameter(torch.cat([p] + [p[sel]] * dup_factor))
+        def param_fn(name: str, p: torch.Tensor) -> torch.Tensor:
+            cat_dim = 0
+            repeats = [dup_factor] + [1] * (p.dim() - 1)
+            if name == "sh0" or name == "shN":
+                repeats = [1, dup_factor, 1]
+                cat_dim = 1
+                p_sel = p[:, sel, ...]
+            else:
+                p_sel = p[sel]
 
-        def optimizer_fn(_: str, v: torch.Tensor) -> torch.Tensor:
-            zpad = torch.zeros((len(sel), *v.shape[1:]), device=device)
-            return torch.cat([v] + [zpad] * dup_factor)
+            return torch.nn.Parameter(torch.cat([p, p_sel.repeat(repeats)], dim=cat_dim))
+
+        def optimizer_fn(name: str, key: str, v: torch.Tensor) -> torch.Tensor:
+            if name == "sh0" or name == "shN":
+                zpad = torch.zeros(v.shape[0], len(sel) * dup_factor, *v.shape[2:], device=v.device, dtype=v.dtype)
+                return torch.cat([v, zpad], dim=1)
+            else:
+                zpad = torch.zeros((len(sel) * dup_factor, *v.shape[1:]), device=device)
+                return torch.cat([v, zpad])
 
         # update the parameters and the state in the optimizers
         self._update_param_with_optimizer(param_fn, optimizer_fn)
@@ -508,10 +537,15 @@ class GaussianSplatOptimizer:
         sel = torch.where(~mask)[0]
 
         def param_fn(name: str, p: torch.Tensor) -> torch.Tensor:
+            if name == "sh0" or name == "shN":
+                return torch.nn.Parameter(p[:, sel, ...])
             return torch.nn.Parameter(p[sel])
 
-        def optimizer_fn(key: str, v: torch.Tensor) -> torch.Tensor:
-            return v[sel]
+        def optimizer_fn(name: str, key: str, v: torch.Tensor) -> torch.Tensor:
+            if name == "sh0" or name == "shN":
+                return v[:, sel, ...]
+            else:
+                return v[sel]
 
         # update the parameters and the state in the optimizers
         self._update_param_with_optimizer(param_fn, optimizer_fn)
@@ -537,7 +571,7 @@ class GaussianSplatOptimizer:
             else:
                 raise ValueError(f"Unexpected parameter name: {name}")
 
-        def optimizer_fn(key: str, v: torch.Tensor) -> torch.Tensor:
+        def optimizer_fn(name: str, key: str, v: torch.Tensor) -> torch.Tensor:
             return torch.zeros_like(v)
 
         # update the parameters and the state in the optimizers
@@ -547,7 +581,7 @@ class GaussianSplatOptimizer:
     def _update_param_with_optimizer(
         self,
         param_fn: Callable[[str, torch.Tensor], torch.Tensor],
-        optimizer_fn: Callable[[str, torch.Tensor], torch.Tensor],
+        optimizer_fn: Callable[[str, str, torch.Tensor], torch.Tensor],
         names: Union[List[str], None] = None,
     ):
         """Update the parameters and the state in the optimizers with defined functions.
@@ -577,7 +611,7 @@ class GaussianSplatOptimizer:
                 for key in p_state.keys():
                     if key != "step":
                         v = p_state[key]
-                        p_state[key] = optimizer_fn(key, v)
+                        p_state[key] = optimizer_fn(name, key, v)
                 p_new = param_fn(name, p)
                 optimizer.param_groups[i]["params"] = [p_new]
                 optimizer.state[p_new] = p_state

@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Ops.h"
-
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/Utils.cuh>
 
 #include <ATen/cuda/Atomic.cuh>
+
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 

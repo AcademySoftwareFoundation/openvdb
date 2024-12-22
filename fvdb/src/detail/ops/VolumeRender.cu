@@ -1,14 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "detail/utils/cuda/Utils.cuh"
-
-#include <thrust/execution_policy.h>
-#include <thrust/scan.h>
+#include <detail/utils/cuda/Utils.cuh>
 
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAMathCompat.h>
+
+#include <thrust/execution_policy.h>
+#include <thrust/scan.h>
 
 namespace fvdb {
 namespace detail {

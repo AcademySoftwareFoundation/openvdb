@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
-
 #include <detail/utils/Utils.h>
 
 #include <nanovdb/NanoVDB.h>
