@@ -3,8 +3,8 @@
 //
 #include "GaussianRender.h"
 
-#include "detail/ops/Ops.h"
-#include "detail/utils/Utils.h"
+#include <detail/ops/Ops.h>
+#include <detail/utils/Utils.h>
 
 namespace fvdb {
 namespace detail {
@@ -13,15 +13,20 @@ namespace autograd {
 SphericalHarmonics::variable_list
 SphericalHarmonics::forward(
     SphericalHarmonics::AutogradContext *ctx, const int sh_degree_to_use,
-    const SphericalHarmonics::Variable &dirs,      // (C, N, 3) or (N, 3)
-    const SphericalHarmonics::Variable &sh_coeffs, // (C, M, K, D) or (N, K, D)
-    const SphericalHarmonics::Variable &radii      // (C, N) or (N,) (optional)
+    const torch::optional<SphericalHarmonics::Variable> maybe_dirs, // (C, N, 3) or (N, 3)
+    const SphericalHarmonics::Variable                 &sh_coeffs,  // (C, M, K, D) or (N, K, D)
+    const SphericalHarmonics::Variable                 &radii       // (C, N) or (N,) (optional)
 ) {
-    Variable colors = FVDB_DISPATCH_KERNEL_DEVICE(dirs.device(), [&]() {
+    torch::Tensor dirs;
+    if (maybe_dirs.has_value()) {
+        dirs = maybe_dirs.value();
+    } else {
+        dirs = sh_coeffs.dim() == 3 ? torch::empty({ 0, 3 }) : torch::empty({ 0, 0, 3 });
+    }
+    Variable colors = FVDB_DISPATCH_KERNEL_DEVICE(sh_coeffs.device(), [&]() {
         return ops::dispatchSphericalHarmonicsForward<DeviceTag>(sh_degree_to_use, dirs, sh_coeffs,
                                                                  radii);
     });
-
     ctx->save_for_backward({ dirs, sh_coeffs, radii });
     ctx->saved_data["sh_degree_to_use"] = (int64_t)sh_degree_to_use;
     return { colors };
@@ -45,7 +50,7 @@ SphericalHarmonics::backward(SphericalHarmonics::AutogradContext *ctx,
     const int  sh_degree_to_use = (int)ctx->saved_data["sh_degree_to_use"].toInt();
     const bool compute_v_dirs   = ctx->needs_input_grad(1);
 
-    auto     variables   = FVDB_DISPATCH_KERNEL_DEVICE(dirs.device(), [&]() {
+    auto     variables   = FVDB_DISPATCH_KERNEL_DEVICE(sh_coeffs.device(), [&]() {
         return ops::dispatchSphericalHarmonicsBackward<DeviceTag>(sh_degree_to_use, dirs, sh_coeffs,
                                                                         v_colors, radii, compute_v_dirs);
     });
@@ -167,17 +172,14 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
 GaussianRasterizeToPixels::variable_list
 GaussianRasterizeToPixels::forward(
     GaussianRasterizeToPixels::AutogradContext *ctx,
-    // Gaussian parameters
-    const GaussianRasterizeToPixels::Variable &means2d,   // [C, N, 2]
-    const GaussianRasterizeToPixels::Variable &conics,    // [C, N, 3]
-    const GaussianRasterizeToPixels::Variable &colors,    // [C, N, 3]
-    const GaussianRasterizeToPixels::Variable &opacities, // [N]
-    // image size
+    const GaussianRasterizeToPixels::Variable  &means2d,          // [C, N, 2]
+    const GaussianRasterizeToPixels::Variable  &conics,           // [C, N, 3]
+    const GaussianRasterizeToPixels::Variable  &colors,           // [C, N, 3]
+    const GaussianRasterizeToPixels::Variable  &opacities,        // [N]
     const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
     const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const GaussianRasterizeToPixels::Variable &tile_offsets, // [C, tile_height, tile_width]
-    const GaussianRasterizeToPixels::Variable &flatten_ids,  // [n_isects]
+    const GaussianRasterizeToPixels::Variable &tile_offsets,      // [C, tile_height, tile_width]
+    const GaussianRasterizeToPixels::Variable &tile_gaussian_ids, // [n_isects]
     const bool                                 absgrad) {
     // const int C = means2d.size(0);
     // const int N = means2d.size(1);
@@ -185,14 +187,14 @@ GaussianRasterizeToPixels::forward(
     auto     variables     = FVDB_DISPATCH_KERNEL_DEVICE(means2d.device(), [&]() {
         return ops::dispatchGaussianRasterizeForward<DeviceTag>(
             means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
-            image_origin_h, tile_size, tile_offsets, flatten_ids);
+            image_origin_h, tile_size, tile_offsets, tile_gaussian_ids);
     });
     Variable render_colors = std::get<0>(variables);
     Variable render_alphas = std::get<1>(variables);
     Variable last_ids      = std::get<2>(variables);
 
-    ctx->save_for_backward(
-        { means2d, conics, colors, opacities, tile_offsets, flatten_ids, render_alphas, last_ids });
+    ctx->save_for_backward({ means2d, conics, colors, opacities, tile_offsets, tile_gaussian_ids,
+                             render_alphas, last_ids });
     ctx->saved_data["image_width"]    = (int64_t)image_width;
     ctx->saved_data["image_height"]   = (int64_t)image_height;
     ctx->saved_data["tile_size"]      = (int64_t)tile_size;
@@ -215,15 +217,15 @@ GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *
     if (v_render_alphas.defined())
         v_render_alphas = v_render_alphas.contiguous();
 
-    variable_list saved         = ctx->get_saved_variables();
-    Variable      means2d       = saved.at(0);
-    Variable      conics        = saved.at(1);
-    Variable      colors        = saved.at(2);
-    Variable      opacities     = saved.at(3);
-    Variable      tile_offsets  = saved.at(4);
-    Variable      flatten_ids   = saved.at(5);
-    Variable      render_alphas = saved.at(6);
-    Variable      last_ids      = saved.at(7);
+    variable_list saved             = ctx->get_saved_variables();
+    Variable      means2d           = saved.at(0);
+    Variable      conics            = saved.at(1);
+    Variable      colors            = saved.at(2);
+    Variable      opacities         = saved.at(3);
+    Variable      tile_offsets      = saved.at(4);
+    Variable      tile_gaussian_ids = saved.at(5);
+    Variable      render_alphas     = saved.at(6);
+    Variable      last_ids          = saved.at(7);
 
     const int  image_width    = (int)ctx->saved_data["image_width"].toInt();
     const int  image_height   = (int)ctx->saved_data["image_height"].toInt();
@@ -235,7 +237,7 @@ GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means2d.device(), [&]() {
         return ops::dispatchGaussianRasterizeBackward<DeviceTag>(
             means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
-            image_origin_h, tile_size, tile_offsets, flatten_ids, render_alphas, last_ids,
+            image_origin_h, tile_size, tile_offsets, tile_gaussian_ids, render_alphas, last_ids,
             v_render_colors, v_render_alphas, absgrad);
     });
     Variable v_means2d_abs;

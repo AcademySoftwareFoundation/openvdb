@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "IO.h"
-
 #include <Types.h>
 #include <detail/GridBatchImpl.h>
 #include <detail/utils/Utils.h>

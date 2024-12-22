@@ -4,6 +4,7 @@
 #ifndef FVDB_DETAIL_AUTOGRAD_GAUSSIANRENDER_H
 #define FVDB_DETAIL_AUTOGRAD_GAUSSIANRENDER_H
 
+#include <torch/all.h>
 #include <torch/autograd.h>
 
 namespace fvdb {
@@ -16,9 +17,9 @@ struct SphericalHarmonics : public torch::autograd::Function<SphericalHarmonics>
     using Variable        = torch::autograd::Variable;
 
     static variable_list forward(AutogradContext *ctx, const int sh_degree_to_use,
-                                 const Variable &dirs,      // (N, 3)
-                                 const Variable &sh_coeffs, // (N, K, 3)
-                                 const Variable &radii      // (N,)
+                                 const torch::optional<Variable> dirs, // [N, 3] or empty for deg 0
+                                 const Variable                 &sh_coeffs, // [K, N, 3]
+                                 const Variable                 &radii      // [N,]
     );
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);

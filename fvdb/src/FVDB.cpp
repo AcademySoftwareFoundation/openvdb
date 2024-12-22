@@ -3,9 +3,9 @@
 //
 #include "FVDB.h"
 
-#include "detail/autograd/Autograd.h"
-#include "detail/io/IO.h"
-#include "detail/ops/jagged/JaggedOps.h"
+#include <detail/autograd/Autograd.h>
+#include <detail/io/IO.h>
+#include <detail/ops/jagged/JaggedOps.h>
 
 #include <ATen/cuda/CUDAContext.h>
 

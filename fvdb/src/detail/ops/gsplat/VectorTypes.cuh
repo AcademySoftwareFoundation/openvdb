@@ -5,10 +5,12 @@
 #define FVDB_DETAIL_OPS_GSPLAT_VECTORTYPES_CUH
 
 #include <ATen/native/Math.h>
-#include <cuda_runtime.h>
-#include <cstdint>
+
 #include <cuda_bf16.hpp>
 #include <cuda_fp16.hpp>
+#include <cuda_runtime.h>
+
+#include <cstdint>
 
 /*
 Wrap 2D vector types for different scalar types

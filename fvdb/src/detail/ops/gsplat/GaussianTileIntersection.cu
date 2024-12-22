@@ -1,13 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include "VectorTypes.cuh"
 #include <detail/ops/Ops.h>
 
 #include <c10/cuda/CUDACachingAllocator.h>
 
 #include <cub/cub.cuh>
-
-#include "VectorTypes.cuh"
 
 #define NUM_THREADS 1024
 
@@ -41,7 +40,7 @@ count_tiles_per_gaussian(const uint32_t total_gaussians, const uint32_t tile_siz
     using OpT = typename OpType<T>::type;
 
     // parallelize over num_cameras * num_gaussians.
-    const int32_t idx = blockIdx.x * blockDim.x + threadIdx.x; // cg::this_grid().thread_rank();
+    const int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= total_gaussians) {
         return;
     }

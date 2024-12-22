@@ -1,7 +1,6 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 #
-
 import itertools
 import time
 from dataclasses import dataclass
@@ -74,11 +73,11 @@ class Runner:
         self.gs_model: GaussianSplat3D = GaussianSplat3D(torch.rand([8, 3]), torch.rand([8, 3])).to(device)
         self.gs_model.load_state_dict(checkpoint["splats"])
 
-        feats = torch.randn(self.gs_model.num_gaussians, 128, device=device)
-        self.gs_model.register_channel("seg", feats)
+        feats = torch.randn(self.gs_model.num_gaussians, 1, 64, device=device)
+        self.gs_model.set_spherical_harmonic_coeffs(feats)
 
         self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(128, 256),
+            torch.nn.Linear(64, 256),
             torch.nn.ReLU(),
             torch.nn.Linear(256, 256),
             torch.nn.ReLU(),
@@ -112,19 +111,27 @@ class Runner:
             intrinsics = minibatch["intrinsics"].to(self.device)
             cam_to_world = minibatch["cam_to_world"].to(self.device)
             world_to_cam = torch.linalg.inv(cam_to_world).contiguous()
-            # scale = minibatch["scale"]
-            # mask_cdf = minibatch["mask_cdf"]
-            # mask_id = minibatch["mask_id"]
 
             img_h, img_w = img.shape[1], img.shape[2]
             print(img_h, img_w, img.shape)
 
             # Forward pass
-            feats, alphas, _ = self.gs_model(
-                image_w=img_w, image_h=img_h, intrincs_mat=intrinsics, extrinsics_mat=world_to_cam, channel="seg"
+            feats, alphas, info = self.gs_model(
+                image_w=img_w, image_h=img_h, intrincs_mat=intrinsics, extrinsics_mat=world_to_cam
             )
 
-            print(feats.shape)
+            # TODO (Francis): Don't use Pytorch caching allocator which causes massive fragmentation
+            #                 This should use about half the memory
+            del alphas, info
+            torch.cuda.empty_cache()
+            feats_ravel = feats.view(-1, 64)
+            idx = torch.randperm(feats_ravel.shape[0])[:4096]
+            feats_slice = feats.view(-1, 64)[idx]
+            gfeats = self.mlp(feats_slice)
+            loss = gfeats.sum()
+            torch.cuda.empty_cache()
+
+            time.sleep(2)
 
 
 def main(checkpoint_path: str):
@@ -134,5 +141,4 @@ def main(checkpoint_path: str):
 
 
 if __name__ == "__main__":
-    with torch.no_grad():
-        tyro.cli(main)
+    tyro.cli(main)

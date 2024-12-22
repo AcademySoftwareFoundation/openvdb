@@ -4,11 +4,11 @@
 #include "GridBatch.h"
 
 #include "FVDB.h"
-#include "detail/GridBatchImpl.h"
-#include "detail/autograd/Autograd.h"
-#include "detail/build/Build.h"
-#include "detail/io/IO.h"
-#include "detail/ops/Ops.h"
+#include <detail/GridBatchImpl.h>
+#include <detail/autograd/Autograd.h>
+#include <detail/build/Build.h>
+#include <detail/io/IO.h>
+#include <detail/ops/Ops.h>
 
 namespace fvdb {
 

@@ -66,8 +66,8 @@ class TestGaussianRender(unittest.TestCase):
         self.opacities.requires_grad = True
 
         self.sh_degree = 3
-        self.sh_coeffs = torch.zeros((self.means.shape[0], (self.sh_degree + 1) ** 2, 3), device=self.device)
-        self.sh_coeffs[:, 0, :] = rgb_to_sh(self.colors)
+        self.sh_coeffs = torch.zeros(((self.sh_degree + 1) ** 2, self.means.shape[0], 3), device=self.device)
+        self.sh_coeffs[0, :, :] = rgb_to_sh(self.colors)
         self.sh_coeffs.requires_grad = True
 
     def test_fully_fused_projection(self):
@@ -161,7 +161,7 @@ class TestGaussianRender(unittest.TestCase):
         jt_quats = JaggedTensor([self.quats, self.quats]).to(self.device)
         jt_scales = JaggedTensor([self.scales, self.scales]).to(self.device)
         jt_opacities = JaggedTensor([self.opacities, self.opacities]).to(self.device)
-        jt_sh_coeffs = JaggedTensor([self.sh_coeffs, self.sh_coeffs]).to(self.device)
+        jt_sh_coeffs = JaggedTensor([self.sh_coeffs.permute(1, 0, 2), self.sh_coeffs.permute(1, 0, 2)]).to(self.device)
 
         # The first scene renders to 2 views and the second scene renders to a single view
         jt_viewmats = JaggedTensor([self.viewmats[:2], self.viewmats[2:]]).to(self.device)

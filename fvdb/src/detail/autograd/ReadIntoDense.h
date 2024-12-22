@@ -4,11 +4,10 @@
 #ifndef FVDB_DETAIL_AUTOGRAD_READINTODENSE_H
 #define FVDB_DETAIL_AUTOGRAD_READINTODENSE_H
 
+#include <Types.h>
+#include <detail/GridBatchImpl.h>
+
 #include <torch/autograd.h>
-
-#include "detail/GridBatchImpl.h"
-
-#include "Types.h"
 
 namespace fvdb {
 namespace detail {

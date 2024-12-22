@@ -2,31 +2,23 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "GaussianSplatting.h"
-#include "detail/autograd/Autograd.h"
-#include "detail/ops/Ops.h"
+
+#include <detail/autograd/Autograd.h>
+#include <detail/ops/Ops.h>
 
 namespace fvdb {
 
 namespace {
 
 torch::Tensor
-evaluateSphericalHarmonics(const torch::Tensor &directions, const torch::Tensor &sh_coeffs,
-                           const torch::Tensor radii            = torch::Tensor(),
-                           const int           sh_degree_to_use = -1) {
-    const int K                = sh_coeffs.size(-2); // number of SH bases
+evaluateSphericalHarmonics(const torch::optional<torch::Tensor> directions,
+                           const torch::Tensor                 &sh_coeffs,
+                           const torch::Tensor                  radii            = torch::Tensor(),
+                           const int                            sh_degree_to_use = -1) {
+    const int K                = sh_coeffs.size(0); // number of SH bases
     const int actual_sh_degree = sh_degree_to_use < 0 ? (std::sqrt(K) - 1) : sh_degree_to_use;
-
     TORCH_CHECK(K >= (actual_sh_degree + 1) * (actual_sh_degree + 1),
                 "K must be at least (sh_degree_to_use + 1)^2");
-    // TORCH_CHECK(sh_coeffs_or_diffuse_data.is_contiguous(), "sh_coeffs must be
-    // contiguous");
-    if (K == 1) {
-        return sh_coeffs.squeeze(-2) * 0.2820947917738781;
-    }
-    if (actual_sh_degree == 0) {
-        return sh_coeffs.index({ torch::indexing::Ellipsis, 0, torch::indexing::Slice() }) *
-               0.2820947917738781;
-    }
     auto sh_results =
         detail::autograd::SphericalHarmonics::apply(actual_sh_degree, directions, sh_coeffs, radii);
 
@@ -43,10 +35,10 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
                                     const int tile_size, const float radius_clip, const float eps2d,
                                     bool antialias, bool render_depth_channel,
                                     bool render_depth_only) {
-    const int C = viewmats.size(0);   // number of cameras
-    const int N = means.size(0);      // number of gaussians
-    const int K = sh_coeffs.size(-2); // number of SH bases
-    const int D = sh_coeffs.size(-1); // Dimension of output
+    const int C = viewmats.size(0);                           // number of cameras
+    const int N = means.size(0);                              // number of gaussians
+    const int K = render_depth_only ? 1 : sh_coeffs.size(0);  // number of SH bases
+    const int D = render_depth_only ? 1 : sh_coeffs.size(-1); // Dimension of output
 
     TORCH_CHECK(means.sizes() == torch::IntArrayRef({ N, 3 }), "means must have shape (N, 3)");
     TORCH_CHECK(quats.sizes() == torch::IntArrayRef({ N, 4 }), "quats must have shape (N, 4)");
@@ -55,8 +47,8 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
     TORCH_CHECK(viewmats.sizes() == torch::IntArrayRef({ C, 4, 4 }),
                 "viewmats must have shape (C, 4, 4)");
     TORCH_CHECK(Ks.sizes() == torch::IntArrayRef({ C, 3, 3 }), "Ks must have shape (C, 3, 3)");
-    TORCH_CHECK(render_depth_only || sh_coeffs.sizes() == torch::IntArrayRef({ N, K, D }),
-                "sh_coeffs must have shape (N, K, 3)");
+    TORCH_CHECK(render_depth_only || sh_coeffs.sizes() == torch::IntArrayRef({ K, N, D }),
+                "sh_coeffs must have shape (K, N, D)");
 
     TORCH_CHECK(means.is_contiguous(), "means must be contiguous");
     TORCH_CHECK(quats.is_contiguous(), "quats must be contiguous");
@@ -85,17 +77,30 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
     if (render_depth_only) {
         colors = depths.unsqueeze(-1); // [C, N, 1]
     } else {
-        // You're using directional colors, evaluate them from spherical harmonics
-        // [differentiable]
-        const torch::Tensor camtoworlds = torch::inverse(viewmats);
-        const torch::Tensor dirs =
-            means.index(
-                { torch::indexing::None, torch::indexing::Slice(), torch::indexing::Slice() }) -
-            camtoworlds.index({ torch::indexing::Slice(), torch::indexing::None,
-                                torch::indexing::Slice(0, 3), 3 });
-        colors = evaluateSphericalHarmonics(dirs, sh_coeffs.unsqueeze(0).expand({ C, -1, -1, -1 }),
-                                            radii, sh_degree_to_use);
-        colors = torch::clamp_min(colors, colors + 0.5f);              // [C, N, 3]
+        if (K == 1 || sh_degree_to_use == 0) {
+            // Handle the case where we only have degree zero spherical harmonics, which just
+            // represent diffuse colors. This means that each Gaussian receives the same color
+            // regardless of which camera sees it, and we can just expand the colors to the correct
+            // shape (without reallocating memory). i.e. the color tensor has shape [C, N, D] but
+            // only allocates NxD floats in memory.
+            // This is useful for rendering e.g. high dimensional diffuse features.
+            colors = evaluateSphericalHarmonics(torch::nullopt, sh_coeffs.unsqueeze(1), radii,
+                                                sh_degree_to_use);
+            colors = colors.expand({ C, -1, -1 });
+
+        } else {
+            // FIXME (Francis): Do this in the kernel instead of materializing a large
+            //                  tensor here. It's a bit annoying because we'll have to update
+            //                  the current backward pass
+            const torch::Tensor camtoworlds = torch::inverse(viewmats);
+            const torch::Tensor dirs =
+                means.index(
+                    { torch::indexing::None, torch::indexing::Slice(), torch::indexing::Slice() }) -
+                camtoworlds.index({ torch::indexing::Slice(), torch::indexing::None,
+                                    torch::indexing::Slice(0, 3), 3 }); // [1, N, 3] - [C, 1, 3]
+            colors = evaluateSphericalHarmonics(
+                dirs, sh_coeffs.unsqueeze(1).expand({ -1, C, -1, -1 }), radii, sh_degree_to_use);
+        }
 
         if (render_depth_channel) {
             colors = torch::cat({ colors, depths.unsqueeze(-1) }, -1); // [C, N, D + 1]
@@ -112,9 +117,8 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
                 means2d, radii, depths, at::nullopt, num_cameras, tile_size, num_tiles_h,
                 num_tiles_w);
         });
-    const torch::Tensor tile_offsets      = std::get<0>(tile_intersections);
-    const torch::Tensor tile_gaussian_ids = std::get<1>(tile_intersections);
-
+    const torch::Tensor tile_offsets      = std::get<0>(tile_intersections); // [C, TH, TW]
+    const torch::Tensor tile_gaussian_ids = std::get<1>(tile_intersections); // [M]
     return {
         means2d, conics, opacities_compensated, radii, colors, tile_offsets, tile_gaussian_ids
     };
@@ -122,17 +126,19 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
 
 // Gaussian render for a single torch Tensor
 std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
-gaussianRenderUnbatchedInternal(
-    const torch::Tensor &means, const torch::Tensor &quats, const torch::Tensor &scales,
-    const torch::Tensor &opacities, const torch::Tensor &sh_coeffs_or_diffuse_data,
-    const torch::Tensor &viewmats, const torch::Tensor &Ks, const uint32_t image_width,
-    const uint32_t image_height, const float near_plane, const float far_plane,
-    const int sh_degree_to_use, const int tile_size, const float radius_clip, const float eps2d,
-    bool antialias, bool render_depth_channel, bool return_debug_info, bool render_depth_only) {
+gaussianRenderUnbatchedInternal(const torch::Tensor &means, const torch::Tensor &quats,
+                                const torch::Tensor &scales, const torch::Tensor &opacities,
+                                const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
+                                const torch::Tensor &Ks, const uint32_t image_width,
+                                const uint32_t image_height, const float near_plane,
+                                const float far_plane, const int sh_degree_to_use,
+                                const int tile_size, const float radius_clip, const float eps2d,
+                                bool antialias, bool render_depth_channel, bool return_debug_info,
+                                bool render_depth_only) {
     std::array<torch::Tensor, 7> renderState = computeGaussianRenderStateUnbatched(
-        means, quats, scales, opacities, sh_coeffs_or_diffuse_data, viewmats, Ks, image_width,
-        image_height, near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d,
-        antialias, render_depth_channel, render_depth_only);
+        means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
+        near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
+        render_depth_channel, render_depth_only);
 
     torch::Tensor means2d               = renderState[0];
     torch::Tensor conics                = renderState[1];
@@ -176,11 +182,11 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                        const int tile_size, const float radius_clip, const float eps2d,
                        bool antialias, bool render_depth_channel, bool return_debug_info,
                        bool render_depth_only) {
-    const int ccz = viewmats.rsize(0);   // number of cameras
-    const int ggz = means.rsize(0);      // number of gaussians
-    const int K   = sh_coeffs.rsize(-2); // number of SH bases
+    const int ccz = viewmats.rsize(0);                           // number of cameras
+    const int ggz = means.rsize(0);                              // number of gaussians
+    const int D   = render_depth_only ? 1 : sh_coeffs.rsize(-1); // Dimension of output
 
-    using namespace torch::indexing;     // For the Slice operation
+    using namespace torch::indexing;                             // For the Slice operation
 
     TORCH_CHECK(means.rsizes() == torch::IntArrayRef({ ggz, 3 }), "means must have shape (ggz, 3)");
     TORCH_CHECK(quats.rsizes() == torch::IntArrayRef({ ggz, 4 }), "quats must have shape (ggz, 4)");
@@ -191,8 +197,6 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     TORCH_CHECK(viewmats.rsizes() == torch::IntArrayRef({ ccz, 4, 4 }),
                 "viewmats must have shape (C, 4, 4)");
     TORCH_CHECK(Ks.rsizes() == torch::IntArrayRef({ ccz, 3, 3 }), "Ks must have shape (ccz, 3, 3)");
-    TORCH_CHECK(render_depth_only || sh_coeffs.rsizes() == torch::IntArrayRef({ ggz, K, 3 }),
-                "sh_coeffs must have shape (ggz, K, 3)");
 
     TORCH_CHECK(means.is_contiguous(), "means must be contiguous");
     TORCH_CHECK(quats.is_contiguous(), "quats must be contiguous");
@@ -208,6 +212,13 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
             sh_degree_to_use, tile_size, radius_clip, eps2d, antialias, render_depth_channel,
             return_debug_info, render_depth_only);
     }
+
+    // Check after we dispatch the unbatched version since the unbatched version accepts a
+    // [K, N, D] tensor for sh_coeffs while the batched version accepts a [ggz, K, D] tensor,
+    // which gets permuted later on.
+    const int K = render_depth_only ? 1 : sh_coeffs.rsize(-2); // number of SH bases
+    TORCH_CHECK(render_depth_only || sh_coeffs.rsizes() == torch::IntArrayRef({ ggz, K, D }),
+                "sh_coeffs must have shape (ggz, K, D)");
 
     // TODO: this part is very convoluted. But I don't have a better way of coding it without
     // customized CUDA kernels. The idea is that given Gaussians with shape [\sum(N_i), ...] and
@@ -271,12 +282,14 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     } else {
         // Colors from SH coefficients [differentiable]
         const torch::Tensor sh_coeffs_batched =
-            sh_coeffs.jdata().index({ gaussian_ids, Slice(), Slice() });    // [nnz, K, 3]
+            sh_coeffs.jdata()
+                .permute({ 1, 0, 2 })
+                .index({ Slice(), gaussian_ids, Slice() });                 // [K, nnz, 3]
+
         const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [ccz, 4, 4]
         const torch::Tensor dirs        = means.jdata().index({ gaussian_ids, Slice() }) -
                                    camtoworlds.index({ camera_ids, Slice(None, 3), 3 });
         colors = evaluateSphericalHarmonics(dirs, sh_coeffs_batched, radii, sh_degree_to_use);
-        colors = torch::clamp_min(colors, colors + 0.5f); // [ggz, 3]
 
         if (render_depth_channel) {
             colors = torch::cat({ colors, depths.index({ gaussian_ids }).unsqueeze(-1) }, -1);
@@ -323,21 +336,17 @@ projectGaussiansToImages(const torch::Tensor &means, const torch::Tensor &quats,
 
 // Gaussian render for a single torch Tensor
 std::unordered_map<std::string, torch::Tensor>
-precomputeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Tensor &quats,
-                                       const torch::Tensor &scales, const torch::Tensor &opacities,
-                                       const torch::Tensor &sh_coeffs_or_diffuse_data,
-                                       const torch::Tensor &viewmats, const torch::Tensor &Ks,
-                                       const uint32_t image_width, const uint32_t image_height,
-                                       const float near_plane, const float far_plane,
-                                       const int sh_degree_to_use, const int tile_size,
-                                       const float radius_clip, const float eps2d, bool antialias,
-                                       bool render_depth_channel) {
-    const bool render_depth_only = false;
-
-    std::array<torch::Tensor, 7> renderState = computeGaussianRenderStateUnbatched(
-        means, quats, scales, opacities, sh_coeffs_or_diffuse_data, viewmats, Ks, image_width,
-        image_height, near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d,
-        antialias, render_depth_channel, render_depth_only);
+precomputeGaussianRenderStateUnbatched(
+    const torch::Tensor &means, const torch::Tensor &quats, const torch::Tensor &scales,
+    const torch::Tensor &opacities, const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
+    const torch::Tensor &Ks, const uint32_t image_width, const uint32_t image_height,
+    const float near_plane, const float far_plane, const int sh_degree_to_use, const int tile_size,
+    const float radius_clip, const float eps2d, bool antialias, bool render_depth_channel) {
+    const bool                   render_depth_only = false;
+    std::array<torch::Tensor, 7> renderState       = computeGaussianRenderStateUnbatched(
+        means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
+        near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
+        render_depth_channel, render_depth_only);
 
     std::unordered_map<std::string, torch::Tensor> info;
     info["means2d"]           = renderState[0];
@@ -376,7 +385,8 @@ gaussianRender(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                const uint32_t image_width, const uint32_t image_height, const float near_plane,
                const float far_plane, const int sh_degree_to_use, const int tile_size,
                const float radius_clip, const float eps2d, bool antialias,
-               bool render_depth_channel, bool return_debug_info) {
+               bool render_depth_channel, bool return_debug_info,
+               const torch::optional<JaggedTensor> pixels_to_render) {
     return gaussianRenderInternal(
         means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
         near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
@@ -392,7 +402,8 @@ gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                     const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
                     const uint32_t image_width, const uint32_t image_height, const float near_plane,
                     const float far_plane, const int tile_size, const float radius_clip,
-                    const float eps2d, bool antialias, bool return_debug_info) {
+                    const float eps2d, bool antialias, bool return_debug_info,
+                    const torch::optional<JaggedTensor> pixels_to_render) {
     fvdb::JaggedTensor dummy_coeffs;
     return gaussianRenderInternal(
         means, quats, scales, opacities, dummy_coeffs, viewmats, Ks, image_width, image_height,
