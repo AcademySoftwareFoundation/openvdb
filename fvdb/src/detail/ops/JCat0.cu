@@ -40,20 +40,24 @@ template <typename IdxT>
 __global__ void
 computeIndexPutArg(
     const size_t jti, const JOffsetsType *__restrict__ const *__restrict__ offsets,
-    const size_t numOffsets,
+    const size_t numOffsets, const size_t numElements,
     const TorchRAcc32<JIdxType, 1>     inJIdxI,     // Jidx of the i^th input tensor
     const TorchRAcc32<JOffsetsType, 1> inJoffsetsI, // JOffsets of the i^th input tensor
     const TorchRAcc32<JOffsetsType, 1> outJOffsets, // Output JOffsets (already computed earlier)
     TorchRAcc32<IdxT, 1>               outSelIdx,   // Output selection indices
-    TorchRAcc32<JIdxType, 1>           outJIdx) {             // Output Jidx
-    int32_t       idx         = blockIdx.x * blockDim.x + threadIdx.x;
-    const int64_t numElements = inJIdxI.size(0);
+    TorchRAcc32<JIdxType, 1>           outJIdx      // Output Jidx
+) {
+    int32_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx >= numElements) {
         return;
     }
 
-    const JIdxType jidx = inJIdxI[idx]; // Which tensor this element belongs to
+    // When you have a JaggedTensor that has only one tensor in it, the JIdx tensor is empty to
+    // save memory (it's effectively all zeros anyway).l We need to handle this case, which is
+    // what this flag is doing
+    const bool     emptyJidx = inJIdxI.size(0) == 0 && numElements != 0;
+    const JIdxType jidx      = emptyJidx ? 0 : inJIdxI[idx]; // Which tensor this element belongs to
 
     // Where in the output tensor we're going to write to
     JOffsetsType tensorWriteOffset = 0;
@@ -146,6 +150,7 @@ dispatchJCat0<torch::kCUDA>(const std::vector<JaggedTensor> &vec) {
                 GET_BLOCKS(numElements, numThreadsComputeIndexPutArg);
             computeIndexPutArg<<<numBlocksComputeIndexPutArg, numThreadsComputeIndexPutArg>>>(
                 jti, thrust::raw_pointer_cast(offsets_d.data()), offsets_d.size(),
+                jt.jdata().size(0),
                 jt.jidx().packed_accessor32<JIdxType, 1, torch::RestrictPtrTraits>(),
                 jt.joffsets().packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
                 outJOffsets.packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
