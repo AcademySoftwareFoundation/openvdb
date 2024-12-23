@@ -15,7 +15,7 @@ dependencies:
   - cuda-nvcc=12.1
   - cuda-cccl=12.1
   - cuda-libraries-static
-  # specifically need these 12.1.1 versions of cudart 
+  # specifically need these 12.1.1 versions of cudart
   #  because of awkward overwriting with conda-forge versions that get picked up
   - nvidia/label/cuda-12.1.1::cuda-cudart-static
   - nvidia/label/cuda-12.1.1::cuda-cudart

@@ -2,7 +2,7 @@
 
 This is the official implementation for [GARField](https://www.garfield.studio).
 
-Tested on Python 3.10, cuda 12.0, using conda. 
+Tested on Python 3.10, cuda 12.0, using conda.
 
 <div align='center'>
 <img src="https://www.garfield.studio/data/garfield_training.jpg" height="230px">
@@ -28,9 +28,9 @@ The best way to install it is through conda: `conda install -c rapidsai -c conda
 
 , or with pip: `pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12==24.2.* cuml-cu12==24.2.*`.
 
-Important: I used [`libmamba`](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) for conda. I have been told multiple times that the conda solver is very slow / gets stuck, but this seems to be key. 
+Important: I used [`libmamba`](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community) for conda. I have been told multiple times that the conda solver is very slow / gets stuck, but this seems to be key.
 
-If you get `ClobberError`, try `conda clean --all` -- see [here](https://stackoverflow.com/questions/51217876/conda-update-anaconda-fails-clobbererror). It seems that `pip` installed packages from `nerfstudio` may conflict with the `conda` install here. 
+If you get `ClobberError`, try `conda clean --all` -- see [here](https://stackoverflow.com/questions/51217876/conda-update-anaconda-fails-clobbererror). It seems that `pip` installed packages from `nerfstudio` may conflict with the `conda` install here.
 
 3. Install GARField!
 ```
@@ -65,14 +65,14 @@ Afterwards, you can start interacting with the affinity field.
 https://github.com/chungmin99/garfield/assets/10284938/e193d7e8-da7c-4176-b7c5-a7ec75513c16
 
 2. Affinity visualization between 3D point and scene: use "Click" button to
-   select the point, and select `instance_interact` as the output type. 
+   select the point, and select `instance_interact` as the output type.
    You might need to drag the viewer window slightly to see this output type.
    Again, interact with the `scale` slider!
-Here, with `invert` True and output unnormalized, red color means high affinity (i.e., features at click point and rendered point are close to each other). Blue means low affinity. 
+Here, with `invert` True and output unnormalized, red color means high affinity (i.e., features at click point and rendered point are close to each other). Blue means low affinity.
 
 https://github.com/chungmin99/garfield/assets/10284938/6edbdad6-d356-4b32-b44e-0df8ec1dca16
 
-Also, note: the results can change a lot between 2k to 30k steps. 
+Also, note: the results can change a lot between 2k to 30k steps.
 
 Once the model is trained to completion, you can use the outputted config file for `garfield-gauss`.
 
@@ -96,7 +96,7 @@ https://github.com/chungmin99/garfield/assets/10284938/82ea7145-d8d1-485d-bab2-f
 https://github.com/chungmin99/garfield/assets/10284938/541fe037-925c-418f-929d-a9397f8d57d3
 
 
-   
+
 ## Citation
 If you use this work or find it helpful, please consider citing: (bibtex)
 
