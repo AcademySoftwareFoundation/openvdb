@@ -1,26 +1,21 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Tuple, Type, Literal
+from typing import Any, Dict, List, Literal, Mapping, Tuple, Type
 
-import torch.nn as nn
-from torch.nn import Parameter
-import trimesh
 import numpy as np
-from torchtyping import TensorType
-
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+import trimesh
+from garfield.garfield_field import GarfieldField, GarfieldFieldConfig
 from nerfstudio.cameras.rays import RayBundle, RaySamples
 from nerfstudio.field_components.field_heads import FieldHeadNames
-from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig
-from nerfstudio.viewer.viewer_elements import *
-from nerfstudio.viewer.viewer import VISER_NERFSTUDIO_SCALE_RATIO
 from nerfstudio.model_components.losses import scale_gradients_by_distance_squared
-
-from garfield.garfield_field import (
-    GarfieldField,
-    GarfieldFieldConfig,
-)
+from nerfstudio.models.nerfacto import NerfactoModel, NerfactoModelConfig
+from nerfstudio.viewer.viewer import VISER_NERFSTUDIO_SCALE_RATIO
+from nerfstudio.viewer.viewer_elements import *
+from torch.nn import Parameter
+from torchtyping import TensorType
 
 
 class FeatureRenderer(nn.Module):
@@ -63,18 +58,17 @@ class GarfieldModel(NerfactoModel):
         self.renderer_feat = FeatureRenderer()
         self.config.instance_field.use_single_scale = self.config.use_single_scale
         self.grouping_field = self.config.instance_field.setup()
-        
+
         # Add a slider to the viewer to control the scale of the grouping field.
         self.scale_slider = ViewerSlider("Scale", 0.0, 0.0, 2.0, 0.001)
 
-        # Store reference to click interface for GARField. 
+        # Store reference to click interface for GARField.
         # Note the List[GarfieldModel] is to avoid circular children.
         from garfield.garfield_interaction import GarfieldClickScene
+
         self.click_scene: GarfieldClickScene = GarfieldClickScene(
-            device=("cuda" if torch.cuda.is_available() else "cpu"),
-            scale_handle=self.scale_slider,
-            model_handle=[self]
-            )
+            device=("cuda" if torch.cuda.is_available() else "cpu"), scale_handle=self.scale_slider, model_handle=[self]
+        )
 
     def get_outputs(self, ray_bundle: RayBundle) -> Dict[str, TensorType]:
         outputs = super().get_outputs(ray_bundle)
@@ -84,14 +78,16 @@ class GarfieldModel(NerfactoModel):
             return outputs
 
         # Recalculate ray samples and weights
-        # ... only if the model is in eval mode, where it should be no_grad(). 
+        # ... only if the model is in eval mode, where it should be no_grad().
         # If in training mode, `outputs` should already have calculated ray samples and weights.
         # Without this if-block, camera optimizer? gradients? seem to get messed up.
         ray_samples: RaySamples
         if self.training:
             ray_samples, weights = outputs["ray_samples_list"][-1], outputs["weights_list"][-1]
         else:
-            ray_samples, weights_list, ray_samples_list = self.proposal_sampler(ray_bundle, density_fns=self.density_fns)
+            ray_samples, weights_list, ray_samples_list = self.proposal_sampler(
+                ray_bundle, density_fns=self.density_fns
+            )
             field_outputs = self.field.forward(ray_samples, compute_normals=self.config.predict_normals)
             if self.config.use_gradient_scaling:
                 field_outputs = scale_gradients_by_distance_squared(field_outputs, ray_samples)
@@ -100,17 +96,11 @@ class GarfieldModel(NerfactoModel):
         # Choose the top k samples with the highest weights, to be used for grouping.
         # This is to decrease # of samples queried for grouping, while sampling close to the scene density.
         def gather_fn(tens):
-            return torch.gather(
-                tens, -2, best_ids.expand(*best_ids.shape[:-1], tens.shape[-1])
-            )
+            return torch.gather(tens, -2, best_ids.expand(*best_ids.shape[:-1], tens.shape[-1]))
 
         dataclass_fn = lambda dc: dc._apply_fn_to_fields(gather_fn, dataclass_fn)
-        grouping_weights, best_ids = torch.topk(
-            weights, self.config.num_feat_samples, dim=-2, sorted=False
-        )
-        grouping_samples: RaySamples = ray_samples._apply_fn_to_fields(
-            gather_fn, dataclass_fn
-        )
+        grouping_weights, best_ids = torch.topk(weights, self.config.num_feat_samples, dim=-2, sorted=False)
+        grouping_samples: RaySamples = ray_samples._apply_fn_to_fields(gather_fn, dataclass_fn)
 
         # Define the scale for each sample. If the scale is not provided, use the selected scale.
         # "scale" is included in ray_bundle.metadata only from training batches, but
@@ -123,17 +113,12 @@ class GarfieldModel(NerfactoModel):
             instance_scales = scales.view(grouping_samples.shape[0], 1)
         else:
             slider_value = self.scale_slider.value
-            instance_scales = (
-                torch.ones(grouping_samples.shape[0], 1, device=self.device)
-                * slider_value
-            )
+            instance_scales = torch.ones(grouping_samples.shape[0], 1, device=self.device) * slider_value
 
         # Calculate features for the scale-conditioned grouping field.
         # Hash values need to be included in the outputs for the loss calculation.
         hash = self.grouping_field.get_hash(grouping_samples)
-        hash_rendered = self.renderer_feat(
-            embeds=hash, weights=grouping_weights.detach().half()
-        )
+        hash_rendered = self.renderer_feat(embeds=hash, weights=grouping_weights.detach().half())
         if self.training:
             outputs["instance_hash"] = hash_rendered  # normalized!
         outputs["instance"] = self.grouping_field.get_mlp(hash_rendered, instance_scales).float()
@@ -188,9 +173,9 @@ class GarfieldModel(NerfactoModel):
             torch.eye(num_chunks, device=self.device, dtype=bool),
             torch.ones((chunk_size, chunk_size), device=self.device, dtype=bool),
         )  # block-diagonal matrix, to consider only pairs within the same image
-        
+
         # Only consider upper triangle to avoid double-counting
-        block_mask = torch.triu(block_mask, diagonal=0)  
+        block_mask = torch.triu(block_mask, diagonal=0)
         # Only consider pairs where both points are valid (-1 means not in mask / invalid)
         block_mask = block_mask * (labels1_expanded != -1) * (labels2_expanded != -1)
 
@@ -210,34 +195,22 @@ class GarfieldModel(NerfactoModel):
         # Note that `use_single_scale` (for ablation only) causes grouping_field to ignore the scale input.
         instance = self.grouping_field.get_mlp(hash_rendered, scale)
         mask = torch.where(mask_full_positive * block_mask * (~diag_mask))
-        instance_loss_1 = torch.norm(
-            instance[mask[0]] - instance[mask[1]], p=2, dim=-1
-        ).nansum()
+        instance_loss_1 = torch.norm(instance[mask[0]] - instance[mask[1]], p=2, dim=-1).nansum()
         total_loss += instance_loss_1
 
         # 2. If ", then also supervise them to be similar at s > s_A
         if self.config.use_hierarchy_losses and (not self.config.use_single_scale):
-            scale_diff = torch.max(
-                torch.zeros_like(scale), (self.config.max_grouping_scale - scale)
-            )
-            larger_scale = scale + scale_diff * torch.rand(
-                size=(1,), device=scale.device
-            )
+            scale_diff = torch.max(torch.zeros_like(scale), (self.config.max_grouping_scale - scale))
+            larger_scale = scale + scale_diff * torch.rand(size=(1,), device=scale.device)
             instance = self.grouping_field.get_mlp(hash_rendered, larger_scale)
             mask = torch.where(mask_full_positive * block_mask * (~diag_mask))
-            instance_loss_2 = torch.norm(
-                instance[mask[0]] - instance[mask[1]], p=2, dim=-1
-            ).nansum()
+            instance_loss_2 = torch.norm(instance[mask[0]] - instance[mask[1]], p=2, dim=-1).nansum()
             total_loss += instance_loss_2
 
         # 4. Also supervising A, B to be dissimilar at scales s_A, s_B respectively seems to help.
         instance = self.grouping_field.get_mlp(hash_rendered, scale)
         mask = torch.where(mask_full_negative * block_mask)
-        instance_loss_4 = (
-            F.relu(
-                margin - torch.norm(instance[mask[0]] - instance[mask[1]], p=2, dim=-1)
-            )
-        ).nansum()
+        instance_loss_4 = (F.relu(margin - torch.norm(instance[mask[0]] - instance[mask[1]], p=2, dim=-1))).nansum()
         total_loss += instance_loss_4
 
         loss_dict["instance_loss"] = total_loss / torch.sum(block_mask).float()

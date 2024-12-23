@@ -1,16 +1,14 @@
 import typing
 from dataclasses import dataclass, field
-from typing import Literal, Type, Mapping, Any
+from typing import Any, Literal, Mapping, Type
 
 import torch
-from nerfstudio.pipelines.base_pipeline import VanillaPipeline, VanillaPipelineConfig
-from torch.cuda.amp.grad_scaler import GradScaler
-
 import tqdm
-
-from sklearn.preprocessing import QuantileTransformer
-from garfield.garfield_datamanager import GarfieldDataManagerConfig, GarfieldDataManager
+from garfield.garfield_datamanager import GarfieldDataManager, GarfieldDataManagerConfig
 from garfield.garfield_model import GarfieldModel, GarfieldModelConfig
+from nerfstudio.pipelines.base_pipeline import VanillaPipeline, VanillaPipelineConfig
+from sklearn.preprocessing import QuantileTransformer
+from torch.cuda.amp.grad_scaler import GradScaler
 
 
 @dataclass
@@ -64,9 +62,7 @@ class GarfieldPipeline(VanillaPipeline):
                 # Initialize grouping statistics. This will be automatically loaded from a checkpoint next time.
                 scale_stats = self.datamanager.scale_3d_statistics
                 self.grouping_stats = torch.nn.Parameter(scale_stats)
-                self.model.grouping_field.quantile_transformer = (
-                    self._get_quantile_func(scale_stats)
-                )
+                self.model.grouping_field.quantile_transformer = self._get_quantile_func(scale_stats)
             # Set the number of rays per image to the number of rays per image for grouping
             pixel_sampler = self.datamanager.train_pixel_sampler
             pixel_sampler.num_rays_per_image = pixel_sampler.config.num_rays_per_image
@@ -76,16 +72,12 @@ class GarfieldPipeline(VanillaPipeline):
             # also set the grouping info in the batch; in-place operation
             self.datamanager.next_group(ray_bundle, batch)
 
-        model_outputs = self._model(
-            ray_bundle
-        )  # train distributed data parallel model if world_size > 1
+        model_outputs = self._model(ray_bundle)  # train distributed data parallel model if world_size > 1
 
         metrics_dict = self.model.get_metrics_dict(model_outputs, batch)
         loss_dict = self.model.get_loss_dict(model_outputs, batch, metrics_dict)
         if step >= self.config.start_grouping_step:
-            loss_dict.update(
-                self.model.get_loss_dict_group(model_outputs, batch, metrics_dict)
-            )
+            loss_dict.update(self.model.get_loss_dict_group(model_outputs, batch, metrics_dict))
 
         return model_outputs, loss_dict, metrics_dict
 
@@ -101,13 +93,9 @@ class GarfieldPipeline(VanillaPipeline):
         scales_3d_list, pixel_level_keys_list, group_cdf_list = [], [], []
         train_cameras = self.datamanager.train_dataset.cameras
         for i in tqdm.trange(len(train_cameras), desc="Calculating 3D masks"):
-            camera_ray_bundle = train_cameras.generate_rays(camera_indices=i).to(
-                self.device
-            )
+            camera_ray_bundle = train_cameras.generate_rays(camera_indices=i).to(self.device)
             with torch.no_grad():
-                outputs = self.model.get_outputs_for_camera_ray_bundle(
-                    camera_ray_bundle
-                )
+                outputs = self.model.get_outputs_for_camera_ray_bundle(camera_ray_bundle)
 
             # Get RGB (for SAM mask generation), depth and 3D point locations (for 3D scale calculation)
             rgb = self.datamanager.train_dataset[i]["image"]
@@ -118,9 +106,7 @@ class GarfieldPipeline(VanillaPipeline):
                 pixel_level_keys,
                 scale_3d,
                 group_cdf,
-            ) = self.datamanager._calculate_3d_groups(
-                rgb, depth, points, max_scale=self.config.max_grouping_scale
-            )
+            ) = self.datamanager._calculate_3d_groups(rgb, depth, points, max_scale=self.config.max_grouping_scale)
 
             pixel_level_keys_list.append(pixel_level_keys)
             scales_3d_list.append(scale_3d)
@@ -128,20 +114,14 @@ class GarfieldPipeline(VanillaPipeline):
 
         # Save grouping data, and set it in the datamanager for current training.
         # This will be cached, so we don't need to calculate it again.
-        self.datamanager.save_sam_data(
-            pixel_level_keys_list, scales_3d_list, group_cdf_list
-        )
-        self.datamanager.pixel_level_keys = torch.nested.nested_tensor(
-            pixel_level_keys_list
-        )
+        self.datamanager.save_sam_data(pixel_level_keys_list, scales_3d_list, group_cdf_list)
+        self.datamanager.pixel_level_keys = torch.nested.nested_tensor(pixel_level_keys_list)
         self.datamanager.scale_3d = torch.nested.nested_tensor(scales_3d_list)
         self.datamanager.group_cdf = torch.nested.nested_tensor(group_cdf_list)
 
         # Initialize grouping statistics. This will be automatically loaded from a checkpoint next time.
         self.grouping_stats = torch.nn.Parameter(torch.cat(scales_3d_list))
-        self.model.grouping_field.quantile_transformer = self._get_quantile_func(
-            torch.cat(scales_3d_list)
-        )
+        self.model.grouping_field.quantile_transformer = self._get_quantile_func(torch.cat(scales_3d_list))
 
         # Turn model back to train mode
         self.model.train()
@@ -153,13 +133,9 @@ class GarfieldPipeline(VanillaPipeline):
         """
         # Load 3D group scale statistics
         grouping_stats = state_dict["grouping_stats"]
-        self.grouping_stats = torch.nn.Parameter(torch.zeros_like(grouping_stats)).to(
-            self.device
-        )
+        self.grouping_stats = torch.nn.Parameter(torch.zeros_like(grouping_stats)).to(self.device)
         # Calculate quantile transformer
-        self.model.grouping_field.quantile_transformer = self._get_quantile_func(
-            grouping_stats
-        )
+        self.model.grouping_field.quantile_transformer = self._get_quantile_func(grouping_stats)
 
         return super().load_state_dict(state_dict, strict)
 
@@ -179,8 +155,6 @@ class GarfieldPipeline(VanillaPipeline):
         def quantile_transformer_func(scales):
             # This function acts as a wrapper for QuantileTransformer.
             # QuantileTransformer expects a numpy array, while we have a torch tensor.
-            return torch.Tensor(
-                quantile_transformer.transform(scales.cpu().numpy())
-            ).to(scales.device)
+            return torch.Tensor(quantile_transformer.transform(scales.cpu().numpy())).to(scales.device)
 
         return quantile_transformer_func

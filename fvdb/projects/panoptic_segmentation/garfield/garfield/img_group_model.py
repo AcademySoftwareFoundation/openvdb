@@ -3,15 +3,13 @@ Quick wrapper for Segment Anything Model
 """
 
 from dataclasses import dataclass, field
-from typing import Type, Union, Literal
+from typing import Literal, Type, Union
 
-import torch
 import numpy as np
-from transformers import pipeline
-
-from PIL import Image
-
+import torch
 from nerfstudio.configs import base_config as cfg
+from PIL import Image
+from transformers import pipeline
 
 
 @dataclass
@@ -32,7 +30,7 @@ class ImgGroupModelConfig(cfg.InstantiateConfig):
     "Arguments for SAM model (fb)."
 
     # # Settings used for the paper:
-    # model_type="sam_fb",  
+    # model_type="sam_fb",
     # sam_model_type="vit_h",
     # sam_model_ckpt="models/sam_vit_h_4b8939.pth",
     # sam_kwargs={
@@ -50,6 +48,7 @@ class ImgGroupModel:
     Original paper uses SAM, but we can use any model that outputs masks.
     The code currently assumes that every image has at least one group/mask.
     """
+
     def __init__(self, config: ImgGroupModelConfig, **kwargs):
         self.config = config
         self.kwargs = kwargs
@@ -67,35 +66,34 @@ class ImgGroupModel:
                 self.model = pipeline("mask-generation", model="facebook/sam-vit-huge", device=self.device)
             img = Image.fromarray(img)
             masks = self.model(img, points_per_side=32, pred_iou_thresh=0.90, stability_score_thresh=0.90)
-            masks = masks['masks']
+            masks = masks["masks"]
             masks = sorted(masks, key=lambda x: x.sum())
             return masks
-        
+
         elif self.config.model_type == "sam_fb":
             # For using the original SAM model
             if self.model is None:
-                from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
+                from segment_anything import (
+                    SamAutomaticMaskGenerator,
+                    sam_model_registry,
+                )
+
                 registry = sam_model_registry[self.config.sam_model_type]
                 model = registry(checkpoint=self.config.sam_model_ckpt)
                 model = model.to(device=self.config.device)
-                self.model = SamAutomaticMaskGenerator(
-                    model=model, **self.config.sam_kwargs
-                )
+                self.model = SamAutomaticMaskGenerator(model=model, **self.config.sam_kwargs)
             masks = self.model.generate(img)
-            masks = [m['segmentation'] for m in masks] # already as bool
+            masks = [m["segmentation"] for m in masks]  # already as bool
             masks = sorted(masks, key=lambda x: x.sum())
             return masks
-        
+
         elif self.config.model_type == "maskformer":
             # For using another model (e.g., MaskFormer)
             if self.model is None:
                 self.model = pipeline(model="facebook/maskformer-swin-large-coco", device=self.device)
             img = Image.fromarray(img)
             masks = self.model(img)
-            masks = [
-                (np.array(m['mask']) != 0)
-                for m in masks
-            ]
+            masks = [(np.array(m["mask"]) != 0) for m in masks]
             masks = sorted(masks, key=lambda x: x.sum())
             return masks
 

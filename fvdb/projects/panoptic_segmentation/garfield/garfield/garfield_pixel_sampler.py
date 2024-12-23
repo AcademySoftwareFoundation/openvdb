@@ -9,12 +9,9 @@ from typing import Optional, Type, Union
 
 import torch
 from jaxtyping import Int
-from torch import Tensor
-from nerfstudio.data.pixel_samplers import (
-    PixelSampler,
-    PixelSamplerConfig,
-)
+from nerfstudio.data.pixel_samplers import PixelSampler, PixelSamplerConfig
 from rich.progress import Console
+from torch import Tensor
 
 CONSOLE = Console(width=120)
 
@@ -27,7 +24,9 @@ class GarfieldPixelSamplerConfig(PixelSamplerConfig):
 
 class GarfieldPixelSampler(PixelSampler):
     def __init__(self, config: GarfieldPixelSamplerConfig, **kwargs):
-        self.num_rays_per_image = 1  # Start with 1 (i.e., no indices grouped by image. Will be updated later in pipeline)
+        self.num_rays_per_image = (
+            1  # Start with 1 (i.e., no indices grouped by image. Will be updated later in pipeline)
+        )
         super().__init__(config, **kwargs)
 
     def sample_method(
@@ -50,9 +49,7 @@ class GarfieldPixelSampler(PixelSampler):
         ]
         """
         if isinstance(mask, Tensor):
-            raise NotImplementedError(
-                "GarfieldPixelSampler does not support masks yet."
-            )
+            raise NotImplementedError("GarfieldPixelSampler does not support masks yet.")
 
         indices = super().sample_method(
             batch_size,

@@ -1,41 +1,33 @@
 """Helper functions for interacting/visualization with GARField model."""
-from typing import List, Optional, Tuple, Union
-import viser
-import trimesh
-import torch.nn as nn
 
+from typing import List, Optional, Tuple, Union
+
+import torch.nn as nn
+import trimesh
+import viser
+from garfield.garfield_model import GarfieldModel
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.field_components.field_heads import FieldHeadNames
 from nerfstudio.model_components.losses import scale_gradients_by_distance_squared
-
-from nerfstudio.viewer.viewer_elements import *
 from nerfstudio.viewer.viewer import VISER_NERFSTUDIO_SCALE_RATIO
+from nerfstudio.viewer.viewer_elements import *
 
-from garfield.garfield_model import GarfieldModel
 
 class GarfieldClickScene(nn.Module):
     """UI for clicking on a scene (visualized as spheres).
     This needs to be a nn.Module to allow the viewer to register callbacks.
     """
+
     _click_handle: viser.GlbHandle
     _box_handle: viser.GlbHandle
     selected_location: np.ndarray
     scale_handle: ViewerSlider  # For getting the scale to query GARField
     model_handle: List[GarfieldModel]  # Store as list to avoid circular children
 
-    def __init__(
-            self,
-            device: torch.device,
-            scale_handle: ViewerSlider,
-            model_handle: List[GarfieldModel]
-        ):
+    def __init__(self, device: torch.device, scale_handle: ViewerSlider, model_handle: List[GarfieldModel]):
         super().__init__()
-        self.add_click_button: ViewerButton = ViewerButton(
-            name="Click", cb_hook=self._add_click_cb
-        )
-        self.del_click_button: ViewerButton = ViewerButton(
-            name="Reset Click", cb_hook=self._del_click_cb
-        )
+        self.add_click_button: ViewerButton = ViewerButton(name="Click", cb_hook=self._add_click_cb)
+        self.del_click_button: ViewerButton = ViewerButton(name="Reset Click", cb_hook=self._del_click_cb)
         self.viewer_control: ViewerControl = ViewerControl()
 
         self.scale_handle = scale_handle
@@ -49,12 +41,14 @@ class GarfieldClickScene(nn.Module):
 
     def _add_click_cb(self, button: ViewerButton):
         """Button press registers a click event, which will add a sphere.
-        Refer more to nerfstudio docs for more details. """
+        Refer more to nerfstudio docs for more details."""
         self.add_click_button.set_disabled(True)
+
         def del_handle_on_rayclick(click: ViewerClick):
             self._on_rayclick(click)
             self.add_click_button.set_disabled(False)
             self.viewer_control.unregister_click_cb(del_handle_on_rayclick)
+
         self.viewer_control.register_click_cb(del_handle_on_rayclick)
 
     def _on_rayclick(self, click: ViewerClick):
@@ -91,9 +85,7 @@ class GarfieldClickScene(nn.Module):
         sphere_mesh: trimesh.Trimesh = trimesh.creation.icosphere(radius=0.1)
         sphere_mesh.vertices += click_position
         sphere_mesh.visual.vertex_colors = (1.0, 0.0, 0.0, 1.0)  # type: ignore
-        sphere_mesh_handle = self.viewer_control.viser_server.add_mesh_trimesh(
-            name=f"/hit_pos", mesh=sphere_mesh
-        )
+        sphere_mesh_handle = self.viewer_control.viser_server.add_mesh_trimesh(name=f"/hit_pos", mesh=sphere_mesh)
         self._click_handle = sphere_mesh_handle
         self.selected_location = np.array(origin + direction * distance)
         self._update_scale_vis(self.scale_handle)
@@ -114,13 +106,15 @@ class GarfieldClickScene(nn.Module):
             self._box_handle.remove()
             self._box_handle = None
         if self.selected_location is not None:
-            box_mesh = trimesh.creation.icosphere(radius=VISER_NERFSTUDIO_SCALE_RATIO*max(0.001, slider.value)/2, subdivision=0)
+            box_mesh = trimesh.creation.icosphere(
+                radius=VISER_NERFSTUDIO_SCALE_RATIO * max(0.001, slider.value) / 2, subdivision=0
+            )
             self._box_handle = self.viewer_control.viser_server.add_mesh_simple(
-                name=f"/hit_pos_box", 
+                name=f"/hit_pos_box",
                 vertices=box_mesh.vertices,
                 faces=box_mesh.faces,
                 position=(self.selected_location * VISER_NERFSTUDIO_SCALE_RATIO).flatten(),
-                wireframe=True
+                wireframe=True,
             )
 
     def get_outputs(self, outputs: dict):
@@ -130,7 +124,7 @@ class GarfieldClickScene(nn.Module):
 
         location = self.selected_location
         instance_scale = self.scale_handle.value
-        
+
         # mimic the fields call
         grouping_field = self.model_handle[0].grouping_field
         positions = torch.tensor(location).view(1, 3).to(self.device)
@@ -141,6 +135,4 @@ class GarfieldClickScene(nn.Module):
         x = x / x.norm(dim=-1, keepdim=True)
         instance_pass = grouping_field.get_mlp(x, torch.tensor([instance_scale]).to(self.device).view(1, 1))
 
-        return {
-            "instance_interact": torch.norm(outputs['instance'] - instance_pass.float(), p=2, dim=-1)
-        }
+        return {"instance_interact": torch.norm(outputs["instance"] - instance_pass.float(), p=2, dim=-1)}

@@ -7,28 +7,26 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Tuple, Type, Union
-from typing_extensions import TypeVar
 
 import torch
 from nerfstudio.cameras.rays import RayBundle
 from nerfstudio.data.datasets.base_dataset import InputDataset
 from rich.progress import Console
+from typing_extensions import TypeVar
 
 CONSOLE = Console(width=120)
 
-import h5py
 import os
 import os.path as osp
 
-
+import h5py
 import numpy as np
+from garfield.garfield_pixel_sampler import GarfieldPixelSampler
+from garfield.img_group_model import ImgGroupModel, ImgGroupModelConfig
 from nerfstudio.data.datamanagers.base_datamanager import (
     VanillaDataManager,
     VanillaDataManagerConfig,
 )
-
-from garfield.img_group_model import ImgGroupModelConfig, ImgGroupModel
-from garfield.garfield_pixel_sampler import GarfieldPixelSampler
 
 
 @dataclass
@@ -96,9 +94,7 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
 
             num_entries = len(sam_data["pixel_level_keys"].keys())
             for i in range(num_entries):
-                pixel_level_keys_list.append(
-                    torch.from_numpy(sam_data["pixel_level_keys"][str(i)][...])
-                )
+                pixel_level_keys_list.append(torch.from_numpy(sam_data["pixel_level_keys"][str(i)][...]))
             self.pixel_level_keys = torch.nested.nested_tensor(pixel_level_keys_list)
             del pixel_level_keys_list
 
@@ -140,9 +136,7 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
         """
         max_masks = masks.sum(dim=0).max().item()
         image_shape = masks.shape[1:]
-        pixel_mask_array = torch.full(
-            (max_masks, image_shape[0], image_shape[1]), -1, dtype=torch.int
-        ).to(masks.device)
+        pixel_mask_array = torch.full((max_masks, image_shape[0], image_shape[1]), -1, dtype=torch.int).to(masks.device)
 
         for m, mask in enumerate(masks):
             mask_clone = mask.clone()
@@ -182,13 +176,9 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
             # Fail gracefully when no masks are found.
             # Create dummy data (all -1s), which will be ignored later.
             # See: `get_loss_dict_group` in `garfield_model.py`
-            pixel_level_keys = torch.full(
-                (image_shape[0], image_shape[1], 1), -1, dtype=torch.int
-            )
+            pixel_level_keys = torch.full((image_shape[0], image_shape[1], 1), -1, dtype=torch.int)
             scale = torch.Tensor([0.0]).view(-1, 1)
-            mask_cdf = torch.full(
-                (image_shape[0], image_shape[1], 1), 1, dtype=torch.float
-            )
+            mask_cdf = torch.full((image_shape[0], image_shape[1], 1), 1, dtype=torch.float)
             return (pixel_level_keys, scale, mask_cdf)
 
         # Calculate SAM masks
@@ -235,9 +225,7 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
 
         # Calculate "pixel level keys", which is a 2D array of shape (H, W, max_masks)
         # Each pixel has a list of group indices that it belongs to, in order of increasing scale.
-        pixel_level_keys = self.create_pixel_mask_array(
-            sam_mask
-        ).long()  # (H, W, max_masks)
+        pixel_level_keys = self.create_pixel_mask_array(sam_mask).long()  # (H, W, max_masks)
 
         # Calculate group sampling CDF, to bias sampling towards smaller groups
         # Be careful to not include -1s in the CDF (padding, or unlabeled pixels)
@@ -247,15 +235,11 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
         mask_inds, counts = mask_inds[mask_sorted], counts[mask_sorted]
         counts[0] = 0  # don't include -1
         probs = counts / counts.sum()  # [-1, 0, ...]
-        mask_probs = torch.gather(probs, 0, pixel_level_keys.reshape(-1) + 1).view(
-            pixel_level_keys.shape
-        )
+        mask_probs = torch.gather(probs, 0, pixel_level_keys.reshape(-1) + 1).view(pixel_level_keys.shape)
         mask_log_probs = torch.log(mask_probs)
         never_masked = mask_log_probs.isinf()
         mask_log_probs[never_masked] = 0.0
-        mask_log_probs = mask_log_probs / (
-            mask_log_probs.sum(dim=-1, keepdim=True) + 1e-6
-        )
+        mask_log_probs = mask_log_probs / (mask_log_probs.sum(dim=-1, keepdim=True) + 1e-6)
         mask_cdf = torch.cumsum(mask_log_probs, dim=-1)
         mask_cdf[never_masked] = 1.0
 
@@ -289,12 +273,9 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
             img_idx = img_ind[i]
 
             # Use `random_vec` to choose a group for each pixel.
-            per_pixel_index = self.pixel_level_keys[img_idx][
-                x_ind[i : i + npximg], y_ind[i : i + npximg]
-            ]
+            per_pixel_index = self.pixel_level_keys[img_idx][x_ind[i : i + npximg], y_ind[i : i + npximg]]
             random_index = torch.sum(
-                random_vec_sampling.view(-1, 1)
-                > self.group_cdf[img_idx][x_ind[i : i + npximg], y_ind[i : i + npximg]],
+                random_vec_sampling.view(-1, 1) > self.group_cdf[img_idx][x_ind[i : i + npximg], y_ind[i : i + npximg]],
                 dim=-1,
             )
 
@@ -304,9 +285,7 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
             if per_pixel_index.shape[-1] == 1:
                 per_pixel_mask = per_pixel_index.squeeze()
             else:
-                per_pixel_mask = torch.gather(
-                    per_pixel_index, 1, random_index.unsqueeze(-1)
-                ).squeeze()
+                per_pixel_mask = torch.gather(per_pixel_index, 1, random_index.unsqueeze(-1)).squeeze()
                 per_pixel_mask_ = torch.gather(
                     per_pixel_index,
                     1,
@@ -318,8 +297,7 @@ class GarfieldDataManager(VanillaDataManager):  # pylint: disable=abstract-metho
             # interval scale supervision
             curr_scale = self.scale_3d[img_idx][per_pixel_mask]
             curr_scale[random_index == 0] = (
-                self.scale_3d[img_idx][per_pixel_mask][random_index == 0]
-                * random_vec_densify[random_index == 0]
+                self.scale_3d[img_idx][per_pixel_mask][random_index == 0] * random_vec_densify[random_index == 0]
             )
             for j in range(1, self.group_cdf[img_idx].shape[-1]):
                 if (random_index == j).sum() == 0:

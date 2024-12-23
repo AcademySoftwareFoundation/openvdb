@@ -1,27 +1,25 @@
+from garfield.garfield_datamanager import GarfieldDataManagerConfig
+from garfield.garfield_field import GarfieldFieldConfig
+from garfield.garfield_gaussian_pipeline import GarfieldGaussianPipelineConfig
+from garfield.garfield_model import GarfieldModelConfig
+from garfield.garfield_pipeline import GarfieldPipelineConfig
+from garfield.garfield_pixel_sampler import GarfieldPixelSamplerConfig
+from garfield.img_group_model import ImgGroupModelConfig
 from nerfstudio.configs.base_config import ViewerConfig
-from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
-from nerfstudio.engine.optimizers import AdamOptimizerConfig
-from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
-from nerfstudio.plugins.types import MethodSpecification
-from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManagerConfig
-from nerfstudio.engine.trainer import TrainerConfig
 
 # For Gaussian Splatting
 from nerfstudio.data.datamanagers.full_images_datamanager import (
     FullImageDatamanagerConfig,
 )
-from nerfstudio.models.splatfacto import SplatfactoModelConfig
 from nerfstudio.data.dataparsers.colmap_dataparser import ColmapDataParserConfig
-
-from garfield.garfield_pipeline import GarfieldPipelineConfig
-from garfield.garfield_datamanager import GarfieldDataManagerConfig
-from garfield.garfield_pixel_sampler import GarfieldPixelSamplerConfig
-from garfield.garfield_model import GarfieldModelConfig
-from garfield.garfield_field import GarfieldFieldConfig
-from garfield.img_group_model import ImgGroupModelConfig
-from garfield.garfield_gaussian_pipeline import GarfieldGaussianPipelineConfig
-
+from nerfstudio.data.dataparsers.nerfstudio_dataparser import NerfstudioDataParserConfig
+from nerfstudio.engine.optimizers import AdamOptimizerConfig
+from nerfstudio.engine.schedulers import ExponentialDecaySchedulerConfig
+from nerfstudio.engine.trainer import TrainerConfig
+from nerfstudio.models.splatfacto import SplatfactoModelConfig
+from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
+from nerfstudio.plugins.types import MethodSpecification
 
 garfield_method = MethodSpecification(
     config=TrainerConfig(
@@ -41,17 +39,13 @@ garfield_method = MethodSpecification(
                     num_rays_per_image=256,  # 4096/256 = 16 images per batch
                 ),
                 img_group_model=ImgGroupModelConfig(
-                    model_type="sam_hf",  
+                    model_type="sam_hf",
                     # Can choose out of "sam_fb", "sam_hf", "maskformer"
-                    # Used sam_fb for the paper, see `img_group_model.py`. 
+                    # Used sam_fb for the paper, see `img_group_model.py`.
                     device="cuda",
                 ),
             ),
-            model=GarfieldModelConfig(
-                instance_field=GarfieldFieldConfig(
-                    n_instance_dims=256  # 256 in original
-                )
-            ),
+            model=GarfieldModelConfig(instance_field=GarfieldFieldConfig(n_instance_dims=256)),  # 256 in original
         ),
         optimizers={
             "proposal_networks": {
@@ -60,24 +54,16 @@ garfield_method = MethodSpecification(
             },
             "fields": {
                 "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-3, max_steps=30000
-                ),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30000),
             },
             "garfield": {
-                "optimizer": AdamOptimizerConfig(
-                    lr=1e-4, eps=1e-15, weight_decay=1e-6, max_norm=1.0
-                ),
+                "optimizer": AdamOptimizerConfig(lr=1e-4, eps=1e-15, weight_decay=1e-6, max_norm=1.0),
                 # TODO the warmup_steps == pipeline.start_grouping_step, but would be good to not hardcode it
-                "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-5, max_steps=10000, warmup_steps=2000
-                ),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-5, max_steps=10000, warmup_steps=2000),
             },
             "camera_opt": {
                 "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(
-                    lr_final=1e-4, max_steps=5000
-                ),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-4, max_steps=5000),
             },
         },
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
@@ -92,11 +78,10 @@ garfield_gauss_method = MethodSpecification(
         steps_per_eval_image=100,
         steps_per_eval_batch=100,
         steps_per_save=2000,
-        steps_per_eval_all_images=100000, 
+        steps_per_eval_all_images=100000,
         max_num_iterations=30000,
         mixed_precision=False,
-        gradient_accumulation_steps = {'camera_opt': 100,'color':10,'shs':10},
-
+        gradient_accumulation_steps={"camera_opt": 100, "color": 10, "shs": 10},
         pipeline=GarfieldGaussianPipelineConfig(
             datamanager=FullImageDatamanagerConfig(
                 dataparser=NerfstudioDataParserConfig(load_3D_points=True),

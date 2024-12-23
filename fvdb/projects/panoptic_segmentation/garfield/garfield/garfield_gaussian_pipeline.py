@@ -1,35 +1,30 @@
+import time
 import typing
 from dataclasses import dataclass, field
-from typing import Literal, Type, Mapping, Any, Optional, List, Dict
-from torchtyping import TensorType
 from pathlib import Path
+from typing import Any, Dict, List, Literal, Mapping, Optional, Type
+
+import cv2
+import open3d as o3d
+import torch
+import tqdm
 import trimesh
 import viser
 import viser.transforms as vtf
-import open3d as o3d
-import cv2
-import time
-
-import torch
-from nerfstudio.pipelines.base_pipeline import VanillaPipeline, VanillaPipelineConfig
-from torch.cuda.amp.grad_scaler import GradScaler
-from nerfstudio.viewer.viewer_elements import *
-from nerfstudio.viewer.viewer import VISER_NERFSTUDIO_SCALE_RATIO
-from nerfstudio.models.splatfacto import SplatfactoModel
-
 from cuml.cluster.hdbscan import HDBSCAN
-from nerfstudio.models.splatfacto import RGB2SH
-
-import tqdm
-
-from sklearn.preprocessing import QuantileTransformer
-from sklearn.neighbors import NearestNeighbors
-
-from scipy.spatial.transform import Rotation as Rot
-
-from garfield.garfield_datamanager import GarfieldDataManagerConfig, GarfieldDataManager
+from garfield.garfield_datamanager import GarfieldDataManager, GarfieldDataManagerConfig
 from garfield.garfield_model import GarfieldModel, GarfieldModelConfig
-from garfield.garfield_pipeline import GarfieldPipelineConfig, GarfieldPipeline
+from garfield.garfield_pipeline import GarfieldPipeline, GarfieldPipelineConfig
+from nerfstudio.models.splatfacto import RGB2SH, SplatfactoModel
+from nerfstudio.pipelines.base_pipeline import VanillaPipeline, VanillaPipelineConfig
+from nerfstudio.viewer.viewer import VISER_NERFSTUDIO_SCALE_RATIO
+from nerfstudio.viewer.viewer_elements import *
+from scipy.spatial.transform import Rotation as Rot
+from sklearn.neighbors import NearestNeighbors
+from sklearn.preprocessing import QuantileTransformer
+from torch.cuda.amp.grad_scaler import GradScaler
+from torchtyping import TensorType
+
 
 def quat_to_rotmat(quat):
     assert quat.shape[-1] == 4, quat.shape
@@ -50,6 +45,7 @@ def quat_to_rotmat(quat):
     )
     return mat.reshape(quat.shape[:-1] + (3, 3))
 
+
 def generate_random_colors(N=5000) -> torch.Tensor:
     """Generate random colors for visualization"""
     hs = np.random.uniform(0, 1, size=(N, 1))
@@ -64,6 +60,7 @@ def generate_random_colors(N=5000) -> torch.Tensor:
 @dataclass
 class GarfieldGaussianPipelineConfig(VanillaPipelineConfig):
     """Gaussian Splatting, but also loading GARField grouping field from ckpt."""
+
     _target: Type = field(default_factory=lambda: GarfieldGaussianPipeline)
     garfield_ckpt: Optional[Path] = None  # Need to specify this
 
@@ -77,6 +74,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
 
     Note that the pipeline training must be stopped before you can interact with the scene!!
     """
+
     model: SplatfactoModel
     garfield_pipeline: List[GarfieldPipeline]  # To avoid importing Viewer* from nerf pipeline
     state_stack: List[Dict[str, TensorType]]  # To revert to previous state
@@ -100,9 +98,8 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         print("Loading instance feature model...")
         assert config.garfield_ckpt is not None, "Need to specify garfield checkpoint"
         from nerfstudio.utils.eval_utils import eval_setup
-        _, garfield_pipeline, _, _ = eval_setup(
-            config.garfield_ckpt, test_mode="inference"
-        )
+
+        _, garfield_pipeline, _, _ = eval_setup(config.garfield_ckpt, test_mode="inference")
         self.garfield_pipeline = [garfield_pipeline]
         self.state_stack = []
 
@@ -114,7 +111,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
             "Interaction Method",
             default_value="Interactive",
             options=["Interactive", "Clustering"],
-            cb_hook=self._update_interaction_method
+            cb_hook=self._update_interaction_method,
         )
 
         self.click_gaussian = ViewerButton(name="Click", cb_hook=self._click_gaussian)
@@ -122,31 +119,53 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         self.click_handle = None
 
         self.crop_to_click = ViewerButton(name="Crop to Click", cb_hook=self._crop_to_click, disabled=True)
-        self.crop_to_group_level = ViewerSlider(name="Group Level", min_value=0, max_value=29, step=1, default_value=0, cb_hook=self._update_crop_vis, disabled=True)
+        self.crop_to_group_level = ViewerSlider(
+            name="Group Level",
+            min_value=0,
+            max_value=29,
+            step=1,
+            default_value=0,
+            cb_hook=self._update_crop_vis,
+            disabled=True,
+        )
         self.crop_group_list = []
 
         self.move_current_crop = ViewerButton(name="Drag Current Crop", cb_hook=self._drag_current_crop, disabled=True)
         self.crop_transform_handle = None
 
-        self.cluster_scene = ViewerButton(name="Cluster Scene", cb_hook=self._cluster_scene, disabled=False, visible=False)
-        self.cluster_scene_scale = ViewerSlider(name="Cluster Scale", min_value=0.0, max_value=2.0, step=0.01, default_value=0.0, disabled=False, visible=False)
-        self.cluster_scene_shuffle_colors = ViewerButton(name="Reshuffle Cluster Colors", cb_hook=self._reshuffle_cluster_colors, disabled=False, visible=False)
+        self.cluster_scene = ViewerButton(
+            name="Cluster Scene", cb_hook=self._cluster_scene, disabled=False, visible=False
+        )
+        self.cluster_scene_scale = ViewerSlider(
+            name="Cluster Scale",
+            min_value=0.0,
+            max_value=2.0,
+            step=0.01,
+            default_value=0.0,
+            disabled=False,
+            visible=False,
+        )
+        self.cluster_scene_shuffle_colors = ViewerButton(
+            name="Reshuffle Cluster Colors", cb_hook=self._reshuffle_cluster_colors, disabled=False, visible=False
+        )
         self.cluster_labels = None
 
         self.reset_state = ViewerButton(name="Reset State", cb_hook=self._reset_state, disabled=True)
 
-        self.z_export_options = ViewerCheckbox(name="Export Options", default_value=False, cb_hook=self._update_export_options)
+        self.z_export_options = ViewerCheckbox(
+            name="Export Options", default_value=False, cb_hook=self._update_export_options
+        )
         self.z_export_options_visible_gaussians = ViewerButton(
-            name="Export Visible Gaussians",
-            visible=False,
-            cb_hook=self._export_visible_gaussians
-            )
+            name="Export Visible Gaussians", visible=False, cb_hook=self._export_visible_gaussians
+        )
         self.z_export_options_camera_path_filename = ViewerText("Camera Path Filename", "", visible=False)
-        self.z_export_options_camera_path_render = ViewerButton("Render Current Pipeline", cb_hook=self.render_from_path, visible=False)
+        self.z_export_options_camera_path_render = ViewerButton(
+            "Render Current Pipeline", cb_hook=self.render_from_path, visible=False
+        )
 
     def _update_interaction_method(self, dropdown: ViewerDropdown):
         """Update the UI based on the interaction method"""
-        hide_in_interactive = (not (dropdown.value == "Interactive")) # i.e., hide if in interactive mode
+        hide_in_interactive = not (dropdown.value == "Interactive")  # i.e., hide if in interactive mode
 
         self.cluster_scene.set_hidden((not hide_in_interactive))
         self.cluster_scene_scale.set_hidden((not hide_in_interactive))
@@ -194,12 +213,14 @@ class GarfieldGaussianPipeline(VanillaPipeline):
     def _queue_state(self):
         """Save current state to stack"""
         import copy
-        self.state_stack.append(copy.deepcopy({k:v.detach() for k,v in self.model.gauss_params.items()}))
+
+        self.state_stack.append(copy.deepcopy({k: v.detach() for k, v in self.model.gauss_params.items()}))
         self.reset_state.set_disabled(False)
 
     def _click_gaussian(self, button: ViewerButton):
         """Start listening for click-based 3D point specification.
         Refer to garfield_interaction.py for more details."""
+
         def del_handle_on_rayclick(click: ViewerClick):
             self._on_rayclick(click)
             self.click_gaussian.set_disabled(False)
@@ -248,7 +269,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         assert self.click_location is not None, "Need to specify click location"
 
         self._queue_state()  # Save current state
-        curr_means = self.model.gauss_params['means'].detach()
+        curr_means = self.model.gauss_params["means"].detach()
         self.model.eval()
 
         # The only way to reset is to reset the state using the reset button.
@@ -286,7 +307,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
             keeps = torch.where(affinity < 0.5)[0].cpu()
             keep_points = points.select_by_index(keeps.tolist())  # indices of gaussians
 
-            # Here, we desire the gaussian groups to be grouped tightly together spatially. 
+            # Here, we desire the gaussian groups to be grouped tightly together spatially.
             # We use DBSCAN to group the gaussians together, and choose the cluster that contains the click point.
             # Note that there may be spuriously high affinity between points that are spatially far apart,
             #  possibly due two different groups being considered together at an odd angle / far viewpoint.
@@ -309,9 +330,9 @@ class GarfieldGaussianPipeline(VanillaPipeline):
                 curr_points_ds_selected[curr_points_ds_ids] = True
 
                 _clusters = np.asarray(curr_points_ds.cluster_dbscan(eps=0.02, min_points=5))
-                nn_model = NearestNeighbors(
-                    n_neighbors=1, algorithm="auto", metric="euclidean"
-                ).fit(np.asarray(curr_points_ds.points))
+                nn_model = NearestNeighbors(n_neighbors=1, algorithm="auto", metric="euclidean").fit(
+                    np.asarray(curr_points_ds.points)
+                )
 
                 _, indices = nn_model.kneighbors(np.asarray(keep_points.points)[~curr_points_ds_selected])
 
@@ -356,7 +377,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         self.click_location = None
         self.click_handle.remove()
         self.click_handle = None
-        
+
         self.crop_group_list = keep_list
         self.crop_to_group_level.set_disabled(False)
         self.crop_to_group_level.value = 29
@@ -369,7 +390,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
             return
         if len(self.state_stack) == 0:
             return
-        
+
         # Clamp the number to be within the range of possible crops
         if number.value > len(self.crop_group_list) - 1:
             number.value = len(self.crop_group_list) - 1
@@ -387,11 +408,11 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         """Add a transform control to the current scene, and update the model accordingly."""
         self.crop_to_group_level.set_disabled(True)  # Disable user from changing crop
         self.move_current_crop.set_disabled(True)  # Disable user from creating another drag handle
-        
-        scene_centroid = self.model.gauss_params['means'].detach().mean(dim=0)
+
+        scene_centroid = self.model.gauss_params["means"].detach().mean(dim=0)
         self.crop_transform_handle = self.viewer_control.viser_server.add_transform_controls(
             name=f"/scene_transform",
-            position=(VISER_NERFSTUDIO_SCALE_RATIO*scene_centroid).cpu().numpy(),
+            position=(VISER_NERFSTUDIO_SCALE_RATIO * scene_centroid).cpu().numpy(),
         )
 
         # Visualize the whole scene -- the points corresponding to the crop will be controlled by the transform handle.
@@ -400,8 +421,8 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         for name in self.model.gauss_params.keys():
             self.model.gauss_params[name] = prev_state[name].clone()
 
-        curr_means = self.model.gauss_params['means'].clone().detach()
-        curr_rotmats = quat_to_rotmat(self.model.gauss_params['quats'][crop_inds].detach())
+        curr_means = self.model.gauss_params["means"].clone().detach()
+        curr_rotmats = quat_to_rotmat(self.model.gauss_params["quats"][crop_inds].detach())
 
         @self.crop_transform_handle.on_update
         def _(_):
@@ -409,19 +430,22 @@ class GarfieldGaussianPipeline(VanillaPipeline):
             handle_position = handle_position / VISER_NERFSTUDIO_SCALE_RATIO
             handle_rotmat = quat_to_rotmat(torch.tensor(self.crop_transform_handle.wxyz).to(self.device).float())
 
-            means = self.model.gauss_params['means'].detach()
-            quats = self.model.gauss_params['quats'].detach()
+            means = self.model.gauss_params["means"].detach()
+            quats = self.model.gauss_params["quats"].detach()
 
-            means[crop_inds] = handle_position.float() + torch.matmul(
-                handle_rotmat, (curr_means[crop_inds] - curr_means[crop_inds].mean(dim=0)).T
-            ).T
-            quats[crop_inds] = torch.Tensor(Rot.from_matrix(
-                torch.matmul(handle_rotmat.float(), curr_rotmats.float()).cpu().numpy()
-            ).as_quat()).to(self.device)  # this is in xyzw format
+            means[crop_inds] = (
+                handle_position.float()
+                + torch.matmul(handle_rotmat, (curr_means[crop_inds] - curr_means[crop_inds].mean(dim=0)).T).T
+            )
+            quats[crop_inds] = torch.Tensor(
+                Rot.from_matrix(torch.matmul(handle_rotmat.float(), curr_rotmats.float()).cpu().numpy()).as_quat()
+            ).to(
+                self.device
+            )  # this is in xyzw format
             quats[crop_inds] = quats[crop_inds][:, [3, 0, 1, 2]]  # convert to wxyz format
 
-            self.model.gauss_params['means'] = torch.nn.Parameter(means.float())
-            self.model.gauss_params['quats'] = torch.nn.Parameter(quats.float())
+            self.model.gauss_params["means"] = torch.nn.Parameter(means.float())
+            self.model.gauss_params["quats"] = torch.nn.Parameter(quats.float())
 
             self.viewer_control.viewer._trigger_rerender()  # trigger viewer rerender
 
@@ -435,16 +459,16 @@ class GarfieldGaussianPipeline(VanillaPipeline):
 
         labels = self.cluster_labels
 
-        features_dc = self.model.gauss_params['features_dc'].detach()
-        features_rest = self.model.gauss_params['features_rest'].detach()
+        features_dc = self.model.gauss_params["features_dc"].detach()
+        features_rest = self.model.gauss_params["features_rest"].detach()
         for c_id in range(0, labels.max().int().item() + 1):
             # set the colors of the gaussians accordingly using colormap from matplotlib
             cluster_mask = np.where(labels == c_id)
-            features_dc[cluster_mask] = RGB2SH(colormap[c_id, :3].to(self.model.gauss_params['features_dc']))
+            features_dc[cluster_mask] = RGB2SH(colormap[c_id, :3].to(self.model.gauss_params["features_dc"]))
             features_rest[cluster_mask] = 0
 
-        self.model.gauss_params['features_dc'] = torch.nn.Parameter(self.model.gauss_params['features_dc'])
-        self.model.gauss_params['features_rest'] = torch.nn.Parameter(self.model.gauss_params['features_rest'])
+        self.model.gauss_params["features_dc"] = torch.nn.Parameter(self.model.gauss_params["features_dc"])
+        self.model.gauss_params["features_rest"] = torch.nn.Parameter(self.model.gauss_params["features_rest"])
         self.cluster_scene_shuffle_colors.set_disabled(False)
 
     def _cluster_scene(self, button: ViewerButton):
@@ -456,15 +480,15 @@ class GarfieldGaussianPipeline(VanillaPipeline):
 
         scale = self.cluster_scene_scale.value
         grouping_model = self.garfield_pipeline[0].model
-        
-        positions = self.model.gauss_params['means'].detach()
+
+        positions = self.model.gauss_params["means"].detach()
         group_feats = grouping_model.get_grouping_at_points(positions, scale).cpu().numpy()  # (N, 256)
         positions = positions.cpu().numpy()
 
         start = time.time()
 
         # Cluster the gaussians using HDBSCAN.
-        # We will first cluster the downsampled gaussians, then 
+        # We will first cluster the downsampled gaussians, then
         #  assign the full gaussians to the spatially closest downsampled gaussian.
 
         vec_o3d = o3d.utility.Vector3dVector(positions)
@@ -473,13 +497,11 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         max_bound = np.clip(pc_o3d.get_max_bound(), -1, 1)
         # downsample size to be a percent of the bounding box extent
         downsample_size = 0.01 * scale
-        pc, _, ids = pc_o3d.voxel_down_sample_and_trace(
-            max(downsample_size, 0.0001), min_bound, max_bound
-        )
+        pc, _, ids = pc_o3d.voxel_down_sample_and_trace(max(downsample_size, 0.0001), min_bound, max_bound)
         if len(ids) > 1e6:
             print(f"Too many points ({len(ids)}) to cluster... aborting.")
-            print( "Consider using interactive select to reduce points before clustering.")
-            print( "Are you sure you want to cluster? Press y to continue, else return.")
+            print("Consider using interactive select to reduce points before clustering.")
+            print("Are you sure you want to cluster? Press y to continue, else return.")
             # wait for input to continue, if yes then continue, else return
             if input() != "y":
                 self.cluster_scene.set_disabled(False)
@@ -509,9 +531,7 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         positions_np = positions[non_clustered]
         if positions_np.shape[0] > 0:  # i.e., if there were points removed during downsampling
             k = 1
-            nn_model = NearestNeighbors(
-                n_neighbors=k, algorithm="auto", metric="euclidean"
-            ).fit(positions_downsampled)
+            nn_model = NearestNeighbors(n_neighbors=k, algorithm="auto", metric="euclidean").fit(positions_downsampled)
             _, indices = nn_model.kneighbors(positions_np)
             clusterer.labels_[non_clustered] = labels[indices[:, 0]]
 
@@ -519,14 +539,12 @@ class GarfieldGaussianPipeline(VanillaPipeline):
         print(f"done. Took {time.time()-start} seconds. Found {labels.max() + 1} clusters.")
 
         noise_mask = labels == -1
-        if noise_mask.sum() != 0 and (labels>=0).sum() > 0:
+        if noise_mask.sum() != 0 and (labels >= 0).sum() > 0:
             # if there is noise, but not all of it is noise, relabel the noise
-            valid_mask = labels >=0
+            valid_mask = labels >= 0
             valid_positions = positions[valid_mask]
             k = 1
-            nn_model = NearestNeighbors(
-                n_neighbors=k, algorithm="auto", metric="euclidean"
-            ).fit(valid_positions)
+            nn_model = NearestNeighbors(n_neighbors=k, algorithm="auto", metric="euclidean").fit(valid_positions)
             noise_positions = positions[noise_mask]
             _, indices = nn_model.kneighbors(noise_positions)
             # for now just pick the closest cluster
@@ -538,21 +556,21 @@ class GarfieldGaussianPipeline(VanillaPipeline):
 
         colormap = self.colormap
 
-        opacities = self.model.gauss_params['opacities'].detach()
+        opacities = self.model.gauss_params["opacities"].detach()
         opacities[labels < 0] = -100  # hide unclustered gaussians
-        self.model.gauss_params['opacities'] = torch.nn.Parameter(opacities.float())
+        self.model.gauss_params["opacities"] = torch.nn.Parameter(opacities.float())
 
         self.cluster_labels = torch.Tensor(labels)
-        features_dc = self.model.gauss_params['features_dc'].detach()
-        features_rest = self.model.gauss_params['features_rest'].detach()
+        features_dc = self.model.gauss_params["features_dc"].detach()
+        features_rest = self.model.gauss_params["features_rest"].detach()
         for c_id in range(0, labels.max() + 1):
             # set the colors of the gaussians accordingly using colormap from matplotlib
             cluster_mask = np.where(labels == c_id)
-            features_dc[cluster_mask] = RGB2SH(colormap[c_id, :3].to(self.model.gauss_params['features_dc']))
+            features_dc[cluster_mask] = RGB2SH(colormap[c_id, :3].to(self.model.gauss_params["features_dc"]))
             features_rest[cluster_mask] = 0
 
-        self.model.gauss_params['features_dc'] = torch.nn.Parameter(self.model.gauss_params['features_dc'])
-        self.model.gauss_params['features_rest'] = torch.nn.Parameter(self.model.gauss_params['features_rest'])
+        self.model.gauss_params["features_dc"] = torch.nn.Parameter(self.model.gauss_params["features_dc"])
+        self.model.gauss_params["features_rest"] = torch.nn.Parameter(self.model.gauss_params["features_rest"])
 
         self.cluster_scene.set_disabled(False)
         self.viewer_control.viewer._trigger_rerender()  # trigger viewer rerender
@@ -565,8 +583,9 @@ class GarfieldGaussianPipeline(VanillaPipeline):
 
         # Copied from exporter.py
         from collections import OrderedDict
+
         map_to_tensors = OrderedDict()
-        model=self.model
+        model = self.model
 
         with torch.no_grad():
             positions = model.means.cpu().numpy()
@@ -619,17 +638,18 @@ class GarfieldGaussianPipeline(VanillaPipeline):
                 map_to_tensors[k] = map_to_tensors[k][select]
             count = np.sum(select)
         from nerfstudio.scripts.exporter import ExportGaussianSplat
+
         ExportGaussianSplat.write_ply(str(filename), count, map_to_tensors)
 
-
     def render_from_path(self, button: ViewerButton):
-        from nerfstudio.cameras.camera_paths import get_path_from_json
         import json
+
+        from nerfstudio.cameras.camera_paths import get_path_from_json
         from nerfstudio.scripts.render import _render_trajectory_video
 
         assert self.z_export_options_camera_path_filename.value != ""
         camera_path_filename = Path(self.z_export_options_camera_path_filename.value)
-        
+
         with open(camera_path_filename, "r", encoding="utf-8") as f:
             camera_path = json.load(f)
         seconds = camera_path["seconds"]
@@ -639,9 +659,9 @@ class GarfieldGaussianPipeline(VanillaPipeline):
             _render_trajectory_video(
                 self,
                 camera_path,
-                output_filename=Path('render.mp4'),
-                rendered_output_names=['rgb'],
-                rendered_resolution_scaling_factor=1.0 ,
+                output_filename=Path("render.mp4"),
+                rendered_output_names=["rgb"],
+                rendered_resolution_scaling_factor=1.0,
                 seconds=seconds,
                 output_format="video",
             )

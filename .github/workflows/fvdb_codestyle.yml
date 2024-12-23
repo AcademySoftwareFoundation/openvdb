@@ -78,3 +78,4 @@ jobs:
             openvdb/openvdb/math/Half.h
             openvdb_wolfram/OpenVDBLink
             openvdb_ax/openvdb_ax/grammar/generated
+            fvdb/projects/panoptic_segmentation/garfield/garfield

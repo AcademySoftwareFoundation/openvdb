@@ -1,6 +1,6 @@
-from enum import Enum
-from typing import Dict, List, Optional, Tuple, Callable, Any, Type
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import torch
@@ -66,9 +66,7 @@ class GarfieldField(Field):
         # This is a trick to make the hashgrid encoding work with the TCNN library.
         self.enc_list = torch.nn.ModuleList(
             [
-                self._get_encoding(
-                    hashgrid_cfg["resolution_range"][i], hashgrid_cfg["level"][i]
-                )
+                self._get_encoding(hashgrid_cfg["resolution_range"][i], hashgrid_cfg["level"][i])
                 for i in range(len(hashgrid_cfg["level"]))
             ]
         )
@@ -90,9 +88,7 @@ class GarfieldField(Field):
         self.quantile_transformer = None  # for scale normalization
 
     @staticmethod
-    def _get_encoding(
-        res_range: Tuple[int, int], levels: int, indim=3, hash_size=19
-    ) -> tcnn.Encoding:
+    def _get_encoding(res_range: Tuple[int, int], levels: int, indim=3, hash_size=19) -> tcnn.Encoding:
         """
         Helper function to create a HashGrid encoding.
         """
