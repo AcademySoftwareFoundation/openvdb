@@ -59,6 +59,7 @@ GRID_TRAITS(openvdb::Vec3SGrid, "Vec3SGrid");
 GRID_TRAITS(openvdb::BoolGrid, "BoolGrid");
 #ifdef PY_OPENVDB_WRAP_ALL_GRID_TYPES
 GRID_TRAITS(openvdb::DoubleGrid, "DoubleGrid");
+GRID_TRAITS(openvdb::Int8Grid, "Int8Grid");
 GRID_TRAITS(openvdb::Int32Grid, "Int32Grid");
 GRID_TRAITS(openvdb::Int64Grid, "Int64Grid");
 GRID_TRAITS(openvdb::Vec3IGrid, "Vec3IGrid");
