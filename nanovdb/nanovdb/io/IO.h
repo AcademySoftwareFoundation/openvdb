@@ -14,7 +14,7 @@
 
     \note  This file does NOT depend on OpenVDB, but optionally on ZIP and BLOSC
 
-    \details NanoVDB files take on one of two following formats:
+    \details NanoVDB files take on one of the two following formats:
              1) multiple segments each with multiple grids (segments have easy to access metadata about its grids)
              2) starting with verion 32.6.0 nanovdb files also support a raw buffer with one or more grids (just a
              dump of a raw grid buffer, so no new metadata in headers as when using segments mentioned above).
