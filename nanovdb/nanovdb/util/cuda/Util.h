@@ -210,6 +210,17 @@ __global__ void lambdaKernel(const size_t numItems, Func func, Args... args)
     func(tid, args...);
 }// util::cuda::lambdaKernel
 
+/// @brief Cuda kernel that launches device lambda functions with a tid offset
+/// @param numItems Problem size
+/// @param offset Offset for thread id
+template<typename Func, typename... Args>
+__global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func func, Args... args)
+{
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numItems) return;
+    func(tid + offset, args...);
+}// util::cuda::offsetLambdaKernel
+
 #endif// __CUDACC__
 
 }// namespace util::cuda ============================================================
