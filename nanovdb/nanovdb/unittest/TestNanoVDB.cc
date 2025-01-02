@@ -13,6 +13,7 @@
 #include <algorithm> // for std::is_sorted
 #include <cmath>
 #include <cstdlib>
+#include <iomanip> // for std::setw, std::setfill
 
 #include <nanovdb/io/IO.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
