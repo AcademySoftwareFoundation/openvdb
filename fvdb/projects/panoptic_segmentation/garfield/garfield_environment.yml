@@ -30,6 +30,7 @@ dependencies:
   - tqdm
   - numpy<2
   - tyro
+  - gdown
   ##  nerfstudio
   - tensorboard
   - torchvision
