@@ -1,11 +1,9 @@
 name: fVDB Unit Tests
 
 on:
-  pull_request:
+  push:
     branches:
-        - 'master'
-        - 'feature/**'
-        - 'pr/**'
+      - "pull-request/[0-9]+"
     paths-ignore:
         - 'CHANGES'
         - 'CODEOWNERS'

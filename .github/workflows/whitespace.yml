@@ -2,10 +2,8 @@ name: Whitespace
 
 on:
   push:
-    paths-ignore:
-      - 'pendingchanges/**'
-      - 'tsc/meetings/**'
-  pull_request:
+    branches:
+      - "pull-request/[0-9]+"
     paths-ignore:
       - 'pendingchanges/**'
       - 'tsc/meetings/**'
