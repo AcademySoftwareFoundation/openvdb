@@ -2807,6 +2807,40 @@ TEST_F(TestOpenVDB, BBox)
     }
 }// BBox
 
+TEST_F(TestOpenVDB, CreateIndexGridFromOpen)
+{
+    using SrcGridT = openvdb::FloatGrid;
+    auto openGrid = this->getSrcGrid(false);// level set dragon or sphere
+    {// create and save an index grid with active values only using the old API
+        using DstBuildT = nanovdb::ValueOnIndex;
+        auto handle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*openGrid, 1);// include SDF values in channel 1
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_onindex1.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with active values only using the new API
+        using DstBuildT = nanovdb::ValueOnIndex;
+        auto handle = nanovdb::tools::openToIndexVDB<DstBuildT>(openGrid);
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_onindex2.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with both active and inactive values using the old API
+        using DstBuildT = nanovdb::ValueIndex;
+        auto handle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*openGrid, 1);// include SDF values in channel 1
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_index1.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with both active and inactive values using the new API
+        using DstBuildT = nanovdb::ValueIndex;
+        auto handle = nanovdb::tools::openToIndexVDB<DstBuildT>(openGrid);
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_index2.nvdb", handle, this->getCodec());
+    }
+}// CreateIndexGridFromOpen
+
 int main(int argc, char** argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
