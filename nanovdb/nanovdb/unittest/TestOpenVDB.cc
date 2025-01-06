@@ -1667,7 +1667,7 @@ TEST_F(TestOpenVDB, File)
     EXPECT_TRUE(dstGrid);
 
     EXPECT_TRUE(handles[0].data());
-    EXPECT_TRUE(handles[0].size() > 0);
+    EXPECT_TRUE(handles[0].bufferSize() > 0);
 
     auto kernel = [&](const openvdb::CoordBBox& bbox) {
         using CoordT = const nanovdb::Coord;
@@ -2783,6 +2783,63 @@ TEST_F(TestOpenVDB, Benchmark_OpenVDB_PointDataGrid)
 
 }// Benchmark_OpenVDB_PointDataGrid
 #endif
+
+// make testOpenVDB && ./unittest/testOpenVDB --gtest_filter="*BBox"
+TEST_F(TestOpenVDB, BBox)
+{
+    const double voxelSize = 5.0;
+    auto nanoHandle = nanovdb::tools::createFogVolumeBox<float>(40, 60, 100, nanovdb::Vec3d(0.0), voxelSize);
+    auto nanoGrid = nanoHandle.grid<float>();
+    EXPECT_TRUE(nanoGrid);
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    auto indexBBox = openGrid->evalActiveVoxelBoundingBox();
+    //std::cerr << "OpenVDB index bbox:\t" << indexBBox << std::endl;
+    //std::cerr << "NanoVDB index bbox:\t" << nanoGrid->indexBBox() << std::endl;
+    auto worldBBoxMin = openGrid->transform().indexToWorld(indexBBox.min());
+    auto worldBBoxMax = openGrid->transform().indexToWorld(indexBBox.max().offsetBy(1));// <----- !!!!!!!!!
+    //std::cout << "OpenVDB world bbox:\t" << worldBBoxMin << " -> " << worldBBoxMax << std::endl;
+    //std::cerr << "NanoVDB world bbox:\t" << nanoGrid->worldBBox() << std::endl;
+    for (int i=0; i<3; ++i) {
+        EXPECT_EQ(  nanoGrid->indexBBox()[0][i], indexBBox.min()[i]);
+        EXPECT_EQ(  nanoGrid->indexBBox()[1][i], indexBBox.max()[i]);
+        EXPECT_NEAR(nanoGrid->worldBBox()[0][i], worldBBoxMin[i], 1e-6);
+        EXPECT_NEAR(nanoGrid->worldBBox()[1][i], worldBBoxMax[i], 1e-6);
+    }
+}// BBox
+
+TEST_F(TestOpenVDB, CreateIndexGridFromOpen)
+{
+    using SrcGridT = openvdb::FloatGrid;
+    auto openGrid = this->getSrcGrid(false);// level set dragon or sphere
+    {// create and save an index grid with active values only using the old API
+        using DstBuildT = nanovdb::ValueOnIndex;
+        auto handle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*openGrid, 1);// include SDF values in channel 1
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_onindex1.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with active values only using the new API
+        using DstBuildT = nanovdb::ValueOnIndex;
+        auto handle = nanovdb::tools::openToIndexVDB<DstBuildT>(openGrid);
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_onindex2.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with both active and inactive values using the old API
+        using DstBuildT = nanovdb::ValueIndex;
+        auto handle = nanovdb::tools::createNanoGrid<SrcGridT, DstBuildT>(*openGrid, 1);// include SDF values in channel 1
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_index1.nvdb", handle, this->getCodec());
+    }
+    {// create and save an index grid with both active and inactive values using the new API
+        using DstBuildT = nanovdb::ValueIndex;
+        auto handle = nanovdb::tools::openToIndexVDB<DstBuildT>(openGrid);
+        auto* nanoGrid = handle.grid<DstBuildT>();
+        EXPECT_TRUE(nanoGrid);
+        nanovdb::io::writeGrid("data/ls_dragon_index2.nvdb", handle, this->getCodec());
+    }
+}// CreateIndexGridFromOpen
 
 int main(int argc, char** argv)
 {

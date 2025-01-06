@@ -4,22 +4,7 @@ name: AX
 on:
   push:
     branches:
-      - 'master'
-      - 'feature/**'
-      - 'pr/**'
-    paths-ignore:
-      - 'CHANGES'
-      - 'CODEOWNERS'
-      - 'doc/**'
-      - 'nanovdb/**'
-      - 'openvdb_maya/**'
-      - 'openvdb_houdini/**'
-      - 'fvdb/**'
-      - 'pendingchanges/**'
-      - '**.md'
-  pull_request:
-    branches:
-      - '**'
+      - "pull-request/[0-9]+"
     paths-ignore:
       - 'CHANGES'
       - 'CODEOWNERS'
@@ -55,7 +40,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -152,7 +137,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2023-clang15
     steps:

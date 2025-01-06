@@ -37,8 +37,7 @@ int main(int ac, char** av)
 
         const int width = 1024;
         const int height = 1024;
-        BufferT   imageBuffer;
-        imageBuffer.init(width * height * sizeof(float));
+        BufferT   imageBuffer(width * height * sizeof(float));
 
         runNanoVDB(handle, numIterations, width, height, imageBuffer);
 #if defined(NANOVDB_USE_OPENVDB)

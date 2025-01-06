@@ -4,18 +4,7 @@ name: Docs
 on:
   push:
     branches:
-      - 'master'
-      - 'feature/**'
-      - 'pr/**'
-    paths-ignore:
-      - 'CHANGES'
-      - 'openvdb_maya/**'
-      - 'pendingchanges/**'
-      - '**.md'
-      - 'fvdb/**'
-  pull_request:
-    branches:
-      - '**'
+      - "pull-request/[0-9]+"
     paths-ignore:
       - 'CHANGES'
       - 'openvdb_maya/**'
@@ -158,4 +147,3 @@ jobs:
           - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
 
           Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
-
