@@ -19,6 +19,7 @@
 #include <cub/util_allocator.cuh>
 #include <vector>
 #include <tuple>
+#include <cinttypes>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
@@ -705,7 +706,7 @@ jump:// this marks the beginning of the actual algorithm
             } else {// maxPointsPerVoxel = 1 so increase dx significantly
                 dx *= 10.0;
             }
-            if (mVerbose==2) printf("\ntarget density = %u, current density = %u current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
+            if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
             mData.map = Map(dx);
             mMemPool.free(mData.d_keys, mStream);
             mMemPool.free(mData.d_indx, mStream);

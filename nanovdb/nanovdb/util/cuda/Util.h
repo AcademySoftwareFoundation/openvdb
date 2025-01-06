@@ -142,7 +142,7 @@ inline void printDevInfo(int device, const char *preMsg = nullptr, std::FILE* fi
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, device);
     if (preMsg) fprintf(file, "%s ", preMsg);
-    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %lu GB of VRAM\n",
+    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %zu GB of VRAM\n",
             device, prop.name, prop.major, prop.minor, prop.totalGlobalMem >> 30);
 }
 
