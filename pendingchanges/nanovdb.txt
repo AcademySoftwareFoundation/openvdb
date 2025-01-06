@@ -1,3 +1,5 @@
+Added nanovdb::openToIndexVDB, which can convert an OpenVDB grid into a NanoVDB IndexGrid.
+Added new options "--index" and "--onIndex" to the command-line tool nanovdb_convert so it can produce IndexGrids 
 Added support for multiple GPUs to DeviceBuffer
 Added a UnifiedBuffer class that wraps CUDA unified memory
 Added example for multiGPU sparse convolution
