@@ -47,7 +47,7 @@ jobs:
 
       - name: Buid fvdb
         run: |
-          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($7/2.5); if(jobs<1) jobs=1; print jobs}'))) conda run --no-capture-output -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
+          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}'))) conda run --no-capture-output -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
 
       - name: Upload package
         uses: actions/upload-artifact@v4
