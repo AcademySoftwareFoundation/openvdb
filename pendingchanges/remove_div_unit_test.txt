@@ -1,0 +1,2 @@
+- Improvements:
+  - Added a unit-test to remove divergence of a velocity field on a MAC grid.
