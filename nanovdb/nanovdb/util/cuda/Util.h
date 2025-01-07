@@ -110,10 +110,11 @@ inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream){return cudaFreeAs
 #endif
 
 /// @brief Returns the device ID associated with the specified pointer
+/// @note  If @c ptr points to host memory (only) the return ID is either cudaInvalidDeviceId = -2 or cudaCpuDeviceId = -1
 inline int ptrToDevice(void *ptr)
 {
     cudaPointerAttributes ptrAtt;
-    cudaPointerGetAttributes(&ptrAtt, ptr);
+    cudaCheck(cudaPointerGetAttributes(&ptrAtt, ptr));
     return ptrAtt.device;
 }
 

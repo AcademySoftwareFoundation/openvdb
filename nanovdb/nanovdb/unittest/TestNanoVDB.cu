@@ -164,7 +164,7 @@ __global__ void testKernel(int device)
 {
     int dev;
     cudaError_t err = cudaGetDevice(&dev);
-    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
+    //if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
     if (dev != device) printf("Error: expected device ID = %i but was called with %i\n", dev, device);
 }
 
@@ -178,7 +178,11 @@ TEST(TestNanoVDBCUDA, DeviceStreamMap)
         EXPECT_EQ(count,   nanovdb::util::cuda::deviceCount());
         EXPECT_EQ(current, nanovdb::util::cuda::currentDevice());
         float *ptr = new float;
-        EXPECT_EQ(cudaInvalidDeviceId, nanovdb::util::cuda::ptrToDevice(ptr));
+        const int deviceID = nanovdb::util::cuda::ptrToDevice(ptr);
+        EXPECT_TRUE(cudaInvalidDeviceId == deviceID || cudaCpuDeviceId == deviceID);
+        EXPECT_GT(0, deviceID);
+        //EXPECT_EQ(cudaInvalidDeviceId, deviceID);
+        //EXPECT_EQ(cudaCpuDeviceId, deviceID);
         delete ptr;
         cudaCheck(cudaMalloc((void**)&ptr, sizeof(float)));
         EXPECT_EQ(current, nanovdb::util::cuda::ptrToDevice(ptr));
