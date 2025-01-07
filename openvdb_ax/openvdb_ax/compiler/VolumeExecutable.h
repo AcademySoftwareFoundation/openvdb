@@ -295,7 +295,7 @@ public:
 
 private:
     friend class Compiler;
-    
+
     FRIEND_TEST(TestVolumeExecutable, testConstructionDestruction);
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not

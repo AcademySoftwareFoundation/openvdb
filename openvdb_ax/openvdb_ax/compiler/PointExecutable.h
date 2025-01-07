@@ -169,7 +169,7 @@ public:
 
 private:
     friend class Compiler;
-    
+
     FRIEND_TEST(TestPointExecutable, testConstructionDestruction);
     FRIEND_TEST(TestPointExecutable, testAttributeCodecs);
 
