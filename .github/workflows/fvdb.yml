@@ -4,23 +4,23 @@ on:
   push:
     branches:
       - "pull-request/[0-9]+"
-    # paths-ignore:
-    #     - 'CHANGES'
-    #     - 'CODEOWNERS'
-    #     - 'doc/**'
-    #     - 'openvdb/**'
-    #     - 'openvdb_cmd/**'
-    #     - 'openvdb_ax/**'
-    #     - 'openvdb_maya/**'
-    #     - 'openvdb_houdini/**'
-    #     - 'nanovdb/**'
-    #     - 'pendingchanges/**'
-    #     - '**.md'
-    #     - 'fvdb/debug/**'
-    #     - 'fvdb/docs/**'
-    #     - 'fvdb/examples/**'
-    #     - 'fvdb/notebooks/**'
-    #     - 'fvdb/scripts/**'
+    paths-ignore:
+        - 'CHANGES'
+        - 'CODEOWNERS'
+        - 'doc/**'
+        - 'openvdb/**'
+        - 'openvdb_cmd/**'
+        - 'openvdb_ax/**'
+        - 'openvdb_maya/**'
+        - 'openvdb_houdini/**'
+        - 'nanovdb/**'
+        - 'pendingchanges/**'
+        - '**.md'
+        - 'fvdb/debug/**'
+        - 'fvdb/docs/**'
+        - 'fvdb/examples/**'
+        - 'fvdb/notebooks/**'
+        - 'fvdb/scripts/**'
 
 # Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
 concurrency:
