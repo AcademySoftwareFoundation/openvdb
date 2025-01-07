@@ -591,7 +591,6 @@ public:
             bool isDirichletPressure = (flag == 4);
             auto vNgbr = Vec3s::zero(); //dirichletVelocity->tree().getValue(neighbor);
 
-            // TODO: Double check this:
             if (isNeumannPressure) {
                 double delta = 0.0;
                 // Neumann pressure from bbox
@@ -620,7 +619,7 @@ public:
             } else if (isDirichletPressure) {
                 diagonal -= 1.0;
                 source -= dirichletBC;
-#if 0 // supposedly the same as the two lines above--checked on Friday.
+#if 0 // supposedly the same as the two lines above
                 // Dirichlet pressure
                 if (neighbor.x() + 1 == ijk.x() /* left x-face */) {
                     diagonal -= 1.0;
@@ -704,24 +703,6 @@ public:
         mPressure->setName("pressure");
     }
 
-    void render()
-    {
-        if (mVERBOSE) printRelevantVelocity("velocity init");
-
-        float divBefore = computeDivergence(mDivBefore, mVCurr, "before");
-        if (mVERBOSE) printGrid(*mDivBefore);
-
-        // Make the velocity divergence free by solving Poisson Equation and subtracting the pressure gradient
-        pressureProjection();
-        subtractPressureGradFromVel();
-
-        float divAfter = computeDivergence(mDivAfter, mVCurr, "after");
-        if (mVERBOSE) printGrid(*mDivAfter);
-
-        writeVDBsDebug(1);
-    }
-
-
     template<class GridType>
     typename GridType::Ptr
     initGridBgAndName(typename GridType::ValueType background, std::string name)
@@ -730,44 +711,6 @@ public:
         grid->setTransform(mXform);
         grid->setName(name);
         return grid;
-    }
-
-    template<class GridType>
-    void printGrid(const GridType& grid, std::string nameFromUser = "") {
-        using ValueType = typename GridType::ValueType;
-        auto name = nameFromUser != "" ? nameFromUser : grid.getName();
-        std::cout << "printGrid::Printing grid " << name << std::endl;
-        auto acc = grid.getAccessor();
-        for (auto iter = grid.beginValueOn(); iter; ++iter) {
-            math::Coord ijk = iter.getCoord();
-            std::cout << "val" << ijk << " = " << acc.getValue(ijk) << std::endl;
-        }
-        std::cout << std::endl;
-    }
-
-    void printRelevantVelocity(std::string nameFromUser = "") {
-        std::cout << "printRelevantVelocity::printing " << nameFromUser << std::endl;
-        auto flagsAcc = mFlags->getAccessor();
-        auto vAcc = mVCurr->getAccessor();
-        for (auto iter = mFlags->beginValueOn(); iter; ++iter) {
-            math::Coord ijk = iter.getCoord();
-            math::Coord im1jk = ijk.offsetBy(-1, 0, 0);
-            math::Coord ijm1k = ijk.offsetBy(0, -1, 0);
-            math::Coord ijkm1 = ijk.offsetBy(0, 0, -1);
-
-            int flag = flagsAcc.getValue(ijk);
-            int flagim1jk = flagsAcc.getValue(im1jk);
-            int flagijm1k = flagsAcc.getValue(ijm1k);
-            int flagijkm1 = flagsAcc.getValue(ijkm1);
-
-            if (flag == 1) {
-                std::cout << "vel" << ijk << " = " << vAcc.getValue(ijk) << std::endl;
-            } else {
-                if (flagim1jk == 1 || flagijm1k == 1 || flagijkm1 == 1) {
-                    std::cout << "vel" << ijk << " = " << vAcc.getValue(ijk) << std::endl;
-                }
-            }
-        }
     }
 
     void initFlags()
@@ -814,7 +757,6 @@ public:
         divGrid = tools::divergence(*vecGrid);
         divGrid->tree().topologyIntersection(mInteriorPressure->tree());
         float div = computeLInfinity(*divGrid);
-        std::cout << "Divergence " << suffix.c_str() << " = " << div << std::endl;
         return div;
     }
 
@@ -855,24 +797,6 @@ public:
         }
     }
 
-    void writeVDBsDebug(int const frame) {
-        std::ostringstream ss;
-        ss << "INIT_DEBUG" << std::setw(3) << std::setfill('0') << frame << ".vdb";
-        std::string fileName(ss.str());
-        io::File file(fileName.c_str());
-
-        openvdb::GridPtrVec grids;
-        grids.push_back(mFlags);
-        grids.push_back(mInteriorPressure);
-        grids.push_back(mVCurr);
-        grids.push_back(mDivBefore);
-        grids.push_back(mDivAfter);
-        grids.push_back(mPressure);
-
-        file.write(grids);
-        file.close();
-    }
-
     bool mVERBOSE = false;
 
     float mVoxelSize = 0.1f;
@@ -900,6 +824,7 @@ TEST_F(TestPoissonSolver, testRemoveDivergence)
     SmokeSolver smoke(0.1f);
 
     float divBefore = smoke.computeDivergence(smoke.mDivBefore, smoke.mVCurr, "before");
+    EXPECT_NEAR(divBefore, -39.425, 1.e-4f);
 
     // Make the velocity divergence free by solving Poisson Equation and subtracting the pressure gradient
     smoke.pressureProjection();
@@ -913,5 +838,4 @@ TEST_F(TestPoissonSolver, testRemoveDivergence)
 
     float divAfter = smoke.computeDivergence(smoke.mDivAfter, smoke.mVCurr, "after");
     EXPECT_TRUE(divAfter < 1.e-3f);
-    smoke.writeVDBsDebug(1 /* frame */);
 }
