@@ -4,7 +4,7 @@ This code is based on the official implementation for [GARField](https://github.
 
 ## Installation
 
-1. Create the `fvdb_garfield` environment with conda.  This will install or build all the necessary dependencies.
+1. Create the `fvdb_garfield` environment with conda.  This will install or build all the necessary dependencies.  This may take a while because some dependencies require building from source to build CUDA 12.1 versions.
    ```bash
    conda env create -f ./garfield_environment.yml
    ```
@@ -17,17 +17,22 @@ This code is based on the official implementation for [GARField](https://github.
 
 ## Running GARField
 
-1. Download example colmap data
+1. Download example image, camera info and COLMAP data
    ```bash
    ./download_example-data.py
    ```
 
-2. Run GARField on the example data
+2. Run the original GARField implementation on the example data
    ```bash
-   ns-train garfield --data ./data/figurines
+   ns-train garfield --data ./data/dozer_nerfgun_waldo
    ```
 
 3. (Optional) Run GARField with Gaussian Splatting geometry
    ```bash
-   ns-train garfield-gauss --data ./data/figurines --pipeline.garfield-ckpt outputs/figurines/garfied/[datetimestamp]/config.yml
+   ns-train garfield-gauss --data ./data/dozer_nerfgun_waldo --pipeline.garfield-ckpt outputs/dozer_nerfgun_waldo/garfied/[datetimestamp]/config.yml
+   ```
+
+4. Run fVDB 3D Gaussian Splatting on the example data
+   ```bash
+   python [fVDB_root]/examples/3dgs/train_colmap.py --data ./data/dozer_nerfgun_waldo
    ```
