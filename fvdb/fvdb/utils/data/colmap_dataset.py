@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import cv2
+import cv2.data
 import imageio.v2 as imageio
 import numpy as np
 import torch
@@ -215,7 +216,7 @@ class ColmapParser:
                 params = np.empty(0, dtype=np.float32)
                 camtype = "perspective"
             if type_ == 2 or type_ == "SIMPLE_RADIAL":
-                params = np.array([cam.k1], dtype=np.float32)
+                params = np.array([cam.k1, 0.0, 0.0, 0.0], dtype=np.float32)
                 camtype = "perspective"
             elif type_ == 3 or type_ == "RADIAL":
                 params = np.array([cam.k1, cam.k2, 0.0, 0.0], dtype=np.float32)
