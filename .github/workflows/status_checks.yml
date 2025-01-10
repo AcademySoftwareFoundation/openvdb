@@ -1,0 +1,16 @@
+name: Wait for Status Checks
+on:
+  pull_request:
+  push:
+    branches:
+      - "pull-request/[0-9]+"
+jobs:
+  enforce-all-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    steps:
+      - name: GitHub Checks
+        uses: poseidon/wait-for-status-checks@v0.6.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
