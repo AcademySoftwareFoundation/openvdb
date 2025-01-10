@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "fVDB"
-copyright = "2023, NVIDIA Corporation"
-author = "NVIDIA Corporation"
+copyright = "Contributors to the OpenVDB Project"
+author = "Contributors to the OpenVDB Project"
 
 
 # -- General configuration ---------------------------------------------------
