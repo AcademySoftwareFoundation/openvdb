@@ -37,7 +37,7 @@ class DownloadData:
             self.unzip_download(colmap_data)
             print(f"{self.dataset} COLMAP data downloaded and unzipped succesfully.")
 
-    def colmap_data_download(self)->Path:
+    def colmap_data_download(self) -> Path:
         colmap_datasets_url = "https://drive.google.com/drive/folders/1EQiZTPWk25yfRFA7UOEwd6hWlosIcOvB"
         files = gdown.download_folder(url=colmap_datasets_url, skip_download=True, quiet=True)
 
@@ -47,7 +47,9 @@ class DownloadData:
                 downloaded_filename = gdown.download(id=file.id, output=str(download_target_file))
                 break
         if not download_target_file.exists():
-            raise FileNotFoundError(f"COLMAP data {self.dataset} not found in the Google Drive folder {colmap_datasets_url}")
+            raise FileNotFoundError(
+                f"COLMAP data {self.dataset} not found in the Google Drive folder {colmap_datasets_url}"
+            )
         return downloaded_filename
 
     def dataset_download(self) -> str:
@@ -66,6 +68,7 @@ class DownloadData:
         with zipfile.ZipFile(downloaded_filename, "r") as zip_ref:
             zip_ref.extractall(downloaded_filename.parent)
         downloaded_filename.unlink()
+
 
 if __name__ == "__main__":
     tyro.cli(DownloadData).main()

@@ -5,7 +5,6 @@ import os
 from typing import Any, Dict, List, Optional
 
 import cv2
-import cv2.data
 import imageio.v2 as imageio
 import numpy as np
 import torch
