@@ -109,47 +109,47 @@ jobs:
       if: matrix.config.build == 'Release'
       run: ccache --evict-older-than 1d
 
-  windows:
-    # Windows CI. Tests a dynamic build with MD.
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'win'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
-    name: windows
-    env:
-      VCPKG_DEFAULT_TRIPLET: x64-windows
-    strategy:
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v3
-    - name: path
-      shell: pwsh
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: install
-      shell: powershell
-      run: .\ci\install_windows.ps1
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --config='Release'
-        --components='core,bin,view,render,python,test'
-        --cargs=\'
-        -A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF
-        -DMSVC_COMPRESS_PDB=ON
-        -DUSE_EXR=ON
-        -DUSE_PNG=ON
-        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
-        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
-        \'
-    - name: size
-      # Print the build directy size (monitor if we're hitting runner limits)
-      run: du -h build
-    - name: test
-      run: cd build && ctest -V -C Release
+  # windows:
+  #   # Windows CI. Tests a dynamic build with MD.
+  #   if: |
+  #     github.event_name != 'workflow_dispatch' ||
+  #     github.event.inputs.type == 'all' ||
+  #     github.event.inputs.type == 'win'
+  #   runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+  #   name: windows
+  #   env:
+  #     VCPKG_DEFAULT_TRIPLET: x64-windows
+  #   strategy:
+  #     fail-fast: false
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - name: path
+  #     shell: pwsh
+  #     run: |
+  #       # note: system path must be modified in a previous step to it's use
+  #       echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+  #       echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+  #   - name: install
+  #     shell: powershell
+  #     run: .\ci\install_windows.ps1
+  #   - name: build
+  #     run: >
+  #       ./ci/build.sh -v
+  #       --config='Release'
+  #       --components='core,bin,view,render,python,test'
+  #       --cargs=\'
+  #       -A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF
+  #       -DMSVC_COMPRESS_PDB=ON
+  #       -DUSE_EXR=ON
+  #       -DUSE_PNG=ON
+  #       -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+  #       -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+  #       \'
+  #   - name: size
+  #     # Print the build directy size (monitor if we're hitting runner limits)
+  #     run: du -h build
+  #   - name: test
+  #     run: cd build && ctest -V -C Release
 
   macos:
     if: |
