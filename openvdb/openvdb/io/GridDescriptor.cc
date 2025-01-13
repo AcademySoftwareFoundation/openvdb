@@ -5,7 +5,9 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Name.h>
+#include <openvdb/io/Compression.h>
 #include <sstream>
+#include <iostream>
 
 
 namespace openvdb {
@@ -94,6 +96,26 @@ GridDescriptor::read(std::istream &is)
     }
     // else
     GridBase::Ptr grid = GridBase::createGrid(mGridType);
+
+    // change the type of grid if it is desired and possible
+    Name desired_scalar_type = io::getStreamMetadataPtr(is)->desiredScalarType();
+    Name grid_value_type = grid->valueType();
+    
+    auto [reader, new_value_type] = io::ConvertingReaderFactory::create(grid_value_type, desired_scalar_type);
+    if (reader)
+    {
+        Name newGridType = mGridType;
+        newGridType.replace(newGridType.find(grid_value_type), grid_value_type.length(), new_value_type);
+
+        // Create the grid of the type if it has been registered.
+        if (GridBase::isRegistered(newGridType)) {
+            mGridType = newGridType;
+            mConvertingReader = reader;
+            grid = GridBase::createGrid(mGridType);
+        }
+    }
+
+    // TODO: store reader into grid/gd
     if (grid) grid->setSaveFloatAsHalf(mSaveFloatAsHalf);
 
     // Read in the offsets.

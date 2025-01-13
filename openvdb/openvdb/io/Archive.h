@@ -34,6 +34,8 @@ public:
     using Ptr = SharedPtr<Archive>;
     using ConstPtr = SharedPtr<const Archive>;
 
+    enum class ScalarConversion { None, Half };
+
     static const uint32_t DEFAULT_COMPRESSION_FLAGS;
 
     Archive();
@@ -97,6 +99,8 @@ public:
     /// @note Define the environment variable @c OPENVDB_DISABLE_DELAYED_LOAD
     /// to disable delayed loading unconditionally.
     static bool isDelayedLoadingEnabled();
+
+    static Name conversionToString(ScalarConversion conv);
 
 protected:
     /// @brief Return @c true if the input stream contains grid offsets
