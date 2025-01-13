@@ -6,7 +6,7 @@
                 "${env:CONDA_PREFIX}/envs/fvdb/include",
                 "${env:CONDA_PREFIX}/envs/fvdb/include/cuda",
                 "${workspaceFolder}/src",
-                "${workspaceFolder}/external/openvdb/nanovdb",
+                "${workspaceFolder}/../nanovdb",
                 "${workspaceFolder}/external/glm",
                 "${workspaceFolder}/external/cudnn_fe/include",
                 "${workspaceFolder}/external/cutlass/include",
