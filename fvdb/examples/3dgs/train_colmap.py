@@ -117,7 +117,8 @@ class Runner:
             "ellapsed_time": time.time() - self.train_start_time,
             "num_gaussians": self.model.num_gaussians,
         }
-        self.logger.info(f"Save checkpoint at step: {step}. Stats: {stats}")
+        checkpoint_path = f"{self.checkpoint_dir}/ckpt_{step:04d}.pt"
+        self.logger.info(f"Save checkpoint at step {step} to path {checkpoint_path}. Stats: {stats}.")
         with open(
             f"{self.stats_dir}/train_step{step:04d}.json",
             "w",
@@ -306,7 +307,7 @@ class Runner:
                     image_w=image_width,
                     image_h=image_height,
                     extrinsics_mat=world_to_cam_mats,
-                    intrincs_mat=intrinsics_mats,
+                    intrinsics_mats=intrinsics_mats,
                     rasterize_mode="classic",
                     sh_degree=sh_degree_to_use,
                     image_crop=crop,
@@ -399,7 +400,7 @@ class Runner:
                 image_w=width,
                 image_h=height,
                 extrinsics_mat=world_to_cam_mats,
-                intrincs_mat=intrinsics_mats,
+                intrinsics_mats=intrinsics_mats,
                 rasterize_mode="classic",
                 sh_degree=cfg.sh_degree,
                 render_depth=False,
@@ -465,7 +466,7 @@ class Runner:
             image_w=W,
             image_h=H,
             extrinsics_mat=c2w[None],
-            intrincs_mat=K[None],
+            intrinsics_mats=K[None],
             sh_degree=self.cfg.sh_degree,
             radius_clip=3.0,
             render_depth=False,

@@ -173,6 +173,42 @@ class GaussianSplat3D(nn.Module):
     def clear_cache(self):
         self._info_cache = {}
 
+    def render_rgb_and_depth(
+        self,
+        image_w: int,
+        image_h: int,
+        extrinsics_mat: torch.Tensor,
+        intrinsics_mat: torch.Tensor,
+        near_plane: float = 0.01,
+        far_plane: float = 1e10,
+        sh_degree: int = -1,
+        eps_2d: float = 0.3,
+        radius_clip: float = 0.0,
+        tile_size: int = 16,
+        rasterize_mode: Literal["classic", "antialiased"] = "classic",
+    ):
+        rgbd, alphas, _ = self(
+            image_w=image_w,
+            image_h=image_h,
+            extrinsics_mat=extrinsics_mat,
+            intrinsics_mat=intrinsics_mat,
+            near_plane=near_plane,
+            far_plane=far_plane,
+            sh_degree=sh_degree,
+            eps_2d=eps_2d,
+            radius_clip=radius_clip,
+            tile_size=tile_size,
+            image_crop=False,
+            render_depth=True,
+            rasterize_mode=rasterize_mode,
+            cache_info=False,
+            depth_only=False,
+        )
+        rgb = rgbd[..., :3]  # [B, H, W, 1]
+        depth = rgbd[..., 3:4] / alphas.clamp(min=1e-10)  # [B, H, W, 1]
+
+        return rgb, depth
+
     def render_depth_points(
         self,
         image_w: int,
@@ -191,7 +227,7 @@ class GaussianSplat3D(nn.Module):
             image_w=image_w,
             image_h=image_h,
             extrinsics_mat=extrinsics_mat,
-            intrincs_mat=intrinsics_mat,
+            intrinsics_mat=intrinsics_mat,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -223,7 +259,7 @@ class GaussianSplat3D(nn.Module):
         image_w: int,
         image_h: int,
         extrinsics_mat: torch.Tensor,
-        intrincs_mat: torch.Tensor,
+        intrinsics_mat: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -267,7 +303,7 @@ class GaussianSplat3D(nn.Module):
                     opacities=opacities,
                     sh_coeffs=sh,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -305,7 +341,7 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     near_plane=near_plane,
@@ -324,7 +360,7 @@ class GaussianSplat3D(nn.Module):
                     opacities=opacities,
                     sh_coeffs=sh,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,

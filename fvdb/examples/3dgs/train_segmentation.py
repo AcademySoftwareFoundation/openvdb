@@ -117,7 +117,7 @@ class Runner:
 
             # Forward pass
             feats, alphas, info = self.gs_model(
-                image_w=img_w, image_h=img_h, intrincs_mat=intrinsics, extrinsics_mat=world_to_cam
+                image_w=img_w, image_h=img_h, intrinsics_mats=intrinsics, extrinsics_mat=world_to_cam
             )
 
             # TODO (Francis): Don't use Pytorch caching allocator which causes massive fragmentation
