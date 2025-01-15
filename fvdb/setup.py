@@ -323,7 +323,7 @@ if __name__ == "__main__":
 
     # benchmarks are built separately using CMake, so exclude the source
     # directory from the extension build
-    exclude = ["benchmarks"]
+    exclude = ["benchmarks", "tests"]
 
     cwd = get_cwd()
     lib_ext = cpp_extension.CUDAExtension(
