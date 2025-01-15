@@ -120,7 +120,7 @@ void TestCodecs::testRegisteredCodecs()
             llvm::Type* ret = F->types(types, C);
             // currently expect codecs to ret void
             CPPUNIT_ASSERT_EQUAL(ret, codegen::LLVMType<void>::get(C));
-            // signature should be unqiue
+            // signature should be unique
             CPPUNIT_ASSERT(!decoderSignatures.count(types));
             decoderSignatures.insert(types);
         }
@@ -133,7 +133,7 @@ void TestCodecs::testRegisteredCodecs()
             llvm::Type* ret = F->types(types, C);
             // currently expect codecs to ret void
             CPPUNIT_ASSERT_EQUAL(ret, codegen::LLVMType<void>::get(C));
-            // signature should be unqiue
+            // signature should be unique
             CPPUNIT_ASSERT(!encoderSignatures.count(types));
             encoderSignatures.insert(types);
         }

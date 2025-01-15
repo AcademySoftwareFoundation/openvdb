@@ -156,7 +156,7 @@ memory or disk footprint.
 
 As mentioned in the introduction, the PointIndexTree is a structure in OpenVDB
 that stores an array of offset indices to a linear point array in the leaf
-nodes. In constrast, the PointDataTree stores the actual data localised in the
+nodes. In contrast, the PointDataTree stores the actual data localised in the
 leaf nodes.
 
 The PointIndexTree has this tree configuration:
@@ -196,7 +196,7 @@ data. While technically it would be valid to use a non-zero background value and
 tile value, this would simply mean that only the first voxel in the LeafNode
 contains points which is neither an efficient storage mechanism nor particularly
 common. For this reason, the LeafNode constructor may take a background value
-but it is internally overriden to be zero on construction.
+but it is internally overridden to be zero on construction.
 
 @subsection secPtActiveValues Active Values
 
@@ -224,7 +224,7 @@ for (; iterOn; ++iterOn) {
 }
 @endcode
 
-These are analagous to the value iterators in the LeafNode and are creating an
+These are analogous to the value iterators in the LeafNode and are creating an
 index iterator that wraps the value iterator together with a null filter.
 
 It is also possible to iterate over indices within a specific voxel by using the

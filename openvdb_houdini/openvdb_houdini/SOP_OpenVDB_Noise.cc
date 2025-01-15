@@ -348,8 +348,8 @@ SOP_OpenVDB_Noise::Cache::applyNoise(
     float noise, alpha;
 
     // The use of the GenericMap is a performance compromise
-    // because the GenericMap holdds a base class pointer.
-    // This should be optimized by resolving the acutal map type
+    // because the GenericMap holds a base class pointer.
+    // This should be optimized by resolving the actual map type
     cvdb::math::GenericMap map(grid);
 
     if (!mask) {

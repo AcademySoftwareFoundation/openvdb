@@ -129,7 +129,7 @@ struct TSHasTypeImpl<TypeList<T, Ts...>, T, Idx>
 
 
 /// @brief  Similar to TsAppendImpl but only appends types to a list if the
-///   type does not alreay exist in the list.
+///   type does not already exist in the list.
 /// @details Defines a new @c TypeList with non-unique types appended
 /// @tparam U      Type to append
 /// @tparam ListT  The @c TypeList to append to
@@ -152,7 +152,7 @@ public:
     ///   method historically did. e.g:
     ///      TypeList<float, int, float>::Unique<> can become:
     ///        a)  TypeList<float, int>  currently
-    ///        b)  TypeList<int, float>  if we used the afformentioned technique
+    ///        b)  TypeList<int, float>  if we used the aforementioned technique
     ///  Might be useful to have both? Complexity in (a) is currently linear so
     ///  this shouldn't be a problem, but be careful this doesn't change.
     //using type = TypeList<Ts...>;
@@ -174,7 +174,7 @@ struct TSAppendUniqueImpl<U, TypeList<Ts...>, false> {
 ///   @c TypeList for every type (first to last), only if the type does not
 ///   already exist in the new @c TypeList. This has the effect of dropping all
 ///   but the first of duplicate types.
-/// @warning  This implementation previously used an embdedded std::conditional
+/// @warning  This implementation previously used an embedded std::conditional
 ///   which resulted in drastically slow compilation times. If you're changing
 ///   this implementation make sure to profile compile times with larger lists.
 /// @tparam Ts Types within the @c TypeList
@@ -715,7 +715,7 @@ struct TypeList
     template <size_t First, size_t Last>
     using RemoveByIndex = typename typelist_internal::TSRemoveIndicesImpl<Self, First, Last>::type;
 
-    /// @brief Transform each type of this TypeList, rebuiling a new list of
+    /// @brief Transform each type of this TypeList, rebuilding a new list of
     ///        converted types. This method instantiates a user provided Opt<T> to
     ///        replace each type in the current list.
     /// @warning Transforming types to new TypeList<> objects causes them to expand to
@@ -723,7 +723,7 @@ struct TypeList
     /// @details Example:
     /// @code
     /// {
-    ///     // Templated type decl, where the type T will be subsituted for each type
+    ///     // Templated type decl, where the type T will be substituted for each type
     ///     // in the TypeList being transformed.
     ///     template <typename T>
     ///     using ConvertedType = typename openvdb::PromoteType<T>::Next;
@@ -834,18 +834,18 @@ struct TypeList
 };
 
 /// @brief  A trivial wrapper around a std::tuple but with compatible TypeList
-///   methods. Importantly can be instatiated from a TypeList and implements a
+///   methods. Importantly can be instantiated from a TypeList and implements a
 ///   similar ::foreach interface
 /// @warning  Some member methods here run on actual instances of types in the
 ///   list. As such, it's unlikely that they can always be resolved at compile
-///   time (unlike methods in TypeList). Compilers are notriously bad at
-///   automatically inlining recursive/nested template instations (without fine
+///   time (unlike methods in TypeList). Compilers are notoriously bad at
+///   automatically inlining recursive/nested template instantiations (without fine
 ///   tuning inline options to the frontend) so the public API of this class is
 ///   marked as force inlined. You can disable this behaviour by defining:
 ///      OPENVDB_TYPELIST_NO_FORCE_INLINE
 ///   before including this header. Note however that the ValueAccessor uses
 ///   this API and disabling force inlining can cause significant performance
-///   degredation.
+///   degradation.
 template<typename... Ts>
 struct TupleList
 {
@@ -949,7 +949,7 @@ private:
     TupleT mTuple;
 };
 
-/// @brief  Specilization of an empty TupleList. Required due to constructor
+/// @brief  Specialization of an empty TupleList. Required due to constructor
 ///   selection.
 template<>
 struct TupleList<>

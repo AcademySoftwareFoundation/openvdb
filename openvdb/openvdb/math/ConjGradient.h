@@ -684,7 +684,7 @@ Vector<T>::dot(const Vector<T>& other) const
 
         // Compute the dot product by segmenting the arrays into
         // a predetermined number of sub arrays in parallel and
-        // accumulate the finial result in series.
+        // accumulate the final result in series.
 
         const SizeType binCount = 100;
         T partialSums[100];

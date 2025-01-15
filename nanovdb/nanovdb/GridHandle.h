@@ -318,7 +318,7 @@ public:
     /// @param gridName string name of the grid to be read
     /// @param pool optional pool from which to allocate the new grid buffer
     /// @throw Will throw a std::ios_base::failure if the file does not exist and a
-    ///        std::logic_error if the files does not contain a valid raw grid withe the specified name
+    ///        std::logic_error if the files does not contain a valid raw grid with the specified name
     void read(const std::string &fileName, const std::string &gridName, const BufferT& pool = BufferT()) {
         std::ifstream is(fileName, std::ios::in | std::ios::binary);
         if (!is.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for input");

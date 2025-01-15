@@ -33,7 +33,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # a compiler with complete support for our MINIMUM_CXX_STANDARD (currently 17).
   # What's usually important is that the version of libstdc++ and glibc in use
   # matches. Compilers other than GCC should provide options to ensure this
-  # targetting e.g. --gcc-toolchain and -fgnuc-version with Clang.
+  # targeting e.g. --gcc-toolchain and -fgnuc-version with Clang.
   set(MINIMUM_GCC_VERSION 11.2.1)
   set(MINIMUM_CLANG_VERSION 5.0)
   set(MINIMUM_ICC_VERSION 19)

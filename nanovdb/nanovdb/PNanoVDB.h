@@ -442,7 +442,7 @@ float pnanovdb_min(float a, float b) { return min(a, b); }
 float pnanovdb_max(float a, float b) { return max(a, b); }
 #endif
 
-// ------------------------------------------------ Coord/Vec3 Utilties -----------------------------------------------------------
+// ------------------------------------------------ Coord/Vec3 Utilities -----------------------------------------------------------
 
 #if defined(PNANOVDB_C)
 PNANOVDB_FORCE_INLINE pnanovdb_vec3_t pnanovdb_vec3_uniform(float a)
@@ -1638,7 +1638,7 @@ struct pnanovdb_grid_type_constants_t
 };
 PNANOVDB_STRUCT_TYPEDEF(pnanovdb_grid_type_constants_t)
 
-// The following table with offsets will nedd to be updates as new GridTypes are added in NanoVDB.h
+// The following table with offsets will need to be updates as new GridTypes are added in NanoVDB.h
 PNANOVDB_STATIC_CONST pnanovdb_grid_type_constants_t pnanovdb_grid_type_constants[PNANOVDB_GRID_TYPE_END] =
 {
 {28, 28, 28, 28, 28, 32,  0, 8, 20, 32,  8224, 8224, 8224, 8224, 8224, 270368,  1056, 1056, 1056, 1056, 1056, 33824,  80, 80, 80, 80, 96, 96},

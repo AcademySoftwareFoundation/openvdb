@@ -2354,7 +2354,7 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
                 // Get max coordinates of the child node that contains voxel xyz.
                 max = this->offsetToGlobalCoord(n).offsetBy(ChildT::DIM-1);
 
-                // Get the bbox of the interection of bbox and the child node
+                // Get the bbox of the interaction of bbox and the child node
                 CoordBBox sub(xyz, Coord::minComponent(bbox.max(), max));
 
                 if (this->isChildMaskOn(n)) {//is a child

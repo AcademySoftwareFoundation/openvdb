@@ -60,7 +60,7 @@ class Extrema;
 /// @tparam BuildT Build type of the input grid
 /// @param grid typed grid
 /// @param bbox index bounding box in which min/max are computed
-/// @return Extream of values insixe @c bbox
+/// @return Extrema of values inside @c bbox
 template<typename BuildT>
 Extrema<typename NanoGrid<BuildT>::ValueType>
 getExtrema(const NanoGrid<BuildT>& grid, const CoordBBox &bbox);
@@ -245,7 +245,7 @@ class Stats<ValueT, 0> : public Extrema<ValueT, 0>
 {
 protected:
     using BaseT = Extrema<ValueT, 0>;
-    using RealT = double; // for accuracy the internal precission must be 64 bit floats
+    using RealT = double; // for accuracy the internal precision must be 64 bit floats
     size_t mSize;
     double mAvg, mAux;
 

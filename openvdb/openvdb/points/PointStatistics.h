@@ -33,7 +33,7 @@ namespace points {
 /// @brief Evaluates the minimum and maximum values of a point attribute.
 /// @details Performs parallel reduction by comparing values using their less
 ///   than and greater than operators. If the PointDataGrid is empty or the
-///   filter evalutes to empty, zeroVal<ValueT>() is returned for both values.
+///   filter evaluates to empty, zeroVal<ValueT>() is returned for both values.
 /// @note The ValueT of the attribute must be copy constructible. This method
 ///   will throw if the templated ValueT does not match the given attribute.
 ///   For vectors and matrices, this results in per component comparisons.
@@ -57,7 +57,7 @@ evalMinMax(const PointDataTreeT& points,
 ///   reduction arithmetic and return value precision evaluates to:
 ///      ConvertElementType<ValueT, double>::Type
 ///   which, for POD and VDB math types, is ValueT at double precision. If the
-///   PointDataGrid is empty or the filter evalutes to empty, zeroVal<ValueT>()
+///   PointDataGrid is empty or the filter evaluates to empty, zeroVal<ValueT>()
 ///   is returned.
 /// @note The ConvertElementType of the attribute must be copy constructible,
 ///   support the same type + - * operators and * / operators from a double.
@@ -82,7 +82,7 @@ evalAverage(const PointDataTreeT& points,
 ///   arithmetic and return value precision evaluates to:
 ///      PromoteType<ValueT>::Highest
 ///   which, for POD and VDB math types, is ValueT at its highest bit precision.
-///   If the PointDataGrid is empty or the filter evalutes to empty,
+///   If the PointDataGrid is empty or the filter evaluates to empty,
 ///   zeroVal<ValueT>() is returned.
 /// @note The PromoteType of the attribute must be copy constructible, support
 ///   the same type + operator. This method will throw if ValueT does not match

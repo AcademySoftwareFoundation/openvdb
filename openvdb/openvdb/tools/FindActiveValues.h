@@ -15,7 +15,7 @@
 /// @warning For repeated calls to the free-standing functions defined below
 ///          consider instead creating an instance of FindActiveValues
 ///          and then repeatedly call its member methods. This assumes the tree
-///          to be constant between calls but is sightly faster.
+///          to be constant between calls but is slightly faster.
 ///
 ///////////////////////////////////////////////////////////////////////////
 

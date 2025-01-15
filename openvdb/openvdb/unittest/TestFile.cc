@@ -337,7 +337,7 @@ TestFile::testWriteMultipleGrids()
     EXPECT_EQ(1, grid_in->getValue(Coord(1000, 1000, 16000)));
 
     /////////////////////////////////////////////////////////////////
-    // Now read in the second grid descriptor. Make use of hte end offset.
+    // Now read in the second grid descriptor. Make use of the end offset.
     ///////////////////////////////////////////////////////////////
 
     gd_in.seekToEnd(istr);

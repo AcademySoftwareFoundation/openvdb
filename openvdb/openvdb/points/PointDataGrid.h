@@ -1703,7 +1703,7 @@ struct PointDataNodeChain<tree::InternalNode<ChildT, Log2Dim>, /*HeadLevel=*/1>
 } // namespace internal
 
 
-/// @brief Similiar to ValueConverter, but allows for tree configuration conversion
+/// @brief Similar to ValueConverter, but allows for tree configuration conversion
 /// to a PointDataTree. ValueConverter<PointDataIndex32> cannot be used as a
 /// PointDataLeafNode is not a specialization of LeafNode
 template <typename TreeType>

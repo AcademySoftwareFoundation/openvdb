@@ -45,7 +45,7 @@ namespace tools {
 /// @param closingSteps    Number of morphological closing steps used to fill gaps
 ///                        in the active voxel region.
 /// @param dilation        Number of voxels to expand the active voxel region.
-/// @param smoothingSteps  Number of smoothing interations.
+/// @param smoothingSteps  Number of smoothing interactions.
 template<typename GridT>
 typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid,
@@ -66,7 +66,7 @@ topologyToLevelSet(const GridT& grid,
 /// @param closingSteps    Number of morphological closing steps used to fill gaps
 ///                        in the active voxel region.
 /// @param dilation        Number of voxels to expand the active voxel region.
-/// @param smoothingSteps  Number of smoothing interations.
+/// @param smoothingSteps  Number of smoothing interactions.
 /// @param interrupt       Optional object adhering to the util::NullInterrupter interface.
 template<typename GridT, typename InterrupterT>
 typename GridT::template ValueConverter<float>::Type::Ptr
@@ -165,7 +165,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
     tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
         OffsetAndMinComp<TreeType>(nodes, filterGrid.tree(), -offset));
 
-    // Clean up any damanage that was done by the min operation
+    // Clean up any damage that was done by the min operation
     normalizeLevelSet(grid, halfBandWidthInVoxels, interrupt);
 }
 

@@ -92,7 +92,7 @@ TEST_F(TestGradient, testISGradientStencil)
 
     // Index Space Gradients: stencil version
     Vec3f result;
-    // this stencil is large enough for all thie different schemes used
+    // this stencil is large enough for all the different schemes used
     // in this test
     math::NineteenPointStencil<FloatGrid> stencil(*grid);
     stencil.moveTo(xyz);
@@ -308,7 +308,7 @@ TEST_F(TestGradient, testWSGradientStencilFrustum)
     math::Vec3s result =
           math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
 
-    // The Gradient should be unit lenght for this case
+    // The Gradient should be unit length for this case
     EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     math::Vec3d wsVec = transform->indexToWorld(xyz);
@@ -326,7 +326,7 @@ TEST_F(TestGradient, testWSGradientStencilFrustum)
     math::Vec3s result =
           math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
 
-    // The Gradient should be unit lenght for this case
+    // The Gradient should be unit length for this case
     EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     math::Vec3d wsVec = transform->indexToWorld(xyz);

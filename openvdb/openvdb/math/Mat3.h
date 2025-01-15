@@ -492,7 +492,7 @@ public:
 
     /// This function snaps a specific axis to a specific direction,
     /// preserving scaling. It does this using minimum energy, thus
-    /// posing a unique solution if basis & direction arent parralel.
+    /// posing a unique solution if basis & direction are not parallel.
     /// Direction need not be unit.
     Mat3 snapBasis(Axis axis, const Vec3<T> &direction)
     {
@@ -738,7 +738,7 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     unsigned int MAX_ITERATIONS=250)
 {
     /// use Givens rotation matrix to eliminate off-diagonal entries.
-    /// initialize the rotation matrix as idenity
+    /// initialize the rotation matrix as identity
     Q  = Mat3<T>::identity();
     int n = Mat3<T>::size;  // should be 3
 
@@ -750,7 +750,7 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     }
 
     unsigned int iterations(0);
-    /// Just iterate over all the non-diagonal enteries
+    /// Just iterate over all the non-diagonal entries
     /// using the largest as a pivot.
     do {
         /// check for absolute convergence

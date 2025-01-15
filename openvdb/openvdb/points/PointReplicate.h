@@ -20,7 +20,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 /// @brief Replicates points provided in a source grid into a new grid,
-///        transfering and creating attributes found in a provided
+///        transferring and creating attributes found in a provided
 ///        attribute vector. If an attribute doesn't exist, it is ignored.
 ///        Position is always replicated, leaving the new points exactly
 ///        over the top of the source points.
@@ -43,7 +43,7 @@ replicate(const PointDataGridT& source,
           const std::string& replicationIndex = "");
 
 /// @brief Replicates points provided in a source grid into a new grid,
-///        transfering and creating all attributes from the source grid.
+///        transferring and creating all attributes from the source grid.
 ///        Position is always replicated, leaving the new points exactly
 ///        over the top of the source points.
 /// @note  The position attribute must exist

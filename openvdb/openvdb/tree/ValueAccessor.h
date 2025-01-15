@@ -141,7 +141,7 @@ using ValueAccessorRW =
 ///   insertion on creation and deletion on destruction) it is also unsafe if
 ///   the tree is modified. So unless you're an expert it is highly recommended
 ///   to set IsSafe = true, which is the default in all derived ValueAccessors
-///   defined below. However if you know that the tree is no being modifed for
+///   defined below. However if you know that the tree is no being modified for
 ///   the lifespan of the ValueAccessor AND the work performed per
 ///   ValueAccessor is small relative to overhead of registering it you should
 ///   consider setting IsSafe = false. If this turns out to improve performance
@@ -163,7 +163,7 @@ public:
     static constexpr bool isSafe() { return IsSafe; }
 
     /// @brief  Construct from a tree. Should rarely be invoked directly, the
-    ///   drived implementation class calls this. Remains public for backwards
+    ///   derived implementation class calls this. Remains public for backwards
     ///   compatibility.
     ValueAccessorBase(TreeType& tree)
         : mTree(&tree)
@@ -980,7 +980,7 @@ private:
 
     /// @brief  Evaluate a predicate on each index I from [0,Size] until it
     ///   returns true, then executes the provided op function on the resolved
-    ///   node type. Helps in cases where std::get may be unecessarily invoked.
+    ///   node type. Helps in cases where std::get may be unnecessarily invoked.
     /// @param pred The predicate to run on the node index
     /// @param op   The function to run on the node where the pred returns true
     template <typename PredT, typename OpT>

@@ -159,7 +159,7 @@ TestAXRun::regressions()
         CPPUNIT_ASSERT_THROW(openvdb::ax::run("@a = 1.0f;", v2), openvdb::AXCompilerError);
     }
 
-    // Various tests which have been caught during developement
+    // Various tests which have been caught during development
 
     CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", g1), openvdb::AXSyntaxError);
     CPPUNIT_ASSERT_THROW(openvdb::ax::run("{} =", g2), openvdb::AXSyntaxError);

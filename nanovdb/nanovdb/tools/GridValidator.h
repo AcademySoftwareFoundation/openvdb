@@ -212,7 +212,7 @@ bool validateGrid(const GridHandleT &handle, uint32_t gridID, CheckMode mode, bo
 /// @param handle GridHandle containing host grids (0,1...,N)
 /// @param mode node of validation tests
 /// @param verbose if true information is printed if a grid fails a validation test
-/// @return true if all grids pass alle the validation tests
+/// @return true if all grids pass all the validation tests
 template <typename GridHandleT>
 bool validateGrids(const GridHandleT &handle, CheckMode mode, bool verbose)
 {

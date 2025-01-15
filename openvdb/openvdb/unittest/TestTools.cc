@@ -937,12 +937,12 @@ TEST_F(TestTools, testPointAdvect)
     {
         // Setup:    Advect a number of points in a uniform velocity field (1,1,1).
         //           over a time dt=1 with each of the 4 different advection schemes.
-        //           Points initialized at latice points.
+        //           Points initialized at lattice points.
         //
         // Uses:     FloatTree (velocity), collocated sampling, advection
         //
         // Expected: All advection schemes will have the same result.  Each point will
-        //           be advanced to a new latice point.  The i-th point will be at (i+1,i+1,i+1)
+        //           be advanced to a new lattice point.  The i-th point will be at (i+1,i+1,i+1)
         //
 
         const size_t numPoints = 2000000;
@@ -983,12 +983,12 @@ TEST_F(TestTools, testPointAdvect)
         // Setup:    Advect a number of points in a uniform velocity field (1,1,1).
         //           over a time dt=1 with each of the 4 different advection schemes.
         //           And then project the point location onto the x-y plane
-        //           Points initialized at latice points.
+        //           Points initialized at lattice points.
         //
         // Uses:     DoubleTree (velocity), staggered sampling, constraint projection, advection
         //
         // Expected: All advection schemes will have the same result.  Modes 1-4: Each point will
-        //           be advanced to a new latice point and projected to x-y plane.
+        //           be advanced to a new lattice point and projected to x-y plane.
         //           The i-th point will be at (i+1,i+1,0).  For mode 0 (no advection), i-th point
         //           will be found at (i, i, 0)
 
@@ -1028,13 +1028,13 @@ TEST_F(TestTools, testPointAdvect)
             std::vector<openvdb::Vec3d>, true> constrainedAdvectionTool(*velocityGrid, *cptGrid, 0);
         constrainedAdvectionTool.setThreaded(false);
 
-        // change the number of constraint interation from default 0 to 5
+        // change the number of constraint iteration from default 0 to 5
         constrainedAdvectionTool.setConstraintIterations(5);
 
         // test the pure-projection mode (order = 0)
         constrainedAdvectionTool.setIntegrationOrder(0);
 
-        // change the number of constraint interation (from 0 to 5)
+        // change the number of constraint iteration (from 0 to 5)
         constrainedAdvectionTool.setConstraintIterations(5);
 
         constrainedAdvectionTool.advect(pointList, /*dt=*/1.0, /*iterations=*/1);

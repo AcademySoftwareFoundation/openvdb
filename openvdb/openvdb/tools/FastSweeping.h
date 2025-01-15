@@ -90,7 +90,7 @@ enum class FastSweepingDomain {
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -180,7 +180,7 @@ sdfToSdf(const GridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -298,7 +298,7 @@ sdfToExt(const SdfGridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except
@@ -361,7 +361,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbritary range, as long as the it
+///       method accepts a scalar volume with an arbitrary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except
@@ -395,7 +395,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
 ///
 /// @param sdfGrid  Input signed distance field to be dilated.
 ///
-/// @param dilation Numer of voxels that the narrow band of the input SDF will be dilated.
+/// @param dilation Number of voxels that the narrow band of the input SDF will be dilated.
 ///
 /// @param nn       Stencil-pattern used for dilation
 ///
@@ -530,7 +530,7 @@ public:
     /// @param isInputSdf Used to determine if @a sdfGrid is a sigend distance field (true)
     ///                   or a scalar fog volume (false).
     ///
-    /// @details This, or any of ther other initialization methods, should be called
+    /// @details This, or any of the other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -578,7 +578,7 @@ public:
     ///                 The opposite convention is implemented when SWEEP_LESS_THAN_ISOVALUE
     ///                 is supplied as an argument for @a mode.
     ///
-    /// @details This, or any of ther other initialization methods, should be called
+    /// @details This, or any of the other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -598,7 +598,7 @@ public:
     ///
     /// @param sdfGrid  Input signed distance field to to be dilated.
     ///
-    /// @param dilation Numer of voxels that the input SDF will be dilated.
+    /// @param dilation Number of voxels that the input SDF will be dilated.
     ///
     /// @param nn       Stencil-pattern used for dilation
     ///
@@ -608,7 +608,7 @@ public:
     ///                 side of the iso-surface, SWEEP_LESS_THAN_ISOVALUE will dilate
     ///                 in the negative side of the iso-surface.
     ///
-    /// @details This, or any of ther other initialization methods, should be called
+    /// @details This, or any of the other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -631,7 +631,7 @@ public:
     /// @param ignoreActiveTiles If false, active tiles in the mask are treated
     ///                 as active voxels. Else they are ignored.
     ///
-    /// @details This, or any of ther other initialization methods, should be called
+    /// @details This, or any of the other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call

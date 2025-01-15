@@ -124,7 +124,7 @@ calculate a position based curl noise on points in a particular group, and to
 use that calculation to update point velocities.
 @par
 <!-- P -->@code{.c}
-// Only calcualte noise and apply it to points if the current point is NOT in
+// Only calculate noise and apply it to points if the current point is NOT in
 // a group called "escaped". Note that the PointExecutable also has native
 // support for group based execution.
 if (!ingroup("escaped")) {
@@ -197,7 +197,7 @@ These examples demonstrate how to use AX on VDB volume grids.
 
 @subsection axexamplevolumeclamp Volume Clamping
 @par
-Below is a small example of reading adn writing to voxels within a VDB volume.
+Below is a small example of reading and writing to voxels within a VDB volume.
 As with points, the @ symbol specifies an access to a named volume, with the
 type of each volume preceding it and the name appearing as a suffix. For
 example: `float@density` would imply a @b float volume called @b density.

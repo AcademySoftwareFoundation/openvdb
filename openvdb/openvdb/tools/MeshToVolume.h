@@ -79,11 +79,11 @@ enum MeshToVolumeFlags {
 };
 
 
-/// @brief Different staregies how to determine sign of an SDF when using
+/// @brief Different strategies how to determine sign of an SDF when using
 /// interior test.
 enum InteriorTestStrategy {
 
-   /// Evaluates interior test at every voxel. This is usefull when we rebuild already
+   /// Evaluates interior test at every voxel. This is useful when we rebuild already
    /// existing SDF where evaluating previous grid is cheap
    EVAL_EVERY_VOXEL = 0,
 
@@ -3185,7 +3185,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
             auto coord = leafNode.offsetToGlobalCoord(offset);
 
             if (interiorTest(coord)){
-                // Yes we assigne positive values to interior points
+                // Yes we assign positive values to interior points
                 // this is aligned with how meshToVolume works internally
                 offsetStack.push_back({offset, POSITIVE});
                 voxelState[offset] = POSITIVE;
@@ -3239,7 +3239,7 @@ floodFillLeafNode(tree::LeafNode<T,Log2Dim>& leafNode, const InteriorTest& inter
 /// inside of the mesh and false outside.
 ///
 /// Furthermore, InteriorTest does not have to be thread-safe, but it has to be
-/// copy constructible and evaluating different coppy has to be thread-safe.
+/// copy constructible and evaluating different copy has to be thread-safe.
 ///
 ///  Example of a interior test
 ///

@@ -64,11 +64,11 @@ QuantizedUnitVec::pack(const Vec3<T>& vec)
     uint16_t xbits = static_cast<uint16_t>((x * w));
     uint16_t ybits = static_cast<uint16_t>((y * w));
 
-    // The remaining 13 bits in our 16 bit word are dividied into a
+    // The remaining 13 bits in our 16 bit word are divided into a
     // 6-bit x-slot and a 7-bit y-slot. Both the xbits and the ybits
     // can still be represented using (2^7 - 1) quantization levels.
 
-    // If the xbits requre more than 6-bits, store the complement.
+    // If the xbits require more than 6-bits, store the complement.
     // (xbits + ybits < 127, thus if xbits > 63 => ybits <= 63)
     if (xbits > 63) {
         xbits = static_cast<uint16_t>(127 - xbits);

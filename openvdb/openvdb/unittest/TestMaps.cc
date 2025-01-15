@@ -521,7 +521,7 @@ TEST_F(TestMaps, testFrustum)
     center += frustumMap_from_camera.applyMap(Vec3d(500,250,5000));
     center = center /4.;
     EXPECT_TRUE( isApproxEqual(center, position + (z_near+depth) * direction));
-    // check that the frustum has the correct heigh on the near plane
+    // check that the frustum has the correct height on the near plane
     Vec3d corner1  = frustumMap_from_camera.applyMap(Vec3d(0,0,0));
     Vec3d corner2  = frustumMap_from_camera.applyMap(Vec3d(0,250,0));
     Vec3d side = corner2-corner1;

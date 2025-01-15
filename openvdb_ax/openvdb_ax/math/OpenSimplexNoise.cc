@@ -183,7 +183,7 @@ T OSNoise::eval(const T x, const T y, const T z) const
   T inSum = xins + yins + zins;
 
   if (inSum > (T)1.0 && inSum < (T)2.0) {
-    // The point is inside the octahedron (rectified 3-Simplex) inbetween.
+    // The point is inside the octahedron (rectified 3-Simplex) in between.
 
     T aScore;
     uint_fast8_t aPoint;

@@ -990,7 +990,7 @@ csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 ///          determined by a use-defined functor (OpT op) that operates on the
 ///          source and destination values. The only exception is when
 ///          the tree type is MaskTree, in which case no functor is
-///          needed since by defintion a MaskTree has no values (only topology).
+///          needed since by definition a MaskTree has no values (only topology).
 ///
 /// @warning This function only operated on leaf node values,
 ///          i.e. tile values are ignored.

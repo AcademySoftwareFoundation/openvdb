@@ -5606,8 +5606,8 @@ TEST_F(TestNanoVDB, VectorSampleFromVoxels)
     //std::cerr << "1'th order: v = " << sampler1(ijk) << std::endl;
     for (int i = 0; i < 3; ++i)
         EXPECT_NEAR(exact[i], sampler1(ijk)[i], 1e-5);
-    //EXPECT_FALSE(sampler1.zeroCrossing());// triggeres a static_assert error
-    //EXPECT_FALSE(sampler1.gradient(grid->indexToWorld(ijk)));// triggeres a static_assert error
+    //EXPECT_FALSE(sampler1.zeroCrossing());// triggers a static_assert error
+    //EXPECT_FALSE(sampler1.gradient(grid->indexToWorld(ijk)));// triggers a static_assert error
 
     nanovdb::math::SampleFromVoxels<nanovdb::NanoTree<nanovdb::Vec3f>, 3> sampler3(grid->tree());
     //auto sampler3 = nanovdb::math::createSampler<3>( acc );
@@ -5758,7 +5758,7 @@ TEST_F(TestNanoVDB, GridValidator)
     EXPECT_EQ(fastChecksum, nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Full));
     EXPECT_TRUE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Full, true));
 
-    leaf->data()->mValueMask.toggle(0); // change a singel bit in a value mask
+    leaf->data()->mValueMask.toggle(0); // change a single bit in a value mask
 
     EXPECT_NE(fastChecksum, nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Full));
     EXPECT_FALSE(nanovdb::tools::isValid(grid, nanovdb::CheckMode::Full, false));

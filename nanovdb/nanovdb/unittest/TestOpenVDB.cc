@@ -1409,7 +1409,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
                 EXPECT_EQ( wldSrc[i], wldDst[i] );
             }
 
-            // compair to original input points
+            // compare to original input points
             auto it = search( wldSrc );
             EXPECT_TRUE( it != positions.end() );
             positions.erase( it );
@@ -2507,11 +2507,11 @@ TEST_F(TestOpenVDB, Tricubic)
     auto sampler2 = nanovdb::math::createSampler<2>(dstAcc);
     //std::cerr << "2'rd order: nanovdb = " << sampler2(ijk) << ", openvdb: " << openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk) << std::endl;
     EXPECT_NEAR(sampler2(ijk), openvdb::tools::Sampler<2>::sample(srcGrid->tree(), ijk), 1e-6);
-    EXPECT_NE(exact, sampler2(ijk)); // it's a 3nd order polynomial
+    EXPECT_NE(exact, sampler2(ijk)); // it's a 3rd order polynomial
 
     auto sampler3 = nanovdb::math::createSampler<3>(dstAcc);
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
-    EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 3nd order polynomial
+    EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 3rd order polynomial
 } // Tricubic
 
 TEST_F(TestOpenVDB, GridValidator)

@@ -167,7 +167,7 @@ initialized to a constant value.  This will be done to all voxels that are
 made active by the specification - including those that were already
 active.
 
-Thus, the Voxel Coordinats option will have the effect of setting a cube
+Thus, the Voxel Coordinates option will have the effect of setting a cube
 area to a constant value.)"));
 
     // Match REGIONTYPE

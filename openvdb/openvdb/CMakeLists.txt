@@ -105,7 +105,7 @@ if(WIN32)
        CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDebugDLL")
       if(OPENVDB_CORE_STATIC)
          message(WARNING "Unexpected value for the Windows CRT with target build artifacts."
-          "You are attempting to use the dyanmic CRT (/MD) with a static configuration of OpenVDB."
+          "You are attempting to use the dynamic CRT (/MD) with a static configuration of OpenVDB."
           "This is not recommended and may cause failures.")
       endif()
     endif()
@@ -247,7 +247,7 @@ endif()
 
 # Pull in Boost last as houdini's boost (hboost) is fully namespaced and libs
 # are renamed too. Boost can be pulled in at any time, but do it last so that,
-# if it's in a shared place (like /usr/local) it doesn't accidently pull in
+# if it's in a shared place (like /usr/local) it doesn't accidentally pull in
 # other headers.
 
 if(OPENVDB_USE_DELAYED_LOADING)

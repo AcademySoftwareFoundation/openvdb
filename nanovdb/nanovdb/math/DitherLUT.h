@@ -182,7 +182,7 @@ ut_initDitherRecursive(int goalres)
     }
 }; // DitherLUT class
 
-}// namspace math
+}// namespace math
 
 }// namespace nanovdb
 

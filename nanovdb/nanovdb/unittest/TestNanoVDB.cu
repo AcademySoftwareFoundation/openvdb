@@ -1026,13 +1026,13 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
 TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
-    const float value = 1.23456f, backgroud = 1.0f;
+    const float value = 1.23456f, background = 1.0f;
     const nanovdb::Coord ijk(1,2,3);
     nanovdb::GridHandle<BufferT> floatHdl;
     nanovdb::FloatGrid *floatGrid = nullptr;
     //nanovdb::util::Timer timer;
     {// create float grid with one active voxel
-        nanovdb::tools::build::Grid<float> grid(backgroud);
+        nanovdb::tools::build::Grid<float> grid(background);
         auto srcAcc = grid.getAccessor();
         srcAcc.setValue(ijk, value);
         auto nodeCount = grid.nodeCount();
@@ -1049,11 +1049,11 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
         EXPECT_EQ(ijk, floatGrid->indexBBox()[0]);
         EXPECT_EQ(ijk, floatGrid->indexBBox()[1]);
         auto acc = floatGrid->getAccessor();
-        EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(-1)));
+        EXPECT_EQ(background, acc.getValue(nanovdb::Coord(-1)));
         EXPECT_FALSE(acc.isActive(nanovdb::Coord(-1)));
-        EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(8)));
+        EXPECT_EQ(background, acc.getValue(nanovdb::Coord(8)));
         EXPECT_FALSE(acc.isActive(nanovdb::Coord(8)));
-        EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(0)));
+        EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0)));
         EXPECT_FALSE(acc.isActive(nanovdb::Coord(0)));
         EXPECT_EQ(value, acc.getValue(ijk));
         EXPECT_TRUE(acc.isActive(ijk));
@@ -1076,7 +1076,7 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
     //timer.restart("Create value list on CPU");
     EXPECT_EQ(1u + 512u, idxGrid->valueCount());// background + 512 values in one leaf node
     float *values = new float[idxGrid->valueCount()], *d_values = nullptr;
-    values[0] = backgroud;
+    values[0] = background;
     const float *q = floatGrid->tree().getFirstLeaf()->mValues;
     for (float *p=values+1, *e=p+512;p!=e; ++p) *p = *q++;
     //timer.restart("Allocate and copy values from CPU to GPU");
@@ -1101,23 +1101,23 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
     EXPECT_EQ(floatGrid->indexBBox(), floatGrid2->indexBBox());
     EXPECT_EQ(floatGrid->worldBBox(), floatGrid2->worldBBox());
     // probe background in root node
-    EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(-1)));
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(-1)));
     EXPECT_FALSE(acc.isActive(nanovdb::Coord(-1)));
-    EXPECT_EQ(backgroud, acc2.getValue(nanovdb::Coord(-1)));
+    EXPECT_EQ(background, acc2.getValue(nanovdb::Coord(-1)));
     EXPECT_FALSE(acc2.isActive(nanovdb::Coord(-1)));
     // probe background in upper node
-    EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(128)));
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(128)));
     EXPECT_FALSE(acc.isActive(nanovdb::Coord(128)));
-    EXPECT_EQ(backgroud, floatGrid2->tree().getValue(nanovdb::Coord(128)));
-    EXPECT_EQ(backgroud, acc2.getValue(nanovdb::Coord(128)));
+    EXPECT_EQ(background, floatGrid2->tree().getValue(nanovdb::Coord(128)));
+    EXPECT_EQ(background, acc2.getValue(nanovdb::Coord(128)));
     EXPECT_FALSE(acc2.isActive(nanovdb::Coord(128)));
     // probe background in leaf node
-    EXPECT_EQ(backgroud, acc.getValue(nanovdb::Coord(0)));
+    EXPECT_EQ(background, acc.getValue(nanovdb::Coord(0)));
     EXPECT_FALSE(acc.isActive(nanovdb::Coord(0)));
-    EXPECT_EQ(backgroud, leaf2->getValue(nanovdb::Coord(0)));
+    EXPECT_EQ(background, leaf2->getValue(nanovdb::Coord(0)));
     EXPECT_FALSE(leaf2->isActive(nanovdb::Coord(0)));
-    EXPECT_EQ(backgroud, floatGrid2->tree().getValue(nanovdb::Coord(0)));
-    EXPECT_EQ(backgroud, acc2.getValue(nanovdb::Coord(0)));
+    EXPECT_EQ(background, floatGrid2->tree().getValue(nanovdb::Coord(0)));
+    EXPECT_EQ(background, acc2.getValue(nanovdb::Coord(0)));
     EXPECT_FALSE(acc2.isActive(nanovdb::Coord(0)));
 
     EXPECT_EQ(value, acc2.getValue(ijk));
@@ -1761,7 +1761,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64)
 }// Large_CudaPointsToGrid_World64
 
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_World64_density)
-{// unlike the previous unit-test this one selects the dx to match a specefic point density
+{// unlike the previous unit-test this one selects the dx to match a specific point density
     using BuildT = nanovdb::Point;
     using Vec3T  = nanovdb::Vec3d;
     //nanovdb::util::Timer timer;

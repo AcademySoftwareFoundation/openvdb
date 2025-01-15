@@ -986,7 +986,7 @@ public:
         int index0 = static_cast<int>(axis0);
         int index1 = static_cast<int>(axis1);
 
-        // to collumn "index0" add a multiple of the index1 row
+        // to column "index0" add a multiple of the index1 row
         MyBase::mm[index0 +  0] += shear * MyBase::mm[index1 +  0];
         MyBase::mm[index0 +  4] += shear * MyBase::mm[index1 +  4];
         MyBase::mm[index0 +  8] += shear * MyBase::mm[index1 +  8];
@@ -1022,7 +1022,7 @@ public:
         return static_cast< Vec3<T0> >(*this * v);
     }
 
-    /// Transform a Vec3 by post-multiplication, doing homogenous divison.
+    /// Transform a Vec3 by post-multiplication, doing homogenous division.
     template<typename T0>
     Vec3<T0> transformH(const Vec3<T0> &p) const
     {

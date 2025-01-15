@@ -567,7 +567,7 @@ struct ReprintVisitor : public ast::Visitor<ReprintVisitor>
             return true;
         }
 
-        // multiple statments
+        // multiple statements
 
         if (stmtl->child(0)->nodetype() == ast::Node::DeclareLocalNode) {
             // it's a declaration list, manually handle the child nodes.

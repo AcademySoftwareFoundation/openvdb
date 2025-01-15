@@ -484,7 +484,7 @@ struct AveragePositionTransfer :
                     }
 
                     x2y2z2 *= invsq; // x2y2z2 = (x - xi) / R
-                    // k(s) = max(0,(1−s^2)^3). note that the max is unecessary
+                    // k(s) = max(0,(1−s^2)^3). note that the max is unnecessary
                     // as we early terminate above with x2y2z2 >= mMaxSearchSqIS
                     x2y2z2 = math::Pow3(1.0 - x2y2z2);
                     OPENVDB_ASSERT(x2y2z2 >= 0.0);
@@ -643,9 +643,9 @@ protected:
     const math::Transform& mSurfaceTransform;
     InterrupterT* mInterrupter;
     // add the size of a single points voxel at the surface resolution
-    // to the distance limits - this is becasue we don't query exact point
+    // to the distance limits - this is because we don't query exact point
     // positions in SurfaceMaskOp, which means we have to
-    // actviate the "worst case scenario" bounds. The closer the points
+    // activate the "worst case scenario" bounds. The closer the points
     // voxel size is to the target sdf voxel size the better the topology
     // estimate
     const int mVoxelOffset;

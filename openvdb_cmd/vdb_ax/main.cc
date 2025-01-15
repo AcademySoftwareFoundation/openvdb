@@ -271,7 +271,7 @@ struct ProgOptions
         openvdb::ax::cli::ParamBuilder<openvdb::ax::CompilerOptions::OptLevel>()
             .addOpt("--opt [NONE|O0|O1|O2|Os|Oz|O3]")
             .setDoc("compilation optimization level (Default: 03). [03] ensures the most "
-                "vigorus optimization passes are enabled. This should very rarely be changed "
+                "vigorous optimization passes are enabled. This should very rarely be changed "
                 "but is useful for identifying issues with particular optimization passes.")
             .setCB([](openvdb::ax::CompilerOptions::OptLevel& v, const char* arg)
             {

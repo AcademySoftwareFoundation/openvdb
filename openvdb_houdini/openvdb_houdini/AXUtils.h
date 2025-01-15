@@ -226,7 +226,7 @@ struct ConvertFromVEX :
         return true;
     }
 
-    /// @brief  Convert Houdini instrinsic volume attribute read accesses
+    /// @brief  Convert Houdini intrinsic volume attribute read accesses
     /// @param  node  The AttributeValue AST node being visited
     bool visit(openvdb::ax::ast::Attribute* node)
     {

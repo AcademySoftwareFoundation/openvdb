@@ -144,7 +144,7 @@ template<typename ValueT, typename OpType>
 void transformDense(Dense<ValueT, openvdb::tools::LayoutZYX>& dense,
                     const openvdb::CoordBBox& bbox, const OpType& op, bool parallel=true);
 
-/// We currrently support the following operations when compositing sparse
+/// We currently support the following operations when compositing sparse
 /// data into a dense grid.
 enum DSCompositeOp {
     DS_OVER, DS_ADD, DS_SUB, DS_MIN, DS_MAX, DS_MULT, DS_SET

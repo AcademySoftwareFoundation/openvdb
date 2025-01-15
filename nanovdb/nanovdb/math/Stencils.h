@@ -243,7 +243,7 @@ public:
     ///
     /// @details The ordering of bit mask is ( -x, +x, -y, +y, -z, +z ), so to
     /// check if there is an intersection in -y use (mask & (1u<<2)) where mask is
-    /// ther return value from this function. To check if there are any
+    /// the return value from this function. To check if there are any
     /// intersections use mask!=0u, and for no intersections use mask==0u.
     /// To count the number of intersections use __builtin_popcount(mask).
     __hostdev__ inline Mask intersectionMask(ValueType isoValue = ValueType(0)) const
@@ -338,7 +338,7 @@ public:
     /// @param xyz Floating point coordinate position. Index space and NOT world space.
     /// @warning It is assumed that the stencil has already been moved
     /// to the relevant voxel position, e.g. using moveTo(xyz).
-    /// @note Trilinear interpolation kernal reads as:
+    /// @note Trilinear interpolation kernel reads as:
     ///       v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     __hostdev__ inline ValueType interpolation(const Vec3<ValueType>& xyz) const
@@ -539,7 +539,7 @@ public:
     /// from which the level set was derived.
     ///
     /// @note This method assumes that the grid represents a level set
-    /// with distances in world units and a simple affine transfrom
+    /// with distances in world units and a simple affine transform
     /// with uniform scaling.
     __hostdev__ inline Vec3<ValueType> cpt()
     {

@@ -200,7 +200,7 @@ struct SymbolTableBlocks
         return this->find(name, mTables.crbegin()->first);
     }
 
-    /// @brief  Replace the first occurrance of a variable with a given name with a
+    /// @brief  Replace the first occurrence of a variable with a given name with a
     ///         replacement value. Returns true if a replacement occurred.
     ///
     /// @param  name   The variable name to find and replace

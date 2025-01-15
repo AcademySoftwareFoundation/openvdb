@@ -56,10 +56,10 @@ operator>> (std::istream& is, half& h)
     return is;
 }
 
-//---------------------------------------
+//----------------------------------------
 // Functions to print the bit-layout of
-// floats and halfs, mostly for debugging
-//---------------------------------------
+// floats and halves, mostly for debugging
+//----------------------------------------
 
 IMATH_EXPORT void
 printBits (std::ostream& os, half h)

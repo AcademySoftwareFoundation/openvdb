@@ -170,7 +170,7 @@ private:
     {
         // steady_clock is a monotonically increasing clock designed for timing duration
         // note that high_resolution_clock is aliased to either steady_clock or system_clock
-        // depending on the platform, so it is preferrable to use steady_clock
+        // depending on the platform, so it is preferable to use steady_clock
         const auto time_since_epoch =
             std::chrono::steady_clock::now().time_since_epoch();
         // cast time since epoch into microseconds (1 / 1000000 seconds)

@@ -64,7 +64,7 @@ apt-get install -y libtbb-dev
 apt-get install -y libblosc-dev
 
 # MacOS
-# @note We are using homebrew in this example to install requried dependencies
+# @note We are using homebrew in this example to install required dependencies
 #  https://brew.sh/
 brew install boost
 brew install tbb

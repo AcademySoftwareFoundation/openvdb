@@ -373,6 +373,6 @@ TEST_F(TestCoord, testCoordHash)
       EXPECT_EQ(h.size(), n);
       n = 0;
       for (const auto& ijk: bbox) EXPECT_EQ(h[ijk], n++);
-      EXPECT_TRUE(h.load_factor() <= 1.0f);// no hask key collisions!
+      EXPECT_TRUE(h.load_factor() <= 1.0f);// no hash key collisions!
     }
 }

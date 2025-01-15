@@ -250,7 +250,7 @@ enum class GridType : uint32_t { Unknown = 0, //  unknown value type - should ra
 /// @brief Maps a GridType to a c-string
 /// @param dst destination string of size 12 or larger
 /// @param gridType GridType enum to be mapped to a string
-/// @return Retuns a c-string used to describe a GridType
+/// @return Returns a c-string used to describe a GridType
 __hostdev__ inline char* toStr(char *dst, GridType gridType)
 {
     switch (gridType){
@@ -302,7 +302,7 @@ enum class GridClass : uint32_t { Unknown = 0,
                                   StrLen = End + 7};// this entry is used to determine the minimum size of c-string
 
 
-/// @brief Retuns a c-string used to describe a GridClass
+/// @brief Returns a c-string used to describe a GridClass
 /// @param dst destination string of size 7 or larger
 /// @param gridClass GridClass enum to be converted to a string
 __hostdev__ inline char* toStr(char *dst, GridClass gridClass)
@@ -336,7 +336,7 @@ enum class GridFlags : uint32_t {
     StrLen = End + 23,// this entry is used to determine the minimum size of c-string
 };
 
-/// @brief Retuns a c-string used to describe a GridFlags
+/// @brief Returns a c-string used to describe a GridFlags
 /// @param dst destination string of size 23 or larger
 /// @param gridFlags GridFlags enum to be converted to a string
 __hostdev__ inline const char* toStr(char *dst, GridFlags gridFlags)
@@ -704,11 +704,11 @@ public:
     __hostdev__ bool isCompatible() const { return this->getMajor() == uint32_t(NANOVDB_MAJOR_VERSION_NUMBER); }
     /// @brief Returns the difference between major version of this instance and NANOVDB_MAJOR_VERSION_NUMBER
     /// @return return 0 if the major version equals NANOVDB_MAJOR_VERSION_NUMBER, else a negative age if this
-    ///         instance has a smaller major verion (is older), and a positive age if it is newer, i.e. larger.
+    ///         instance has a smaller major version (is older), and a positive age if it is newer, i.e. larger.
     __hostdev__ int age() const {return int(this->getMajor()) - int(NANOVDB_MAJOR_VERSION_NUMBER);}
 }; // Version
 
-/// @brief print the verion number to a c-string
+/// @brief print the version number to a c-string
 /// @param dst destination string of size 8 or more
 /// @param v version to be printed
 /// @return returns destination string @c dst
@@ -1739,7 +1739,7 @@ struct NodeTrait<const GridOrTreeOrRootT, 3>
     using type = const typename GridOrTreeOrRootT::RootNodeType;
 };
 
-// ------------> Froward decelerations of accelerated random access methods <---------------
+// ------------> Forward declarations of accelerated random access methods <---------------
 
 template<typename BuildT>
 struct GetValue;
@@ -1819,9 +1819,9 @@ public:
     /// @brief return the 64 bit checksum of this instance
     [[deprecated("Use Checksum::data instead.")]]
     __hostdev__ uint64_t checksum() const { return mCRC64; }
-    [[deprecated("Use Checksum::head and Ckecksum::tail instead.")]]
+    [[deprecated("Use Checksum::head and Checksum::tail instead.")]]
     __hostdev__ uint32_t& checksum(int i) {NANOVDB_ASSERT(i==0 || i==1); return mCRC32[i]; }
-    [[deprecated("Use Checksum::head and Ckecksum::tail instead.")]]
+    [[deprecated("Use Checksum::head and Checksum::tail instead.")]]
     __hostdev__ uint32_t checksum(int i) const {NANOVDB_ASSERT(i==0 || i==1); return mCRC32[i]; }
 
     __hostdev__ uint64_t  full() const { return mCRC64; }
@@ -3179,7 +3179,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
         mTable[n].value = v;
     }
 
-    /// @brief Returns a pointer to the child node at the specifed linear offset.
+    /// @brief Returns a pointer to the child node at the specified linear offset.
     __hostdev__ ChildT* getChild(uint32_t n)
     {
         NANOVDB_ASSERT(mChildMask.isOn(n));
@@ -3609,7 +3609,7 @@ private:
 
 // --------------------------> LeafData<T> <------------------------------------
 
-/// @brief Stuct with all the member data of the LeafNode (useful during serialization of an openvdb LeafNode)
+/// @brief Struct with all the member data of the LeafNode (useful during serialization of an openvdb LeafNode)
 ///
 /// @note No client code should (or can) interface with this struct so it can safely be ignored!
 template<typename ValueT, typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
@@ -3760,7 +3760,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafFnBase
 
 // --------------------------> LeafData<Fp4> <------------------------------------
 
-/// @brief Stuct with all the member data of the LeafNode (useful during serialization of an openvdb LeafNode)
+/// @brief Struct with all the member data of the LeafNode (useful during serialization of an openvdb LeafNode)
 ///
 /// @note No client code should (or can) interface with this struct so it can safely be ignored!
 template<typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
@@ -5826,7 +5826,7 @@ struct FileHeader {// 16 bytes
 // Grid size in memory             (uint64_t)   |
 // Grid size on disk               (uint64_t)   |
 // Grid name hash key              (uint64_t)   |
-// Numer of active voxels          (uint64_t)   |
+// Number of active voxels          (uint64_t)  |
 // Grid type                       (uint32_t)   |
 // Grid class                      (uint32_t)   |
 // Characters in grid name         (uint32_t)   |
@@ -5835,7 +5835,7 @@ struct FileHeader {// 16 bytes
 // Size of a voxel in world units  (3*double)   |
 // Byte size of the grid name      (uint32_t)   |
 // Number of nodes per level       (4*uint32_t) |
-// Numer of active tiles per level (3*uint32_t) |
+// Number of active tiles per level (3*uint32_t)|
 // Codec for file compression      (uint16_t)   |
 // Padding due to 8B alignment     (uint16_t)   |
 // Version number                  (uint32_t)   |

@@ -967,7 +967,7 @@ inline FunctionGroup::UniquePtr axrand32(const FunctionOptions& op)
             // So, we must convert it. I should note that the OpenVDB math libraries will
             // do this for us, but its implementation static_casts `size_t` to `unsigned int`,
             // and because `std::hash` returns a binary copy of the original
-            // double-precision number in almost all cases, this ends up producing noticable
+            // double-precision number in almost all cases, this ends up producing noticeable
             // patterns in the result (e.g. by truncating the upper 4 bytes, values of 1.0,
             // 2.0, 3.0, and 4.0 all return the same hash value because their lower 4 bytes
             // are all zero).
@@ -2545,7 +2545,7 @@ inline FunctionGroup::UniquePtr axatan2(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axatoi(const FunctionOptions& op)
 {
-    // WARNING: decltype removes the throw identifer from atoi. We should
+    // WARNING: decltype removes the throw identifier from atoi. We should
     // use this are automatically update the function attributes as appropriate
     return FunctionBuilder("atoi")
         .addSignature<decltype(std::atoi)>(std::atoi)
@@ -2564,7 +2564,7 @@ inline FunctionGroup::UniquePtr axatoi(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axatof(const FunctionOptions& op)
 {
-    // WARNING: decltype removes the throw identifer from atof. We should
+    // WARNING: decltype removes the throw identifier from atof. We should
     // use this are automatically update the function attributes as appropriate
     return FunctionBuilder("atof")
         .addSignature<decltype(std::atof)>(std::atof)
@@ -2863,7 +2863,7 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
             B.SetInsertPoint(el);
         }
 
-        // Final case (hue > 1 || hue < 0), zero intialize
+        // Final case (hue > 1 || hue < 0), zero initialize
         B.CreateStore(zero, rgb[0]);
         B.CreateStore(zero, rgb[1]);
         B.CreateStore(zero, rgb[2]);
@@ -3189,7 +3189,7 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("axfree", axfree, true);
     add("axrealloc", axrealloc, true);
 
-    // llvm instrinsics
+    // llvm intrinsics
 
     add("ceil", llvm_ceil);
     add("cos", llvm_cos);

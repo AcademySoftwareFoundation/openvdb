@@ -229,7 +229,7 @@ struct Voxelizer
 
     /// @brief  Convert tiles to leaf nodes that exist at a particular
     ///         voxel distance away
-    /// @param width  distance in voxels to seach for tiles from each leaf
+    /// @param width  distance in voxels to search for tiles from each leaf
     /// @return  Returns how many search iterations were performed, which
     ///          also represents how many leaf node neighbors may have been
     ///          created. Returns 0 if the tree is already entirely voxelized
@@ -383,7 +383,7 @@ private:
                 // neighbor directly and use a flag buffer to test offsets in
                 // this node which need converting to leaf level topology.
                 // This is faster than the more general method which steps across
-                // faces (unecessary due to CHILDDIM == LEAFDIM) and provides
+                // faces (unnecessary due to CHILDDIM == LEAFDIM) and provides
                 // a simpler way of tracking new topology
 
                 std::vector<char> flags(NodeT::NUM_VALUES, char(0));

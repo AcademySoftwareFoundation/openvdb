@@ -196,7 +196,7 @@ __hostdev__ inline char* strncpy(char *dst, const char *src, size_t max)
 /// @param num signed number to be concatenated after @c dst
 /// @param bas base used when converting @c num to a string
 /// @return destination string @c dst
-/// @note Emulates the behaviour of itoa, except this verion also works on the GPU.
+/// @note Emulates the behaviour of itoa, except this version also works on the GPU.
 __hostdev__ inline char* strcpy(char* dst, int num, int bas = 10)
 {
     NANOVDB_ASSERT(dst != nullptr && bas > 0);

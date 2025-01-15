@@ -114,7 +114,7 @@ add_executable(vdb_ax_test ${TEST_SOURCE_FILES})
 
 # @note  From Clang 14, fp-contract has been switched to ON by default. Docs in
 #  Clang versions before 14 state that fp-contract is ON, but it is in fact off.
-#  This options effects the emmission on fmuladd instructions in the Clang
+#  This options effects the emission on fmuladd instructions in the Clang
 #  driver. Because this behaviour requires statement contexts (these instructions
 #  are only emitted on intermediate floating point results, not across statements)
 #  it cannot be an optimization pass in LLVM and must be emitted in the Clang

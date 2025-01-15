@@ -410,7 +410,7 @@ message2DBBoxQ[___] = False;
 (*Messages*)
 
 
-General::bbox2d = "`1` does not represent valid 2D bunding box.";
+General::bbox2d = "`1` does not represent valid 2D bounding box.";
 
 
 (* ::Subsection::Closed:: *)
@@ -439,7 +439,7 @@ message3DBBoxQ[___] = False;
 (*Messages*)
 
 
-General::bbox3d = "`1` does not represent valid 3D bunding box.";
+General::bbox3d = "`1` does not represent valid 3D bounding box.";
 
 
 (* ::Section:: *)

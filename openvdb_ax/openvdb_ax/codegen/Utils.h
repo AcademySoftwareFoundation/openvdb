@@ -39,7 +39,7 @@ namespace ax {
 namespace codegen {
 
 /// @note Function definitions for some types returned from automatic token to
-/// llvm IR operations. See llvmArithmeticConversion and llvmBianryConversion
+/// llvm IR operations. See llvmArithmeticConversion and llvmBinaryConversion
 
 using CastFunction = std::function<llvm::Value*
     (llvm::IRBuilder<>&, llvm::Value*, llvm::Type*)>;
@@ -426,7 +426,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         if (token == ast::tokens::PLUS)                  return BIND_BINARY_OP(CreateAdd); // No Unsigned/Signed Wrap
         else if (token == ast::tokens::MINUS)            return BIND_BINARY_OP(CreateSub); // No Unsigned/Signed Wrap
         else if (token == ast::tokens::MULTIPLY)         return BIND_BINARY_OP(CreateMul); // No Unsigned/Signed Wrap
-        else if (token == ast::tokens::DIVIDE)           return BIND_BINARY_OP(CreateSDiv); // IsExact = false - when true, poison value if the reuslt is rounded
+        else if (token == ast::tokens::DIVIDE)           return BIND_BINARY_OP(CreateSDiv); // IsExact = false - when true, poison value if the result is rounded
         else if (token == ast::tokens::MODULO)           return BIND_BINARY_OP(CreateSRem); // Note this is NOT a%b in AX.
         else if (token == ast::tokens::EQUALSEQUALS)     return BIND_BINARY_OP(CreateICmpEQ);
         else if (token == ast::tokens::NOTEQUALS)        return BIND_BINARY_OP(CreateICmpNE);
@@ -596,7 +596,7 @@ arithmeticConversion(std::vector<llvm::Value*>& values,
 
 /// @brief  Chooses the highest order llvm Type as defined by typePrecedence
 ///         from either of the two incoming values and casts the other value to
-///         the choosen type if it is not already. The types of valueA and valueB
+///         the chosen type if it is not already. The types of valueA and valueB
 ///         are guaranteed to match. Both values must be scalar LLVM types
 /// @warning  This assumes any integer types are signed.
 /// @param valueA   The first llvm value

@@ -42,8 +42,8 @@ enum DScheme {
     BD_3RD,         // backward difference,  3rd order
     FD_WENO5,       // forward difference,   weno5
     BD_WENO5,       // backward difference,  weno5
-    FD_HJWENO5,     // forward differene,   HJ-weno5
-    BD_HJWENO5      // backward difference, HJ-weno5
+    FD_HJWENO5,     // forward difference,   HJ-weno5
+    BD_HJWENO5      // backward difference,  HJ-weno5
 };
 
 enum { NUM_DS_SCHEMES = BD_HJWENO5 + 1 };
@@ -438,7 +438,7 @@ struct D1
 template<>
 struct D1<CD_2NDT>
 {
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xm1) {
         return xp1 - xm1;
@@ -493,7 +493,7 @@ template<>
 struct D1<CD_2ND>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xm1) {
         return (xp1 - xm1)*ValueType(0.5);
@@ -553,7 +553,7 @@ template<>
 struct D1<CD_4TH>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference( const ValueType& xp2, const ValueType& xp1,
                                  const ValueType& xm1, const ValueType& xm2 ) {
@@ -622,7 +622,7 @@ template<>
 struct D1<CD_6TH>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference( const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
                                  const ValueType& xm1, const ValueType& xm2, const ValueType& xm3 )
@@ -702,7 +702,7 @@ template<>
 struct D1<FD_1ST>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xp0) {
         return xp1 - xp0;
@@ -752,7 +752,7 @@ struct D1<FD_1ST>
 template<>
 struct D1<FD_2ND>
 {
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0)
     {
@@ -821,7 +821,7 @@ template<>
 struct D1<FD_3RD>
 {
 
-    // the difference opperator
+    // the difference operator
     template<typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
         const ValueType& xp1, const ValueType& xp0)
@@ -893,7 +893,7 @@ template<>
 struct D1<BD_1ST>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xm1, const ValueType& xm0) {
         return -D1<FD_1ST>::difference(xm1, xm0);
@@ -945,7 +945,7 @@ template<>
 struct D1<BD_2ND>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xm2, const ValueType& xm1, const ValueType& xm0)
     {
@@ -1009,7 +1009,7 @@ template<>
 struct D1<BD_3RD>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xm3, const ValueType& xm2,
         const ValueType& xm1, const ValueType& xm0)
@@ -1178,7 +1178,7 @@ template<>
 struct D1<FD_HJWENO5>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
@@ -1805,7 +1805,7 @@ template<>
 struct D2<CD_SECOND>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xp0, const ValueType& xm1)
     {
@@ -1919,7 +1919,7 @@ template<>
 struct D2<CD_FOURTH>
 {
 
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2) {
@@ -2089,7 +2089,7 @@ struct D2<CD_FOURTH>
 template<>
 struct D2<CD_SIXTH>
 {
-    // the difference opperator
+    // the difference operator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
                                 const ValueType& xp0,

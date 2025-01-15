@@ -116,7 +116,7 @@ createSymmetricMap(const Mat3d& m)
 PolarDecomposedMap::Ptr
 createPolarDecomposedMap(const Mat3d& m)
 {
-    // Because our internal libary left-multiplies vectors against matrices
+    // Because our internal library left-multiplies vectors against matrices
     // we are constructing  M  = Symmetric * Unitary instead of the more
     // standard M = Unitary * Symmetric
     Mat3d unitary, symmetric, mat3 = m.transpose();

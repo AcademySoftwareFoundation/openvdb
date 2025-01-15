@@ -1452,7 +1452,7 @@ Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     // Write out the Descriptor's header information (grid name and type)
     gd.writeHeader(os);
 
-    // Save the curent stream position as postion to where the offsets for
+    // Save the current stream position as position to where the offsets for
     // this GridDescriptor will be written to.
     int64_t offsetPos = (seekable ? int64_t(os.tellp()) : 0);
 
@@ -1519,7 +1519,7 @@ Archive::writeGridInstance(GridDescriptor& gd, GridBase::ConstPtr grid,
     // and instance parent name).
     gd.writeHeader(os);
 
-    // Save the curent stream position as postion to where the offsets for
+    // Save the current stream position as position to where the offsets for
     // this GridDescriptor will be written to.
     int64_t offsetPos = (seekable ? int64_t(os.tellp()) : 0);
 

@@ -142,7 +142,7 @@ private:
     GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
     void clip();
 
-    /// @brief composit two grids, e.g. min, max, sum
+    /// @brief composite two grids, e.g. min, max, sum
     void composite();
 
     /// @brief generate a grid of selected properties from another grid
@@ -356,14 +356,14 @@ void Tool::init()
   mParser.addAction(
       "config", "c", "Import and process one or more configuration files",
     {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"},
-     {"execute", "true", "1|0|true|false", "toggle wether to execute the actions in the config file"},
-     {"update", "false", "1|0|true|false", "toggle wether to update the version number of the config file"}},
+     {"execute", "true", "1|0|true|false", "toggle whether to execute the actions in the config file"},
+     {"update", "false", "1|0|true|false", "toggle whether to update the version number of the config file"}},
      [&](){this->config();}, [](){}, 0); // anonymous options are appended to "files"
 
   mParser.addAction(
       "help", "h", "Print documentation for one, multiple or all available actions",
     {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed this action, documentation is printed for those actions only"},
-     {"exit", "true", "1|0|true|false", "toggle wether to terminate after this action or not"},
+     {"exit", "true", "1|0|true|false", "toggle whether to terminate after this action or not"},
      {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"}},
      [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
@@ -379,7 +379,7 @@ void Tool::init()
     {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
-     {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
+     {"keep", "", "1|0|true|false", "toggle whether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
      {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
      {"dither", "false", "1|0|true|false", "toggle dithering of quantized NanoVDB grids (disabled by default)"},
@@ -413,7 +413,7 @@ void Tool::init()
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
-     {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
+     {"keep", "", "1|0|true|false", "toggle whether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "mesh2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
@@ -424,14 +424,14 @@ void Tool::init()
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
      {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
      {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
      {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
 
   mParser.addAction(
       "ls2fog", "l2f", "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2fog_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
 
@@ -442,7 +442,7 @@ void Tool::init()
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"radius", "2.0", "2.0", "radius in voxel units of the input points"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"keep", "", "1|0|true|false", "toggle wether the input points are preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input points are preserved or deleted after the processing"},
      {"name", "", "points2ls_input", "specify the name of the resulting VDB (by default it's derived from the input points)"}},
      [&](){mParser.setDefaults();}, [&](){this->particlesToLevelSet();});
 
@@ -452,14 +452,14 @@ void Tool::init()
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
      {"name", "", "iso2ls_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->isoToLevelSet();});
 
   mParser.addAction(
       "points2vdb", "p2v", "Encode geometry points into a VDB grid",
     {{"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"keep", "", "1|0|true|false", "toggle wether the input points are preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input points are preserved or deleted after the processing"},
      {"ppv", "8", "8", "the number of points per voxel in the output VDB grid (defaults to 8)"},
      {"bits", "16", "16|8|32", "the number of bits used to represent a single point in the VDB grid (defaults to 16, i.e. half precision)"},
      {"name", "", "points_2vdb_input", "specify the name of the resulting VDB (by default it's derived from the input geometry)"}},
@@ -468,7 +468,7 @@ void Tool::init()
   mParser.addAction(
       "vdb2points", "v2p", "Extract points encoded in a VDB to points in a geometry format",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
      {"name", "", "vdb2points_input", "specify the name of the resulting points (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->vdbToPoints();});
 
@@ -478,7 +478,7 @@ void Tool::init()
      {"density", "0.0", "0.0", "uniform density of points per active voxel (disabled by default)"},
      {"ppv", "8", "8", "number of points per active voxel (defaults to 8)"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be scatter points into. Defaults to 0, i.e. most recently inserted VDB"},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
      {"name", "", "scatter_input", "specify the name of the resulting points (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->scatter();});
 
@@ -499,7 +499,7 @@ void Tool::init()
      {"scale", "1.0", "1.0", "defined the scale of the Enright velocity field"},
      {"dt", "0.05", "0.05", "time-step the input level set is advected"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->enright();});
 
   mParser.addAction(
@@ -564,86 +564,86 @@ void Tool::init()
   mParser.addAction(
       "cpt", "", "generate a vector grid with the closest-point-transform to a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "div", "", "generate a scalar grid with the divergence of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "curl", "", "generate a vector grid with the curl of another vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "grad", "", "generate a vector grid with the gradient of a scalar grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "curvature", "", "generate scalar grid with the mean curvature of a level set surface",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "length", "", "generate a scalar grid with the magnitude of a vector grid",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->compute();});
 
   mParser.addAction(
       "union", "", "CSG union of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to union. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
-     {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
-     {"rebuild", "true", "true", "toggle wether to re-build the level set after the boolean operation (enabled by default)"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
+     {"prune", "true", "true", "toggle whether to prune the tree after the boolean operation (enabled by default)"},
+     {"rebuild", "true", "true", "toggle whether to re-build the level set after the boolean operation (enabled by default)"}},
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
       "intersection", "", "CSG intersection of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to intersect. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
-     {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
-     {"rebuild", "true", "true", "toggle wether to re-build the level set after the boolean operation (enabled by default)"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
+     {"prune", "true", "true", "toggle whether to prune the tree after the boolean operation (enabled by default)"},
+     {"rebuild", "true", "true", "toggle whether to re-build the level set after the boolean operation (enabled by default)"}},
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
       "difference", "", "CSG difference of two level sets surfaces",
     {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to difference. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
-     {"prune", "true", "true", "toggle wether to prune the tree after the boolean operation (enabled by default)"},
-     {"rebuild", "true",  "true", "toggle wether to re-build the level set after the boolean operation (enabled by default)"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
+     {"prune", "true", "true", "toggle whether to prune the tree after the boolean operation (enabled by default)"},
+     {"rebuild", "true",  "true", "toggle whether to re-build the level set after the boolean operation (enabled by default)"}},
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
       "min", "", "Given grids A and B, compute min(a, b) per voxel",
-    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composite. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
       "max", "", "Given grids A and B, compute max(a, b) per voxel",
-    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composite. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
       "sum", "", "Given grids A and B, compute sum(a, b) per voxel",
-    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composite. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDBs is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
       "multires", "", "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->multires();});
 
   mParser.addAction(
@@ -652,13 +652,13 @@ void Tool::init()
      {"scale", "0", "0", "scale use to transform the input grid (ignored if two grids are specified with vdb)"},
      {"translate", "(0,0,0)", "(0,0,0)", "translation use to transform the input grid (ignored if two grids are specified with vdb)"},
      {"order", "1", "1", "order of the polynomial interpolation kernel used during resampling"},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->resample();});
 
   mParser.addAction(
       "clip", "", "Clip a VDB grid against another grid, a bbox or frustum",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"},
      {"bbox", "", "(0,0,0),(1,1,1)", "min and max of the world-space bounding-box used for clipping. Defaults to empty, i.e. disabled"},
      {"taper", "-1", "1", "taper of the frustum (requires bbox and depth to be specified). Defaults to -1, i.e. disabled"},
      {"depth", "-1", "1", "depth in world units of the frustum (requires bbox and taper to be specified). Defaults to -1, i.e. disabled"},
@@ -680,13 +680,13 @@ void Tool::init()
     {{"dilate", "1", "1", "number of integer voxels that the narrow band of the input SDF will be dilated"},
      {"iter", "1", "1", "number of iterations of the fast sweeping algorithm (each using 8 sweeps)"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->expandLevelSet();});
 
   mParser.addAction(
       "segment", "", "segment an input VDB into a list if topologically disconnected VDB grids",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->segment();});
 
   mParser.addAction(
@@ -696,14 +696,14 @@ void Tool::init()
      {"scale", "1.0", "1.0", "uniform scaling in world units"},
      {"vdb", "", "0,2,..", "age (i.e. stack index) of the VDB grid to be processed. Defaults to empty."},
      {"geo", "", "0,2,..", "age (i.e. stack index) of the Geometry to be processed. Defaults to empty."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or overwritten"}},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or overwritten"}},
      [&](){mParser.setDefaults();}, [&](){this->transform();});
 
   mParser.addAction(
       "render", "", "ray-tracing of level set surfaces and volume rendering of fog volumes",
     {{"files", "", "output.{jpg|png|ppm|exr}", "file used to save the rendered image to disk"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the rendering"},
+     {"keep", "", "1|0|true|false", "toggle whether the input VDB is preserved or deleted after the rendering"},
      {"camera", "perspective", "persp|ortho", "perspective or orthographic camera"},
      {"aperture", "41.2136", "41.2136", "width in mm of the frame of a perspective camera, i.e., the visible field (defaults to 41.2136mm)"},
      {"focal", "50", "50", "focal length of a perspective camera in mm (defaults to 50mm)"},
@@ -2474,8 +2474,8 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
     BBoxd bbox(Vec3T(v[0],v[1],v[2]), Vec3T(v[3],v[4],v[5]));
     output = tools::clip(input, bbox);
     break;
-  } case 8: {// clip against a frustrum
-  if (age>=0) throw std::invalid_argument("clip: both mask and frustrum were specified");
+  } case 8: {// clip against a frustum
+  if (age>=0) throw std::invalid_argument("clip: both mask and frustum were specified");
     BBoxd bbox(Vec3T(v[0],v[1],v[2]), Vec3T(v[3],v[4],v[5]));
     math::NonlinearFrustumMap frustum(bbox,v[6],v[7]);
     output = tools::clip(input, frustum);

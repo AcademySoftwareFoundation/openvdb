@@ -176,7 +176,7 @@ public:
     ///        simply redefines size. Otherwise a new page-table is defined, with the specified advice, and the old block is copied to the new block.
     /// @param size size of the new memory block
     /// @param dev the device ID on which to apply each advice provided in list, cudaCpuDeviceId = -1, 0, 1, ...
-    /// @param list advices to be applied to the resized range
+    /// @param list advice to be applied to the resized range
     void resize(size_t size, int dev = cudaCpuDeviceId, std::initializer_list<cudaMemoryAdvise> list = {cudaMemAdviseSetPreferredLocation})
     {
         if (size <= mCapacity) {

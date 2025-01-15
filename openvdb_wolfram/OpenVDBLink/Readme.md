@@ -52,7 +52,7 @@ Compiling library code ...
 
 If compilation fails, you may need to add any include/link paths that are not currently in your path environment. These can be added in `BuildSettings.m`.
 
-* For example on MacOS one may need to explictly add include and link paths like `-I/usr/local/include` in the `"CompileOptions"` field in the `"MacOSX"` area.
+* For example on MacOS one may need to explicitly add include and link paths like `-I/usr/local/include` in the `"CompileOptions"` field in the `"MacOSX"` area.
 * On Windows `$vcpkgDir` might need to be changed if `vcpkg` is not in `$HomeDirectory`.
 
 Once these are set, reload and then recompile. Below the input `True` is optional and tells the system to print the compile command as well as any warnings or errors during compile:

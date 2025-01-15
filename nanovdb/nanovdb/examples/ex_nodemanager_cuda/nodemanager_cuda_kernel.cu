@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
+#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessible on both the host and device
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
 #include <nanovdb/cuda/NodeManager.cuh>

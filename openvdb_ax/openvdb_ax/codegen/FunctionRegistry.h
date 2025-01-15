@@ -58,7 +58,7 @@ public:
         /// @brief Return a pointer to this function definition
         inline const FunctionGroup* function() const { return mFunction.get(); }
 
-        /// @brief Check whether this function should be only internally accesible
+        /// @brief Check whether this function should be only internally accessible
         inline bool isInternal() const { return mInternal; }
 
     private:

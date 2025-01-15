@@ -72,7 +72,7 @@ class Compiler;
 ///       @sa setGrainSize
 ///       @sa setActiveTileStreamingGrainSize
 ///   - AttributeBindings: None
-///       Whether to indriect any AX accesses to different grid names.
+///       Whether to indirect any AX accesses to different grid names.
 ///       @sa setAttributeBindings
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
@@ -249,7 +249,7 @@ public:
     ///   for a subset of the attributes will leave the others unchanged.
     ///   AX attributes can only bind to a single volume and vice versa.
     ///   However, in a single set call these can be swapped e.g. a -> b and b -> a.
-    ///   When bindings are overriden through subsequent calls to this function,
+    ///   When bindings are overridden through subsequent calls to this function,
     ///   any dangling volumes will be automatically bound by name.
     ///   To reset these bindings call get function and create a target set of bindings
     ///   for each attribute of name -> name.
@@ -259,7 +259,7 @@ public:
 
     ////////////////////////////////////////////////////////
 
-    // foward declaration of settings for this executable
+    // forward declaration of settings for this executable
     template <bool> struct Settings;
 
     /// @brief Command Line Interface handling for the VolumeExecutable.
@@ -279,7 +279,7 @@ public:
         std::unique_ptr<Settings<true>> mSettings;
     };
 
-    /// @brief  Intialize the Settings of this executables from the CLI object
+    /// @brief  Initialize the Settings of this executables from the CLI object
     /// @param cli The CLI object
     /// @{
     void setSettingsFromCLI(const CLI& cli);

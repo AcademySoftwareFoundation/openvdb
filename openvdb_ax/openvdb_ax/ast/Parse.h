@@ -28,7 +28,7 @@ namespace ast {
 ///   attempts to construct a complete abstract syntax tree (AST) which can be
 ///   passed to the AX Compiler. If the code is not well formed (as defined by
 ///   the AX grammar) a nullptr is returned and instances of any errors
-///   encoutered are stored to the provided logger.
+///   encountered are stored to the provided logger.
 /// @note   The returned AST is const as the logger uses this to determine line
 ///   and column numbers of errors/warnings in later stages. If you need to
 ///   modify the tree, take a copy.

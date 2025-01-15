@@ -67,7 +67,7 @@ TestVDBFunctions::addremovefromgroup()
 
     openvdb::points::PointDataTree& dataTree = dataGrid->tree();
 
-    // apppend a new attribute for stress testing
+    // append a new attribute for stress testing
 
     openvdb::points::appendAttribute(dataTree, "existingTestAttribute", 2);
     openvdb::points::appendGroup(dataTree, "existingTestGroup");
@@ -113,7 +113,7 @@ TestVDBFunctions::addremovefromgroup()
     CPPUNIT_ASSERT(existingTestGroupHandle.get(2));
     CPPUNIT_ASSERT(!existingTestGroupHandle.get(3));
 
-    // membership of this group should now mirror exisingTestGroup
+    // membership of this group should now mirror existingTestGroup
     openvdb::points::GroupHandle existingTestGroup2Handle = leafIter->groupHandle("existingTestGroup2");
     CPPUNIT_ASSERT(existingTestGroup2Handle.get(0));
     CPPUNIT_ASSERT(!existingTestGroup2Handle.get(1));

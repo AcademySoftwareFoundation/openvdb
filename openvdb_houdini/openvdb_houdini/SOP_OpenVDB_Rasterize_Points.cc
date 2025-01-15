@@ -1094,7 +1094,7 @@ private:
 
 /// Inactivates candidate leafnodes that have no particle overlap.
 /// (The ConstructCandidateVoxelMask scheme is overestimating the region
-///  of intrest when frustum transforms are used, this culls the regions.)
+///  of interest when frustum transforms are used, this culls the regions.)
 template <typename MaskLeafNodeType>
 struct CullFrustumLeafNodes
 {

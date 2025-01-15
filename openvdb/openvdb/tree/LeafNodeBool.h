@@ -83,7 +83,7 @@ public:
     /// @brief Deprecated topology copy constructor
     /// @note  This constructor initialises the bool buffer to the ValueMask
     ///   states (i.e. value will be true if the active state is on and
-    ///   vice-versa). This is not really a "TopologyCopy" and is therefor
+    ///   vice-versa). This is not really a "TopologyCopy" and is therefore
     ///   deprecated. Use the explicit mask/buffer constructor instead:
     /// @code
     ///    // build new leaf node with the mask of 'a', but with the mask of

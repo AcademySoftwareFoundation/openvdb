@@ -1062,7 +1062,7 @@ public:
 // Unlike NodeMask above this RootNodeMask has a run-time defined size.
 // It is only included for backward compatibility and will likely be
 // deprecated in the future!
-// This class is 32-bit specefic, hence the use if Index32 vs Index!
+// This class is 32-bit specific, hence the use if Index32 vs Index!
 class RootNodeMask
 {
 protected:
@@ -1207,7 +1207,7 @@ public:
         DenseIterator(Index32 pos,const RootNodeMask *parent) : BaseIterator(pos,parent) {}
         void increment() {
             OPENVDB_ASSERT(mParent != nullptr);
-            mPos += 1;//carefull - the increament might go beyond the end
+            mPos += 1;//careful - the increment might go beyond the end
             OPENVDB_ASSERT(mPos<= mBitSize);
         }
         void increment(Index n) {

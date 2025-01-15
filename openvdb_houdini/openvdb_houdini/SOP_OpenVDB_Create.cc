@@ -585,7 +585,7 @@ SOP_OpenVDB_Create::updateParmsFlags()
             eType = TYPE_VEC3S;
         }
 
-        /// Disbale unused bg value options
+        /// Disable unused bg value options
         changed |= enableParmInst("bgFloat#", &i,
             !isLevelSet && (eType == TYPE_FLOAT || eType == TYPE_DOUBLE));
         changed |= enableParmInst("width#",   &i, isLevelSet);

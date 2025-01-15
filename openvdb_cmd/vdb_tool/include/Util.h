@@ -377,7 +377,7 @@ inline bool isLittleEndian()
     return (*(char *)&tmp == 1);
 }
 
-/// @brief invert endianess of a type
+/// @brief invert endianness of a type
 /// @tparam T Template type to be inverted
 /// @param val value to be inverted
 /// @return value with reverse bytes
@@ -389,7 +389,7 @@ inline T swapBytes(T val)
     return tmp;
 }
 
-/// @brief invert endianess of an array of values of a specific type
+/// @brief invert endianness of an array of values of a specific type
 /// @tparam T Template type to be inverted
 /// @param val pointer to array with values to be inverted
 /// @param n number of elements in the array

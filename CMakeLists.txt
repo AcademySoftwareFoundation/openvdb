@@ -44,7 +44,7 @@
 #  ensure policy scope is set up correctly
 cmake_minimum_required(VERSION 3.20)
 
-# CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
+# CMP0091 allows for MSVC ABI targeting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
 if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
@@ -93,7 +93,7 @@ option(USE_CCACHE "Build using Ccache if found on the path" ON)
 cmake_dependent_option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes
 and methods against a pre-defined list of OpenVDB trees. This makes the core library larger and slower
 to compile, but speeds up the compilation of all dependent code by bypassing the expensive template
-instantation." ON "NOT WIN32" OFF)
+instantiation." ON "NOT WIN32" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -124,7 +124,7 @@ option(USE_EXR [=[
 Use OpenEXR while building openvdb components. If enabled, this also switches USE_IMATH_HALF to ON unless
 it too was provided and set to OFF.]=] OFF)
 option(USE_IMATH_HALF [=[
-Use the definiton of half floating point types from the Imath library. If OFF, the embedded definition provided
+Use the definition of half floating point types from the Imath library. If OFF, the embedded definition provided
 by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located openvdb build configuration
 to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
 required.]=] ${USE_EXR})
@@ -135,7 +135,7 @@ option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BU
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_STATIC_DEPENDENCIES [=[
-Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
+Only search for and use static libraries. If OFF the shared versions of required libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
 to ON, where XXX is the package name. On Windows this behaviour is less strict, with any located libraries assumed
 to be static. This has no effect for any packages found with Xxx_DIR (i.e. CMake CONFIG mode).]=] OFF)

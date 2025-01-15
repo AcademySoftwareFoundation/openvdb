@@ -457,7 +457,7 @@ provide:
 =`/path/to/install/dir` # The location you wish to install OpenVDB to. See
 the link for default values.
 - @b Xxx_ROOT =`/path/to/Xxx/` # Give CMake a path to where a package has been
-installed or simply to where your prefered package is installed if it cannot
+installed or simply to where your preferred package is installed if it cannot
 locate it.
 
 For example, a typical first attempt at generating the build files may look as
@@ -472,7 +472,7 @@ available, their corresponding CMake flags and their default values.
 
 After the CMake build files have been successfully generated, run the build
 tool within the build directory to compile the project. On UNIX, you can
-typically incoke `make` directly:
+typically invoke `make` directly:
 @code
 make -j4
 @endcode

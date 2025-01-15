@@ -52,7 +52,7 @@ houdini_get_default_install_dir():
   Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
-the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
+the visibility of OpenVDB nodes and their native equivalents.]=] OFF)
 
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
@@ -311,7 +311,7 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   endif()
 
   # Call houdini_configure_target to setup the sesi tag information. We set
-  # INSTDIR to the project build directory and configure the actuall install
+  # INSTDIR to the project build directory and configure the actual install
   # paths ourselves (otherwise cmake will configure the build to build directly
   # to the install dir)
 

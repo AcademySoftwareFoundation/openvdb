@@ -114,7 +114,7 @@ struct LockedInfoTextRegistry
 // Declare this at file scope to ensure thread-safe initialization
 static std::mutex theInitInfoTextRegistryMutex;
 
-// Global function for accessing the regsitry
+// Global function for accessing the registry
 static LockedInfoTextRegistry*
 getInfoTextRegistry()
 {

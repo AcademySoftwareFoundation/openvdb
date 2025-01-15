@@ -262,7 +262,7 @@ TEST_F(TestStreamCompression, testBlosc)
 #endif
     }
 
-    { // uncompressible buffer
+    { // incompressible buffer
         const int uncompressedCount = 32;
 
         std::vector<int> values;

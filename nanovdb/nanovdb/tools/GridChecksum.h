@@ -138,9 +138,9 @@ inline __hostdev__ uint32_t crc32(const void *begin, const void *end, uint32_t c
 }
 
 /// @brief Compute crc32 checksum of @c data with @c size bytes using a lookup table
-/// @param data pointer to begenning of data
+/// @param data pointer to beginning of data
 /// @param size byte size
-/// @param lut pointer to loopup table for accelerated crc32 computation
+/// @param lut pointer to lookup table for accelerated crc32 computation
 /// @param crc initial value of the checksum
 /// @return crc32 checksum of @c data with @c size bytes
 inline __hostdev__ uint32_t crc32(const void *data, size_t size, const uint32_t lut[256], uint32_t crc = 0)
@@ -154,7 +154,7 @@ inline __hostdev__ uint32_t crc32(const void *data, size_t size, const uint32_t 
 /// @brief Compute crc32 checksum of data between @c begin and @c end using a lookup table
 /// @param begin points to beginning of data
 /// @param end points to end of @data, (exclusive)
-/// @param lut pointer to loopup table for accelerated crc32 computation
+/// @param lut pointer to lookup table for accelerated crc32 computation
 /// @param crc initial value of crc32 checksum
 /// @return return crc32 checksum
 inline __hostdev__ uint32_t crc32(const void *begin, const void *end, const uint32_t lut[256], uint32_t crc = 0)

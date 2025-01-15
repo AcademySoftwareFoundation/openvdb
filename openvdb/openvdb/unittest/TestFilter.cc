@@ -89,7 +89,7 @@ TEST_F(TestFilter, testMedian)
     const int width = 2;
     openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
     openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-    filter.median(width, /*interations=*/1);
+    filter.median(width, /*iterations=*/1);
     std::vector<float> tmp;
     for (int x=0; x<dim[0]; ++x) {
         xyz[0]=x;
@@ -132,7 +132,7 @@ TEST_F(TestFilter, testMean)
     const int width = 2;
     openvdb::math::DenseStencil<openvdb::FloatGrid> stencil(*referenceGrid, width);
     openvdb::tools::Filter<openvdb::FloatGrid> filter(*filteredGrid);
-    filter.mean(width,  /*interations=*/1);
+    filter.mean(width,  /*iterations=*/1);
     for (int x=0; x<dim[0]; ++x) {
         xyz[0]=x;
         for (int y=0; y<dim[1]; ++y) {

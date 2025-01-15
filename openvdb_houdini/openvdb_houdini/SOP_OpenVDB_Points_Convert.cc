@@ -325,7 +325,7 @@ To Match Reference VDB:\n\
 
     parms.add(hutil::ParmFactory(PRM_HEADING, "transferheading", "Attribute Transfer"));
 
-     // Mode. Either convert all or convert specifc attributes
+     // Mode. Either convert all or convert specific attributes
     parms.add(hutil::ParmFactory(PRM_ORD, "mode", "Mode")
         .setDefault(PRMzeroDefaults)
         .setTooltip("Whether to transfer only specific attributes or all attributes found")

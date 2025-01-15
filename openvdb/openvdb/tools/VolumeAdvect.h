@@ -58,7 +58,7 @@ namespace Scheme {
 /// @verbatim The supported integrations schemes:
 ///
 ///    ================================================================
-///    |  Lable | Accuracy |  Integration Scheme   |  Interpolations  |
+///    |  Label | Accuracy |  Integration Scheme   |  Interpolations  |
 ///    |        |Time/Space|                       |  velocity/volume |
 ///    ================================================================
 ///    |  SEMI  |   1/1    | Semi-Lagrangian       |        1/1       |
@@ -135,7 +135,7 @@ public:
     /// @brief Set the limiter (see details above)
     void setLimiter(Scheme::Limiter limiter) { mLimiter = limiter; }
 
-    /// @brief Retrun the limiter (see details above)
+    /// @brief Return the limiter (see details above)
     Scheme::Limiter getLimiter() const { return mLimiter; }
 
     /// @brief Return @c true if a limiter will be applied based on

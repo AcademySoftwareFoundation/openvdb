@@ -64,7 +64,7 @@ global proc replaceOpenVDBVisualizeGridSelection(string $attr)
         for ($name in $gridNames) menuItem -l $name -parent vdbGridNameMenu;
     }
 
-    /// @todo re-select previous item if it exists, don't update VdbSelectedGridNames if the same item is selectd.
+    /// @todo re-select previous item if it exists, don't update VdbSelectedGridNames if the same item is selected.
 }
 
 global proc updateOpenVDBVisualizeGridSelection(string $attr)

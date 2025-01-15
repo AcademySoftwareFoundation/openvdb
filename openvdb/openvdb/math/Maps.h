@@ -154,7 +154,7 @@ public:
 
     /// Return @c true if this map is linear.
     virtual bool isLinear() const = 0;
-    /// Return @c true if the spacing between the image of latice is uniform in all directions
+    /// Return @c true if the spacing between the image of lattice is uniform in all directions
     virtual bool hasUniformScale() const = 0;
 
     virtual Vec3d applyMap(const Vec3d& in) const = 0;
@@ -429,7 +429,7 @@ public:
     }
 
     /// Return the Jacobian Transpose of the map applied to @a in.
-    /// This tranforms range-space gradients to domain-space gradients
+    /// This transforms range-space gradients to domain-space gradients
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const override {
@@ -552,7 +552,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropraite operation.
+    /// of prepending the appropriate operation.
     MapBase::Ptr preRotate(double radians, Axis axis = X_AXIS) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -582,7 +582,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of postfixing the appropraite operation.
+    /// of postfixing the appropriate operation.
     MapBase::Ptr postRotate(double radians, Axis axis = X_AXIS) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -757,7 +757,7 @@ public:
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
-    /// @details This tranforms range-space gradients to domain-space gradients
+    /// @details This transforms range-space gradients to domain-space gradients
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const final { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const final { return applyMap(in); }
@@ -827,7 +827,7 @@ public:
         mInvScaleSqr.write(os);
         mInvTwiceScale.write(os);
     }
-    /// string serialization, useful for debuging
+    /// string serialization, useful for debugging
     std::string str() const override
     {
         std::ostringstream buffer;
@@ -857,7 +857,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropraite operation to the existing map
+    /// of prepending the appropriate operation to the existing map
     MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -878,7 +878,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropraite operation to the existing map.
+    /// of prepending the appropriate operation to the existing map.
     MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -1034,7 +1034,7 @@ public:
 
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
-    /// @details This tranforms range-space gradients to domain-space gradients
+    /// @details This transforms range-space gradients to domain-space gradients
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const override { return in; }
@@ -1068,7 +1068,7 @@ public:
     void read(std::istream& is) override { mTranslation.read(is); }
     /// write serialization
     void write(std::ostream& os) const override { mTranslation.write(os); }
-    /// string serialization, useful for debuging
+    /// string serialization, useful for debugging
     std::string str() const override
     {
         std::ostringstream buffer;
@@ -1289,7 +1289,7 @@ public:
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
-    /// @details This tranforms range-space gradients to domain-space gradients
+    /// @details This transforms range-space gradients to domain-space gradients
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const final { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const final { return applyJacobian(in); }
@@ -1366,7 +1366,7 @@ public:
         mInvScaleSqr.write(os);
         mInvTwiceScale.write(os);
     }
-    /// string serialization, useful for debuging
+    /// string serialization, useful for debugging
     std::string str() const override
     {
         std::ostringstream buffer;
@@ -1398,7 +1398,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of prepending the appropraite operation.
+    /// of prepending the appropriate operation.
     MapBase::Ptr preRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -1426,7 +1426,7 @@ public:
 
     //@{
     /// @brief  Return a MapBase::Ptr to a new map that is the result
-    /// of postfixing the appropraite operation.
+    /// of postfixing the appropriate operation.
     MapBase::Ptr postRotate(double radians, Axis axis) const override
     {
         AffineMap::Ptr affineMap = getAffineMap();
@@ -1615,7 +1615,7 @@ ScaleTranslateMap::postScale(const Vec3d& v) const
 ////////////////////////////////////////
 
 
-/// @brief A specialized linear transform that performs a unitary maping
+/// @brief A specialized linear transform that performs a unitary mapping
 /// i.e. rotation  and or reflection.
 class OPENVDB_API UnitaryMap final: public MapBase
 {
@@ -1623,7 +1623,7 @@ public:
     using Ptr = SharedPtr<UnitaryMap>;
     using ConstPtr = SharedPtr<const UnitaryMap>;
 
-    /// default constructor makes an Idenity.
+    /// default constructor makes an Identity.
     UnitaryMap(): mAffineMap(Mat4d::identity())
     {
     }
@@ -1753,7 +1753,7 @@ public:
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
-    /// @details This tranforms range-space gradients to domain-space gradients
+    /// @details This transforms range-space gradients to domain-space gradients
     Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
     Vec3d applyJT(const Vec3d& in) const override {
@@ -1796,7 +1796,7 @@ public:
     {
         mAffineMap.write(os);
     }
-    /// string serialization, useful for debuging
+    /// string serialization, useful for debugging
     std::string str() const override
     {
         std::ostringstream buffer;
@@ -1915,7 +1915,7 @@ public:
     /// @brief Constructor that takes an index-space bounding box
     /// to be mapped into a frustum with a given @a depth and @a taper
     /// (defined as ratio of nearplane/farplane).
-    /// @details This frustum is further modifed by the @a secondMap,
+    /// @details This frustum is further modified by the @a secondMap,
     /// intended to be a simple translation and rotation and uniform scale
    NonlinearFrustumMap(const BBoxd& bb, double taper, double depth,
         const MapBase::Ptr& secondMap):
@@ -1923,7 +1923,7 @@ public:
     {
         if (!secondMap->isLinear() ) {
               OPENVDB_THROW(ArithmeticError,
-                "The second map in the Frustum transfrom must be linear");
+                "The second map in the Frustum transform must be linear");
         }
         mSecondMap = *( secondMap->getAffineMap() );
         init();
@@ -2162,7 +2162,7 @@ public:
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to vector @c in at @c indexloc.
-    /// @details This tranforms range-space gradients to domain-space gradients.
+    /// @details This transforms range-space gradients to domain-space gradients.
     Vec3d applyJT(const Vec3d& in, const Vec3d& isloc) const override {
         const Vec3d tmp = mSecondMap.applyJT(in);
         // Move the center of the x-face of the bbox
@@ -2365,7 +2365,7 @@ public:
     /// Return MapBase::Ptr& to the second map
     const AffineMap& secondMap() const { return mSecondMap; }
     /// Return @c true if the  the bounding box in index space that defines the region that
-    /// is maped into the frustum is non-zero, otherwise @c false
+    /// is mapped into the frustum is non-zero, otherwise @c false
     bool isValid() const { return !mBBox.empty();}
 
     /// Return @c true if the second map is a uniform scale, Rotation and translation
@@ -2412,7 +2412,7 @@ public:
         mSecondMap.write(os);
     }
 
-    /// string serialization, useful for debuging
+    /// string serialization, useful for debugging
     std::string str() const override
     {
         std::ostringstream buffer;

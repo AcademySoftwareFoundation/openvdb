@@ -40,7 +40,7 @@ struct Default
 ///
 /// @param tree               the PointDataTree to be appended to.
 /// @param name               name for the new attribute.
-/// @param type               the type of the attibute.
+/// @param type               the type of the attribute.
 /// @param strideOrTotalSize  the stride of the attribute
 /// @param constantStride     if @c false, stride is interpreted as total size of the array
 /// @param defaultValue       metadata default attribute value

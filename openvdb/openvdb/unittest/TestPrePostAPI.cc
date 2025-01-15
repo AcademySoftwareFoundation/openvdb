@@ -442,8 +442,8 @@ TEST_F(TestPrePostAPI, testLinearTransform)
         tinv->postTranslate(-Vec3d(2, 2, 2));
 
 
-        // test this by verifying that equvilent interal matrix
-        // represenations are inverses
+        // test this by verifying that equivalent internal matrix
+        // representations are inverses
         Mat4d m = t->baseMap()->getAffineMap()->getMat4();
         Mat4d minv = tinv->baseMap()->getAffineMap()->getMat4();
 
@@ -561,8 +561,8 @@ TEST_F(TestPrePostAPI, testFrustumTransform)
         tinv->postTranslate(-Vec3d(2, 2, 2));
 
 
-        // test this by verifying that equvilent interal matrix
-        // represenations are inverses
+        // test this by verifying that equivalent internal matrix
+        // representations are inverses
         NonlinearFrustumMap::Ptr frustum =
             openvdb::StaticPtrCast<NonlinearFrustumMap, MapBase>(t->baseMap());
         NonlinearFrustumMap::Ptr frustuminv =

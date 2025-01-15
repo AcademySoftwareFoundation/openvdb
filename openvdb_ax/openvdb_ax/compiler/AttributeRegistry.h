@@ -156,7 +156,7 @@ public:
         return nullptr;
     }
 
-    /// @brief  Returns a const reference to the vector of registered accesss
+    /// @brief  Returns a const reference to the vector of registered accesses
     inline const AccessDataVec& data() const { return mAccesses; }
 
     void print(std::ostream& os) const;

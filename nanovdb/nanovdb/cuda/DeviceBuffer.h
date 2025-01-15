@@ -183,7 +183,7 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
-    /// @brief Retuns a raw void pointer to the host/CPU buffer managed by this allocator.
+    /// @brief Returns a raw void pointer to the host/CPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
     void* data() const { return mCpuData; }
 
@@ -211,14 +211,14 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
-    /// @brief Retuns a raw pointer to the specified device/GPU buffer managed by this allocator.
+    /// @brief Returns a raw pointer to the specified device/GPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
     void* deviceData(int device) const {
         NANOVDB_ASSERT(device >= 0 && device < mDeviceCount);
         return mGpuData[device];
     }
 
-    /// @brief Retuns a raw pointer to the current device/GPU buffer managed by this allocator.
+    /// @brief Returns a raw pointer to the current device/GPU buffer managed by this allocator.
     /// @warning Note that the pointer can be NULL!
     void* deviceData() const {
         int device = cudaCpuDeviceId;
@@ -252,7 +252,7 @@ public:
     /// @param device device ID to download source data from
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous.
-    /// @warning Assumes that the specifed device buffer already exists!
+    /// @warning Assumes that the specified device buffer already exists!
     void deviceDownload(int device = 0, cudaStream_t stream = 0, bool sync = true);
     void deviceDownload(int device, void* stream , bool sync) {this->deviceDownload(device, cudaStream_t(stream), sync);}
 

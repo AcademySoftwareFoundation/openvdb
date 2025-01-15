@@ -1326,7 +1326,7 @@ SOP_OpenVDB_AX::Cache::evaluateExternalExpressions(const double time,
         //        in this case return a vector filled with the single value.
         //        for example, if p = 1, return (1,1,1)
         //
-        //  -5) chramp(p) - as ramps are alwyas multi parms, we don't  have
+        //  -5) chramp(p) - as ramps are always multi parms, we don't  have
         //        to consider the case where it could be a channel
 
         const bool isCHRampLookup(type == "ramp");

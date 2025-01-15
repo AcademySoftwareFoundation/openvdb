@@ -245,7 +245,7 @@ set(HOUDINI_LIB_DIR ${_houdini_install_root}/${HOUDINI_DSOLIB_DIR})
 #  Configure dependencies
 # ------------------------------------------------------------------------
 
-# Congfigure dependency hints to point to Houdini. Allow for user overriding
+# Configure dependency hints to point to Houdini. Allow for user overriding
 # if custom Houdini installations are in use
 
 # ZLIB - FindPackage ( ZLIB) only supports a few path hints. We use
@@ -339,7 +339,7 @@ if(NOT OPENVDB_HOUDINI_ABI)
 endif()
 
 # ------------------------------------------------------------------------
-#  Configure libstc++ CXX11 ABI
+#  Configure libstdc++ CXX11 ABI
 # ------------------------------------------------------------------------
 
 if(UNIX AND NOT APPLE)

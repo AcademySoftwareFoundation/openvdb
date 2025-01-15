@@ -265,7 +265,7 @@ main(int argc, char *argv[])
     openvdb::ax::initialize();
     openvdb::logging::initialize(argc, argv);
 
-    // Also intialize Vec2/4 point attributes
+    // Also initialize Vec2/4 point attributes
 
     registerType<openvdb::math::Vec2<int32_t>>();
     registerType<openvdb::math::Vec2<float>>();

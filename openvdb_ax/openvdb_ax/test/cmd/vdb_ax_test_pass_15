@@ -23,7 +23,7 @@ usage: vdb_ax [execute] [<args>]
                               code).
     --opt [NONE|O0|O1|O2|Os|Oz|O3]
                               compilation optimization level (Default: 03). [03] ensures the most
-                              vigorus optimization passes are enabled. This should very rarely be
+                              vigorous optimization passes are enabled. This should very rarely be
                               changed but is useful for identifying issues with particular
                               optimization passes.
     --threads [n]             number of threads to use, 0 uses all available (Default: 0).
@@ -59,7 +59,7 @@ usage: vdb_ax [execute] [<args>]
     --bindings ["ax_name:volume_name,..."]
                               attribute bindings for volumes. The argument accepts a quoted string
                               list of AX (source code) name to data (vdb attribute) name pairs
-                              joined by colons and seperated by commas. For example:
+                              joined by colons and separated by commas. For example:
                                 --bindings "velocity:v,density:s"
                               binds velocity AX accesses to a 'v' attribute and density AX accesses
                               to a 's' attribute. The following snippet would then alias these
@@ -80,7 +80,7 @@ usage: vdb_ax [execute] [<args>]
     --bindings ["ax_name:point_attr_name,..."]
                               attribute bindings for points. The argument accepts a quoted string
                               list of AX (source code) name to data (vdb attribute) name pairs
-                              joined by colons and seperated by commas. For example:
+                              joined by colons and separated by commas. For example:
                                 --bindings "velocity:v,density:s"
                               binds velocity AX accesses to a 'v' attribute and density AX accesses
                               to a 's' attribute. The following snippet would then alias these

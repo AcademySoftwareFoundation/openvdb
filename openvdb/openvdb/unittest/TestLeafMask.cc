@@ -199,11 +199,11 @@ TEST_F(TestLeafMask, testEquivalence)
 
         leaf2.setValueOff(Coord(0, 0, 1), false);
 
-        EXPECT_TRUE(leaf == leaf2);//values and states coinside
+        EXPECT_TRUE(leaf == leaf2);//values and states coincide
 
         leaf2.setValueOn(Coord(0, 0, 1));
 
-        EXPECT_TRUE(leaf != leaf2);//values and states coinside
+        EXPECT_TRUE(leaf != leaf2);//values and states coincide
     }
     {// test LeafNode<bool>::operator==()
         LeafType leaf1(Coord(0            , 0, 0), true); // true and inactive

@@ -110,8 +110,8 @@ public:
         return msec;
     }
 
-    /// @brief elapsed time (since start) in miliseconds
-    /// @return elapsed time (since start) in miliseconds
+    /// @brief elapsed time (since start) in milliseconds
+    /// @return elapsed time (since start) in milliseconds
     inline float elapsed()
     {
         this->record();

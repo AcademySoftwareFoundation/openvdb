@@ -144,7 +144,7 @@ public:
     /// @note  This method is actually not required by cuda::PointsToGrid
     /// @param ptr Pointer to array of elements
     __hostdev__ explicit fancy_ptr(const T* ptr = nullptr) : mPtr(ptr) {}
-    /// @brief Index acces into the array pointed to by the stored pointer.
+    /// @brief Index access into the array pointed to by the stored pointer.
     /// @note  This method is required by cuda::PointsToGrid!
     /// @param i Unsigned index of the element to be returned
     /// @return Const reference to the element at the i'th position
@@ -698,7 +698,7 @@ jump:// this marks the beginning of the actual algorithm
             goto jump;
         }
     }
-    if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
+    if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint density\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
     cudaCheck(cudaEventSynchronize(copyEvent));

@@ -9,7 +9,7 @@
 /// @details The leaf array is useful for multithreaded computations over
 /// leaf voxels in a tree with static topology but varying voxel values.
 /// The auxiliary buffers are convenient for temporal integration.
-/// Efficient methods are provided for multithreaded swapping and synching
+/// Efficient methods are provided for multithreaded swapping and syncing
 /// (i.e., copying the contents) of these buffers.
 
 #ifndef OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED

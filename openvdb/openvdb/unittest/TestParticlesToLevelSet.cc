@@ -61,7 +61,7 @@ public:
         pa.v = v;
         mParticleList.push_back(pa);
     }
-    /// @return coordinate bbox in the space of the specified transfrom
+    /// @return coordinate bbox in the space of the specified transform
     openvdb::CoordBBox getBBox(const openvdb::GridBase& grid) {
         openvdb::CoordBBox bbox;
         openvdb::Coord &min= bbox.min(), &max = bbox.max();

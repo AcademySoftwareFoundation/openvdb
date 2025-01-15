@@ -597,7 +597,7 @@ class TestSampleFromPoints(unittest.TestCase):
                     [100.0, 0.0, 0.0],  # on the boundary
                     [0.0, 0.0, 99.0],  # interior point inside the narrow band
                     [0.0, 101.0, 0.0],  # exterior point inside the narrow band
-                    [110.0, 0.0, 0.0],  # exterior point ouside the narrow band
+                    [110.0, 0.0, 0.0],  # exterior point outside the narrow band
                 ],
                 dtype=torch.float32,
                 device=torch.device("cuda", 0),
