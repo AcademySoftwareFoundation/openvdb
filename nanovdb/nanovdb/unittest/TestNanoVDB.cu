@@ -22,12 +22,14 @@
 #include <nanovdb/io/IO.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
+#include <nanovdb/cuda/DeviceMesh.h>
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
 #include <iomanip> // for std::setw, std::setfill
+#include <thread> // for std::thread
 
 namespace nanovdb {// this namespace is required by gtest
 
@@ -230,6 +232,52 @@ TEST(TestNanoVDBCUDA, DeviceStreamMap)
         }
     }
     cudaSetDevice(current); // restore device so subsequent tests don't fail
+}
+
+TEST(TestNanoVDBCUDA, DeviceMesh)
+{
+    int count = 0, current = 0;
+    {
+        cudaCheck(cudaGetDeviceCount(&count));
+        cudaCheck(cudaGetDevice(&current));
+        EXPECT_EQ(count,   nanovdb::util::cuda::deviceCount());
+        EXPECT_EQ(current, nanovdb::util::cuda::currentDevice());
+    }
+    //std::cout << "Total device count = " << count << std::endl;
+    nanovdb::cuda::DeviceMesh serialMesh;
+    EXPECT_EQ(count, serialMesh.deviceCount());
+    EXPECT_GT(nanovdb::cuda::minDevicePageSize(serialMesh), 0);
+    // Construction of deviceMesh (and destruction) should not modify current device
+    EXPECT_EQ(current, nanovdb::util::cuda::currentDevice());
+    // Serial kernel dispatch with iterator
+    for (const auto& [device, stream] : serialMesh) {
+        cudaSetDevice(device);
+        testKernel<<<1, 1, 0, stream>>>(device);
+    }
+    // Wait on each kernel to finish using indexing operation
+    for (int i = 0; i < serialMesh.deviceCount(); ++i) {
+        cudaSetDevice(serialMesh[i].id);
+        cudaStreamSynchronize(serialMesh[i].stream);
+    }
+
+    // Test move constructor
+    nanovdb::cuda::DeviceMesh parallelMesh(std::move(serialMesh));
+    EXPECT_EQ(count, parallelMesh.deviceCount());
+    // After move constructor, serialMesh should have no devices
+    EXPECT_EQ(0, serialMesh.deviceCount());
+    // Parallel kernel dispatch with iterator
+    std::vector<std::thread> threads;
+    for (const auto& [device, stream] : parallelMesh) {
+        threads.emplace_back([](int device, cudaStream_t stream) {
+            cudaSetDevice(device);
+            testKernel<<<1, 1, 0, stream>>>(device);
+            cudaStreamSynchronize(stream);
+        }, device, stream);
+    }
+    std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
+    threads.clear();
+
+    cudaSetDevice(current); // Restore device so subsequent tests don't fail
 }
 
 TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_float)

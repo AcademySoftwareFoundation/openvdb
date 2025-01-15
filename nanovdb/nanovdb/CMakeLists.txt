@@ -115,6 +115,7 @@ if(NANOVDB_USE_CUDA)
   endif()
 
   find_package(CUDAToolkit)
+  find_package(NCCL)
 endif()
 
 if(NANOVDB_USE_OPENVDB)
@@ -171,6 +172,8 @@ set(NANOVDB_INCLUDE_FILES
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/DeviceBuffer.h
+  cuda/DeviceGuard.h
+  cuda/DeviceMesh.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
   cuda/NodeManager.cuh
@@ -313,6 +316,11 @@ if(NANOVDB_USE_CUDA)
   # Add CUDA includes to any C++ units which use NanoVDB
   target_include_directories(nanovdb INTERFACE
     ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+
+  if(NCCL_FOUND)
+    target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_NCCL)
+    target_link_libraries(nanovdb INTERFACE NCCL::NCCL)
+  endif()
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)
