@@ -87,7 +87,7 @@ TEST_F(TestDivergence, testDivergenceMaskedTool)
     EXPECT_TRUE(!inTree.empty());
     EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
-    /// maked region
+    /// masked region
     openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
     maskGrid->fill(maskBBox, true /*value*/, true /*activate*/);

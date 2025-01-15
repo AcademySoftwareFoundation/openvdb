@@ -242,17 +242,17 @@ public:
             [&](){mCallStack.top()=getExt(mCallStack.top());});
 
         // boolean operations
-        add("==","returns true if the two top enteries on the stack compare equal, e.g. {1:2:==} -> {0}",
+        add("==","returns true if the two top entries on the stack compare equal, e.g. {1:2:==} -> {0}",
             [&](){this->boolean(std::equal_to<>());});
-        add("!=","returns true if the two top enteries on the stack are not equal, e.g. {1:2:!=} -> {1}",
+        add("!=","returns true if the two top entries on the stack are not equal, e.g. {1:2:!=} -> {1}",
             [&](){this->boolean(std::not_equal_to<>());});
-        add("<=","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+        add("<=","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
             [&](){this->boolean(std::less_equal<>());});
-        add(">=","returns true if the two top enteries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
+        add(">=","returns true if the two top entries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
             [&](){this->boolean(std::greater_equal<>());});
-        add("<","returns true if the two top enteries on the stack are less than, e.g. {1:2:<} -> {1}",
+        add("<","returns true if the two top entries on the stack are less than, e.g. {1:2:<} -> {1}",
             [&](){this->boolean(std::less<>());});
-        add(">","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+        add(">","returns true if the two top entries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
             [&](){this->boolean(std::greater<>());});
         add("!","logical negation, e.g. {1:!} -> {0}",
             [&](){this->set(!strToBool(mCallStack.top()));});
@@ -917,7 +917,7 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         "end", "", "marks the end scope of \"-for,-each,and -if\" control actions", {},
         [&](){
-            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for,-each, or -if");
+            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceded by -for,-each, or -if");
             --counter;},
         [&](){
             OPENVDB_ASSERT(iter->name == "end");

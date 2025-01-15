@@ -138,7 +138,7 @@ TEST_F(TestVolumeToSpheres, testMinimumSphereCount)
                 /*overlapping=*/true, /*minRadius=*/2.0f);
 
             // Given the relatively large minimum radius, the actual sphere count
-            // should be no larger than the requested mimimum count.
+            // should be no larger than the requested minimum count.
             EXPECT_EQ(minSphereCount, int(spheres.size()));
             //EXPECT_TRUE(int(spheres.size()) >= minSphereCount);
             EXPECT_TRUE(int(spheres.size()) <= maxSphereCount);

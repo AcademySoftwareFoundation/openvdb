@@ -66,7 +66,7 @@ public:
         }
     }
 
-    /// @brief Simular to init above except it uses the bounds of the input ray
+    /// @brief Similar to init above except it uses the bounds of the input ray
     __hostdev__ void init(const RayT& ray, int dim) { this->init(ray, ray.t0(), ray.t1(), dim); }
 
     /// @brief Updates the HDDA to march with the specified dimension
@@ -248,7 +248,7 @@ public:
         }
     }
 
-    /// @brief Simular to init above except it uses the bounds of the input ray
+    /// @brief Similar to init above except it uses the bounds of the input ray
     __hostdev__ void init(const RayT& ray) { this->init(ray, ray.t0(), ray.t1()); }
 
     /// @brief Increment the voxel index to next intersected voxel or node
@@ -483,7 +483,7 @@ private:
 
 /// @brief A Tree Marcher for Point Grids
 ///
-/// @note This class will handle correctly offseting the ray by 0.5 to ensure that
+/// @note This class will handle correctly offsetting the ray by 0.5 to ensure that
 /// the underlying HDDA will intersect with the grid-cells. See details below.
 
 template<typename AccT, typename RayT, typename CoordT = Coord>
@@ -498,10 +498,10 @@ public:
     /// @details An offset by 0.5 is applied to the ray to account for the fact that points in vdb
     ///          grids are bucketed into so-called grid cell, which are centered round grid voxels,
     ///          whereas the DDA is based on so-called grid nodes, which are coincident with grid
-    ///          voxels. So, rather than offsettting the points by 0.5 to bring them into a grid
+    ///          voxels. So, rather than offsetting the points by 0.5 to bring them into a grid
     ///          node representation this method offsets the eye of the ray by 0.5, which effectively
     ///          ensures that the DDA operates on grid cells as oppose to grid nodes. This subtle
-    ///          but important offset by 0.5 is explined in more details in our online documentation.
+    ///          but important offset by 0.5 is explained in more details in our online documentation.
     __hostdev__ bool init(RayT ray) { return BaseT::init(ray.offsetEye(0.5)); }
 };// PointTreeMarcher
 

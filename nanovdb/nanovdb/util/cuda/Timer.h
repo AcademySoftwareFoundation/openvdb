@@ -110,8 +110,8 @@ public:
         return msec;
     }
 
-    /// @brief elapsed time (since start) in miliseconds
-    /// @return elapsed time (since start) in miliseconds
+    /// @brief elapsed time (since start) in milliseconds
+    /// @return elapsed time (since start) in milliseconds
     inline float elapsed()
     {
         this->record();
@@ -127,7 +127,7 @@ public:
     }
 
     /// @brief Prints a message followed by the elapsed time in milliseconds to a stream
-    /// @param msg meaasge to print before the time
+    /// @param msg message to print before the time
     /// @param os stream to print to
     inline void print(const char* msg, std::ostream& os = std::cerr)
     {
@@ -135,7 +135,7 @@ public:
         this->print(os);
     }
 
-    /// @brief Like the above method but with a std::string arguemnts
+    /// @brief Like the above method but with a std::string arguments
     inline void print(const std::string &msg, std::ostream& os = std::cerr){this->print(msg.c_str(), os);}
 
     /// @brief stop the timer

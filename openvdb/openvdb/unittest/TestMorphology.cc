@@ -64,7 +64,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
     const Coord* const end = start + offsets;
 
     // Small methods to check neighbour activity from an xyz coordinate. Recurse
-    // parameter allows for recursively checking the acitvity of the xyz
+    // parameter allows for recursively checking the activity of the xyz
     // neighbours, with recurse=0 only checking the immediate neighbours.
     std::function<void(const TreeT&, const Coord&, const size_t)> CheckActiveNeighbours;
     CheckActiveNeighbours = [start, end, &CheckActiveNeighbours]
@@ -407,7 +407,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
     const Coord* const end = start + offsets;
 
     // Small method to check neighbour activity from an xyz coordinate. Recurse
-    // parameter allows for recursively checking the acitvity of the xyz
+    // parameter allows for recursively checking the activity of the xyz
     // neighbours, with recurse=0 only checking the immediate neighbours.
     std::function<void(const TreeT&, const Coord&, const size_t)> CheckActiveNeighbours;
     CheckActiveNeighbours = [start, end, &CheckActiveNeighbours]

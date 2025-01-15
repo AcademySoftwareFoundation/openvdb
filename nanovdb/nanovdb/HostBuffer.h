@@ -11,7 +11,7 @@
 
     @details This HostBuffer can be used in multiple ways, most of which are
              demonstrated in the examples below. Memory in the pool can
-             be managed or unmanged (e.g. internal or external) and can
+             be managed or unmanaged (e.g. internal or external) and can
              be shared between multiple buffers or belong to a single buffer.
 
    Example that uses HostBuffer::create inside io::readGrids to create a
@@ -145,7 +145,7 @@ public:
      /// @brief Move copy-constructor
     HostBuffer(HostBuffer&& other);
 
-    /// @brief Custom descructor
+    /// @brief Custom destructor
     ~HostBuffer() { this->clear(); }
 
     /// @brief Move copy assignment operation
@@ -185,7 +185,7 @@ public:
     void init(uint64_t bufferSize, void *data = nullptr);
 
     //@{
-    /// @brief Retuns a pointer to the raw memory buffer managed by this allocator.
+    /// @brief Returns a pointer to the raw memory buffer managed by this allocator.
     ///
     /// @warning Note that the pointer can be NULL if the allocator was not initialized!
     const void* data() const { return mData; }

@@ -178,7 +178,7 @@ struct VolumeExecutable::Settings
             .addOpt("--bindings [\"ax_name:volume_name,...\"]")
             .setDoc("attribute bindings for volumes. The argument accepts a quoted string list of "
                     "AX (source code) name to data (vdb attribute) name pairs joined by colons and "
-                    "seperated by commas. For example:\n"
+                    "separated by commas. For example:\n"
                     "  --bindings \"velocity:v,density:s\"\n"
                     "binds velocity AX accesses to a 'v' attribute and density AX accesses to a 's' "
                     "attribute. The following snippet would then alias these attributes:\n"

@@ -110,7 +110,7 @@ public:
     /// thread will get its only deep copy. For instance it could
     /// contains a ValueAccessor into another grid with auxiliary
     /// shading information. Thus, make sure it is relatively
-    /// light-weight and efficient to copy (which is the case for ValueAccesors).
+    /// light-weight and efficient to copy (which is the case for ValueAccessors).
     void setShader(const BaseShader& shader);
 
     /// @brief Set the camera derived from the abstract BaseCamera class.
@@ -181,10 +181,10 @@ public:
     /// @brief Set the color of the directional light source.
     void setLightColor(Real r, Real g, Real b) { mLightColor = Vec3R(r,g,b); }
 
-    /// @brief Set the integration step-size in voxel units for the primay ray.
+    /// @brief Set the integration step-size in voxel units for the primary ray.
     void setPrimaryStep(Real primaryStep) { mPrimaryStep = primaryStep; }
 
-    /// @brief Set the integration step-size in voxel units for the primay ray.
+    /// @brief Set the integration step-size in voxel units for the primary ray.
     void setShadowStep(Real shadowStep) { mShadowStep  = shadowStep; }
 
     /// @brief Set Scattering coefficients.
@@ -462,7 +462,7 @@ class PerspectiveCamera: public BaseCamera
     }
 
     /// @brief Return the horizontal field of view in degrees given a
-    /// focal lenth in mm and the specified aperture in mm.
+    /// focal length in mm and the specified aperture in mm.
     static double focalLengthToFieldOfView(double length, double aperture)
     {
         return 360.0 / math::pi<double>() * atan(aperture/(2.0*length));

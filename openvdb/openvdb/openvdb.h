@@ -46,7 +46,7 @@ OPENVDB_API void initialize();
 OPENVDB_API void uninitialize();
 
 
-// foward declare some default types
+// forward declare some default types
 namespace io { class DelayedLoadMetadata; }
 
 /// Common tree types

@@ -130,7 +130,7 @@ replicate(const PointDataGridT& source,
         using ValueType = PointDataTree::ValueType;
 
         const auto& sourceLeaf = sourceManager.leaf(pos);
-        // @note  This really shoudn't return uint64_t as AttributeArray's size is
+        // @note  This really shouldn't return uint64_t as AttributeArray's size is
         //  limited to the max of a uint32_t...
         OPENVDB_ASSERT(sourceLeaf.pointCount() < Index64(std::numeric_limits<Index>::max()));
         const Index sourceCount = static_cast<Index>(sourceLeaf.pointCount());

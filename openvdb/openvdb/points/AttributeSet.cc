@@ -452,7 +452,7 @@ AttributeSet::reorderAttributes(const DescriptorPtr& replacement)
 
     AttrArrayVec attrs(replacement->size());
 
-    // compute target indices for attributes from the given decriptor
+    // compute target indices for attributes from the given descriptor
     for (const auto& namePos : mDescr->map()) {
         const size_t index = replacement->find(namePos.first);
         attrs[index] = AttributeArray::Ptr(mAttrs[namePos.second]);

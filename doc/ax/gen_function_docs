@@ -25,13 +25,13 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
 # 1) Create the contents list (reference links to each function)
 # Get all the function names
 $BINARY functions --list-names > tmp.txt
-# Remove commans
+# Remove commas
 tr -d , < tmp.txt > tmp2.txt
 # Add new lines between names
 tr ' ' '\n' < tmp2.txt > tmp.txt
 # Remove empty lines (created by the vdb_ax binary wrapping output)
 sed  '/^$/d' tmp.txt > tmp2.txt
-# Append doxygen references to each funciton
+# Append doxygen references to each function
 sed -e 's/^\(.*\)/\t<li> @ref ax\1 \"\1\"<\/li>/' tmp2.txt >> functions.txt
 
 # End the function list and add a line break

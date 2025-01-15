@@ -1528,7 +1528,7 @@ TEST_F(TestTree, testTopologyIntersection)
         EXPECT_EQ(openvdb::Index64(7), tree3.leafCount());
 
 
-        //tree1.topologyInterection(tree2);//should make tree1 = tree0
+        //tree1.topologyIntersection(tree2);//should make tree1 = tree0
         tree1.topologyIntersection(tree3);//should make tree1 = tree0
 
         EXPECT_TRUE(tree0.leafCount()==tree1.leafCount());
@@ -1616,7 +1616,7 @@ TEST_F(TestTree, testTopologyIntersection)
         EXPECT_EQ(0, int(gridSmall->tree().activeTileCount()));
         EXPECT_EQ((10 * 10 * 10), int(gridSmall->activeVoxelCount()));
 
-        // In this case the interesection should be exactly "small"
+        // In this case the intersection should be exactly "small"
         EXPECT_EQ(0, int(gridBig->tree().activeTileCount()));
         EXPECT_EQ((10 * 10 * 10), int(gridBig->activeVoxelCount()));
 
@@ -1812,7 +1812,7 @@ TEST_F(TestTree, testTopologyDifference)
         EXPECT_EQ(openvdb::Index64(7), tree3.leafCount());
 
 
-        //tree1.topologyInterection(tree2);//should make tree1 = tree0
+        //tree1.topologyIntersection(tree2);//should make tree1 = tree0
         tree1.topologyIntersection(tree3);//should make tree1 = tree0
 
         EXPECT_TRUE(tree0.leafCount()==tree1.leafCount());
@@ -2177,7 +2177,7 @@ TEST_F(TestTree, testPruneLevelSet)
     }
     // The following version is slower since it employs
     // FloatTree::ValueOnIter that visits both tiles and voxels and
-    // also uses random acceess to set the voxels off.
+    // also uses random access to set the voxels off.
     /*
       for (openvdb::FloatTree::ValueOnIter i = tree.beginValueOn(); i; ++i) {
       if (fabs(*i)<new_width) continue;
@@ -2652,7 +2652,7 @@ TEST_F(TestTree, testStealNode)
     const float background=0.0f, value = 5.6f, epsilon=0.000001f;
     const openvdb::Coord xyz(-23,42,70);
 
-    {// stal a LeafNode
+    {// steal a LeafNode
         using NodeT = FloatTree::LeafNodeType;
         EXPECT_EQ(Index(0), NodeT::getLevel());
 

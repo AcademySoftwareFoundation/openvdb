@@ -38,7 +38,7 @@ public:
     /// @details If @a sorted is false, sort the points by their
     /// @e x, @e y and @e z components.
     BBox(const Vec3T& xyzMin, const Vec3T& xyzMax, bool sorted);
-    /// @brief Contruct a cubical bounding box from a minimum coordinate
+    /// @brief Construct a cubical bounding box from a minimum coordinate
     /// and an edge length.
     /// @note Inclusive for integral <b>ElementType</b>s
     BBox(const Vec3T& xyzMin, const ElementType& length);
@@ -54,7 +54,7 @@ public:
     BBox(const BBox&) = default;
     BBox& operator=(const BBox&) = default;
 
-    /// @brief Sort the mininum and maximum points of this bounding box
+    /// @brief Sort the minimum and maximum points of this bounding box
     /// by their @e x, @e y and @e z components.
     void sort();
 

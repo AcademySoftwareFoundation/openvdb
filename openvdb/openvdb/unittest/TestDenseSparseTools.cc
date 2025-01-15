@@ -216,7 +216,7 @@ TEST_F(TestDenseSparseTools, testExtractSparseMaskedTree)
 
     openvdb::FloatTree mask(0.f);
 
-    // turn on a point inside the bouding domain of the dense grid
+    // turn on a point inside the bounding domain of the dense grid
     mask.setValue(mijk, 5.f);
 
     // turn on a point outside the bounding domain of the dense grid
@@ -321,7 +321,7 @@ TEST_F(TestDenseSparseTools, testOver)
         EXPECT_NEAR(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
     }
 
-    { // testing sparse explict sparse composite
+    { // testing sparse explicit sparse composite
         openvdb::tools::Dense<float> dense(domain, 0.f);
         dense.fill(value);
 
@@ -338,7 +338,7 @@ TEST_F(TestDenseSparseTools, testOver)
         EXPECT_NEAR(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
     }
 
-    { // testing sparse explict dense composite
+    { // testing sparse explicit dense composite
         openvdb::tools::Dense<float> dense(domain, 0.f);
         dense.fill(value);
 

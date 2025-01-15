@@ -249,7 +249,7 @@ public:
 
     Index32 end() const { return mIterator.end(); }
 
-    /// @brief Reset the begining and end of the iterator.
+    /// @brief Reset the beginning and end of the iterator.
     void reset(Index32 begin, Index32 end) {
         mIterator.reset(begin, end);
         while (mIterator.test() && !mFilter.template valid<ValueIndexIter>(mIterator)) {
