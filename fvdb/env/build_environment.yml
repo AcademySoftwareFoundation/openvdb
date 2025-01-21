@@ -1,25 +1,21 @@
 name: fvdb_build
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.10
-  - pytorch::pytorch=2.4.0
-  - pytorch::pytorch-cuda=12.1
-  - pytorch::pytorch-mutex=*=cuda
+  - python=3.11
+  - pytorch-gpu=2.4.1[build=cuda120*]
   - git
   - gitpython
   - ca-certificates
   - certifi
   - openssl
-  - cuda-toolkit=12.1
-  - cuda-compiler=12.1
-  - cuda-nvcc=12.1
-  - cuda-cccl=12.1
-  - cuda-libraries-static=12.1
-  - cuda-cudart-static=12.1
+  - cuda-version=12.0
+  - cuda-command-line-tools
+  - cuda-compiler
+  - libcusparse-dev
+  - libcublas-dev
+  - libcusolver-dev
   - gcc_linux-64=11
   - gxx_linux-64=11
   - cxx-compiler

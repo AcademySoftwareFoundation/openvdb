@@ -3,6 +3,7 @@
 #
 import logging
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -274,6 +275,15 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
 
 
 if __name__ == "__main__":
+    # Set CUDA_INC_PATH from the appropriate conda target cross-compilation platform directory
+    # NOTE: This strategy will potentially have to change when compiling for different platforms but by then we will likely not be using setuptools…
+    target_platform_include_dir = (
+        Path(os.getenv("CONDA_PREFIX")) / "targets" / f"{platform.machine()}-{platform.system().lower()}" / "include"
+    )
+    # The cuda-toolkit headers (and other '-dev' package headers) from the packages on the `conda-forge` channel are installed in the `targets` directory
+    #   which is to support cross-compilation for different platforms. The headers are installed in the appropriate target platform directory.
+    if (target_platform_include_dir / "cuda.h").exists():
+        os.environ["CUDA_INC_PATH"] = str(target_platform_include_dir)
     # check we will be compiling for a supported compute architecture
     for arch_flag in cpp_extension._get_cuda_arch_flags():
         match = re.search(r"code=sm_(\d+)", arch_flag)

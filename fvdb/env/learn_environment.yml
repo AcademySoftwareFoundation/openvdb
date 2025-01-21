@@ -1,16 +1,13 @@
 name: fvdb_learn
 channels:
-  - pytorch
-  - nvidia
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.10
+  - python=3.11
+  - pytorch-gpu=2.4.1[build=cuda120*]
+  - cuda-version=12.0
   - jupyterlab
-  - pytorch::pytorch=2.4.0
-  - pytorch::pytorch-cuda=12.1
-  - pytorch::pytorch-mutex=*=cuda
-  - pytorch::torchvision
+  - torchvision
   - tensorboard
   - pip
   - git
@@ -23,7 +20,6 @@ dependencies:
   - matplotlib
   - tqdm
   - sparsehash
-  - pyg::pytorch-scatter=2.1.2
   - pandas
   - pytest-benchmark
   - polyscope
@@ -33,7 +29,7 @@ dependencies:
   ## 3dgs
   - imageio
   - torchmetrics
-  - py-opencv
+  - fastai::opencv-python-headless
   - tyro
   - pillow
   - pyyaml
@@ -42,3 +38,4 @@ dependencies:
     - point-cloud-utils
     ## 3dgs
     - viser
+    - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu120/torch_scatter-2.1.2-cp311-cp311-linux_x86_64.whl
