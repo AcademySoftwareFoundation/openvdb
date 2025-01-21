@@ -163,10 +163,13 @@ rasterize_forward(const uint32_t C, const uint32_t N, const uint32_t n_isects, c
 
     const int32_t camera_id = blockIdx.x;
 
-    // blockIdx runs from [0, num_tiles_h] x [0, num_tiles_w]
-    const int32_t tile_id = (blockIdx.y + tile_origin_h) * tile_width + blockIdx.z + tile_origin_w;
+    // blockIdx.yz runs from [0, num_tiles_h] x [0, num_tiles_w]
+    const int32_t tile_id =
+        (blockIdx.y + tile_origin_h) * tile_width + (blockIdx.z + tile_origin_w);
 
     // Pixel coordinates run from [0, height] x [0, width]
+    // i.e. they are in the local coordinates of the crop starting from pixel
+    //      [image_origin_h, image_origin_w] with size [image_height, image_width]
     const uint32_t i      = blockIdx.y * tile_size + threadIdx.y;
     const uint32_t j      = blockIdx.z * tile_size + threadIdx.x;
     const int32_t  pix_id = i * image_width + j;
@@ -206,9 +209,12 @@ rasterize_forward(const uint32_t C, const uint32_t N, const uint32_t n_isects, c
                                      : tile_offsets[tile_id + 1];
     const uint32_t block_size  = blockDim.x * blockDim.y;
 
+    // Pixel coordinates in the global image (not just the local crop)
+    const uint32_t global_i = i + image_origin_h;
+    const uint32_t global_j = j + image_origin_w;
     return volume_render_tile<S, COLOR_DIM>(range_start, range_end, block_size, tile_size,
-                                            pixel_in_image, i, j, means2d, conics, colors,
-                                            opacities, backgrounds, tile_gaussian_ids,
+                                            pixel_in_image, global_i, global_j, means2d, conics,
+                                            colors, opacities, backgrounds, tile_gaussian_ids,
                                             out_render_colors, out_render_alphas, out_last_ids);
 }
 
