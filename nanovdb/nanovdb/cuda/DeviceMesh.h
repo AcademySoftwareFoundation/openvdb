@@ -45,12 +45,12 @@ public:
     DeviceMesh(const DeviceMesh&) = delete;
     /// @brief Move constructor.  Underlying CUDA streams and NCCL communicators are not reinitialized.
     /// @param DeviceMesh instance that will be moved into this DeviceMesh.
-    DeviceMesh(DeviceMesh&&);
+    DeviceMesh(DeviceMesh&&) noexcept;
     /// @brief Disallow copy-assignment
     DeviceMesh& operator=(const DeviceMesh&) = delete;
     /// @brief Move assignment. Underlying CUDA streams and NCCL communicators are not reinitialized.
     /// @param DeviceMesh instance that will be moved into this DeviceMesh.
-    DeviceMesh& operator=(DeviceMesh&&);
+    DeviceMesh& operator=(DeviceMesh&&) noexcept;
 
     /// @brief Returns the number of devices
     size_type deviceCount() const { return mDeviceNodes.size(); };
@@ -85,7 +85,7 @@ private:
     std::vector<std::vector<uint32_t>> mConnectivity;
 };
 
-DeviceMesh::DeviceMesh()
+inline DeviceMesh::DeviceMesh()
 {
     DeviceGuard deviceGuard;
 
@@ -121,7 +121,7 @@ DeviceMesh::DeviceMesh()
     }
 }
 
-DeviceMesh::DeviceMesh(DeviceMesh&& other)
+inline DeviceMesh::DeviceMesh(DeviceMesh&& other) noexcept
     : mDeviceNodes(std::move(other.mDeviceNodes)),
 #ifdef NANOVDB_USE_NCCL
       mComms(std::move(other.mComms)),
@@ -130,7 +130,7 @@ DeviceMesh::DeviceMesh(DeviceMesh&& other)
 {
 }
 
-DeviceMesh::~DeviceMesh()
+inline DeviceMesh::~DeviceMesh()
 {
     DeviceGuard deviceGuard;
 
@@ -147,7 +147,7 @@ DeviceMesh::~DeviceMesh()
     });
 }
 
-DeviceMesh& DeviceMesh::operator=(DeviceMesh&& other)
+inline DeviceMesh& DeviceMesh::operator=(DeviceMesh&& other) noexcept
 {
     mDeviceNodes = std::move(other.mDeviceNodes);
 #ifdef NANOVDB_USE_NCCL
@@ -159,7 +159,7 @@ DeviceMesh& DeviceMesh::operator=(DeviceMesh&& other)
 
 namespace detail {
 
-void* queryAllocationGranularityEntryPoint()
+inline void* queryAllocationGranularityEntryPoint()
 {
     void* entryPoint = nullptr;
 #if CUDART_VERSION >= 12500 // cudaGetDriverEntryPointByVersion was added in CUDA 12.5 with cudaGetDriverEntryPoint being potentially deprecated
@@ -179,7 +179,7 @@ void* queryAllocationGranularityEntryPoint()
 }
 
 /// @brief Returns the minimum page size (in bytes) across all devices on the system
-size_t minDevicePageSize(const DeviceMesh& mesh)
+inline size_t minDevicePageSize(const DeviceMesh& mesh)
 {
     using FuncT = CUresult(size_t*, const CUmemAllocationProp*, CUmemAllocationGranularity_flags);
     static FuncT* functPtr = reinterpret_cast<FuncT*>(detail::queryAllocationGranularityEntryPoint());
