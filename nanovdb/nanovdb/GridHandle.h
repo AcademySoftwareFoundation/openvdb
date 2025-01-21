@@ -111,6 +111,9 @@ public:
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData() const { return mBuffer.deviceData(); }
     template<typename U = BufferT>
+    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
+    deviceData(int device) const { return mBuffer.deviceData(device); }
+    template<typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData() { return mBuffer.deviceData(); }
     template<typename U = BufferT>
