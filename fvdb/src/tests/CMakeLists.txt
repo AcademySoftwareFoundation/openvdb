@@ -47,7 +47,7 @@ function(ConfigureTest CMAKE_TEST_NAME)
   )
   target_include_directories(${CMAKE_TEST_NAME} PRIVATE "${FVDB_BUILD_DIR}/include/fvdb")
   target_include_directories(${CMAKE_TEST_NAME} PRIVATE "${FVDB_BUILD_DIR}/include/nanovdb")
-  target_include_directories(${CMAKE_TEST_NAME} PRIVATE "${CONDA_ENV_PATH}/include/python3.10")
+  target_include_directories(${CMAKE_TEST_NAME} PRIVATE "${Python3_INCLUDE_DIRS}")
   target_link_libraries(
     ${CMAKE_TEST_NAME}
     fvdb ${TORCH_LIBRARIES} ${Python3_LIBRARIES}

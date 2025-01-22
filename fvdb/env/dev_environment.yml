@@ -3,55 +3,58 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.11
-  - pytorch-gpu=2.4.1[build=cuda120*]
-  - jupyterlab
-  - torchvision=0.19
-  - tensorboard
-  - pip
-  - git
-  - gitpython
   - ca-certificates
   - certifi
-  - openssl
-  - cuda-version=12.0
-  - cuda-command-line-tools
-  - cuda-compiler
-  - libcusparse-dev
-  - libcublas-dev
-  - libcusolver-dev
-  - libcurand-dev
-  - gcc_linux-64=11
-  - gxx_linux-64=11
-  - cxx-compiler
-  - setuptools>=68.2.2
   - clang-format=18
   - cmake
-  - make
-  - ninja
-  - sphinx>=7.0.0
-  - sphinx_rtd_theme
-  - myst-parser
-  - linkify-it-py
-  - numpy<2
-  - tqdm
-  - sparsehash
-  - pandas
-  - pytest-benchmark
-  - polyscope
-  - pyrender
-  - rich
-  - parameterized
+  - cuda-command-line-tools
+  - cuda-compiler
+  - cuda-nvrtc-dev
+  - cuda-nvtx-dev
+  - cuda-version=12.0
+  - cxx-compiler
+  - gcc_linux-64=11
+  - git
+  - gitpython
+  - gxx_linux-64=11
   - ipython
+  - jupyterlab
+  - libcublas-dev
+  - libcurand-dev
+  - libcusolver-dev
+  - libcusparse-dev
+  - linkify-it-py
+  - make
   - matplotlib
+  - myst-parser
+  - ninja
+  - numpy<2
+  - openssl
+  - pandas
+  - parameterized
+  - pip
+  - polyscope
+  - pybind11
+  - pyrender
+  - pytest-benchmark
+  - python=3.11
+  - pytorch-gpu=2.4.1[build=cuda120*]
+  - rich
+  - setuptools>=68.2.2
+  - sparsehash
+  - sphinx_rtd_theme
+  - sphinx>=7.0.0
+  - tensorboard
+  - torchvision=0.19
+  - tqdm
     ## 3dgs
-  - imageio
-  - torchmetrics
   - fastai::opencv-python-headless
-  - tyro
+  - imageio
   - pillow
   - pyyaml
   - scikit-learn
+  - torchmetrics
+  - tyro
   - pip:
     - point-cloud-utils
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu120/torchsparse-2.1.0-cp311-cp311-linux_x86_64.whl
