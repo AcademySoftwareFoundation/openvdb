@@ -61,8 +61,8 @@ def jcat(things_to_cat, dim=None):
         raise ValueError("jcat() can only cat GridBatch, JaggedTensor, or VDBTensor")
 
 
-__version__ = "0.2.0"
-__version_info__ = (0, 2, 0)
+__version__ = "0.2.1"
+__version_info__ = (0, 2, 1)
 
 __all__ = [
     "GridBatch",
