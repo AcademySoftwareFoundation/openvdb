@@ -18,8 +18,8 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/util/NullInterrupter.h>
 
-#include "Merge.h"
-#include "SignedFloodFill.h"
+#include <openvdb/tools/Merge.h>
+#include <openvdb/tools/SignedFloodFill.h>
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
