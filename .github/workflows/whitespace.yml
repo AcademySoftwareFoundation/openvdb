@@ -1,9 +1,12 @@
+
 name: Whitespace
 
 on:
   push:
-    branches:
-      - "pull-request/[0-9]+"
+    paths-ignore:
+      - 'pendingchanges/**'
+      - 'tsc/meetings/**'
+  pull_request:
     paths-ignore:
       - 'pendingchanges/**'
       - 'tsc/meetings/**'
@@ -18,7 +21,7 @@ jobs:
   trailingspaces:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: test
       run: |
           set +e
@@ -29,9 +32,9 @@ jobs:
   spacesnottabs:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: test
       run: |
           set +e
-          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!pendingchanges/*' ':!*.wlt' ':!*.jpg' ':!*.gif' ':!*.mp4' ':!*.pt' ':!*.pth' ':!*.nvdb' ':!*.npz' ':!*.gitmodules'
+          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!pendingchanges/*' ':!*.wlt' ':!*.jpg' ':!*.gif' ':!*.mp4' ':!*.pt' ':!*.pth' ':!*.nvdb' ':!*.npz'
           test $? -eq 1
