@@ -117,7 +117,8 @@ class Runner:
             "ellapsed_time": time.time() - self.train_start_time,
             "num_gaussians": self.model.num_gaussians,
         }
-        self.logger.info(f"Save checkpoint at step: {step}. Stats: {stats}")
+        checkpoint_path = f"{self.checkpoint_dir}/ckpt_{step:04d}.pt"
+        self.logger.info(f"Save checkpoint at step {step} to path {checkpoint_path}. Stats: {stats}.")
         with open(
             f"{self.stats_dir}/train_step{step:04d}.json",
             "w",
@@ -260,8 +261,15 @@ class Runner:
 
     def train(self, start_step: int = 0):
         # We keep cycling through every image in a random order until we reach
-        # the specified number of optimization steps.
-        trainloader = itertools.cycle(
+        # the specified number of optimization steps. We can't use itertools.cycle
+        # because it caches each minibatch element in memory which can quickly
+        # exhaust the amount of available RAM
+        def cycle(dataloader):
+            while True:
+                for minibatch in dataloader:
+                    yield minibatch
+
+        trainloader = cycle(
             torch.utils.data.DataLoader(
                 self.trainset,
                 batch_size=self.cfg.batch_size,
@@ -293,7 +301,6 @@ class Runner:
             # If you have very large images, you can iterate over disjoint crops and accumulate gradients
             # If cfg.crops_per_image is 1, then this just returns the image
             for pixels, crop, is_last in crop_image_batch(image, self.cfg.crops_per_image):
-
                 # Actual pixels to compute the loss on, normalized to [0, 1]
                 pixels = pixels.to(self.device) / 255.0  # [1, H, W, 3]
 
@@ -306,13 +313,12 @@ class Runner:
                     image_w=image_width,
                     image_h=image_height,
                     extrinsics_mat=world_to_cam_mats,
-                    intrincs_mat=intrinsics_mats,
+                    intrinsics_mats=intrinsics_mats,
                     rasterize_mode="classic",
                     sh_degree=sh_degree_to_use,
                     image_crop=crop,
                     cache_info=True,
                 )
-
                 # If you specified depth rendering, grab the depth map as well
                 if renders.shape[-1] == 4:
                     colors, depths = renders[..., 0:3], renders[..., 3:4]
@@ -399,7 +405,7 @@ class Runner:
                 image_w=width,
                 image_h=height,
                 extrinsics_mat=world_to_cam_mats,
-                intrincs_mat=intrinsics_mats,
+                intrinsics_mats=intrinsics_mats,
                 rasterize_mode="classic",
                 sh_degree=cfg.sh_degree,
                 render_depth=False,
@@ -465,7 +471,7 @@ class Runner:
             image_w=W,
             image_h=H,
             extrinsics_mat=c2w[None],
-            intrincs_mat=K[None],
+            intrinsics_mats=K[None],
             sh_degree=self.cfg.sh_degree,
             radius_clip=3.0,
             render_depth=False,

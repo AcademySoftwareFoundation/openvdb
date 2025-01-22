@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "PackInfoOps.h"
-
 #include <Types.h>
 #include <detail/utils/cuda/Utils.cuh>
 
@@ -10,6 +9,7 @@
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/util/Half.h>
+
 #include <cute/tensor.hpp>
 
 namespace fvdb {

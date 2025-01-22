@@ -4,11 +4,10 @@
 #ifndef FVDB_GRIDBATCH_H
 #define FVDB_GRIDBATCH_H
 
-#include "detail/GridBatchImpl.h"
-#include "detail/utils/Utils.h"
-
 #include "JaggedTensor.h"
 #include "Types.h"
+#include <detail/GridBatchImpl.h>
+#include <detail/utils/Utils.h>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/io/IO.h>

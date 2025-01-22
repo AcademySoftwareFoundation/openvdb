@@ -4,7 +4,7 @@
 #ifndef FVDB_TYPES_H
 #define FVDB_TYPES_H
 
-#include "detail/TypesImpl.h"
+#include <detail/TypesImpl.h>
 
 #include <nanovdb/NanoVDB.h>
 

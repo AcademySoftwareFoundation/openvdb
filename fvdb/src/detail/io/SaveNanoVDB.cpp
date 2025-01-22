@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "IO.h"
-
 #include <detail/utils/Utils.h>
 
 #include <nanovdb/NanoVDB.h>
@@ -10,9 +9,8 @@
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/GridBuilder.h>
 
-#include <torch/all.h>
-
 #include <c10/cuda/CUDACachingAllocator.h>
+#include <torch/all.h>
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>

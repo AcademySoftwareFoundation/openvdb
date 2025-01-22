@@ -1,3 +1,5 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
 #ifndef OPENVDB_PYTYPECASTERS_HAS_BEEN_INCLUDED
 #define OPENVDB_PYTYPECASTERS_HAS_BEEN_INCLUDED
 

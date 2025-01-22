@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Ops.h"
-
 #include <detail/utils/cuda/Utils.cuh>
 
 #include <c10/cuda/CUDACachingAllocator.h>
+
 #include <cub/cub.cuh>
 
 namespace fvdb {

@@ -7,7 +7,6 @@
 #include "TorchDeviceBuffer.h"
 #include "VoxelCoordTransform.h"
 #include "utils/Utils.h"
-
 #include <JaggedTensor.h>
 
 #include <nanovdb/GridHandle.h>

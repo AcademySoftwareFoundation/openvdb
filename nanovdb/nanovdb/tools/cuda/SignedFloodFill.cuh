@@ -10,7 +10,7 @@
 
     \brief Performs signed flood-fill operation on the hierarchical tree structure on the device
 
-    \todo This tools needs to handle the (extremely) rare case when root node
+    \todo This tools needs to handle the (extremely) rare case when the root node
           needs to be modified during the signed flood fill operation. This happens
           when the root-table needs to be expanded with tile values (of size 4096^3)
           that are completely inside the implicit surface.
@@ -41,8 +41,6 @@ template<typename BuildT>
 typename util::enable_if<BuildTraits<BuildT>::is_float, void>::type
 signedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose = false, cudaStream_t stream = 0);
 
-namespace {// anonymous namespace
-
 template<typename BuildT>
 class SignedFloodFill
 {
@@ -65,8 +63,10 @@ private:
 
 //================================================================================================
 
+namespace kernels {// kernels namespace
+
 template<typename BuildT>
-__global__ void processRootKernel(NanoTree<BuildT> *tree)
+__global__ void processRoot(NanoTree<BuildT> *tree)
 {
     // auto &root = tree->root();
     /*
@@ -91,12 +91,12 @@ __global__ void processRootKernel(NanoTree<BuildT> *tree)
     }
     */
     //root.setBackground(mOutside, /*updateChildNodes=*/false);
-}// processRootKernel
+}// processRoot
 
 //================================================================================================
 
 template<typename BuildT, int LEVEL>
-__global__ void processNodeKernel(NanoTree<BuildT> *tree, size_t count)
+__global__ void processNode(NanoTree<BuildT> *tree, size_t count)
 {
     using NodeT = typename NanoNode<BuildT, LEVEL>::type;
     const int tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -115,12 +115,12 @@ __global__ void processNodeKernel(NanoTree<BuildT> *tree, size_t count)
         value = -value;
     }
     node.setValue(nValue, value);
-}// processNodeKernel
+}// processNode
 
 //================================================================================================
 
 template<typename BuildT>
-__global__ void processLeafKernel(NanoTree<BuildT> *tree, size_t count)
+__global__ void processLeaf(NanoTree<BuildT> *tree, size_t count)
 {
     using LeafT = NanoLeaf<BuildT>;
     const size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
@@ -133,7 +133,7 @@ __global__ void processLeafKernel(NanoTree<BuildT> *tree, size_t count)
     auto n = mask.template findNext<true>(nVoxel);
     if (n == LeafT::SIZE && (n = mask.template findPrev<true>(nVoxel)) == LeafT::SIZE) n = 0u;
     buffer[nVoxel] = buffer[n]<0 ? -tree->background() : tree->background();
-}// processLeafKernel
+}// processLeaf
 
 //================================================================================================
 
@@ -145,7 +145,7 @@ __global__ void cpyNodeCountKernel(NanoGrid<BuildT> *d_grid, uint64_t *d_count)
     *d_count = d_grid->tree().root().tileCount();
 }
 
-}// anonymous namespace
+}// kernels namespace
 
 //================================================================================================
 
@@ -156,7 +156,7 @@ void SignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     NANOVDB_ASSERT(d_grid);
     uint64_t count[4], *d_count = nullptr;
     cudaCheck(util::cuda::mallocAsync((void**)&d_count, 4*sizeof(uint64_t), mStream));
-    cpyNodeCountKernel<BuildT><<<1, 1, 0, mStream>>>(d_grid, d_count);
+    kernels::cpyNodeCountKernel<BuildT><<<1, 1, 0, mStream>>>(d_grid, d_count);
     cudaCheckError();
     cudaCheck(cudaMemcpyAsync(&count, d_count, 4*sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(util::cuda::freeAsync(d_count, mStream));
@@ -166,19 +166,19 @@ void SignedFloodFill<BuildT>::operator()(NanoGrid<BuildT> *d_grid)
     auto *tree = reinterpret_cast<NanoTree<BuildT>*>(d_grid + 1);
 
     if (mVerbose) mTimer.start("\nProcess leaf nodes");
-    processLeafKernel<BuildT><<<blocksPerGrid(count[0]<<9), threadsPerBlock, 0, mStream>>>(tree, count[0]<<9);
+    kernels::processLeaf<BuildT><<<blocksPerGrid(count[0]<<9), threadsPerBlock, 0, mStream>>>(tree, count[0]<<9);
     cudaCheckError();
 
     if (mVerbose) mTimer.restart("Process lower internal nodes");
-    processNodeKernel<BuildT,1><<<blocksPerGrid(count[1]<<12), threadsPerBlock, 0, mStream>>>(tree, count[1]<<12);
+    kernels::processNode<BuildT,1><<<blocksPerGrid(count[1]<<12), threadsPerBlock, 0, mStream>>>(tree, count[1]<<12);
     cudaCheckError();
 
     if (mVerbose) mTimer.restart("Process upper internal nodes");
-    processNodeKernel<BuildT,2><<<blocksPerGrid(count[2]<<15), threadsPerBlock, 0, mStream>>>(tree, count[2]<<15);
+    kernels::processNode<BuildT,2><<<blocksPerGrid(count[2]<<15), threadsPerBlock, 0, mStream>>>(tree, count[2]<<15);
     cudaCheckError();
 
     //if (mVerbose) mTimer.restart("Process root node");
-    //processRootKernel<BuildT><<<1, 1, 0, mStream>>>(tree);
+    //kernels::processRoot<BuildT><<<1, 1, 0, mStream>>>(tree);
     if (mVerbose) mTimer.stop();
     cudaCheckError();
 }// SignedFloodFill::operator()

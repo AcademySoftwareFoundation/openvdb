@@ -124,6 +124,23 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
               StatsMode                     sMode = StatsMode::Default,
               CheckMode                     cMode = CheckMode::Default,
               int                           verbose = 0);
+
+/// @brief Forward declaration of free-standing function that converts an OpenVDB GridBase into a NanoVDB GridHandle with an IndexGrid
+/// @tparam DstBuildT Should be either nanovdb::ValueIndex or nanovdb::ValueOnIndex
+/// @tparam BufferT Type of the buffer used to allocate the destination grid
+/// @param base Shared pointer to a base openvdb grid to be converted
+/// @param channels Number of side-car channels with the values (active or all) in the source grid
+/// @param includeStats If true stats are also indexed
+/// @param includeTiles  If true tile values (active or all) are also indexed
+/// @param verbose Mode of verbosity
+/// @return Handle to the destination NanoGrid of type IndexGrid or OnIndexGrid
+template<typename DstBuildT = nanovdb::ValueOnIndex, typename BufferT = HostBuffer>
+typename util::enable_if<BuildTraits<DstBuildT>::is_index, GridHandle<BufferT>>::type
+openToIndexVDB(const openvdb::GridBase::Ptr& base,
+               uint32_t                      channels = 1u,
+               bool                          includeStats = true,
+               bool                          includeTiles = true,
+               int                           verbose = 0);
 #endif
 
 //================================================================================================
@@ -2024,7 +2041,7 @@ template<typename BufferT>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::GridBase::Ptr& base,
               StatsMode                     sMode,
-              CheckMode                  cMode,
+              CheckMode                     cMode,
               int                           verbose)
 {
     // We need to define these types because they are not defined in OpenVDB
@@ -2064,6 +2081,52 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
         OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
     }
 }// openToNanoVDB
+
+template<typename DstBuildT, typename BufferT>
+typename util::enable_if<BuildTraits<DstBuildT>::is_index, GridHandle<BufferT>>::type
+openToIndexVDB(const openvdb::GridBase::Ptr& base,
+              uint32_t                       channels,
+              bool                           includeStats,
+              bool                           includeTiles,
+              int                            verbose)
+{
+    // We need to define these types because they are not defined in OpenVDB
+    using openvdb_Vec4fTree = typename openvdb::tree::Tree4<openvdb::Vec4f, 5, 4, 3>::Type;
+    using openvdb_Vec4dTree = typename openvdb::tree::Tree4<openvdb::Vec4d, 5, 4, 3>::Type;
+    using openvdb_Vec4fGrid = openvdb::Grid<openvdb_Vec4fTree>;
+    using openvdb_Vec4dGrid = openvdb::Grid<openvdb_Vec4dTree>;
+    using openvdb_UInt32Grid = openvdb::Grid<openvdb::UInt32Tree>;
+
+    if (auto grid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
+        return createNanoGrid<openvdb::FloatGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::DoubleGrid>(base)) {
+        return createNanoGrid<openvdb::DoubleGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Int32Grid>(base)) {
+        return createNanoGrid<openvdb::Int32Grid, DstBuildT,BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Int64Grid>(base)) {
+        return createNanoGrid<openvdb::Int64Grid, DstBuildT, BufferT>(*grid, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_UInt32Grid>(base)) {
+        return createNanoGrid<openvdb_UInt32Grid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3fGrid>(base)) {
+        return createNanoGrid<openvdb::Vec3fGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::Vec3dGrid>(base)) {
+        return createNanoGrid<openvdb::Vec3dGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::tools::PointIndexGrid>(base)) {
+        return createNanoGrid<openvdb::tools::PointIndexGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::points::PointDataGrid>(base)) {
+        return createNanoGrid<openvdb::points::PointDataGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::MaskGrid>(base)) {
+        return createNanoGrid<openvdb::MaskGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::BoolGrid>(base)) {
+        return createNanoGrid<openvdb::BoolGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_Vec4fGrid>(base)) {
+        return createNanoGrid<openvdb_Vec4fGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb_Vec4dGrid>(base)) {
+        return createNanoGrid<openvdb_Vec4dGrid, DstBuildT, BufferT>(*grid, channels, includeStats, includeTiles, verbose);
+    } else {
+        OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
+    }
+}// openToIndexVDB
 #endif
 
 }// namespace tools ===============================================================================

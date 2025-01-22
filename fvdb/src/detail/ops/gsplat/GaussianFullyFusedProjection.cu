@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "GsplatUtils.cuh"
-
 #include <detail/ops/Ops.h>
 
 #include <ATen/cuda/Atomic.cuh>
+
 #include <cooperative_groups.h>
 
 constexpr int NUM_THREADS = 256;

@@ -37,10 +37,8 @@ int main(int ac, char** av)
 
         const int numPoints = 10000000;
 
-        BufferT positionBuffer;
-        positionBuffer.init(numPoints * sizeof(float) * 3);
-        BufferT velocityBuffer;
-        velocityBuffer.init(numPoints * sizeof(float) * 3);
+        BufferT positionBuffer(numPoints * sizeof(float) * 3);
+        BufferT velocityBuffer(numPoints * sizeof(float) * 3);
 
         runNanoVDB(handle, numIterations, numPoints, positionBuffer, velocityBuffer);
 #if defined(NANOVDB_USE_OPENVDB)

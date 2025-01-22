@@ -3,6 +3,7 @@
 #
 import logging
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -88,12 +89,18 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
         os.makedirs(cmake_build_dir, exist_ok=True)
         os.makedirs(cmake_install_dir, exist_ok=True)
         subprocess.check_call(
-            ["cmake", base_path, f"-DCMAKE_INSTALL_PREFIX={cmake_install_dir}", "-DCMAKE_INSTALL_LIBDIR=lib"]
+            [
+                "cmake",
+                base_path,
+                f"-DCMAKE_INSTALL_PREFIX={cmake_install_dir}",
+                "-DCMAKE_INSTALL_LIBDIR=lib",
+            ]
             + cmake_args,
             cwd=cmake_build_dir,
         )
         subprocess.check_call(
-            ["cmake", "--build", ".", "--target", "install", f"-j{parallel_jobs}"], cwd=cmake_build_dir
+            ["cmake", "--build", ".", "--target", "install", f"-j{parallel_jobs}"],
+            cwd=cmake_build_dir,
         )
         return cmake_install_dir
 
@@ -135,7 +142,9 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             self.download_external_dep(name="openvdb", git_url=openvdb_url, git_tag="feature/nanovdb_v32.7")
 
         _, cutlass_repo = self.download_external_dep(
-            name="cutlass", git_url="https://github.com/NVIDIA/cutlass.git", git_tag="v3.4.0"
+            name="cutlass",
+            git_url="https://github.com/NVIDIA/cutlass.git",
+            git_tag="v3.4.0",
         )
         try:
             # NOTE:  In python <=3.8, __file__ will be a relative path and >3.8 it is an absolute path
@@ -144,11 +153,15 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             logging.info(f"Failed to apply cutlass patch: {str(e)}, continuing without patching")
 
         self.download_external_dep(
-            name="cudnn_fe", git_url="https://github.com/NVIDIA/cudnn-frontend", git_tag="v1.3.0"
+            name="cudnn_fe",
+            git_url="https://github.com/NVIDIA/cudnn-frontend",
+            git_tag="v1.3.0",
         )
 
         blosc_source_dir, _ = self.download_external_dep(
-            name="c-blosc", git_url="https://github.com/Blosc/c-blosc.git", git_tag="v1.21.4"
+            name="c-blosc",
+            git_url="https://github.com/Blosc/c-blosc.git",
+            git_tag="v1.21.4",
         )
         self.build_cmake_project(
             blosc_source_dir,
@@ -178,9 +191,10 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
                 shutil.copy(header_file, os.path.join(self.build_lib, header_folder))
 
 
-def get_source_files_recursive(base_path, include_bindings=True) -> List[str]:
+def get_source_files_recursive(base_path, exclude=[], include_bindings=True) -> List[str]:
     source_files = []
-    for dir_name, _, dir_files in os.walk(base_path):
+    for dir_name, dir, dir_files in os.walk(base_path, topdown=True):
+        dir[:] = [d for d in dir if d not in exclude]
         if not include_bindings and os.path.basename(dir_name) == "python":
             continue
         cpp_files = [os.path.join(dir_name, t) for t in dir_files if t.endswith(".cpp")]
@@ -236,7 +250,7 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
         if cudnn_hash != cudnn_hash_output:
             raise RuntimeError("Hash of cudnn.tar.xz does not match")
 
-    if not folder_filepath.exists():
+    if (not folder_filepath.exists()) or (len(os.listdir(folder_filepath)) == 0):
         logging.info("Extracting cudnn…")
         with tarfile.open(tar_filepath, "r:xz") as tar:
             tar.extractall(folder_filepath)
@@ -261,6 +275,15 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
 
 
 if __name__ == "__main__":
+    # Set CUDA_INC_PATH from the appropriate conda target cross-compilation platform directory
+    # NOTE: This strategy will potentially have to change when compiling for different platforms but by then we will likely not be using setuptools…
+    target_platform_include_dir = (
+        Path(os.getenv("CONDA_PREFIX")) / "targets" / f"{platform.machine()}-{platform.system().lower()}" / "include"
+    )
+    # The cuda-toolkit headers (and other '-dev' package headers) from the packages on the `conda-forge` channel are installed in the `targets` directory
+    #   which is to support cross-compilation for different platforms. The headers are installed in the appropriate target platform directory.
+    if (target_platform_include_dir / "cuda.h").exists():
+        os.environ["CUDA_INC_PATH"] = str(target_platform_include_dir)
     # check we will be compiling for a supported compute architecture
     for arch_flag in cpp_extension._get_cuda_arch_flags():
         match = re.search(r"code=sm_(\d+)", arch_flag)
@@ -308,10 +331,14 @@ if __name__ == "__main__":
     user_nvcc_flags = os.getenv("NVCC_FLAGS", "").split()
     nvcc_flags += user_nvcc_flags
 
+    # benchmarks are built separately using CMake, so exclude the source
+    # directory from the extension build
+    exclude = ["benchmarks", "tests"]
+
     cwd = get_cwd()
     lib_ext = cpp_extension.CUDAExtension(
         name="fvdb.fvdblib",
-        sources=get_source_files_recursive("src", include_bindings=False),
+        sources=get_source_files_recursive("src", exclude, include_bindings=False),
         include_dirs=[
             cwd / "src",
             cwd / get_nanovdb_source_dir(),
@@ -325,13 +352,16 @@ if __name__ == "__main__":
             "external/c-blosc/install/lib/libblosc.a",
         ]
         + cudnn_static_libs,
-        extra_compile_args={"cxx": cpp_flags + ["-fvisibility=default"], "nvcc": nvcc_flags},
+        extra_compile_args={
+            "cxx": cpp_flags + ["-fvisibility=default"],
+            "nvcc": nvcc_flags,
+        },
         language="c++",
     )
 
     bind_ext = cpp_extension.CUDAExtension(
         name="fvdb._Cpp",
-        sources=get_source_files_recursive("src/python/"),
+        sources=get_source_files_recursive("src/python/", exclude),
         include_dirs=[
             cwd / "src",
             cwd / get_nanovdb_source_dir(),
@@ -342,7 +372,10 @@ if __name__ == "__main__":
         library_dirs=[str(cwd / "fvdb")],
         libraries=["fvdb"],
         extra_link_args=["-Wl,-rpath,$ORIGIN"],
-        extra_compile_args={"cxx": cpp_flags + ["-fvisibility=hidden"], "nvcc": nvcc_flags},
+        extra_compile_args={
+            "cxx": cpp_flags + ["-fvisibility=hidden"],
+            "nvcc": nvcc_flags,
+        },
         language="c++",
     )
 

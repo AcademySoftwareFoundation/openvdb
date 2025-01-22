@@ -1,4 +1,6 @@
 /build/*
+/src/benchmarks/build/*
+/src/tests/build/*
 *.creator
 *.includes
 *.files

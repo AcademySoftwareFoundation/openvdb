@@ -4,10 +4,11 @@
 #ifndef FVDB_GAUSSIANSPLATTING_H
 #define FVDB_GAUSSIANSPLATTING_H
 
-#include <torch/all.h>
-#include <unordered_map>
-
 #include "JaggedTensor.h"
+
+#include <torch/all.h>
+
+#include <unordered_map>
 
 namespace fvdb {
 
@@ -54,7 +55,8 @@ gaussianRender(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                const float near_plane = 0.01, const float far_plane = 1e10,
                const int sh_degree_to_use = -1, const int tile_size = 16,
                const float radius_clip = 0.0, const float eps2d = 0.3, bool antialias = false,
-               bool render_depth_channel = false, bool return_debug_info = false);
+               bool render_depth_channel = false, bool return_debug_info = false,
+               const torch::optional<JaggedTensor> pixels_to_render = torch::nullopt);
 
 std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
 gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
@@ -66,8 +68,8 @@ gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                     const uint32_t image_width, const uint32_t image_height,
                     const float near_plane = 0.01, const float far_plane = 1e10,
                     const int tile_size = 16, const float radius_clip = 0.0,
-                    const float eps2d = 0.3, bool antialias = false,
-                    bool return_debug_info = false);
+                    const float eps2d = 0.3, bool antialias = false, bool return_debug_info = false,
+                    const torch::optional<JaggedTensor> pixels_to_render = torch::nullopt);
 
 } // namespace fvdb
 

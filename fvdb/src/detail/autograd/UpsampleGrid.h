@@ -4,9 +4,9 @@
 #ifndef FVDB_DETAIL_AUTOGRAD_UPSAMPLEGRID_H
 #define FVDB_DETAIL_AUTOGRAD_UPSAMPLEGRID_H
 
-#include <torch/autograd.h>
+#include <detail/GridBatchImpl.h>
 
-#include "detail/GridBatchImpl.h"
+#include <torch/autograd.h>
 
 namespace fvdb {
 namespace detail {

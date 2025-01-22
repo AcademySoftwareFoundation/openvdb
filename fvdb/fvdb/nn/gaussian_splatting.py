@@ -41,16 +41,20 @@ class GaussianSplat3D(nn.Module):
         opacities = torch.logit(torch.full((num_means,), initial_opacity))  # [N,]
 
         # TODO (Francis): Don't hardcode number of channels to 3 here
-        _sh_and_colors = torch.zeros((num_means, (sh_degree + 1) ** 2, 3))  # [N, K, 3]
-        _sh_and_colors[:, 0, :] = self._rgb_to_sh(rgbs)
+        _sh_and_colors = torch.zeros(((sh_degree + 1) ** 2, num_means, 3))  # [N, K, 3]
+        _sh_and_colors[0, :, :] = self._rgb_to_sh(rgbs)
 
         # sh = nn.Parameter(_sh_and_colors)  # [N, K, 3]
         means = torch.nn.Parameter(means)  # [N, 3]
         scales = torch.nn.Parameter(scales)  # [N, 3]
         quats = torch.nn.Parameter(quats)  # [N, 4]
         opacities = torch.nn.Parameter(opacities)  # [N,]
-        sh_0 = torch.nn.Parameter(_sh_and_colors[:, :1, :])  # [N, 1, 3]
-        sh_n = torch.nn.Parameter(_sh_and_colors[:, 1:, :])  # [N, K, 3]
+
+        # FIXME (Francis): I don't like splitting these but during training we need
+        #                  a seperate learning rate for each of them. I wonder if we can
+        #                  just create a view for the optimizer but keep them in the same tensor
+        sh_0 = torch.nn.Parameter(_sh_and_colors[:1, :, :])  # [1, N, 3]
+        sh_n = torch.nn.Parameter(_sh_and_colors[1:, :, :])  # [K, N, 3]
 
         self._params = torch.nn.ParameterDict(
             {
@@ -131,6 +135,13 @@ class GaussianSplat3D(nn.Module):
             sh_degree=sh_degree,
         )
 
+    def set_spherical_harmonic_coeffs(self, new_sh_coeffs: torch.Tensor):
+        self._params["sh0"].data = new_sh_coeffs[:1, :, :]
+        self._params["shN"].data = new_sh_coeffs[1:, :, :]
+        k = new_sh_coeffs.shape[1]
+        self.sh_degree = int(math.sqrt(k) - 1)
+        self.clear_cache()
+
     @property
     def num_gaussians(self) -> int:
         return self._params["means"].shape[0]
@@ -162,6 +173,42 @@ class GaussianSplat3D(nn.Module):
     def clear_cache(self):
         self._info_cache = {}
 
+    def render_rgb_and_depth(
+        self,
+        image_w: int,
+        image_h: int,
+        extrinsics_mat: torch.Tensor,
+        intrinsics_mat: torch.Tensor,
+        near_plane: float = 0.01,
+        far_plane: float = 1e10,
+        sh_degree: int = -1,
+        eps_2d: float = 0.3,
+        radius_clip: float = 0.0,
+        tile_size: int = 16,
+        rasterize_mode: Literal["classic", "antialiased"] = "classic",
+    ):
+        rgbd, alphas, _ = self(
+            image_w=image_w,
+            image_h=image_h,
+            extrinsics_mat=extrinsics_mat,
+            intrinsics_mat=intrinsics_mat,
+            near_plane=near_plane,
+            far_plane=far_plane,
+            sh_degree=sh_degree,
+            eps_2d=eps_2d,
+            radius_clip=radius_clip,
+            tile_size=tile_size,
+            image_crop=False,
+            render_depth=True,
+            rasterize_mode=rasterize_mode,
+            cache_info=False,
+            depth_only=False,
+        )
+        rgb = rgbd[..., :3]  # [B, H, W, 1]
+        depth = rgbd[..., 3:4] / alphas.clamp(min=1e-10)  # [B, H, W, 1]
+
+        return rgb, depth
+
     def render_depth_points(
         self,
         image_w: int,
@@ -180,7 +227,7 @@ class GaussianSplat3D(nn.Module):
             image_w=image_w,
             image_h=image_h,
             extrinsics_mat=extrinsics_mat,
-            intrincs_mat=intrinsics_mat,
+            intrinsics_mat=intrinsics_mat,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -212,7 +259,7 @@ class GaussianSplat3D(nn.Module):
         image_w: int,
         image_h: int,
         extrinsics_mat: torch.Tensor,
-        intrincs_mat: torch.Tensor,
+        intrinsics_mat: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -230,7 +277,6 @@ class GaussianSplat3D(nn.Module):
 
         # if camera_model not in ["pinhole", "ortho", "fisheye"]:
         #     raise ValueError(f"Invalid camera_model {camera_model}")
-
         sh_degree = self.sh_degree if sh_degree < 0 else sh_degree
         if sh_degree > self.sh_degree:
             raise ValueError(f"sh_degree {sh_degree} is larger than the maximum {self.sh_degree}")
@@ -239,7 +285,13 @@ class GaussianSplat3D(nn.Module):
         quats = self._params["quats"]  # [N, 4]
         scales = torch.exp(self._params["scales"])  # [N, 3]
         opacities = torch.sigmoid(self._params["opacities"])  # [N,]
-        sh = torch.cat([self._params["sh0"], self._params["shN"]], 1)  # [N, K, 3]
+        # FIXME (Francis): It sucks that we need to concatenate here
+        #                  but we do this so we can optimize
+        #                  these parameters seperately. I wonder if we can
+        #                  fix this
+        sh0 = self._params["sh0"]  # [1, N, 3]
+        shN = self._params["shN"]  # [K, N, 3]
+        sh = sh0 if shN.numel() == 0 or sh_degree == 0 else torch.cat([sh0, shN], 0)  # [N, K, 3]
 
         image_crop = (0, 0, image_w, image_h) if image_crop is None else image_crop
         if cache_info:
@@ -251,7 +303,7 @@ class GaussianSplat3D(nn.Module):
                     opacities=opacities,
                     sh_coeffs=sh,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -289,7 +341,7 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     near_plane=near_plane,
@@ -308,7 +360,7 @@ class GaussianSplat3D(nn.Module):
                     opacities=opacities,
                     sh_coeffs=sh,
                     viewmats=extrinsics_mat,
-                    Ks=intrincs_mat,
+                    Ks=intrinsics_mat,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,

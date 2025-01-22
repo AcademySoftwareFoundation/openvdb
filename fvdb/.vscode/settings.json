@@ -154,4 +154,5 @@
     "json.format.keepLines": true,
     "C_Cpp.formatting": "clangFormat",
     "C_Cpp.clang_format_path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clang-format-18",
+    "files.insertFinalNewline": true,
 }

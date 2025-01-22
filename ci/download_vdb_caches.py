@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 import os
 import sys

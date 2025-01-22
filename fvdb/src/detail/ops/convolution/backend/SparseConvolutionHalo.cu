@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
-
 #include <detail/utils/cuda/Utils.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
+
 #include <mma.h>
 
 #define COALESCED_MEMORY_ACCESS_VARIANT

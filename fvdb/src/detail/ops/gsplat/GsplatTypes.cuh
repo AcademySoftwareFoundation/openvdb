@@ -6,11 +6,12 @@
 
 #include "GsplatMacros.cuh"
 
+#include <ATen/native/Math.h>
+
+#include <cooperative_groups/reduce.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
-
-#include <ATen/native/Math.h>
-#include <cooperative_groups/reduce.h>
 
 namespace fvdb {
 namespace detail {

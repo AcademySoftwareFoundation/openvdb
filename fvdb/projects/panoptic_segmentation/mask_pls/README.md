@@ -9,7 +9,7 @@ Build an environment with the required dependencies for this project and install
 ```bash
 conda env create -f maskpls_envrionment.yml
 conda activate maskpls
-pip install /path/to/fVDB/dist/fvdb-0.2.0-cp312-cp312-linux_x86_64.whl # Replace with the correct wheel
+pip install /path/to/fVDB/dist/fvdb-0.2.1-cp311-cp311-linux_x86_64.whl # Replace with the correct wheel
 ```
 
 ## Usage
