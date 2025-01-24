@@ -77,7 +77,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("quats"), py::arg("scales"), py::arg("viewmats"), py::arg("Ks"),
           py::arg("image_width"), py::arg("image_height"), py::arg("near_plane") = 0.01,
           py::arg("far_plane") = 1e10, py::arg("radius_clip") = 0.0, py::arg("eps2d") = 0.3,
-          py::arg("antialias") = false);
+          py::arg("antialias") = false, py::arg("ortho") = false);
 
     m.def("gaussian_render", &fvdb::gaussianRender, py::arg("means"), py::arg("quats"),
           py::arg("scales"), py::arg("opacities"), py::arg("sh_coeffs"), py::arg("viewmats"),
@@ -86,7 +86,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("sh_degree_to_use") = 3, py::arg("tile_size") = 16, py::arg("radius_clip") = 0.0,
           py::arg("eps2d") = 0.3, py::arg("antialias") = false,
           py::arg("render_depth_channel") = false, py::arg("return_debug_info") = false,
-          py::arg("pixels_to_render") = torch::nullopt);
+          py::arg("pixels_to_render") = torch::nullopt, py::arg("ortho") = false);
 
     m.def("gaussian_render_depth", &fvdb::gaussianRenderDepth, py::arg("means"), py::arg("quats"),
           py::arg("scales"), py::arg("opacities"), py::arg("viewmats"), py::arg("Ks"),
@@ -101,7 +101,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("image_height"), py::arg("near_plane") = 0.01, py::arg("far_plane") = 1e10,
           py::arg("sh_degree_to_use") = 3, py::arg("tile_size") = 16, py::arg("radius_clip") = 0.0,
           py::arg("eps2d") = 0.3, py::arg("antialias") = false,
-          py::arg("render_depth_channel") = false);
+          py::arg("render_depth_channel") = false, py::arg("ortho") = false);
 
     m.def("render_pixels_from_precomputed_gaussian_render_state",
           &fvdb::renderPixelsFromPrecomputedGaussianRenderStateUnbatched, py::arg("means2d"),

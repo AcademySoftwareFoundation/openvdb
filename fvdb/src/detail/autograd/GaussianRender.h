@@ -39,7 +39,8 @@ struct GaussianFullyFusedProjection
                                  const Variable  &Ks,       // [C, 3, 3]
                                  const uint32_t image_width, const uint32_t image_height,
                                  const float eps2d, const float near_plane, const float far_plane,
-                                 const float radius_clip, const bool calc_compensations);
+                                 const float radius_clip, const bool calc_compensations,
+                                 const bool ortho);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
