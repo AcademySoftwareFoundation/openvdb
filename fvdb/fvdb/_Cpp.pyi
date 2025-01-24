@@ -563,7 +563,6 @@ def gaussian_render_depth(
     antialias: bool = False,
     return_debug_info=False,
     pixels_to_render: Optional[JaggedTensorOrTensor] = None,
-    ortho: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
 def precompute_gaussian_render_state(
     means: torch.Tensor,

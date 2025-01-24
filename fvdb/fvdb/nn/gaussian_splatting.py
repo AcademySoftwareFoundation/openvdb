@@ -186,7 +186,6 @@ class GaussianSplat3D(nn.Module):
         radius_clip: float = 0.0,
         tile_size: int = 16,
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
-        ortho: bool = False,
     ):
         rgbd, alphas, _ = self(
             image_w=image_w,
@@ -204,7 +203,6 @@ class GaussianSplat3D(nn.Module):
             rasterize_mode=rasterize_mode,
             cache_info=False,
             depth_only=False,
-            ortho=ortho,
         )
         rgb = rgbd[..., :3]  # [B, H, W, 1]
         depth = rgbd[..., 3:4] / alphas.clamp(min=1e-10)  # [B, H, W, 1]
@@ -224,7 +222,6 @@ class GaussianSplat3D(nn.Module):
         radius_clip: float = 0.0,
         tile_size: int = 16,
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
-        ortho: bool = False,
     ):
         depth, alphas, _ = self(
             image_w=image_w,
@@ -242,7 +239,6 @@ class GaussianSplat3D(nn.Module):
             rasterize_mode=rasterize_mode,
             cache_info=False,
             depth_only=True,
-            ortho=ortho,
         )
         depth = depth / alphas.clamp(min=1e-10)  # [B, H, W, 1]
 
@@ -275,7 +271,6 @@ class GaussianSplat3D(nn.Module):
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
         cache_info: bool = False,
         depth_only: bool = False,
-        ortho: bool = False,
     ):
         if rasterize_mode not in ["classic", "antialiased"]:
             raise ValueError(f"Invalid rasterize_mode {rasterize_mode}")
@@ -319,7 +314,6 @@ class GaussianSplat3D(nn.Module):
                     tile_size=tile_size,
                     antialias=(rasterize_mode == "antialiased"),
                     render_depth_channel=render_depth,
-                    ortho=ortho,
                 )
             colors, alphas = render_pixels_from_precomputed_gaussian_render_state(
                 self._info_cache["means2d"],
@@ -357,7 +351,6 @@ class GaussianSplat3D(nn.Module):
                     eps2d=eps_2d,
                     antialias=(rasterize_mode == "antialiased"),
                     return_debug_info=True,
-                    ortho=ortho,
                 )
             else:
                 colors, alphas, info = gaussian_render(
@@ -379,7 +372,6 @@ class GaussianSplat3D(nn.Module):
                     antialias=(rasterize_mode == "antialiased"),
                     render_depth_channel=render_depth,
                     return_debug_info=True,
-                    ortho=ortho,
                 )
 
         # if render_mode in ["ED", "RGB+ED"]:
