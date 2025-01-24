@@ -105,9 +105,7 @@
         "cerrno": "cpp",
         "queue": "cpp",
         "execution": "cpp",
-        "__config": "cpp",
-        "any": "cpp",
-        "span": "cpp"
+        "__config": "cpp"
     },
     "files.trimTrailingWhitespace": true,
     "editor.rulers": [ 100 ],
