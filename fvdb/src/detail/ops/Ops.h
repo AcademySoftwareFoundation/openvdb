@@ -348,7 +348,7 @@ dispatchGaussianFullyFusedProjectionForward(const torch::Tensor &means,    // [N
                                             const uint32_t image_width, const uint32_t image_height,
                                             const float eps2d, const float near_plane,
                                             const float far_plane, const float radius_clip,
-                                            const bool calc_compensations, const bool ortho);
+                                            const bool calc_compensations);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -369,7 +369,7 @@ dispatchGaussianFullyFusedProjectionBackward(
     const torch::Tensor               &v_depths,        // [C, N]
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho);
+    const bool                         viewmats_requires_grad);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor>

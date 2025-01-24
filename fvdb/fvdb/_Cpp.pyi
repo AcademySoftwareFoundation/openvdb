@@ -522,7 +522,6 @@ def gaussian_fully_fused_projection(
     radius_clip: float = 0.0,
     eps2d: float = 0.3,
     antialias: bool = False,
-    ortho: bool = False,
 ) -> List[torch.Tensor]: ...
 def gaussian_render(
     means: JaggedTensorOrTensor,
@@ -544,7 +543,6 @@ def gaussian_render(
     render_depth_channel: bool = False,
     return_debug_info=False,
     pixels_to_render: Optional[JaggedTensorOrTensor] = None,
-    ortho: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
 def gaussian_render_depth(
     means: JaggedTensorOrTensor,
@@ -583,7 +581,6 @@ def precompute_gaussian_render_state(
     antialias: bool = False,
     render_depth_channel: bool = False,
     return_debug_info=False,
-    ortho: bool = False,
 ) -> Dict[str, torch.Tensor | Any]: ...
 def render_pixels_from_precomputed_gaussian_render_state(
     means2d: torch.Tensor,
