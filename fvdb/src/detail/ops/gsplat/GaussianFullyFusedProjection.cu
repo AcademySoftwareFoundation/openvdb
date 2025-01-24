@@ -34,7 +34,7 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
                                   T *__restrict__ depths,        // [C, N]
                                   T *__restrict__ conics,        // [C, N, 3]
                                   T *__restrict__ compensations, // [C, N] optional
-                                  const bool ortho) {
+                                  bool ortho) {
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N) {
@@ -168,7 +168,7 @@ fully_fused_projection_bwd_kernel(
     T *__restrict__ v_quats,    // [N, 4] optional
     T *__restrict__ v_scales,   // [N, 3] optional
     T *__restrict__ v_viewmats, // [C, 4, 4] optional
-    const bool ortho) {
+    bool ortho) {
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N || radii[idx] <= 0) {
@@ -371,7 +371,6 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
                 radius_clip, radii.data_ptr<int32_t>(), means2d.data_ptr<float>(),
                 depths.data_ptr<float>(), conics.data_ptr<float>(),
                 calc_compensations ? compensations.data_ptr<float>() : nullptr, ortho);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(radii, means2d, depths, conics, compensations);
 }
@@ -471,7 +470,6 @@ dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
                 covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                 covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
                 viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr, ortho);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);
 }

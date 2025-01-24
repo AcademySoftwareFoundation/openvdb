@@ -215,6 +215,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
             return_debug_info, render_depth_only, ortho);
     }
 
+    TORCH_CHECK_NOT_IMPLEMENTED(!ortho, "orthographic projection not implemented")
     // Check after we dispatch the unbatched version since the unbatched version accepts a
     // [K, N, D] tensor for sh_coeffs while the batched version accepts a [ggz, K, D] tensor,
     // which gets permuted later on.
@@ -255,7 +256,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     // Project to image plane [differentiable]
     auto projection_results = detail::autograd::GaussianFullyFusedProjectionJagged::apply(
         g_sizes, means.jdata(), quats.jdata(), scales.jdata(), c_sizes, viewmats.jdata(),
-        Ks.jdata(), image_width, image_height, eps2d, near_plane, far_plane, radius_clip, ortho);
+        Ks.jdata(), image_width, image_height, eps2d, near_plane, far_plane, radius_clip);
     torch::Tensor radii   = projection_results[0];
     torch::Tensor means2d = projection_results[1];
     torch::Tensor depths  = projection_results[2];

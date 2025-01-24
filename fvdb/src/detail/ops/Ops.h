@@ -429,7 +429,7 @@ dispatchGaussianFullyFusedProjectionJaggedForward(
     const torch::Tensor &viewmats, // [ccz, 4, 4]
     const torch::Tensor &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip, const bool ortho);
+    const float near_plane, const float far_plane, const float radius_clip);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
@@ -447,7 +447,7 @@ dispatchGaussianFullyFusedProjectionJaggedBackward(
     const torch::Tensor &v_means2d, // [nnz, 2]
     const torch::Tensor &v_depths,  // [nnz]
     const torch::Tensor &v_conics,  // [nnz, 3]
-    const bool viewmats_requires_grad, const bool ortho);
+    const bool           viewmats_requires_grad);
 
 } // namespace ops
 } // namespace detail
