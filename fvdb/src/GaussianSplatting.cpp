@@ -33,8 +33,8 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
                                     const uint32_t image_height, const float near_plane,
                                     const float far_plane, const int sh_degree_to_use,
                                     const int tile_size, const float radius_clip, const float eps2d,
-                                    bool antialias, bool render_depth_channel,
-                                    bool render_depth_only) {
+                                    const bool antialias, const bool render_depth_channel,
+                                    const bool render_depth_only, const bool ortho) {
     const int C = viewmats.size(0);                           // number of cameras
     const int N = means.size(0);                              // number of gaussians
     const int K = render_depth_only ? 1 : sh_coeffs.size(0);  // number of SH bases
@@ -60,7 +60,7 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
     // Project to image plane [differentiable]
     const auto projection_results = detail::autograd::GaussianFullyFusedProjection::apply(
         means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane, far_plane,
-        radius_clip, antialias);
+        radius_clip, antialias, ortho);
     const torch::Tensor radii                 = projection_results[0];
     const torch::Tensor means2d               = projection_results[1];
     const torch::Tensor depths                = projection_results[2];
@@ -133,12 +133,13 @@ gaussianRenderUnbatchedInternal(const torch::Tensor &means, const torch::Tensor 
                                 const uint32_t image_height, const float near_plane,
                                 const float far_plane, const int sh_degree_to_use,
                                 const int tile_size, const float radius_clip, const float eps2d,
-                                bool antialias, bool render_depth_channel, bool return_debug_info,
-                                bool render_depth_only) {
+                                const bool antialias, const bool render_depth_channel,
+                                const bool return_debug_info, const bool render_depth_only,
+                                const bool ortho) {
     std::array<torch::Tensor, 7> renderState = computeGaussianRenderStateUnbatched(
         means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
         near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, render_depth_only);
+        render_depth_channel, render_depth_only, ortho);
 
     torch::Tensor means2d               = renderState[0];
     torch::Tensor conics                = renderState[1];
@@ -180,8 +181,9 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                        const uint32_t image_width, const uint32_t image_height,
                        const float near_plane, const float far_plane, const int sh_degree_to_use,
                        const int tile_size, const float radius_clip, const float eps2d,
-                       bool antialias, bool render_depth_channel, bool return_debug_info,
-                       bool render_depth_only) {
+                       const bool antialias, const bool render_depth_channel,
+                       const bool return_debug_info, const bool render_depth_only,
+                       const bool ortho) {
     const int ccz = viewmats.rsize(0);                           // number of cameras
     const int ggz = means.rsize(0);                              // number of gaussians
     const int D   = render_depth_only ? 1 : sh_coeffs.rsize(-1); // Dimension of output
@@ -210,7 +212,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
             means.jdata(), quats.jdata(), scales.jdata(), opacities.jdata(), sh_coeffs.jdata(),
             viewmats.jdata(), Ks.jdata(), image_width, image_height, near_plane, far_plane,
             sh_degree_to_use, tile_size, radius_clip, eps2d, antialias, render_depth_channel,
-            return_debug_info, render_depth_only);
+            return_debug_info, render_depth_only, ortho);
     }
 
     // Check after we dispatch the unbatched version since the unbatched version accepts a
@@ -253,7 +255,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     // Project to image plane [differentiable]
     auto projection_results = detail::autograd::GaussianFullyFusedProjectionJagged::apply(
         g_sizes, means.jdata(), quats.jdata(), scales.jdata(), c_sizes, viewmats.jdata(),
-        Ks.jdata(), image_width, image_height, eps2d, near_plane, far_plane, radius_clip);
+        Ks.jdata(), image_width, image_height, eps2d, near_plane, far_plane, radius_clip, ortho);
     torch::Tensor radii   = projection_results[0];
     torch::Tensor means2d = projection_results[1];
     torch::Tensor depths  = projection_results[2];
@@ -328,10 +330,11 @@ projectGaussiansToImages(const torch::Tensor &means, const torch::Tensor &quats,
                          const torch::Tensor &scales, const torch::Tensor &viewmats,
                          const torch::Tensor &Ks, const uint32_t image_width,
                          const uint32_t image_height, const float near_plane, const float far_plane,
-                         const float radius_clip, const float eps2d, bool antialias) {
+                         const float radius_clip, const float eps2d, const bool antialias,
+                         const bool ortho) {
     return detail::autograd::GaussianFullyFusedProjection::apply(
         means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane, far_plane,
-        radius_clip, antialias);
+        radius_clip, antialias, ortho);
 }
 
 // Gaussian render for a single torch Tensor
@@ -341,12 +344,13 @@ precomputeGaussianRenderStateUnbatched(
     const torch::Tensor &opacities, const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
     const torch::Tensor &Ks, const uint32_t image_width, const uint32_t image_height,
     const float near_plane, const float far_plane, const int sh_degree_to_use, const int tile_size,
-    const float radius_clip, const float eps2d, bool antialias, bool render_depth_channel) {
+    const float radius_clip, const float eps2d, const bool antialias,
+    const bool render_depth_channel, const bool ortho) {
     const bool                   render_depth_only = false;
     std::array<torch::Tensor, 7> renderState       = computeGaussianRenderStateUnbatched(
         means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
         near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, render_depth_only);
+        render_depth_channel, render_depth_only, ortho);
 
     std::unordered_map<std::string, torch::Tensor> info;
     info["means2d"]           = renderState[0];
@@ -384,13 +388,13 @@ gaussianRender(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
                const uint32_t image_width, const uint32_t image_height, const float near_plane,
                const float far_plane, const int sh_degree_to_use, const int tile_size,
-               const float radius_clip, const float eps2d, bool antialias,
-               bool render_depth_channel, bool return_debug_info,
-               const torch::optional<JaggedTensor> pixels_to_render) {
+               const float radius_clip, const float eps2d, const bool antialias,
+               const bool render_depth_channel, const bool return_debug_info,
+               const torch::optional<JaggedTensor> pixels_to_render, const bool ortho) {
     return gaussianRenderInternal(
         means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
         near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, return_debug_info, false /* render_depth_only*/);
+        render_depth_channel, return_debug_info, false /* render_depth_only*/, ortho);
 }
 
 std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
@@ -402,13 +406,13 @@ gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                     const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
                     const uint32_t image_width, const uint32_t image_height, const float near_plane,
                     const float far_plane, const int tile_size, const float radius_clip,
-                    const float eps2d, bool antialias, bool return_debug_info,
-                    const torch::optional<JaggedTensor> pixels_to_render) {
+                    const float eps2d, const bool antialias, const bool return_debug_info,
+                    const torch::optional<JaggedTensor> pixels_to_render, const bool ortho) {
     fvdb::JaggedTensor dummy_coeffs;
     return gaussianRenderInternal(
         means, quats, scales, opacities, dummy_coeffs, viewmats, Ks, image_width, image_height,
         near_plane, far_plane, -1 /* sh_degree_to_use */, tile_size, radius_clip, eps2d, antialias,
-        false /* render_depth_channel */, return_debug_info, true);
+        false /* render_depth_channel */, return_debug_info, true, ortho);
 }
 
 } // namespace fvdb

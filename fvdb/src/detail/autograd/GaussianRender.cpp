@@ -75,7 +75,7 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
                                       const uint32_t image_width, const uint32_t image_height,
                                       const float eps2d, const float near_plane,
                                       const float far_plane, const float radius_clip,
-                                      const bool calc_compensations) {
+                                      const bool calc_compensations, const bool ortho) {
     TORCH_CHECK(means.dim() == 2, "means must have shape (N, 3)");
     TORCH_CHECK(viewmats.dim() == 3, "viewmats must have shape (C, 4, 4)");
     TORCH_CHECK(Ks.dim() == 3, "Ks must have shape (C, 3, 3)");
@@ -83,7 +83,7 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionForward<DeviceTag>(
             means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane,
-            far_plane, radius_clip, calc_compensations);
+            far_plane, radius_clip, calc_compensations, ortho);
     });
     Variable radii     = std::get<0>(variables);
     Variable means2d   = std::get<1>(variables);
@@ -94,6 +94,7 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     ctx->saved_data["image_height"]       = (int64_t)image_height;
     ctx->saved_data["eps2d"]              = (double)eps2d;
     ctx->saved_data["calc_compensations"] = (bool)calc_compensations;
+    ctx->saved_data["ortho"]              = (bool)ortho;
 
     if (calc_compensations) {
         Variable compensations = std::get<4>(variables);
@@ -152,12 +153,13 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     const int   image_width  = (int)ctx->saved_data["image_width"].toInt();
     const int   image_height = (int)ctx->saved_data["image_height"].toInt();
     const float eps2d        = (float)ctx->saved_data["eps2d"].toDouble();
+    const bool  ortho        = (bool)ctx->saved_data["ortho"].toBool();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionBackward<DeviceTag>(
             means, quats, scales, viewmats, Ks, compensations, image_width, image_height, eps2d,
-            radii, conics, v_means2d, v_depths, v_conics, v_compensations,
-            ctx->needs_input_grad(4));
+            radii, conics, v_means2d, v_depths, v_conics, v_compensations, ctx->needs_input_grad(4),
+            ortho);
     });
     Variable v_means   = std::get<0>(variables);
     // Variable v_covars = std::get<1>(variables);
@@ -269,11 +271,11 @@ GaussianFullyFusedProjectionJagged::forward(
     const GaussianFullyFusedProjectionJagged::Variable  &viewmats, // [ccz, 4, 4]
     const GaussianFullyFusedProjectionJagged::Variable  &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip) {
+    const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionJaggedForward<DeviceTag>(
             g_sizes, means, quats, scales, c_sizes, viewmats, Ks, image_width, image_height, eps2d,
-            near_plane, far_plane, radius_clip);
+            near_plane, far_plane, radius_clip, ortho);
     });
     Variable radii     = std::get<0>(variables);
     Variable means2d   = std::get<1>(variables);
@@ -284,6 +286,7 @@ GaussianFullyFusedProjectionJagged::forward(
     ctx->saved_data["image_width"]  = (int64_t)image_width;
     ctx->saved_data["image_height"] = (int64_t)image_height;
     ctx->saved_data["eps2d"]        = (double)eps2d;
+    ctx->saved_data["ortho"]        = (bool)ortho;
 
     return { radii, means2d, depths, conics };
 }
@@ -321,11 +324,12 @@ GaussianFullyFusedProjectionJagged::backward(
     const int   image_width  = (int)ctx->saved_data["image_width"].toInt();
     const int   image_height = (int)ctx->saved_data["image_height"].toInt();
     const float eps2d        = (float)ctx->saved_data["eps2d"].toDouble();
+    const bool  ortho        = (bool)ctx->saved_data["ortho"].toBool();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianFullyFusedProjectionJaggedBackward<DeviceTag>(
             g_sizes, means, quats, scales, c_sizes, viewmats, Ks, image_width, image_height, eps2d,
-            radii, conics, v_means2d, v_depths, v_conics, ctx->needs_input_grad(6));
+            radii, conics, v_means2d, v_depths, v_conics, ctx->needs_input_grad(6), ortho);
     });
     Variable v_means   = std::get<0>(variables);
     // Variable v_covars = std::get<1>(variables);
