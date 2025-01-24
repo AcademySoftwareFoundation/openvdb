@@ -34,12 +34,12 @@ fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
                                          const T eps2d, const T near_plane, const T far_plane,
                                          const T radius_clip,
                                          // outputs
-                                         int32_t *__restrict__ radii,  // [nnz]
-                                         T *__restrict__ means2d,      // [nnz, 2]
-                                         T *__restrict__ depths,       // [nnz]
-                                         T *__restrict__ conics,       // [nnz, 3]
-                                         T *__restrict__ compensations // [nnz] optional
-) {
+                                         int32_t *__restrict__ radii,   // [nnz]
+                                         T *__restrict__ means2d,       // [nnz, 2]
+                                         T *__restrict__ depths,        // [nnz]
+                                         T *__restrict__ conics,        // [nnz, 3]
+                                         T *__restrict__ compensations, // [nnz] optional
+                                         const bool ortho) {
     // parallelize over nnz.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= nnz) {
@@ -101,8 +101,13 @@ fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
     // perspective projection
     mat2<T> covar2d;
     vec2<T> mean2d;
-    persp_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height, covar2d,
-                  mean2d);
+    if (ortho) {
+        ortho_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
+                      covar2d, mean2d);
+    } else {
+        persp_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
+                      covar2d, mean2d);
+    }
 
     T compensation;
     T det = add_blur(eps2d, covar2d, compensation);
@@ -174,12 +179,12 @@ fully_fused_projection_jagged_bwd_kernel(
     const T *__restrict__ v_conics,        // [nnz, 3]
     const T *__restrict__ v_compensations, // [nnz] optional
     // grad inputs
-    T *__restrict__ v_means,   // [ggz, 3]
-    T *__restrict__ v_covars,  // [ggz, 6] optional
-    T *__restrict__ v_quats,   // [ggz, 4] optional
-    T *__restrict__ v_scales,  // [ggz, 3] optional
-    T *__restrict__ v_viewmats // [ccz, 4, 4] optional
-) {
+    T *__restrict__ v_means,    // [ggz, 3]
+    T *__restrict__ v_covars,   // [ggz, 6] optional
+    T *__restrict__ v_quats,    // [ggz, 4] optional
+    T *__restrict__ v_scales,   // [ggz, 3] optional
+    T *__restrict__ v_viewmats, // [ccz, 4, 4] optional
+    const bool ortho) {
     // parallelize over nnz.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= nnz || radii[idx] <= 0) {
@@ -255,8 +260,13 @@ fully_fused_projection_jagged_bwd_kernel(
     T       fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
     mat3<T> v_covar_c(0.f);
     vec3<T> v_mean_c(0.f);
-    persp_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
-                      glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
+    if (ortho) {
+        ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
+                          glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
+    } else {
+        persp_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
+                          glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
+    }
 
     // add contribution from v_depths
     v_mean_c.z += v_depths[0];
@@ -344,7 +354,7 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCUDA>(
     const torch::Tensor &viewmats, // [ccz, 4, 4]
     const torch::Tensor &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip) {
+    const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars             = std::nullopt;
     constexpr bool                     calc_compensations = false;
@@ -394,7 +404,8 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCUDA>(
                 Ks.data_ptr<float>(), image_width, image_height, eps2d, near_plane, far_plane,
                 radius_clip, radii.data_ptr<int32_t>(), means2d.data_ptr<float>(),
                 depths.data_ptr<float>(), conics.data_ptr<float>(),
-                calc_compensations ? compensations.data_ptr<float>() : nullptr);
+                calc_compensations ? compensations.data_ptr<float>() : nullptr, ortho);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(radii, means2d, depths, conics, compensations);
 }
@@ -410,7 +421,7 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCPU>(
     const torch::Tensor &viewmats, // [ccz, 4, 4]
     const torch::Tensor &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip) {
+    const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
@@ -432,7 +443,7 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCUDA>(
     const torch::Tensor &v_means2d, // [nnz, 2]
     const torch::Tensor &v_depths,  // [nnz]
     const torch::Tensor &v_conics,  // [nnz, 3]
-    const bool           viewmats_requires_grad) {
+    const bool viewmats_requires_grad, const bool ortho) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars          = std::nullopt;
     const at::optional<torch::Tensor> &compensations   = std::nullopt;
@@ -503,7 +514,8 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCUDA>(
                 covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
                 covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                 covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+                viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr, ortho);
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);
 }
@@ -524,7 +536,7 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCPU>(
     const torch::Tensor &v_means2d, // [nnz, 2]
     const torch::Tensor &v_depths,  // [nnz]
     const torch::Tensor &v_conics,  // [nnz, 3]
-    const bool           viewmats_requires_grad) {
+    const bool viewmats_requires_grad, const bool ortho) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
