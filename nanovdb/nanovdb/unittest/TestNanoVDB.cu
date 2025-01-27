@@ -3333,6 +3333,11 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_basic)
     int *x = buffer.data<int>();
     for (int i = 0; i < N; ++i) EXPECT_EQ(1, *x++);
     for (int i = 0; i < N; ++i) EXPECT_EQ(2, *x++);
+
+    nanovdb::cuda::UnifiedBuffer otherBuffer(std::move(buffer));
+    int *y = otherBuffer.data<int>();
+    for (int i = 0; i < N; ++i) EXPECT_EQ(1, *y++);
+    for (int i = 0; i < N; ++i) EXPECT_EQ(2, *y++);
 }// UnifiedBuffer_basic
 
 TEST(TestNanoVDBCUDA, UnifiedBuffer_IO)
