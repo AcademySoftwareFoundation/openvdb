@@ -81,7 +81,9 @@ private:
 
     DeviceVecT mDeviceNodes;
 
+#ifdef NANOVDB_USE_NCCL
     std::vector<ncclComm_t> mComms;
+#endif
     std::vector<std::vector<uint32_t>> mConnectivity;
 };
 
