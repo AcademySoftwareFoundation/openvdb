@@ -90,12 +90,11 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
     // perspective projection
     mat2<T> covar2d;
     vec2<T> mean2d;
+    const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
     if (ortho) {
-        ortho_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
-                      covar2d, mean2d);
+        ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
     } else {
-        persp_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
-                      covar2d, mean2d);
+        persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
     }
 
     T compensation;
@@ -239,6 +238,7 @@ fully_fused_projection_bwd_kernel(
     mat3<T> v_covar_c(0.f);
     vec3<T> v_mean_c(0.f);
     if (ortho) {
+        printf("BACKWARD WEIRD!~\n");
         ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
                           glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
     } else {
