@@ -76,11 +76,10 @@ public:
 
     /// @brief Move copy-constructor
     UnifiedBuffer(UnifiedBuffer&& other) noexcept
-        : mSize(other.mSize)
+        : mPtr(other.mPtr)
+        , mSize(other.mSize)
         , mCapacity(other.mCapacity)
     {
-        cudaCheck(cudaFree(mPtr));
-        mPtr = other.mPtr;
         other.mPtr = nullptr;
         other.mSize = other.mCapacity = 0;
     }
