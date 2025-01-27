@@ -198,7 +198,7 @@ public:
     /// @param size size in bytes of the memory block to be advised.
     /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param adv cuda device
-    void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv)
+    void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv) const
     {
         cudaCheck(cudaMemAdvise(util::PtrAdd(mPtr, byteOffset), size, adv, dev));
     }
@@ -208,7 +208,7 @@ public:
     /// @param size size in bytes of the memory block to be advised.
     /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param list list of cuda advises
-    void advise(ptrdiff_t byteOffset, size_t size, int dev, std::initializer_list<cudaMemoryAdvise> list)
+    void advise(ptrdiff_t byteOffset, size_t size, int dev, std::initializer_list<cudaMemoryAdvise> list) const
     {
         void *ptr = util::PtrAdd(mPtr, byteOffset);
         for (auto a : list)  cudaCheck(cudaMemAdvise(ptr, size, a, dev));
@@ -219,7 +219,7 @@ public:
     /// @param size size in bytes of the memory block to be prefetched. The default value of zero means copy all @c this->size() bytes.
     /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param stream  cuda stream
-    void prefetch(ptrdiff_t byteOffset = 0, size_t size = 0, int dev = cudaCpuDeviceId, cudaStream_t stream = cudaStreamPerThread)
+    void prefetch(ptrdiff_t byteOffset = 0, size_t size = 0, int dev = cudaCpuDeviceId, cudaStream_t stream = cudaStreamPerThread) const
     {
         cudaCheck(cudaMemPrefetchAsync(util::PtrAdd(mPtr, byteOffset), size ? size : mSize, dev, stream));
     }
