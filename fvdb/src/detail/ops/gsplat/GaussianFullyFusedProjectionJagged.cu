@@ -16,7 +16,7 @@ namespace ops {
 
 namespace cg = cooperative_groups;
 
-template <typename T>
+template <typename T, bool Ortho>
 __global__ void
 fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
                                          const int64_t *__restrict__ g_sizes,  // [B]
@@ -34,12 +34,11 @@ fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
                                          const T eps2d, const T near_plane, const T far_plane,
                                          const T radius_clip,
                                          // outputs
-                                         int32_t *__restrict__ radii,   // [nnz]
-                                         T *__restrict__ means2d,       // [nnz, 2]
-                                         T *__restrict__ depths,        // [nnz]
-                                         T *__restrict__ conics,        // [nnz, 3]
-                                         T *__restrict__ compensations, // [nnz] optional
-                                         const bool ortho) {
+                                         int32_t *__restrict__ radii,     // [nnz]
+                                         T *__restrict__ means2d,         // [nnz, 2]
+                                         T *__restrict__ depths,          // [nnz]
+                                         T *__restrict__ conics,          // [nnz, 3]
+                                         T *__restrict__ compensations) { // [nnz] optional
     // parallelize over nnz.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= nnz) {
@@ -98,16 +97,15 @@ fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
     mat3<T> covar_c;
     covar_world_to_cam(R, covar, covar_c);
 
-    // perspective projection
-    mat2<T> covar2d;
-    vec2<T> mean2d;
-    if (ortho) {
-        ortho_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
-                      covar2d, mean2d);
-    } else {
-        persp_proj<T>(mean_c, covar_c, Ks[0], Ks[4], Ks[2], Ks[5], image_width, image_height,
-                      covar2d, mean2d);
-    }
+    // camera projection
+    const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
+    auto [covar2d, mean2d] = [&]() {
+        if constexpr (Ortho) {
+            return ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+        } else {
+            return persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+        }
+    }();
 
     T compensation;
     T det = add_blur(eps2d, covar2d, compensation);
@@ -152,7 +150,7 @@ fully_fused_projection_jagged_fwd_kernel(const uint32_t B, const int64_t nnz,
     }
 }
 
-template <typename T>
+template <typename T, bool Ortho>
 __global__ void
 fully_fused_projection_jagged_bwd_kernel(
     // fwd inputs
@@ -179,12 +177,11 @@ fully_fused_projection_jagged_bwd_kernel(
     const T *__restrict__ v_conics,        // [nnz, 3]
     const T *__restrict__ v_compensations, // [nnz] optional
     // grad inputs
-    T *__restrict__ v_means,    // [ggz, 3]
-    T *__restrict__ v_covars,   // [ggz, 6] optional
-    T *__restrict__ v_quats,    // [ggz, 4] optional
-    T *__restrict__ v_scales,   // [ggz, 3] optional
-    T *__restrict__ v_viewmats, // [ccz, 4, 4] optional
-    const bool ortho) {
+    T *__restrict__ v_means,      // [ggz, 3]
+    T *__restrict__ v_covars,     // [ggz, 6] optional
+    T *__restrict__ v_quats,      // [ggz, 4] optional
+    T *__restrict__ v_scales,     // [ggz, 3] optional
+    T *__restrict__ v_viewmats) { // [ccz, 4, 4] optional
     // parallelize over nnz.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= nnz || radii[idx] <= 0) {
@@ -256,11 +253,11 @@ fully_fused_projection_jagged_bwd_kernel(
     mat3<T> covar_c;
     covar_world_to_cam(R, covar, covar_c);
 
-    // vjp: perspective projection
+    // vjp: camera projection
     T       fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
     mat3<T> v_covar_c(0.f);
     vec3<T> v_mean_c(0.f);
-    if (ortho) {
+    if constexpr (Ortho) {
         ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
                           glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
     } else {
@@ -393,18 +390,34 @@ dispatchGaussianFullyFusedProjectionJaggedForward<torch::kCUDA>(
         compensations = torch::zeros({ nnz }, means.options());
     }
     if (nnz) {
-        fully_fused_projection_jagged_fwd_kernel<float>
-            <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
-                g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
-                n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
-                covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : scales.data_ptr<float>(), viewmats.data_ptr<float>(),
-                Ks.data_ptr<float>(), image_width, image_height, eps2d, near_plane, far_plane,
-                radius_clip, radii.data_ptr<int32_t>(), means2d.data_ptr<float>(),
-                depths.data_ptr<float>(), conics.data_ptr<float>(),
-                calc_compensations ? compensations.data_ptr<float>() : nullptr, ortho);
+        if (ortho) {
+            fully_fused_projection_jagged_fwd_kernel<float, true>
+                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
+                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
+                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
+                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    calc_compensations ? compensations.data_ptr<float>() : nullptr);
+        } else {
+            fully_fused_projection_jagged_fwd_kernel<float, false>
+                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
+                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
+                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
+                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    calc_compensations ? compensations.data_ptr<float>() : nullptr);
+        }
+
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(radii, means2d, depths, conics, compensations);
@@ -497,24 +510,50 @@ dispatchGaussianFullyFusedProjectionJaggedBackward<torch::kCUDA>(
         v_viewmats = torch::zeros_like(viewmats);
     }
     if (nnz) {
-        fully_fused_projection_jagged_bwd_kernel<float>
-            <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
-                g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
-                n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
-                covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : scales.data_ptr<float>(), viewmats.data_ptr<float>(),
-                Ks.data_ptr<float>(), image_width, image_height, eps2d, radii.data_ptr<int32_t>(),
-                conics.data_ptr<float>(),
-                compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
-                v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(), v_conics.data_ptr<float>(),
-                v_compensations.has_value() ? v_compensations.value().data_ptr<float>() : nullptr,
-                v_means.data_ptr<float>(),
-                covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr, ortho);
+        if (ortho) {
+            fully_fused_projection_jagged_bwd_kernel<float, true>
+                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
+                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
+                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
+                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
+                    v_conics.data_ptr<float>(),
+                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
+                                                : nullptr,
+                    v_means.data_ptr<float>(),
+                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+        } else {
+            fully_fused_projection_jagged_bwd_kernel<float, false>
+                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
+                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
+                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
+                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
+                    v_conics.data_ptr<float>(),
+                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
+                                                : nullptr,
+                    v_means.data_ptr<float>(),
+                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+        }
+
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);

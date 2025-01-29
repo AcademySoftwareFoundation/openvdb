@@ -6,6 +6,8 @@
 
 #include "GsplatTypes.cuh"
 
+#include <tuple>
+
 namespace fvdb {
 namespace detail {
 namespace ops {
@@ -219,14 +221,12 @@ covar_world_to_cam_vjp(
 }
 
 template <typename T>
-inline __device__ void
-persp_proj(
-    // inputs
-    const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx, const T cy,
-    const uint32_t width, const uint32_t height,
-    // outputs
-    mat2<T> &cov2d, vec2<T> &mean2d) {
-    T x = mean3d[0], y = mean3d[1], z = mean3d[2];
+inline __device__ std::tuple<mat2<T>, vec2<T>>
+persp_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx,
+           const T cy, const uint32_t width, const uint32_t height) {
+    const T x = mean3d[0];
+    const T y = mean3d[1];
+    const T z = mean3d[2];
 
     T tan_fovx  = 0.5f * width / fx;
     T tan_fovy  = 0.5f * height / fy;
@@ -241,15 +241,17 @@ persp_proj(
     T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
 
     // mat3x2 is 3 columns x 2 rows.
-    mat3x2<T> J = mat3x2<T>(fx * rz,
-                            0.f,           // 1st column
-                            0.f,
-                            fy * rz,       // 2nd column
-                            -fx * tx * rz2,
-                            -fy * ty * rz2 // 3rd column
-    );
-    cov2d       = J * cov3d * glm::transpose(J);
-    mean2d      = vec2<T>({ fx * x * rz + cx, fy * y * rz + cy });
+    auto    J      = mat3x2<T>(fx * rz,
+                               0.f,           // 1st column
+                               0.f,
+                               fy * rz,       // 2nd column
+                               -fx * tx * rz2,
+                               -fy * ty * rz2 // 3rd column
+            );
+    mat2<T> cov2d  = J * cov3d * glm::transpose(J);
+    vec2<T> mean2d = vec2<T>({ fx * x * rz + cx, fy * y * rz + cy });
+
+    return { cov2d, mean2d };
 }
 
 template <typename T>
@@ -319,25 +321,23 @@ persp_proj_vjp(
 }
 
 template <typename T>
-inline __device__ void
-ortho_proj(
-    // inputs
-    const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx, const T cy,
-    const uint32_t width, const uint32_t height,
-    // outputs
-    mat2<T> &cov2d, vec2<T> &mean2d) {
+inline __device__ std::tuple<mat2<T>, vec2<T>>
+ortho_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx,
+           const T cy, const uint32_t width, const uint32_t height) {
     const T x = mean3d[0], y = mean3d[1], z = mean3d[2];
 
     // mat3x2 is 3 columns x 2 rows.
-    const mat3x2<T> J = mat3x2<T>(fx,
+    const auto J      = mat3x2<T>(fx,
                                   0.f, // 1st column
                                   0.f,
                                   fy,  // 2nd column
                                   0.f,
                                   0.f  // 3rd column
-    );
-    cov2d             = J * cov3d * glm::transpose(J);
-    mean2d            = vec2<T>({ fx * x + cx, fy * y + cy });
+         );
+    mat2<T>    cov2d  = J * cov3d * glm::transpose(J);
+    vec2<T>    mean2d = vec2<T>({ fx * x + cx, fy * y + cy });
+
+    return { cov2d, mean2d };
 }
 
 template <typename T>

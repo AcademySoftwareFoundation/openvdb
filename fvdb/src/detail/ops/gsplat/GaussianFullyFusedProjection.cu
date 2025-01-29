@@ -86,15 +86,15 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
     mat3<T> covar_c;
     covar_world_to_cam(R, covar, covar_c);
 
-    // perspective projection
-    mat2<T> covar2d;
-    vec2<T> mean2d;
+    // camera projection
     const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
-    if constexpr (Ortho) {
-        ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
-    } else {
-        persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
-    }
+    auto [covar2d, mean2d] = [&]() {
+        if constexpr (Ortho) {
+            return ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+        } else {
+            return persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+        }
+    }();
 
     T compensation;
     T det = add_blur(eps2d, covar2d, compensation);
@@ -231,7 +231,7 @@ fully_fused_projection_bwd_kernel(
     mat3<T> covar_c;
     covar_world_to_cam(R, covar, covar_c);
 
-    // vjp: perspective projection
+    // vjp: camera projection
     T       fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
     mat3<T> v_covar_c(0.f);
     vec3<T> v_mean_c(0.f);
