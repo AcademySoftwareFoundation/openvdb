@@ -44,6 +44,7 @@ add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 if(NANOVDB_USE_CUDA)
   add_executable(nanovdb_test_cuda "TestNanoVDB.cu")
   target_link_libraries(nanovdb_test_cuda PRIVATE nanovdb GTest::GTest GTest::Main)
+  set_target_properties(nanovdb_test_cuda PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   add_test(nanovdb_cuda_unit_test nanovdb_test_cuda)
 endif()
 
