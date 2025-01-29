@@ -471,7 +471,7 @@ class Runner:
             image_w=W,
             image_h=H,
             extrinsics_mat=c2w[None],
-            intrinsics_mats=K[None],
+            intrinsics_mat=K[None],
             sh_degree=self.cfg.sh_degree,
             radius_clip=3.0,
             render_depth=False,
