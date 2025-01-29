@@ -1,6 +1,5 @@
 name: Wait for Status Checks
 on:
-  pull_request:
   push:
     branches:
       - "pull-request/[0-9]+"
