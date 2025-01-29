@@ -326,18 +326,18 @@ ortho_proj(
     const uint32_t width, const uint32_t height,
     // outputs
     mat2<T> &cov2d, vec2<T> &mean2d) {
-    T x = mean3d[0], y = mean3d[1], z = mean3d[2];
+    const T x = mean3d[0], y = mean3d[1], z = mean3d[2];
 
     // mat3x2 is 3 columns x 2 rows.
-    mat3x2<T> J = mat3x2<T>(fx,
-                            0.f, // 1st column
-                            0.f,
-                            fy,  // 2nd column
-                            0.f,
-                            0.f  // 3rd column
+    const mat3x2<T> J = mat3x2<T>(fx,
+                                  0.f, // 1st column
+                                  0.f,
+                                  fy,  // 2nd column
+                                  0.f,
+                                  0.f  // 3rd column
     );
-    cov2d       = J * cov3d * glm::transpose(J);
-    mean2d      = vec2<T>({ fx * x + cx, fy * y + cy });
+    cov2d             = J * cov3d * glm::transpose(J);
+    mean2d            = vec2<T>({ fx * x + cx, fy * y + cy });
 }
 
 template <typename T>

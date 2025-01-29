@@ -16,7 +16,7 @@ namespace ops {
 
 namespace cg = cooperative_groups;
 
-template <typename T>
+template <typename T, bool Ortho>
 __global__ void
 fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
                                   const T *__restrict__ means,    // [N, 3]
@@ -29,12 +29,11 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
                                   const T eps2d, const T near_plane, const T far_plane,
                                   const T radius_clip,
                                   // outputs
-                                  int32_t *__restrict__ radii,   // [C, N]
-                                  T *__restrict__ means2d,       // [C, N, 2]
-                                  T *__restrict__ depths,        // [C, N]
-                                  T *__restrict__ conics,        // [C, N, 3]
-                                  T *__restrict__ compensations, // [C, N] optional
-                                  const bool ortho) {
+                                  int32_t *__restrict__ radii,     // [C, N]
+                                  T *__restrict__ means2d,         // [C, N, 2]
+                                  T *__restrict__ depths,          // [C, N]
+                                  T *__restrict__ conics,          // [C, N, 3]
+                                  T *__restrict__ compensations) { // [C, N] optional
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N) {
@@ -91,7 +90,7 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
     mat2<T> covar2d;
     vec2<T> mean2d;
     const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
-    if (ortho) {
+    if constexpr (Ortho) {
         ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
     } else {
         persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, covar2d, mean2d);
@@ -361,16 +360,29 @@ dispatchGaussianFullyFusedProjectionForward<torch::kCUDA>(
         compensations = torch::zeros({ C, N }, means.options());
     }
     if (C && N) {
-        fully_fused_projection_fwd_kernel<float>
-            <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                C, N, means.data_ptr<float>(),
-                covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : scales.data_ptr<float>(), viewmats.data_ptr<float>(),
-                Ks.data_ptr<float>(), image_width, image_height, eps2d, near_plane, far_plane,
-                radius_clip, radii.data_ptr<int32_t>(), means2d.data_ptr<float>(),
-                depths.data_ptr<float>(), conics.data_ptr<float>(),
-                calc_compensations ? compensations.data_ptr<float>() : nullptr, ortho);
+        if (ortho) {
+            fully_fused_projection_fwd_kernel<float, true>
+                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    C, N, means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
+                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    calc_compensations ? compensations.data_ptr<float>() : nullptr);
+        } else {
+            fully_fused_projection_fwd_kernel<float, false>
+                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    C, N, means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
+                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    calc_compensations ? compensations.data_ptr<float>() : nullptr);
+        }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(radii, means2d, depths, conics, compensations);
