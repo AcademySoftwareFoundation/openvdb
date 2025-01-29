@@ -19,7 +19,7 @@ namespace util {
 
 class Timer
 {
-    std::chrono::high_resolution_clock::time_point mStart;
+    std::chrono::high_resolution_clock::time_point mStart, mStop;
 public:
     /// @brief Default constructor
     Timer() {}
@@ -38,22 +38,34 @@ public:
         mStart = std::chrono::high_resolution_clock::now();
     }
 
-    /// @brief elapsed time (since start) in miliseconds
+    /// @brief Record the stop time so the elapsed time since start can be computed
+    void record()
+    {
+        mStop = std::chrono::high_resolution_clock::now();
+    }
+
+    /// @brief Returns the time in milliseconds since record was called
+    float milliseconds() const
+    {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(mStop - mStart).count();
+    }
+
+    /// @brief call record and return the elapsed time (since start) in miliseconds
     template <typename AccuracyT = std::chrono::milliseconds>
     auto elapsed()
     {
-        auto end = std::chrono::high_resolution_clock::now();
-        return std::chrono::duration_cast<AccuracyT>(end - mStart).count();
+        this->record();
+        return std::chrono::duration_cast<AccuracyT>(mStop - mStart).count();
     }
 
-    /// @brief stop the timer
+    /// @brief stop the timer and print elapsed time to a stream
     /// @tparam AccuracyT Template parameter defining the accuracy of the reported times
     /// @param os output stream for the message above
     template <typename AccuracyT = std::chrono::milliseconds>
     void stop(std::ostream& os = std::cerr)
     {
-        auto end = std::chrono::high_resolution_clock::now();
-        auto diff = std::chrono::duration_cast<AccuracyT>(end - mStart).count();
+        mStop = std::chrono::high_resolution_clock::now();
+        auto diff = std::chrono::duration_cast<AccuracyT>(mStop - mStart).count();
         os << "completed in " << diff;
         if (std::is_same<AccuracyT, std::chrono::microseconds>::value) {// resolved at compile-time
             os << " microseconds" << std::endl;
@@ -66,7 +78,7 @@ public:
         }
     }
 
-    /// @brief stop and start the timer
+    /// @brief stop and start the timer again
     /// @tparam AccuracyT Template parameter defining the accuracy of the reported times
     /// @param msg string message to be printed when timer is started
     /// @param os output stream for the message above

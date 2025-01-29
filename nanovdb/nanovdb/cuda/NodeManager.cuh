@@ -37,7 +37,9 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
                   const BufferT& pool = BufferT(),
                   cudaStream_t stream = 0)
 {
-    auto buffer = BufferT::create(sizeof(NodeManagerData), &pool, false, stream);
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    auto buffer = BufferT::create(sizeof(NodeManagerData), &pool, device, stream);
     auto *d_data = (NodeManagerData*)buffer.deviceData();
     size_t size = 0u, *d_size;
     cudaCheck(util::cuda::mallocAsync((void**)&d_size, sizeof(size_t), stream));
@@ -62,7 +64,7 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
     cudaCheck(cudaMemcpyAsync(&size, d_size, sizeof(size_t), cudaMemcpyDeviceToHost, stream));
     cudaCheck(util::cuda::freeAsync(d_size, stream));
     if (size > sizeof(NodeManagerData)) {
-        auto tmp = BufferT::create(size, &pool, false, stream);// only allocate buffer on the device
+        auto tmp = BufferT::create(size, &pool, device, stream);// only allocate buffer on the device
         cudaCheck(cudaMemcpyAsync(tmp.deviceData(), buffer.deviceData(), sizeof(NodeManagerData), cudaMemcpyDeviceToDevice, stream));
         buffer = std::move(tmp);
         d_data = reinterpret_cast<NodeManagerData*>(buffer.deviceData());

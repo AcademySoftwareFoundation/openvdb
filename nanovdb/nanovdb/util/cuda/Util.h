@@ -109,6 +109,43 @@ inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream){return cudaFreeAs
 
 #endif
 
+/// @brief Returns the device ID associated with the specified pointer
+inline int ptrToDevice(void *ptr)
+{
+    cudaPointerAttributes ptrAtt;
+    cudaPointerGetAttributes(&ptrAtt, ptr);
+    return ptrAtt.device;
+}
+
+/// @brief Returns the ID of the current device
+inline int currentDevice()
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+    return current;
+}
+
+/// @brief Returns the number of devices with compute capability greater or equal to 1.0 that are available for execution
+inline int deviceCount()
+{
+    int deviceCount = 0;
+    cudaCheck(cudaGetDeviceCount(&deviceCount));
+    return deviceCount;
+}
+
+/// @brief Print information about a specific device
+/// @param device device ID for which information will be printed
+/// @param preMsg optional message printed before the device information
+/// @param file   Optional file stream to print to, e.g. stderr or stdout
+inline void printDevInfo(int device, const char *preMsg = nullptr, std::FILE* file = stderr)
+{
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+    if (preMsg) fprintf(file, "%s ", preMsg);
+    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %lu GB of VRAM\n",
+            device, prop.name, prop.major, prop.minor, prop.totalGlobalMem >> 30);
+}
+
 /// @brief Simple (naive) implementation of a unique device pointer
 ///        using stream ordered memory allocation and deallocation.
 /// @tparam T Type of the device pointer

@@ -8037,7 +8037,7 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
         handles1.emplace_back(nanovdb::tools::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
                                                             nanovdb::Vec3d(0), gridNames.back()));
         EXPECT_FALSE(handles1.back().isPadded());
-        size1 += handles1.back().size();
+        size1 += handles1.back().bufferSize();
     }
     EXPECT_EQ(5u, gridNames.size());
     EXPECT_EQ(5u, handles1.size());
@@ -8046,26 +8046,26 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
         gridNames.emplace_back("sphere_" + std::to_string(radius));
         handles2.emplace_back(nanovdb::tools::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
                                                             nanovdb::Vec3d(0), gridNames.back()));
-        size2 += handles2.back().size();
+        size2 += handles2.back().bufferSize();
     }
     EXPECT_EQ(10u, gridNames.size());
     EXPECT_EQ( 5u, handles2.size());
     //timer.restart("merging 5 host grids");
     auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles2);// merge last 5 grid handles
-    EXPECT_EQ(size2, mergedHandle.size());
+    EXPECT_EQ(size2, mergedHandle.bufferSize());
     EXPECT_FALSE(mergedHandle.isPadded());
     EXPECT_TRUE(mergedHandle.data());
     auto *gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(5u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
-    EXPECT_EQ(handles2[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles2[0].bufferSize(), gridData->mGridSize);
     //timer.restart("unit-test host grids");
     for (int i=0; i<5; ++i){
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
         EXPECT_EQ(i, gridData->mGridIndex);
-        EXPECT_EQ(handles2[i].size(), gridData->mGridSize);
+        EXPECT_EQ(handles2[i].bufferSize(), gridData->mGridSize);
         EXPECT_EQ(strcmp(gridNames[i+5].c_str(), gridData->mGridName),0);
     }
 
@@ -8091,27 +8091,27 @@ TEST_F(TestNanoVDB, mergeSplitGrids)
 
     //timer.restart("merging 10 host grids");
     mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles1);
-    EXPECT_EQ(size1 + size2, mergedHandle.size());
+    EXPECT_EQ(size1 + size2, mergedHandle.bufferSize());
     EXPECT_TRUE(mergedHandle.data());
     gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(10u, gridData->mGridCount);
     EXPECT_EQ( 0u, gridData->mGridIndex);
-    EXPECT_EQ(handles1[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles1[0].bufferSize(), gridData->mGridSize);
 
     //timer.restart("splitting host grids");
     auto splitHandles = nanovdb::splitGrids(mergedHandle);
     //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (int i=0; i<5; ++i){
-        EXPECT_EQ(handles1[i].size(), splitHandles[i].size());
+        EXPECT_EQ(handles1[i].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
     for (int i=5; i<10; ++i){
-        EXPECT_EQ(handles2[i-5].size(), splitHandles[i].size());
+        EXPECT_EQ(handles2[i-5].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);

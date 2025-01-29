@@ -109,6 +109,11 @@ nanovdb_example(NAME "ex_collide_level_set")
 nanovdb_example(NAME "ex_raytrace_fog_volume")
 nanovdb_example(NAME "ex_raytrace_level_set")
 
+if(CUDAToolkit_FOUND)
+  nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
+  target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+endif()
+
 if(NANOVDB_USE_MAGICAVOXEL)
   nanovdb_example(NAME "ex_vox_to_nanovdb")
 endif()
