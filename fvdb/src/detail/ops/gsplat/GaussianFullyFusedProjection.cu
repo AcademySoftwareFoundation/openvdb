@@ -139,7 +139,7 @@ fully_fused_projection_fwd_kernel(const uint32_t C, const uint32_t N,
     }
 }
 
-template <typename T>
+template <typename T, bool Ortho>
 __global__ void
 fully_fused_projection_bwd_kernel(
     // fwd inputs
@@ -161,12 +161,11 @@ fully_fused_projection_bwd_kernel(
     const T *__restrict__ v_conics,        // [C, N, 3]
     const T *__restrict__ v_compensations, // [C, N] optional
     // grad inputs
-    T *__restrict__ v_means,    // [N, 3]
-    T *__restrict__ v_covars,   // [N, 6] optional
-    T *__restrict__ v_quats,    // [N, 4] optional
-    T *__restrict__ v_scales,   // [N, 3] optional
-    T *__restrict__ v_viewmats, // [C, 4, 4] optional
-    const bool ortho) {
+    T *__restrict__ v_means,      // [N, 3]
+    T *__restrict__ v_covars,     // [N, 6] optional
+    T *__restrict__ v_quats,      // [N, 4] optional
+    T *__restrict__ v_scales,     // [N, 3] optional
+    T *__restrict__ v_viewmats) { // [C, 4, 4] optional
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N || radii[idx] <= 0) {
@@ -236,8 +235,7 @@ fully_fused_projection_bwd_kernel(
     T       fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
     mat3<T> v_covar_c(0.f);
     vec3<T> v_mean_c(0.f);
-    if (ortho) {
-        printf("BACKWARD WEIRD!~\n");
+    if constexpr (Ortho) {
         ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
                           glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
     } else {
@@ -467,22 +465,46 @@ dispatchGaussianFullyFusedProjectionBackward<torch::kCUDA>(
         v_viewmats = torch::zeros_like(viewmats);
     }
     if (C && N) {
-        fully_fused_projection_bwd_kernel<float>
-            <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                C, N, means.data_ptr<float>(),
-                covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : scales.data_ptr<float>(), viewmats.data_ptr<float>(),
-                Ks.data_ptr<float>(), image_width, image_height, eps2d, radii.data_ptr<int32_t>(),
-                conics.data_ptr<float>(),
-                compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
-                v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(), v_conics.data_ptr<float>(),
-                v_compensations.has_value() ? v_compensations.value().data_ptr<float>() : nullptr,
-                v_means.data_ptr<float>(),
-                covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
-                covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
-                covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr, ortho);
+        if (ortho) {
+            fully_fused_projection_bwd_kernel<float, true>
+                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    C, N, means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
+                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
+                    v_conics.data_ptr<float>(),
+                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
+                                                : nullptr,
+                    v_means.data_ptr<float>(),
+                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+        } else {
+            fully_fused_projection_bwd_kernel<float, false>
+                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    C, N, means.data_ptr<float>(),
+                    covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : scales.data_ptr<float>(),
+                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
+                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
+                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
+                    v_conics.data_ptr<float>(),
+                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
+                                                : nullptr,
+                    v_means.data_ptr<float>(),
+                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+        }
+
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);
