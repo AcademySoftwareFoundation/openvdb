@@ -167,7 +167,7 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     Variable v_scales   = std::get<3>(variables);
     Variable v_viewmats = std::get<4>(variables);
 
-    return { v_means,    v_quats,    v_scales,   v_viewmats, Variable(), Variable(),
+    return { v_means,    v_quats,    v_scales,   v_viewmats, Variable(), Variable(), Variable(),
              Variable(), Variable(), Variable(), Variable(), Variable(), Variable() };
 }
 
