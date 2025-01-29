@@ -313,7 +313,7 @@ class Runner:
                     image_w=image_width,
                     image_h=image_height,
                     extrinsics_mat=world_to_cam_mats,
-                    intrinsics_mats=intrinsics_mats,
+                    intrinsics_mat=intrinsics_mats,
                     rasterize_mode="classic",
                     sh_degree=sh_degree_to_use,
                     image_crop=crop,
