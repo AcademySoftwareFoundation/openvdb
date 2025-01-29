@@ -166,7 +166,7 @@ __global__ void testKernel(int device)
 {
     int dev;
     cudaError_t err = cudaGetDevice(&dev);
-    //if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
+    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
     if (dev != device) printf("Error: expected device ID = %i but was called with %i\n", dev, device);
 }
 
