@@ -228,28 +228,30 @@ persp_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, co
     const T y = mean3d[1];
     const T z = mean3d[2];
 
-    T tan_fovx  = 0.5f * width / fx;
-    T tan_fovy  = 0.5f * height / fy;
-    T lim_x_pos = (width - cx) / fx + 0.3f * tan_fovx;
-    T lim_x_neg = cx / fx + 0.3f * tan_fovx;
-    T lim_y_pos = (height - cy) / fy + 0.3f * tan_fovy;
-    T lim_y_neg = cy / fy + 0.3f * tan_fovy;
+    const T tan_fovx  = 0.5f * width / fx;
+    const T tan_fovy  = 0.5f * height / fy;
+    const T lim_x_pos = (width - cx) / fx + 0.3f * tan_fovx;
+    const T lim_x_neg = cx / fx + 0.3f * tan_fovx;
+    const T lim_y_pos = (height - cy) / fy + 0.3f * tan_fovy;
+    const T lim_y_neg = cy / fy + 0.3f * tan_fovy;
 
-    T rz  = 1.f / z;
-    T rz2 = rz * rz;
-    T tx  = z * min(lim_x_pos, max(-lim_x_neg, x * rz));
-    T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
+    const T rz  = 1.f / z;
+    const T rz2 = rz * rz;
+    const T tx  = z * min(lim_x_pos, max(-lim_x_neg, x * rz));
+    const T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
 
     // mat3x2 is 3 columns x 2 rows.
-    auto    J      = mat3x2<T>(fx * rz,
-                               0.f,           // 1st column
-                               0.f,
-                               fy * rz,       // 2nd column
-                               -fx * tx * rz2,
-                               -fy * ty * rz2 // 3rd column
-            );
-    mat2<T> cov2d  = J * cov3d * glm::transpose(J);
-    vec2<T> mean2d = vec2<T>({ fx * x * rz + cx, fy * y * rz + cy });
+    const auto J = mat3x2<T>{
+        fx * rz,
+        0.f,           // 1st column
+        0.f,
+        fy * rz,       // 2nd column
+        -fx * tx * rz2,
+        -fy * ty * rz2 // 3rd column
+    };
+
+    const mat2<T> cov2d  = J * cov3d * glm::transpose(J);
+    const vec2<T> mean2d = vec2<T>({ fx * x * rz + cx, fy * y * rz + cy });
 
     return { cov2d, mean2d };
 }
@@ -266,26 +268,27 @@ persp_proj_vjp(
     vec3<T> &v_mean3d, mat3<T> &v_cov3d) {
     T x = mean3d[0], y = mean3d[1], z = mean3d[2];
 
-    T tan_fovx  = 0.5f * width / fx;
-    T tan_fovy  = 0.5f * height / fy;
-    T lim_x_pos = (width - cx) / fx + 0.3f * tan_fovx;
-    T lim_x_neg = cx / fx + 0.3f * tan_fovx;
-    T lim_y_pos = (height - cy) / fy + 0.3f * tan_fovy;
-    T lim_y_neg = cy / fy + 0.3f * tan_fovy;
+    const T tan_fovx  = 0.5f * width / fx;
+    const T tan_fovy  = 0.5f * height / fy;
+    const T lim_x_pos = (width - cx) / fx + 0.3f * tan_fovx;
+    const T lim_x_neg = cx / fx + 0.3f * tan_fovx;
+    const T lim_y_pos = (height - cy) / fy + 0.3f * tan_fovy;
+    const T lim_y_neg = cy / fy + 0.3f * tan_fovy;
 
-    T rz  = 1.f / z;
-    T rz2 = rz * rz;
-    T tx  = z * min(lim_x_pos, max(-lim_x_neg, x * rz));
-    T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
+    const T rz  = 1.f / z;
+    const T rz2 = rz * rz;
+    const T tx  = z * min(lim_x_pos, max(-lim_x_neg, x * rz));
+    const T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
 
     // mat3x2 is 3 columns x 2 rows.
-    mat3x2<T> J = mat3x2<T>(fx * rz,
-                            0.f,           // 1st column
-                            0.f,
-                            fy * rz,       // 2nd column
-                            -fx * tx * rz2,
-                            -fy * ty * rz2 // 3rd column
-    );
+    const auto J = mat3x2<T>{
+        fx * rz,
+        0.f,           // 1st column
+        0.f,
+        fy * rz,       // 2nd column
+        -fx * tx * rz2,
+        -fy * ty * rz2 // 3rd column
+    };
 
     // cov = J * V * Jt; G = df/dcov = v_cov
     // -> df/dV = Jt * G * J
@@ -302,7 +305,7 @@ persp_proj_vjp(
     // df/dy = -fy * rz2 * df/dJ_12
     // df/dz = -fx * rz2 * df/dJ_00 - fy * rz2 * df/dJ_11
     //         + 2 * fx * tx * rz3 * df/dJ_02 + 2 * fy * ty * rz3
-    T         rz3 = rz2 * rz;
+    const T   rz3 = rz2 * rz;
     mat3x2<T> v_J = v_cov2d * J * glm::transpose(cov3d) + glm::transpose(v_cov2d) * J * cov3d;
 
     // fov clipping
@@ -324,18 +327,22 @@ template <typename T>
 inline __device__ std::tuple<mat2<T>, vec2<T>>
 ortho_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx,
            const T cy, const uint32_t width, const uint32_t height) {
-    const T x = mean3d[0], y = mean3d[1], z = mean3d[2];
+    const T x = mean3d[0];
+    const T y = mean3d[1];
+    const T z = mean3d[2];
 
     // mat3x2 is 3 columns x 2 rows.
-    const auto J      = mat3x2<T>(fx,
-                                  0.f, // 1st column
-                                  0.f,
-                                  fy,  // 2nd column
-                                  0.f,
-                                  0.f  // 3rd column
-         );
-    mat2<T>    cov2d  = J * cov3d * glm::transpose(J);
-    vec2<T>    mean2d = vec2<T>({ fx * x + cx, fy * y + cy });
+    const auto J = mat3x2<T>{
+        fx,
+        0.f, // 1st column
+        0.f,
+        fy,  // 2nd column
+        0.f,
+        0.f  // 3rd column
+    };
+
+    const mat2<T> cov2d  = J * cov3d * glm::transpose(J);
+    const vec2<T> mean2d = vec2<T>({ fx * x + cx, fy * y + cy });
 
     return { cov2d, mean2d };
 }
@@ -350,16 +357,19 @@ ortho_proj_vjp(
     const mat2<T> v_cov2d, const vec2<T> v_mean2d,
     // grad inputs
     vec3<T> &v_mean3d, mat3<T> &v_cov3d) {
-    T x = mean3d[0], y = mean3d[1], z = mean3d[2];
+    const T x = mean3d[0];
+    const T y = mean3d[1];
+    const T z = mean3d[2];
 
     // mat3x2 is 3 columns x 2 rows.
-    mat3x2<T> J = mat3x2<T>(fx,
-                            0.f, // 1st column
-                            0.f,
-                            fy,  // 2nd column
-                            0.f,
-                            0.f  // 3rd column
-    );
+    mat3x2<T> J = mat3x2<T>{
+        fx,
+        0.f, // 1st column
+        0.f,
+        fy,  // 2nd column
+        0.f,
+        0.f  // 3rd column
+    };
 
     // cov = J * V * Jt; G = df/dcov = v_cov
     // -> df/dV = Jt * G * J
