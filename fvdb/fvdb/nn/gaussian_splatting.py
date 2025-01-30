@@ -177,8 +177,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -186,12 +186,13 @@ class GaussianSplat3D(nn.Module):
         radius_clip: float = 0.0,
         tile_size: int = 16,
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
+        ortho: bool = False,
     ):
         rgbd, alphas, _ = self(
             image_w=image_w,
             image_h=image_h,
-            extrinsics_mat=extrinsics_mat,
-            intrinsics_mat=intrinsics_mat,
+            extrinsics_mats=extrinsics_mats,
+            intrinsics_mats=intrinsics_mats,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -203,6 +204,7 @@ class GaussianSplat3D(nn.Module):
             rasterize_mode=rasterize_mode,
             cache_info=False,
             depth_only=False,
+            ortho=ortho,
         )
         rgb = rgbd[..., :3]  # [B, H, W, 1]
         depth = rgbd[..., 3:4] / alphas.clamp(min=1e-10)  # [B, H, W, 1]
@@ -213,8 +215,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -222,12 +224,13 @@ class GaussianSplat3D(nn.Module):
         radius_clip: float = 0.0,
         tile_size: int = 16,
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
+        ortho: bool = False,
     ):
         depth, alphas, _ = self(
             image_w=image_w,
             image_h=image_h,
-            extrinsics_mat=extrinsics_mat,
-            intrinsics_mat=intrinsics_mat,
+            extrinsics_mats=extrinsics_mats,
+            intrinsics_mats=intrinsics_mats,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -239,6 +242,7 @@ class GaussianSplat3D(nn.Module):
             rasterize_mode=rasterize_mode,
             cache_info=False,
             depth_only=True,
+            ortho=ortho,
         )
         depth = depth / alphas.clamp(min=1e-10)  # [B, H, W, 1]
 
@@ -249,7 +253,7 @@ class GaussianSplat3D(nn.Module):
             indexing="ij",
         )
         cam_pts = torch.stack([col, row, torch.ones_like(row)])  # [3, H, W]
-        cam_pts = torch.linalg.inv(intrinsics_mat) @ cam_pts.view(3, -1)  # [B, 3, H * W]
+        cam_pts = torch.linalg.inv(intrinsics_mats) @ cam_pts.view(3, -1)  # [B, 3, H * W]
         cam_pts = cam_pts.permute(0, 2, 1).reshape(depth.shape[0], image_h, image_w, 3) * depth  # [B, H, W, 3]
 
         return depth, cam_pts
@@ -258,8 +262,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -271,6 +275,7 @@ class GaussianSplat3D(nn.Module):
         rasterize_mode: Literal["classic", "antialiased"] = "classic",
         cache_info: bool = False,
         depth_only: bool = False,
+        ortho: bool = False,
     ):
         if rasterize_mode not in ["classic", "antialiased"]:
             raise ValueError(f"Invalid rasterize_mode {rasterize_mode}")
@@ -302,8 +307,8 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     sh_coeffs=sh,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -314,6 +319,7 @@ class GaussianSplat3D(nn.Module):
                     tile_size=tile_size,
                     antialias=(rasterize_mode == "antialiased"),
                     render_depth_channel=render_depth,
+                    ortho=ortho,
                 )
             colors, alphas = render_pixels_from_precomputed_gaussian_render_state(
                 self._info_cache["means2d"],
@@ -340,8 +346,8 @@ class GaussianSplat3D(nn.Module):
                     quats=quats,
                     scales=scales,
                     opacities=opacities,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     near_plane=near_plane,
@@ -351,6 +357,7 @@ class GaussianSplat3D(nn.Module):
                     eps2d=eps_2d,
                     antialias=(rasterize_mode == "antialiased"),
                     return_debug_info=True,
+                    ortho=ortho,
                 )
             else:
                 colors, alphas, info = gaussian_render(
@@ -359,8 +366,8 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     sh_coeffs=sh,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -372,6 +379,7 @@ class GaussianSplat3D(nn.Module):
                     antialias=(rasterize_mode == "antialiased"),
                     render_depth_channel=render_depth,
                     return_debug_info=True,
+                    ortho=ortho,
                 )
 
         # if render_mode in ["ED", "RGB+ED"]:
@@ -387,7 +395,7 @@ class GaussianSplat3D(nn.Module):
         info["width"] = image_w
         info["height"] = image_h
         info["tile_size"] = tile_size
-        info["n_cameras"] = extrinsics_mat.shape[0]
+        info["n_cameras"] = extrinsics_mats.shape[0]
         info["tile_width"] = math.ceil(image_w / float(tile_size))
         info["tile_height"] = math.ceil(image_h / float(tile_size))
         info["gaussian_ids"] = None
