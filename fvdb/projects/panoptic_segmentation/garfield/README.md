@@ -34,5 +34,5 @@ This code is based on the official implementation for [GARField](https://github.
 
 4. Run fVDB 3D Gaussian Splatting on the example data
    ```bash
-   python [fVDB_root]/examples/3dgs/train_colmap.py --data ./data/dozer_nerfgun_waldo
+   python [fVDB_root]/projects/3d_gaussian_splatting/training/train_colmap.py --data ./data/dozer_nerfgun_waldo
    ```

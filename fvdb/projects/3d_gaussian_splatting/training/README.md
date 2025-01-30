@@ -5,7 +5,7 @@
 1. Setup the environment:
 
     ```bash
-    conda env create -f ../../env/learn_environment.yml
+    conda env create -f ../../../env/learn_environment.yml
     ```
 
 2. Download the example data
