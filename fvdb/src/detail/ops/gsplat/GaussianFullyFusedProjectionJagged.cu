@@ -254,17 +254,16 @@ fully_fused_projection_jagged_bwd_kernel(
     covar_world_to_cam(R, covar, covar_c);
 
     // vjp: camera projection
-    T       fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
-    mat3<T> v_covar_c(0.f);
-    vec3<T> v_mean_c(0.f);
-    if constexpr (Ortho) {
-        ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
-                          glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
-    } else {
-        persp_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height, v_covar2d,
-                          glm::make_vec2(v_means2d), v_mean_c, v_covar_c);
-    }
-
+    const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
+    auto [v_covar_c, v_mean_c] = [&]() {
+        if constexpr (Ortho) {
+            return ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height,
+                                     v_covar2d, glm::make_vec2(v_means2d));
+        } else {
+            return persp_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height,
+                                     v_covar2d, glm::make_vec2(v_means2d));
+        }
+    }();
     // add contribution from v_depths
     v_mean_c.z += v_depths[0];
 

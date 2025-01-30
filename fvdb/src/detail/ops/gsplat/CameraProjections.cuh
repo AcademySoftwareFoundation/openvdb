@@ -57,10 +57,10 @@ persp_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, co
 // matrix. The projection is defined by the camera intrinsics fx, fy, cx, cy and the image
 // dimensions width and height.
 template <typename T>
-inline __device__ void
+inline __device__ std::tuple<mat3<T>, vec3<T>>
 persp_proj_vjp(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx,
                const T cy, const uint32_t width, const uint32_t height, const mat2<T> v_cov2d,
-               const vec2<T> v_mean2d, vec3<T> &v_mean3d, mat3<T> &v_cov3d) {
+               const vec2<T> v_mean2d) {
     const T x = mean3d[0];
     const T y = mean3d[1];
     const T z = mean3d[2];
@@ -90,13 +90,13 @@ persp_proj_vjp(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy
     // cov = J * V * Jt; G = df/dcov = v_cov
     // -> df/dV = Jt * G * J
     // -> df/dJ = G * J * Vt + Gt * J * V
-    v_cov3d += glm::transpose(J) * v_cov2d * J;
+    mat3<T> v_cov3d = glm::transpose(J) * v_cov2d * J;
 
     // df/dx = fx * rz * df/dpixx
     // df/dy = fy * rz * df/dpixy
     // df/dz = - fx * mean.x * rz2 * df/dpixx - fy * mean.y * rz2 * df/dpixy
-    v_mean3d += vec3<T>(fx * rz * v_mean2d[0], fy * rz * v_mean2d[1],
-                        -(fx * x * v_mean2d[0] + fy * y * v_mean2d[1]) * rz2);
+    auto v_mean3d = vec3<T>(fx * rz * v_mean2d[0], fy * rz * v_mean2d[1],
+                            -(fx * x * v_mean2d[0] + fy * y * v_mean2d[1]) * rz2);
 
     // df/dx = -fx * rz2 * df/dJ_02
     // df/dy = -fy * rz2 * df/dJ_12
@@ -118,6 +118,8 @@ persp_proj_vjp(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy
     }
     v_mean3d.z += -fx * rz2 * v_J[0][0] - fy * rz2 * v_J[1][1] + 2.f * fx * tx * rz3 * v_J[2][0] +
                   2.f * fy * ty * rz3 * v_J[2][1];
+
+    return { v_cov3d, v_mean3d };
 }
 
 // Apply orthographic projection to a 3D Gaussian defined by it's 3D mean and 3x3 covariance matrix.
@@ -153,15 +155,10 @@ ortho_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, co
 // matrix. The projection is defined by the camera intrinsics fx, fy, cx, cy and the image
 // dimensions width and height.
 template <typename T>
-inline __device__ void
-ortho_proj_vjp(
-    // fwd inputs
-    const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx, const T cy,
-    const uint32_t width, const uint32_t height,
-    // grad outputs
-    const mat2<T> v_cov2d, const vec2<T> v_mean2d,
-    // grad inputs
-    vec3<T> &v_mean3d, mat3<T> &v_cov3d) {
+inline __device__ std::tuple<mat3<T>, vec3<T>>
+ortho_proj_vjp(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, const T cx,
+               const T cy, const uint32_t width, const uint32_t height, const mat2<T> v_cov2d,
+               const vec2<T> v_mean2d) {
     const T x = mean3d[0];
     const T y = mean3d[1];
     const T z = mean3d[2];
@@ -179,12 +176,14 @@ ortho_proj_vjp(
     // cov = J * V * Jt; G = df/dcov = v_cov
     // -> df/dV = Jt * G * J
     // -> df/dJ = G * J * Vt + Gt * J * V
-    v_cov3d += glm::transpose(J) * v_cov2d * J;
+    mat3<T> v_cov3d = glm::transpose(J) * v_cov2d * J;
 
     // df/dx = fx * df/dpixx
     // df/dy = fy * df/dpixy
     // df/dz = 0
-    v_mean3d += vec3<T>(fx * v_mean2d[0], fy * v_mean2d[1], 0.f);
+    auto v_mean3d = vec3<T>(fx * v_mean2d[0], fy * v_mean2d[1], 0.f);
+
+    return { v_cov3d, v_mean3d };
 }
 
 } // namespace ops
