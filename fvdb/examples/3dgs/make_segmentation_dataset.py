@@ -40,8 +40,8 @@ def make_segmentation_dataset(model: GaussianSplat3D, dataset: ColmapDataset, ma
         depth, cam_pts = model.render_depth_points(
             image_w=img.shape[1],
             image_h=img.shape[0],
-            extrinsics_mat=world_to_cam.unsqueeze(0),
-            intrinsics_mat=K.unsqueeze(0),
+            extrinsics_mats=world_to_cam.unsqueeze(0),
+            intrinsics_mats=K.unsqueeze(0),
             rasterize_mode="classic",
             sh_degree=0,
         )

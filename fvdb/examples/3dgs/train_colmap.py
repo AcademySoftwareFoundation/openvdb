@@ -312,8 +312,8 @@ class Runner:
                 renders, alphas, info = self.model(
                     image_w=image_width,
                     image_h=image_height,
-                    extrinsics_mat=world_to_cam_mats,
-                    intrinsics_mat=intrinsics_mats,
+                    extrinsics_mats=world_to_cam_mats,
+                    intrinsics_mats=intrinsics_mats,
                     rasterize_mode="classic",
                     sh_degree=sh_degree_to_use,
                     image_crop=crop,
@@ -404,8 +404,8 @@ class Runner:
             colors, _, _ = self.model(
                 image_w=width,
                 image_h=height,
-                extrinsics_mat=world_to_cam_mats,
-                intrinsics_mat=intrinsics_mats,
+                extrinsics_mats=world_to_cam_mats,
+                intrinsics_mats=intrinsics_mats,
                 rasterize_mode="classic",
                 sh_degree=cfg.sh_degree,
                 render_depth=False,
@@ -470,8 +470,8 @@ class Runner:
         render_colors, _, _ = self.model(
             image_w=W,
             image_h=H,
-            extrinsics_mat=c2w[None],
-            intrinsics_mat=K[None],
+            extrinsics_mats=c2w[None],
+            intrinsics_mats=K[None],
             sh_degree=self.cfg.sh_degree,
             radius_clip=3.0,
             render_depth=False,

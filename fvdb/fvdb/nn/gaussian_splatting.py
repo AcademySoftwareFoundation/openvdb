@@ -177,8 +177,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -191,8 +191,8 @@ class GaussianSplat3D(nn.Module):
         rgbd, alphas, _ = self(
             image_w=image_w,
             image_h=image_h,
-            extrinsics_mat=extrinsics_mat,
-            intrinsics_mat=intrinsics_mat,
+            extrinsics_mats=extrinsics_mats,
+            intrinsics_mats=intrinsics_mats,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -215,8 +215,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -229,8 +229,8 @@ class GaussianSplat3D(nn.Module):
         depth, alphas, _ = self(
             image_w=image_w,
             image_h=image_h,
-            extrinsics_mat=extrinsics_mat,
-            intrinsics_mat=intrinsics_mat,
+            extrinsics_mats=extrinsics_mats,
+            intrinsics_mats=intrinsics_mats,
             near_plane=near_plane,
             far_plane=far_plane,
             sh_degree=sh_degree,
@@ -253,7 +253,7 @@ class GaussianSplat3D(nn.Module):
             indexing="ij",
         )
         cam_pts = torch.stack([col, row, torch.ones_like(row)])  # [3, H, W]
-        cam_pts = torch.linalg.inv(intrinsics_mat) @ cam_pts.view(3, -1)  # [B, 3, H * W]
+        cam_pts = torch.linalg.inv(intrinsics_mats) @ cam_pts.view(3, -1)  # [B, 3, H * W]
         cam_pts = cam_pts.permute(0, 2, 1).reshape(depth.shape[0], image_h, image_w, 3) * depth  # [B, H, W, 3]
 
         return depth, cam_pts
@@ -262,8 +262,8 @@ class GaussianSplat3D(nn.Module):
         self,
         image_w: int,
         image_h: int,
-        extrinsics_mat: torch.Tensor,
-        intrinsics_mat: torch.Tensor,
+        extrinsics_mats: torch.Tensor,
+        intrinsics_mats: torch.Tensor,
         near_plane: float = 0.01,
         far_plane: float = 1e10,
         sh_degree: int = -1,
@@ -307,8 +307,8 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     sh_coeffs=sh,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -346,8 +346,8 @@ class GaussianSplat3D(nn.Module):
                     quats=quats,
                     scales=scales,
                     opacities=opacities,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     near_plane=near_plane,
@@ -366,8 +366,8 @@ class GaussianSplat3D(nn.Module):
                     scales=scales,
                     opacities=opacities,
                     sh_coeffs=sh,
-                    viewmats=extrinsics_mat,
-                    Ks=intrinsics_mat,
+                    viewmats=extrinsics_mats,
+                    Ks=intrinsics_mats,
                     image_width=image_w,
                     image_height=image_h,
                     eps2d=eps_2d,
@@ -395,7 +395,7 @@ class GaussianSplat3D(nn.Module):
         info["width"] = image_w
         info["height"] = image_h
         info["tile_size"] = tile_size
-        info["n_cameras"] = extrinsics_mat.shape[0]
+        info["n_cameras"] = extrinsics_mats.shape[0]
         info["tile_width"] = math.ceil(image_w / float(tile_size))
         info["tile_height"] = math.ceil(image_h / float(tile_size))
         info["gaussian_ids"] = None
