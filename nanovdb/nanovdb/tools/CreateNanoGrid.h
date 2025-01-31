@@ -277,12 +277,6 @@ public:
     }
 };// AbsDiff
 
-inline std::ostream& operator<<(std::ostream& os, const AbsDiff& diff)
-{
-    os << "Absolute tolerance: " << diff.getTolerance();
-    return os;
-}
-
 //================================================================================================
 
 /// @brief Compression oracle based on relative difference
@@ -306,12 +300,6 @@ public:
         return  math::Abs(exact - approx)/math::Max(math::Abs(exact), math::Abs(approx)) <= mTolerance;
     }
 };// RelDiff
-
-inline std::ostream& operator<<(std::ostream& os, const RelDiff& diff)
-{
-    os << "Relative tolerance: " << diff.getTolerance();
-    return os;
-}
 
 //================================================================================================
 
@@ -2132,5 +2120,17 @@ openToIndexVDB(const openvdb::GridBase::Ptr& base,
 }// namespace tools ===============================================================================
 
 } // namespace nanovdb
+
+inline std::ostream& operator<<(std::ostream& os, const nanovdb::tools::AbsDiff& diff)
+{
+    os << "Absolute tolerance: " << diff.getTolerance();
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const nanovdb::tools::RelDiff& diff)
+{
+    os << "Relative tolerance: " << diff.getTolerance();
+    return os;
+}
 
 #endif // NANOVDB_TOOLS_CREATENANOGRID_H_HAS_BEEN_INCLUDED
