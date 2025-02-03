@@ -65,6 +65,10 @@ function(ConfigureTest CMAKE_TEST_NAME)
     COMMENT "Adding ${CMAKE_TEST_NAME}"
   )
 
+  target_compile_options(${CMAKE_TEST_NAME} PRIVATE
+    $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CUDA>>:-G -Xcompiler=-O0>
+    $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CXX>>:-O0>)
+
   install(
     TARGETS ${CMAKE_TEST_NAME}
     COMPONENT testing
@@ -77,3 +81,7 @@ enable_testing()
 
 # Configure an example test
 ConfigureTest(ExampleTest "ExampleTest.cpp")
+
+
+# Configure unit tests
+ConfigureTest(GaussianSplattingTest "GaussianSplattingTest.cpp")

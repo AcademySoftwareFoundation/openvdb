@@ -13,6 +13,7 @@ from typing import List, Tuple
 
 import git
 import git.repo
+import psutil
 import requests
 from git.exc import GitCommandError, InvalidGitRepositoryError
 from setuptools import setup
@@ -275,10 +276,18 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
 
 
 if __name__ == "__main__":
+    # Set MAX_JOBS to control the number of parallel jobs for building based on available RAM, if not already set
+    if "MAX_JOBS" not in os.environ:
+        # 2.5 GB per job
+        os.environ["MAX_JOBS"] = str(int(psutil.virtual_memory().free / 1024**3 / 2.5))
+
     # Set CUDA_INC_PATH from the appropriate conda target cross-compilation platform directory
     # NOTE: This strategy will potentially have to change when compiling for different platforms but by then we will likely not be using setuptools…
     target_platform_include_dir = (
-        Path(os.getenv("CONDA_PREFIX")) / "targets" / f"{platform.machine()}-{platform.system().lower()}" / "include"
+        Path(os.getenv("CONDA_PREFIX", ""))
+        / "targets"
+        / f"{platform.machine()}-{platform.system().lower()}"
+        / "include"
     )
     # The cuda-toolkit headers (and other '-dev' package headers) from the packages on the `conda-forge` channel are installed in the `targets` directory
     #   which is to support cross-compilation for different platforms. The headers are installed in the appropriate target platform directory.

@@ -25,6 +25,7 @@ dependencies:
   - ninja
   - numpy<2
   - openssl
+  - psutil
   - pybind11
   - python=3.11
   - pytorch-gpu=2.4.1[build=cuda120*]
