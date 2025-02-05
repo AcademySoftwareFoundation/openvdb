@@ -624,17 +624,18 @@ Pow(double b, double e)
 
 namespace internal {
 
-inline const math::half&
-max_impl(const math::half& a, const math::half& b)
-{
-    return a > b ? a : b;
-}
-
 template<typename Type>
 inline const Type&
 max_impl(const Type& a, const Type& b)
 {
     return std::max(a,b);
+}
+
+template<>
+inline const math::half&
+max_impl(const math::half& a, const math::half& b)
+{
+    return a > b ? a : b;
 }
 
 } // namespace internal
@@ -702,17 +703,18 @@ Max(const Type& a, const Type& b, const Type& c, const Type& d,
 
 namespace internal {
 
-inline const math::half&
-min_impl(const math::half& a, const math::half& b)
-{
-    return a < b ? a : b;
-}
-
 template<typename Type>
 inline const Type&
 min_impl(const Type& a, const Type& b)
 {
     return std::min(a,b);
+}
+
+template<>
+inline const math::half&
+min_impl(const math::half& a, const math::half& b)
+{
+    return a < b ? a : b;
 }
 
 } // namespace internal
