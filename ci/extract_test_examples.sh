@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 #################################################################################
 # This script extracts all code blocks from AX documentation which are NOT      #
 # marked as cpp/sh/unparsed and attempts to parse or compile them through the   #

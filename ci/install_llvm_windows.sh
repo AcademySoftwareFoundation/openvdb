@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 set -ex
 
 LLVM_CRT="$1"
 
-git clone -b llvmorg-12.0.0 --depth 1 https://github.com/llvm/llvm-project.git llvm
+git clone -b llvmorg-14.0.0 --depth 1 https://github.com/llvm/llvm-project.git llvm
 cd llvm
 
 mkdir .build

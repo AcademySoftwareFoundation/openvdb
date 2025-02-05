@@ -10,8 +10,8 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
-| **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
-| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, abc or vdb file |
+| **read** | Read mesh, points and level sets as obj, ply, abc, stl, off, pts, vdb or nvdb files |
+| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, off, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a polygon mesh to a narrow-band level set |
 | **points2ls** | Convert points into a narrow-band level set |
@@ -59,9 +59,10 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | Extension | Actions | Description |
 |-------|-------|-------|
 | vdb | read and write | OpenVDB sparse volume files with float, Vec3f and points |
-| obj | read and write | ASCII OBJ mesh files with triangle, quad or points |
-| ply | read and write | Binary and ASCII PLY mesh files with triangle, quad or points |
+| obj | read and write | ASCII OBJ mesh files with triangles, quads or points |
+| ply | read and write | Binary and ASCII PLY mesh files with triangles, quads or points |
 | stl | read and write | Binary STL mesh files with triangles |
+| off | read and write | ASCI OFF mesh files with triangles, quads or points |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read and write | Alembic binary mesh files |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
@@ -73,7 +74,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 
 # Terminology
 
-We introduce terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
+We introduce the following terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
 
 Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of any option associated with the action "erode".
 
@@ -88,7 +89,7 @@ This tool supports its own light-weight stack-oriented programming language that
 This tool is using CMake for build on Linux and Windows.
 The only mandatory dependency of is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
 
-The included unit test are using Gtest. Add `-DBUILD_TEST=ON` to the cmake command line to build it.
+The included unit test are using Gtest. Add `-DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON` to the cmake command line to build it.
 
 ## Building OpenVDB
 
@@ -102,7 +103,7 @@ To generate the makefile, navigate to the cloned directory of vdb_tool, then fol
 ```bash
 mkdir build
 cd build
-cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DBUILD_TEST=ON ..
+cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON ..
 ```
 Update the OpenVDB cmake path above as needed.
 

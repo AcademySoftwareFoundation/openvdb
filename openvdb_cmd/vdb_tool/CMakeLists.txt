@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.18)
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+cmake_minimum_required(VERSION 3.20)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -26,7 +28,7 @@ list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
 add_library(vdb_tool_common INTERFACE)
 
 # Optional components
-option(BUILD_TEST "Build unit tests" OFF)
+option(OPENVDB_BUILD_VDB_TOOL_UNITTESTS "Build unit tests" OFF)
 
 option(OPENVDB_TOOL_USE_NANO "Compile with NanoVDB support" OFF)
 option(OPENVDB_TOOL_NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
@@ -34,6 +36,7 @@ option(OPENVDB_TOOL_NANO_USE_BLOSC "Compile NanoVDB with Blosc compression suppo
 option(OPENVDB_TOOL_USE_PNG "Compile with PNG support" OFF)
 option(OPENVDB_TOOL_USE_EXR "Compile with EXR support" OFF)
 option(OPENVDB_TOOL_USE_JPG "Compile with JPG support" OFF)
+option(OPENVDB_TOOL_USE_PDAL "Compile with extended points support" OFF)
 option(OPENVDB_TOOL_USE_ABC "Compile with Alembic support" OFF)
 option(OPENVDB_TOOL_USE_ALL "Compile with all optional components" OFF)
 if(OPENVDB_TOOL_USE_ALL)
@@ -42,18 +45,20 @@ if(OPENVDB_TOOL_USE_ALL)
   set(OPENVDB_TOOL_USE_EXR ON)
   set(OPENVDB_TOOL_USE_JPG ON)
   set(OPENVDB_TOOL_USE_ABC ON)
+  set(OPENVDB_TOOL_USE_PDAL ON)
+
 endif()
 
 if(OPENVDB_TOOL_USE_NANO)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_NANO")
   if(OPENVDB_TOOL_NANO_USE_ZIP)
     target_compile_definitions(vdb_tool_common INTERFACE "NANOVDB_USE_ZIP")
-    find_package(ZLIB REQUIRED)
+    find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
     target_link_libraries(vdb_tool_common INTERFACE ZLIB::ZLIB)
   endif()
   if(OPENVDB_TOOL_NANO_USE_BLOSC)
     target_compile_definitions(vdb_tool_common INTERFACE "NANOVDB_USE_BLOSC")
-    find_package(Blosc REQUIRED)
+    find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
     target_link_libraries(vdb_tool_common INTERFACE blosc)
   endif()
   #target_include_directories(vdb_tool_common INTERFACE ${PROJECT_SOURCE_DIR}/../nanovdb/)
@@ -83,6 +88,18 @@ if(OPENVDB_TOOL_USE_PNG)
   target_link_libraries(vdb_tool_common INTERFACE png)
 endif()
 
+if(OPENVDB_TOOL_USE_PDAL)
+  target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_PDAL")
+  if(WIN32)
+    find_package(libdpal CONFIG REQUIRED)
+  else()
+    find_package(PDAL REQUIRED)
+  endif()
+  message(STATUS "PDAL: ${PDAL_LIBRARIES} ${PDAL_INCLUDE_DIRS}")
+  target_link_libraries(vdb_tool_common INTERFACE ${PDAL_LIBRARIES})
+  target_include_directories(vdb_tool_common INTERFACE ${PDAL_INCLUDE_DIRS})
+endif()
+
 if(OPENVDB_TOOL_USE_JPG)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_JPG")
   find_package(JPEG REQUIRED)
@@ -92,7 +109,7 @@ endif()
 
 if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
-  find_package(OpenEXR REQUIRED)
+  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf)
 endif()
 
@@ -166,14 +183,15 @@ target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${
 add_executable(vdb_tool src/main.cpp)
 target_include_directories(vdb_tool PRIVATE vdb_tool_common)
 target_link_libraries(vdb_tool PRIVATE vdb_tool_common)
-install(TARGETS vdb_tool RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 
 
 # unit test
-if(BUILD_TEST)
-  find_package(GTest CONFIG REQUIRED)
+if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
+  find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
 
   add_executable(vdb_tool_test src/unittest.cpp)
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
+  add_test(vdb_tool_unit_test vdb_tool_test)
 endif()

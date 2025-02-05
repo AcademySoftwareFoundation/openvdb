@@ -357,10 +357,10 @@ struct PopulateDelayedLoadMetadataOp
         using MaskT = typename LeafT::NodeMaskType;
 
         const TreeT& tree = grid.constTree();
-        const Index32 leafCount = tree.leafCount();
+        const Index64 leafCount = tree.leafCount();
 
         // early exit if not leaf nodes
-        if (leafCount == Index32(0))    return;
+        if (leafCount == Index64(0))    return;
 
         metadata.resizeMask(leafCount);
 

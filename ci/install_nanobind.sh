@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 set -ex
 
@@ -25,4 +27,4 @@ cmake \
     ..
 
 make -j8
-make install
+sudo make install

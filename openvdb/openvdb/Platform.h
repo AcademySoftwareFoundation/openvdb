@@ -211,16 +211,10 @@
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END
 #elif defined __GNUC__
     // -Wfloat-conversion was only introduced in GCC 4.9
-    #if OPENVDB_CHECK_GCC(4, 9)
-        #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
-            _Pragma("GCC diagnostic push") \
-            _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
-            _Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"")
-    #else
-        #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
-            _Pragma("GCC diagnostic push") \
-            _Pragma("GCC diagnostic ignored \"-Wconversion\"")
-    #endif
+    #define OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN \
+        _Pragma("GCC diagnostic push") \
+        _Pragma("GCC diagnostic ignored \"-Wconversion\"") \
+        _Pragma("GCC diagnostic ignored \"-Wfloat-conversion\"")
     #define OPENVDB_NO_TYPE_CONVERSION_WARNING_END \
         _Pragma("GCC diagnostic pop")
 #else

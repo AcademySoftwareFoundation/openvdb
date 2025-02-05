@@ -70,18 +70,14 @@ jobs:
           - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'clang++', build: 'Debug',   cmake: '' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
       fail-fast: false
     steps:
-      - name: Enable Node 16
-        if: contains(matrix.config.image, '2022')
-        run: |
-          echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
       - uses: actions/checkout@v3
       - name: nanobind
         #if: contains(matrix.config.image, '2023') == false
         run: ./ci/install_nanobind.sh 2.0.0
+      - name: install_gtest
+        run: ./ci/install_gtest.sh 1.15.2
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -126,9 +122,8 @@ jobs:
     strategy:
       matrix:
         config:
-          #@note llvm10 never got its own brew formula...
-          # Last macos runner befor M1 (macos-14)
-          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '12' }
+          # Last macos runner before M1 (macos-14)
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '15' }
           - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
@@ -159,13 +154,13 @@ jobs:
       github.event.inputs.type == 'grammar'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2022-clang11
+      image: aswf/ci-openvdb:2023-clang15
     steps:
     - uses: actions/checkout@v3
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ax_grammar
         path: ./build/openvdb_ax/openvdb_ax/openvdb_ax/grammar

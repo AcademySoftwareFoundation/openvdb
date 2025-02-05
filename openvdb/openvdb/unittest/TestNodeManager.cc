@@ -294,8 +294,8 @@ TEST_F(TestNodeManager, testDynamic)
         std::make_unique<Internal1NodeType>(Coord(0, 0, 0), /*value=*/1.0f);
 
     EXPECT_TRUE(sourceTree.root().addChild(child.release()));
-    EXPECT_EQ(Index32(0), sourceTree.leafCount());
-    EXPECT_EQ(Index32(2), sourceTree.nonLeafCount());
+    EXPECT_EQ(Index64(0), sourceTree.leafCount());
+    EXPECT_EQ(Index64(2), sourceTree.nonLeafCount());
 
     ExpandOp<Int32Tree> expandOp;
 
@@ -304,7 +304,7 @@ TEST_F(TestNodeManager, testDynamic)
         openvdb::tree::NodeManager<Int32Tree> manager(tree);
         EXPECT_EQ(Index64(1), manager.nodeCount());
         manager.foreachTopDown(expandOp);
-        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
 
         // first level has been expanded, but node manager cache does not include the new nodes
         SumOp<Int32Tree> sumOp;
@@ -324,7 +324,7 @@ TEST_F(TestNodeManager, testDynamic)
         Int32Tree tree(sourceTree);
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
         manager.foreachTopDown(expandOp, /*threaded=*/true, /*leafGrainSize=*/32, /*nonLeafGrainSize=*/8);
-        EXPECT_EQ(Index32(32768), tree.leafCount());
+        EXPECT_EQ(Index64(32768), tree.leafCount());
 
         SumOp<Int32Tree> sumOp;
         manager.reduceTopDown(sumOp);
@@ -340,7 +340,7 @@ TEST_F(TestNodeManager, testDynamic)
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
         ExpandOp<Int32Tree> zeroExpandOp(true);
         manager.foreachTopDown(zeroExpandOp);
-        EXPECT_EQ(Index32(32768), tree.leafCount());
+        EXPECT_EQ(Index64(32768), tree.leafCount());
 
         SumOp<Int32Tree> sumOp;
         manager.reduceTopDown(sumOp);

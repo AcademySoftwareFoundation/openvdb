@@ -1,4 +1,6 @@
-# /usr/bin/env python
+#!/usr/bin/env python
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 import nanovdb
 import unittest

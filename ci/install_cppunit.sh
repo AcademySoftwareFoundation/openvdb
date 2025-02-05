@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 set -ex
 CURL_VERSION="$1"

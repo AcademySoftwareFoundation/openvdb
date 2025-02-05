@@ -1,3 +1,0 @@
-OpenVDB:
-  Improvements:
-    - ValueAccessors are now defined and created in the Tree class instead of in the Grid class so that custom Tree implementations may define and create their own ValueAccessors if desired.

@@ -1343,15 +1343,15 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.addTile(1, xyz, true, true); // leaf level tile
         tree1.touchLeaf(xyz)->setValueOn(0); // single leaf
         tree0.topologyUnion(tree1, true); // single tile
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(LeafT::NUM_VOXELS), tree0.activeVoxelCount());
 
         tree1.addTile(1, xyz + openvdb::Coord(8), true, true); // leaf + tile
         tree0.topologyUnion(tree1, true); // two tiles
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(2), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(LeafT::NUM_VOXELS*2), tree0.activeVoxelCount());
 
@@ -1359,8 +1359,8 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.clear();
         tree0.addTile(2, xyz, true, true);
         tree0.topologyUnion(tree1, true); // all topology in tree1 is already active. no change
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(2), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(2), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(InternalT1::NUM_VOXELS), tree0.activeVoxelCount());
 
@@ -1368,8 +1368,8 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.clear();
         tree0.addTile(3, xyz, true, true);
         tree0.topologyUnion(tree1, true);
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(1), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(1), tree0.nonLeafCount());
         EXPECT_EQ(openvdb::Index64(1), tree0.activeTileCount());
         EXPECT_EQ(openvdb::Index64(InternalT2::NUM_VOXELS), tree0.activeVoxelCount());
 
@@ -1379,8 +1379,8 @@ TEST_F(TestTree, testTopologyUnion)
         tree0.addTile(1, xyz, true, true);
         tree1.addTile(2, xyz, true, true);
         tree0.topologyUnion(tree1, true);
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.nonLeafCount());
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(3), tree0.nonLeafCount());
         openvdb::Index64 tiles = openvdb::Index64(InternalT1::DIM) / InternalT1::getChildDim();
         tiles = tiles * tiles * tiles;
         EXPECT_EQ(tiles, tree0.activeTileCount());
@@ -1429,22 +1429,22 @@ TEST_F(TestTree, testTopologyIntersection)
         tree0.setValue(openvdb::Coord( 400,  30,  20), 2.0f);
         tree0.setValue(openvdb::Coord(   8,  11,  11), 3.0f);
         EXPECT_EQ(openvdb::Index64(3), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree0.leafCount() );
 
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord(   8,  11,  11), 6.0f);
         EXPECT_EQ(openvdb::Index64(3), tree1.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree1.leafCount() );
 
         tree1.topologyIntersection(tree0);
 
-        EXPECT_EQ( openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(3), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(2), tree1.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
         openvdb::tools::pruneInactive(tree1);
         EXPECT_TRUE(!tree1.empty());
-        EXPECT_EQ( openvdb::Index32(2), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(2), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(2), tree1.activeVoxelCount() );
     }
     {//passive tile
@@ -1453,17 +1453,17 @@ TEST_F(TestTree, testTopologyIntersection)
         openvdb::FloatTree tree0(background), tree1(background);
         tree0.fill(openvdb::CoordBBox(openvdb::Coord(0),openvdb::Coord(dim-1)),2.0f, false);
         EXPECT_EQ(openvdb::Index64(0), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount() );
 
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
-        EXPECT_EQ(openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree1.leafCount() );
         EXPECT_EQ(openvdb::Index64(3), tree1.activeVoxelCount());
 
         tree1.topologyIntersection(tree0);
 
-        EXPECT_EQ( openvdb::Index32(0), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(0), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(0), tree1.activeVoxelCount() );
         EXPECT_TRUE(tree1.empty());
     }
@@ -1473,17 +1473,17 @@ TEST_F(TestTree, testTopologyIntersection)
         openvdb::FloatTree tree0(background), tree1(background);
         tree1.fill(openvdb::CoordBBox(openvdb::Coord(0),openvdb::Coord(dim-1)),2.0f, true);
         EXPECT_EQ(dim*dim*dim, tree1.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(0), tree1.leafCount() );
+        EXPECT_EQ(openvdb::Index64(0), tree1.leafCount() );
 
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         EXPECT_EQ(openvdb::Index64(3), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree0.leafCount() );
 
         tree1.topologyIntersection(tree0);
 
-        EXPECT_EQ( openvdb::Index32(2), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(2), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(2), tree1.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
         openvdb::tools::pruneInactive(tree1);
@@ -1522,10 +1522,10 @@ TEST_F(TestTree, testTopologyIntersection)
             tree3.setValue(iter.getCoord(), vec_val);
         }
 
-        EXPECT_EQ(openvdb::Index32(4), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(4), tree1.leafCount());
-        EXPECT_EQ(openvdb::Index32(7), tree2.leafCount());
-        EXPECT_EQ(openvdb::Index32(7), tree3.leafCount());
+        EXPECT_EQ(openvdb::Index64(4), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(4), tree1.leafCount());
+        EXPECT_EQ(openvdb::Index64(7), tree2.leafCount());
+        EXPECT_EQ(openvdb::Index64(7), tree3.leafCount());
 
 
         //tree1.topologyInterection(tree2);//should make tree1 = tree0
@@ -1673,22 +1673,22 @@ TEST_F(TestTree, testTopologyDifference)
         tree0.setValue(openvdb::Coord( 400,  30,  20), 2.0f);
         tree0.setValue(openvdb::Coord(   8,  11,  11), 3.0f);
         EXPECT_EQ(openvdb::Index64(3), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree0.leafCount() );
 
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord(   8,  11,  11), 6.0f);
         EXPECT_EQ(openvdb::Index64(3), tree1.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree1.leafCount() );
 
         tree1.topologyDifference(tree0);
 
-        EXPECT_EQ( openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(3), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(1), tree1.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
         openvdb::tools::pruneInactive(tree1);
         EXPECT_TRUE(!tree1.empty());
-        EXPECT_EQ( openvdb::Index32(1), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(1), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(1), tree1.activeVoxelCount() );
     }
     {//passive tile
@@ -1699,22 +1699,22 @@ TEST_F(TestTree, testTopologyDifference)
         EXPECT_EQ(openvdb::Index64(0), tree0.activeVoxelCount());
         EXPECT_TRUE(!tree0.hasActiveTiles());
         EXPECT_EQ(openvdb::Index64(0), tree0.root().onTileCount());
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount() );
 
         tree1.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree1.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree1.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         EXPECT_EQ(openvdb::Index64(3), tree1.activeVoxelCount());
         EXPECT_TRUE(!tree1.hasActiveTiles());
-        EXPECT_EQ(openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree1.leafCount() );
 
         tree1.topologyDifference(tree0);
 
-        EXPECT_EQ( openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(3), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(3), tree1.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
         openvdb::tools::pruneInactive(tree1);
-        EXPECT_EQ( openvdb::Index32(3), tree1.leafCount() );
+        EXPECT_EQ( openvdb::Index64(3), tree1.leafCount() );
         EXPECT_EQ( openvdb::Index64(3), tree1.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
     }
@@ -1726,14 +1726,14 @@ TEST_F(TestTree, testTopologyDifference)
         EXPECT_EQ(dim*dim*dim, tree1.activeVoxelCount());
         EXPECT_TRUE(tree1.hasActiveTiles());
         EXPECT_EQ(openvdb::Index64(1), tree1.root().onTileCount());
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount() );
 
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( int(dim),  11,  11), 6.0f);
         EXPECT_TRUE(!tree0.hasActiveTiles());
         EXPECT_EQ(openvdb::Index64(3), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree0.leafCount() );
         EXPECT_TRUE( tree0.isValueOn(openvdb::Coord( int(dim),  11,  11)));
         EXPECT_TRUE(!tree1.isValueOn(openvdb::Coord( int(dim),  11,  11)));
 
@@ -1754,22 +1754,22 @@ TEST_F(TestTree, testTopologyDifference)
         EXPECT_EQ(dim*dim*dim, tree1.activeVoxelCount());
         EXPECT_TRUE(tree1.hasActiveTiles());
         EXPECT_EQ(openvdb::Index64(1), tree1.root().onTileCount());
-        EXPECT_EQ(openvdb::Index32(0), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(0), tree0.leafCount() );
 
         tree0.setValue(openvdb::Coord( 500, 301, 200), 4.0f);
         tree0.setValue(openvdb::Coord( 400,  30,  20), 5.0f);
         tree0.setValue(openvdb::Coord( dim,  11,  11), 6.0f);
         EXPECT_TRUE(!tree0.hasActiveTiles());
         EXPECT_EQ(openvdb::Index64(3), tree0.activeVoxelCount());
-        EXPECT_EQ(openvdb::Index32(3), tree0.leafCount() );
+        EXPECT_EQ(openvdb::Index64(3), tree0.leafCount() );
 
         tree0.topologyDifference(tree1);
 
-        EXPECT_EQ( openvdb::Index32(1), tree0.leafCount() );
+        EXPECT_EQ( openvdb::Index64(1), tree0.leafCount() );
         EXPECT_EQ( openvdb::Index64(1), tree0.activeVoxelCount() );
         EXPECT_TRUE(!tree0.empty());
         openvdb::tools::pruneInactive(tree0);
-        EXPECT_EQ( openvdb::Index32(1), tree0.leafCount() );
+        EXPECT_EQ( openvdb::Index64(1), tree0.leafCount() );
         EXPECT_EQ( openvdb::Index64(1), tree0.activeVoxelCount() );
         EXPECT_TRUE(!tree1.empty());
     }
@@ -1806,10 +1806,10 @@ TEST_F(TestTree, testTopologyDifference)
             tree3.setValue(iter.getCoord(), vec_val);
         }
 
-        EXPECT_EQ(openvdb::Index32(4), tree0.leafCount());
-        EXPECT_EQ(openvdb::Index32(4), tree1.leafCount());
-        EXPECT_EQ(openvdb::Index32(7), tree2.leafCount());
-        EXPECT_EQ(openvdb::Index32(7), tree3.leafCount());
+        EXPECT_EQ(openvdb::Index64(4), tree0.leafCount());
+        EXPECT_EQ(openvdb::Index64(4), tree1.leafCount());
+        EXPECT_EQ(openvdb::Index64(7), tree2.leafCount());
+        EXPECT_EQ(openvdb::Index64(7), tree3.leafCount());
 
 
         //tree1.topologyInterection(tree2);//should make tree1 = tree0
@@ -2094,16 +2094,16 @@ TEST_F(TestTree, testPruneInactive)
     tree.setValue(Coord( 5, 10,-20), 0.3f);
     // Verify that the tree has the expected numbers of active voxels and leaf nodes.
     EXPECT_EQ(Index64(8), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(8), tree.leafCount());
+    EXPECT_EQ(Index64(8), tree.leafCount());
 
     // Verify that prune() has no effect, since the values are all different.
     openvdb::tools::prune(tree);
     EXPECT_EQ(Index64(8), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(8), tree.leafCount());
+    EXPECT_EQ(Index64(8), tree.leafCount());
     // Verify that pruneInactive() has no effect, since the values are active.
     openvdb::tools::pruneInactive(tree);
     EXPECT_EQ(Index64(8), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(8), tree.leafCount());
+    EXPECT_EQ(Index64(8), tree.leafCount());
 
     // Make some of the active values inactive, without changing their values.
     tree.setValueOff(Coord(-5, 10, 20));
@@ -2111,15 +2111,15 @@ TEST_F(TestTree, testPruneInactive)
     tree.setValueOff(Coord(-5, 10,-20));
     tree.setValueOff(Coord(-5,-10,-20));
     EXPECT_EQ(Index64(4), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(8), tree.leafCount());
+    EXPECT_EQ(Index64(8), tree.leafCount());
     // Verify that prune() has no effect, since the values are still different.
     openvdb::tools::prune(tree);
     EXPECT_EQ(Index64(4), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(8), tree.leafCount());
+    EXPECT_EQ(Index64(8), tree.leafCount());
     // Verify that pruneInactive() prunes the nodes containing only inactive voxels.
     openvdb::tools::pruneInactive(tree);
     EXPECT_EQ(Index64(4), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(4), tree.leafCount());
+    EXPECT_EQ(Index64(4), tree.leafCount());
 
     // Make all of the active values inactive, without changing their values.
     tree.setValueOff(Coord( 5, 10, 20));
@@ -2127,11 +2127,11 @@ TEST_F(TestTree, testPruneInactive)
     tree.setValueOff(Coord( 5,-10,-20));
     tree.setValueOff(Coord( 5, 10,-20));
     EXPECT_EQ(Index64(0), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(4), tree.leafCount());
+    EXPECT_EQ(Index64(4), tree.leafCount());
     // Verify that prune() has no effect, since the values are still different.
     openvdb::tools::prune(tree);
     EXPECT_EQ(Index64(0), tree.activeVoxelCount());
-    EXPECT_EQ(Index32(4), tree.leafCount());
+    EXPECT_EQ(Index64(4), tree.leafCount());
     // Verify that pruneInactive() prunes all of the remaining leaf nodes.
     openvdb::tools::pruneInactive(tree);
     EXPECT_TRUE(tree.empty());
@@ -2158,7 +2158,7 @@ TEST_F(TestTree, testPruneLevelSet)
         }
     }
 
-    const openvdb::Index32 leafCount = tree.leafCount();
+    const openvdb::Index64 leafCount = tree.leafCount();
     EXPECT_EQ(tree.activeVoxelCount(), count);
     EXPECT_EQ(tree.activeLeafVoxelCount(), count);
 
@@ -2646,6 +2646,7 @@ TEST_F(TestTree, testStealNodes)
 TEST_F(TestTree, testStealNode)
 {
     using openvdb::Index;
+    using openvdb::Index64;
     using openvdb::FloatTree;
 
     const float background=0.0f, value = 5.6f, epsilon=0.000001f;
@@ -2656,19 +2657,19 @@ TEST_F(TestTree, testStealNode)
         EXPECT_EQ(Index(0), NodeT::getLevel());
 
         FloatTree tree(background);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
-        EXPECT_EQ(Index(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         EXPECT_TRUE(tree.isValueOn(xyz));
         EXPECT_NEAR(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         EXPECT_TRUE(node != nullptr);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
@@ -2681,19 +2682,19 @@ TEST_F(TestTree, testStealNode)
         EXPECT_EQ(Index(1), NodeT::getLevel());
 
         FloatTree tree(background);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
-        EXPECT_EQ(Index(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         EXPECT_TRUE(tree.isValueOn(xyz));
         EXPECT_NEAR(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         EXPECT_TRUE(node != nullptr);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
@@ -2706,19 +2707,19 @@ TEST_F(TestTree, testStealNode)
         EXPECT_EQ(Index(2), NodeT::getLevel());
 
         FloatTree tree(background);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
 
         tree.setValue(xyz, value);
-        EXPECT_EQ(Index(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         EXPECT_TRUE(tree.isValueOn(xyz));
         EXPECT_NEAR(value, tree.getValue(xyz), epsilon);
 
         NodeT* node = tree.root().stealNode<NodeT>(xyz, background, false);
         EXPECT_TRUE(node != nullptr);
-        EXPECT_EQ(Index(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_TRUE(!tree.isValueOn(xyz));
         EXPECT_NEAR(background, tree.getValue(xyz), epsilon);
         EXPECT_TRUE(tree.root().stealNode<NodeT>(xyz, value, false) == nullptr);
@@ -2743,7 +2744,7 @@ TEST_F(TestTree, testNodeCount)
 
     std::vector<openvdb::Index> dims;
     tree.getNodeLog2Dims(dims);
-    std::vector<openvdb::Index32> nodeCount1(dims.size());
+    std::vector<openvdb::Index64> nodeCount1(dims.size());
     //timer.start("Old technique");// use for benchmark test
     for (auto it = tree.cbeginNode(); it; ++it) ++(nodeCount1[dims.size()-1-it.getDepth()]);
     //timer.restart("New technique");// use for benchmark test
@@ -2754,205 +2755,4 @@ TEST_F(TestTree, testNodeCount)
     EXPECT_EQ(1U, nodeCount2.back());// one root node
     EXPECT_EQ(tree.leafCount(), nodeCount2.front());// leaf nodes
     for (size_t i=0; i<nodeCount2.size(); ++i) EXPECT_EQ( nodeCount1[i], nodeCount2[i]);
-}
-
-TEST_F(TestTree, testRootNode)
-{
-    using ChildType = RootNodeType::ChildNodeType;
-    const openvdb::Coord c0(0,0,0), c1(49152, 16384, 28672);
-
-    { // test inserting child nodes directly and indirectly
-        RootNodeType root(0.0f);
-        EXPECT_TRUE(root.empty());
-        EXPECT_EQ(openvdb::Index32(0), root.childCount());
-
-        // populate the tree by inserting the two leaf nodes containing c0 and c1
-        root.touchLeaf(c0);
-        root.touchLeaf(c1);
-        EXPECT_EQ(openvdb::Index(2), root.getTableSize());
-        EXPECT_EQ(openvdb::Index32(2), root.childCount());
-        EXPECT_TRUE(!root.hasActiveTiles());
-
-        { // verify c0 and c1 are the root node coordinates
-            auto rootIter = root.cbeginChildOn();
-            EXPECT_EQ(c0, rootIter.getCoord());
-            ++rootIter;
-            EXPECT_EQ(c1, rootIter.getCoord());
-        }
-
-        // copy the root node
-        RootNodeType rootCopy(root);
-
-        // steal the root node children leaving the root node empty again
-        std::vector<ChildType*> children;
-        root.stealNodes(children);
-        EXPECT_TRUE(root.empty());
-
-        // insert the root node children directly
-        for (ChildType* child : children) {
-            root.addChild(child);
-        }
-        EXPECT_EQ(openvdb::Index(2), root.getTableSize());
-        EXPECT_EQ(openvdb::Index32(2), root.childCount());
-
-        { // verify the coordinates of the root node children
-            auto rootIter = root.cbeginChildOn();
-            EXPECT_EQ(c0, rootIter.getCoord());
-            ++rootIter;
-            EXPECT_EQ(c1, rootIter.getCoord());
-        }
-    }
-
-    { // test inserting tiles and replacing them with child nodes
-        RootNodeType root(0.0f);
-        EXPECT_TRUE(root.empty());
-
-        // no-op
-        root.addChild(nullptr);
-
-        // populate the root node by inserting tiles
-        root.addTile(c0, /*value=*/1.0f, /*state=*/true);
-        root.addTile(c1, /*value=*/2.0f, /*state=*/true);
-        EXPECT_EQ(openvdb::Index(2), root.getTableSize());
-        EXPECT_EQ(openvdb::Index32(0), root.childCount());
-        EXPECT_TRUE(root.hasActiveTiles());
-        ASSERT_DOUBLES_EXACTLY_EQUAL(1.0f, root.getValue(c0));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(2.0f, root.getValue(c1));
-
-        // insert child nodes with the same coordinates
-        root.addChild(new ChildType(c0, 3.0f));
-        root.addChild(new ChildType(c1, 4.0f));
-
-        // insert a new child at c0
-        root.addChild(new ChildType(c0, 5.0f));
-
-        // verify active tiles have been replaced by child nodes
-        EXPECT_EQ(openvdb::Index(2), root.getTableSize());
-        EXPECT_EQ(openvdb::Index32(2), root.childCount());
-        EXPECT_TRUE(!root.hasActiveTiles());
-
-        { // verify the coordinates of the root node children
-            auto rootIter = root.cbeginChildOn();
-            EXPECT_EQ(c0, rootIter.getCoord());
-            ASSERT_DOUBLES_EXACTLY_EQUAL(5.0f, root.getValue(c0));
-            ++rootIter;
-            EXPECT_EQ(c1, rootIter.getCoord());
-        }
-    }
-
-    { // test transient data
-        RootNodeType rootNode(0.0f);
-        EXPECT_EQ(openvdb::Index32(0), rootNode.transientData());
-        rootNode.setTransientData(openvdb::Index32(5));
-        EXPECT_EQ(openvdb::Index32(5), rootNode.transientData());
-        RootNodeType rootNode2(rootNode);
-        EXPECT_EQ(openvdb::Index32(5), rootNode2.transientData());
-        RootNodeType rootNode3 = rootNode;
-        EXPECT_EQ(openvdb::Index32(5), rootNode3.transientData());
-    }
-}
-
-TEST_F(TestTree, testInternalNode)
-{
-    const openvdb::Coord c0(1000, 1000, 1000);
-    const openvdb::Coord c1(896, 896, 896);
-
-    using InternalNodeType = InternalNodeType1;
-    using ChildType = LeafNodeType;
-
-    { // test inserting child nodes directly and indirectly
-        openvdb::Coord c2 = c1.offsetBy(8,0,0);
-        openvdb::Coord c3 = c1.offsetBy(16,16,16);
-
-        InternalNodeType internalNode(c1, 0.0f);
-        internalNode.touchLeaf(c2);
-        internalNode.touchLeaf(c3);
-
-        EXPECT_EQ(openvdb::Index(2), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(2), internalNode.childCount());
-        EXPECT_TRUE(!internalNode.hasActiveTiles());
-
-        { // verify c0 and c1 are the root node coordinates
-            auto childIter = internalNode.cbeginChildOn();
-            EXPECT_EQ(c2, childIter.getCoord());
-            ++childIter;
-            EXPECT_EQ(c3, childIter.getCoord());
-        }
-
-        // copy the internal node
-        InternalNodeType internalNodeCopy(internalNode);
-
-        // steal the internal node children leaving it empty again
-        std::vector<ChildType*> children;
-        internalNode.stealNodes(children, 0.0f, false);
-        EXPECT_EQ(openvdb::Index(0), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(0), internalNode.childCount());
-
-        // insert the root node children directly
-        for (ChildType* child : children) {
-            internalNode.addChild(child);
-        }
-        EXPECT_EQ(openvdb::Index(2), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(2), internalNode.childCount());
-
-        { // verify the coordinates of the root node children
-            auto childIter = internalNode.cbeginChildOn();
-            EXPECT_EQ(c2, childIter.getCoord());
-            ++childIter;
-            EXPECT_EQ(c3, childIter.getCoord());
-        }
-    }
-
-    { // test inserting a tile and replacing with a child node
-        InternalNodeType internalNode(c1, 0.0f);
-        EXPECT_TRUE(!internalNode.hasActiveTiles());
-        EXPECT_EQ(openvdb::Index(0), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(0), internalNode.childCount());
-
-        // add a tile
-        internalNode.addTile(openvdb::Index(0), /*value=*/1.0f, /*state=*/true);
-        EXPECT_TRUE(internalNode.hasActiveTiles());
-        EXPECT_EQ(openvdb::Index(0), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(0), internalNode.childCount());
-
-        // replace the tile with a child node
-        EXPECT_TRUE(internalNode.addChild(new ChildType(c1, 2.0f)));
-        EXPECT_TRUE(!internalNode.hasActiveTiles());
-        EXPECT_EQ(openvdb::Index(1), internalNode.leafCount());
-        EXPECT_EQ(openvdb::Index32(1), internalNode.childCount());
-        EXPECT_EQ(c1, internalNode.cbeginChildOn().getCoord());
-        ASSERT_DOUBLES_EXACTLY_EQUAL(2.0f, internalNode.cbeginChildOn()->getValue(0));
-
-        // replace the child node with another child node
-        EXPECT_TRUE(internalNode.addChild(new ChildType(c1, 3.0f)));
-        ASSERT_DOUBLES_EXACTLY_EQUAL(3.0f, internalNode.cbeginChildOn()->getValue(0));
-    }
-
-    { // test inserting child nodes that do and do not belong to the internal node
-        InternalNodeType internalNode(c1, 0.0f);
-
-        // succeed if child belongs to this internal node
-        EXPECT_TRUE(internalNode.addChild(new ChildType(c0.offsetBy(8,0,0))));
-        EXPECT_TRUE(internalNode.probeLeaf(c0.offsetBy(8,0,0)));
-        openvdb::Index index1 = internalNode.coordToOffset(c0);
-        openvdb::Index index2 = internalNode.coordToOffset(c0.offsetBy(8,0,0));
-        EXPECT_TRUE(!internalNode.isChildMaskOn(index1));
-        EXPECT_TRUE(internalNode.isChildMaskOn(index2));
-
-        // fail otherwise
-        auto* child = new ChildType(c0.offsetBy(8000,0,0));
-        EXPECT_TRUE(!internalNode.addChild(child));
-        delete child;
-    }
-
-    { // test transient data
-        InternalNodeType internalNode(c1, 0.0f);
-        EXPECT_EQ(openvdb::Index32(0), internalNode.transientData());
-        internalNode.setTransientData(openvdb::Index32(5));
-        EXPECT_EQ(openvdb::Index32(5), internalNode.transientData());
-        InternalNodeType internalNode2(internalNode);
-        EXPECT_EQ(openvdb::Index32(5), internalNode2.transientData());
-        InternalNodeType internalNode3 = internalNode;
-        EXPECT_EQ(openvdb::Index32(5), internalNode3.transientData());
-    }
 }

@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 #Usage process all files in this directory or optionally specify a target directory
 
 # Define directory in which to find files

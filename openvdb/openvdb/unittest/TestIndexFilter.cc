@@ -157,7 +157,7 @@ TEST_F(TestIndexFilter, testActiveFilter)
 
     // check there are two leafs
 
-    EXPECT_EQ(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index64(2), points->tree().leafCount());
 
     ActiveFilter activeFilter;
     InactiveFilter inActiveFilter;
@@ -551,7 +551,7 @@ TEST_F(TestIndexFilter, testAttributeHashFilter)
 
     // four points, two leafs
 
-    EXPECT_EQ(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index64(2));
 
     appendAttribute<int>(tree, "id");
 
@@ -846,7 +846,7 @@ TEST_F(TestIndexFilter, testBBoxFilter)
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    EXPECT_EQ(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index64(2));
 
     // build some bounding box filters to test
 

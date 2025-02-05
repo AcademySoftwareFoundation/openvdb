@@ -1523,7 +1523,7 @@ TEST_F(TestPointDataLeaf, testCopyDescriptor)
 
     PointDataTree tree2(tree);
 
-    EXPECT_EQ(tree2.leafCount(), openvdb::Index32(2));
+    EXPECT_EQ(tree2.leafCount(), openvdb::Index64(2));
 
     descrA->setGroup("test", size_t(1));
 

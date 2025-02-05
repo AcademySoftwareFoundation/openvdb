@@ -1,4 +1,0 @@
-OpenVDB:
-    Improvements:
-        - Removed last traces of Boost when OPENVDB_USE_DELAYED_LOADING is OFF
-        [Reported by Brian McKinnon]

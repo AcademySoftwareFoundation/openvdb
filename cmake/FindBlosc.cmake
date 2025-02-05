@@ -88,7 +88,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 include(GNUInstallDirs)
 
 mark_as_advanced(

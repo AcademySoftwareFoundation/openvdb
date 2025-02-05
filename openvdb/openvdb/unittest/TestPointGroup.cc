@@ -137,7 +137,7 @@ TEST_F(TestPointGroup, testAppendDrop)
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    EXPECT_EQ(tree.leafCount(), Index32(4));
+    EXPECT_EQ(tree.leafCount(), Index64(4));
 
     // retrieve first and last leaf attribute sets
 
@@ -312,7 +312,7 @@ TEST_F(TestPointGroup, testCompact)
     PointDataTree& tree = grid->tree();
 
     // check one leaf
-    EXPECT_EQ(tree.leafCount(), Index32(1));
+    EXPECT_EQ(tree.leafCount(), Index64(1));
 
     // retrieve first and last leaf attribute sets
 

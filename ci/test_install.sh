@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Various tests to test the FindOpenVDB CMake modules and
@@ -8,7 +10,7 @@ set -e
 # the expected VDB installation
 
 cmakelists="
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(TestInstall LANGUAGES CXX)
 find_package(OpenVDB REQUIRED COMPONENTS openvdb)
 add_executable(test_vdb_print \"../openvdb_cmd/vdb_print/main.cc\")

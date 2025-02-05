@@ -109,7 +109,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 include(GNUInstallDirs)
 
 
@@ -334,10 +334,8 @@ set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 set(OPENVDB_PYTHON_PATH_SUFFIXES
   lib64/python
-  lib64/python2.7
   lib64/python3
   lib/python
-  lib/python2.7
   lib/python3
 )
 
