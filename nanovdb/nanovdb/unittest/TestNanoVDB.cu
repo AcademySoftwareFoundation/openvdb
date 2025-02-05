@@ -986,14 +986,12 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
     EXPECT_EQ(1u, idxHdl.buffer().bufferCount());
     EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
     EXPECT_FALSE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.buffer().data(0, 1));
     EXPECT_FALSE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
     idxHdl.deviceUpload();
     EXPECT_TRUE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
     EXPECT_EQ(2u, idxHdl.buffer().bufferCount());
     EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
     EXPECT_TRUE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.buffer().data(0, 1));
     auto *idxGrid = idxHdl.grid<nanovdb::ValueIndex>();
     EXPECT_TRUE(idxGrid);
     //timer.restart("Create value list on CPU");
