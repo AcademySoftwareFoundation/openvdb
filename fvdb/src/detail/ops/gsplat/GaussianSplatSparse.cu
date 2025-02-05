@@ -159,9 +159,8 @@ __launch_bounds__(256) computePerTileBitMask(
             sharedMemBitmask[threadIdx.x * numWordsPerTile + i] = 0;
         }
 
-        // For each pixel in this tile, write out the bit
-        const int64_t tileStart       = tileOrdinal > 0 ? cumPixelsPerTile[tileOrdinal - 1] : 0;
-        const int64_t numPixelsInTile = cumPixelsPerTile[tileOrdinal] - tileStart;
+        const int tileStart = tileOrdinal > 0 ? cumPixelsPerTile[tileOrdinal - 1] : 0;
+        const int tileEnd   = cumPixelsPerTile[tileOrdinal];
 
         // tileId = batch * numTilesW * numTilesH + tileU * numTilesW + tileV
         const int32_t batchId         = tileId / (numTilesW * numTilesH);
@@ -171,8 +170,8 @@ __launch_bounds__(256) computePerTileBitMask(
         const int32_t tileStartPixelV = tileV * tileSideLength;
 
         // Note, we could use a warp per tile and do more in parallel.
-        for (int i = 0; i < numPixelsInTile; ++i) {
-            const int32_t   pixelId = unsortPerPixelTileIds[tileStart + i];
+        for (int i = tileStart; i < tileEnd; ++i) {
+            const int32_t   pixelId = unsortPerPixelTileIds[i];
             const CoordType pixelU  = pixelCoords.data()[pixelId][0];
             const CoordType pixelV  = pixelCoords.data()[pixelId][1];
 
@@ -232,12 +231,13 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
         torch::TensorOptions().device(device).dtype(torch::kBool);
 
     // Compute a boolean tile
-    torch::Tensor tileMask        = torch::zeros({ numTilesW * numImages }, optionsBool);
+    torch::Tensor tileMask = torch::zeros({ numTilesW * numTilesH * numImages }, optionsBool);
     torch::Tensor perPixelTileIds = torch::empty({ numPixels }, optionsInt64);
 
     auto outMaskAccessor   = fvdb::tensorAccessor<torch::kCUDA, bool, 1>(tileMask);
     auto outTileIdAccessor = fvdb::tensorAccessor<torch::kCUDA, int64_t, 1>(perPixelTileIds);
 
+    // TODO we do not output tileMask currently, but we should
     AT_DISPATCH_INDEX_TYPES(pixelsToRender.scalar_type(), "computeTileMask", [&]() {
         const int32_t NUM_THREADS = 256;
         const int32_t NUM_BLOCKS  = (numPixels + NUM_THREADS - 1) / NUM_THREADS;
@@ -265,12 +265,13 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
                                         [] __host__ __device__(int64_t x) { return x >> 32; });
 
     // Run length encode to get the unique tile ids, and the number of pixels per tile
-    torch::Tensor numPixelsPerTile =
-        torch::empty({ std::min(numPixels, int64_t(numTilesW * numTilesH)) }, optionsInt64);
-    torch::Tensor uniqueTileIds = torch::empty({ numPixels + 1 }, optionsInt32);
+    torch::Tensor numPixelsPerTile = torch::empty(
+        { std::min(numPixels, int64_t(numImages * numTilesW * numTilesH)) }, optionsInt64);
+    torch::Tensor uniqueTileIds = torch::empty({ numPixels }, optionsInt32);
     torch::Tensor uniqueCounts  = torch::empty({ 1 }, optionsInt32);
     CUB_WRAPPER(cub::DeviceRunLengthEncode::Encode, tileIdIter, uniqueTileIds.data_ptr<int32_t>(),
                 numPixelsPerTile.data_ptr<int64_t>(), uniqueCounts.data_ptr<int32_t>(), numPixels);
+    cudaDeviceSynchronize(); // TODO use a stream
     auto const numUniqueTiles = uniqueCounts.item<int32_t>();
     uniqueTileIds             = uniqueTileIds.index({ at::indexing::Slice(0, numUniqueTiles) });
     numPixelsPerTile          = numPixelsPerTile.index({ at::indexing::Slice(0, numUniqueTiles) });
@@ -304,16 +305,16 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     //     1. active_tiles: An integer tensor with shape [AT] indicating the tile_ids
     //        corresponding to tiles which contain active pixels.
     //     2. tile_pixel_mask: An int64 tensor of bitmasks with shape [AT, words_per_tile] where
-    //        words_per_tile is the number of int64_t words needed to make a bitmask for a PxP tile.
-    //        We asume bits are in raster order (top left to bottom right)
+    //        words_per_tile is the number of int64_t words needed to make a bitmask for a PxP
+    //        tile. We asume bits are in raster order (top left to bottom right)
     //     3. tile_pixel_cumsum: An int64 tensor with shape [AT] encoding the cumuluative sum of
-    //        active pixels in each active tile. i.e. tile_pixel_cumsum[i-1] is the number of active
-    //        pixels in all tiles before the i^th active tile
+    //        active pixels in each active tile. i.e. tile_pixel_cumsum[i-1] is the number of
+    //        active pixels in all tiles before the i^th active tile
     //     4. pixel_map: An int64 tensor with shape [AP] specifying the order that pixels should
     //        be written within each tile.
     //        i.e. Suppose we're rendering the k^th active pixel in tile_id = active_tiles[t],
-    //             we write its rendered value to index pixel_map[tile_pixel_cumsum[tile_id-1] + k]
-    //             in the output
+    //             we write its rendered value to index pixel_map[tile_pixel_cumsum[tile_id-1] +
+    //             k] in the output
     return std::make_tuple(uniqueTileIds, tileBitMask, numPixelsPerTile, unsortPerPixelTileIds);
 }
 

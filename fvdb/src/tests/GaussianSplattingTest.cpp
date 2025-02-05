@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "utils/Tensor.h"
+#include "utils/TestUtilities.h"
 #include "utils/TileBitMask.h"
 #include <detail/ops/gsplat/GaussianSplatSparse.h>
 
@@ -22,28 +23,36 @@ using fvdb::test::TileBitMask;
 // given the tensor of UV pixel coordinates and the tile and image sizes
 template <typename CoordType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-expectedTensors(torch::Tensor const &uvsCPU, std::int64_t tileSize, std::int64_t numTilesPerAxis,
-                std::int64_t numPixelsPerAxis) {
-    std::int64_t                           numTiles = numTilesPerAxis * numTilesPerAxis;
+expectedTensors(fvdb::JaggedTensor const &uvsCPU, std::int64_t tileSize,
+                std::int64_t numTilesPerAxis, std::int64_t numPixelsPerAxis) {
+    std::int64_t                           numImages = uvsCPU.num_outer_lists();
+    std::int64_t                           numTiles  = numTilesPerAxis * numTilesPerAxis;
+    std::int64_t                           numPixels = numPixelsPerAxis * numPixelsPerAxis;
     std::vector<std::int64_t>              expectedPixelMap{};
-    std::vector<std::vector<std::int64_t>> tilePixelIds(numTiles);
-    std::vector<std::vector<std::int64_t>> tilePixelKeys(numTiles);
+    std::vector<std::vector<std::int64_t>> tilePixelIds(numTiles * numImages);
+    std::vector<std::vector<std::int64_t>> tilePixelKeys(numTiles * numImages);
     std::vector<std::uint64_t>             tileBitMasks;
     std::set<std::uint64_t>                activeTiles;
-    auto                                   uvsCPUAccessor = uvsCPU.accessor<CoordType, 2>();
+
+    auto uvsCPUAccessor = uvsCPU.jdata().accessor<CoordType, 2>();
+
     // Bucket active pixel ordinals into per-tile buckets
-    for (int pixelOrdinal = 0; pixelOrdinal < uvsCPU.size(0); pixelOrdinal += 1) {
-        auto pixelU = uvsCPUAccessor[pixelOrdinal][0];
-        auto pixelV = uvsCPUAccessor[pixelOrdinal][1];
+    for (int image = 0; image < numImages; image++) {
+        for (int pixelOrdinal = uvsCPU.joffsets()[image].item<std::int64_t>();
+             pixelOrdinal < uvsCPU.joffsets()[image + 1].item<std::int64_t>(); pixelOrdinal++) {
+            auto pixelU = uvsCPUAccessor[pixelOrdinal][0];
+            auto pixelV = uvsCPUAccessor[pixelOrdinal][1];
 
-        auto tileU = pixelU / tileSize;
-        auto tileV = pixelV / tileSize;
+            auto tileU = pixelU / tileSize;
+            auto tileV = pixelV / tileSize;
 
-        auto tileId  = tileV * numTilesPerAxis + tileU;
-        auto pixelId = pixelV * numPixelsPerAxis + pixelU;
-        activeTiles.insert(tileId);
-        tilePixelIds[tileId].push_back(pixelOrdinal);
-        tilePixelKeys[tileId].push_back(pixelId);
+            auto tileId  = image * numTiles + tileV * numTilesPerAxis + tileU;
+            auto pixelId = image * numPixels + pixelV * numPixelsPerAxis + pixelU;
+
+            activeTiles.insert(tileId);
+            tilePixelIds[tileId].push_back(pixelOrdinal);
+            tilePixelKeys[tileId].push_back(pixelId);
+        }
     }
 
     // Sort each bucket by the linearized pixel order (called pixelId above)
@@ -52,6 +61,7 @@ expectedTensors(torch::Tensor const &uvsCPU, std::int64_t tileSize, std::int64_t
         thrust::sort_by_key(tilePixelKeys[tileId].begin(), tilePixelKeys[tileId].end(),
                             tilePixelIds[tileId].begin());
     }
+
     // Concatenate all the sorted pixel ids into one big vector
     std::vector<std::int64_t> pixelsPerTile{};
     for (auto tileId: activeTiles) {
@@ -66,6 +76,7 @@ expectedTensors(torch::Tensor const &uvsCPU, std::int64_t tileSize, std::int64_t
             tileBitMasks.insert(tileBitMasks.end(), bitMask.begin(), bitMask.end());
         }
     }
+
     // compute cumulative sum of pixels per tile
     std::inclusive_scan(pixelsPerTile.begin(), pixelsPerTile.end(), pixelsPerTile.begin());
 
@@ -95,10 +106,25 @@ expectedTensors(torch::Tensor const &uvsCPU, std::int64_t tileSize, std::int64_t
              pixelMapT.clone() };
 }
 
+// Randomize the order of the UVs within each image in a JaggedTensor
+fvdb::JaggedTensor
+randomPermuteUVs(fvdb::JaggedTensor const &uvs) {
+    auto tensors    = uvs.unbind1();
+    auto outTensors = std::vector<torch::Tensor>{};
+    outTensors.reserve(tensors.size());
+
+    for (auto &tensor: tensors) {
+        auto randIndices = torch::randperm(tensor.size(0), tensorOpts<std::int64_t>(torch::kCPU));
+        outTensors.emplace_back(tensor.index_select(0, randIndices));
+    }
+
+    return fvdb::JaggedTensor(outTensors).to(uvs.device());
+}
+
 // Test fixtures
 template <typename CoordType> struct ComputeSparseInfo : public ::testing::Test {
     ComputeSparseInfo()
-        : mTileSize(0), mNumTilesPerAxis(0), mNumTiles(0), mNumPixelsPerAxis(0),
+        : mNumImages(0), mTileSize(0), mNumTilesPerAxis(0), mNumTiles(0), mNumPixelsPerAxis(0),
           mNumActivePixels(0), mNumWordsPerTile(0) {
         // seed torch random number generator so we get consistent results
         //
@@ -106,7 +132,8 @@ template <typename CoordType> struct ComputeSparseInfo : public ::testing::Test 
     }
 
     void
-    setTiling(std::int64_t tileSize, std::int64_t numTilesPerAxis) {
+    setTiling(std::int64_t numImages, std::int64_t tileSize, std::int64_t numTilesPerAxis) {
+        mNumImages        = numImages;
         mTileSize         = tileSize;
         mNumTilesPerAxis  = numTilesPerAxis;
         mNumTiles         = numTilesPerAxis * numTilesPerAxis;
@@ -114,28 +141,60 @@ template <typename CoordType> struct ComputeSparseInfo : public ::testing::Test 
         mNumWordsPerTile  = TileBitMask<std::uint64_t>::numWordsPerTile(tileSize);
     }
 
-    // Helper function to generate UVs for a grid of tiles, with everyNth pixel in each row active
-    // Returns a torch CPU tensor of shape {numActivePixels, 2}
-    torch::Tensor
-    makeStridedUVs(std::int64_t const tileSize, std::int64_t const numTilesPerAxis,
-                   std::int64_t const pixelStride) {
-        setTiling(tileSize, numTilesPerAxis);
-        std::int64_t const numActivePixelsU = mNumPixelsPerAxis / pixelStride;
-        mNumActivePixels                    = numActivePixelsU * mNumPixelsPerAxis;
+    // Helper function to generate UVs for a grid of tiles, with everyNth pixel in each row
+    // active. Returns a torch CPU tensor of shape {numActivePixels, 2}
+    fvdb::JaggedTensor
+    makeStridedUVs(std::int64_t numImages, std::int64_t const tileSize,
+                   std::int64_t const numTilesPerAxis, std::int64_t const pixelStride) {
+        setTiling(numImages, tileSize, numTilesPerAxis);
+        std::int64_t const numPixels = mNumTiles * mTileSize * mTileSize;
 
         auto opts = tensorOpts<CoordType>(torch::kCPU);
 
-        torch::Tensor uvsCPU         = torch::empty({ mNumActivePixels, 2 }, opts);
+        auto numActivePixels = (numPixels + pixelStride - 1) / pixelStride;
+
+        torch::Tensor uvsCPU         = torch::empty({ numActivePixels, 2 }, opts);
         auto          uvsCPUAccessor = uvsCPU.accessor<CoordType, 2>();
-        for (std::int64_t i = 0; i < numActivePixelsU; ++i) {
-            for (std::int64_t j = 0; j < mNumPixelsPerAxis; ++j) {
-                uvsCPUAccessor[j * numActivePixelsU + i][0] = i * pixelStride;
-                uvsCPUAccessor[j * numActivePixelsU + i][1] = j;
-            }
+
+        for (std::int64_t i = 0; i < numPixels; i += pixelStride) {
+            uvsCPUAccessor[i / pixelStride][0] = i % mNumPixelsPerAxis;
+            uvsCPUAccessor[i / pixelStride][1] = i / mNumPixelsPerAxis;
         }
-        return uvsCPU.clone();
+
+        std::vector<torch::Tensor> uvs(mNumImages, uvsCPU.clone());
+        return fvdb::JaggedTensor(uvs);
     }
 
+    void
+    testStridedUVs(std::int64_t numImages, std::int64_t const tileSize,
+                   std::int64_t const numTilesPerAxis, std::int64_t const pixelStride,
+                   bool randomPermute = false) {
+        auto uvsCPU = [&]() {
+            if (randomPermute) {
+                return randomPermuteUVs(
+                    this->makeStridedUVs(numImages, tileSize, numTilesPerAxis, pixelStride));
+            } else {
+                return this->makeStridedUVs(numImages, tileSize, numTilesPerAxis, pixelStride);
+            }
+        }();
+        auto uvs = uvsCPU.to(torch::kCUDA);
+
+        auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
+            fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
+                                                 this->mNumTilesPerAxis, uvs);
+
+        auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
+            expectedTensors<CoordType>(uvsCPU, this->mTileSize, this->mNumTilesPerAxis,
+                                       this->mNumPixelsPerAxis);
+
+        EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
+        EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
+        EXPECT_TRUE(
+            torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
+        EXPECT_TRUE(torch::equal(pixelMap, expectedPixelMap.to(pixelMap.device())));
+    }
+
+    std::int64_t mNumImages;
     std::int64_t mTileSize;
     std::int64_t mNumTilesPerAxis;
     std::int64_t mNumTiles;
@@ -165,7 +224,7 @@ TEST(BadTypeTest, CPUThrows) {
 }
 
 TYPED_TEST(ComputeSparseInfo, Empty) {
-    this->setTiling(16, 4);
+    this->setTiling(1, 16, 4);
     auto opts = tensorOpts<TypeParam>();
 
     auto const emptyPixels = fvdb::JaggedTensor(torch::empty({ 0, 0 }, opts));
@@ -182,28 +241,10 @@ TYPED_TEST(ComputeSparseInfo, Empty) {
         torch::equal(pixelMap, torch::empty({ 0 }, tensorOpts<std::int64_t>(torch::kCUDA))));
 }
 
-TYPED_TEST(ComputeSparseInfo, SinglePixelInTopLeftTile) {
-    this->setTiling(16, 4);
-    auto const singlePixelCPU = torch::ones({ 1, 2 }, tensorOpts<TypeParam>(torch::kCPU));
-
-    auto const singlePixel = singlePixelCPU.to(torch::kCUDA);
-
-    auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
-        fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
-                                             this->mNumTilesPerAxis, singlePixel);
-
-    auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
-        expectedTensors<TypeParam>(singlePixelCPU, this->mTileSize, this->mNumTilesPerAxis,
-                                   this->mNumPixelsPerAxis);
-
-    EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
-    EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
-    EXPECT_TRUE(torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
-    EXPECT_TRUE(torch::equal(pixelMap, expectedPixelMap.to(pixelMap.device())));
-}
-
-TYPED_TEST(ComputeSparseInfo, Every4thPixel) {
-    // x = active pixel, o = inactive pixel
+// x = active pixel, o = inactive pixel
+static const std::vector<std::tuple<std::string, std::array<std::int64_t, 5>>> configs{
+    { "Single Pixel top left tile", { 1, 16, 4, 4097, 0 } },
+    { "Single Pixel top left tile, 10 images", { 10, 16, 4, 4097, 0 } },
 
     //   u 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 || 1 1 1 1 ... || 2 2 2 2 ... || 3 3 3 3 ...
     // v   0 1 2 3 4 5 6 7 8 9 a b c d e f || 0 1 2 3 ... || 0 1 2 3 ... || 0 1 2 3 ...
@@ -217,25 +258,9 @@ TYPED_TEST(ComputeSparseInfo, Every4thPixel) {
     // ----------------------------------  || ...
     // ... 3 more rows of tiles vertically ...
 
-    torch::Tensor uvsCPU = this->makeStridedUVs(16, 4, 4);
-    auto          uvs    = uvsCPU.to(torch::kCUDA);
+    { "Every 4th pixel", { 1, 16, 4, 4, 0 } },
+    { "Every 4th pixel, 10 images", { 10, 16, 4, 4, 0 } },
 
-    auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
-        fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
-                                             this->mNumTilesPerAxis, uvs);
-
-    auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
-        expectedTensors<TypeParam>(uvsCPU, this->mTileSize, this->mNumTilesPerAxis,
-                                   this->mNumPixelsPerAxis);
-
-    EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
-    EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
-    EXPECT_TRUE(torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
-    EXPECT_TRUE(torch::equal(pixelMap, expectedPixelMap.to(pixelMap.device())));
-}
-
-TYPED_TEST(ComputeSparseInfo, EveryOtherColumnOfTiles) {
-    // x = active pixel, o = inactive pixel
     // 0 1 | 2 3 | 4 5 | 6 7   <-u/v
     // ========================    |
     // x o | o o | x o | o o || 0  v
@@ -250,57 +275,49 @@ TYPED_TEST(ComputeSparseInfo, EveryOtherColumnOfTiles) {
     // x o | o o | x o | o o || 6
     // x o | o o | x o | o o || 7
 
-    torch::Tensor uvsCPU = this->makeStridedUVs(2, 4, 4);
-    auto          uvs    = uvsCPU.to(torch::kCUDA);
+    { "Every other column of tiles", { 1, 2, 4, 4, 0 } },
+    { "Every other column of tiles, 10 images", { 10, 2, 4, 4, 0 } },
 
-    auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
-        fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
-                                             this->mNumTilesPerAxis, uvs);
+    // 0 1 2 3 | 4 5 6 7 | 8 9 a b | c d e f   <-u/v
+    // ========================================
+    // x o o o | o o o o | o o o o | o o o o || 0
+    // o x o o | o o o o | o o o o | o o o o || 1
+    // o o x o | o o o o | o o o o | o o o o || 2
+    // o o o x | o o o o | o o o o | o o o o || 3
+    // ----------------------------------------
+    // o o o o | x o o o | o o o o | o o o o || 4
+    // o o o o | o x o o | o o o o | o o o o || 5
+    // o o o o | o o x o | o o o o | o o o o || 6
+    // o o o o | o o o x | o o o o | o o o o || 7
+    // ----------------------------------------
+    // o o o o | o o o o | x o o o | o o o o || 8
+    // o o o o | o o o o | o x o o | o o o o || 9
+    // o o o o | o o o o | o o x o | o o o o || a
+    // o o o o | o o o o | o o o x | o o o o || b
+    // ----------------------------------------
+    // o o o o | o o o o | o o o o | x o o o || c
+    // o o o o | o o o o | o o o o | o x o o || d
+    // o o o o | o o o o | o o o o | o o x o || e
+    // o o o o | o o o o | o o o o | o o o x || f
 
-    auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
-        expectedTensors<TypeParam>(uvsCPU, this->mTileSize, this->mNumTilesPerAxis,
-                                   this->mNumPixelsPerAxis);
+    { "Prime stride", { 1, 4, 4, 17, 0 } },
+    { "Prime stride, 10 images", { 10, 4, 4, 17, 0 } },
+    { "Single Pixel top left tile, permuted", { 1, 16, 4, 4097, 1 } },
+    { "Single Pixel top left tile, 10 images, permuted", { 10, 16, 4, 4097, 1 } },
+    { "Every 4th pixel, permuted", { 1, 16, 4, 4, 1 } },
+    { "Every 4th pixel, 10 images, permuted", { 10, 16, 4, 4, 1 } },
+    { "Every other column of tiles, permuted", { 1, 2, 4, 4, 1 } },
+    { "Every other column of tiles, 10 images, permuted", { 10, 2, 4, 4, 1 } },
+    { "Prime stride, permuted", { 1, 4, 4, 17, 1 } },
+    { "Prime stride, 10 images, permuted", { 10, 4, 4, 17, 1 } },
+};
 
-    EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
-    EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
-    EXPECT_TRUE(torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
-    EXPECT_TRUE(torch::equal(pixelMap, expectedPixelMap.to(pixelMap.device())));
-}
-
-TYPED_TEST(ComputeSparseInfo, EveryOtherColumnOfTiles_Permuted) {
-    // Start with this, but randomly permute the order of the input
-
-    // x = active pixel, o = inactive pixel
-    // 0 1 | 2 3 | 4 5 | 6 7   <-u/v
-    // ========================    |
-    // x o | o o | x o | o o || 0  v
-    // x o | o o | x o | o o || 1
-    // ----------------------||
-    // x o | o o | x o | o o || 2
-    // x o | o o | x o | o o || 3
-    // ----------------------||
-    // x o | o o | x o | o o || 4
-    // x o | o o | x o | o o || 5
-    // ----------------------||
-    // x o | o o | x o | o o || 6
-    // x o | o o | x o | o o || 7
-
-    torch::Tensor uvsCPU = this->makeStridedUVs(2, 4, 4);
-    torch::Tensor randIndices =
-        torch::randperm(uvsCPU.size(0), tensorOpts<std::int64_t>(torch::kCPU));
-    uvsCPU   = uvsCPU.index_select(0, randIndices);
-    auto uvs = uvsCPU.to(torch::kCUDA);
-
-    auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
-        fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
-                                             this->mNumTilesPerAxis, uvs);
-
-    auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
-        expectedTensors<TypeParam>(uvsCPU, this->mTileSize, this->mNumTilesPerAxis,
-                                   this->mNumPixelsPerAxis);
-
-    EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
-    EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
-    EXPECT_TRUE(torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
-    EXPECT_TRUE(torch::equal(pixelMap, expectedPixelMap.to(pixelMap.device())));
+TYPED_TEST(ComputeSparseInfo, StridedUVs) {
+    for (auto const &[name, config]: configs) {
+        fvdb::test::printSubtestPrefix(name);
+        this->testStridedUVs(config[0], config[1], config[2], config[3], config[4]);
+        if (not testing::Test::HasFailure()) {
+            fvdb::test::printGreenOK();
+        }
+    }
 }
