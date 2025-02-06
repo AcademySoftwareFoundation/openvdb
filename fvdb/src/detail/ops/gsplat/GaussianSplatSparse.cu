@@ -207,6 +207,10 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
                   const fvdb::JaggedTensor &pixelsToRender) {
     TORCH_CHECK_NOT_IMPLEMENTED(pixelsToRender.device().is_cuda(),
                                 "computeSparseInfo only implemented on the device");
+
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(pixelsToRender.jdata()));
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(pixelsToRender.device().index());
+
     TORCH_CHECK_TYPE(pixelsToRender.scalar_type() == torch::kInt32 ||
                          pixelsToRender.scalar_type() == torch::kInt64,
                      "pixelsToRender must be of type int32 or int64");
@@ -241,10 +245,9 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     AT_DISPATCH_INDEX_TYPES(pixelsToRender.scalar_type(), "computeTileMask", [&]() {
         const int32_t NUM_THREADS = 256;
         const int32_t NUM_BLOCKS  = (numPixels + NUM_THREADS - 1) / NUM_THREADS;
-        computeTileMask<index_t><<<NUM_BLOCKS, NUM_THREADS>>>(
+        computeTileMask<index_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
             pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
             tileSideLength, numTilesW, numTilesH, outMaskAccessor, outTileIdAccessor);
-        cudaDeviceSynchronize();        // TODO remove
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
 
@@ -257,7 +260,8 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     // Sort by tile ID (out-of-place)
     CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, perPixelTileIds.data_ptr<int64_t>(),
                 sortedPerPixelTileIds.data_ptr<int64_t>(), pixelIds.data_ptr<int64_t>(),
-                unsortPerPixelTileIds.data_ptr<int64_t>(), numPixels);
+                unsortPerPixelTileIds.data_ptr<int64_t>(), numPixels, 0 /* begin_bit */,
+                sizeof(int64_t) * 8 /* end_bit */, stream);
 
     // Make a transform_iterator to extract the tile id from the sorted pixel ids
     auto tileIdIter =
@@ -270,8 +274,9 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     torch::Tensor uniqueTileIds = torch::empty({ numPixels }, optionsInt32);
     torch::Tensor uniqueCounts  = torch::empty({ 1 }, optionsInt32);
     CUB_WRAPPER(cub::DeviceRunLengthEncode::Encode, tileIdIter, uniqueTileIds.data_ptr<int32_t>(),
-                numPixelsPerTile.data_ptr<int64_t>(), uniqueCounts.data_ptr<int32_t>(), numPixels);
-    cudaDeviceSynchronize(); // TODO use a stream
+                numPixelsPerTile.data_ptr<int64_t>(), uniqueCounts.data_ptr<int32_t>(), numPixels,
+                stream);
+    cudaStreamSynchronize(stream);
     auto const numUniqueTiles = uniqueCounts.item<int32_t>();
     uniqueTileIds             = uniqueTileIds.index({ at::indexing::Slice(0, numUniqueTiles) });
     numPixelsPerTile          = numPixelsPerTile.index({ at::indexing::Slice(0, numUniqueTiles) });
@@ -290,15 +295,14 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
         const uint32_t NUM_THREADS2 = 256;
         const uint32_t NUM_BLOCKS2  = (numUniqueTiles + NUM_THREADS2 - 1) / NUM_THREADS2;
         computePerTileBitMask<index_t>
-            <<<NUM_BLOCKS2, NUM_THREADS2,
-               NUM_THREADS2 * numWordsPerTileBitmask * sizeof(uint64_t)>>>(
+            <<<NUM_BLOCKS2, NUM_THREADS2, NUM_THREADS2 * numWordsPerTileBitmask * sizeof(uint64_t),
+               stream>>>(
                 numUniqueTiles, numWordsPerTileBitmask, numTilesW, numTilesH, tileSideLength,
                 uniqueTileIds.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>(),
                 numPixelsPerTile.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
                 unsortPerPixelTileIds.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
                 pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
                 tileBitMask.packed_accessor32<uint64_t, 2, torch::RestrictPtrTraits>());
-        cudaDeviceSynchronize();        // TODO remove
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
 
