@@ -14,6 +14,7 @@
 #include <vector>
 #include <algorithm>
 
+#include <nanovdb/util/cuda/Util.h>
 #include <nanovdb/cuda/DeviceGuard.h>
 #ifdef NANOVDB_USE_NCCL
 #include <nccl.h>
