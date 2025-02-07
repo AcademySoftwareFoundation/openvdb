@@ -1164,22 +1164,22 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
     //nanovdb::util::Timer timer("Create FloatGrid on CPU");
-    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(100);
+    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(1000);
     auto *floatGrid = floatHdl.grid<float>();
     EXPECT_TRUE(floatGrid);
     auto acc = floatGrid->getAccessor();
-    EXPECT_FALSE(acc.isActive(nanovdb::Coord(103,0,0)));
-    EXPECT_TRUE( acc.isActive(nanovdb::Coord(100,0,0)));
-    EXPECT_FALSE(acc.isActive(nanovdb::Coord( 97,0,0)));
-    EXPECT_EQ( 3.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ(-3.0f, acc( 97,0,0));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord(1003,0,0)));
+    EXPECT_TRUE( acc.isActive(nanovdb::Coord(1000,0,0)));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord( 997,0,0)));
+    EXPECT_EQ( 3.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ(-3.0f, acc( 997,0,0));
     using OpT = nanovdb::SetVoxel<float>;// only set the voxel value
-    acc.set<OpT>(nanovdb::Coord(103,0,0),-1.0f);// flip sign and value of inactive voxel
-    acc.set<OpT>(nanovdb::Coord( 97,0,0), 1.0f);// flip sign and value of inactive voxel
-    EXPECT_EQ(-1.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ( 1.0f, acc( 97,0,0));
+    acc.set<OpT>(nanovdb::Coord(1003,0,0),-1.0f);// flip sign and value of inactive voxel
+    acc.set<OpT>(nanovdb::Coord( 997,0,0), 1.0f);// flip sign and value of inactive voxel
+    EXPECT_EQ(-1.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ( 1.0f, acc( 997,0,0));
     //timer.restart("Copy FloatGrid from CPU to GPU");
     floatHdl.deviceUpload();// CPU -> GPU
     auto *d_floatGrid = floatHdl.deviceGrid<float>();
@@ -1193,9 +1193,9 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     floatGrid = floatHdl.grid<float>();
     EXPECT_TRUE(floatGrid);
     acc = floatGrid->getAccessor();
-    EXPECT_EQ( 3.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ(-3.0f, acc( 97,0,0));
+    EXPECT_EQ( 3.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ(-3.0f, acc( 997,0,0));
     //EXPECT_FALSE(floatGrid->isLexicographic());
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill

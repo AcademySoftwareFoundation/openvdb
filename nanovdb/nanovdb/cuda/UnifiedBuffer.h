@@ -60,6 +60,7 @@ public:
     /// @param stream
     UnifiedBuffer(uint64_t size, uint64_t capacity, int device, cudaStream_t stream = 0) : mPtr(nullptr), mSize(size), mCapacity(size)
     {
+        assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
         cudaCheck(cudaMemAdvise(mPtr, size, cudaMemAdviseSetPreferredLocation, device));
         cudaCheck(cudaMemPrefetchAsync(mPtr, size, device, stream));

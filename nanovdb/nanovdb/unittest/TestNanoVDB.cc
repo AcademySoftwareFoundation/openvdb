@@ -6752,21 +6752,45 @@ TEST_F(TestNanoVDB, NodeIterators)
     {// check RootNode::ValueOnInterator
         nanovdb::NanoRoot<float>::ValueOnIterator it;
         EXPECT_FALSE(it);
-        it = fltTree.root().beginValueOn();
+        it = fltRoot.beginValueOn();
         EXPECT_FALSE(it);// no active tiles
         auto it2 = it;
         EXPECT_FALSE(it2);
     }
 
-    {// check RootNode::ValueOnInterator
+    {// check RootNode::ChildInterator
         nanovdb::NanoRoot<float>::ChildIterator it;
         EXPECT_FALSE(it);
-        it = fltTree.root().beginChild();
+        it = fltRoot.beginChild();
         EXPECT_TRUE(it);
         auto it2 = it;
         EXPECT_TRUE(it2);
     }
-}
+
+    {// RootNode::TileIterator
+        nanovdb::NanoRoot<float>::TileIterator it;
+        EXPECT_FALSE(it);
+        it = fltRoot.beginTile();
+        EXPECT_TRUE(it);
+        EXPECT_EQ(0, it.pos());
+        EXPECT_EQ(nanovdb::Coord(-4096), it->origin());
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+        EXPECT_EQ(0, it2.pos());
+        EXPECT_EQ(nanovdb::Coord(-4096), it2->origin());
+        EXPECT_TRUE(it2.isChild());
+        EXPECT_FALSE(it2.isValue());
+        EXPECT_FALSE(it2.isValueOn());
+        auto it3 = fltRoot.probe(nanovdb::Coord(0));
+        EXPECT_TRUE(it3);
+        EXPECT_EQ(8, fltRoot.tileCount());
+        EXPECT_EQ(7, it3.pos());
+        EXPECT_EQ(nanovdb::Coord(0), it3->origin());
+        EXPECT_TRUE(it3.isChild());
+        EXPECT_FALSE(it3.isValue());
+        EXPECT_FALSE(it3.isValueOn());
+    }
+}// NodeIterators
 
 // make testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*BasicValueIndexStats*" --gtest_break_on_failure --gtest_repeat=5
 TEST_F(TestNanoVDB, BasicValueIndexStats)
