@@ -2292,7 +2292,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     uint32_t mTileCount[3]; // 12B, total number of active tile values at the lower internal, upper internal and root node levels
     uint64_t mVoxelCount; //    8B, total number of active voxels in the root and all its child nodes.
     // No padding since it's always 32B aligned
-    //__hostdev__ TreeData& operator=(const TreeData& other){return *util::memcpy(this, &other);}
     TreeData& operator=(const TreeData&) = default;
     __hostdev__ void setRoot(const void* root) {
         NANOVDB_ASSERT(root);
@@ -2587,7 +2586,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         ValueT             value; // value of tile (i.e. no child node)
     }; // Tile
 
-    /// @brief Returns a non-const reference to the tile at the specified linear offset.
+    /// @brief Returns a pointer to the tile at the specified linear offset.
     ///
     /// @warning The linear offset is assumed to be in the valid range
     __hostdev__ const Tile* tile(uint32_t n) const
@@ -2601,34 +2600,116 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         return reinterpret_cast<Tile*>(this + 1) + n;
     }
 
-    __hostdev__ Tile* probeTile(const CoordT& ijk)
+    template<typename DataT>
+    class TileIter
     {
-#if 1 // switch between linear and binary seach
-        const auto key = CoordToKey(ijk);
-        for (Tile *p = reinterpret_cast<Tile*>(this + 1), *q = p + mTableSize; p < q; ++p)
-            if (p->key == key)
-                return p;
-        return nullptr;
-#else // do not enable binary search if tiles are not guaranteed to be sorted!!!!!!
-        int32_t low = 0, high = mTableSize; // low is inclusive and high is exclusive
-        while (low != high) {
-            int         mid = low + ((high - low) >> 1);
-            const Tile* tile = &tiles[mid];
-            if (tile->key == key) {
-                return tile;
-            } else if (tile->key < key) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
+    protected:
+        using TileT = typename util::match_const<Tile,   DataT>::type;
+        using NodeT = typename util::match_const<ChildT, DataT>::type;
+        TileT *mBegin, *mPos, *mEnd;
+
+    public:
+        __hostdev__ TileIter() : mBegin(nullptr), mPos(nullptr), mEnd(nullptr) {}
+        __hostdev__ TileIter(DataT* data, uint32_t pos = 0)
+            : mBegin(reinterpret_cast<TileT*>(data + 1))// tiles reside right after the RootData
+            , mPos(mBegin + pos)
+            , mEnd(mBegin + data->mTableSize)
+        {
+            NANOVDB_ASSERT(data);
+            NANOVDB_ASSERT(mBegin <= mPos);// pos > mTableSize is allowed
+            NANOVDB_ASSERT(mBegin <= mEnd);// mTableSize = 0 is possible
         }
-        return nullptr;
-#endif
+        __hostdev__ inline operator bool() const { return mPos < mEnd; }
+        __hostdev__ inline auto pos() const {return mPos - mBegin; }
+        __hostdev__ inline TileIter& operator++()
+        {
+            ++mPos;
+            return *this;
+        }
+        __hostdev__ inline TileT& operator*() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return *mPos;
+        }
+        __hostdev__ inline TileT* operator->() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos;
+        }
+        __hostdev__ inline DataT* data() const
+        {
+            NANOVDB_ASSERT(mBegin);
+            return reinterpret_cast<DataT*>(mBegin) - 1;
+        }
+        __hostdev__ inline bool isChild() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child != 0;
+        }
+        __hostdev__ inline bool isValue() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child == 0;
+        }
+        __hostdev__ inline bool isValueOn() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child == 0 && mPos->state != 0;
+        }
+        __hostdev__ inline NodeT* child() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd && mPos->child != 0);
+            return util::PtrAdd<NodeT>(this->data(), mPos->child);// byte offset relative to RootData::this
+        }
+        __hostdev__ inline ValueT value() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd && mPos->child == 0);
+            return mPos->value;
+        }
+    };// TileIter
+
+    using TileIterator      = TileIter<RootData>;
+    using ConstTileIterator = TileIter<const RootData>;
+
+    __hostdev__ TileIterator       beginTile()       { return      TileIterator(this); }
+    __hostdev__ ConstTileIterator cbeginTile() const { return ConstTileIterator(this); }
+
+    __hostdev__ inline TileIterator probe(const CoordT& ijk)
+    {
+        const auto key = CoordToKey(ijk);
+        TileIterator iter(this);
+        for(; iter; ++iter) if (iter->key == key) break;
+        return iter;
+    }
+
+    __hostdev__ inline ConstTileIterator probe(const CoordT& ijk) const
+    {
+        const auto key = CoordToKey(ijk);
+        ConstTileIterator iter(this);
+        for(; iter; ++iter) if (iter->key == key) break;
+        return iter;
+    }
+
+    __hostdev__ inline Tile* probeTile(const CoordT& ijk)
+    {
+        auto iter = this->probe(ijk);
+        return iter ? iter.operator->() : nullptr;
     }
 
     __hostdev__ inline const Tile* probeTile(const CoordT& ijk) const
     {
         return const_cast<RootData*>(this)->probeTile(ijk);
+    }
+
+    __hostdev__ inline ChildT* probeChild(const CoordT& ijk)
+    {
+        auto iter = this->probe(ijk);
+        return iter && iter.isChild() ? iter.child() : nullptr;
+    }
+
+     __hostdev__ inline const ChildT* probeChild(const CoordT& ijk) const
+    {
+        return const_cast<RootData*>(this)->probeChild(ijk);
     }
 
     /// @brief Returns a const reference to the child node in the specified tile.
@@ -2694,30 +2775,16 @@ public:
     protected:
         using DataT = typename util::match_const<DataType, RootT>::type;
         using TileT = typename util::match_const<Tile, RootT>::type;
-        DataT*      mData;
-        uint32_t    mPos, mSize;
-        __hostdev__ BaseIter(DataT* data = nullptr, uint32_t n = 0)
-            : mData(data)
-            , mPos(0)
-            , mSize(n)
-        {
-        }
+        typename DataType::template TileIter<DataT> mTileIter;
+        __hostdev__ BaseIter() : mTileIter() {}
+        __hostdev__ BaseIter(DataT* data) : mTileIter(data){}
 
     public:
-        __hostdev__ operator bool() const { return mPos < mSize; }
-        __hostdev__ uint32_t  pos() const { return mPos; }
-        __hostdev__ void      next() { ++mPos; }
-        __hostdev__ TileT*    tile() const { return mData->tile(mPos); }
-        __hostdev__ CoordType getOrigin() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->origin();
-        }
-        __hostdev__ CoordType getCoord() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->origin();
-        }
+        __hostdev__ operator bool() const { return bool(mTileIter); }
+        __hostdev__ uint32_t  pos() const { return uint32_t(mTileIter.pos()); }
+        __hostdev__ TileT*    tile() const { return mTileIter.operator->(); }
+        __hostdev__ CoordType getOrigin() const {return mTileIter->origin();}
+        __hostdev__ CoordType getCoord()  const {return this->getOrigin();}
     }; // Member class BaseIter
 
     template<typename RootT>
@@ -2726,41 +2793,26 @@ public:
         static_assert(util::is_same<typename util::remove_const<RootT>::type, RootNode>::value, "Invalid RootT");
         using BaseT = BaseIter<RootT>;
         using NodeT = typename util::match_const<ChildT, RootT>::type;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ChildIter()
-            : BaseT()
+        __hostdev__ ChildIter() : BaseT() {}
+        __hostdev__ ChildIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && mTileIter.isValue()) ++mTileIter;
         }
-        __hostdev__ ChildIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && !this->tile()->isChild())
-                this->next();
-        }
-        __hostdev__ NodeT& operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return *BaseT::mData->getChild(this->tile());
-        }
-        __hostdev__ NodeT* operator->() const
-        {
-            NANOVDB_ASSERT(*this);
-            return BaseT::mData->getChild(this->tile());
-        }
+        __hostdev__ NodeT& operator*()  const {return *mTileIter.child();}
+        __hostdev__ NodeT* operator->() const {return  mTileIter.child();}
         __hostdev__ ChildIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && this->tile()->isValue())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && mTileIter.isValue()) ++mTileIter;
             return *this;
         }
         __hostdev__ ChildIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ChildIter
@@ -2768,48 +2820,33 @@ public:
     using ChildIterator      = ChildIter<RootNode>;
     using ConstChildIterator = ChildIter<const RootNode>;
 
-    __hostdev__ ChildIterator       beginChild() { return ChildIterator(this); }
+    __hostdev__ ChildIterator       beginChild()       { return      ChildIterator(this); }
     __hostdev__ ConstChildIterator cbeginChild() const { return ConstChildIterator(this); }
 
     template<typename RootT>
     class ValueIter : public BaseIter<RootT>
     {
         using BaseT = BaseIter<RootT>;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ValueIter()
-            : BaseT()
+        __hostdev__ ValueIter() : BaseT(){}
+        __hostdev__ ValueIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && mTileIter.isChild()) ++mTileIter;
         }
-        __hostdev__ ValueIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && this->tile()->isChild())
-                this->next();
-        }
-        __hostdev__ ValueType operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->value;
-        }
-        __hostdev__ bool isActive() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->state;
-        }
+        __hostdev__ ValueType operator*() const {return mTileIter.value();}
+        __hostdev__ bool isActive() const {return mTileIter.isValueOn();}
         __hostdev__ ValueIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && this->tile()->isChild())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && mTileIter.isChild()) ++mTileIter;
             return *this;
         }
         __hostdev__ ValueIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ValueIter
@@ -2817,43 +2854,32 @@ public:
     using ValueIterator = ValueIter<RootNode>;
     using ConstValueIterator = ValueIter<const RootNode>;
 
-    __hostdev__ ValueIterator      beginValue() { return ValueIterator(this); }
+    __hostdev__ ValueIterator       beginValue()          { return      ValueIterator(this); }
     __hostdev__ ConstValueIterator cbeginValueAll() const { return ConstValueIterator(this); }
 
     template<typename RootT>
     class ValueOnIter : public BaseIter<RootT>
     {
         using BaseT = BaseIter<RootT>;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ValueOnIter()
-            : BaseT()
+        __hostdev__ ValueOnIter() : BaseT(){}
+        __hostdev__ ValueOnIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && !mTileIter.isValueOn()) ++mTileIter;
         }
-        __hostdev__ ValueOnIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && !this->tile()->isActive())
-                ++BaseT::mPos;
-        }
-        __hostdev__ ValueType operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->value;
-        }
+        __hostdev__ ValueType operator*() const {return mTileIter.value();}
         __hostdev__ ValueOnIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && !this->tile()->isActive())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && !mTileIter.isValueOn()) ++mTileIter;
             return *this;
         }
         __hostdev__ ValueOnIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ValueOnIter
@@ -2861,7 +2887,7 @@ public:
     using ValueOnIterator = ValueOnIter<RootNode>;
     using ConstValueOnIterator = ValueOnIter<const RootNode>;
 
-    __hostdev__ ValueOnIterator      beginValueOn() { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator       beginValueOn()       { return      ValueOnIterator(this); }
     __hostdev__ ConstValueOnIterator cbeginValueOn() const { return ConstValueOnIterator(this); }
 
     template<typename RootT>
@@ -2869,53 +2895,36 @@ public:
     {
         using BaseT = BaseIter<RootT>;
         using NodeT = typename util::match_const<ChildT, RootT>::type;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ DenseIter()
-            : BaseT()
-        {
-        }
-        __hostdev__ DenseIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-        }
+        __hostdev__ DenseIter() : BaseT(){}
+        __hostdev__ DenseIter(RootT* parent) : BaseT(parent->data()){}
         __hostdev__ NodeT* probeChild(ValueType& value) const
         {
-            NANOVDB_ASSERT(*this);
-            NodeT* child = nullptr;
-            auto*  t = this->tile();
-            if (t->isChild()) {
-                child = BaseT::mData->getChild(t);
-            } else {
-                value = t->value;
-            }
-            return child;
+            if (mTileIter.isChild()) return mTileIter.child();
+            value = mTileIter.value();
+            return nullptr;
         }
-        __hostdev__ bool isValueOn() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->state;
-        }
+        __hostdev__ bool isValueOn() const{return mTileIter.isValueOn();}
         __hostdev__ DenseIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
+            ++mTileIter;
             return *this;
         }
         __hostdev__ DenseIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            ++mTileIter;
             return tmp;
         }
     }; // Member class DenseIter
 
-    using DenseIterator = DenseIter<RootNode>;
+    using DenseIterator      = DenseIter<RootNode>;
     using ConstDenseIterator = DenseIter<const RootNode>;
 
-    __hostdev__ DenseIterator      beginDense() { return DenseIterator(this); }
-    __hostdev__ ConstDenseIterator cbeginDense() const { return ConstDenseIterator(this); }
+    __hostdev__ DenseIterator       beginDense()          { return      DenseIterator(this); }
+    __hostdev__ ConstDenseIterator cbeginDense() const    { return ConstDenseIterator(this); }
     __hostdev__ ConstDenseIterator cbeginChildAll() const { return ConstDenseIterator(this); }
 
     /// @brief This class cannot be constructed or deleted
@@ -3020,18 +3029,6 @@ public:
     }
 
 #endif // NANOVDB_NEW_ACCESSOR_METHODS
-
-    __hostdev__ const ChildNodeType* probeChild(const CoordType& ijk) const
-    {
-        const Tile* tile = DataType::probeTile(ijk);
-        return tile && tile->isChild() ? this->getChild(tile) : nullptr;
-    }
-
-    __hostdev__ ChildNodeType* probeChild(const CoordType& ijk)
-    {
-        const Tile* tile = DataType::probeTile(ijk);
-        return tile && tile->isChild() ? this->getChild(tile) : nullptr;
-    }
 
     template<typename OpT, typename... ArgsT>
     __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
