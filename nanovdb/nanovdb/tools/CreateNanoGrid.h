@@ -846,7 +846,7 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         , order(i)// sorted id of meta data
         , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
-        std::memset(metaData, 0, sizeof(GridBlindMetaData));// zero out all meta data
+        std::memset(reinterpret_cast<char*>(metaData), 0, sizeof(GridBlindMetaData));// zero out all meta data
         if (name.length()>=GridData::MaxNameSize) throw std::runtime_error("blind data name exceeds character limit");
         std::memcpy(metaData->mName, name.c_str(), name.length() + 1);
         metaData->mValueCount = valueCount;
