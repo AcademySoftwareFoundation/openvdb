@@ -1565,6 +1565,16 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     char                  mName[MaxNameSize]; // note this includes the NULL termination
     // no padding required for 32 byte alignment
 
+    GridBlindMetaData(int64_t dataOffset, uint64_t valueCount, uint32_t valueSize, GridBlindDataSemantic semantic, GridBlindDataClass dataClass, GridType dataType)
+        : mDataOffset(dataOffset)
+        , mValueCount(valueCount)
+        , mValueSize(valueSize)
+        , mSemantic(semantic)
+        , mDataClass(dataClass)
+        , mDataType(dataType)
+    {
+    }
+
     // disallow copy-construction since methods like blindData and getBlindData uses the this pointer!
     GridBlindMetaData(const GridBlindMetaData&) = delete;
 
