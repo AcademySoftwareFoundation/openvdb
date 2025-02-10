@@ -2199,6 +2199,50 @@ TEST_F(TestNanoVDB, RootNode)
     }
 } // RootNode
 
+TEST_F(TestNanoVDB, GridBlindMetaData)
+{
+    nanovdb::GridBlindMetaData meta0;
+    EXPECT_FALSE(meta0.isValid());
+    EXPECT_TRUE(std::string(meta0.mName).empty());
+    EXPECT_EQ(nullptr, meta0.getBlindData<float>());
+    EXPECT_EQ(nullptr, meta0.getBlindData<int>());
+
+    const std::string name("this is a test");
+    nanovdb::GridBlindMetaData meta(0, 10, sizeof(float),
+                                    nanovdb::GridBlindDataSemantic::Unknown,
+                                    nanovdb::GridBlindDataClass::AttributeArray,
+                                    nanovdb::GridType::Float);
+    EXPECT_TRUE(meta.isValid());
+    EXPECT_TRUE(std::string(meta.mName).empty());
+    meta.setName("this is a test");
+    EXPECT_EQ(std::string(meta.mName), name);
+
+    float *data = new float[10];
+    EXPECT_TRUE(data);
+    meta.setBlindData(data);
+    EXPECT_TRUE(meta.isValid());
+    EXPECT_EQ(std::string(meta.mName), name);
+    EXPECT_EQ((const void*)data, meta.blindData());
+    EXPECT_EQ(data, meta.getBlindData<float>());
+    EXPECT_EQ(nullptr, meta.getBlindData<int>());
+
+    auto meta2 = meta;
+    EXPECT_TRUE(meta2.isValid());
+    EXPECT_EQ(std::string(meta2.mName), name);
+    EXPECT_EQ((const void*)data, meta2.blindData());
+    EXPECT_EQ(data, meta2.getBlindData<float>());
+    EXPECT_EQ(nullptr, meta2.getBlindData<int>());
+
+    nanovdb::GridBlindMetaData meta3(meta);
+    EXPECT_TRUE(meta3.isValid());
+    EXPECT_EQ(std::string(meta3.mName), name);
+    EXPECT_EQ((const void*)data, meta3.blindData());
+    EXPECT_EQ(data, meta3.getBlindData<float>());
+    EXPECT_EQ(nullptr, meta3.getBlindData<int>());
+
+    delete [] data;
+}// GridBlindMetaData
+
 TEST_F(TestNanoVDB, Offsets)
 {
     {// check GridBlindMetaData

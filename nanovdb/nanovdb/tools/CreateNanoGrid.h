@@ -823,18 +823,11 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
                   const std::string& type,// used to derive GridType of blind data
                   GridBlindDataClass dataClass,
                   size_t i, size_t valueCount, size_t valueSize)
-        : metaData(reinterpret_cast<GridBlindMetaData*>(new char[sizeof(GridBlindMetaData)]))
+        : metaData(new GridBlindMetaData(0, valueCount, valueSize, this->mapToSemantics(name), dataClass, this->mapToType(type)))
         , order(i)// sorted id of meta data
         , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
-        util::memzero(metaData, sizeof(GridBlindMetaData));// zero out all meta data
-        if (name.length()>=GridData::MaxNameSize) throw std::runtime_error("blind data name exceeds limit");
-        std::memcpy(metaData->mName, name.c_str(), name.length() + 1);
-        metaData->mValueCount = valueCount;
-        metaData->mSemantic = BlindMetaData::mapToSemantics(name);
-        metaData->mDataClass = dataClass;
-        metaData->mDataType = BlindMetaData::mapToType(type);
-        metaData->mValueSize = valueSize;
+        if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
     BlindMetaData(const std::string& name,// only name
@@ -842,21 +835,14 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
                   GridBlindDataClass dataClass,
                   GridType dataType,
                   size_t i, size_t valueCount, size_t valueSize)
-        : metaData(reinterpret_cast<GridBlindMetaData*>(new char[sizeof(GridBlindMetaData)]))
+        : metaData(new GridBlindMetaData(0, valueCount, valueSize, dataSemantic, dataClass, dataType))
         , order(i)// sorted id of meta data
         , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
-        std::memset(reinterpret_cast<char*>(metaData), 0, sizeof(GridBlindMetaData));// zero out all meta data
-        if (name.length()>=GridData::MaxNameSize) throw std::runtime_error("blind data name exceeds character limit");
-        std::memcpy(metaData->mName, name.c_str(), name.length() + 1);
-        metaData->mValueCount = valueCount;
-        metaData->mSemantic = dataSemantic;
-        metaData->mDataClass = dataClass;
-        metaData->mDataType = dataType;
-        metaData->mValueSize = valueSize;
+        if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    ~BlindMetaData(){ delete [] reinterpret_cast<char*>(metaData); }
+    ~BlindMetaData(){ delete metaData; }
     bool operator<(const BlindMetaData& other) const { return order < other.order; } // required by std::set
     static GridType mapToType(const std::string& name)
     {
@@ -890,8 +876,8 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         }
         return semantic;
     }
-    GridBlindMetaData *metaData;
-    const size_t       order, size;
+    GridBlindMetaData *metaData;// a pointer is preferred since it avoids deep copy during sorting
+    const size_t       order, size;// sorted order and total byte size of corresponding blind data
 }; // CreateNanoGrid::BlindMetaData
 
 //================================================================================================

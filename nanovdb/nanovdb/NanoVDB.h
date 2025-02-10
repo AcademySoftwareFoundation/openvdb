@@ -99,12 +99,19 @@
 
     Array of: LeafNodes of size 8^3: bbox, bit masks, 512 voxel values, and min/max/avg/standard deviation values
 
+    ... optional padding ...
+
+    Array of: GridBlindMetaData (288 bytes). The offset and count are defined in GridData::mBlindMetadataOffset and GridData::mBlindMetadataCount
+
+    ... optional padding ...
+
+    Array of: blind data
 
     Notation: "]---[" implies it has optional padding, and "][" implies zero padding
 
     [GridData(672B)][TreeData(64B)]---[RootData][N x Root::Tile]---[InternalData<5>]---[InternalData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
-    ^                                 ^         ^                  ^                   ^                   ^
-    |                                 |         |                  |                   |                   |
+    ^                                 ^         ^                  ^                   ^                   ^               ^
+    |                                 |         |                  |                   |                   |               GridBlindMetaData*
     +-- Start of 32B aligned buffer   |         |                  |                   |                   +-- Node0::DataType* leafData
         GridType::DataType* gridData  |         |                  |                   |
                                       |         |                  |                   +-- Node1::DataType* lowerData
@@ -1553,7 +1560,7 @@ inline void Map::set(double dx, const Vec3T& trans, double taper)
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
 { // 288 bytes
     static const int      MaxNameSize = 256; // due to NULL termination the maximum length is one less!
-    int64_t               mDataOffset; // byte offset to the blind data, relative to this GridBlindMetaData.
+    int64_t               mDataOffset; // byte offset to the blind data, relative to GridBlindMetaData::this.
     uint64_t              mValueCount; // number of blind values, e.g. point count
     uint32_t              mValueSize;// byte size of each value, e.g. 4 if mDataType=Float and 1 if mDataType=Unknown since that amounts to char
     GridBlindDataSemantic mSemantic; // semantic meaning of the data.
@@ -1561,6 +1568,18 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     GridType              mDataType; // 4 bytes
     char                  mName[MaxNameSize]; // note this includes the NULL termination
     // no padding required for 32 byte alignment
+
+    /// @brief Empty constructor
+    GridBlindMetaData()
+        : mDataOffset(0)
+        , mValueCount(0)
+        , mValueSize(0)
+        , mSemantic(GridBlindDataSemantic::Unknown)
+        , mDataClass(GridBlindDataClass::Unknown)
+        , mDataType(GridType::Unknown)
+    {
+        util::memzero(mName, MaxNameSize);
+    }
 
     GridBlindMetaData(int64_t dataOffset, uint64_t valueCount, uint32_t valueSize, GridBlindDataSemantic semantic, GridBlindDataClass dataClass, GridType dataType)
         : mDataOffset(dataOffset)
@@ -1570,18 +1589,53 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
         , mDataClass(dataClass)
         , mDataType(dataType)
     {
+        util::memzero(mName, MaxNameSize);
     }
 
-    // disallow copy-construction since methods like blindData and getBlindData uses the this pointer!
-    GridBlindMetaData(const GridBlindMetaData&) = delete;
+    /// @brief Copy constructor that resets mDataOffset and zeros out mName
+    GridBlindMetaData(const GridBlindMetaData &other)
+        : mDataOffset(util::PtrDiff(util::PtrAdd(&other, other.mDataOffset), this))
+        , mValueCount(other.mValueCount)
+        , mValueSize(other.mValueSize)
+        , mSemantic(other.mSemantic)
+        , mDataClass(other.mDataClass)
+        , mDataType(other.mDataType)
+    {
+        util::strncpy(mName, other.mName, MaxNameSize);
+    }
 
-    // disallow copy-assignment since methods like blindData and getBlindData uses the this pointer!
-    const GridBlindMetaData& operator=(const GridBlindMetaData&) = delete;
+    /// @brief Copy assignment operator that resets mDataOffset and copies mName
+    /// @param rhs right-hand instance to copy
+    /// @return reference to itself
+    const GridBlindMetaData& operator=(const GridBlindMetaData& rhs)
+    {
+        mDataOffset = util::PtrDiff(util::PtrAdd(&rhs, rhs.mDataOffset), this);
+        mValueCount = rhs.mValueCount;
+        mValueSize  = rhs. mValueSize;
+        mSemantic   = rhs.mSemantic;
+        mDataClass  = rhs.mDataClass;
+        mDataType   = rhs.mDataType;
+        util::strncpy(mName, rhs.mName, MaxNameSize);
+        return *this;
+    }
 
-    __hostdev__ void setBlindData(void* blindData) { mDataOffset = util::PtrDiff(blindData, this); }
+    __hostdev__ void setBlindData(const void* blindData)
+    {
+        mDataOffset = util::PtrDiff(blindData, this);
+    }
 
-    // unsafe
-    __hostdev__ const void* blindData() const {return util::PtrAdd(this, mDataOffset);}
+    /// @brief Sets the name string
+    /// @param name c-string source name
+    /// @return returns false if @c name has too many characters
+    __hostdev__  bool setName(const char* name){return util::strncpy(mName, name, MaxNameSize)[MaxNameSize-1] == '\0';}
+
+    /// @brief returns a const void point to the blind data
+    /// @note assumes that setBlinddData was called
+    __hostdev__ const void* blindData() const
+    {
+        NANOVDB_ASSERT(mDataOffset != 0);
+        return util::PtrAdd(this, mDataOffset);
+    }
 
     /// @brief Get a const pointer to the blind data represented by this meta data
     /// @tparam BlindDataT Expected value type of the blind data.
@@ -1590,11 +1644,11 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     template<typename BlindDataT>
     __hostdev__ const BlindDataT* getBlindData() const
     {
-        //if (mDataType != toGridType<BlindDataT>()) printf("getBlindData mismatch\n");
-        return mDataType == toGridType<BlindDataT>() ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
+        return mDataOffset && (mDataType == toGridType<BlindDataT>()) ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
     }
 
     /// @brief return true if this meta data has a valid combination of semantic, class and value tags
+    /// @note this does not check if the mDataOffset has been set!
     __hostdev__ bool isValid() const
     {
         auto check = [&]()->bool{
