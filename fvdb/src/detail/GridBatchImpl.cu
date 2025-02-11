@@ -139,7 +139,7 @@ GridBatchImpl::recomputeBatchOffsets() {
 torch::Tensor
 GridBatchImpl::gridToWorldMatrix(int64_t bi) const {
     bi = negativeToPositiveIndexWithRangecheck(bi);
-    return torch::linalg::inv(worldToGridMatrix(bi));
+    return at::linalg_inv(worldToGridMatrix(bi));
 }
 
 c10::intrusive_ptr<GridBatchImpl>
