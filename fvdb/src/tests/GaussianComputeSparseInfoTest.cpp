@@ -22,7 +22,7 @@ using fvdb::test::TileBitMask;
 // 4. pixelMap: A 1D tensor of pixel ordinals sorted by tile and pixel order within the tile
 // given the tensor of UV pixel coordinates and the tile and image sizes
 template <typename CoordType>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 expectedTensors(fvdb::JaggedTensor const &uvsCPU, std::int64_t tileSize,
                 std::int64_t numTilesPerAxis, std::int64_t numPixelsPerAxis) {
     std::int64_t                           numImages = uvsCPU.num_outer_lists();
@@ -33,6 +33,10 @@ expectedTensors(fvdb::JaggedTensor const &uvsCPU, std::int64_t tileSize,
     std::vector<std::vector<std::int64_t>> tilePixelKeys(numTiles * numImages);
     std::vector<std::uint64_t>             tileBitMasks;
     std::set<std::uint64_t>                activeTiles;
+
+    torch::Tensor activeTileMask = torch::zeros({ numImages, numTilesPerAxis, numTilesPerAxis },
+                                                tensorOpts<bool>(uvsCPU.device()));
+    auto          activeTileMaskAccessor = activeTileMask.accessor<bool, 3>();
 
     auto uvsCPUAccessor = uvsCPU.jdata().accessor<CoordType, 2>();
 
@@ -50,6 +54,7 @@ expectedTensors(fvdb::JaggedTensor const &uvsCPU, std::int64_t tileSize,
             auto pixelId = image * numPixels + pixelV * numPixelsPerAxis + pixelU;
 
             activeTiles.insert(tileId);
+            activeTileMaskAccessor[image][tileV][tileU] = true;
             tilePixelIds[tileId].push_back(pixelOrdinal);
             tilePixelKeys[tileId].push_back(pixelId);
         }
@@ -102,8 +107,8 @@ expectedTensors(fvdb::JaggedTensor const &uvsCPU, std::int64_t tileSize,
                                       { static_cast<std::int64_t>(expectedPixelMap.size()) },
                                       tensorOpts<std::int64_t>(uvsCPU.device()));
 
-    return { activeTilesT.clone(), tileBitMasksT.clone(), pixelsPerTileT.clone(),
-             pixelMapT.clone() };
+    return { activeTilesT.clone(), activeTileMask.to(activeTilesT.device()), tileBitMasksT.clone(),
+             pixelsPerTileT.clone(), pixelMapT.clone() };
 }
 
 // Randomize the order of the UVs within each image in a JaggedTensor
@@ -179,15 +184,18 @@ template <typename CoordType> struct ComputeSparseInfo : public ::testing::Test 
         }();
         auto uvs = uvsCPU.to(torch::kCUDA);
 
-        auto [activeTiles, tileBitMasks, tilePixelOffsets, pixelMap] =
+        auto [activeTiles, activeTileMask, tileBitMasks, tilePixelOffsets, pixelMap] =
             fvdb::detail::ops::computeSparseInfo(this->mTileSize, this->mNumTilesPerAxis,
                                                  this->mNumTilesPerAxis, uvs);
 
-        auto [expectedActiveTiles, expectedBitMasks, expectedPixelOffsets, expectedPixelMap] =
+        auto [expectedActiveTiles, expectedActiveTileMask, expectedBitMasks, expectedPixelOffsets,
+              expectedPixelMap] =
             expectedTensors<CoordType>(uvsCPU, this->mTileSize, this->mNumTilesPerAxis,
                                        this->mNumPixelsPerAxis);
 
         EXPECT_TRUE(torch::equal(activeTiles, expectedActiveTiles.to(activeTiles.device())));
+        EXPECT_TRUE(
+            torch::equal(activeTileMask, expectedActiveTileMask.to(activeTileMask.device())));
         EXPECT_TRUE(torch::equal(tileBitMasks, expectedBitMasks.to(tileBitMasks.device())));
         EXPECT_TRUE(
             torch::equal(tilePixelOffsets, expectedPixelOffsets.to(tilePixelOffsets.device())));
@@ -228,11 +236,13 @@ TYPED_TEST(ComputeSparseInfo, Empty) {
     auto opts = tensorOpts<TypeParam>();
 
     auto const emptyPixels = fvdb::JaggedTensor(torch::empty({ 0, 0 }, opts));
-    auto [activeTiles, tileBitMask, tilePixelOffsets, pixelMap] =
+    auto [activeTiles, activeTileMask, tileBitMask, tilePixelOffsets, pixelMap] =
         fvdb::detail::ops::computeSparseInfo(this->mTileSize, 4, 4, emptyPixels);
 
     EXPECT_TRUE(
         torch::equal(activeTiles, torch::empty({ 0 }, tensorOpts<std::int32_t>(torch::kCUDA))));
+    EXPECT_TRUE(
+        torch::equal(activeTileMask, torch::zeros({ 1, 4, 4 }, tensorOpts<bool>(torch::kCUDA))));
     EXPECT_TRUE(torch::equal(tileBitMask, torch::empty({ 0, this->mNumWordsPerTile },
                                                        tensorOpts<std::uint64_t>(torch::kCUDA))));
     EXPECT_TRUE(torch::equal(tilePixelOffsets,

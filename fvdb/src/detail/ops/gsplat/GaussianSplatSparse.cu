@@ -202,7 +202,7 @@ zeros(at::IntArrayRef dims, c10::ScalarType dtype, torch::Device device) {
     return torch::zeros(dims, torch::TensorOptions().device(device).dtype(dtype));
 }
 
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const int32_t numTilesH,
                   const fvdb::JaggedTensor &pixelsToRender) {
     TORCH_CHECK_NOT_IMPLEMENTED(pixelsToRender.device().is_cuda(),
@@ -221,18 +221,19 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
 
     const torch::Device device = pixelsToRender.device();
 
-    if (numImages == 0 || numPixels == 0) {
-        return { empty({ 0 }, torch::kInt, device),
-                 empty({ 0, numWordsPerTileBitmask }, torch::kLong, device),
-                 zeros({ 1 }, torch::kLong, device), empty({ 0 }, torch::kLong, device) };
-    }
-
     const torch::TensorOptions optionsInt64 =
         torch::TensorOptions().device(device).dtype(torch::kInt64);
     const torch::TensorOptions optionsInt32 =
         torch::TensorOptions().device(device).dtype(torch::kInt32);
     const torch::TensorOptions optionsBool =
         torch::TensorOptions().device(device).dtype(torch::kBool);
+
+    if (numImages == 0 || numPixels == 0) {
+        return { empty({ 0 }, torch::kInt, device),
+                 zeros({ numImages, numTilesW, numTilesH }, torch::kBool, device),
+                 empty({ 0, numWordsPerTileBitmask }, torch::kLong, device),
+                 zeros({ 1 }, torch::kLong, device), empty({ 0 }, torch::kLong, device) };
+    }
 
     // Compute a boolean tile
     torch::Tensor tileMask = torch::zeros({ numTilesW * numTilesH * numImages }, optionsBool);
@@ -250,6 +251,8 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
             tileSideLength, numTilesW, numTilesH, outMaskAccessor, outTileIdAccessor);
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
+
+    tileMask = tileMask.view({ numImages, numTilesH, numTilesW });
 
     // Sort pixels by their tile id and store the inverse mapping from sorted to original
     // TODO can we reduce the data sizes here?
@@ -319,7 +322,8 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     //        i.e. Suppose we're rendering the k^th active pixel in tile_id = active_tiles[t],
     //             we write its rendered value to index pixel_map[tile_pixel_cumsum[tile_id-1] +
     //             k] in the output
-    return std::make_tuple(uniqueTileIds, tileBitMask, numPixelsPerTile, unsortPerPixelTileIds);
+    return std::make_tuple(uniqueTileIds, tileMask, tileBitMask, numPixelsPerTile,
+                           unsortPerPixelTileIds);
 }
 
 } // namespace fvdb::detail::ops
