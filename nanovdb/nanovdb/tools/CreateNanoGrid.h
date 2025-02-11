@@ -774,8 +774,8 @@ private:
 
     std::unique_ptr<SrcNodeAccT> mSrcNodeAccPtr;// placeholder for potential local instance
     const SrcNodeAccT       &mSrcNodeAcc;
-    struct BlindMetaData; // forward declaration
-    std::set<BlindMetaData>  mBlindMetaData; // sorted according to BlindMetaData.order
+    struct OrderedBlindMetaData; // forward declaration
+    std::set<OrderedBlindMetaData>  mBlindMetaData; // sorted set of GridBlindMetaData
     struct Codec { float min, max; uint64_t offset; uint8_t log2; };// used for adaptive bit-rate quantization
     std::unique_ptr<Codec[]> mCodec;// defines a codec per leaf node when DstBuildT = FpN
     StatsMode                mStats;
@@ -817,33 +817,31 @@ CreateNanoGrid<SrcGridT>::CreateNanoGrid(const SrcNodeAccT &srcNodeAcc)
 //================================================================================================
 
 template <typename SrcGridT>
-struct CreateNanoGrid<SrcGridT>::BlindMetaData
+struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
 {
-    BlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
-                  const std::string& type,// used to derive GridType of blind data
-                  GridBlindDataClass dataClass,
-                  size_t i, size_t valueCount, size_t valueSize)
+    OrderedBlindMetaData(const std::string& name,// name + used to derive GridBlindDataSemantic
+                         const std::string& type,// used to derive GridType of blind data
+                         GridBlindDataClass dataClass,
+                         size_t i, size_t valueCount, size_t valueSize)
         : metaData(new GridBlindMetaData(0, valueCount, valueSize, this->mapToSemantics(name), dataClass, this->mapToType(type)))
         , order(i)// sorted id of meta data
-        , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
         if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    BlindMetaData(const std::string& name,// only name
-                  GridBlindDataSemantic dataSemantic,
-                  GridBlindDataClass dataClass,
-                  GridType dataType,
-                  size_t i, size_t valueCount, size_t valueSize)
+    OrderedBlindMetaData(const std::string& name,// only name
+                         GridBlindDataSemantic dataSemantic,
+                         GridBlindDataClass dataClass,
+                         GridType dataType,
+                         size_t i, size_t valueCount, size_t valueSize)
         : metaData(new GridBlindMetaData(0, valueCount, valueSize, dataSemantic, dataClass, dataType))
         , order(i)// sorted id of meta data
-        , size(math::AlignUp<NANOVDB_DATA_ALIGNMENT>(valueCount * valueSize))
     {
         if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
         NANOVDB_ASSERT(metaData->isValid());
     }
-    ~BlindMetaData(){ delete metaData; }
-    bool operator<(const BlindMetaData& other) const { return order < other.order; } // required by std::set
+    ~OrderedBlindMetaData(){ delete metaData; }
+    bool operator<(const OrderedBlindMetaData& other) const { return order < other.order; } // required by std::set
     static GridType mapToType(const std::string& name)
     {
         GridType type = GridType::Unknown;
@@ -876,9 +874,10 @@ struct CreateNanoGrid<SrcGridT>::BlindMetaData
         }
         return semantic;
     }
+    size_t memUsage() const {return metaData->blindDataSize();}
     GridBlindMetaData *metaData;// a pointer is preferred since it avoids deep copy during sorting
-    const size_t       order, size;// sorted order and total byte size of corresponding blind data
-}; // CreateNanoGrid::BlindMetaData
+    const size_t       order;// index used for sorting of the blind meta data
+}; // CreateNanoGrid::OrderedBlindMetaData
 
 //================================================================================================
 
@@ -940,7 +939,7 @@ GridHandle<BufferT> CreateNanoGrid<SrcGridT>::initHandle(const BufferT& pool)
     mOffset.meta  = mOffset.leaf  + mLeafNodeSize;// leaf nodes end and blind meta data begins
     mOffset.blind = mOffset.meta  + sizeof(GridBlindMetaData)*mBlindMetaData.size(); // meta data ends and blind data begins
     mOffset.size  = mOffset.blind;// end of buffer
-    for (const auto& b : mBlindMetaData) mOffset.size += b.size; // accumulate all the blind data
+    for (const auto& b : mBlindMetaData) mOffset.size += b.memUsage(); // accumulate all the blind data
 
     auto buffer = BufferT::create(mOffset.size, &pool);
     mBufferPtr = buffer.data();
@@ -1731,7 +1730,7 @@ void CreateNanoGrid<SrcGridT>::processGrid()
             metaData->setBlindData(blindData);// sets metaData.mOffset
             if (metaData->mDataClass == GridBlindDataClass::GridName) strcpy(blindData, mSrcNodeAcc.getName().c_str());
             ++metaData;
-            blindData += b.size;
+            blindData += b.memUsage();
         }
         mBlindMetaData.clear();
     }
