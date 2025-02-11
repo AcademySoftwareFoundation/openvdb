@@ -81,7 +81,7 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     TORCH_CHECK(Ks.dim() == 3, "Ks must have shape (C, 3, 3)");
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-        return ops::dispatchGaussianFullyFusedProjectionForward<DeviceTag>(
+        return ops::dispatchGaussianProjectionForward<DeviceTag>(
             means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane,
             far_plane, radius_clip, calc_compensations, ortho);
     });
@@ -156,7 +156,7 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     const bool  ortho        = (bool)ctx->saved_data["ortho"].toBool();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-        return ops::dispatchGaussianFullyFusedProjectionBackward<DeviceTag>(
+        return ops::dispatchGaussianProjectionBackward<DeviceTag>(
             means, quats, scales, viewmats, Ks, compensations, image_width, image_height, eps2d,
             radii, conics, v_means2d, v_depths, v_conics, v_compensations, ctx->needs_input_grad(4),
             ortho);
@@ -273,7 +273,7 @@ GaussianFullyFusedProjectionJagged::forward(
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
     const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-        return ops::dispatchGaussianFullyFusedProjectionJaggedForward<DeviceTag>(
+        return ops::dispatchGaussianProjectionJaggedForward<DeviceTag>(
             g_sizes, means, quats, scales, c_sizes, viewmats, Ks, image_width, image_height, eps2d,
             near_plane, far_plane, radius_clip, ortho);
     });
@@ -327,7 +327,7 @@ GaussianFullyFusedProjectionJagged::backward(
     const bool  ortho        = (bool)ctx->saved_data["ortho"].toBool();
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-        return ops::dispatchGaussianFullyFusedProjectionJaggedBackward<DeviceTag>(
+        return ops::dispatchGaussianProjectionJaggedBackward<DeviceTag>(
             g_sizes, means, quats, scales, c_sizes, viewmats, Ks, image_width, image_height, eps2d,
             radii, conics, v_means2d, v_depths, v_conics, ctx->needs_input_grad(6), ortho);
     });

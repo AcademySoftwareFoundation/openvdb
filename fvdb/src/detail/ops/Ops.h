@@ -340,19 +340,19 @@ dispatchSphericalHarmonicsBackward(const int            sh_degree_to_use,
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianFullyFusedProjectionForward(const torch::Tensor &means,    // [N, 3]
-                                            const torch::Tensor &quats,    // [N, 4]
-                                            const torch::Tensor &scales,   // [N, 3]
-                                            const torch::Tensor &viewmats, // [C, 4, 4]
-                                            const torch::Tensor &Ks,       // [C, 3, 3]
-                                            const uint32_t image_width, const uint32_t image_height,
-                                            const float eps2d, const float near_plane,
-                                            const float far_plane, const float radius_clip,
-                                            const bool calc_compensations, const bool ortho);
+dispatchGaussianProjectionForward(const torch::Tensor &means,    // [N, 3]
+                                  const torch::Tensor &quats,    // [N, 4]
+                                  const torch::Tensor &scales,   // [N, 3]
+                                  const torch::Tensor &viewmats, // [C, 4, 4]
+                                  const torch::Tensor &Ks,       // [C, 3, 3]
+                                  const uint32_t image_width, const uint32_t image_height,
+                                  const float eps2d, const float near_plane, const float far_plane,
+                                  const float radius_clip, const bool calc_compensations,
+                                  const bool ortho);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianFullyFusedProjectionBackward(
+dispatchGaussianProjectionBackward(
     // fwd inputs
     const torch::Tensor               &means,         // [N, 3]
     const torch::Tensor               &quats,         // [N, 4]
@@ -420,34 +420,35 @@ dispatchGaussianRasterizeBackward(
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianFullyFusedProjectionJaggedForward(
-    const torch::Tensor &g_sizes,  // [B] gaussian sizes
-    const torch::Tensor &means,    // [ggz, 3]
-    const torch::Tensor &quats,    // [ggz, 4] optional
-    const torch::Tensor &scales,   // [ggz, 3] optional
-    const torch::Tensor &c_sizes,  // [B] camera sizes
-    const torch::Tensor &viewmats, // [ccz, 4, 4]
-    const torch::Tensor &Ks,       // [ccz, 3, 3]
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip, const bool ortho);
+dispatchGaussianProjectionJaggedForward(const torch::Tensor &g_sizes,  // [B] gaussian sizes
+                                        const torch::Tensor &means,    // [ggz, 3]
+                                        const torch::Tensor &quats,    // [ggz, 4] optional
+                                        const torch::Tensor &scales,   // [ggz, 3] optional
+                                        const torch::Tensor &c_sizes,  // [B] camera sizes
+                                        const torch::Tensor &viewmats, // [ccz, 4, 4]
+                                        const torch::Tensor &Ks,       // [ccz, 3, 3]
+                                        const uint32_t image_width, const uint32_t image_height,
+                                        const float eps2d, const float near_plane,
+                                        const float far_plane, const float radius_clip,
+                                        const bool ortho);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianFullyFusedProjectionJaggedBackward(
-    const torch::Tensor &g_sizes,   // [B] gaussian sizes
-    const torch::Tensor &means,     // [ggz, 3]
-    const torch::Tensor &quats,     // [ggz, 4] optional
-    const torch::Tensor &scales,    // [ggz, 3] optional
-    const torch::Tensor &c_sizes,   // [B] camera sizes
-    const torch::Tensor &viewmats,  // [ccz, 4, 4]
-    const torch::Tensor &Ks,        // [ccz, 3, 3]
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const torch::Tensor &radii,     // [nnz]
-    const torch::Tensor &conics,    // [nnz, 3]
-    const torch::Tensor &v_means2d, // [nnz, 2]
-    const torch::Tensor &v_depths,  // [nnz]
-    const torch::Tensor &v_conics,  // [nnz, 3]
-    const bool viewmats_requires_grad, const bool ortho);
+dispatchGaussianProjectionJaggedBackward(const torch::Tensor &g_sizes,   // [B] gaussian sizes
+                                         const torch::Tensor &means,     // [ggz, 3]
+                                         const torch::Tensor &quats,     // [ggz, 4] optional
+                                         const torch::Tensor &scales,    // [ggz, 3] optional
+                                         const torch::Tensor &c_sizes,   // [B] camera sizes
+                                         const torch::Tensor &viewmats,  // [ccz, 4, 4]
+                                         const torch::Tensor &Ks,        // [ccz, 3, 3]
+                                         const uint32_t image_width, const uint32_t image_height,
+                                         const float          eps2d,
+                                         const torch::Tensor &radii,     // [nnz]
+                                         const torch::Tensor &conics,    // [nnz, 3]
+                                         const torch::Tensor &v_means2d, // [nnz, 2]
+                                         const torch::Tensor &v_depths,  // [nnz]
+                                         const torch::Tensor &v_conics,  // [nnz, 3]
+                                         const bool viewmats_requires_grad, const bool ortho);
 
 } // namespace ops
 } // namespace detail
