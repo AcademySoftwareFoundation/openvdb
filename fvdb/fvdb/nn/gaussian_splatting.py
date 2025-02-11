@@ -15,6 +15,7 @@ from .. import (
     gaussian_render_depth,
     precompute_gaussian_render_state,
     render_pixels_from_precomputed_gaussian_render_state,
+    save_gaussian_ply,
 )
 
 
@@ -172,6 +173,18 @@ class GaussianSplat3D(nn.Module):
 
     def clear_cache(self):
         self._info_cache = {}
+
+    def save_ply(self, path: str):
+
+        means = self._params["means"].detach()
+        scales = self._params["scales"].detach()
+        opacities = self._params["opacities"].detach()
+        quats = self._params["quats"].detach()
+        sh0 = self._params["sh0"].detach()
+        shN = self._params["shN"].detach()
+        sh = torch.cat([sh0, shN], 0).permute(1, 0, 2).detach()
+
+        save_gaussian_ply(path, means, quats, scales, opacities, sh)
 
     def render_rgb_and_depth(
         self,

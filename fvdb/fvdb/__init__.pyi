@@ -36,6 +36,7 @@ from ._Cpp import (
     precompute_gaussian_render_state,
     render_pixels_from_precomputed_gaussian_render_state,
     save,
+    save_gaussian_ply,
     scaled_dot_product_attention,
     volume_render,
 )
@@ -77,4 +78,5 @@ __all__ = [
     "precompute_gaussian_render_state",
     "render_pixels_from_precomputed_gaussian_render_state",
     "gaussian_render_depth",
+    "save_gaussian_ply",
 ]

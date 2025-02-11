@@ -450,6 +450,12 @@ dispatchGaussianProjectionJaggedBackward(const torch::Tensor &g_sizes,   // [B] 
                                          const torch::Tensor &v_conics,  // [nnz, 3]
                                          const bool viewmats_requires_grad, const bool ortho);
 
+template <c10::DeviceType>
+fvdb::JaggedTensor
+dispatchGaussianNanInfMask(const fvdb::JaggedTensor &means, const fvdb::JaggedTensor &quats,
+                           const fvdb::JaggedTensor &scales, const fvdb::JaggedTensor &opacities,
+                           const fvdb::JaggedTensor &sh_coeffs);
+
 } // namespace ops
 } // namespace detail
 } // namespace fvdb

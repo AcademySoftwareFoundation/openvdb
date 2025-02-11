@@ -74,6 +74,10 @@ gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                     const torch::optional<JaggedTensor> pixels_to_render  = torch::nullopt,
                     const bool                          ortho             = false);
 
+void saveGaussianPly(const std::string filename, const fvdb::JaggedTensor &means,
+                     const fvdb::JaggedTensor &quats, const fvdb::JaggedTensor &scales,
+                     const fvdb::JaggedTensor &opacities, const fvdb::JaggedTensor &sh_coeffs);
+
 } // namespace fvdb
 
 #endif // FVDB_GAUSSIANSPLATTING_H

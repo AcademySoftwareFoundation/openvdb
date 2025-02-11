@@ -82,6 +82,6 @@ enable_testing()
 # Configure an example test
 ConfigureTest(ExampleTest "ExampleTest.cpp")
 
-
 # Configure unit tests
 ConfigureTest(GaussianSplattingTest "GaussianSplattingTest.cpp")
+ConfigureTest(GaussianSplattingNanInfMaskTest "GaussianSplattingNanInfMaskTest.cpp")

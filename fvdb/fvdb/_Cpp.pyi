@@ -599,6 +599,14 @@ def render_pixels_from_precomputed_gaussian_render_state(
     isect_offsets: torch.Tensor,
     flatten_ids: torch.Tensor,
 ) -> Tuple[torch.Tensor, torch.Tensor]: ...
+def save_gaussian_ply(
+    filename: str,
+    means: JaggedTensorOrTensor,
+    quats: JaggedTensorOrTensor,
+    scales: JaggedTensorOrTensor,
+    opacities: JaggedTensorOrTensor,
+    sh_coeffs: JaggedTensorOrTensor,
+) -> None: ...
 def scaled_dot_product_attention(
     query: JaggedTensorOrTensor,
     key: JaggedTensorOrTensor,

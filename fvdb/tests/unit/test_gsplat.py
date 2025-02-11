@@ -1,15 +1,22 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 #
+import tempfile
 import unittest
 from pathlib import Path
 
 import imageio
 import numpy as np
 import OpenImageIO as oiio
+import point_cloud_utils as pcu
 import torch
 
-from fvdb import JaggedTensor, gaussian_fully_fused_projection, gaussian_render
+from fvdb import (
+    JaggedTensor,
+    gaussian_fully_fused_projection,
+    gaussian_render,
+    save_gaussian_ply,
+)
 from fvdb.utils.tests import get_fvdb_test_data_path
 
 
@@ -117,6 +124,39 @@ class TestGaussianRender(unittest.TestCase):
             .numpy()
         )
         return (canvas * 255).astype(np.uint8)
+
+    def test_save_ply(self):
+        means = torch.rand(1000, 3, device=self.device)
+        quats = torch.rand(1000, 4, device=self.device)
+        scales = torch.rand(1000, 3, device=self.device)
+        opacities = torch.rand(1000, device=self.device)
+        sh = torch.rand(1000, 27, 3, device=self.device)
+
+        tf = tempfile.NamedTemporaryFile(delete=True, suffix=".ply")
+        save_gaussian_ply(tf.name, means, quats, scales, opacities, sh)
+
+        loaded = pcu.load_triangle_mesh(tf.name)
+        attribs = loaded.vertex_data.custom_attributes
+        means_loaded = torch.from_numpy(loaded.vertex_data.positions).to(self.device)
+        self.assertTrue(torch.allclose(means_loaded, means))
+
+        scales_loaded = torch.from_numpy(
+            np.stack([attribs["scale_0"], attribs["scale_1"], attribs["scale_2"]], axis=-1)
+        ).to(self.device)
+        self.assertTrue(torch.allclose(scales_loaded, scales))
+
+        quats_loaded = torch.from_numpy(
+            np.stack([attribs["rot_0"], attribs["rot_1"], attribs["rot_2"], attribs["rot_3"]], axis=-1)
+        ).to(self.device)
+        self.assertTrue(torch.allclose(quats_loaded, quats))
+
+        opacities_loaded = torch.from_numpy(attribs["opacity"]).to(self.device)
+        self.assertTrue(torch.allclose(opacities_loaded, opacities))
+
+        sh0_loaded = torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1)).to(self.device)
+        shN_loaded = torch.from_numpy(np.stack([attribs[f"f_rest_{i}"] for i in range(3 * 26)], axis=1)).to(self.device)
+        sh_loaded = torch.cat([sh0_loaded.unsqueeze(1), shN_loaded.view(1000, 26, 3)], dim=1)
+        self.assertTrue(torch.allclose(sh_loaded, sh))
 
     def test_gaussian_render(self):
 

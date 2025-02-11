@@ -110,6 +110,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("image_height"), py::arg("image_origin_w"), py::arg("image_origin_h"),
           py::arg("tile_size"), py::arg("isect_offsets"), py::arg("flatten_ids"));
 
+    m.def("save_gaussian_ply", &fvdb::saveGaussianPly, py::arg("filename"), py::arg("means"),
+          py::arg("quats"), py::arg("scales"), py::arg("opacities"), py::arg("sh_coeffs"));
+
     // attention
     m.def("scaled_dot_product_attention", &fvdb::scaledDotProductAttention, py::arg("query"),
           py::arg("key"), py::arg("value"), py::arg("scale"), R"_FVDB_(

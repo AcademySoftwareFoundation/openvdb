@@ -131,6 +131,7 @@ class Runner:
             "config": vars(self.cfg),
         }
         torch.save(data, f"{self.checkpoint_dir}/ckpt_{step:04d}.pt")
+        self.model.save_ply(f"{self.checkpoint_dir}/ckpt_{step:04d}.ply")
 
     def load_checkpoint(self, checkpoint_path: str, load_optimizer: bool = True):
         checkpoint = torch.load(checkpoint_path)

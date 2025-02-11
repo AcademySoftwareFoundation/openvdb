@@ -6,6 +6,12 @@
 #include <detail/autograd/Autograd.h>
 #include <detail/ops/Ops.h>
 
+#define TINYPLY_IMPLEMENTATION
+#include <tinyply.h>
+
+#include <fstream>
+#include <ostream>
+
 namespace fvdb {
 
 namespace {
@@ -324,6 +330,72 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
 }
 
 } // namespace
+
+void
+saveGaussianPly(const std::string filename, const fvdb::JaggedTensor &means,
+                const fvdb::JaggedTensor &quats, const fvdb::JaggedTensor &scales,
+                const fvdb::JaggedTensor &opacities, const fvdb::JaggedTensor &sh_coeffs) {
+    using namespace tinyply;
+
+    const fvdb::JaggedTensor validMask = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
+        return detail::ops::dispatchGaussianNanInfMask<DeviceTag>(means, quats, scales, opacities,
+                                                                  sh_coeffs);
+    });
+
+    std::filebuf fb;
+    fb.open(filename, std::ios::out | std::ios::binary);
+
+    std::ostream outstream(&fb);
+    TORCH_CHECK(!outstream.fail(), "failed to open " + filename);
+
+    PlyFile plyf;
+
+    const torch::Tensor meansCPU =
+        means.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor quatsCPU =
+        quats.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor scalesCPU =
+        scales.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor opacitiesCPU =
+        opacities.jdata().index({ validMask.jdata() }).cpu().contiguous();
+
+    const torch::Tensor shCoeffsMasked =
+        sh_coeffs.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis });
+
+    const torch::Tensor shCoeffs0CPU =
+        shCoeffsMasked.index({ torch::indexing::Slice(), 0 }).cpu().contiguous();
+    const torch::Tensor shCoeffsNCPU =
+        shCoeffsMasked
+            .index({ torch::indexing::Slice(), torch::indexing::Slice(1, sh_coeffs.rsize(1)) })
+            .reshape({ meansCPU.size(0), -1 })
+            .cpu()
+            .contiguous();
+
+    plyf.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, meansCPU.size(0),
+                                   detail::tensorBytePointer(meansCPU), Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "opacity" }, Type::FLOAT32, opacitiesCPU.size(0),
+                                   detail::tensorBytePointer(opacitiesCPU), Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "scale_0", "scale_1", "scale_2" }, Type::FLOAT32,
+                                   scalesCPU.size(0), detail::tensorBytePointer(scalesCPU),
+                                   Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "rot_0", "rot_1", "rot_2", "rot_3" }, Type::FLOAT32,
+                                   quatsCPU.size(0), detail::tensorBytePointer(quatsCPU),
+                                   Type::INVALID, 0);
+
+    std::vector<std::string> shCoeff0Names(shCoeffs0CPU.size(1));
+    std::generate(shCoeff0Names.begin(), shCoeff0Names.end(),
+                  [i = 0]() mutable { return "f_dc_" + std::to_string(i++); });
+    plyf.add_properties_to_element("vertex", shCoeff0Names, Type::FLOAT32, shCoeffs0CPU.size(0),
+                                   detail::tensorBytePointer(shCoeffs0CPU), Type::INVALID, 0);
+
+    std::vector<std::string> shCoeffNNames(shCoeffsNCPU.size(1));
+    std::generate(shCoeffNNames.begin(), shCoeffNNames.end(),
+                  [i = 0]() mutable { return "f_rest_" + std::to_string(i++); });
+    plyf.add_properties_to_element("vertex", shCoeffNNames, Type::FLOAT32, shCoeffsNCPU.size(0),
+                                   detail::tensorBytePointer(shCoeffsNCPU), Type::INVALID, 0);
+
+    plyf.write(outstream, true);
+};
 
 std::vector<torch::Tensor>
 projectGaussiansToImages(const torch::Tensor &means, const torch::Tensor &quats,

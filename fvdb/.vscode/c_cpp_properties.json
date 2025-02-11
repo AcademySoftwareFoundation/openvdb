@@ -13,6 +13,7 @@
                 "${workspaceFolder}/external/glm",
                 "${workspaceFolder}/external/cudnn_fe/include",
                 "${workspaceFolder}/external/cutlass/include",
+                "${workspaceFolder}/external/tinyply/source",
                 "${env:CONDA_PREFIX}/envs/fvdb/include/python3.11",
                 "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.11/site-packages/torch/include",
                 "${env:CONDA_PREFIX}/envs/fvdb/lib/python3.11/site-packages/torch/include/torch/csrc/api/include",

@@ -107,7 +107,8 @@
         "execution": "cpp",
         "__config": "cpp",
         "any": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "csignal": "cpp"
     },
     "files.trimTrailingWhitespace": true,
     "editor.rulers": [ 100 ],

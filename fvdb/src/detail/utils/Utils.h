@@ -12,6 +12,7 @@
 
 #include <nanovdb/NanoVDB.h>
 
+#include <ATen/Dispatch.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/util/Half.h>
 #include <torch/extension.h>
@@ -320,6 +321,16 @@ struct RAIIDeviceGuard {
   private:
     c10::cuda::CUDAGuard *mGuard = nullptr;
 };
+
+/// @brief Get a uint8_t pointer to the data of a tensor
+/// @param tensor The tensor to get the pointer to
+/// @return A uint8_t pointer to the data of the tensor
+inline uint8_t *
+tensorBytePointer(const torch::Tensor &tensor) {
+    return AT_DISPATCH_ALL_TYPES(tensor.scalar_type(), "tensorBytePointer", [&]() {
+        return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>());
+    });
+}
 
 } // namespace detail
 } // namespace fvdb

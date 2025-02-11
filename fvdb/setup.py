@@ -159,6 +159,8 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             git_tag="v1.3.0",
         )
 
+        self.download_external_dep(name="tinyply", git_url="https://github.com/ddiakopoulos/tinyply.git", git_tag="2.4")
+
         blosc_source_dir, _ = self.download_external_dep(
             name="c-blosc",
             git_url="https://github.com/Blosc/c-blosc.git",
@@ -355,6 +357,7 @@ if __name__ == "__main__":
             cwd / "external/c-blosc/install/include",
             cwd / "external/cudnn_fe/include",
             cwd / "external/glm",
+            cwd / "external/tinyply/source",
         ]
         + cudnn_include_dirs,
         extra_objects=[
