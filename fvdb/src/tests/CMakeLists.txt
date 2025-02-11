@@ -83,5 +83,6 @@ enable_testing()
 ConfigureTest(ExampleTest "ExampleTest.cpp")
 
 # Configure unit tests
-ConfigureTest(GaussianSplattingTest "GaussianSplattingTest.cpp")
-ConfigureTest(GaussianSplattingNanInfMaskTest "GaussianSplattingNanInfMaskTest.cpp")
+ConfigureTest(GaussianComputeSparseInfoTest "GaussianComputeSparseInfoTest.cpp")
+ConfigureTest(GaussianTileIntersectionTest "GaussianTileIntersectionTest.cpp")
+ConfigureTest(GaussianComputeNanInfMaskTest "GaussianComputeNanInfMaskTest.cpp")

@@ -250,8 +250,45 @@ dispatchGaussianTileIntersection<torch::kCUDA>(
     const at::optional<torch::Tensor> &camera_jidx, // NULL or [M]
     const uint32_t num_cameras, const uint32_t tile_size, const uint32_t num_tiles_h,
     const uint32_t num_tiles_w) {
-    //
-    const bool     is_packed       = camera_jidx.has_value();
+    // Indicates if the input tensors are in "packed" format where camera indices are provided
+    // separately via camera_jidx tensor, rather than being part of the tensor dimensions. When
+    // true, means2d has shape [M, 2] and camera_jidx maps each of the M points to a camera. When
+    // false, means2d has shape [C, N, 2] where C is num_cameras and N is points per camera.
+    const bool is_packed = camera_jidx.has_value();
+
+    TORCH_CHECK(means2d.is_cuda(), "means2d must be a CUDA tensor");
+    TORCH_CHECK(radii.is_cuda(), "radii must be a CUDA tensor");
+    TORCH_CHECK(depths.is_cuda(), "depths must be a CUDA tensor");
+
+    if (is_packed) {
+        TORCH_CHECK(camera_jidx.value().is_cuda(), "camera_jidx must be a CUDA tensor");
+        TORCH_CHECK_VALUE(means2d.dim() == 2, "means2d must have 2 dimensions (M, 2)");
+        TORCH_CHECK_VALUE(radii.dim() == 1, "radii must have 1 dimension (M)");
+        TORCH_CHECK_VALUE(depths.dim() == 1, "depths must have 1 dimension (M)");
+        TORCH_CHECK_VALUE(camera_jidx.value().dim() == 1, "camera_jidx must have 1 dimension (M)");
+        TORCH_CHECK_VALUE(radii.size(0) == means2d.size(0),
+                          "radii must have the same number of points as means2d");
+        TORCH_CHECK_VALUE(depths.size(0) == means2d.size(0),
+                          "depths must have the same number of points as means2d");
+        TORCH_CHECK_VALUE(camera_jidx.value().size(0) == means2d.size(0),
+                          "camera_jidx must have the same number of points as means2d");
+    } else {
+        TORCH_CHECK_VALUE(means2d.dim() == 3, "means2d must have 3 dimensions (C, N, 2)");
+        TORCH_CHECK_VALUE(means2d.size(0) == num_cameras,
+                          "means2d must have num_cameras in the first dimension");
+        TORCH_CHECK_VALUE(means2d.size(2) == 2, "means2d must have 2 points in the last dimension");
+        TORCH_CHECK_VALUE(radii.dim() == 2, "radii must have 2 dimensions (C, N)");
+        TORCH_CHECK_VALUE(radii.size(0) == num_cameras,
+                          "radii must have num_cameras in the first dimension");
+        TORCH_CHECK_VALUE(radii.size(1) == means2d.size(1),
+                          "radii must have the same number of points as means2d");
+        TORCH_CHECK_VALUE(depths.dim() == 2, "depths must have 2 dimensions (C, N)");
+        TORCH_CHECK_VALUE(depths.size(0) == num_cameras,
+                          "depths must have num_cameras in the first dimension");
+        TORCH_CHECK_VALUE(depths.size(1) == means2d.size(1),
+                          "depths must have the same number of points as means2d");
+    }
+
     const uint32_t num_gaussians   = is_packed ? means2d.size(0) : means2d.size(1);
     const uint32_t total_gaussians = is_packed ? means2d.size(0) : num_cameras * num_gaussians;
 
@@ -262,6 +299,11 @@ dispatchGaussianTileIntersection<torch::kCUDA>(
 
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(means2d));
 
+    if (total_gaussians == 0) {
+        return std::make_tuple(torch::empty({ num_cameras, num_tiles_h, num_tiles_w },
+                                            means2d.options().dtype(torch::kInt32)),
+                               torch::empty({ 0 }, means2d.options().dtype(torch::kInt32)));
+    }
     using scalar_t = float;
 
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means2d.device().index());
@@ -282,62 +324,68 @@ dispatchGaussianTileIntersection<torch::kCUDA>(
 
     // Allocate tensors to store the intersections
     const int64_t total_intersections = tiles_per_gaussian_cumsum[-1].item<int64_t>();
-    torch::Tensor intersection_keys =
-        torch::empty({ total_intersections }, means2d.options().dtype(torch::kInt64));
-    torch::Tensor intersection_values =
-        torch::empty({ total_intersections }, means2d.options().dtype(torch::kInt32));
+    if (total_intersections == 0) {
+        return std::make_tuple(torch::empty({ num_cameras, num_tiles_h, num_tiles_w },
+                                            means2d.options().dtype(torch::kInt32)),
+                               torch::empty({ 0 }, means2d.options().dtype(torch::kInt32)));
+    } else {
+        torch::Tensor intersection_keys =
+            torch::empty({ total_intersections }, means2d.options().dtype(torch::kInt64));
+        torch::Tensor intersection_values =
+            torch::empty({ total_intersections }, means2d.options().dtype(torch::kInt32));
 
-    // Compute the set of intersections between each projected Gaussian and each tile,
-    // store them in intersection_keys and intersection_values
-    // where intersection_keys encodes (camera_id, tile_id, depth) and intersection_values
-    // encodes the index of the Gaussian in the input arrays.
-    compute_gaussian_tile_intersections<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
-        num_cameras, num_gaussians, total_gaussians, tile_size, num_tiles_w, num_tiles_h,
-        num_tile_id_bits, means2d.data_ptr<scalar_t>(), radii.data_ptr<int32_t>(),
-        depths.data_ptr<scalar_t>(),
-        camera_jidx.has_value() ? camera_jidx.value().data_ptr<int32_t>() : nullptr,
-        tiles_per_gaussian_cumsum.data_ptr<int32_t>(), intersection_keys.data_ptr<int64_t>(),
-        intersection_values.data_ptr<int32_t>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
+        // Compute the set of intersections between each projected Gaussian and each tile,
+        // store them in intersection_keys and intersection_values
+        // where intersection_keys encodes (camera_id, tile_id, depth) and intersection_values
+        // encodes the index of the Gaussian in the input arrays.
+        compute_gaussian_tile_intersections<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            num_cameras, num_gaussians, total_gaussians, tile_size, num_tiles_w, num_tiles_h,
+            num_tile_id_bits, means2d.data_ptr<scalar_t>(), radii.data_ptr<int32_t>(),
+            depths.data_ptr<scalar_t>(),
+            camera_jidx.has_value() ? camera_jidx.value().data_ptr<int32_t>() : nullptr,
+            tiles_per_gaussian_cumsum.data_ptr<int32_t>(), intersection_keys.data_ptr<int64_t>(),
+            intersection_values.data_ptr<int32_t>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-    // Sort the intersections by their key so intersections within the same tile are grouped
-    // together and sorted by their depth (near to far).
-    {
-        // Allocate tensors to store the sorted intersections
-        torch::Tensor keys_sorted = torch::empty_like(intersection_keys);
-        torch::Tensor vals_sorted = torch::empty_like(intersection_values);
+        // Sort the intersections by their key so intersections within the same tile are grouped
+        // together and sorted by their depth (near to far).
+        {
+            // Allocate tensors to store the sorted intersections
+            torch::Tensor keys_sorted = torch::empty_like(intersection_keys);
+            torch::Tensor vals_sorted = torch::empty_like(intersection_values);
 
-        // https://nvidia.github.io/cccl/cub/api/structcub_1_1DeviceRadixSort.html
-        // DoubleBuffer reduce the auxiliary memory usage from O(N+P) to O(P)
-        // Create a set of DoubleBuffers to wrap pairs of device pointers
-        cub::DoubleBuffer<int64_t> d_keys(intersection_keys.data_ptr<int64_t>(),
-                                          keys_sorted.data_ptr<int64_t>());
-        cub::DoubleBuffer<int32_t> d_vals(intersection_values.data_ptr<int32_t>(),
-                                          vals_sorted.data_ptr<int32_t>());
+            // https://nvidia.github.io/cccl/cub/api/structcub_1_1DeviceRadixSort.html
+            // DoubleBuffer reduce the auxiliary memory usage from O(N+P) to O(P)
+            // Create a set of DoubleBuffers to wrap pairs of device pointers
+            cub::DoubleBuffer<int64_t> d_keys(intersection_keys.data_ptr<int64_t>(),
+                                              keys_sorted.data_ptr<int64_t>());
+            cub::DoubleBuffer<int32_t> d_vals(intersection_values.data_ptr<int32_t>(),
+                                              vals_sorted.data_ptr<int32_t>());
 
-        const int32_t num_bits = 32 + num_cam_id_bits + num_tile_id_bits;
-        CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, d_keys, d_vals, total_intersections, 0,
-                    num_bits, stream);
-        // DoubleBuffer swaps the pointers if the keys were sorted in the input buffer
-        // so we need to grab the right buffer.
-        if (d_keys.selector == 1) {
-            intersection_keys = keys_sorted;
+            const int32_t num_bits = 32 + num_cam_id_bits + num_tile_id_bits;
+            CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, d_keys, d_vals, total_intersections, 0,
+                        num_bits, stream);
+            // DoubleBuffer swaps the pointers if the keys were sorted in the input buffer
+            // so we need to grab the right buffer.
+            if (d_keys.selector == 1) {
+                intersection_keys = keys_sorted;
+            }
+            if (d_vals.selector == 1) {
+                intersection_values = vals_sorted;
+            }
         }
-        if (d_vals.selector == 1) {
-            intersection_values = vals_sorted;
-        }
+
+        // Compute a joffsets tensor that stores the offsets into the sorted Gaussian intersections
+        torch::Tensor tile_joffsets = torch::empty({ num_cameras, num_tiles_h, num_tiles_w },
+                                                   means2d.options().dtype(torch::kInt32));
+        const int     NUM_BLOCKS_2  = (total_intersections + NUM_THREADS - 1) / NUM_THREADS;
+        compute_tile_offsets<<<NUM_BLOCKS_2, NUM_THREADS, 0, stream>>>(
+            total_intersections, num_cameras, total_tiles, num_tile_id_bits,
+            intersection_keys.data_ptr<int64_t>(), tile_joffsets.data_ptr<int32_t>());
+        C10_CUDA_KERNEL_LAUNCH_CHECK();
+
+        return std::make_tuple(tile_joffsets, intersection_values);
     }
-
-    // Compute a joffsets tensor that stores the offsets into the sorted Gaussian intersections
-    torch::Tensor tile_joffsets = torch::empty({ num_cameras, num_tiles_h, num_tiles_w },
-                                               means2d.options().dtype(torch::kInt32));
-    const int     NUM_BLOCKS_2  = (total_intersections + NUM_THREADS - 1) / NUM_THREADS;
-    compute_tile_offsets<<<NUM_BLOCKS_2, NUM_THREADS, 0, stream>>>(
-        total_intersections, num_cameras, total_tiles, num_tile_id_bits,
-        intersection_keys.data_ptr<int64_t>(), tile_joffsets.data_ptr<int32_t>());
-    C10_CUDA_KERNEL_LAUNCH_CHECK();
-
-    return std::make_tuple(tile_joffsets, intersection_values);
 }
 
 template <>
