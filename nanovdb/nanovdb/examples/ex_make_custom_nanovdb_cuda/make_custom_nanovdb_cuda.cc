@@ -34,6 +34,7 @@ int main()
 
         cudaStream_t stream; // Create a CUDA stream to allow for asynchronous copy of pinned CUDA memory.
         cudaStreamCreate(&stream);
+
         handle.deviceUpload(stream, false); // Copy the NanoVDB grid to the GPU asynchronously
         auto* gpuGrid = handle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
 
