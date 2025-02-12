@@ -9,8 +9,6 @@
 
 #include <ATen/cuda/CUDAContext.h>
 
-#include <execution>
-
 namespace fvdb {
 
 std::vector<torch::Tensor>
@@ -152,7 +150,7 @@ gridbatch_from_mesh(const JaggedTensor &vertices, const JaggedTensor &faces,
 
 std::vector<int64_t>
 jdataShape1(const std::vector<int64_t> &lsizes, const std::vector<int64_t> &rsizes) {
-    const int64_t totalElements = std::reduce(std::execution::par, lsizes.begin(), lsizes.end());
+    const int64_t        totalElements = std::reduce(lsizes.begin(), lsizes.end());
     std::vector<int64_t> shape;
     shape.reserve(rsizes.size() + 1);
     shape.push_back(totalElements);
@@ -167,13 +165,12 @@ jdataShape2(const std::vector<std::vector<int64_t>> &lsizes, const std::vector<i
     elementCountsPerList.reserve(lsizes.size());
     tensorCountsPerList.reserve(lsizes.size());
     for (const auto &l: lsizes) {
-        elementCountsPerList.push_back(std::reduce(std::execution::par, l.begin(), l.end()));
+        elementCountsPerList.push_back(std::reduce(l.begin(), l.end()));
         tensorCountsPerList.push_back(l.size());
     }
-    const int64_t totalSize =
-        std::reduce(std::execution::par, elementCountsPerList.begin(), elementCountsPerList.end());
+    const int64_t totalSize = std::reduce(elementCountsPerList.begin(), elementCountsPerList.end());
     const int64_t totalTensors =
-        std::reduce(std::execution::par, tensorCountsPerList.begin(), tensorCountsPerList.end());
+        std::reduce(tensorCountsPerList.begin(), tensorCountsPerList.end());
     std::vector<int64_t> shape;
     shape.reserve(rsizes.size() + 1);
     shape.push_back(totalSize);
