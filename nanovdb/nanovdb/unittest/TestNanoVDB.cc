@@ -444,8 +444,6 @@ TEST_F(TestNanoVDB, toStr)
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoVDB ),  "nanovdb"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoGrid ), "nanovdb::Grid"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoFile ), "nanovdb::File"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoNode ), "nanovdb::NodeManager"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoFrag ), "fragmented nanovdb::Grid"), 0 );
     }
 }// toStr
 
@@ -4190,9 +4188,9 @@ TEST_F(TestNanoVDB, NodeManager)
         EXPECT_TRUE(dstGrid->isSequential<GridT::TreeType::Node1>());
         EXPECT_TRUE(dstGrid->isSequential<GridT::TreeType::Node0>());
 
-        EXPECT_EQ(48u, sizeof(nanovdb::NodeManagerData));
+        EXPECT_EQ(40u, sizeof(nanovdb::NodeManagerData));
         auto nodeMgrHandle = nanovdb::createNodeManager(*dstGrid);
-        EXPECT_EQ(48u, nodeMgrHandle.size());// since its linear
+        EXPECT_EQ(40u, nodeMgrHandle.size());// since its linear
         auto *nodeMgr = nodeMgrHandle.mgr<float>();
         EXPECT_TRUE(nodeMgr);
         EXPECT_TRUE(nanovdb::isAligned(nodeMgr));

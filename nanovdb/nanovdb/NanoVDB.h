@@ -132,21 +132,16 @@
 // Do not change this value! 32 byte alignment is fixed in NanoVDB
 #define NANOVDB_DATA_ALIGNMENT 32
 
-// NANOVDB_MAGIC_NUMB is currently used for both grids and files (starting with v32.6.0)
-// NANOVDB_MAGIC_GRID will soon be used exclusively for grids (serialized to a single buffer)
-// NANOVDB_MAGIC_FILE will soon be used exclusively for files
-// NANOVDB_MAGIC_NODE will soon be used exclusively for NodeManager
-// NANOVDB_MAGIC_FRAG will soon be used exclusively for a fragmented grid, i.e. a grid that is not serialized
-//                              | : 0 in 30 corresponds to 0 in NanoVDB0
+// NANOVDB_MAGIC_NUMB previously used for both grids and files (starting with v32.6.0)
+// NANOVDB_MAGIC_GRID currently used exclusively for grids (serialized to a single buffer)
+// NANOVDB_MAGIC_FILE currently used exclusively for files
+//                             | : 0 in 30 corresponds to 0 in NanoVDB0
 #define NANOVDB_MAGIC_NUMB  0x304244566f6e614eUL // "NanoVDB0" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_GRID  0x314244566f6e614eUL // "NanoVDB1" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_FILE  0x324244566f6e614eUL // "NanoVDB2" in hex - little endian (uint64_t)
-#define NANOVDB_MAGIC_NODE  0x334244566f6e614eUL // "NanoVDB3" in hex - little endian (uint64_t)
-#define NANOVDB_MAGIC_FRAG  0x344244566f6e614eUL // "NanoVDB4" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_MASK  0x00FFFFFFFFFFFFFFUL // use this mask to remove the number
 
-//#define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL
-//#define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
+#define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER 8 //  reflects changes to the API but not ABI
@@ -363,9 +358,7 @@ enum class MagicType : uint32_t { Unknown  = 0,// first 64 bits are neither of t
                                   NanoVDB  = 2,// first 64 bits = NANOVDB_MAGIC_NUMB
                                   NanoGrid = 3,// first 64 bits = NANOVDB_MAGIC_GRID
                                   NanoFile = 4,// first 64 bits = NANOVDB_MAGIC_FILE
-                                  NanoNode = 5,// first 64 bits = NANOVDB_MAGIC_NODE
-                                  NanoFrag = 6,// first 64 bits = NANOVDB_MAGIC_FRAG
-                                  End      = 7,
+                                  End      = 5,
                                   StrLen   = End + 25};// this entry is used to determine the minimum size of c-string
 
 /// @brief maps 64 bits of magic number to enum
@@ -375,8 +368,6 @@ __hostdev__ inline MagicType toMagic(uint64_t magic)
         case NANOVDB_MAGIC_NUMB:   return MagicType::NanoVDB;
         case NANOVDB_MAGIC_GRID:   return MagicType::NanoGrid;
         case NANOVDB_MAGIC_FILE:   return MagicType::NanoFile;
-        case NANOVDB_MAGIC_NODE:   return MagicType::NanoNode;
-        case NANOVDB_MAGIC_FRAG:   return MagicType::NanoFrag;
         default: return (magic & ~uint32_t(0)) == 0x56444220UL ? MagicType::OpenVDB : MagicType::Unknown;
     }
 }
@@ -392,8 +383,6 @@ __hostdev__ inline char* toStr(char *dst, MagicType magic)
         case MagicType::NanoVDB:  return util::strcpy(dst, "nanovdb");
         case MagicType::NanoGrid: return util::strcpy(dst, "nanovdb::Grid");
         case MagicType::NanoFile: return util::strcpy(dst, "nanovdb::File");
-        case MagicType::NanoNode: return util::strcpy(dst, "nanovdb::NodeManager");
-        case MagicType::NanoFrag: return util::strcpy(dst, "fragmented nanovdb::Grid");
         case MagicType::OpenVDB:  return util::strcpy(dst, "openvdb");
         default:                  return util::strcpy(dst, "end");
     }
@@ -1953,7 +1942,11 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mBlindMetadataCount = 0u; // i.e. no blind data
         mData0 = 0u; // zero padding
         mData1 = 0u; // only used for index and point grids
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        mData2 = 0u;// unused
+#else
         mData2 = NANOVDB_MAGIC_GRID; // since version 32.6.0 (will change in the future)
+#endif
     }
     /// @brief return true if the magic number and the version are both valid
     __hostdev__ bool isValid() const {
