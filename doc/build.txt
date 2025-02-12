@@ -257,7 +257,6 @@ CMake          | Cross-platform family of tools designed to help build software 
 C++17 Compiler | Matching Houdini compiler and version                           | All                |
 Boost          | Components: iostreams                                           | All                |
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
-CppUnit        | A unit testing framework module for C++                         | Unit Tests (AX)    |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
 Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
@@ -349,7 +348,6 @@ Boost          | Components: iostreams                                          
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
-CppUnit        | A unit testing framework module for C++                           | Unit Tests (AX)                  |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |

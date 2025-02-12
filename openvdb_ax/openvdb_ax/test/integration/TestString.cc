@@ -5,38 +5,13 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestString : public unittest_util::AXTestCase
 {
-public:
-    void setUp() override {
-        unittest_util::AXTestCase::setUp();
-    }
-
-    CPPUNIT_TEST_SUITE(TestString);
-    CPPUNIT_TEST(testAssignCompound);
-    CPPUNIT_TEST(testAssignFromAttributes);
-    CPPUNIT_TEST(testAssignFromLocals);
-    CPPUNIT_TEST(testAssignNewOverwrite);
-    CPPUNIT_TEST(testBinaryConcat);
-    CPPUNIT_TEST(testDeclare);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAssignCompound();
-    void testAssignFromAttributes();
-    void testAssignFromLocals();
-    void testAssignNewOverwrite();
-    void testBinaryConcat();
-    void testDeclare();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestString);
-
-void
-TestString::testAssignCompound()
+TEST_F(TestString, testAssignCompound)
 {
     mHarness.addAttributes<std::string>(unittest_util::nameSequence("test", 3),
         {"foo", "foobar", "aaaaaaaaaa"});
@@ -44,8 +19,7 @@ TestString::testAssignCompound()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestString::testAssignFromAttributes()
+TEST_F(TestString, testAssignFromAttributes)
 {
     mHarness.addInputPtAttributes<std::string>({"string_test1"}, {"test"});
     mHarness.addExpectedAttributes<std::string>(unittest_util::nameSequence("string_test", 6),
@@ -58,8 +32,7 @@ TestString::testAssignFromAttributes()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestString::testAssignFromLocals()
+TEST_F(TestString, testAssignFromLocals)
 {
     mHarness.addAttributes<std::string>(unittest_util::nameSequence("string_test", 4),
         {"test", "test", "new string size", ""});
@@ -67,8 +40,7 @@ TestString::testAssignFromLocals()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestString::testAssignNewOverwrite()
+TEST_F(TestString, testAssignNewOverwrite)
 {
     mHarness.addExpectedAttributes<std::string>({"string_test1", "string_test2"},
         {"next_value", "new_value"});
@@ -80,8 +52,7 @@ TestString::testAssignNewOverwrite()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestString::testBinaryConcat()
+TEST_F(TestString, testBinaryConcat)
 {
     mHarness.addExpectedAttributes<std::string>(unittest_util::nameSequence("string_test", 6),
         {"test new value", "test new value", "test new value", "test new value", "", "test new value"});
@@ -93,8 +64,7 @@ TestString::testBinaryConcat()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestString::testDeclare()
+TEST_F(TestString, testDeclare)
 {
     mHarness.addAttribute<std::string>("string_test", "test");
     mHarness.executeCode("test/snippets/string/declare");
