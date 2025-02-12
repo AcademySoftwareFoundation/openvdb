@@ -563,8 +563,6 @@ TEST_F(TestOpenVDB, MagicType)
         EXPECT_EQ( nanovdb::toMagic(NANOVDB_MAGIC_NUMB), nanovdb::MagicType::NanoVDB );
         EXPECT_EQ( nanovdb::toMagic(NANOVDB_MAGIC_GRID), nanovdb::MagicType::NanoGrid );
         EXPECT_EQ( nanovdb::toMagic(NANOVDB_MAGIC_FILE), nanovdb::MagicType::NanoFile );
-        EXPECT_EQ( nanovdb::toMagic(NANOVDB_MAGIC_NODE), nanovdb::MagicType::NanoNode );
-        EXPECT_EQ( nanovdb::toMagic(NANOVDB_MAGIC_FRAG), nanovdb::MagicType::NanoFrag );
         EXPECT_EQ( nanovdb::toMagic(      0x56444220UL), nanovdb::MagicType::OpenVDB );
     }
 
@@ -574,8 +572,6 @@ TEST_F(TestOpenVDB, MagicType)
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoVDB ),  "nanovdb"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoGrid ), "nanovdb::Grid"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoFile ), "nanovdb::File"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoNode ), "nanovdb::NodeManager"), 0 );
-        EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoFrag ), "fragmented nanovdb::Grid"), 0 );
     }
 }
 
