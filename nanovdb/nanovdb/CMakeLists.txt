@@ -172,7 +172,6 @@ set(NANOVDB_INCLUDE_FILES
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/DeviceBuffer.h
-  cuda/DeviceGuard.h
   cuda/DeviceMesh.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
