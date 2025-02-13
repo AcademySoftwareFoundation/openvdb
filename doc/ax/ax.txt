@@ -290,7 +290,7 @@ other unsigned scalar types in AX.
 @par Integer Overflow and Floating Point Truncation
 Scalars may be cast from one type to another, either explicitly using the
 @ref axopother "cast" operator or implicitly during @ref axopassignment
-"assignments" or @ref axopbinarithmetic "binary arthimetic" operations (in which
+"assignments" or @ref axopbinarithmetic "binary arithmetic" operations (in which
 case the order of @ref axtypeprecedence "type precedence" is observed). Data can
 be truncated (converting floats to integrals) or overflow (conversions
 from integers of larger bit widths to integers of smaller bit widths) depending
@@ -299,7 +299,7 @@ on the source and target types. See the below examples:
 This example demonstrates floating point truncation in AX.
 @code
 float a = 1.1f;
-int b = 5.5f; // implict conversion from literal 5.5f. "b" is set to 5
+int b = 5.5f; // implicit conversion from literal 5.5f. "b" is set to 5
 b = a; // implicit conversion from float "a". "b" is set to 1
 @endcode
 @par
@@ -343,9 +343,9 @@ Matrices are stored in row major layout (lexographical access order) which
 matches the representation of a matrix in OpenVDB. Matrix support consists of
 @b `float` and @b `double` precision elements with dimensions either @b `3x3` or
 @b `4x4` (total size of 9 and 16 elements respectively). There are no integer or
-boolean matrix types. Similiar to vectors, the suffix letter on the type denotes
+boolean matrix types. Similar to vectors, the suffix letter on the type denotes
 the contained elements precision, with the number corresponding to the matrix
-dimension. A matrix of type @b `mat3d` therefor corresponds to a @b `3x3` matrix
+dimension. A matrix of type @b `mat3d` therefore corresponds to a @b `3x3` matrix
 (9 elements) with @b `double` precision elements.
 @par Element Access
 As elements of all matrix and vector types are stored contiguously, they can be
@@ -385,7 +385,7 @@ detect these cases and convert values when necessary. This is known as
 <b>implicit type conversion</b> and the way in which the target operation type
 is chosen is known as <b>type precedence</b>.
 @par
-When referring to type precedence, we are primarily refering to the conversion of
+When referring to type precedence, we are primarily referring to the conversion of
 one @b scalar type to another. For vectors, matrices and other containers, this
 refers to the conversion of their element type e.g. `mat3f` to `mat3d`. The
 conversion rules for more than the element type (e.g. `int` to `mat4f`) are
@@ -670,7 +670,7 @@ The behaviour of a given compound assignment (for example `a += b`) is similar
 to replacing the compound assignment with a @ref axopassignment
 "direct assignment" followed by a @ref axopbinarithmetic "binary expression"
 with the same operands and given arithmetic token (i.e. `a = a + b`). However,
-compound assignments imporantly do @b not evaluate the @b `lhs` twice. This is
+compound assignments importantly do @b not evaluate the @b `lhs` twice. This is
 important when assigning to an expression which is not an attribute or local
 value. The best example of this is assigning to a @ref axopunincdec "pre-crement"
 operation:
@@ -1066,7 +1066,7 @@ b[2] = tmp[2];
 <tr style="text-align:center"><td>@ref axvecmats "matrix"</td>
 <td style="text-align:left">
 Performs matrix multiplication and returns the matrix product, which is matrix
-of matchign size and type. <b>Operand sizes must match.</b> e.g:
+of matching size and type. <b>Operand sizes must match.</b> e.g:
 <!-- A -->@code{.c}
 mat4f a = 1, b = 2;
 mat4f c = a * b;
@@ -1124,9 +1124,9 @@ These operations only run on @b integral operands. After @ref axtypeprecedence
 <th>Left Operand Type</th><th>Binary Op(s)</th><th>Right Operand Type</th><th>Description</th>
 </tr>
 <tr style="text-align:center">
-<td>@ref axscalars "intergral"</td>
+<td>@ref axscalars "integral"</td>
 <td>`& | ^ << >>`</td>
-<td>@ref axscalars "intergral"</td>
+<td>@ref axscalars "integral"</td>
 <td style="text-align:left">
 Returns the result of the bitwise operation as described above. If either operand
 is not an integral type (`bool` `int32` or `int64`), the program is ill formed.
@@ -1296,7 +1296,7 @@ increment / decrement operators are supported.
 
 @subsubsection axopunarithmetic Arithmetic
 @par
-Arithmetic unary operators are comprised of arithemtic and bitwise operators.
+Arithmetic unary operators are comprised of arithmetic and bitwise operators.
 @par
 <table>
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
@@ -1514,8 +1514,8 @@ The <b>`[]`</b> operator is valid for both vectors and matrices. It has the form
 following the @ref axopassignment "assignment casting" rules and falls within
 the valid size of the @a `container`. <b>No bounds checking is performed</b>.
 @par
-As matrices are also an array of contigous values, they can be accessed in the
-same way. This can make some operations much simplier; a typical example being
+As matrices are also an array of contiguous values, they can be accessed in the
+same way. This can make some operations much simpler; a typical example being
 iterating through all matrix elements and performing some logic:
 @par
 @code{.c}
@@ -1578,7 +1578,7 @@ a_{30}\quad a_{31}\quad a_{32}\quad a_{33}\\
 <th>Access [a]</th>
 <th>Access [a,b]</th>
 <th style="border-right-style:none;">Result</th>
-<td style="border:none" rowspan="17"></td> <!-- table seperator -->
+<td style="border:none" rowspan="17"></td> <!-- table separator -->
 <th>Access [a]</th>
 <th>Access [a,b]</th>
 <th>Result</th>
@@ -1740,7 +1740,7 @@ a = int(b.x);
 @endcode
 @par
 Whilst explicit casts take only a single argument, the operator itself supports
-multiple or empty arguments for function calls. Whe multiple arguments are
+multiple or empty arguments for function calls. When multiple arguments are
 provided, they are parsed from first to last and processed in reverse order.
 @b However, the order of runtime evaluation is @b unspecified i.e. they may
 evaluate in any order. Each function parameter is initialized with its
@@ -2005,10 +2005,10 @@ can be used to assign any scalar a value.
 <table>
 <tr><th>Type</th><th>Literal Tokens</th></tr>
 <tr><td>`bool`</td><td>Tokens @b `true` and @b `false`</td></tr>
-<tr><td>`int32`</td><td>No suffix, automatically infered from integral literals</td></tr>
+<tr><td>`int32`</td><td>No suffix, automatically inferred from integral literals</td></tr>
 <tr><td>`int64`</td><td>The letter @b `l` e.g. @code int64 a = 10l; @endcode</td></tr>
 <tr><td>`float`</td><td>The letter @b `f` e.g. @code float a = 0.0f; @endcode</td></tr>
-<tr><td>`double`</td><td>No suffix, automatically infered from floating point literals.</td></tr>
+<tr><td>`double`</td><td>No suffix, automatically inferred from floating point literals.</td></tr>
 <tr><td>`string`</td><td>Character strings wrapped in double quotes @b \" @b \"</td></tr>
 </table>
 @par

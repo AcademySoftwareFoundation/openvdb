@@ -977,7 +977,7 @@ TEST_F(TestPointRasterizeSDF, testAttrTransfer)
             EXPECT_TRUE(sdf->tree().hasSameTopology(test1->tree()));
             EXPECT_TRUE(sdf->tree().hasSameTopology(test2->tree()));
 
-            // check atributes that have been transfered are correct
+            // check attributes that have been transferred are correct
             for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
                 const Coord ijk = iter.getCoord();
                 const Vec3d ws = sdf->transform().indexToWorld(ijk);
@@ -1053,7 +1053,7 @@ TEST_F(TestPointRasterizeSDF, testVariableAttrTransfer)
         //   contributions to match normal sphere attribute transfer
         const float radscale = 0.5, search = 3.0;
 
-        // test cloest point transfer
+        // test closest point transfer
         s.halfband = 3;
         s.transform = math::Transform::createLinearTransform(0.3);
         s.points = PointBuilder(positions)
@@ -1104,7 +1104,7 @@ TEST_F(TestPointRasterizeSDF, testVariableAttrTransfer)
             EXPECT_TRUE(sdf->tree().hasSameTopology(test1->tree()));
             EXPECT_TRUE(sdf->tree().hasSameTopology(test2->tree()));
 
-            // check atributes that have been transfered are correct
+            // check attributes that have been transferred are correct
             for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
                 const Coord ijk = iter.getCoord();
                 const Vec3d ws = sdf->transform().indexToWorld(ijk);

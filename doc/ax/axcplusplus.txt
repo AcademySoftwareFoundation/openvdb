@@ -117,7 +117,7 @@ parser is accessed through the @b ast module.
 @subsection vdbaxast The AST
 @par
 The @b ast module provides:
- - The complete implemenation of an @ref AST.h "AX abstract syntax tree"
+ - The complete implementation of an @ref AST.h "AX abstract syntax tree"
  - The openvdb::ax::ast::parse() method
  - The @vdblink::ax::ast::Visitor AST Visitor@endlink
  - AST scanners and tools
@@ -302,7 +302,7 @@ f@density = f$my_value;
 @endcode
 @par
 When compiled, this program will attempt to read a single float type value with
-the storage name "my_value". If the value cannot be found, a zero intialized
+the storage name "my_value". If the value cannot be found, a zero initialized
 block of memory (with size of the desired type) is returned. So, with no further
 setup, this will assign each value of @b density to 0.0f.
 @par
@@ -351,7 +351,7 @@ exe->execute(density); // density set to 1.0f
 @endcode
 @warning
 Care should be taken to ensure that modifications to custom data values are
-peformed outside of any calls to `execute()`. Any attempt to modify the data
+performed outside of any calls to `execute()`. Any attempt to modify the data
 whilst executables attempt to access it will result in undefined behaviour.
 
 @subsubsection vdbaxcodegen Codegen
@@ -396,7 +396,7 @@ if (!exe) {
     for (cosnt auto& msg : err) std::cout << msg << std::endl;
 }
 
-// without logger, divison by zero warning won't be reported
+// without logger, division by zero warning won't be reported
 exe = compiler.compile<ax::VolumeExecutable>("f@a = 1.0f / 0.0f;");
 
 // without logger, invalid AX will cause a runtime error but
@@ -412,7 +412,7 @@ catch (...) {
 A single instance of the @vdblink::ax::Compiler AX Compiler@endlink uses a
 uniquely constructed <A HREF="https://llvm.org/doxygen/classllvm_1_1LLVMContext.html">
 LLVMContext</A>. This context is @b shared between copies of the Compiler,
-however new Compilers create new LLVMContexts. It is therefor unsafe to invoke
+however new Compilers create new LLVMContexts. It is therefore unsafe to invoke
 concurrent calls to @vdblink::ax::Compiler::compile() Compiler::compile()
 @endlink on Compilers which share the same underlying LLVMContext.
 @par

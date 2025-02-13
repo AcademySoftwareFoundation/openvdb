@@ -1774,7 +1774,7 @@ struct MeanCurvature
          Vec3d d1_is(static_cast<double>(D1<DiffScheme1>::inX(grid, ijk)),
                      static_cast<double>(D1<DiffScheme1>::inY(grid, ijk)),
                      static_cast<double>(D1<DiffScheme1>::inZ(grid, ijk))), d1_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
+         if (is_linear<MapType>::value) {//resolved at compile time
              d1_ws = map.applyIJT(d1_is);
          } else {
              d1_ws = map.applyIJT(d1_is, ijk.asVec3d());
@@ -1804,7 +1804,7 @@ struct MeanCurvature
 
          // convert second derivatives to world space
          Mat3d d2_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
+         if (is_linear<MapType>::value) {//resolved at compile time
              d2_ws = map.applyIJC(d2_is);
          } else {
              d2_ws = map.applyIJC(d2_is, d1_is, ijk.asVec3d());
@@ -1853,7 +1853,7 @@ struct MeanCurvature
          Vec3d d1_is(D1<DiffScheme1>::inX(stencil),
                      D1<DiffScheme1>::inY(stencil),
                      D1<DiffScheme1>::inZ(stencil) ), d1_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
+         if (is_linear<MapType>::value) {//resolved at compile time
              d1_ws = map.applyIJT(d1_is);
          } else {
              d1_ws = map.applyIJT(d1_is, stencil.getCenterCoord().asVec3d());
@@ -1883,7 +1883,7 @@ struct MeanCurvature
 
          // convert second derivatives to world space
          Mat3d d2_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
+         if (is_linear<MapType>::value) {//resolved at compile time
              d2_ws = map.applyIJC(d2_is);
          } else {
              d2_ws = map.applyIJC(d2_is, d1_is, stencil.getCenterCoord().asVec3d());

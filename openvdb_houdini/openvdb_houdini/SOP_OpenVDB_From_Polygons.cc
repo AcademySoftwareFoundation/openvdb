@@ -5,7 +5,7 @@
 ///
 /// @author FX R&D OpenVDB team
 ///
-/// @brief Converts a closed mesh of trinagles and/or quads into different VDB volumes.
+/// @brief Converts a closed mesh of triangles and/or quads into different VDB volumes.
 /// The supported volumes are: Signed distance field / level-set, closest primitive grid
 /// and grids with different mesh attributes (closest UVW, Normal etc.)
 
@@ -693,7 +693,7 @@ SOP_OpenVDB_From_Polygons::updateParmsFlags()
     changed |= enableParm("fogname", bool(evalInt("buildfog", 0, time)) && !unsignedDist);
     changed |= enableParm("buildfog", !unsignedDist);
 
-    // enable / diable vector type menu
+    // enable / disable vector type menu
     UT_String attrStr, attrName;
     GA_ROAttributeRef attrRef;
     int attrClass = POINT_ATTR;

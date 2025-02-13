@@ -23,7 +23,7 @@
 ///
 /// Finally, tools::setValueOnMin(), tools::setValueOnMax(), tools::setValueOnSum()
 /// and tools::setValueOnMult() are wrappers around Tree::modifyValue() (or
-/// ValueAccessor::modifyValue()) for some commmon in-place operations.
+/// ValueAccessor::modifyValue()) for some common in-place operations.
 /// These are typically significantly faster than calling getValue() followed by setValue().
 
 #ifndef OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED

@@ -356,7 +356,7 @@ decode(llvm::Value* buffer,
             OPENVDB_ASSERT(encodedType);
             encodedType = encodedType->getPointerTo();
 
-            // guranteed to be castable
+            // guaranteed to be castable
             llvm::Value* typedBuffer = B.CreatePointerCast(buffer, encodedType);
             llvm::Value* encoded = ir_gep(B, typedBuffer, pid);
             OPENVDB_ASSERT(F->match({store->getType(), encoded->getType()}, C));
@@ -368,7 +368,7 @@ decode(llvm::Value* buffer,
     }
 
     // if we're here (the final else), the value is not encoded
-    // @todo  We could instead register all vaid nullcodecs which would give
+    // @todo  We could instead register all valid nullcodecs which would give
     //   guarantees should a codec not exist
     llvm::Value* typedBuffer = B.CreatePointerCast(buffer, type->getPointerTo());
     llvm::Value* value = ir_gep(B, typedBuffer, pid);
@@ -439,7 +439,7 @@ encode(llvm::Value* in,
     }
 
     // if we're here (the final else), the value is not encodable
-    // @todo  We could instead register all vaid nullcodecs which would give
+    // @todo  We could instead register all valid nullcodecs which would give
     //   guarantees should a codec not exist
     llvm::Value* typedBuffer = B.CreatePointerCast(buffer, type->getPointerTo());
     llvm::Value* loc = ir_gep(B, typedBuffer, pid);
@@ -830,7 +830,7 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
 
     AttributeRegistry::Ptr registry = AttributeRegistry::create(tree);
 
-    // intialise the global indices - do this here so it's only done once
+    // initialise the global indices - do this here so it's only done once
 
     for (const AttributeRegistry::AccessData& access : registry->data()) {
         const std::string token = access.tokenname();

@@ -69,7 +69,7 @@ pointsToGrid(const PtrT dWorldPoints,
 /// @param maxPointsPerVoxel Max density of points per voxel, i.e. maximum number of points in any voxel
 /// @param tolerance allow for point density to vary by the specified tolerance (defaults to 1). That is, the voxel size
 ///                  is selected such that the max density is +/- the tolerance.
-/// @param maxIterations Maximum number of iterations used to seach for a voxel size that produces a point density
+/// @param maxIterations Maximum number of iterations used to search for a voxel size that produces a point density
 ///                      with specified tolerance takes.
 /// @param type Defined the way point information is represented in the output grid (see PointType enum in NanoVDB.h)
 ///             Should not be PointType::Disable!
@@ -139,13 +139,13 @@ class fancy_ptr
     const T* mPtr;
 public:
     /// @brief Default constructor.
-    /// @note  This method is atcually not required by cuda::PointsToGrid
+    /// @note  This method is actually not required by cuda::PointsToGrid
     /// @param ptr Pointer to array of elements
     __hostdev__ explicit fancy_ptr(const T* ptr = nullptr) : mPtr(ptr) {}
-    /// @brief Index acces into the array pointed to by the stored pointer.
+    /// @brief Index access into the array pointed to by the stored pointer.
     /// @note  This method is required by cuda::PointsToGrid!
     /// @param i Unsigned index of the element to be returned
-    /// @return Const refernce to the element at the i'th poisiton
+    /// @return Const reference to the element at the i'th position
     __hostdev__ inline const T& operator[](size_t i) const {return mPtr[i];}
     /// @brief Dummy implementation required by pointer_traits.
     /// @note  Note that only the return type matters!
@@ -700,7 +700,7 @@ jump:// this marks the beginning of the actual algorithm
             goto jump;
         }
     }
-    if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
+    if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint density\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
     cudaCheck(cudaEventSynchronize(copyEvent));
