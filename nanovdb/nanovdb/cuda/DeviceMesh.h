@@ -5,7 +5,7 @@
     \file DeviceMesh.h
 
     \brief nanovdb::cuda::DeviceMesh encapsulates device IDs, CUDA streams,
-           and NCCL communicators in order to faciliate multi-GPU applications.
+           and NCCL communicators in order to facilitate multi-GPU applications.
 */
 
 #ifndef NANOVDB_CUDA_DEVICEMESH_H_HAS_BEEN_INCLUDED
@@ -201,8 +201,8 @@ inline size_t minDevicePageSize(const DeviceMesh& mesh)
     return minGranularity;
 }// minDevicePageSize
 
-}
+} // namespace cuda
 
-} // namespace nanovdb::cuda
+} // namespace nanovdb
 
 #endif // end of NANOVDB_CUDA_DEVICEMESH_H_HAS_BEEN_INCLUDED
