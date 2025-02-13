@@ -92,7 +92,7 @@ void processRoot(NanoTree<BuildT> *d_tree)
     cudaCheck(cudaMemcpy(uBuffer.data(), d_tree, uBuffer.size(), cudaMemcpyDeviceToHost));// copy Tree and Root (minus tiles)
     if (!uBuffer.data<TreeT>()->isRootNext()) throw std::runtime_error("ERROR: expected no padding between tree and root!");
     if ( uBuffer.data<TreeT>()->root().tileCount() == 0) return;// empty root node so nothing to do
-    uBuffer.resize(sizeof(TreeT) + uBuffer.data<TreeT>()->root().memUsage());// likely does nothing since we reseved 64 tiles
+    uBuffer.resize(sizeof(TreeT) + uBuffer.data<TreeT>()->root().memUsage());// likely does nothing since we reserved 64 tiles
     RootT *root = &uBuffer.data<TreeT>()->root();
     cudaCheck(cudaMemcpy(root + 1, (char*)(d_tree + 1) + sizeof(RootT), root->tileCount()*sizeof(TileT), cudaMemcpyDeviceToHost));// copy tiles
 
@@ -105,14 +105,14 @@ void processRoot(NanoTree<BuildT> *d_tree)
 
     // We employ a simple z-scanline algorithm that inserts inactive tiles with
     // the inside value if they are sandwiched between inside child nodes only!
-    for (ChildT *a = first, *b = a+1; b!=last; ++a, ++b) {// loop over pairs of adjacend child nodes
+    for (ChildT *a = first, *b = a+1; b!=last; ++a, ++b) {// loop over pairs of adjacent child nodes
         const Coord d = b->ijk - a->ijk;// coord delta of adjacent child nodes
         if (d[0]!=0 || d[1]!=0 || d[2]==dim) continue;// not same z-scanline or they are neighbors
         util::cuda::lambdaKernel<<<1, 1>>>(1, [=] __device__(size_t) {
             a->val[1] = root->getChild(root->tile(a->idx))->getLastValue();
             b->val[0] = root->getChild(root->tile(b->idx))->getFirstValue();
         });
-        cudaCheck(cudaDeviceSynchronize());// required for host acecss to RootChild::val[2]
+        cudaCheck(cudaDeviceSynchronize());// required for host access to RootChild::val[2]
         if (a->val[1] > 0 || b->val[0] > 0) continue; // scanline is not inside a surface
         for (Coord c = a->ijk.offsetBy(0,0,dim); c[2] != b->ijk[2]; c[2] += dim) {
             TileT *tile = root->probeTile(c);

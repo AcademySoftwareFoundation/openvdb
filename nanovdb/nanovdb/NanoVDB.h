@@ -2242,12 +2242,12 @@ public:
     __hostdev__ bool             hasStdDeviation() const { return DataType::mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return DataType::mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
 
-    /// @brief return true if the specified node type is layed out breadth-first in memory and has a fixed size.
+    /// @brief return true if the specified node type is laid out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
     template<typename NodeT>
     __hostdev__ bool isSequential() const { return NodeT::FIXED_SIZE && this->isBreadthFirst(); }
 
-    /// @brief return true if the specified node level is layed out breadth-first in memory and has a fixed size.
+    /// @brief return true if the specified node level is laid out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
     template<int LEVEL>
     __hostdev__ bool isSequential() const { return NodeTrait<TreeT, LEVEL>::type::FIXED_SIZE && this->isBreadthFirst(); }

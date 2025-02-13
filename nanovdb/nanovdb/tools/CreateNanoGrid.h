@@ -1705,16 +1705,6 @@ void CreateNanoGrid<SrcGridT>::processGrid()
     dstGrid->mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
     dstGrid->mData1 = this->valueCount();
 
-//    if (!isValid(dstGrid->mGridType, dstGrid->mGridClass)) {
-//#if 1
-//        char str[30];
-//        fprintf(stderr,"Warning: Strange combination of GridType(\"%s\") and GridClass(\"%s\"). Consider changing GridClass to \"Unknown\"\n",
-//                toStr(str, dstGrid->mGridType), toStr(str + 15, dstGrid->mGridClass));
-//#else
-//        throw std::runtime_error("Invalid combination of GridType("+std::to_string(int(dstGrid->mGridType))+
-//                                 ") and GridClass("+std::to_string(int(dstGrid->mGridClass))+"). See NanoVDB.h for details!");
-//#endif
-//    }
     util::memzero(dstGrid->mGridName, GridData::MaxNameSize);// initialize mGridName to zero
     strncpy(dstGrid->mGridName, mSrcNodeAcc.getName().c_str(), GridData::MaxNameSize-1);
     if (mSrcNodeAcc.hasLongGridName()) dstGrid->setLongGridNameOn();// grid name is long so store it as blind data

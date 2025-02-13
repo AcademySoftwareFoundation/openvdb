@@ -23,17 +23,19 @@ class DeviceGuard {
         DeviceGuard() { cudaGetDevice(&deviceId); }
         ~DeviceGuard() { cudaSetDevice(deviceId); }
 
-        // DeviceGuard is not copyable nor movable
+        /// @{
+        /// @brief DeviceGuard is not copyable nor movable
         DeviceGuard(const DeviceGuard&) = delete;
         DeviceGuard& operator=(const DeviceGuard&) = delete;
         DeviceGuard(DeviceGuard&& other) = delete;
         DeviceGuard& operator=(DeviceGuard&& other) = delete;
+        /// @}
     private:
         int deviceId = -1;
 };
 
-}
+} // namespace cuda
 
-} // namespace nanovdb::cuda
+} // namespace nanovdb
 
 #endif // end of NANOVDB_CUDA_DEVICEGUARD_H_HAS_BEEN_INCLUDED
