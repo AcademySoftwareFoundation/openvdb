@@ -15,7 +15,6 @@
 #include <algorithm>
 
 #include <nanovdb/util/cuda/Util.h>
-#include <nanovdb/cuda/DeviceGuard.h>
 #ifdef NANOVDB_USE_NCCL
 #include <nccl.h>
 #endif
@@ -23,6 +22,27 @@
 namespace nanovdb {
 
 namespace cuda {
+
+namespace detail {
+
+/// @brief RAII class that caches/restores the current device at construction/destruction
+class DeviceGuard {
+    public:
+        DeviceGuard() { cudaGetDevice(&deviceId); }
+        ~DeviceGuard() { cudaSetDevice(deviceId); }
+
+        /// @{
+        /// @brief DeviceGuard is not copyable nor movable
+        DeviceGuard(const DeviceGuard&) = delete;
+        DeviceGuard& operator=(const DeviceGuard&) = delete;
+        DeviceGuard(DeviceGuard&& other) = delete;
+        DeviceGuard& operator=(DeviceGuard&& other) = delete;
+        /// @}
+    private:
+        int deviceId = -1;
+};
+
+}
 
 /// @brief POD struct representing a device id and a stream on that device
 struct DeviceNode
@@ -90,7 +110,7 @@ private:
 
 inline DeviceMesh::DeviceMesh()
 {
-    DeviceGuard deviceGuard;
+    detail::DeviceGuard deviceGuard;
 
     int deviceCount = -1;
     cudaGetDeviceCount(&deviceCount);
@@ -135,7 +155,7 @@ inline DeviceMesh::DeviceMesh(DeviceMesh&& other) noexcept
 
 inline DeviceMesh::~DeviceMesh()
 {
-    DeviceGuard deviceGuard;
+    detail::DeviceGuard deviceGuard;
 
 #ifdef NANOVDB_USE_NCCL
     std::for_each(mComms.begin(), mComms.end(), [](ncclComm_t comm) {
