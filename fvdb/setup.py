@@ -13,7 +13,6 @@ from typing import List, Tuple
 
 import git
 import git.repo
-import psutil
 import requests
 from git.exc import GitCommandError, InvalidGitRepositoryError
 from setuptools import setup
@@ -280,6 +279,8 @@ def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
 if __name__ == "__main__":
     # Set MAX_JOBS to control the number of parallel jobs for building based on available RAM, if not already set
     if "MAX_JOBS" not in os.environ:
+        import psutil
+
         # 2.5 GB per job
         os.environ["MAX_JOBS"] = str(int(psutil.virtual_memory().free / 1024**3 / 2.5))
 
