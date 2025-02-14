@@ -8,6 +8,14 @@
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.20)
+
+# CMP0167 skips the (deprecated) FindBoost.cmake module included with CMake
+# and instead uses the BoostConfig.cmake configuration file (included in
+# Boost v1.70.0 and later) directly.
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
+endif()
+
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
