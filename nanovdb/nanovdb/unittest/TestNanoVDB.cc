@@ -438,7 +438,7 @@ TEST_F(TestNanoVDB, toStr)
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::Version(12,34,56) ),  "12.34.56"), 0 );
     }
     {// toStr(MagicType)
-        EXPECT_EQ(25, nanovdb::strlen<nanovdb::MagicType>());
+        EXPECT_EQ(14, nanovdb::strlen<nanovdb::MagicType>());
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::Unknown ),  "unknown"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::OpenVDB ),  "openvdb"), 0 );
         EXPECT_EQ( strcmp(nanovdb::toStr(mStr, nanovdb::MagicType::NanoVDB ),  "nanovdb"), 0 );
