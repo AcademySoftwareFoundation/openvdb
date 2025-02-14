@@ -1,5 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: Apache-2.0#include <nanovdb/NanoVDB.h>
+// SPDX-License-Identifier: Apache-2.0
+
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceMesh.h>
