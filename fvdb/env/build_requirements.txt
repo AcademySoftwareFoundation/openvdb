@@ -5,3 +5,5 @@ GitPython
 ninja
 requests
 tqdm
+numpy<2.0.0
+torch
