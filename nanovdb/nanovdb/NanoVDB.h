@@ -204,6 +204,8 @@ class Point{};
 // --------------------------> GridType <------------------------------------
 
 /// @brief return the number of characters (including null termination) required to convert enum type to a string
+///
+/// @note This curious implementation, which subtracts End from StrLen, avoids duplicate values in the enum!
 template <class EnumT>
 __hostdev__ inline constexpr uint32_t strlen(){return (uint32_t)EnumT::StrLen - (uint32_t)EnumT::End;}
 
@@ -274,7 +276,7 @@ __hostdev__ inline char* toStr(char *dst, GridType gridType)
         case GridType::Index:       return util::strcpy(dst, "Index");
         case GridType::OnIndex:     return util::strcpy(dst, "OnIndex");
         case GridType::IndexMask:   return util::strcpy(dst, "IndexMask");
-        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");
+        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");// StrLen = 11 + 1 + End
         case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");
         case GridType::Vec3u8:      return util::strcpy(dst, "Vec3u8");
         case GridType::Vec3u16:     return util::strcpy(dst, "Vec3u16");
@@ -310,7 +312,7 @@ __hostdev__ inline char* toStr(char *dst, GridClass gridClass)
         case GridClass::LevelSet:    return util::strcpy(dst, "SDF");
         case GridClass::FogVolume:   return util::strcpy(dst, "FOG");
         case GridClass::Staggered:   return util::strcpy(dst, "MAC");
-        case GridClass::PointIndex:  return util::strcpy(dst, "PNTIDX");
+        case GridClass::PointIndex:  return util::strcpy(dst, "PNTIDX");// StrLen = 6 + 1 + End
         case GridClass::PointData:   return util::strcpy(dst, "PNTDAT");
         case GridClass::Topology:    return util::strcpy(dst, "TOPO");
         case GridClass::VoxelVolume: return util::strcpy(dst, "VOX");
@@ -344,7 +346,7 @@ __hostdev__ inline const char* toStr(char *dst, GridFlags gridFlags)
         case GridFlags::HasBBox:         return util::strcpy(dst, "has bbox");
         case GridFlags::HasMinMax:       return util::strcpy(dst, "has min/max");
         case GridFlags::HasAverage:      return util::strcpy(dst, "has average");
-        case GridFlags::HasStdDeviation: return util::strcpy(dst, "has standard deviation");
+        case GridFlags::HasStdDeviation: return util::strcpy(dst, "has standard deviation");// StrLen = 22 + 1 + End
         case GridFlags::IsBreadthFirst:  return util::strcpy(dst, "is breadth-first");
         default:                         return util::strcpy(dst, "end");
     }
@@ -359,7 +361,7 @@ enum class MagicType : uint32_t { Unknown  = 0,// first 64 bits are neither of t
                                   NanoGrid = 3,// first 64 bits = NANOVDB_MAGIC_GRID
                                   NanoFile = 4,// first 64 bits = NANOVDB_MAGIC_FILE
                                   End      = 5,
-                                  StrLen   = End + 25};// this entry is used to determine the minimum size of c-string
+                                  StrLen   = End + 14};// this entry is used to determine the minimum size of c-string
 
 /// @brief maps 64 bits of magic number to enum
 __hostdev__ inline MagicType toMagic(uint64_t magic)
@@ -381,7 +383,7 @@ __hostdev__ inline char* toStr(char *dst, MagicType magic)
     switch (magic){
         case MagicType::Unknown:  return util::strcpy(dst, "unknown");
         case MagicType::NanoVDB:  return util::strcpy(dst, "nanovdb");
-        case MagicType::NanoGrid: return util::strcpy(dst, "nanovdb::Grid");
+        case MagicType::NanoGrid: return util::strcpy(dst, "nanovdb::Grid");// StrLen = 13 + 1 + End
         case MagicType::NanoFile: return util::strcpy(dst, "nanovdb::File");
         case MagicType::OpenVDB:  return util::strcpy(dst, "openvdb");
         default:                  return util::strcpy(dst, "end");
@@ -946,8 +948,6 @@ public:
         mFlags = 0u;
         for (auto mask : list) mFlags |= static_cast<Type>(mask);
     }
-    //__hostdev__ Type& data() { return mFlags; }
-    //__hostdev__ Type data() const { return mFlags; }
     __hostdev__ Type getFlags() const { return mFlags & (static_cast<Type>(GridFlags::End) - 1u); } // mask out everything except relevant bits
 
     __hostdev__ void setOn() { mFlags = ~Type(0u); }
@@ -1739,7 +1739,7 @@ struct NodeTrait<const GridOrTreeOrRootT, 3>
     using type = const typename GridOrTreeOrRootT::RootNodeType;
 };
 
-// ----------------------------> Froward decelerations of random access methods <--------------------------------------
+// ------------> Froward decelerations of accelerated random access methods <---------------
 
 template<typename BuildT>
 struct GetValue;
@@ -1779,7 +1779,7 @@ __hostdev__ inline char* toStr(char *dst, CheckMode mode)
     switch (mode){
         case CheckMode::Half: return util::strcpy(dst, "half");
         case CheckMode::Full: return util::strcpy(dst, "full");
-        default: return util::strcpy(dst, "disabled");
+        default: return util::strcpy(dst, "disabled");// StrLen = 8 + 1 + End
     }
 }
 
@@ -4569,7 +4569,7 @@ __hostdev__ inline bool LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
     };
     uint64_t *w = DataType::mValueMask.words(), word64 = *w;
     uint32_t  Xmin = word64 ? 0u : 8u, Xmax = Xmin;
-    for (int i = 1; i < 8; ++i) { // last loop over 8 64 bit words
+    for (int i = 1; i < 8; ++i) { // last loop over 7 remaining 64 bit words
         if (w[i]) { // skip if word has no set bits
             word64 |= w[i]; // union 8 x 64 bits words into one 64 bit word
             if (Xmin == 8)
@@ -5796,7 +5796,7 @@ __hostdev__ inline const char* toStr(char *dst, Codec codec)
     switch (codec){
         case Codec::NONE:   return util::strcpy(dst, "NONE");
         case Codec::ZIP:    return util::strcpy(dst, "ZIP");
-        case Codec::BLOSC : return util::strcpy(dst, "BLOSC");
+        case Codec::BLOSC : return util::strcpy(dst, "BLOSC");// StrLen = 5 + 1 + End
         default:            return util::strcpy(dst, "END");
     }
 }
