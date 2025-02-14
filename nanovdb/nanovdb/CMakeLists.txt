@@ -115,6 +115,17 @@ if(NANOVDB_USE_CUDA)
   endif()
 
   find_package(CUDAToolkit)
+
+
+  include(../../cmake/CPM.cmake)
+
+  # This will automatically clone CCCL from GitHub and make the exported cmake targets available
+  CPMAddPackage(
+      NAME CCCL
+      GITHUB_REPOSITORY nvidia/cccl
+      GIT_TAG main # Fetches the latest commit on the main branch
+  )
+
   find_package(NCCL)
 endif()
 
@@ -313,8 +324,7 @@ if(NANOVDB_USE_CUDA)
   endif()
 
   # Add CUDA includes to any C++ units which use NanoVDB
-  target_include_directories(nanovdb INTERFACE
-    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+  target_link_libraries(nanovdb INTERFACE CCCL::CCCL CUDA::cudart)
 
   if(NCCL_FOUND)
     target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_NCCL)
