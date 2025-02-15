@@ -5,7 +5,7 @@ on:
       - "pull-request/[0-9]+"
 jobs:
   enforce-all-checks:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-arm64-cpu4') || 'ubuntu-latest' }}
     permissions:
       checks: read
     steps:
