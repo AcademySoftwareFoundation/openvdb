@@ -582,7 +582,8 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
 
     cute::Tensor gOutput_mn = zipped_divide(
         mOutputScatter, typename KernelFunctor::TilerOut{});           // ((BLK_M, BLK_N), (m', n'))
-    dim3             lauch_grid{ size<1, 1>(gOutput_mn), size<1, 0>(gOutput_mn), 1 };
+    dim3             launch_grid{ static_cast<unsigned int>(size<1, 1>(gOutput_mn)),
+                      static_cast<unsigned int>(size<1, 0>(gOutput_mn)), 1u };
     constexpr size_t smem_size = sizeof(typename KernelFunctor::SharedStorage);
 
 #if 0
@@ -633,8 +634,8 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
     // cudaEventRecord(start);
     kernel_entrypoint<KernelFunctor, decltype(mFilter), decltype(mXformedActGather),
                       decltype(mOutputScatter)>
-        <<<lauch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(mFilter, mXformedActGather,
-                                                                       mOutputScatter);
+        <<<launch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(mFilter, mXformedActGather,
+                                                                        mOutputScatter);
     // cudaEventRecord(stop);
     // cudaEventSynchronize(stop);
     // float milliseconds = 0;

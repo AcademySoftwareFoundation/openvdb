@@ -153,9 +153,9 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             logging.info(f"Failed to apply cutlass patch: {str(e)}, continuing without patching")
 
         self.download_external_dep(
-            name="cudnn_fe",
-            git_url="https://github.com/NVIDIA/cudnn-frontend",
-            git_tag="v1.3.0",
+            name="cudnn_frontend",
+            git_url="https://github.com/NVIDIA/cudnn-frontend.git",
+            git_tag="v1.10.0",
         )
 
         self.download_external_dep(name="tinyply", git_url="https://github.com/ddiakopoulos/tinyply.git", git_tag="2.4")
@@ -219,63 +219,6 @@ def get_header_files_recursive(base_path, new_path) -> List[Tuple[str, List[str]
     return source_files
 
 
-def download_and_install_cudnn() -> Tuple[List[str], List[str]]:
-    url = (
-        "https://developer.download.nvidia.com/compute/cudnn/redist/cudnn/linux-x86_64/"
-        + "cudnn-linux-x86_64-9.1.0.70_cuda12-archive.tar.xz"
-    )
-    external_dir = get_external_dir()
-    tar_filepath = external_dir / "cudnn.tar.xz"
-    folder_filepath = external_dir / "cudnn"
-
-    logging.info("CUDNN path: %s" % folder_filepath.resolve())
-    if not tar_filepath.exists():
-        response = requests.get(url, stream=True)
-
-        # Sizes in bytes.
-        total_size = int(response.headers.get("content-length", 0))
-        block_size = 1024
-
-        with tqdm(total=total_size, unit="B", unit_scale=True, desc="Downloading cudnn") as progress_bar:
-            with open(tar_filepath, "wb") as file:
-                for data in response.iter_content(block_size):
-                    progress_bar.update(len(data))
-                    file.write(data)
-
-        if total_size != 0 and progress_bar.n != total_size:
-            raise RuntimeError("Could not download cudnn")
-
-        # Check hash of cudnn.tar.xz
-        cudnn_hash = "105585f6dd62cc013354d81a2a692d2e"
-        cudnn_hash_cmd = f"md5sum {tar_filepath}"
-        cudnn_hash_output = subprocess.check_output(cudnn_hash_cmd, shell=True).decode().split()[0]
-        if cudnn_hash != cudnn_hash_output:
-            raise RuntimeError("Hash of cudnn.tar.xz does not match")
-
-    if (not folder_filepath.exists()) or (len(os.listdir(folder_filepath)) == 0):
-        logging.info("Extracting cudnn…")
-        with tarfile.open(tar_filepath, "r:xz") as tar:
-            tar.extractall(folder_filepath)
-
-    # Find include directories and all static libraries
-    cudnn_include = None
-    cudnn_libs = []
-    # NOTE: Similar Path.walk() is only available in Python 3.12+
-    for dir_name, _, dir_files in os.walk(str(folder_filepath)):
-        if cudnn_include is None and "include" in dir_name:
-            cudnn_include = dir_name
-        if "lib" in dir_name:
-            cudnn_libs += [os.path.join(dir_name, t) for t in dir_files if t.endswith(".a")]
-
-    # Remove symbolic links
-    cudnn_libs = [t for t in cudnn_libs if not os.path.islink(t)]
-
-    if cudnn_include is None or len(cudnn_libs) == 0:
-        raise RuntimeError("Could not find cudnn include or libraries")
-
-    return [cudnn_include], cudnn_libs
-
-
 if __name__ == "__main__":
     # Set MAX_JOBS to control the number of parallel jobs for building based on available RAM, if not already set
     if "MAX_JOBS" not in os.environ:
@@ -320,10 +263,8 @@ if __name__ == "__main__":
 
     if cuda_version is not None and int(cuda_version.split(".")[0]) >= 12:
         cpp_std = "c++20"
-        cudnn_include_dirs, cudnn_static_libs = download_and_install_cudnn()
     else:
         cpp_std = "c++17"
-        cudnn_include_dirs, cudnn_static_libs = [], []
 
     cpp_flags = [
         f"-std={cpp_std}",
@@ -348,23 +289,29 @@ if __name__ == "__main__":
     exclude = ["benchmarks", "tests"]
 
     cwd = get_cwd()
+    lib_ext_include_dirs = [
+        cwd / "src",
+        cwd / get_nanovdb_source_dir(),
+        cwd / "external/cutlass/include",
+        cwd / "external/c-blosc/install/include",
+        cwd / "external/cudnn_frontend/include",
+        cwd / "external/glm",
+        cwd / "external/tinyply/source",
+    ]
+    if not is_conda_env:
+        import nvidia.cudnn
+
+        cudnn_dir = os.path.dirname(os.path.abspath(nvidia.cudnn.__file__))
+        cudnn_include_dir = os.path.join(cudnn_dir, "include")
+        lib_ext_include_dirs.append(cudnn_include_dir)
+
     lib_ext = cpp_extension.CUDAExtension(
         name="fvdb.fvdblib",
         sources=get_source_files_recursive("src", exclude, include_bindings=False),
-        include_dirs=[
-            cwd / "src",
-            cwd / get_nanovdb_source_dir(),
-            cwd / "external/cutlass/include",
-            cwd / "external/c-blosc/install/include",
-            cwd / "external/cudnn_fe/include",
-            cwd / "external/glm",
-            cwd / "external/tinyply/source",
-        ]
-        + cudnn_include_dirs,
+        include_dirs=lib_ext_include_dirs,
         extra_objects=[
             "external/c-blosc/install/lib/libblosc.a",
-        ]
-        + cudnn_static_libs,
+        ],
         extra_compile_args={
             "cxx": cpp_flags + ["-fvisibility=default"],
             "nvcc": nvcc_flags,
