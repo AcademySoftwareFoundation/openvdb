@@ -94,13 +94,19 @@ count_tiles_per_gaussian(const uint32_t total_gaussians, const uint32_t num_gaus
     }
 }
 
+// Encode a float depth into a int64_t
 __device__ inline int64_t
 encode_depth(float depth) {
-    // TODO: this should be static_cast<int64_t>(*reinterpret_cast<int32_t *>(&depth))
-    // but really we should use a memcpy
-    return (int64_t) * (int32_t *)(&depth);
+    int32_t ret;
+    std::memcpy(&ret, &depth, sizeof(depth));
+    return static_cast<int64_t>(ret);
 }
 
+// Encode a camera index, tile index, and depth into a int64_t
+// The layout is (from least to most significant bits):
+// [32 bits] depth
+// [tile_id_bits] tile_idx
+// [camera_id_bits] cidx
 __device__ inline int64_t
 encode_cam_tile_depth_key(int64_t cidx, int64_t tile_idx, int64_t encoded_depth,
                           int32_t tile_id_bits) {
@@ -108,6 +114,11 @@ encode_cam_tile_depth_key(int64_t cidx, int64_t tile_idx, int64_t encoded_depth,
     return ((cidx_enc | tile_idx) << 32) | encoded_depth;
 }
 
+// Decode a camera index and tile index from a int64_t
+// The layout is (from least to most significant bits):
+// [32 bits] depth (ignored and dropped)
+// [tile_id_bits] tile_idx
+// [camera_id_bits] cidx
 __device__ inline std::tuple<int32_t, int32_t>
 decode_cam_tile_key(int64_t packed_cam_tile_depth_key, int32_t tile_id_bits) {
     int32_t tile_key = packed_cam_tile_depth_key >> 32;
