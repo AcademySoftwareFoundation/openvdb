@@ -16,18 +16,21 @@
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
 #include <nanovdb/tools/cuda/GridStats.cuh>
+#include <nanovdb/tools/cuda/DistributedPointsToGrid.cuh>
 //#include <nanovdb/tools/cuda/DilateVoxels.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/io/IO.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
+#include <nanovdb/cuda/DeviceMesh.h>
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
 #include <iomanip> // for std::setw, std::setfill
+#include <thread> // for std::thread
 
 namespace nanovdb {// this namespace is required by gtest
 
@@ -230,6 +233,52 @@ TEST(TestNanoVDBCUDA, DeviceStreamMap)
         }
     }
     cudaSetDevice(current); // restore device so subsequent tests don't fail
+}
+
+TEST(TestNanoVDBCUDA, DeviceMesh)
+{
+    int count = 0, current = 0;
+    {
+        cudaCheck(cudaGetDeviceCount(&count));
+        cudaCheck(cudaGetDevice(&current));
+        EXPECT_EQ(count,   nanovdb::util::cuda::deviceCount());
+        EXPECT_EQ(current, nanovdb::util::cuda::currentDevice());
+    }
+    //std::cout << "Total device count = " << count << std::endl;
+    nanovdb::cuda::DeviceMesh serialMesh;
+    EXPECT_EQ(count, serialMesh.deviceCount());
+    EXPECT_GT(nanovdb::cuda::minDevicePageSize(serialMesh), 0);
+    // Construction of deviceMesh (and destruction) should not modify current device
+    EXPECT_EQ(current, nanovdb::util::cuda::currentDevice());
+    // Serial kernel dispatch with iterator
+    for (const auto& [device, stream] : serialMesh) {
+        cudaSetDevice(device);
+        testKernel<<<1, 1, 0, stream>>>(device);
+    }
+    // Wait on each kernel to finish using indexing operation
+    for (int i = 0; i < serialMesh.deviceCount(); ++i) {
+        cudaSetDevice(serialMesh[i].id);
+        cudaStreamSynchronize(serialMesh[i].stream);
+    }
+
+    // Test move constructor
+    nanovdb::cuda::DeviceMesh parallelMesh(std::move(serialMesh));
+    EXPECT_EQ(count, parallelMesh.deviceCount());
+    // After move constructor, serialMesh should have no devices
+    EXPECT_EQ(0, serialMesh.deviceCount());
+    // Parallel kernel dispatch with iterator
+    std::vector<std::thread> threads;
+    for (const auto& [device, stream] : parallelMesh) {
+        threads.emplace_back([](int device, cudaStream_t stream) {
+            cudaSetDevice(device);
+            testKernel<<<1, 1, 0, stream>>>(device);
+            cudaStreamSynchronize(stream);
+        }, device, stream);
+    }
+    std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
+    threads.clear();
+
+    cudaSetDevice(current); // Restore device so subsequent tests don't fail
 }
 
 TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_float)
@@ -678,7 +727,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
     });
 
     //timer.stop();
-}// Large_CudaPointsToGrid_old
+}// Large_CudaPointsToGrid_DeviceBuffer
 
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
 {
@@ -757,7 +806,70 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     });
 
     //timer.stop();
-}// Large_CudaPointsToGrid_new
+}// Large_CudaPointsToGrid_UnifiedBuffer
+
+TEST(TestNanoVDBCUDA, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+
+    using BufferT = nanovdb::cuda::UnifiedBuffer;
+    using BuildT = nanovdb::ValueOnIndex;
+    nanovdb::util::Timer timer;
+    const size_t voxelCount = 1 << 20;// 1048576
+    nanovdb::Coord* voxels =  nullptr;
+    const size_t voxelSize = voxelCount * sizeof(nanovdb::Coord);
+    cudaCheck(cudaMallocManaged(&voxels, voxelSize));
+    {//generate random voxels
+        std::srand(98765);
+        const int max = 512, min = -max;
+        auto op = [&](){return rand() % (max - min) + min;};
+        for (size_t i = 0; i < voxelCount; ++i)
+            voxels[i] = nanovdb::Coord(op(), op(), op());
+    }
+
+    nanovdb::cuda::DeviceMesh deviceMesh;
+    nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
+    auto handle = converter.getHandle(voxels, voxelCount);
+    // auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, BufferT>(voxels, voxelCount);
+
+    EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
+    EXPECT_TRUE(handle.deviceGrid<BuildT>());
+    EXPECT_FALSE(handle.deviceGrid<int>(0));
+    EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
+    EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
+    EXPECT_TRUE(handle.data());// grid also exists on the CPU
+
+    //timer.start("Allocating and copying grid from GPU to CPU");
+    auto *grid = handle.grid<BuildT>();// grid also exists on the CPU
+    EXPECT_TRUE(grid);
+    handle.deviceDownload();// creates a copy on the CPU
+    EXPECT_TRUE(handle.deviceData());
+    EXPECT_TRUE(handle.data());
+    auto *data = handle.gridData();
+    EXPECT_TRUE(data);
+    grid = handle.grid<BuildT>();
+    EXPECT_TRUE(grid);
+    EXPECT_TRUE(grid->valueCount()>0);
+    EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
+
+    //timer.restart("Parallel unit-testing on CPU");
+    nanovdb::util::forEach(0, voxelCount, 1, [&](const nanovdb::util::Range1D &r){
+        auto acc = grid->getAccessor();
+        for (size_t i=r.begin(); i!=r.end(); ++i) {
+            const nanovdb::Coord &ijk = voxels[i];
+            EXPECT_TRUE(acc.probeLeaf(ijk)!=nullptr);
+            EXPECT_TRUE(acc.isActive(ijk));
+            EXPECT_TRUE(acc.getValue(ijk) > 0u);
+            const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
+            EXPECT_TRUE(leaf);
+            const auto offset = leaf->CoordToOffset(ijk);
+            EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        }
+    });
+
+    cudaSetDevice(current); // restore device so subsequent tests don't fail
+}// Large_DistributedCudaPointsToGrid_UnifiedBuffer
 
 TEST(TestNanoVDBCUDA, mergeSplitGrids)
 {
@@ -938,14 +1050,12 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_basic)
     EXPECT_EQ(1u, idxHdl.buffer().bufferCount());
     EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
     EXPECT_FALSE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.buffer().data(0, 1));
     EXPECT_FALSE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
     idxHdl.deviceUpload();
     EXPECT_TRUE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
     EXPECT_EQ(2u, idxHdl.buffer().bufferCount());
     EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
     EXPECT_TRUE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.buffer().data(0, 1));
     auto *idxGrid = idxHdl.grid<nanovdb::ValueIndex>();
     EXPECT_TRUE(idxGrid);
     //timer.restart("Create value list on CPU");
@@ -1107,22 +1217,22 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
 {
     using BufferT = nanovdb::cuda::DeviceBuffer;
     //nanovdb::util::Timer timer("Create FloatGrid on CPU");
-    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(100);
+    auto floatHdl = nanovdb::tools::createLevelSetSphere<float, BufferT>(1000);
     auto *floatGrid = floatHdl.grid<float>();
     EXPECT_TRUE(floatGrid);
     auto acc = floatGrid->getAccessor();
-    EXPECT_FALSE(acc.isActive(nanovdb::Coord(103,0,0)));
-    EXPECT_TRUE( acc.isActive(nanovdb::Coord(100,0,0)));
-    EXPECT_FALSE(acc.isActive(nanovdb::Coord( 97,0,0)));
-    EXPECT_EQ( 3.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ(-3.0f, acc( 97,0,0));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord(1003,0,0)));
+    EXPECT_TRUE( acc.isActive(nanovdb::Coord(1000,0,0)));
+    EXPECT_FALSE(acc.isActive(nanovdb::Coord( 997,0,0)));
+    EXPECT_EQ( 3.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ(-3.0f, acc( 997,0,0));
     using OpT = nanovdb::SetVoxel<float>;// only set the voxel value
-    acc.set<OpT>(nanovdb::Coord(103,0,0),-1.0f);// flip sign and value of inactive voxel
-    acc.set<OpT>(nanovdb::Coord( 97,0,0), 1.0f);// flip sign and value of inactive voxel
-    EXPECT_EQ(-1.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ( 1.0f, acc( 97,0,0));
+    acc.set<OpT>(nanovdb::Coord(1003,0,0),-1.0f);// flip sign and value of inactive voxel
+    acc.set<OpT>(nanovdb::Coord( 997,0,0), 1.0f);// flip sign and value of inactive voxel
+    EXPECT_EQ(-1.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ( 1.0f, acc( 997,0,0));
     //timer.restart("Copy FloatGrid from CPU to GPU");
     floatHdl.deviceUpload();// CPU -> GPU
     auto *d_floatGrid = floatHdl.deviceGrid<float>();
@@ -1136,9 +1246,9 @@ TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
     floatGrid = floatHdl.grid<float>();
     EXPECT_TRUE(floatGrid);
     acc = floatGrid->getAccessor();
-    EXPECT_EQ( 3.0f, acc(103,0,0));
-    EXPECT_EQ( 0.0f, acc(100,0,0));
-    EXPECT_EQ(-3.0f, acc( 97,0,0));
+    EXPECT_EQ( 3.0f, acc(1003,0,0));
+    EXPECT_EQ( 0.0f, acc(1000,0,0));
+    EXPECT_EQ(-3.0f, acc( 997,0,0));
     //EXPECT_FALSE(floatGrid->isLexicographic());
     EXPECT_TRUE(floatGrid->isBreadthFirst());
 }//  CudaSignedFloodFill
@@ -3274,6 +3384,11 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_basic)
     int *x = buffer.data<int>();
     for (int i = 0; i < N; ++i) EXPECT_EQ(1, *x++);
     for (int i = 0; i < N; ++i) EXPECT_EQ(2, *x++);
+
+    nanovdb::cuda::UnifiedBuffer otherBuffer(std::move(buffer));
+    int *y = otherBuffer.data<int>();
+    for (int i = 0; i < N; ++i) EXPECT_EQ(1, *y++);
+    for (int i = 0; i < N; ++i) EXPECT_EQ(2, *y++);
 }// UnifiedBuffer_basic
 
 TEST(TestNanoVDBCUDA, UnifiedBuffer_IO)

@@ -155,12 +155,12 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
-    //@{
+    /// @{
     /// @brief Factory methods that create a shared pointer to an DeviceBuffer instance
     static PtrT createPtr(uint64_t size, const DeviceBuffer* = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DeviceBuffer>(size, device, stream);}
     static PtrT createPtr(uint64_t size, void* cpuData, void* gpuData) {return std::make_shared<DeviceBuffer>(size, cpuData, gpuData);}
     static PtrT createPtr(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return std::make_shared<DeviceBuffer>(size, cpuData, list);}
-    ///@}
+    /// @}
 
     ///////////////////////////////////////////////////////////////////////
 
@@ -279,11 +279,11 @@ public:
 
     int deviceCount() const {return mDeviceCount;}
 
-    //@{
+    /// @{
     /// @brief Returns true if this allocator is empty, i.e. has no allocated memory
     bool empty() const { return mSize == 0; }
     bool isEmpty() const { return this->empty(); }
-    //@}
+    /// @}
 
     /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
     void clear(cudaStream_t stream = 0);

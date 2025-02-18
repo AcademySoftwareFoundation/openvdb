@@ -111,6 +111,9 @@ public:
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
     deviceData() const { return mBuffer.deviceData(); }
     template<typename U = BufferT>
+    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
+    deviceData(int device) const { return mBuffer.deviceData(device); }
+    template<typename U = BufferT>
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
     deviceData() { return mBuffer.deviceData(); }
     template<typename U = BufferT>
@@ -173,7 +176,7 @@ public:
     typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
     deviceUpload(void* stream, bool sync = true) { mBuffer.deviceUpload(stream, sync); }
 
-    /// @brief Upload the host buffer to a specefic device buffer. It device buffer doesn't exist it's created first
+    /// @brief Upload the host buffer to a specific device buffer. It device buffer doesn't exist it's created first
     /// @param device Device to upload host data to
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
@@ -212,7 +215,7 @@ public:
         return sum;
     }
 
-    /// @brief compute the size of unusedstorage in this buffer
+    /// @brief compute the size of unused storage in this buffer
     /// @return the number of unused bytes in this buffer.
     uint64_t freeSize() const {return mBuffer.size() - this->totalGridSize();}
 
@@ -286,12 +289,12 @@ public:
     /// @param is input stream containing a raw grid buffer
     /// @param gridName string name of the grid to be read
     /// @param pool optional pool from which to allocate the new grid buffer
-    /// @throw Will throw a std::logic_error if the stream does not contain a valid raw grid with the speficied name
+    /// @throw Will throw a std::logic_error if the stream does not contain a valid raw grid with the specified name
     void read(std::istream& is, const std::string &gridName, const BufferT& pool = BufferT());
 
     /// @brief Read a raw grid buffer from a file
     /// @param filename string name of the input file containing a raw grid buffer
-    /// @param pool optional pool from which to allocate the new grid buffe
+    /// @param pool optional pool from which to allocate the new grid buffer
     void read(const std::string &fileName, const BufferT& pool = BufferT()) {
         std::ifstream is(fileName, std::ios::in | std::ios::binary);
         if (!is.is_open()) throw std::ios_base::failure("Unable to open file named \"" + fileName + "\" for input");

@@ -2,19 +2,19 @@
 name: AX
 
 on:
-  push:
-    branches:
-      - "pull-request/[0-9]+"
-    paths-ignore:
-      - 'CHANGES'
-      - 'CODEOWNERS'
-      - 'doc/**'
-      - 'nanovdb/**'
-      - 'openvdb_maya/**'
-      - 'openvdb_houdini/**'
-      - 'fvdb/**'
-      - 'pendingchanges/**'
-      - '**.md'
+  # push:
+  #   branches:
+  #     - "pull-request/[0-9]+"
+  #   paths-ignore:
+  #     - 'CHANGES'
+  #     - 'CODEOWNERS'
+  #     - 'doc/**'
+  #     - 'nanovdb/**'
+  #     - 'openvdb_maya/**'
+  #     - 'openvdb_houdini/**'
+  #     - 'fvdb/**'
+  #     - 'pendingchanges/**'
+  #     - '**.md'
   schedule:
     # run this workflow every day 7am UTC
     - cron:  '0 7 * * *'

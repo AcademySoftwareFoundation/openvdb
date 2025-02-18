@@ -99,12 +99,19 @@
 
     Array of: LeafNodes of size 8^3: bbox, bit masks, 512 voxel values, and min/max/avg/standard deviation values
 
+    ... optional padding ...
+
+    Array of: GridBlindMetaData (288 bytes). The offset and count are defined in GridData::mBlindMetadataOffset and GridData::mBlindMetadataCount
+
+    ... optional padding ...
+
+    Array of: blind data
 
     Notation: "]---[" implies it has optional padding, and "][" implies zero padding
 
     [GridData(672B)][TreeData(64B)]---[RootData][N x Root::Tile]---[InternalData<5>]---[InternalData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
-    ^                                 ^         ^                  ^                   ^                   ^
-    |                                 |         |                  |                   |                   |
+    ^                                 ^         ^                  ^                   ^                   ^               ^
+    |                                 |         |                  |                   |                   |               GridBlindMetaData*
     +-- Start of 32B aligned buffer   |         |                  |                   |                   +-- Node0::DataType* leafData
         GridType::DataType* gridData  |         |                  |                   |
                                       |         |                  |                   +-- Node1::DataType* lowerData
@@ -125,24 +132,19 @@
 // Do not change this value! 32 byte alignment is fixed in NanoVDB
 #define NANOVDB_DATA_ALIGNMENT 32
 
-// NANOVDB_MAGIC_NUMB is currently used for both grids and files (starting with v32.6.0)
-// NANOVDB_MAGIC_GRID will soon be used exclusively for grids (serialized to a single buffer)
-// NANOVDB_MAGIC_FILE will soon be used exclusively for files
-// NANOVDB_MAGIC_NODE will soon be used exclusively for NodeManager
-// NANOVDB_MAGIC_FRAG will soon be used exclusively for a fragmented grid, i.e. a grid that is not serialized
-//                              | : 0 in 30 corresponds to 0 in NanoVDB0
+// NANOVDB_MAGIC_NUMB previously used for both grids and files (starting with v32.6.0)
+// NANOVDB_MAGIC_GRID currently used exclusively for grids (serialized to a single buffer)
+// NANOVDB_MAGIC_FILE currently used exclusively for files
+//                             | : 0 in 30 corresponds to 0 in NanoVDB0
 #define NANOVDB_MAGIC_NUMB  0x304244566f6e614eUL // "NanoVDB0" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_GRID  0x314244566f6e614eUL // "NanoVDB1" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_FILE  0x324244566f6e614eUL // "NanoVDB2" in hex - little endian (uint64_t)
-#define NANOVDB_MAGIC_NODE  0x334244566f6e614eUL // "NanoVDB3" in hex - little endian (uint64_t)
-#define NANOVDB_MAGIC_FRAG  0x344244566f6e614eUL // "NanoVDB4" in hex - little endian (uint64_t)
 #define NANOVDB_MAGIC_MASK  0x00FFFFFFFFFFFFFFUL // use this mask to remove the number
 
-//#define NANOVDB_MAGIC_NUMBER 0x304244566f6e614eUL
-//#define NANOVDB_USE_NEW_MAGIC_NUMBERS// used to enable use of the new magic numbers described above
+#define NANOVDB_USE_NEW_MAGIC_NUMBERS// enables use of the new magic numbers described above
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
-#define NANOVDB_MINOR_VERSION_NUMBER 7 //  reflects changes to the API but not ABI
+#define NANOVDB_MINOR_VERSION_NUMBER 8 //  reflects changes to the API but not ABI
 #define NANOVDB_PATCH_VERSION_NUMBER 0 //  reflects changes that does not affect the ABI or API
 
 #define TBB_SUPPRESS_DEPRECATED_MESSAGES 1
@@ -155,9 +157,6 @@
 
 // Use this to switch between std::ofstream or FILE implementations
 //#define NANOVDB_USE_IOSTREAMS
-
-// Use this to switch between old and new accessor methods
-#define NANOVDB_NEW_ACCESSOR_METHODS
 
 #define NANOVDB_FPN_BRANCHLESS
 
@@ -205,6 +204,8 @@ class Point{};
 // --------------------------> GridType <------------------------------------
 
 /// @brief return the number of characters (including null termination) required to convert enum type to a string
+///
+/// @note This curious implementation, which subtracts End from StrLen, avoids duplicate values in the enum!
 template <class EnumT>
 __hostdev__ inline constexpr uint32_t strlen(){return (uint32_t)EnumT::StrLen - (uint32_t)EnumT::End;}
 
@@ -275,7 +276,7 @@ __hostdev__ inline char* toStr(char *dst, GridType gridType)
         case GridType::Index:       return util::strcpy(dst, "Index");
         case GridType::OnIndex:     return util::strcpy(dst, "OnIndex");
         case GridType::IndexMask:   return util::strcpy(dst, "IndexMask");
-        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");
+        case GridType::OnIndexMask: return util::strcpy(dst, "OnIndexMask");// StrLen = 11 + 1 + End
         case GridType::PointIndex:  return util::strcpy(dst, "PointIndex");
         case GridType::Vec3u8:      return util::strcpy(dst, "Vec3u8");
         case GridType::Vec3u16:     return util::strcpy(dst, "Vec3u16");
@@ -311,7 +312,7 @@ __hostdev__ inline char* toStr(char *dst, GridClass gridClass)
         case GridClass::LevelSet:    return util::strcpy(dst, "SDF");
         case GridClass::FogVolume:   return util::strcpy(dst, "FOG");
         case GridClass::Staggered:   return util::strcpy(dst, "MAC");
-        case GridClass::PointIndex:  return util::strcpy(dst, "PNTIDX");
+        case GridClass::PointIndex:  return util::strcpy(dst, "PNTIDX");// StrLen = 6 + 1 + End
         case GridClass::PointData:   return util::strcpy(dst, "PNTDAT");
         case GridClass::Topology:    return util::strcpy(dst, "TOPO");
         case GridClass::VoxelVolume: return util::strcpy(dst, "VOX");
@@ -345,7 +346,7 @@ __hostdev__ inline const char* toStr(char *dst, GridFlags gridFlags)
         case GridFlags::HasBBox:         return util::strcpy(dst, "has bbox");
         case GridFlags::HasMinMax:       return util::strcpy(dst, "has min/max");
         case GridFlags::HasAverage:      return util::strcpy(dst, "has average");
-        case GridFlags::HasStdDeviation: return util::strcpy(dst, "has standard deviation");
+        case GridFlags::HasStdDeviation: return util::strcpy(dst, "has standard deviation");// StrLen = 22 + 1 + End
         case GridFlags::IsBreadthFirst:  return util::strcpy(dst, "is breadth-first");
         default:                         return util::strcpy(dst, "end");
     }
@@ -359,10 +360,8 @@ enum class MagicType : uint32_t { Unknown  = 0,// first 64 bits are neither of t
                                   NanoVDB  = 2,// first 64 bits = NANOVDB_MAGIC_NUMB
                                   NanoGrid = 3,// first 64 bits = NANOVDB_MAGIC_GRID
                                   NanoFile = 4,// first 64 bits = NANOVDB_MAGIC_FILE
-                                  NanoNode = 5,// first 64 bits = NANOVDB_MAGIC_NODE
-                                  NanoFrag = 6,// first 64 bits = NANOVDB_MAGIC_FRAG
-                                  End      = 7,
-                                  StrLen   = End + 25};// this entry is used to determine the minimum size of c-string
+                                  End      = 5,
+                                  StrLen   = End + 14};// this entry is used to determine the minimum size of c-string
 
 /// @brief maps 64 bits of magic number to enum
 __hostdev__ inline MagicType toMagic(uint64_t magic)
@@ -371,8 +370,6 @@ __hostdev__ inline MagicType toMagic(uint64_t magic)
         case NANOVDB_MAGIC_NUMB:   return MagicType::NanoVDB;
         case NANOVDB_MAGIC_GRID:   return MagicType::NanoGrid;
         case NANOVDB_MAGIC_FILE:   return MagicType::NanoFile;
-        case NANOVDB_MAGIC_NODE:   return MagicType::NanoNode;
-        case NANOVDB_MAGIC_FRAG:   return MagicType::NanoFrag;
         default: return (magic & ~uint32_t(0)) == 0x56444220UL ? MagicType::OpenVDB : MagicType::Unknown;
     }
 }
@@ -386,10 +383,8 @@ __hostdev__ inline char* toStr(char *dst, MagicType magic)
     switch (magic){
         case MagicType::Unknown:  return util::strcpy(dst, "unknown");
         case MagicType::NanoVDB:  return util::strcpy(dst, "nanovdb");
-        case MagicType::NanoGrid: return util::strcpy(dst, "nanovdb::Grid");
+        case MagicType::NanoGrid: return util::strcpy(dst, "nanovdb::Grid");// StrLen = 13 + 1 + End
         case MagicType::NanoFile: return util::strcpy(dst, "nanovdb::File");
-        case MagicType::NanoNode: return util::strcpy(dst, "nanovdb::NodeManager");
-        case MagicType::NanoFrag: return util::strcpy(dst, "fragmented nanovdb::Grid");
         case MagicType::OpenVDB:  return util::strcpy(dst, "openvdb");
         default:                  return util::strcpy(dst, "end");
     }
@@ -953,8 +948,6 @@ public:
         mFlags = 0u;
         for (auto mask : list) mFlags |= static_cast<Type>(mask);
     }
-    //__hostdev__ Type& data() { return mFlags; }
-    //__hostdev__ Type data() const { return mFlags; }
     __hostdev__ Type getFlags() const { return mFlags & (static_cast<Type>(GridFlags::End) - 1u); } // mask out everything except relevant bits
 
     __hostdev__ void setOn() { mFlags = ~Type(0u); }
@@ -1556,7 +1549,7 @@ inline void Map::set(double dx, const Vec3T& trans, double taper)
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
 { // 288 bytes
     static const int      MaxNameSize = 256; // due to NULL termination the maximum length is one less!
-    int64_t               mDataOffset; // byte offset to the blind data, relative to this GridBlindMetaData.
+    int64_t               mDataOffset; // byte offset to the blind data, relative to GridBlindMetaData::this.
     uint64_t              mValueCount; // number of blind values, e.g. point count
     uint32_t              mValueSize;// byte size of each value, e.g. 4 if mDataType=Float and 1 if mDataType=Unknown since that amounts to char
     GridBlindDataSemantic mSemantic; // semantic meaning of the data.
@@ -1565,16 +1558,73 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     char                  mName[MaxNameSize]; // note this includes the NULL termination
     // no padding required for 32 byte alignment
 
-    // disallow copy-construction since methods like blindData and getBlindData uses the this pointer!
-    GridBlindMetaData(const GridBlindMetaData&) = delete;
+    /// @brief Empty constructor
+    GridBlindMetaData()
+        : mDataOffset(0)
+        , mValueCount(0)
+        , mValueSize(0)
+        , mSemantic(GridBlindDataSemantic::Unknown)
+        , mDataClass(GridBlindDataClass::Unknown)
+        , mDataType(GridType::Unknown)
+    {
+        util::memzero(mName, MaxNameSize);
+    }
 
-    // disallow copy-assignment since methods like blindData and getBlindData uses the this pointer!
-    const GridBlindMetaData& operator=(const GridBlindMetaData&) = delete;
+    GridBlindMetaData(int64_t dataOffset, uint64_t valueCount, uint32_t valueSize, GridBlindDataSemantic semantic, GridBlindDataClass dataClass, GridType dataType)
+        : mDataOffset(dataOffset)
+        , mValueCount(valueCount)
+        , mValueSize(valueSize)
+        , mSemantic(semantic)
+        , mDataClass(dataClass)
+        , mDataType(dataType)
+    {
+        util::memzero(mName, MaxNameSize);
+    }
 
-    __hostdev__ void setBlindData(void* blindData) { mDataOffset = util::PtrDiff(blindData, this); }
+    /// @brief Copy constructor that resets mDataOffset and zeros out mName
+    GridBlindMetaData(const GridBlindMetaData &other)
+        : mDataOffset(util::PtrDiff(util::PtrAdd(&other, other.mDataOffset), this))
+        , mValueCount(other.mValueCount)
+        , mValueSize(other.mValueSize)
+        , mSemantic(other.mSemantic)
+        , mDataClass(other.mDataClass)
+        , mDataType(other.mDataType)
+    {
+        util::strncpy(mName, other.mName, MaxNameSize);
+    }
 
-    // unsafe
-    __hostdev__ const void* blindData() const {return util::PtrAdd(this, mDataOffset);}
+    /// @brief Copy assignment operator that resets mDataOffset and copies mName
+    /// @param rhs right-hand instance to copy
+    /// @return reference to itself
+    const GridBlindMetaData& operator=(const GridBlindMetaData& rhs)
+    {
+        mDataOffset = util::PtrDiff(util::PtrAdd(&rhs, rhs.mDataOffset), this);
+        mValueCount = rhs.mValueCount;
+        mValueSize  = rhs. mValueSize;
+        mSemantic   = rhs.mSemantic;
+        mDataClass  = rhs.mDataClass;
+        mDataType   = rhs.mDataType;
+        util::strncpy(mName, rhs.mName, MaxNameSize);
+        return *this;
+    }
+
+    __hostdev__ void setBlindData(const void* blindData)
+    {
+        mDataOffset = util::PtrDiff(blindData, this);
+    }
+
+    /// @brief Sets the name string
+    /// @param name c-string source name
+    /// @return returns false if @c name has too many characters
+    __hostdev__  bool setName(const char* name){return util::strncpy(mName, name, MaxNameSize)[MaxNameSize-1] == '\0';}
+
+    /// @brief returns a const void point to the blind data
+    /// @note assumes that setBlinddData was called
+    __hostdev__ const void* blindData() const
+    {
+        NANOVDB_ASSERT(mDataOffset != 0);
+        return util::PtrAdd(this, mDataOffset);
+    }
 
     /// @brief Get a const pointer to the blind data represented by this meta data
     /// @tparam BlindDataT Expected value type of the blind data.
@@ -1583,11 +1633,11 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
     template<typename BlindDataT>
     __hostdev__ const BlindDataT* getBlindData() const
     {
-        //if (mDataType != toGridType<BlindDataT>()) printf("getBlindData mismatch\n");
-        return mDataType == toGridType<BlindDataT>() ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
+        return mDataOffset && (mDataType == toGridType<BlindDataT>()) ? util::PtrAdd<BlindDataT>(this, mDataOffset) : nullptr;
     }
 
     /// @brief return true if this meta data has a valid combination of semantic, class and value tags
+    /// @note this does not check if the mDataOffset has been set!
     __hostdev__ bool isValid() const
     {
         auto check = [&]()->bool{
@@ -1689,7 +1739,7 @@ struct NodeTrait<const GridOrTreeOrRootT, 3>
     using type = const typename GridOrTreeOrRootT::RootNodeType;
 };
 
-// ----------------------------> Froward decelerations of random access methods <--------------------------------------
+// ------------> Froward decelerations of accelerated random access methods <---------------
 
 template<typename BuildT>
 struct GetValue;
@@ -1729,7 +1779,7 @@ __hostdev__ inline char* toStr(char *dst, CheckMode mode)
     switch (mode){
         case CheckMode::Half: return util::strcpy(dst, "half");
         case CheckMode::Full: return util::strcpy(dst, "full");
-        default: return util::strcpy(dst, "disabled");
+        default: return util::strcpy(dst, "disabled");// StrLen = 8 + 1 + End
     }
 }
 
@@ -1892,7 +1942,11 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
         mBlindMetadataCount = 0u; // i.e. no blind data
         mData0 = 0u; // zero padding
         mData1 = 0u; // only used for index and point grids
+#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
+        mData2 = 0u;// unused
+#else
         mData2 = NANOVDB_MAGIC_GRID; // since version 32.6.0 (will change in the future)
+#endif
     }
     /// @brief return true if the magic number and the version are both valid
     __hostdev__ bool isValid() const {
@@ -2188,12 +2242,12 @@ public:
     __hostdev__ bool             hasStdDeviation() const { return DataType::mFlags.isMaskOn(GridFlags::HasStdDeviation); }
     __hostdev__ bool             isBreadthFirst() const { return DataType::mFlags.isMaskOn(GridFlags::IsBreadthFirst); }
 
-    /// @brief return true if the specified node type is layed out breadth-first in memory and has a fixed size.
+    /// @brief return true if the specified node type is laid out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
     template<typename NodeT>
     __hostdev__ bool isSequential() const { return NodeT::FIXED_SIZE && this->isBreadthFirst(); }
 
-    /// @brief return true if the specified node level is layed out breadth-first in memory and has a fixed size.
+    /// @brief return true if the specified node level is laid out breadth-first in memory and has a fixed size.
     ///        This allows for sequential access to the nodes.
     template<int LEVEL>
     __hostdev__ bool isSequential() const { return NodeTrait<TreeT, LEVEL>::type::FIXED_SIZE && this->isBreadthFirst(); }
@@ -2292,7 +2346,6 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     uint32_t mTileCount[3]; // 12B, total number of active tile values at the lower internal, upper internal and root node levels
     uint64_t mVoxelCount; //    8B, total number of active voxels in the root and all its child nodes.
     // No padding since it's always 32B aligned
-    //__hostdev__ TreeData& operator=(const TreeData& other){return *util::memcpy(this, &other);}
     TreeData& operator=(const TreeData&) = default;
     __hostdev__ void setRoot(const void* root) {
         NANOVDB_ASSERT(root);
@@ -2587,7 +2640,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         ValueT             value; // value of tile (i.e. no child node)
     }; // Tile
 
-    /// @brief Returns a non-const reference to the tile at the specified linear offset.
+    /// @brief Returns a pointer to the tile at the specified linear offset.
     ///
     /// @warning The linear offset is assumed to be in the valid range
     __hostdev__ const Tile* tile(uint32_t n) const
@@ -2601,34 +2654,116 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
         return reinterpret_cast<Tile*>(this + 1) + n;
     }
 
-    __hostdev__ Tile* probeTile(const CoordT& ijk)
+    template<typename DataT>
+    class TileIter
     {
-#if 1 // switch between linear and binary seach
-        const auto key = CoordToKey(ijk);
-        for (Tile *p = reinterpret_cast<Tile*>(this + 1), *q = p + mTableSize; p < q; ++p)
-            if (p->key == key)
-                return p;
-        return nullptr;
-#else // do not enable binary search if tiles are not guaranteed to be sorted!!!!!!
-        int32_t low = 0, high = mTableSize; // low is inclusive and high is exclusive
-        while (low != high) {
-            int         mid = low + ((high - low) >> 1);
-            const Tile* tile = &tiles[mid];
-            if (tile->key == key) {
-                return tile;
-            } else if (tile->key < key) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
+    protected:
+        using TileT = typename util::match_const<Tile,   DataT>::type;
+        using NodeT = typename util::match_const<ChildT, DataT>::type;
+        TileT *mBegin, *mPos, *mEnd;
+
+    public:
+        __hostdev__ TileIter() : mBegin(nullptr), mPos(nullptr), mEnd(nullptr) {}
+        __hostdev__ TileIter(DataT* data, uint32_t pos = 0)
+            : mBegin(reinterpret_cast<TileT*>(data + 1))// tiles reside right after the RootData
+            , mPos(mBegin + pos)
+            , mEnd(mBegin + data->mTableSize)
+        {
+            NANOVDB_ASSERT(data);
+            NANOVDB_ASSERT(mBegin <= mPos);// pos > mTableSize is allowed
+            NANOVDB_ASSERT(mBegin <= mEnd);// mTableSize = 0 is possible
         }
-        return nullptr;
-#endif
+        __hostdev__ inline operator bool() const { return mPos < mEnd; }
+        __hostdev__ inline auto pos() const {return mPos - mBegin; }
+        __hostdev__ inline TileIter& operator++()
+        {
+            ++mPos;
+            return *this;
+        }
+        __hostdev__ inline TileT& operator*() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return *mPos;
+        }
+        __hostdev__ inline TileT* operator->() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos;
+        }
+        __hostdev__ inline DataT* data() const
+        {
+            NANOVDB_ASSERT(mBegin);
+            return reinterpret_cast<DataT*>(mBegin) - 1;
+        }
+        __hostdev__ inline bool isChild() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child != 0;
+        }
+        __hostdev__ inline bool isValue() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child == 0;
+        }
+        __hostdev__ inline bool isValueOn() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd);
+            return mPos->child == 0 && mPos->state != 0;
+        }
+        __hostdev__ inline NodeT* child() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd && mPos->child != 0);
+            return util::PtrAdd<NodeT>(this->data(), mPos->child);// byte offset relative to RootData::this
+        }
+        __hostdev__ inline ValueT value() const
+        {
+            NANOVDB_ASSERT(mPos < mEnd && mPos->child == 0);
+            return mPos->value;
+        }
+    };// TileIter
+
+    using TileIterator      = TileIter<RootData>;
+    using ConstTileIterator = TileIter<const RootData>;
+
+    __hostdev__ TileIterator       beginTile()       { return      TileIterator(this); }
+    __hostdev__ ConstTileIterator cbeginTile() const { return ConstTileIterator(this); }
+
+    __hostdev__ inline TileIterator probe(const CoordT& ijk)
+    {
+        const auto key = CoordToKey(ijk);
+        TileIterator iter(this);
+        for(; iter; ++iter) if (iter->key == key) break;
+        return iter;
+    }
+
+    __hostdev__ inline ConstTileIterator probe(const CoordT& ijk) const
+    {
+        const auto key = CoordToKey(ijk);
+        ConstTileIterator iter(this);
+        for(; iter; ++iter) if (iter->key == key) break;
+        return iter;
+    }
+
+    __hostdev__ inline Tile* probeTile(const CoordT& ijk)
+    {
+        auto iter = this->probe(ijk);
+        return iter ? iter.operator->() : nullptr;
     }
 
     __hostdev__ inline const Tile* probeTile(const CoordT& ijk) const
     {
         return const_cast<RootData*>(this)->probeTile(ijk);
+    }
+
+    __hostdev__ inline ChildT* probeChild(const CoordT& ijk)
+    {
+        auto iter = this->probe(ijk);
+        return iter && iter.isChild() ? iter.child() : nullptr;
+    }
+
+     __hostdev__ inline const ChildT* probeChild(const CoordT& ijk) const
+    {
+        return const_cast<RootData*>(this)->probeChild(ijk);
     }
 
     /// @brief Returns a const reference to the child node in the specified tile.
@@ -2694,30 +2829,16 @@ public:
     protected:
         using DataT = typename util::match_const<DataType, RootT>::type;
         using TileT = typename util::match_const<Tile, RootT>::type;
-        DataT*      mData;
-        uint32_t    mPos, mSize;
-        __hostdev__ BaseIter(DataT* data = nullptr, uint32_t n = 0)
-            : mData(data)
-            , mPos(0)
-            , mSize(n)
-        {
-        }
+        typename DataType::template TileIter<DataT> mTileIter;
+        __hostdev__ BaseIter() : mTileIter() {}
+        __hostdev__ BaseIter(DataT* data) : mTileIter(data){}
 
     public:
-        __hostdev__ operator bool() const { return mPos < mSize; }
-        __hostdev__ uint32_t  pos() const { return mPos; }
-        __hostdev__ void      next() { ++mPos; }
-        __hostdev__ TileT*    tile() const { return mData->tile(mPos); }
-        __hostdev__ CoordType getOrigin() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->origin();
-        }
-        __hostdev__ CoordType getCoord() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->origin();
-        }
+        __hostdev__ operator bool() const { return bool(mTileIter); }
+        __hostdev__ uint32_t  pos() const { return uint32_t(mTileIter.pos()); }
+        __hostdev__ TileT*    tile() const { return mTileIter.operator->(); }
+        __hostdev__ CoordType getOrigin() const {return mTileIter->origin();}
+        __hostdev__ CoordType getCoord()  const {return this->getOrigin();}
     }; // Member class BaseIter
 
     template<typename RootT>
@@ -2726,41 +2847,26 @@ public:
         static_assert(util::is_same<typename util::remove_const<RootT>::type, RootNode>::value, "Invalid RootT");
         using BaseT = BaseIter<RootT>;
         using NodeT = typename util::match_const<ChildT, RootT>::type;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ChildIter()
-            : BaseT()
+        __hostdev__ ChildIter() : BaseT() {}
+        __hostdev__ ChildIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && mTileIter.isValue()) ++mTileIter;
         }
-        __hostdev__ ChildIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && !this->tile()->isChild())
-                this->next();
-        }
-        __hostdev__ NodeT& operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return *BaseT::mData->getChild(this->tile());
-        }
-        __hostdev__ NodeT* operator->() const
-        {
-            NANOVDB_ASSERT(*this);
-            return BaseT::mData->getChild(this->tile());
-        }
+        __hostdev__ NodeT& operator*()  const {return *mTileIter.child();}
+        __hostdev__ NodeT* operator->() const {return  mTileIter.child();}
         __hostdev__ ChildIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && this->tile()->isValue())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && mTileIter.isValue()) ++mTileIter;
             return *this;
         }
         __hostdev__ ChildIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ChildIter
@@ -2768,48 +2874,33 @@ public:
     using ChildIterator      = ChildIter<RootNode>;
     using ConstChildIterator = ChildIter<const RootNode>;
 
-    __hostdev__ ChildIterator       beginChild() { return ChildIterator(this); }
+    __hostdev__ ChildIterator       beginChild()       { return      ChildIterator(this); }
     __hostdev__ ConstChildIterator cbeginChild() const { return ConstChildIterator(this); }
 
     template<typename RootT>
     class ValueIter : public BaseIter<RootT>
     {
         using BaseT = BaseIter<RootT>;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ValueIter()
-            : BaseT()
+        __hostdev__ ValueIter() : BaseT(){}
+        __hostdev__ ValueIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && mTileIter.isChild()) ++mTileIter;
         }
-        __hostdev__ ValueIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && this->tile()->isChild())
-                this->next();
-        }
-        __hostdev__ ValueType operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->value;
-        }
-        __hostdev__ bool isActive() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->state;
-        }
+        __hostdev__ ValueType operator*() const {return mTileIter.value();}
+        __hostdev__ bool isActive() const {return mTileIter.isValueOn();}
         __hostdev__ ValueIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && this->tile()->isChild())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && mTileIter.isChild()) ++mTileIter;
             return *this;
         }
         __hostdev__ ValueIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ValueIter
@@ -2817,43 +2908,32 @@ public:
     using ValueIterator = ValueIter<RootNode>;
     using ConstValueIterator = ValueIter<const RootNode>;
 
-    __hostdev__ ValueIterator      beginValue() { return ValueIterator(this); }
+    __hostdev__ ValueIterator       beginValue()          { return      ValueIterator(this); }
     __hostdev__ ConstValueIterator cbeginValueAll() const { return ConstValueIterator(this); }
 
     template<typename RootT>
     class ValueOnIter : public BaseIter<RootT>
     {
         using BaseT = BaseIter<RootT>;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ ValueOnIter()
-            : BaseT()
+        __hostdev__ ValueOnIter() : BaseT(){}
+        __hostdev__ ValueOnIter(RootT* parent) : BaseT(parent->data())
         {
+            while (mTileIter && !mTileIter.isValueOn()) ++mTileIter;
         }
-        __hostdev__ ValueOnIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-            while (*this && !this->tile()->isActive())
-                ++BaseT::mPos;
-        }
-        __hostdev__ ValueType operator*() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->value;
-        }
+        __hostdev__ ValueType operator*() const {return mTileIter.value();}
         __hostdev__ ValueOnIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
-            while (*this && !this->tile()->isActive())
-                this->next();
+            ++mTileIter;
+            while (mTileIter && !mTileIter.isValueOn()) ++mTileIter;
             return *this;
         }
         __hostdev__ ValueOnIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            this->operator++();
             return tmp;
         }
     }; // Member class ValueOnIter
@@ -2861,7 +2941,7 @@ public:
     using ValueOnIterator = ValueOnIter<RootNode>;
     using ConstValueOnIterator = ValueOnIter<const RootNode>;
 
-    __hostdev__ ValueOnIterator      beginValueOn() { return ValueOnIterator(this); }
+    __hostdev__ ValueOnIterator       beginValueOn()       { return      ValueOnIterator(this); }
     __hostdev__ ConstValueOnIterator cbeginValueOn() const { return ConstValueOnIterator(this); }
 
     template<typename RootT>
@@ -2869,53 +2949,36 @@ public:
     {
         using BaseT = BaseIter<RootT>;
         using NodeT = typename util::match_const<ChildT, RootT>::type;
+        using BaseT::mTileIter;
 
     public:
-        __hostdev__ DenseIter()
-            : BaseT()
-        {
-        }
-        __hostdev__ DenseIter(RootT* parent)
-            : BaseT(parent->data(), parent->tileCount())
-        {
-            NANOVDB_ASSERT(BaseT::mData);
-        }
+        __hostdev__ DenseIter() : BaseT(){}
+        __hostdev__ DenseIter(RootT* parent) : BaseT(parent->data()){}
         __hostdev__ NodeT* probeChild(ValueType& value) const
         {
-            NANOVDB_ASSERT(*this);
-            NodeT* child = nullptr;
-            auto*  t = this->tile();
-            if (t->isChild()) {
-                child = BaseT::mData->getChild(t);
-            } else {
-                value = t->value;
-            }
-            return child;
+            if (mTileIter.isChild()) return mTileIter.child();
+            value = mTileIter.value();
+            return nullptr;
         }
-        __hostdev__ bool isValueOn() const
-        {
-            NANOVDB_ASSERT(*this);
-            return this->tile()->state;
-        }
+        __hostdev__ bool isValueOn() const{return mTileIter.isValueOn();}
         __hostdev__ DenseIter& operator++()
         {
-            NANOVDB_ASSERT(BaseT::mData);
-            this->next();
+            ++mTileIter;
             return *this;
         }
         __hostdev__ DenseIter operator++(int)
         {
             auto tmp = *this;
-            ++(*this);
+            ++mTileIter;
             return tmp;
         }
     }; // Member class DenseIter
 
-    using DenseIterator = DenseIter<RootNode>;
+    using DenseIterator      = DenseIter<RootNode>;
     using ConstDenseIterator = DenseIter<const RootNode>;
 
-    __hostdev__ DenseIterator      beginDense() { return DenseIterator(this); }
-    __hostdev__ ConstDenseIterator cbeginDense() const { return ConstDenseIterator(this); }
+    __hostdev__ DenseIterator       beginDense()          { return      DenseIterator(this); }
+    __hostdev__ ConstDenseIterator cbeginDense() const    { return ConstDenseIterator(this); }
     __hostdev__ ConstDenseIterator cbeginChildAll() const { return ConstDenseIterator(this); }
 
     /// @brief This class cannot be constructed or deleted
@@ -2967,7 +3030,6 @@ public:
     /// @brief Return true if this RootNode is empty, i.e. contains no values or nodes
     __hostdev__ bool isEmpty() const { return DataType::mTableSize == uint32_t(0); }
 
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     /// @brief Return the value of the given voxel
     __hostdev__ ValueType getValue(const CoordType& ijk) const { return this->template get<GetValue<BuildType>>(ijk); }
     __hostdev__ ValueType getValue(int i, int j, int k) const { return this->template get<GetValue<BuildType>>(CoordType(i, j, k)); }
@@ -2975,63 +3037,6 @@ public:
     /// @brief return the state and updates the value of the specified voxel
     __hostdev__ bool                probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildType>>(ijk, v); }
     __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildType>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-
-    /// @brief Return the value of the given voxel
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-        if (const Tile* tile = DataType::probeTile(ijk)) {
-            return tile->isChild() ? this->getChild(tile)->getValue(ijk) : tile->value;
-        }
-        return DataType::mBackground;
-    }
-    __hostdev__ ValueType getValue(int i, int j, int k) const { return this->getValue(CoordType(i, j, k)); }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-        if (const Tile* tile = DataType::probeTile(ijk)) {
-            return tile->isChild() ? this->getChild(tile)->isActive(ijk) : tile->state;
-        }
-        return false;
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-        if (const Tile* tile = DataType::probeTile(ijk)) {
-            if (tile->isChild()) {
-                const auto* child = this->getChild(tile);
-                return child->probeValue(ijk, v);
-            }
-            v = tile->value;
-            return tile->state;
-        }
-        v = DataType::mBackground;
-        return false;
-    }
-
-    __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const
-    {
-        const Tile* tile = DataType::probeTile(ijk);
-        if (tile && tile->isChild()) {
-            const auto* child = this->getChild(tile);
-            return child->probeLeaf(ijk);
-        }
-        return nullptr;
-    }
-
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
-
-    __hostdev__ const ChildNodeType* probeChild(const CoordType& ijk) const
-    {
-        const Tile* tile = DataType::probeTile(ijk);
-        return tile && tile->isChild() ? this->getChild(tile) : nullptr;
-    }
-
-    __hostdev__ ChildNodeType* probeChild(const CoordType& ijk)
-    {
-        const Tile* tile = DataType::probeTile(ijk);
-        return tile && tile->isChild() ? this->getChild(tile) : nullptr;
-    }
 
     template<typename OpT, typename... ArgsT>
     __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
@@ -3066,78 +3071,6 @@ private:
 
     template<typename>
     friend class Tree;
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    /// @brief Private method to return node information and update a ReadAccessor
-    template<typename AccT>
-    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        using NodeInfoT = typename AccT::NodeInfo;
-        if (const Tile* tile = this->probeTile(ijk)) {
-            if (tile->isChild()) {
-                const auto* child = this->getChild(tile);
-                acc.insert(ijk, child);
-                return child->getNodeInfoAndCache(ijk, acc);
-            }
-            return NodeInfoT{LEVEL, ChildT::dim(), tile->value, tile->value, tile->value, 0, tile->origin(), tile->origin() + CoordType(ChildT::DIM)};
-        }
-        return NodeInfoT{LEVEL, ChildT::dim(), this->minimum(), this->maximum(), this->average(), this->stdDeviation(), this->bbox()[0], this->bbox()[1]};
-    }
-
-    /// @brief Private method to return a voxel value and update a ReadAccessor
-    template<typename AccT>
-    __hostdev__ ValueType getValueAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        if (const Tile* tile = this->probeTile(ijk)) {
-            if (tile->isChild()) {
-                const auto* child = this->getChild(tile);
-                acc.insert(ijk, child);
-                return child->getValueAndCache(ijk, acc);
-            }
-            return tile->value;
-        }
-        return DataType::mBackground;
-    }
-
-    template<typename AccT>
-    __hostdev__ bool isActiveAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        const Tile* tile = this->probeTile(ijk);
-        if (tile && tile->isChild()) {
-            const auto* child = this->getChild(tile);
-            acc.insert(ijk, child);
-            return child->isActiveAndCache(ijk, acc);
-        }
-        return false;
-    }
-
-    template<typename AccT>
-    __hostdev__ bool probeValueAndCache(const CoordType& ijk, ValueType& v, const AccT& acc) const
-    {
-        if (const Tile* tile = this->probeTile(ijk)) {
-            if (tile->isChild()) {
-                const auto* child = this->getChild(tile);
-                acc.insert(ijk, child);
-                return child->probeValueAndCache(ijk, v, acc);
-            }
-            v = tile->value;
-            return tile->state;
-        }
-        v = DataType::mBackground;
-        return false;
-    }
-
-    template<typename AccT>
-    __hostdev__ const LeafNodeType* probeLeafAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        const Tile* tile = this->probeTile(ijk);
-        if (tile && tile->isChild()) {
-            const auto* child = this->getChild(tile);
-            acc.insert(ijk, child);
-            return child->probeLeafAndCache(ijk, acc);
-        }
-        return nullptr;
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
 
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
@@ -3551,41 +3484,12 @@ public:
         return DataType::mChildMask.isOn(SIZE - 1) ? this->getChild(SIZE - 1)->getLastValue() : DataType::getValue(SIZE - 1);
     }
 
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     /// @brief Return the value of the given voxel
     __hostdev__ ValueType getValue(const CoordType& ijk) const { return this->template get<GetValue<BuildType>>(ijk); }
     __hostdev__ bool      isActive(const CoordType& ijk) const { return this->template get<GetState<BuildType>>(ijk); }
     /// @brief return the state and updates the value of the specified voxel
     __hostdev__ bool                probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildType>>(ijk, v); }
     __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildType>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        return DataType::mChildMask.isOn(n) ? this->getChild(n)->getValue(ijk) : DataType::getValue(n);
-    }
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        return DataType::mChildMask.isOn(n) ? this->getChild(n)->isActive(ijk) : DataType::isActive(n);
-    }
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOn(n))
-            return this->getChild(n)->probeValue(ijk, v);
-        v = DataType::getValue(n);
-        return DataType::isActive(n);
-    }
-    __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOn(n))
-            return this->getChild(n)->probeLeaf(ijk);
-        return nullptr;
-    }
-
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
 
     __hostdev__ ChildNodeType* probeChild(const CoordType& ijk)
     {
@@ -3661,64 +3565,6 @@ private:
     friend class RootNode;
     template<typename, uint32_t>
     friend class InternalNode;
-
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    /// @brief Private read access method used by the ReadAccessor
-    template<typename AccT>
-    __hostdev__ ValueType getValueAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n))
-            return DataType::getValue(n);
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->getValueAndCache(ijk, acc);
-    }
-    template<typename AccT>
-    __hostdev__ bool isActiveAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n))
-            return DataType::isActive(n);
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->isActiveAndCache(ijk, acc);
-    }
-    template<typename AccT>
-    __hostdev__ bool probeValueAndCache(const CoordType& ijk, ValueType& v, const AccT& acc) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n)) {
-            v = DataType::getValue(n);
-            return DataType::isActive(n);
-        }
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->probeValueAndCache(ijk, v, acc);
-    }
-    template<typename AccT>
-    __hostdev__ const LeafNodeType* probeLeafAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n))
-            return nullptr;
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->probeLeafAndCache(ijk, acc);
-    }
-    template<typename AccT>
-    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& ijk, const AccT& acc) const
-    {
-        using NodeInfoT = typename AccT::NodeInfo;
-        const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n)) {
-            return NodeInfoT{LEVEL, this->dim(), this->minimum(), this->maximum(), this->average(), this->stdDeviation(), this->bbox()[0], this->bbox()[1]};
-        }
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->getNodeInfoAndCache(ijk, acc);
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
 
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
@@ -4678,29 +4524,6 @@ private:
     template<typename, uint32_t>
     friend class InternalNode;
 
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    /// @brief Private method to return a voxel value and update a (dummy) ReadAccessor
-    template<typename AccT>
-    __hostdev__ ValueType getValueAndCache(const CoordT& ijk, const AccT&) const { return this->getValue(ijk); }
-
-    /// @brief Return the node information.
-    template<typename AccT>
-    __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& /*ijk*/, const AccT& /*acc*/) const
-    {
-        using NodeInfoT = typename AccT::NodeInfo;
-        return NodeInfoT{LEVEL, this->dim(), this->minimum(), this->maximum(), this->average(), this->stdDeviation(), this->bbox()[0], this->bbox()[1]};
-    }
-
-    template<typename AccT>
-    __hostdev__ bool isActiveAndCache(const CoordT& ijk, const AccT&) const { return this->isActive(ijk); }
-
-    template<typename AccT>
-    __hostdev__ bool probeValueAndCache(const CoordT& ijk, ValueType& v, const AccT&) const { return this->probeValue(ijk, v); }
-
-    template<typename AccT>
-    __hostdev__ const LeafNode* probeLeafAndCache(const CoordT&, const AccT&) const { return this; }
-#endif
-
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordT&, const RayT& /*ray*/, const AccT&) const
     {
@@ -4746,7 +4569,7 @@ __hostdev__ inline bool LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
     };
     uint64_t *w = DataType::mValueMask.words(), word64 = *w;
     uint32_t  Xmin = word64 ? 0u : 8u, Xmax = Xmin;
-    for (int i = 1; i < 8; ++i) { // last loop over 8 64 bit words
+    for (int i = 1; i < 8; ++i) { // last loop over 7 remaining 64 bit words
         if (w[i]) { // skip if word has no set bits
             word64 |= w[i]; // union 8 x 64 bits words into one 64 bit word
             if (Xmin == 8)
@@ -4977,19 +4800,7 @@ public:
     using CoordType = typename RootT::CoordType;
 
     static const int CacheLevels = 0;
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    struct NodeInfo
-    {
-        uint32_t  mLevel; //   4B
-        uint32_t  mDim; //     4B
-        ValueType mMinimum; // typically 4B
-        ValueType mMaximum; // typically 4B
-        FloatType mAverage; // typically 4B
-        FloatType mStdDevi; // typically 4B
-        CoordType mBBoxMin; // 3*4B
-        CoordType mBBoxMax; // 3*4B
-    };
-#endif
+
     /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
         : mRoot{&root}
@@ -5018,7 +4829,6 @@ public:
     ReadAccessor(const ReadAccessor&) = default;
     ~ReadAccessor() = default;
     ReadAccessor& operator=(const ReadAccessor&) = default;
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     __hostdev__ ValueType getValue(const CoordType& ijk) const
     {
         return this->template get<GetValue<BuildT>>(ijk);
@@ -5030,44 +4840,6 @@ public:
     __hostdev__ bool         isActive(const CoordType& ijk) const { return this->template get<GetState<BuildT>>(ijk); }
     __hostdev__ bool         probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildT>>(ijk, v); }
     __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildT>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-        return mRoot->getValueAndCache(ijk, *this);
-    }
-    __hostdev__ ValueType getValue(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-    __hostdev__ ValueType operator()(const CoordType& ijk) const
-    {
-        return this->getValue(ijk);
-    }
-    __hostdev__ ValueType operator()(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-
-    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
-    {
-        return mRoot->getNodeInfoAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-        return mRoot->isActiveAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-        return mRoot->probeValueAndCache(ijk, v, *this);
-    }
-
-    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
-    {
-        return mRoot->probeLeafAndCache(ijk, *this);
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
     template<typename RayT>
     __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
     {
@@ -5127,9 +4899,7 @@ public:
     using CoordType = CoordT;
 
     static const int CacheLevels = 1;
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    using NodeInfo = typename ReadAccessor<ValueT, -1, -1, -1>::NodeInfo;
-#endif
+
     /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
         : mKey(CoordType::max())
@@ -5171,7 +4941,6 @@ public:
                (ijk[2] & int32_t(~NodeT::MASK)) == mKey[2];
     }
 
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     __hostdev__ ValueType getValue(const CoordType& ijk) const
     {
         return this->template get<GetValue<BuildT>>(ijk);
@@ -5183,54 +4952,7 @@ public:
     __hostdev__ bool         isActive(const CoordType& ijk) const { return this->template get<GetState<BuildT>>(ijk); }
     __hostdev__ bool         probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildT>>(ijk, v); }
     __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildT>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-        if (this->isCached(ijk))
-            return mNode->getValueAndCache(ijk, *this);
-        return mRoot->getValueAndCache(ijk, *this);
-    }
-    __hostdev__ ValueType getValue(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-    __hostdev__ ValueType operator()(const CoordType& ijk) const
-    {
-        return this->getValue(ijk);
-    }
-    __hostdev__ ValueType operator()(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
 
-    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
-    {
-        if (this->isCached(ijk))
-            return mNode->getNodeInfoAndCache(ijk, *this);
-        return mRoot->getNodeInfoAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-        if (this->isCached(ijk))
-            return mNode->isActiveAndCache(ijk, *this);
-        return mRoot->isActiveAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-        if (this->isCached(ijk))
-            return mNode->probeValueAndCache(ijk, v, *this);
-        return mRoot->probeValueAndCache(ijk, v, *this);
-    }
-
-    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
-    {
-        if (this->isCached(ijk))
-            return mNode->probeLeafAndCache(ijk, *this);
-        return mRoot->probeLeafAndCache(ijk, *this);
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
     template<typename RayT>
     __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
     {
@@ -5310,9 +5032,7 @@ public:
     using CoordType = CoordT;
 
     static const int CacheLevels = 2;
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    using NodeInfo = typename ReadAccessor<ValueT, -1, -1, -1>::NodeInfo;
-#endif
+
     /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
@@ -5397,7 +5117,6 @@ public:
     }
 #endif
 
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     __hostdev__ ValueType getValue(const CoordType& ijk) const
     {
         return this->template get<GetValue<BuildT>>(ijk);
@@ -5409,94 +5128,6 @@ public:
     __hostdev__ bool         isActive(const CoordType& ijk) const { return this->template get<GetState<BuildT>>(ijk); }
     __hostdev__ bool         probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildT>>(ijk, v); }
     __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildT>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached1(dirty)) {
-            return mNode1->getValueAndCache(ijk, *this);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->getValueAndCache(ijk, *this);
-        }
-        return mRoot->getValueAndCache(ijk, *this);
-    }
-    __hostdev__ ValueType operator()(const CoordType& ijk) const
-    {
-        return this->getValue(ijk);
-    }
-    __hostdev__ ValueType operator()(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-    __hostdev__ ValueType getValue(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached1(dirty)) {
-            return mNode1->getNodeInfoAndCache(ijk, *this);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->getNodeInfoAndCache(ijk, *this);
-        }
-        return mRoot->getNodeInfoAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached1(dirty)) {
-            return mNode1->isActiveAndCache(ijk, *this);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->isActiveAndCache(ijk, *this);
-        }
-        return mRoot->isActiveAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached1(dirty)) {
-            return mNode1->probeValueAndCache(ijk, v, *this);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->probeValueAndCache(ijk, v, *this);
-        }
-        return mRoot->probeValueAndCache(ijk, v, *this);
-    }
-
-    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached1(dirty)) {
-            return mNode1->probeLeafAndCache(ijk, *this);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->probeLeafAndCache(ijk, *this);
-        }
-        return mRoot->probeLeafAndCache(ijk, *this);
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
 
     template<typename RayT>
     __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
@@ -5609,9 +5240,7 @@ public:
     using CoordType = CoordT;
 
     static const int CacheLevels = 3;
-#ifndef NANOVDB_NEW_ACCESSOR_METHODS
-    using NodeInfo = typename ReadAccessor<ValueT, -1, -1, -1>::NodeInfo;
-#endif
+
     /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
@@ -5700,7 +5329,6 @@ public:
     }
 #endif
 
-#ifdef NANOVDB_NEW_ACCESSOR_METHODS
     __hostdev__ ValueType getValue(const CoordType& ijk) const
     {
         return this->template get<GetValue<BuildT>>(ijk);
@@ -5712,104 +5340,6 @@ public:
     __hostdev__ bool         isActive(const CoordType& ijk) const { return this->template get<GetState<BuildT>>(ijk); }
     __hostdev__ bool         probeValue(const CoordType& ijk, ValueType& v) const { return this->template get<ProbeValue<BuildT>>(ijk, v); }
     __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildT>>(ijk); }
-#else // NANOVDB_NEW_ACCESSOR_METHODS
-
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0])->getValue(ijk);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->getValueAndCache(ijk, *this);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->getValueAndCache(ijk, *this);
-        }
-        return mRoot->getValueAndCache(ijk, *this);
-    }
-    __hostdev__ ValueType operator()(const CoordType& ijk) const
-    {
-        return this->getValue(ijk);
-    }
-    __hostdev__ ValueType operator()(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-    __hostdev__ ValueType getValue(int i, int j, int k) const
-    {
-        return this->getValue(CoordType(i, j, k));
-    }
-
-    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0])->getNodeInfoAndCache(ijk, *this);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->getNodeInfoAndCache(ijk, *this);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->getNodeInfoAndCache(ijk, *this);
-        }
-        return mRoot->getNodeInfoAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0])->isActive(ijk);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->isActiveAndCache(ijk, *this);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->isActiveAndCache(ijk, *this);
-        }
-        return mRoot->isActiveAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0])->probeValue(ijk, v);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->probeValueAndCache(ijk, v, *this);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->probeValueAndCache(ijk, v, *this);
-        }
-        return mRoot->probeValueAndCache(ijk, v, *this);
-    }
-    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
-    {
-#ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
-        const CoordValueType dirty = this->computeDirty(ijk);
-#else
-        auto&& dirty = ijk;
-#endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0]);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->probeLeafAndCache(ijk, *this);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->probeLeafAndCache(ijk, *this);
-        }
-        return mRoot->probeLeafAndCache(ijk, *this);
-    }
-#endif // NANOVDB_NEW_ACCESSOR_METHODS
 
     template<typename OpT, typename... ArgsT>
     __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
@@ -6266,7 +5796,7 @@ __hostdev__ inline const char* toStr(char *dst, Codec codec)
     switch (codec){
         case Codec::NONE:   return util::strcpy(dst, "NONE");
         case Codec::ZIP:    return util::strcpy(dst, "ZIP");
-        case Codec::BLOSC : return util::strcpy(dst, "BLOSC");
+        case Codec::BLOSC : return util::strcpy(dst, "BLOSC");// StrLen = 5 + 1 + End
         default:            return util::strcpy(dst, "END");
     }
 }
