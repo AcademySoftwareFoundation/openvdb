@@ -34,7 +34,7 @@ namespace nanovdb {
 
 namespace tools::build {
 
-// ----------------------------> Froward decelerations of random access methods <--------------------------------------
+// ----------------------------> Forward declarations of random access methods <--------------------------------------
 
 template <typename T> struct GetValue;
 template <typename T> struct SetValue;

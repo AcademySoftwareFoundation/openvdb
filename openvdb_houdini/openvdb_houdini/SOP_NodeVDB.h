@@ -134,14 +134,14 @@ protected:
     /// @param gdh      handle to manage input locking
     /// @param clean    (forwarded to duplicateSource())
     ///
-    /// @note Prior to Houdini 13.0, this method peforms a duplicateSource() and unlocks the
+    /// @note Prior to Houdini 13.0, this method performs a duplicateSource() and unlocks the
     /// inputs to the SOP. From Houdini 13.0 on, this method will insert the existing data
     /// into the detail and update the detail handle in the SOP.
     ///
     /// @warning No attempt to call duplicateSource() or inputGeo() should be made after
     /// calling this method, as there will be no data on the input stream if isSourceStealable()
     /// returns @c true.
-    /// @deprecated     verbification renders this redundant
+    /// @deprecated     verification renders this redundant
     [[deprecated]]
     OP_ERROR duplicateSourceStealable(const unsigned index,
         OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean = true);
@@ -157,13 +157,13 @@ protected:
     /// this method falls back to copying the shared pointer, effectively performing
     /// a duplicateSource().
     ///
-    /// @note Prior to Houdini 13.0, this method peforms a duplicateSource() and unlocks the
+    /// @note Prior to Houdini 13.0, this method performs a duplicateSource() and unlocks the
     /// inputs to the SOP. From Houdini 13.0 on, this method will insert the existing data
     /// into the detail and update the detail handle in the SOP.
     ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
-    /// @deprecated     verbification renders this redundant
+    /// @deprecated     verification renders this redundant
     [[deprecated]]
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context);
 
@@ -173,13 +173,13 @@ private:
     /// @brief Traverse the upstream network to determine if the source input can be stolen.
     ///
     /// An upstream SOP cannot be stolen if it is implicitly caching the data (no "unload" flag)
-    /// or explictly caching the data (using a Cache SOP)
+    /// or explicitly caching the data (using a Cache SOP)
     ///
     /// The traversal ignores pass through nodes such as null SOPs and bypassing.
     ///
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
-    /// @deprecated     verbification renders this redundant
+    /// @deprecated     verification renders this redundant
     [[deprecated]]
     bool isSourceStealable(const unsigned index, OP_Context& context) const;
 }; // class SOP_NodeVDB

@@ -37,7 +37,7 @@ public:
     /// @brief Initiates a map between CUDA device IDs and corresponding streams that satisfy certain constraints.
     ///        All devices should be able to access memory on all the other devices!
     /// @param t Type of device to include in map. Any means all available devices, PeerToPeer means only devices that
-    ///          access all aother devices are included, and Unified means all devices support unified memory, concurrent access,
+    ///          access all another devices are included, and Unified means all devices support unified memory, concurrent access,
     ///          and can be access by all other devices.
     /// @param exclude optional list of device IDs to exclude from the map
     /// @param verbose  0 means quiet, 1 means print if a device is ignores and 2 means print is a device is included

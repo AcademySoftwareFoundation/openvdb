@@ -67,7 +67,7 @@ namespace
 /// @brief  Initialize a target machine for the host platform. Returns a nullptr
 ///         if a target could not be created.
 /// @note   This logic is based off the Kaleidoscope tutorial below with extensions
-///         for CPU and CPU featrue set targetting
+///         for CPU and CPU feature set targeting
 ///         https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl08.html
 inline std::unique_ptr<llvm::ExecutionEngine>
 initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)

@@ -191,7 +191,7 @@ inline FunctionGroup::UniquePtr axoffsettoglobalcoord(const FunctionOptions& op)
     /// @warning This function assumes that the node in question is a LeafNode!
     ///   This means that the result of this method is ONLY correct if the
     ///   origin points to an existing leaf node, OR if the offset is zero.
-    ///   Currently the VolumeExectuable processes non-leaf nodes (active tiles)
+    ///   Currently the VolumeExecutable processes non-leaf nodes (active tiles)
     ///   individually, so the offset for these nodes is always zero. Should
     ///   we need to processes a non-leaf node with a non-zero offset, this
     ///   function should be extended to take a "level" param from the parent
@@ -272,7 +272,7 @@ inline FunctionGroup::UniquePtr axindextoworld(const FunctionOptions& op)
         .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setConstantFold(false)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Converted the given index space coordiante to a world space value based on the currently executing volume.")
+        .setDocumentation("Converted the given index space coordinate to a world space value based on the currently executing volume.")
         .get();
 }
 
@@ -295,7 +295,7 @@ inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
         .setConstantFold(false)
         .addDependency("offsettoglobalcoord")
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Returns the current voxel's ijk index space coordiante.")
+        .setDocumentation("Returns the current voxel's ijk index space coordinate.")
         .get();
 }
 

@@ -454,7 +454,7 @@ public:
         return (mm[0]*q.mm[0] + mm[1]*q.mm[1] + mm[2]*q.mm[2] + mm[3]*q.mm[3]);
     }
 
-    /// Return the quaternion rate corrsponding to the angular velocity omega
+    /// Return the quaternion rate corresponding to the angular velocity omega
     /// and "this" current rotation
     Quat derivative(const Vec3<T>& omega) const
     {

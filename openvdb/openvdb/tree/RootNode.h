@@ -2315,7 +2315,7 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
                 // Get the coordinate bbox of the child node that contains voxel xyz.
                 nodeBBox = CoordBBox::createCube(coordToKey(xyz), ChildT::DIM);
 
-                // Get the coordinate bbox of the interection of inBBox and nodeBBox
+                // Get the coordinate bbox of the interaction of inBBox and nodeBBox
                 CoordBBox sub(xyz, Coord::minComponent(bbox.max(), nodeBBox.max()));
 
                 MapCIter iter = this->findKey(nodeBBox.min());
