@@ -33,6 +33,11 @@ endif()
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
+if (MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler /bigobj")
+endif()
+
 # -----------------------------------------------------------------------------
 
 add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
