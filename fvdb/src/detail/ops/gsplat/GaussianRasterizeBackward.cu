@@ -1,468 +1,588 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "GsplatTypes.cuh"
 #include "VectorTypes.cuh"
 #include <detail/ops/Ops.h>
+#include <detail/utils/cuda/Utils.cuh>
 
 #include <ATen/cuda/Atomic.cuh>
 
-#include <cooperative_groups.h>
+namespace fvdb::detail::ops {
 
-#include <cub/cub.cuh>
+template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct DeviceArgs {
+    constexpr static uint32_t N_OUTER_DIMS = IS_PACKED ? 1 : 2;
+    using vec2t                            = Vec2Type<ScalarType>::type;
+    using vec3t                            = Vec3Type<ScalarType>::type;
+    using ColorAccessorType                = fvdb::TorchRAcc64<ScalarType, N_OUTER_DIMS + 1>;
 
-namespace fvdb {
-namespace detail {
-namespace ops {
+    uint32_t numCameras;
+    uint32_t numGaussiansPerCamera;
+    uint32_t totalIntersections;
+    bool     packed;
+    uint32_t imageWidth;
+    uint32_t imageHeight;
+    uint32_t imageOriginW;
+    uint32_t imageOriginH;
+    uint32_t tileOriginW;
+    uint32_t tileOriginH;
+    uint32_t tileSize;
+    uint32_t numTilesW;
+    uint32_t numTilesH;
+    vec2t *__restrict__ means2d;                           // [C, N, 2] or [nnz, 2]
+    vec3t *__restrict__ conics;                            // [C, N, 3] or [nnz, 3]
+    ColorAccessorType colors;                              // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    ScalarType *__restrict__ opacities;                    // [C, N] or [nnz]
+    ScalarType *__restrict__ backgrounds;                  // [C, COLOR_DIM] or [nnz, COLOR_DIM]
+    bool *__restrict__ masks;                              // [C, nTilesH, nTilesW]
+    int32_t *__restrict__ tileOffsets;                     // [C, nTilesH, nTilesW]
+    int32_t *__restrict__ tileGaussianIds;                 // [totalIntersections]
+    ScalarType *__restrict__ renderedAlphas;               // [C, imgH, imgW, 1]
+    int32_t *__restrict__ lastGaussianIdsPerPixel;         // [C, imgH, imgW]
+    ScalarType *__restrict__ dLossDRenderedColors;         // [C, imgH, imgW, COLOR_DIM]
+    ScalarType *__restrict__ dLossDRenderedAlphas;         // [C, imgH, imgW, 1]
+    vec2t *__restrict__ outDLossDMeans2dAbs;               // [C, N, 2] or [nnz, 2]
+    vec2t *__restrict__ outDLossDMeans2d;                  // [C, N, 2] or [nnz, 2]
+    vec3t *__restrict__ outDLossDConics;                   // [C, N, 3] or [nnz, 3]
+    ScalarType *__restrict__ outDLossDColors;              // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    ScalarType *__restrict__ outDLossDOpacities;           // [C, N] or [nnz]
 
-namespace cg = cooperative_groups;
+    DeviceArgs(const torch::Tensor               &means2d, // [C, N, 2] or [nnz, 2]
+               const torch::Tensor               &conics,  // [C, N, 3] or [nnz, 3]
+               const torch::Tensor               &colors,  // [C, N, 3] or [nnz, 3]
+               const torch::Tensor               &opacities,   // [C, N] or [nnz]
+               const at::optional<torch::Tensor> &backgrounds, // [C, 3]
+               const at::optional<torch::Tensor> &masks,       // [C, numTilesH, numTilesW]
+               const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
+               const uint32_t imageOriginH, const uint32_t tileSize,
+               const torch::Tensor &tileOffsets,               // [C, numTilesH, numTilesW]
+               const torch::Tensor &tileGaussianIds,           // [totalIntersections]
+               const torch::Tensor &renderedAlphas,            // [C, imageHeight, imageWidth, 1]
+               const torch::Tensor &lastGaussianIdsPerPixel,   // [C, imageHeight, imageWidth]
+               const torch::Tensor &dLossDRenderedColors,      // [C, imageHeight, imageWidth, 3]
+               const torch::Tensor &dLossDRenderedAlphas       // [C, imageHeight, imageWidth, 1]
+               )
+        : colors(
+              colors.packed_accessor64<ScalarType, N_OUTER_DIMS + 1, torch::RestrictPtrTraits>()) {
+        TORCH_CHECK(colors.is_cuda(), "Input must be a CUDA tensor");
 
-/****************************************************************************
- * Rasterization to Pixels Backward Pass
- ****************************************************************************/
+        checkInputTensor(means2d, "means2d");
+        checkInputTensor(conics, "conics");
+        checkInputTensor(opacities, "opacities");
+        checkInputTensor(tileOffsets, "tileOffsets");
+        checkInputTensor(tileGaussianIds, "tileGaussianIds");
+        checkInputTensor(renderedAlphas, "renderedAlphas");
+        checkInputTensor(lastGaussianIdsPerPixel, "lastGaussianIdsPerPixel");
+        checkInputTensor(dLossDRenderedColors, "dLossDRenderedColors");
+        checkInputTensor(dLossDRenderedAlphas, "dLossDRenderedAlphas");
+        if (backgrounds.has_value()) {
+            checkInputTensor(backgrounds.value(), "backgrounds");
+        }
+        if (masks.has_value()) {
+            checkInputTensor(masks.value(), "masks");
+        }
 
-template <uint32_t COLOR_DIM, uint32_t N_OUTER_DIMS, typename S>
+        this->numCameras            = tileOffsets.size(0);
+        this->numGaussiansPerCamera = packed ? 0 : means2d.size(1);
+        this->totalIntersections    = tileGaussianIds.size(0);
+        this->packed                = means2d.dim() == 2;
+        this->imageWidth            = imageWidth;
+        this->imageHeight           = imageHeight;
+        this->imageOriginW          = imageOriginW;
+        this->imageOriginH          = imageOriginH;
+        this->tileOriginW           = imageOriginW / tileSize;
+        this->tileOriginH           = imageOriginH / tileSize;
+        this->tileSize              = tileSize;
+        this->numTilesW             = tileOffsets.size(2);
+        this->numTilesH             = tileOffsets.size(1);
+
+        if constexpr (N_OUTER_DIMS == 1) {
+            TORCH_CHECK(packed, "means2d must be packed for N_OUTER_DIMS == 1");
+        }
+        if constexpr (N_OUTER_DIMS == 2) {
+            TORCH_CHECK(!packed, "means2d must be unpacked for N_OUTER_DIMS == 2");
+        }
+        static_assert(N_OUTER_DIMS == 1 || N_OUTER_DIMS == 2, "N_OUTER_DIMS must be 1 or 2");
+
+        this->means2d   = reinterpret_cast<vec2t *>(means2d.data_ptr<ScalarType>());
+        this->conics    = reinterpret_cast<vec3t *>(conics.data_ptr<ScalarType>());
+        this->opacities = opacities.data_ptr<ScalarType>();
+        this->backgrounds =
+            backgrounds.has_value() ? backgrounds.value().data_ptr<ScalarType>() : nullptr;
+        this->masks           = masks.has_value() ? masks.value().data_ptr<bool>() : nullptr;
+        this->tileOffsets     = tileOffsets.data_ptr<int32_t>();
+        this->tileGaussianIds = tileGaussianIds.data_ptr<int32_t>();
+        this->renderedAlphas  = renderedAlphas.data_ptr<ScalarType>();
+        this->lastGaussianIdsPerPixel = lastGaussianIdsPerPixel.data_ptr<int32_t>();
+        this->dLossDRenderedColors    = dLossDRenderedColors.data_ptr<ScalarType>();
+        this->dLossDRenderedAlphas    = dLossDRenderedAlphas.data_ptr<ScalarType>();
+    }
+
+    void
+    setOutputArguments(const torch::Tensor &outDLossDMeans2d, const torch::Tensor &outDLossDConics,
+                       const torch::Tensor &outDLossDColors,
+                       const torch::Tensor &outDLossDOpacities,
+                       const torch::Tensor &outDLossDMeans2dAbs, const bool absgrad) {
+        this->outDLossDMeans2dAbs =
+            absgrad ? reinterpret_cast<vec2t *>(outDLossDMeans2dAbs.data_ptr<ScalarType>())
+                    : nullptr;
+        this->outDLossDMeans2d = reinterpret_cast<vec2t *>(outDLossDMeans2d.data_ptr<ScalarType>());
+        this->outDLossDConics  = reinterpret_cast<vec3t *>(outDLossDConics.data_ptr<ScalarType>());
+        this->outDLossDColors  = outDLossDColors.data_ptr<ScalarType>();
+        this->outDLossDOpacities = outDLossDOpacities.data_ptr<ScalarType>();
+    }
+
+    inline __device__ void
+    advancePointersToCamera(const uint32_t cameraId) {
+        // Move all the pointers forward to the current camera
+        const std::ptrdiff_t offsetForPixels = cameraId * imageHeight * imageWidth;
+        const std::ptrdiff_t offsetForTiles  = cameraId * numTilesH * numTilesW;
+
+        tileOffsets += offsetForTiles;
+        renderedAlphas += offsetForPixels;
+        lastGaussianIdsPerPixel += offsetForPixels;
+        dLossDRenderedColors += offsetForPixels * COLOR_DIM;
+        dLossDRenderedAlphas += offsetForPixels;
+        if (backgrounds != nullptr) {
+            backgrounds += cameraId * COLOR_DIM;
+        }
+        if (masks != nullptr) {
+            masks += offsetForTiles;
+        }
+    }
+    template <uint32_t WARP_TILE_SIZE>
+    inline __device__ void
+    volumeRenderTileBackward(const cooperative_groups::thread_block_tile<WARP_TILE_SIZE> &warp,
+                             const uint32_t i, const uint32_t j,
+                             const int32_t firstGaussianIdInBlock,
+                             const int32_t lastGaussianIdInBlock, const uint32_t blockSize) {
+        namespace cg = cooperative_groups;
+        using vec3t  = Vec3Type<ScalarType>::type;
+        using vec2t  = Vec2Type<ScalarType>::type;
+
+        // (i, j) coordinates are relative to the specified image origin which may be a crop
+        // so we need to add the origin to get the absolute pixel coordinates
+        const ScalarType px = (ScalarType)(j + imageOriginW) + ScalarType{ 0.5 };
+        const ScalarType py = (ScalarType)(i + imageOriginH) + ScalarType{ 0.5 };
+
+        // The ordinal of this pixel in its output image (does not account for batch dimension)
+        const int32_t pixelOrdinalInImage = min(i * imageWidth + j, imageWidth * imageHeight - 1);
+
+        // Whether this pixel is inside the image bounds.
+        // NOTE: We keep threads which correspond to pixels outside the image bounds around
+        //       to load gaussians from global memory, but they do not contribute to the output.
+        const bool pixelInImage = (i < imageHeight && j < imageWidth);
+
+        extern __shared__ int s[];
+        struct Gaussian {
+            int32_t    id;                                           // 4 bytes
+            vec2t      xy;                                           // 8 bytes
+            ScalarType opacity;                                      // 4 bytes
+            vec3t      conic;                                        // 12 bytes
+        };
+        struct Color {
+            ScalarType rgb[COLOR_DIM];                               // 4 * COLOR_DIM bytes
+        };
+        Gaussian *sharedGaussians = reinterpret_cast<Gaussian *>(s); // [blockSize]
+        Color    *sharedGaussianColors =
+            reinterpret_cast<Color *>(&sharedGaussians[blockSize]);  // [blockSize]
+
+        // this is the T AFTER the last gaussian in this pixel
+        const ScalarType finalTransmittance = ScalarType{ 1 } - renderedAlphas[pixelOrdinalInImage];
+        ScalarType       transmittance      = finalTransmittance;
+
+        // the contribution from gaussians behind the current one
+        ScalarType buffer[COLOR_DIM] = { ScalarType{ 0 } };
+
+        // Gradient of the loss with respect to the color output of the forward pass at this
+        // pixel
+        ScalarType dLossDRenderedPixelColor[COLOR_DIM];
+#pragma unroll COLOR_DIM
+        for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+            dLossDRenderedPixelColor[k] = dLossDRenderedColors[pixelOrdinalInImage * COLOR_DIM + k];
+        }
+        // Gradient of the loss with respect to the alpha output of the forward pass at this
+        // pixel
+        const ScalarType dLossDRenderPixelAlpha = dLossDRenderedAlphas[pixelOrdinalInImage];
+
+        // ID of the last Gaussian to contribute to this pixel and the last gaussian id to
+        // contribute to any pixel in this block
+        const int32_t lastGaussianIdInPixel =
+            pixelInImage ? lastGaussianIdsPerPixel[pixelOrdinalInImage] : 0;
+        const int32_t lastGaussianIdInWarp = warpMax(lastGaussianIdInPixel, warp);
+
+        // Process Gaussians in batches of size blockSize (i.e. one Gaussian per thread in the
+        // block), and batchEnd is the index of the last gaussian.
+        const uint32_t threadOrdinal = threadIdx.x * blockDim.y + threadIdx.y;
+        const uint32_t numBatches =
+            (lastGaussianIdInBlock - firstGaussianIdInBlock + blockSize - 1) / blockSize;
+        for (uint32_t b = 0; b < numBatches; ++b) {
+            // resync all threads before writing next batch of shared mem
+            __syncthreads();
+
+            // Each thread fetches one gaussian into shared memory.
+            // Gaussians are stored in shared memory locations in order of decreasing distance from
+            // the camera. Gaussians are processed in batches of size blockSize (i.e. one Gaussian
+            // per thread in the block), and batchEnd is the index of the last gaussian. NOTE: These
+            // values can be negative so must be int32 instead of uint32
+            const int32_t batchEnd = lastGaussianIdInBlock - 1 - blockSize * b;
+            const int32_t idx      = batchEnd - threadOrdinal;
+            if (idx >= firstGaussianIdInBlock) {
+                const int32_t    g     = tileGaussianIds[idx]; // flatten index in [C * N] or [nnz]
+                const vec2t      xy    = means2d[g];
+                const ScalarType opac  = opacities[g];
+                const vec3t      conic = conics[g];
+                sharedGaussians[threadOrdinal] = { g, xy, opac, conic };
+
+                if constexpr (IS_PACKED) {
+                    const ScalarType *c_ptr = colors[g].data(); // + g * COLOR_DIM;
+#pragma unroll COLOR_DIM
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        sharedGaussianColors[threadOrdinal].rgb[k] = c_ptr[k];
+                    }
+                } else {
+                    // colors: [C, N, COLOR_DIM]
+                    // colors[c, n, k] = [c * N * COLOR_DIM + n * COLOR_DIM + k]
+                    // g = c * N + n
+                    const int32_t     cid   = g / numGaussiansPerCamera;
+                    const int32_t     gid   = g % numGaussiansPerCamera;
+                    const ScalarType *c_ptr = colors[cid][gid].data();
+#pragma unroll COLOR_DIM
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        sharedGaussianColors[threadOrdinal].rgb[k] = c_ptr[k];
+                    }
+                }
+            }
+
+            // Sync threads so all gaussians for this batch are loaded in shared memory
+            __syncthreads();
+
+            // process gaussians in the current batch for this pixel
+            // 0 index is the furthest back gaussian in the batch
+            // For each Gaussian which contributes to this pixel, compute this pixel's gradient
+            // contribution to that Gaussian
+            const int32_t batchSize = min(blockSize, batchEnd + 1 - firstGaussianIdInBlock);
+            for (uint32_t t = max(0, batchEnd - lastGaussianIdInWarp); t < batchSize; ++t) {
+                constexpr ScalarType ALPHA_THRESHOLD = ScalarType{ 0.999 };
+
+                bool valid = pixelInImage;
+                if (batchEnd - t > lastGaussianIdInPixel) {
+                    valid = false;
+                }
+
+                const vec3t      conic = sharedGaussians[t].conic;
+                const vec2t      xy    = sharedGaussians[t].xy;
+                const ScalarType opac  = sharedGaussians[t].opacity;
+                const vec2t      delta = { xy.x - px, xy.y - py };
+                const ScalarType sigma = ScalarType{ 0.5 } * (conic.x * delta.x * delta.x +
+                                                              conic.z * delta.y * delta.y) +
+                                         conic.y * delta.x * delta.y;
+                const ScalarType vis   = __expf(-sigma);
+                const ScalarType alpha = min(ALPHA_THRESHOLD, opac * vis);
+                valid                  = valid &&
+                        !(sigma < ScalarType{ 0 } || alpha < static_cast<ScalarType>(1.f / 255.f));
+                // if there are no active thread in this warp, skip this loop
+                if (!warp.any(valid)) {
+                    continue;
+                }
+
+                // How much each pixel contributes to the gradient of the parameters for this
+                // gaussian Initialize to 0 and only set if this pixel is valid
+                ScalarType pixelRGBGradientContribution[COLOR_DIM] = { ScalarType{ 0 } };
+                vec3t      pixelConicGradientContribution   = { ScalarType{ 0 }, ScalarType{ 0 },
+                                                                ScalarType{ 0 } };
+                vec2t      pixelMean2dGradientContribution  = { ScalarType{ 0 }, ScalarType{ 0 } };
+                vec2t pixelMean2dAbsGradientContribution    = { ScalarType{ 0 }, ScalarType{ 0 } };
+                ScalarType pixelOpacityGradientContribution = ScalarType{ 0 };
+                if (valid) {
+                    // Compute the transmittance for the current gaussian
+                    const ScalarType ra = 1.0f / (1.0f - alpha);
+                    transmittance *= ra;
+
+                    // Update the contribution of this pixel to the color gradient if the
+                    // Gaussian
+                    const ScalarType fac = alpha * transmittance;
+#pragma unroll COLOR_DIM
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        pixelRGBGradientContribution[k] = fac * dLossDRenderedPixelColor[k];
+                    }
+
+                    // Contribution from this pixel to the alpha value for this Gaussian
+                    ScalarType pixelAlphaGradientContribution = ScalarType{ 0 };
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        pixelAlphaGradientContribution +=
+                            (sharedGaussianColors[t].rgb[k] * transmittance - buffer[k] * ra) *
+                            dLossDRenderedPixelColor[k];
+                    }
+                    pixelAlphaGradientContribution +=
+                        finalTransmittance * ra * dLossDRenderPixelAlpha;
+
+                    // Factor in the contribution from the background to this pixel
+                    if (backgrounds != nullptr) {
+                        ScalarType accum = ScalarType{ 0 };
+#pragma unroll COLOR_DIM
+                        for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                            accum += backgrounds[k] * dLossDRenderedPixelColor[k];
+                        }
+                        pixelAlphaGradientContribution += -finalTransmittance * ra * accum;
+                    }
+
+                    if (opac * vis <= ALPHA_THRESHOLD) {
+                        // Contribution from this pixel to sigma for this Gaussian
+                        const ScalarType pixelSigmaGradientContribution =
+                            -opac * vis * pixelAlphaGradientContribution;
+                        pixelConicGradientContribution = {
+                            ScalarType{ 0.5 } * pixelSigmaGradientContribution * delta.x * delta.x,
+                            pixelSigmaGradientContribution * delta.x * delta.y,
+                            ScalarType{ 0.5 } * pixelSigmaGradientContribution * delta.y * delta.y
+                        };
+                        pixelMean2dGradientContribution = {
+                            pixelSigmaGradientContribution *
+                                (conic.x * delta.x + conic.y * delta.y),
+                            pixelSigmaGradientContribution * (conic.y * delta.x + conic.z * delta.y)
+                        };
+                        if (outDLossDMeans2dAbs != nullptr) {
+                            pixelMean2dAbsGradientContribution = {
+                                abs(pixelMean2dGradientContribution.x),
+                                abs(pixelMean2dGradientContribution.y)
+                            };
+                        }
+                        pixelOpacityGradientContribution = vis * pixelAlphaGradientContribution;
+                    }
+
+#pragma unroll COLOR_DIM
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        buffer[k] += sharedGaussianColors[t].rgb[k] * fac;
+                    }
+                }
+
+                // Accumulate the gradient contribution to this Gaussian from every pixel in the
+                // block
+                warpSumMut<COLOR_DIM, decltype(warp), ScalarType>(pixelRGBGradientContribution,
+                                                                  warp);
+                warpSumMut<decltype(warp), ScalarType>(pixelConicGradientContribution, warp);
+                warpSumMut<decltype(warp), ScalarType>(pixelMean2dGradientContribution, warp);
+                if (outDLossDMeans2dAbs != nullptr) {
+                    warpSumMut<decltype(warp), ScalarType>(pixelMean2dAbsGradientContribution,
+                                                           warp);
+                }
+                warpSumMut<decltype(warp), ScalarType>(pixelOpacityGradientContribution, warp);
+
+                // The first thread in the block accumulates the gradient contribution from the
+                // whole block into the global gradient of this Gaussian
+                if (warp.thread_rank() == 0) {
+                    // Id of this gaussian in the block in [0, C * N] or [0, nnz]
+                    const int32_t g = sharedGaussians[t].id;
+
+                    // Accumulate the gradient contribution from this pixel to the global
+                    // gradient for the color of this Gaussian
+                    ScalarType *dlLossDColorsGaussianPtr = &outDLossDColors[COLOR_DIM * g];
+#pragma unroll COLOR_DIM
+                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                        gpuAtomicAdd(dlLossDColorsGaussianPtr + k, pixelRGBGradientContribution[k]);
+                    }
+
+                    // Accumulate the gradient contribution from this pixel to the global
+                    // gradient for the 3d conic of this Gaussian
+                    vec3t *dLossDConicsGaussianPtr = &outDLossDConics[g];
+                    gpuAtomicAdd(&dLossDConicsGaussianPtr->x, pixelConicGradientContribution.x);
+                    gpuAtomicAdd(&dLossDConicsGaussianPtr->y, pixelConicGradientContribution.y);
+                    gpuAtomicAdd(&dLossDConicsGaussianPtr->z, pixelConicGradientContribution.z);
+
+                    // Accumulate the gradient contribution from this pixel to the global
+                    // gradient for the 2d mean of this Gaussian
+                    vec2t *dLossDMeans2DGaussianPtr = &outDLossDMeans2d[g];
+                    gpuAtomicAdd(&dLossDMeans2DGaussianPtr->x, pixelMean2dGradientContribution.x);
+                    gpuAtomicAdd(&dLossDMeans2DGaussianPtr->y, pixelMean2dGradientContribution.y);
+
+                    // Accumulate the gradient contribution from this pixel to the global
+                    // gradient for the absolute value of the 2d mean of this Gaussian
+                    if (outDLossDMeans2dAbs != nullptr) {
+                        vec2t *dLossDMeans2dAbsGaussianPtr = &outDLossDMeans2dAbs[g];
+                        gpuAtomicAdd(&dLossDMeans2dAbsGaussianPtr->x,
+                                     pixelMean2dAbsGradientContribution.x);
+                        gpuAtomicAdd(&dLossDMeans2dAbsGaussianPtr->y,
+                                     pixelMean2dAbsGradientContribution.y);
+                    }
+
+                    // Accumulate the gradient contribution from this pixel to the global
+                    // gradient for the opacity of this Gaussian
+                    gpuAtomicAdd(&outDLossDOpacities[g], pixelOpacityGradientContribution);
+                }
+            }
+        }
+    }
+
+    inline void
+    checkInputTensor(const torch::Tensor &x, const std::string &name) {
+        TORCH_CHECK(x.is_cuda(), "Input ", name, " must be a CUDA tensor");
+        TORCH_CHECK(x.is_contiguous(), "Input ", name, " must be contiguous");
+    }
+
+    std::size_t
+    getSharedMemSize() const {
+        return tileSize * tileSize *
+               (sizeof(int32_t) + sizeof(vec3t) + sizeof(vec3t) + sizeof(ScalarType) * COLOR_DIM);
+    }
+
+    const dim3
+    getBlockDim() const {
+        return { tileSize, tileSize, 1 };
+    }
+
+    const dim3
+    getGridDim() const {
+        const uint32_t tileExtentW = (imageWidth + tileSize - 1) / tileSize;
+        const uint32_t tileExtentH = (imageHeight + tileSize - 1) / tileSize;
+        return { numCameras, tileExtentH, tileExtentW };
+    }
+};
+
+template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED>
 __global__ void
-rasterize_to_pixels_bwd_kernel(
-    const uint32_t C, const uint32_t N, const uint32_t n_isects, const bool packed,
-    // fwd inputs
-    const vec2<S> *__restrict__ means2d, // [C, N, 2] or [nnz, 2]
-    const vec3<S> *__restrict__ conics,  // [C, N, 3] or [nnz, 3]
-    // const S *__restrict__ colors,        // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    torch::PackedTensorAccessor64<S, N_OUTER_DIMS + 1, torch::RestrictPtrTraits>
-        colors,                        // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    const S *__restrict__ opacities,   // [C, N] or [nnz]
-    const S *__restrict__ backgrounds, // [C, COLOR_DIM] or [nnz, COLOR_DIM]
-    const bool *__restrict__ masks,    // [C, tile_height, tile_width]
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_origin_w, const uint32_t tile_origin_h,
-    const uint32_t tile_size, const uint32_t tile_width, const uint32_t tile_height,
-    const int32_t *__restrict__ tile_offsets, // [C, tile_height, tile_width]
-    const int32_t *__restrict__ flatten_ids,  // [n_isects]
-    // fwd outputs
-    const S *__restrict__ render_alphas,  // [C, image_height, image_width, 1]
-    const int32_t *__restrict__ last_ids, // [C, image_height, image_width]
-    // grad outputs
-    const S *__restrict__ v_render_colors, // [C, image_height, image_width,
-                                           // COLOR_DIM]
-    const S *__restrict__ v_render_alphas, // [C, image_height, image_width, 1]
-    // grad inputs
-    vec2<S> *__restrict__ v_means2d_abs, // [C, N, 2] or [nnz, 2]
-    vec2<S> *__restrict__ v_means2d,     // [C, N, 2] or [nnz, 2]
-    vec3<S> *__restrict__ v_conics,      // [C, N, 3] or [nnz, 3]
-    S *__restrict__ v_colors,            // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    S *__restrict__ v_opacities          // [C, N] or [nnz]
-) {
-    auto     block     = cg::this_thread_block();
-    uint32_t camera_id = block.group_index().x;
+rasterizeGaussiansBackward(DeviceArgs<ScalarType, COLOR_DIM, IS_PACKED> args) {
+    namespace cg = cooperative_groups;
 
-    // blockIdx runs from [0, num_tiles_h] x [0, num_tiles_w]
-    const int32_t tile_id = (block.group_index().y + tile_origin_h) * tile_width +
-                            block.group_index().z + tile_origin_w;
-    // Pixel coordinates run from [0, height] x [0, width]
-    const uint32_t i = block.group_index().y * tile_size + block.thread_index().y;
-    const uint32_t j = block.group_index().z * tile_size + block.thread_index().x;
+    auto block = cg::this_thread_block();
 
-    tile_offsets += camera_id * tile_height * tile_width;
-    render_alphas += camera_id * image_height * image_width;
-    last_ids += camera_id * image_height * image_width;
-    v_render_colors += camera_id * image_height * image_width * COLOR_DIM;
-    v_render_alphas += camera_id * image_height * image_width;
-    if (backgrounds != nullptr) {
-        backgrounds += camera_id * COLOR_DIM;
-    }
-    if (masks != nullptr) {
-        masks += camera_id * tile_height * tile_width;
-    }
+    // Advance argument pointers so they start at the image for the current camera
+    // This is a bit ugly but it makes it so we can just use tile/pixel coordinates
+    // during volume rendering which is cleaner
+    const uint32_t cameraId = block.group_index().x; // Which camera are we processing
+    args.advancePointersToCamera(cameraId);
 
-    // when the mask is provided, do nothing and return if
-    // this tile is labeled as False
-    if (masks != nullptr && !masks[tile_id]) {
+    // Ordinal of this tile in the current of image/camera (in row major order).
+    // tileOrdinal is in [0, numTilesW * numTilesH]
+    const int32_t tileOrdinal = (block.group_index().y + args.tileOriginH) * args.numTilesW +
+                                block.group_index().z + args.tileOriginW;
+
+    // If the caller provides a per-tile mask and this tile is masked, do nothing and return
+    if (args.masks != nullptr && !args.masks[tileOrdinal]) {
         return;
     }
 
-    const S px = (S)(j + image_origin_w) + 0.5f;
-    const S py = (S)(i + image_origin_h) + 0.5f;
+    // Pixel coordinates of the top left of the current tile.
+    // Pixel coordinates run from [0, height] x [0, width]
+    const uint32_t i = block.group_index().y * args.tileSize + block.thread_index().y;
+    const uint32_t j = block.group_index().z * args.tileSize + block.thread_index().x;
 
-    // clamp this value to the last pixel
-    const int32_t pix_id = min(i * image_width + j, image_width * image_height - 1);
+    // Figure out the first and (one past the) last Gaussian ID in this block/tile
+    const int32_t firstGaussianIdInBlock = args.tileOffsets[tileOrdinal];
+    const int32_t lastGaussianIdInBlock =
+        (cameraId == args.numCameras - 1) && (tileOrdinal == args.numTilesW * args.numTilesH - 1)
+            ? args.totalIntersections
+            : args.tileOffsets[tileOrdinal + 1];
 
-    // keep not rasterizing threads around for reading data
-    const bool inside = (i < image_height && j < image_width);
-
-    // have all threads in tile process the same gaussians in batches
-    // first collect gaussians between range.x and range.y in batches
-    // which gaussians to look through in this tile
-    int32_t        range_start = tile_offsets[tile_id];
-    int32_t        range_end   = (camera_id == C - 1) && (tile_id == tile_width * tile_height - 1)
-                                     ? n_isects
-                                     : tile_offsets[tile_id + 1];
-    const uint32_t block_size  = block.size();
-    const uint32_t num_batches = (range_end - range_start + block_size - 1) / block_size;
-
-    extern __shared__ int s[];
-    int32_t              *id_batch = (int32_t *)s;                      // [block_size]
-    vec3<S>              *xy_opacity_batch =
-        reinterpret_cast<vec3<float> *>(&id_batch[block_size]);         // [block_size]
-    vec3<S> *conic_batch =
-        reinterpret_cast<vec3<float> *>(&xy_opacity_batch[block_size]); // [block_size]
-    S *rgbs_batch = (S *)&conic_batch[block_size];                      // [block_size * COLOR_DIM]
-
-    // this is the T AFTER the last gaussian in this pixel
-    S T_final = 1.0f - render_alphas[pix_id];
-    S T       = T_final;
-    // the contribution from gaussians behind the current one
-    S buffer[COLOR_DIM] = { 0.f };
-    // index of last gaussian to contribute to this pixel
-    const int32_t bin_final = inside ? last_ids[pix_id] : 0;
-
-    // df/d_out for this pixel
-    S v_render_c[COLOR_DIM];
-    GSPLAT_PRAGMA_UNROLL
-    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-        v_render_c[k] = v_render_colors[pix_id * COLOR_DIM + k];
-    }
-    const S v_render_a = v_render_alphas[pix_id];
-
-    // collect and process batches of gaussians
-    // each thread loads one gaussian at a time before rasterizing
-    const uint32_t            tr             = block.thread_rank();
-    cg::thread_block_tile<32> warp           = cg::tiled_partition<32>(block);
-    const int32_t             warp_bin_final = cg::reduce(warp, bin_final, cg::greater<int>());
-    for (uint32_t b = 0; b < num_batches; ++b) {
-        // resync all threads before writing next batch of shared mem
-        block.sync();
-
-        // each thread fetch 1 gaussian from back to front
-        // 0 index will be furthest back in batch
-        // index of gaussian to load
-        // batch end is the index of the last gaussian in the batch
-        // These values can be negative so must be int32 instead of uint32
-        const int32_t batch_end  = range_end - 1 - block_size * b;
-        const int32_t batch_size = min(block_size, batch_end + 1 - range_start);
-        const int32_t idx        = batch_end - tr;
-        if (idx >= range_start) {
-            int32_t g            = flatten_ids[idx]; // flatten index in [C * N] or [nnz]
-            id_batch[tr]         = g;
-            const vec2<S> xy     = means2d[g];
-            const S       opac   = opacities[g];
-            xy_opacity_batch[tr] = { xy.x, xy.y, opac };
-            conic_batch[tr]      = conics[g];
-            if constexpr (N_OUTER_DIMS == 2) {
-                // colors: [C, N, COLOR_DIM]
-                // colors[c, n, k] = [c * N * COLOR_DIM + n * COLOR_DIM + k]
-                // g = c * N + n
-                const int32_t cid   = g / N;
-                const int32_t gid   = g % N;
-                const S      *c_ptr = colors[cid][gid].data();
-                GSPLAT_PRAGMA_UNROLL
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    rgbs_batch[tr * COLOR_DIM + k] = c_ptr[k];
-                }
-            } else {
-                const S *c_ptr = colors[g].data(); // + g * COLOR_DIM;
-                GSPLAT_PRAGMA_UNROLL
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    rgbs_batch[tr * COLOR_DIM + k] = c_ptr[k];
-                }
-            }
-        }
-        // wait for other threads to collect the gaussians in batch
-        block.sync();
-        // process gaussians in the current batch for this pixel
-        // 0 index is the furthest back gaussian in the batch
-        for (uint32_t t = max(0, batch_end - warp_bin_final); t < batch_size; ++t) {
-            bool valid = inside;
-            if (batch_end - t > bin_final) {
-                valid = 0;
-            }
-            S       alpha;
-            S       opac;
-            vec2<S> delta;
-            vec3<S> conic;
-            S       vis;
-
-            if (valid) {
-                conic           = conic_batch[t];
-                vec3<S> xy_opac = xy_opacity_batch[t];
-                opac            = xy_opac.z;
-                delta           = { xy_opac.x - px, xy_opac.y - py };
-                S sigma = 0.5f * (conic.x * delta.x * delta.x + conic.z * delta.y * delta.y) +
-                          conic.y * delta.x * delta.y;
-                vis   = __expf(-sigma);
-                alpha = min(0.999f, opac * vis);
-                if (sigma < 0.f || alpha < 1.f / 255.f) {
-                    valid = false;
-                }
-            }
-
-            // if all threads are inactive in this warp, skip this loop
-            if (!warp.any(valid)) {
-                continue;
-            }
-            S       v_rgb_local[COLOR_DIM] = { 0.f };
-            vec3<S> v_conic_local          = { 0.f, 0.f, 0.f };
-            vec2<S> v_xy_local             = { 0.f, 0.f };
-            vec2<S> v_xy_abs_local         = { 0.f, 0.f };
-            S       v_opacity_local        = 0.f;
-            // initialize everything to 0, only set if the lane is valid
-            if (valid) {
-                // compute the current T for this gaussian
-                S ra = 1.0f / (1.0f - alpha);
-                T *= ra;
-                // update v_rgb for this gaussian
-                const S fac = alpha * T;
-                GSPLAT_PRAGMA_UNROLL
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    v_rgb_local[k] = fac * v_render_c[k];
-                }
-                // contribution from this pixel
-                S v_alpha = 0.f;
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    v_alpha += (rgbs_batch[t * COLOR_DIM + k] * T - buffer[k] * ra) * v_render_c[k];
-                }
-
-                v_alpha += T_final * ra * v_render_a;
-                // contribution from background pixel
-                if (backgrounds != nullptr) {
-                    S accum = 0.f;
-                    GSPLAT_PRAGMA_UNROLL
-                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                        accum += backgrounds[k] * v_render_c[k];
-                    }
-                    v_alpha += -T_final * ra * accum;
-                }
-
-                if (opac * vis <= 0.999f) {
-                    const S v_sigma = -opac * vis * v_alpha;
-                    v_conic_local   = { 0.5f * v_sigma * delta.x * delta.x,
-                                        v_sigma * delta.x * delta.y,
-                                        0.5f * v_sigma * delta.y * delta.y };
-                    v_xy_local      = { v_sigma * (conic.x * delta.x + conic.y * delta.y),
-                                        v_sigma * (conic.y * delta.x + conic.z * delta.y) };
-                    if (v_means2d_abs != nullptr) {
-                        v_xy_abs_local = { abs(v_xy_local.x), abs(v_xy_local.y) };
-                    }
-                    v_opacity_local = vis * v_alpha;
-                }
-
-                GSPLAT_PRAGMA_UNROLL
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    buffer[k] += rgbs_batch[t * COLOR_DIM + k] * fac;
-                }
-            }
-            warpSum<COLOR_DIM, S>(v_rgb_local, warp);
-            warpSum<decltype(warp), S>(v_conic_local, warp);
-            warpSum<decltype(warp), S>(v_xy_local, warp);
-            if (v_means2d_abs != nullptr) {
-                warpSum<decltype(warp), S>(v_xy_abs_local, warp);
-            }
-            warpSum<decltype(warp), S>(v_opacity_local, warp);
-            if (warp.thread_rank() == 0) {
-                int32_t g         = id_batch[t]; // flatten index in [C * N] or [nnz]
-                S      *v_rgb_ptr = (S *)(v_colors) + COLOR_DIM * g;
-                GSPLAT_PRAGMA_UNROLL
-                for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                    gpuAtomicAdd(v_rgb_ptr + k, v_rgb_local[k]);
-                }
-
-                S *v_conic_ptr = (S *)(v_conics) + 3 * g;
-                gpuAtomicAdd(v_conic_ptr, v_conic_local.x);
-                gpuAtomicAdd(v_conic_ptr + 1, v_conic_local.y);
-                gpuAtomicAdd(v_conic_ptr + 2, v_conic_local.z);
-
-                S *v_xy_ptr = (S *)(v_means2d) + 2 * g;
-                gpuAtomicAdd(v_xy_ptr, v_xy_local.x);
-                gpuAtomicAdd(v_xy_ptr + 1, v_xy_local.y);
-
-                if (v_means2d_abs != nullptr) {
-                    S *v_xy_abs_ptr = (S *)(v_means2d_abs) + 2 * g;
-                    gpuAtomicAdd(v_xy_abs_ptr, v_xy_abs_local.x);
-                    gpuAtomicAdd(v_xy_abs_ptr + 1, v_xy_abs_local.y);
-                }
-
-                gpuAtomicAdd(v_opacities + g, v_opacity_local);
-            }
-        }
-    }
+    // Compute the backward pass for the current tile starting at pixel (i, j)
+    // and containing Gaussians with ids in [firstGaussianIdInBlock, lastGaussianIdInBlock)
+    constexpr uint32_t WARP_TILE_SIZE                = 32; // TODO (fwilliams): Tune this value
+    const cg::thread_block_tile<WARP_TILE_SIZE> warp = cg::tiled_partition<WARP_TILE_SIZE>(block);
+    args.volumeRenderTileBackward<WARP_TILE_SIZE>(warp, i, j, firstGaussianIdInBlock,
+                                                  lastGaussianIdInBlock, block.size());
 }
 
-template <uint32_t CDIM>
+template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-call_bwd_kernel_with_dim(
-    // Gaussian parameters
+rasterizeGaussiansWithTemplatedColorDim(
     const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
     const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
     const torch::Tensor               &colors,      // [C, N, 3] or [nnz, 3]
     const torch::Tensor               &opacities,   // [C, N] or [nnz]
     const at::optional<torch::Tensor> &backgrounds, // [C, 3]
-    const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids,  // [n_isects]
-    // forward outputs
-    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
-    const torch::Tensor &last_ids,      // [C, image_height, image_width]
-    // gradients of outputs
-    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
-    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
-    // options
-    bool absgrad) {
-    GSPLAT_DEVICE_GUARD(means2d);
-    GSPLAT_CHECK_INPUT(means2d);
-    GSPLAT_CHECK_INPUT(conics);
-    GSPLAT_CHECK_CUDA(colors);
-    GSPLAT_CHECK_INPUT(opacities);
-    GSPLAT_CHECK_INPUT(tile_offsets);
-    GSPLAT_CHECK_INPUT(flatten_ids);
-    GSPLAT_CHECK_INPUT(render_alphas);
-    GSPLAT_CHECK_INPUT(last_ids);
-    GSPLAT_CHECK_INPUT(v_render_colors);
-    GSPLAT_CHECK_INPUT(v_render_alphas);
-    if (backgrounds.has_value()) {
-        GSPLAT_CHECK_INPUT(backgrounds.value());
-    }
-    if (masks.has_value()) {
-        GSPLAT_CHECK_INPUT(masks.value());
-    }
+    const at::optional<torch::Tensor> &masks,       // [C, numTilesH, numTilesW]
+    const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
+    const uint32_t imageOriginH, const uint32_t tileSize,
+    const torch::Tensor &tileOffsets,               // [C, numTilesH, numTilesW]
+    const torch::Tensor &tileGaussianIds,           // [totalIntersections]
+    const torch::Tensor &renderedAlphas,            // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastGaussianIdsPerPixel,   // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedColors,      // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &dLossDRenderedAlphas,      // [C, imageHeight, imageWidth, 1]
+    bool                 absgrad) {
+    TORCH_CHECK(tileSize > 0, "Tile size must be greater than 0");
 
-    bool packed = means2d.dim() == 2;
+    const at::cuda::OptionalCUDAGuard device_guard(device_of(means2d));
 
-    uint32_t C           = tile_offsets.size(0);         // number of cameras
-    uint32_t N           = packed ? 0 : means2d.size(1); // number of gaussians
-    uint32_t n_isects    = flatten_ids.size(0);
-    uint32_t COLOR_DIM   = colors.size(-1);
-    uint32_t tile_height = tile_offsets.size(1);
-    uint32_t tile_width  = tile_offsets.size(2);
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
 
-    const uint32_t tile_origin_w = image_origin_w / tile_size;
-    const uint32_t tile_origin_h = image_origin_h / tile_size;
-    const uint32_t tile_extent_w = (image_width + tile_size - 1) / tile_size;
-    const uint32_t tile_extent_h = (image_height + tile_size - 1) / tile_size;
+    DeviceArgs<ScalarType, COLOR_DIM, IS_PACKED> deviceArgs(
+        means2d, conics, colors, opacities, backgrounds, masks, imageWidth, imageHeight,
+        imageOriginW, imageOriginH, tileSize, tileOffsets, tileGaussianIds, renderedAlphas,
+        lastGaussianIdsPerPixel, dLossDRenderedColors, dLossDRenderedAlphas);
 
-    // std::cerr << "RASTERIZE TO PIXELS BACKWARD " << std::endl;
-    // std::cerr << "  BLOCKS = (" << C << ", " << tile_extent_h << ", " << tile_extent_w << ")"
-    //           << std::endl;
-    // std::cerr << "  THREADS = (" << tile_size << ", " << tile_size << ". " << 1 << ")" <<
-    // std::endl; std::cerr << "  TILE WIDTH = " << tile_width << ", TILE HEIGHT = " << tile_height
-    // << std::endl;
-
-    // Each block covers a tile on the image. In total there are
-    // C * tile_height * tile_width blocks.
-    dim3 threads = { tile_size, tile_size, 1 };
-    dim3 blocks  = { C, tile_extent_h, tile_extent_w };
-
-    torch::Tensor v_means2d   = torch::zeros_like(means2d);
-    torch::Tensor v_conics    = torch::zeros_like(conics);
-    torch::Tensor v_colors    = torch::zeros_like(colors);
-    torch::Tensor v_opacities = torch::zeros_like(opacities);
-    torch::Tensor v_means2d_abs;
+    torch::Tensor outDLossDMeans2d   = torch::zeros_like(means2d);
+    torch::Tensor outDLossDConics    = torch::zeros_like(conics);
+    torch::Tensor outDLossDColors    = torch::zeros_like(colors);
+    torch::Tensor outDLossDOpacities = torch::zeros_like(opacities);
+    torch::Tensor outDLossDMeans2dAbs;
     if (absgrad) {
-        v_means2d_abs = torch::zeros_like(means2d);
+        outDLossDMeans2dAbs = torch::zeros_like(means2d);
     }
 
-    if (n_isects) {
-        const uint32_t shared_mem = tile_size * tile_size *
-                                    (sizeof(int32_t) + sizeof(vec3<float>) + sizeof(vec3<float>) +
-                                     sizeof(float) * COLOR_DIM);
-        at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream();
-
-        if (packed) {
-            if (cudaFuncSetAttribute(rasterize_to_pixels_bwd_kernel<CDIM, 1, float>,
-                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                     shared_mem) != cudaSuccess) {
-                AT_ERROR("Failed to set maximum shared memory size (requested ", shared_mem,
-                         " bytes), try lowering tile_size.");
-            }
-            rasterize_to_pixels_bwd_kernel<CDIM, 1, float><<<blocks, threads, shared_mem, stream>>>(
-                C, N, n_isects, packed, reinterpret_cast<vec2<float> *>(means2d.data_ptr<float>()),
-                reinterpret_cast<vec3<float> *>(conics.data_ptr<float>()),
-                colors.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
-                opacities.data_ptr<float>(),
-                backgrounds.has_value() ? backgrounds.value().data_ptr<float>() : nullptr,
-                masks.has_value() ? masks.value().data_ptr<bool>() : nullptr, image_width,
-                image_height, image_origin_w, image_origin_h, tile_origin_w, tile_origin_h,
-                tile_size, tile_width, tile_height, tile_offsets.data_ptr<int32_t>(),
-                flatten_ids.data_ptr<int32_t>(), render_alphas.data_ptr<float>(),
-                last_ids.data_ptr<int32_t>(), v_render_colors.data_ptr<float>(),
-                v_render_alphas.data_ptr<float>(),
-                absgrad ? reinterpret_cast<vec2<float> *>(v_means2d_abs.data_ptr<float>())
-                        : nullptr,
-                reinterpret_cast<vec2<float> *>(v_means2d.data_ptr<float>()),
-                reinterpret_cast<vec3<float> *>(v_conics.data_ptr<float>()),
-                v_colors.data_ptr<float>(), v_opacities.data_ptr<float>());
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        } else {
-            // int maxshmemperblock = 0;
-            // cudaDeviceGetAttribute(&maxshmemperblock, cudaDevAttrMaxSharedMemoryPerBlockOptin,
-            // 0); std::cerr << "maximum shared mem per block is " << maxshmemperblock << std::endl;
-            if (cudaFuncSetAttribute(rasterize_to_pixels_bwd_kernel<CDIM, 2, float>,
-                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
-                                     shared_mem) != cudaSuccess) {
-                AT_ERROR("Failed to set maximum shared memory size (requested ", shared_mem,
-                         " bytes), try lowering tile_size.");
-            }
-            rasterize_to_pixels_bwd_kernel<CDIM, 2, float><<<blocks, threads, shared_mem, stream>>>(
-                C, N, n_isects, packed, reinterpret_cast<vec2<float> *>(means2d.data_ptr<float>()),
-                reinterpret_cast<vec3<float> *>(conics.data_ptr<float>()),
-                colors.packed_accessor64<float, 3, torch::RestrictPtrTraits>(),
-                opacities.data_ptr<float>(),
-                backgrounds.has_value() ? backgrounds.value().data_ptr<float>() : nullptr,
-                masks.has_value() ? masks.value().data_ptr<bool>() : nullptr, image_width,
-                image_height, image_origin_w, image_origin_h, tile_origin_w, tile_origin_h,
-                tile_size, tile_width, tile_height, tile_offsets.data_ptr<int32_t>(),
-                flatten_ids.data_ptr<int32_t>(), render_alphas.data_ptr<float>(),
-                last_ids.data_ptr<int32_t>(), v_render_colors.data_ptr<float>(),
-                v_render_alphas.data_ptr<float>(),
-                absgrad ? reinterpret_cast<vec2<float> *>(v_means2d_abs.data_ptr<float>())
-                        : nullptr,
-                reinterpret_cast<vec2<float> *>(v_means2d.data_ptr<float>()),
-                reinterpret_cast<vec3<float> *>(v_conics.data_ptr<float>()),
-                v_colors.data_ptr<float>(), v_opacities.data_ptr<float>());
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }
+    // Just return empty tensors if there are no gaussians, cameras, or intersections
+    if (means2d.numel() == 0 || tileGaussianIds.numel() == 0) {
+        return std::make_tuple(outDLossDMeans2dAbs, outDLossDMeans2d, outDLossDConics,
+                               outDLossDColors, outDLossDOpacities);
     }
 
-    return std::make_tuple(v_means2d_abs, v_means2d, v_conics, v_colors, v_opacities);
+    deviceArgs.setOutputArguments(outDLossDMeans2d, outDLossDConics, outDLossDColors,
+                                  outDLossDOpacities, outDLossDMeans2dAbs, absgrad);
+
+    const std::size_t sharedMemSize = deviceArgs.getSharedMemSize();
+    const dim3        blockDim      = deviceArgs.getBlockDim();
+    const dim3        gridDim       = deviceArgs.getGridDim();
+
+    if (cudaFuncSetAttribute(rasterizeGaussiansBackward<ScalarType, COLOR_DIM, IS_PACKED>,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             sharedMemSize) != cudaSuccess) {
+        AT_ERROR("Failed to set maximum shared memory size (requested ", sharedMemSize,
+                 " bytes), try lowering tileSize.");
+    }
+    rasterizeGaussiansBackward<ScalarType, COLOR_DIM, IS_PACKED>
+        <<<gridDim, blockDim, sharedMemSize, stream>>>(deviceArgs);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
+    return std::make_tuple(outDLossDMeans2dAbs, outDLossDMeans2d, outDLossDConics, outDLossDColors,
+                           outDLossDOpacities);
 }
 
+template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-rasterize_to_pixels_bwd_tensor(
-    // Gaussian parameters
-    const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
-    const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
-    const torch::Tensor               &colors,      // [C, N, 3] or [nnz, 3]
-    const torch::Tensor               &opacities,   // [C, N] or [nnz]
-    const at::optional<torch::Tensor> &backgrounds, // [C, 3]
-    const at::optional<torch::Tensor> &masks,       // [C, tile_height, tile_width]
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids,  // [n_isects]
-    // forward outputs
-    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
-    const torch::Tensor &last_ids,      // [C, image_height, image_width]
-    // gradients of outputs
-    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
-    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
-    // options
-    bool absgrad) {
-    GSPLAT_CHECK_CUDA(colors);
-    uint32_t COLOR_DIM = colors.size(-1);
+dispatchGaussianRasterizeBackward<torch::kCUDA>(
+    const torch::Tensor &means2d,                 // [C, N, 2]
+    const torch::Tensor &conics,                  // [C, N, 3]
+    const torch::Tensor &colors,                  // [C, N, 3]
+    const torch::Tensor &opacities,               // [N]
+    const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
+    const uint32_t imageOriginH, const uint32_t tileSize,
+    const torch::Tensor &tileOffsets,             // [C, numTilesH, numTilesW]
+    const torch::Tensor &tileGaussianIds,         // [totalIntersections]
+    const torch::Tensor &renderedAlphas,          // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastGaussianIdsPerPixel, // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedColors,    // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &dLossDRenderedAlphas,    // [C, imageHeight, imageWidth, 1]
+    bool                 absgrad) {
+    TORCH_CHECK(colors.is_cuda(), "Input colors must be a CUDA tensor");
+    TORCH_CHECK(means2d.is_cuda(), "Input means2d must be a CUDA tensor");
+    uint32_t   colorDim = colors.size(-1);
+    const bool isPacked = means2d.dim() == 2;
 
 #define __GS__CALL_BWD_(N)                                                                       \
-    case N:                                                                                      \
-        return call_bwd_kernel_with_dim<N>(                                                      \
-            means2d, conics, colors, opacities, backgrounds, masks, image_width, image_height,   \
-            image_origin_w, image_origin_h, tile_size, tile_offsets, flatten_ids, render_alphas, \
-            last_ids, v_render_colors, v_render_alphas, absgrad);
+    case N: {                                                                                    \
+        if (isPacked) {                                                                          \
+            return rasterizeGaussiansWithTemplatedColorDim<float, N, true>(                      \
+                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,                 \
+                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,      \
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel, \
+                dLossDRenderedColors, dLossDRenderedAlphas, absgrad);                            \
+        } else {                                                                                 \
+            return rasterizeGaussiansWithTemplatedColorDim<float, N, false>(                     \
+                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,                 \
+                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,      \
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel, \
+                dLossDRenderedColors, dLossDRenderedAlphas, absgrad);                            \
+        }                                                                                        \
+    }
 
-    switch (COLOR_DIM) {
+    switch (colorDim) {
         __GS__CALL_BWD_(1)
         __GS__CALL_BWD_(2)
         __GS__CALL_BWD_(3)
@@ -483,66 +603,27 @@ rasterize_to_pixels_bwd_tensor(
         __GS__CALL_BWD_(512)
         __GS__CALL_BWD_(513)
     default:
-        AT_ERROR("Unsupported number of channels: ", COLOR_DIM);
+        AT_ERROR("Unsupported number of channels: ", colorDim);
     }
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianRasterizeBackward<torch::kCUDA>(
-    // Gaussian parameters
-    const torch::Tensor &means2d,   // [C, N, 2]
-    const torch::Tensor &conics,    // [C, N, 3]
-    const torch::Tensor &colors,    // [C, N, 3]
-    const torch::Tensor &opacities, // [N]
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h,
-
-    const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids,  // [n_isects]
-    // forward outputs
-    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
-    const torch::Tensor &last_ids,      // [C, image_height, image_width]
-    // gradients of outputs
-    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
-    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
-    // options
-    bool absgrad) {
-    return rasterize_to_pixels_bwd_tensor(
-        means2d, conics, colors, opacities, std::nullopt /*backgrounds*/, std::nullopt /*mask*/,
-        image_width, image_height, image_origin_w, image_origin_h, tile_size, tile_offsets,
-        flatten_ids, render_alphas, last_ids, v_render_colors, v_render_alphas, absgrad);
-}
-
-template <>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeBackward<torch::kCPU>(
-    // Gaussian parameters
-    const torch::Tensor &means2d,   // [C, N, 2]
-    const torch::Tensor &conics,    // [C, N, 3]
-    const torch::Tensor &colors,    // [C, N, 3]
-    const torch::Tensor &opacities, // [N]
-
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids,  // [n_isects]
-    // forward outputs
-    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
-    const torch::Tensor &last_ids,      // [C, image_height, image_width]
-    // gradients of outputs
-    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
-    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
-    // options
-    bool absgrad) {
+    const torch::Tensor &means2d,                 // [C, N, 2]
+    const torch::Tensor &conics,                  // [C, N, 3]
+    const torch::Tensor &colors,                  // [C, N, 3]
+    const torch::Tensor &opacities,               // [N]
+    const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
+    const uint32_t imageOriginH, const uint32_t tileSize,
+    const torch::Tensor &tileOffsets,             // [C, numTilesH, numTilesW]
+    const torch::Tensor &tileGaussianIds,         // [totalIntersections]
+    const torch::Tensor &renderedAlphas,          // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastGaussianIdsPerPixel, // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedColors,    // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &dLossDRenderedAlphas,    // [C, imageHeight, imageWidth, 1]
+    bool                 absgrad) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 
-} // namespace ops
-} // namespace detail
-} // namespace fvdb
+} // namespace fvdb::detail::ops
