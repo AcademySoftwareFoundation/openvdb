@@ -11,8 +11,8 @@ namespace fvdb::detail::ops {
 
 template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct DeviceArgs {
     constexpr static uint32_t N_OUTER_DIMS = IS_PACKED ? 1 : 2;
-    using vec2t                            = Vec2Type<ScalarType>::type;
-    using vec3t                            = Vec3Type<ScalarType>::type;
+    using vec2t                            = typename Vec2Type<ScalarType>::type;
+    using vec3t                            = typename Vec3Type<ScalarType>::type;
     using ColorAccessorType                = fvdb::TorchRAcc64<ScalarType, N_OUTER_DIMS + 1>;
 
     uint32_t numCameras;
@@ -156,8 +156,8 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
                              const int32_t firstGaussianIdInBlock,
                              const int32_t lastGaussianIdInBlock, const uint32_t blockSize) {
         namespace cg = cooperative_groups;
-        using vec3t  = Vec3Type<ScalarType>::type;
-        using vec2t  = Vec2Type<ScalarType>::type;
+        using vec3t  = typename Vec3Type<ScalarType>::type;
+        using vec2t  = typename Vec2Type<ScalarType>::type;
 
         // (i, j) coordinates are relative to the specified image origin which may be a crop
         // so we need to add the origin to get the absolute pixel coordinates

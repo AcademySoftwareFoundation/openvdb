@@ -405,8 +405,10 @@ gaussianTileIntersectionCUDAImpl(
         is_sparse ? active_tiles.value().size(0) : num_cameras * total_tiles;
     const uint32_t output_num_tiles = num_active_tiles + 1;
 
-    auto output_dims = is_sparse ? at::IntArrayRef({ output_num_tiles })
-                                 : at::IntArrayRef({ num_cameras, num_tiles_h, num_tiles_w });
+    auto dims = is_sparse ? std::vector<int64_t>({ output_num_tiles })
+                          : std::vector<int64_t>({ num_cameras, num_tiles_h, num_tiles_w });
+
+    auto output_dims = at::IntArrayRef(dims);
 
     if (total_gaussians == 0) {
         return std::make_tuple(torch::zeros(output_dims, means2d.options().dtype(torch::kInt32)),

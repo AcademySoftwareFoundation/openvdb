@@ -29,9 +29,9 @@ volume_render_tile(const uint32_t tile_start, const uint32_t tile_end, const uin
                    const S *__restrict__ background, const int32_t *__restrict__ tile_gaussian_ids,
                    S *__restrict__ out_tile_colors, S *__restrict__ out_tile_alphas,
                    int32_t *__restrict__ out_tile_last_ids) {
-    using coord2t = Vec2Type<int32_t>::type;
-    using vec2t   = Vec2Type<S>::type;
-    using vec3t   = Vec3Type<S>::type;
+    using coord2t = typename Vec2Type<int32_t>::type;
+    using vec2t   = typename Vec2Type<S>::type;
+    using vec3t   = typename Vec3Type<S>::type;
 
     const uint32_t num_batches = (tile_end - tile_start + block_size - 1) / block_size;
 
