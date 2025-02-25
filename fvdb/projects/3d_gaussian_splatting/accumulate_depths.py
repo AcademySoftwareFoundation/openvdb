@@ -7,10 +7,10 @@ import torch
 import torch.utils.data
 import tqdm
 import tyro
+from datasets import ColmapDataset, ColmapParser
 from skimage import feature, morphology
 
 from fvdb.nn.gaussian_splatting import GaussianSplat3D
-from fvdb.utils.data import ColmapDataset, ColmapParser
 
 
 @torch.inference_mode()
@@ -78,7 +78,7 @@ def main(checkpoint_path: str, data_path: str, data_scale_factor: int = 4, devic
     model = GaussianSplat3D(torch.rand([8, 3]), torch.rand([8, 3])).to(device)
     model.load_state_dict(checkpoint["splats"])
 
-    parser = ColmapParser(data_path, test_every=1, normalize=True, factor=data_scale_factor)
+    parser = ColmapParser(data_path, test_every=1, factor=data_scale_factor)
     dataset = ColmapDataset(parser, split="test")
 
     points, colors = accumulated_point_cloud(model, dataset, device=device)

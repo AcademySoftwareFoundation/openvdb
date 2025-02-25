@@ -19,6 +19,7 @@ import tqdm
 import tyro
 import viser
 import yaml
+from datasets import ColmapDataset, ColmapParser
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
@@ -26,7 +27,6 @@ from viz import CameraState, Viewer
 
 from fvdb.nn import GaussianSplat3D
 from fvdb.optim import GaussianSplatOptimizer
-from fvdb.utils.data import ColmapDataset, ColmapParser
 
 
 @dataclass
@@ -40,20 +40,20 @@ class Config:
     # If you're using very large images, run the forward pass on crops and accumulate gradients
     crops_per_image: int = 1
 
-    # Number of training steps
+    # Number of training steps (TODO: Scale with dataset size)
     max_steps: int = 30_000
-    # Steps to evaluate the model
+    # Steps to evaluate the model (TODO: Scale with dataset size)
     eval_steps: List[int] = field(default_factory=lambda: [3_500, 7_000, 30_000])
-    # Steps to save the model
+    # Steps to save the model (TODO: Scale with dataset size)
     save_steps: List[int] = field(default_factory=lambda: [3_500, 7_000, 30_000])
 
     # Degree of spherical harmonics
     sh_degree: int = 3
-    # Turn on another SH degree every this steps
+    # Turn on another SH degree every this steps (TODO: Scale with dataset size)
     increase_sh_degree_every: int = 1000
-    # Initial opacity of GS
+    # Initial opacity of each Gaussian
     initial_opacity: float = 0.1
-    # Initial scale of GS
+    # Initial scale of each Gaussian
     initial_scale: float = 1.0
     # Weight for SSIM loss
     ssim_lambda: float = 0.2
@@ -72,7 +72,7 @@ class Config:
     far_plane: float = 1e10
 
 
-def crop_image_batch(image: torch.Tensor, ncrops: int):
+def crop_image_batch(image: torch.Tensor, mask: Optional[torch.Tensor], ncrops: int):
     """
     Generator to iterate a minibatch of images (B, H, W, C) into disjoint patches patches (B, H_patch, W_patch, C).
     We use this function when training on very large images so that we can accumulate gradients over
@@ -98,11 +98,14 @@ def crop_image_batch(image: torch.Tensor, ncrops: int):
     for patch_id in range(patches.shape[0]):
         x1, y1, x2, y2 = patches[patch_id]
         image_patch = image[:, y1:y2, x1:x2]
+        mask_patch = None
+        if mask is not None:
+            mask_patch = mask[:, y1:y2, x1:x2]
 
         crop = (x1, y1, (x2 - x1), (y2 - y1))
         assert (x2 - x1) == patch_w and (y2 - y1) == patch_h
         is_last = patch_id == (patches.shape[0] - 1)
-        yield image_patch, crop, is_last
+        yield image_patch, mask_patch, crop, is_last
 
 
 class Runner:
@@ -189,11 +192,14 @@ class Runner:
         data_scale_factor: int = 4,
         results_path: Optional[str] = None,
         device: Union[str, torch.device] = "cuda",
-        use_every_n_as_test: int = 8,
+        use_every_n_as_test: int = 100,
         disable_viewer: bool = False,
         log_tensorboard_every: int = 100,
         log_images_to_tensorboard: bool = False,
         no_save: bool = False,
+        no_save_renders: bool = False,
+        normalize_ecef2enu: bool = False,
+        use_masks: bool = False,
     ) -> None:
         random.seed(cfg.seed)
         np.random.seed(cfg.seed)
@@ -206,6 +212,8 @@ class Runner:
         self.log_images_to_tensorboard = log_images_to_tensorboard
         self.results_path = results_path
         self.no_save = no_save
+        self.no_save_renders = no_save_renders
+        self.use_masks = use_masks
 
         self.logger = logging.getLogger(__name__)
 
@@ -219,7 +227,7 @@ class Runner:
         self.parser = ColmapParser(
             data_dir=data_path,
             factor=data_scale_factor,
-            normalize=True,
+            normalization_type="ecef2enu" if normalize_ecef2enu else "pca",
             test_every=use_every_n_as_test,
         )
         self.trainset = ColmapDataset(self.parser, split="train")
@@ -229,7 +237,8 @@ class Runner:
 
         # Initialize model
         self.model = GaussianSplat3D.from_colmap(
-            self.parser,
+            self.parser.points,
+            self.parser.points_rgb,
             initial_covariance_scale=cfg.initial_scale,
             initial_opacity=cfg.initial_opacity,
             scene_size=self.scene_scale,
@@ -282,6 +291,8 @@ class Runner:
         )
 
         # Training loop.
+        cnt = 0
+        mask_debug_path = "mask_images/"
         self.train_start_time = time.time()
         pbar = tqdm.tqdm(range(start_step, self.cfg.max_steps))
         for step in pbar:
@@ -296,12 +307,13 @@ class Runner:
             world_to_cam_mats = torch.linalg.inv(cam_to_world_mats).contiguous()  # [B, 4, 4]
             intrinsics_mats = minibatch["K"].to(self.device)  # [B, 3, 3]
             image = minibatch["image"]  # [B, H, W, 3]
+            mask = minibatch["mask"] if "mask" in minibatch else None
             image_height, image_width = image.shape[1:3]
             num_pixels_in_minibatch = image.shape[0] * image.shape[1] * image.shape[2]
 
             # If you have very large images, you can iterate over disjoint crops and accumulate gradients
             # If cfg.crops_per_image is 1, then this just returns the image
-            for pixels, crop, is_last in crop_image_batch(image, self.cfg.crops_per_image):
+            for pixels, mask_pixels, crop, is_last in crop_image_batch(image, mask, self.cfg.crops_per_image):
                 # Actual pixels to compute the loss on, normalized to [0, 1]
                 pixels = pixels.to(self.device) / 255.0  # [1, H, W, 3]
 
@@ -330,6 +342,28 @@ class Runner:
                 if self.cfg.random_bkgd:
                     bkgd = torch.rand(1, 3, device=self.device)
                     colors = colors + bkgd * (1.0 - alphas)
+
+                if self.use_masks:
+                    if mask_pixels is None:
+                        raise ValueError("use masks set, but no mask images available")
+                    else:
+                        # set the ground truth pixel values to match render, thus loss is zero at mask pixels and not updated
+                        # if minibatch["image_id"].cpu().numpy()[0] == 95:
+                        # mask_img = np.ones(mask_pixels.squeeze().shape,dtype=np.uint8)
+                        #     mask_img[mask_pixels.squeeze()] = 0
+                        #     mask_img = mask_img * 255
+                        #     imageio.imwrite(mask_debug_path+str(cnt).zfill(8)+"_mask_img.jpg", mask_img)
+                        mask_pixels = mask_pixels.to(self.device)
+                        pixels[mask_pixels] = colors.detach()[mask_pixels]
+
+                        # if minibatch["image_id"].cpu().numpy()[0] == 95:
+                        #     canvas = torch.cat([pixels, colors], dim=2).squeeze(0).detach().cpu().numpy()
+
+                        #     imageio.imwrite(
+                        #         mask_debug_path + str(cnt).zfill(8)+"_train_canvas.jpg",
+                        #         (canvas * 255).astype(np.uint8),
+                        #     )
+                    cnt += 1
 
                 # Image losses
                 l1loss = F.l1_loss(colors, pixels)
@@ -390,13 +424,15 @@ class Runner:
         device = self.device
 
         valloader = torch.utils.data.DataLoader(self.valset, batch_size=1, shuffle=False, num_workers=1)
-        ellipse_time = 0
+        ellapsed_time = 0
         metrics = {"psnr": [], "ssim": [], "lpips": []}
         for i, data in enumerate(valloader):
             cam_to_world_mats = data["camtoworld"].to(device)
             world_to_cam_mats = torch.linalg.inv(cam_to_world_mats).contiguous()
             intrinsics_mats = data["K"].to(device)
             pixels = data["image"].to(device) / 255.0
+            mask_pixels = data["mask"] if "mask" in data else None
+
             height, width = pixels.shape[1:3]
 
             torch.cuda.synchronize()
@@ -415,16 +451,27 @@ class Runner:
             # depths = colors[..., -1:] / alphas.clamp(min=1e-10)
             # depths = (depths - depths.min()) / (depths.max() - depths.min())
             # depths = depths / depths.max()
+
             torch.cuda.synchronize()
-            ellipse_time += time.time() - tic
+
+            ellapsed_time += time.time() - tic
+
+            if self.use_masks:
+                if mask_pixels is None:
+                    raise ValueError("use masks set, but no mask images available")
+                else:
+                    # set the ground truth pixel values to match render, thus loss is zero at mask pixels and not updated
+                    mask_pixels = mask_pixels.to(self.device)
+                    pixels[mask_pixels] = colors.detach()[mask_pixels]
 
             # write images
             canvas = torch.cat([pixels, colors], dim=2).squeeze(0).cpu().numpy()
             if not self.no_save:
-                imageio.imwrite(
-                    f"{self.render_dir}/{stage}_{i:04d}.png",
-                    (canvas * 255).astype(np.uint8),
-                )
+                if not self.no_save_renders:
+                    imageio.imwrite(
+                        f"{self.render_dir}/{stage}_{i:04d}.png",
+                        (canvas * 255).astype(np.uint8),
+                    )
 
             pixels = pixels.permute(0, 3, 1, 2)  # [1, 3, H, W]
             colors = colors.permute(0, 3, 1, 2)  # [1, 3, H, W]
@@ -432,14 +479,14 @@ class Runner:
             metrics["ssim"].append(self.ssim(colors, pixels))
             metrics["lpips"].append(self.lpips(colors, pixels))
 
-        ellipse_time /= len(valloader)
+        ellapsed_time /= len(valloader)
 
         psnr = torch.stack(metrics["psnr"]).mean()
         ssim = torch.stack(metrics["ssim"]).mean()
         lpips = torch.stack(metrics["lpips"]).mean()
         self.logger.info(
             f"PSNR: {psnr.item():.3f}, SSIM: {ssim.item():.4f}, LPIPS: {lpips.item():.3f} "
-            f"Time: {ellipse_time:.3f}s/image "
+            f"Time: {ellapsed_time:.3f}s/image "
             f"Number of GS: {self.model.num_gaussians}"
         )
         # save stats as json
@@ -447,7 +494,7 @@ class Runner:
             "psnr": psnr.item(),
             "ssim": ssim.item(),
             "lpips": lpips.item(),
-            "ellipse_time": ellipse_time,
+            "ellapsed_time": ellapsed_time,
             "num_GS": self.model.num_gaussians,
         }
         if not self.no_save:
@@ -495,6 +542,9 @@ def train(
     log_tensorboard_every: int = 100,
     log_images_to_tensorboard: bool = False,
     no_save: bool = False,
+    no_save_renders: bool = False,
+    normalize_ecef2enu: bool = False,
+    use_masks: bool = False,
 ):
     logging.basicConfig(level=logging.INFO)
     runner = Runner(
@@ -508,6 +558,9 @@ def train(
         log_tensorboard_every,
         log_images_to_tensorboard,
         no_save,
+        no_save_renders,
+        normalize_ecef2enu,
+        use_masks,
     )
     runner.train()
     if not disable_viewer:

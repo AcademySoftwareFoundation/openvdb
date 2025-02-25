@@ -5,11 +5,11 @@ import torch
 import torch.utils.data
 import tqdm
 import tyro
+from datasets import ColmapDataset, ColmapParser
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from sam2.build_sam import build_sam2
 
 from fvdb.nn.gaussian_splatting import GaussianSplat3D
-from fvdb.utils.data import ColmapDataset, ColmapParser
 
 
 @torch.inference_mode()
@@ -144,7 +144,7 @@ def main(checkpoint_path: str, data_path: str, data_scale_factor: int = 4, devic
 
     print(model)
 
-    parser = ColmapParser(data_path, test_every=1, normalize=True, factor=data_scale_factor)
+    parser = ColmapParser(data_path, test_every=1, factor=data_scale_factor)
     dataset = ColmapDataset(parser, split="test")
 
     scales, mask_ids, mask_cds, imgs, cam_to_worlds, intrinsics = make_segmentation_dataset(

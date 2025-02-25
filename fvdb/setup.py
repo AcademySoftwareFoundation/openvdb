@@ -357,8 +357,6 @@ if __name__ == "__main__":
             "fvdb.utils",
             "fvdb.utils.examples",
             "fvdb.utils.tests",
-            "fvdb.utils.data",
-            "fvdb.utils.data._colmap_utils",
         ],
         include_package_data=True,
         package_data={"fvdb": ["_Cpp.pyi", "py.typed"]},

@@ -4,11 +4,10 @@
 import math
 from typing import Literal
 
+import numpy as np
 import torch
 import torch.nn as nn
 from sklearn.neighbors import NearestNeighbors
-
-from fvdb.utils.data import ColmapParser
 
 from .. import (
     gaussian_render,
@@ -98,14 +97,15 @@ class GaussianSplat3D(nn.Module):
 
     @staticmethod
     def from_colmap(
-        parser: ColmapParser,
+        colmap_points: np.ndarray,
+        colmap_points_rgb: np.ndarray,
         initial_covariance_scale: float = 1.0,
         initial_opacity: float = 1.0,
         scene_size: float = 1.0,
         sh_degree: int = 3,
     ) -> "GaussianSplat3D":
-        points = torch.from_numpy(parser.points).float()
-        rgbs = torch.from_numpy(parser.points_rgb / 255.0).float()
+        points = torch.from_numpy(colmap_points).float()
+        rgbs = torch.from_numpy(colmap_points_rgb / 255.0).float()
         return GaussianSplat3D(
             points,
             rgbs,

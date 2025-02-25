@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 import os
+import warnings
 from typing import Any, Dict, List, Optional
 
 import cv2
@@ -9,6 +10,7 @@ import imageio.v2 as imageio
 import numpy as np
 import torch
 import torch.utils.data
+from pyproj import Transformer
 
 from ._colmap_utils import SceneManager
 
@@ -109,6 +111,27 @@ def align_principle_axes(point_cloud):
     return transform
 
 
+def geo_norm_ecef2enu(point_cloud, londeg, latdeg, xorigin, yorigin, zorigin):
+    # ECEF to ENU rotation matrix
+    lon = np.deg2rad(londeg)
+    lat = np.deg2rad(latdeg)
+    rot = np.array(
+        [
+            [-np.sin(lon), np.cos(lon), 0.0],
+            [-np.cos(lon) * np.sin(lat), -np.sin(lon) * np.sin(lat), np.cos(lat)],
+            [np.cos(lon) * np.cos(lat), np.sin(lon) * np.cos(lat), np.sin(lat)],
+        ]
+    )
+
+    tvec = np.array([xorigin, yorigin, zorigin])
+    # Create SE(3) matrix (4x4 transformation matrix)
+    transform = np.eye(4)
+    transform[:3, :3] = rot
+    transform[:3, 3] = -rot @ tvec
+
+    return transform
+
+
 def transform_points(matrix, points):
     """Transform points using an SE(3) matrix.
 
@@ -162,18 +185,29 @@ class ColmapParser:
         self,
         data_dir: str,
         factor: int = 1,
-        normalize: bool = False,
-        test_every: int = 8,
+        normalization_type="pca",
+        test_every: int = 100,
     ):
         self.data_dir = data_dir
         self.factor = factor
-        self.normalize = normalize
+        self.normalization_type = normalization_type
+        self.utm_proj4 = None
         self.test_every = test_every
+
+        valid_normalization_types = {"none", "pca", "ecef2enu"}
+        if normalization_type not in valid_normalization_types:
+            raise ValueError(
+                f"Unknown normalization type {normalization_type}. Must be one of {valid_normalization_types}"
+            )
 
         colmap_dir = os.path.join(data_dir, "sparse/0/")
         if not os.path.exists(colmap_dir):
             colmap_dir = os.path.join(data_dir, "sparse")
         assert os.path.exists(colmap_dir), f"COLMAP directory {colmap_dir} does not exist."
+
+        mask_path = os.path.join(data_dir, "image_masks")
+        if not os.path.exists(mask_path):
+            mask_path = None
 
         manager = SceneManager(colmap_dir)
         manager.load_cameras()
@@ -236,9 +270,9 @@ class ColmapParser:
         print(f"[Parser] {len(imdata)} images, taken by {len(set(camera_ids))} cameras.")
 
         if len(imdata) == 0:
-            raise ValueError("No images found in COLMAP.")
+            raise FileNotFoundError("No images found in COLMAP.")
         if not (type_ == 0 or type_ == 1):
-            print("Warning: COLMAP Camera is not PINHOLE. Images have distortion.")
+            warnings.warn("Warning: COLMAP Camera is not PINHOLE. Images have distortion.")
 
         w2c_mats = np.stack(w2c_mats, axis=0)
 
@@ -249,13 +283,6 @@ class ColmapParser:
         # image names anymore.
         image_names = [imdata[k].name for k in imdata]
 
-        # Previous Nerf results were generated with images sorted by filename,
-        # ensure metrics are reported on the same test set.
-        inds = np.argsort(image_names)
-        image_names = [image_names[i] for i in inds]
-        camtoworlds = camtoworlds[inds]
-        camera_ids = [camera_ids[i] for i in inds]
-
         # Load images.
         if factor > 1:
             image_dir_suffix = f"_{factor}"
@@ -263,6 +290,31 @@ class ColmapParser:
             image_dir_suffix = ""
         colmap_image_dir = os.path.join(data_dir, "images")
         image_dir = os.path.join(data_dir, "images" + image_dir_suffix)
+
+        # check for masks if needed
+        mask_names = []
+        if mask_path is not None:
+            for imname in image_names:
+                image_mask_path = os.path.join(mask_path, os.path.basename(imname))
+                if os.path.exists(image_mask_path):
+                    mask_names.append(image_mask_path)
+                else:
+                    raise FileNotFoundError("missing mask: " + image_mask_path)
+            if len(mask_names) != len(image_names):
+                raise ValueError(
+                    f"Number of mask images ({len(mask_names)}) does not match images ({len(image_names)}). [mask path={mask_path} image path={image_dir}]"
+                )
+
+        # Previous Nerf results were generated with images sorted by filename,
+        # ensure metrics are reported on the same test set.
+        inds = np.argsort(image_names)
+        image_names = [image_names[i] for i in inds]
+        if len(mask_names) > 0:
+            mask_names = [mask_names[i] for i in inds]
+        camtoworlds = camtoworlds[inds]
+        camera_ids = [camera_ids[i] for i in inds]
+
+        # TODO update logic to handle no "images" folder and only the downsized image folder
         for d in [image_dir, colmap_image_dir]:
             if not os.path.exists(d):
                 raise ValueError(f"Image folder {d} does not exist.")
@@ -275,7 +327,7 @@ class ColmapParser:
         image_paths = [os.path.join(image_dir, colmap_to_image[f]) for f in image_names]
 
         # 3D points and {image_name -> [point_idx]}
-        points: np.ndarray = manager.points3D.astype(np.float32)  # type: ignore
+        points: np.ndarray = manager.points3D  # type: ignore
         points_err: np.ndarray = manager.point3D_errors.astype(np.float32)  # type: ignore
         points_rgb: np.ndarray = manager.point3D_colors.astype(np.uint8)  # type: ignore
         point_indices = dict()
@@ -289,31 +341,38 @@ class ColmapParser:
         point_indices = {k: np.array(v).astype(np.int32) for k, v in point_indices.items()}
 
         # Normalize the world space.
-        if normalize:
-            T1 = similarity_from_cameras(camtoworlds)
-            camtoworlds = transform_cameras(T1, camtoworlds)
-            points = transform_points(T1, points)
+        if normalization_type == "pca":
+            normalization_transform = align_principle_axes(points)
+        elif normalization_type == "ecef2enu":
+            centroid = np.median(points, axis=0)
+            tform_ecef2lonlat = Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
+            pt_lonlat = tform_ecef2lonlat.transform(centroid[0], centroid[1], centroid[2])
 
-            T2 = align_principle_axes(points)
-            camtoworlds = transform_cameras(T2, camtoworlds)
-            points = transform_points(T2, points)
-
-            transform = T2 @ T1
+            normalization_transform = geo_norm_ecef2enu(
+                points, pt_lonlat[0], pt_lonlat[1], centroid[0], centroid[1], centroid[2]
+            )
+        elif normalization_type == "none":
+            normalization_transform = np.eye(4)
         else:
-            transform = np.eye(4)
+            raise RuntimeError(f"Unknown normalization type {normalization_type}")
+
+        if normalization_type != "none":
+            camtoworlds = transform_cameras(normalization_transform, camtoworlds)
+            points = transform_points(normalization_transform, points)
 
         self.image_names = image_names  # List[str], (num_images,)
+        self.mask_names = mask_names  # List[str], (num_images,)
         self.image_paths = image_paths  # List[str], (num_images,)
         self.camtoworlds = camtoworlds  # np.ndarray, (num_images, 4, 4)
         self.camera_ids = camera_ids  # List[int], (num_images,)
         self.Ks_dict = Ks_dict  # Dict of camera_id -> K
         self.params_dict = params_dict  # Dict of camera_id -> params
         self.imsize_dict = imsize_dict  # Dict of camera_id -> (width, height)
-        self.points = points  # np.ndarray, (num_points, 3)
+        self.points = points.astype(np.float32)  # np.ndarray, (num_points, 3)
         self.points_err = points_err  # np.ndarray, (num_points,)
         self.points_rgb = points_rgb  # np.ndarray, (num_points, 3)
         self.point_indices = point_indices  # Dict[str, np.ndarray], image_name -> [M,]
-        self.transform = transform  # np.ndarray, (4, 4)
+        self.transform = normalization_transform  # np.ndarray, (4, 4)
 
         # undistortion
         self.mapx_dict = dict()
@@ -408,6 +467,13 @@ class ColmapDataset(torch.utils.data.Dataset):
             "image_path": self.parser.image_paths[index],
         }
 
+        if len(self.parser.mask_names) > 0:
+            mask_image_path = self.parser.mask_names[index]
+            mask = imageio.imread(mask_image_path)[..., :3]
+            mask = mask < 127
+            data["mask_path"] = mask_image_path
+            data["mask"] = mask
+
         if self.load_depths:
             # projected points to image plane to get depths
             worldtocams = np.linalg.inv(camtoworlds)
@@ -451,7 +517,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Parse COLMAP data.
-    parser = ColmapParser(data_dir=args.data_dir, factor=args.factor, normalize=True, test_every=8)
+    parser = ColmapParser(data_dir=args.data_dir, factor=args.factor, test_every=8)
     dataset = ColmapDataset(parser, split="train", load_depths=True)
     print(f"Dataset: {len(dataset)} images.")
 
