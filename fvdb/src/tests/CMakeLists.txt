@@ -10,6 +10,8 @@ add_custom_command(
   USES_TERMINAL
 )
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_test_data.cmake)
+
 # output directory
 set(TEST_BINARY_DIRECTORY "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/gtests>")
 
@@ -49,6 +51,9 @@ function(ConfigureTest CMAKE_TEST_NAME)
     $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CUDA>>:-G -Xcompiler=-O0>
     $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CXX>>:-O0>)
 
+  target_compile_definitions(${CMAKE_TEST_NAME} PRIVATE
+    "FVDB_EXTERNAL_TEST_DATA_PATH=\"${FVDB_TEST_DATA_DIR}\"")
+
   install(
     TARGETS ${CMAKE_TEST_NAME}
     COMPONENT testing
@@ -66,3 +71,4 @@ ConfigureTest(ExampleTest "ExampleTest.cpp")
 ConfigureTest(GaussianComputeSparseInfoTest "GaussianComputeSparseInfoTest.cpp")
 ConfigureTest(GaussianTileIntersectionTest "GaussianTileIntersectionTest.cpp")
 ConfigureTest(GaussianComputeNanInfMaskTest "GaussianComputeNanInfMaskTest.cpp")
+ConfigureTest(GaussianRasterizeBackwardTest "GaussianRasterizeBackwardTest.cpp")

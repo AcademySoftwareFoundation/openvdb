@@ -7,6 +7,8 @@
 
 #include <ATen/cuda/Atomic.cuh>
 
+#include <cooperative_groups.h>
+
 namespace fvdb::detail::ops {
 
 template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct DeviceArgs {
@@ -18,7 +20,6 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
     uint32_t numCameras;
     uint32_t numGaussiansPerCamera;
     uint32_t totalIntersections;
-    bool     packed;
     uint32_t imageWidth;
     uint32_t imageHeight;
     uint32_t imageOriginW;
@@ -28,23 +29,45 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
     uint32_t tileSize;
     uint32_t numTilesW;
     uint32_t numTilesH;
-    vec2t *__restrict__ means2d;                           // [C, N, 2] or [nnz, 2]
-    vec3t *__restrict__ conics;                            // [C, N, 3] or [nnz, 3]
-    ColorAccessorType colors;                              // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    ScalarType *__restrict__ opacities;                    // [C, N] or [nnz]
-    ScalarType *__restrict__ backgrounds;                  // [C, COLOR_DIM] or [nnz, COLOR_DIM]
-    bool *__restrict__ masks;                              // [C, nTilesH, nTilesW]
-    int32_t *__restrict__ tileOffsets;                     // [C, nTilesH, nTilesW]
-    int32_t *__restrict__ tileGaussianIds;                 // [totalIntersections]
-    ScalarType *__restrict__ renderedAlphas;               // [C, imgH, imgW, 1]
-    int32_t *__restrict__ lastGaussianIdsPerPixel;         // [C, imgH, imgW]
-    ScalarType *__restrict__ dLossDRenderedColors;         // [C, imgH, imgW, COLOR_DIM]
-    ScalarType *__restrict__ dLossDRenderedAlphas;         // [C, imgH, imgW, 1]
-    vec2t *__restrict__ outDLossDMeans2dAbs;               // [C, N, 2] or [nnz, 2]
-    vec2t *__restrict__ outDLossDMeans2d;                  // [C, N, 2] or [nnz, 2]
-    vec3t *__restrict__ outDLossDConics;                   // [C, N, 3] or [nnz, 3]
-    ScalarType *__restrict__ outDLossDColors;              // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
-    ScalarType *__restrict__ outDLossDOpacities;           // [C, N] or [nnz]
+    vec2t *__restrict__ means2d;                   // [C, N, 2] or [nnz, 2]
+    vec3t *__restrict__ conics;                    // [C, N, 3] or [nnz, 3]
+    ColorAccessorType colors;                      // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    ScalarType *__restrict__ opacities;            // [C, N] or [nnz]
+    ScalarType *__restrict__ backgrounds;          // [C, COLOR_DIM] or [nnz, COLOR_DIM]
+    bool *__restrict__ masks;                      // [C, nTilesH, nTilesW]
+    int32_t *__restrict__ tileOffsets;             // [C, nTilesH, nTilesW]
+    int32_t *__restrict__ tileGaussianIds;         // [totalIntersections]
+    ScalarType *__restrict__ renderedAlphas;       // [C, imgH, imgW, 1]
+    int32_t *__restrict__ lastGaussianIdsPerPixel; // [C, imgH, imgW]
+    ScalarType *__restrict__ dLossDRenderedColors; // [C, imgH, imgW, COLOR_DIM]
+    ScalarType *__restrict__ dLossDRenderedAlphas; // [C, imgH, imgW, 1]
+    vec2t *__restrict__ outDLossDMeans2dAbs;       // [C, N, 2] or [nnz, 2]
+    vec2t *__restrict__ outDLossDMeans2d;          // [C, N, 2] or [nnz, 2]
+    vec3t *__restrict__ outDLossDConics;           // [C, N, 3] or [nnz, 3]
+    ScalarType *__restrict__ outDLossDColors;      // [C, N, COLOR_DIM] or [nnz, COLOR_DIM]
+    ScalarType *__restrict__ outDLossDOpacities;   // [C, N] or [nnz]
+
+    struct alignas(32) Gaussian {                  // 28 bytes
+        int32_t    id;                             // 4 bytes
+        vec2t      xy;                             // 8 bytes
+        ScalarType opacity;                        // 4 bytes
+        vec3t      conic;                          // 12 bytes
+
+        inline __device__ vec2t
+        delta(const ScalarType px, const ScalarType py) const {
+            return { xy.x - px, xy.y - py };
+        }
+
+        inline __device__ ScalarType
+        sigma(const vec2t delta) const {
+            return ScalarType{ 0.5 } * (conic.x * delta.x * delta.x + conic.z * delta.y * delta.y) +
+                   conic.y * delta.x * delta.y;
+        }
+    };
+
+    struct alignas(16) Color {                             // 12 bytes for 3 channels (align to 16)
+        ScalarType rgb[COLOR_DIM];                         // 4 * COLOR_DIM bytes
+    };
 
     DeviceArgs(const torch::Tensor               &means2d, // [C, N, 2] or [nnz, 2]
                const torch::Tensor               &conics,  // [C, N, 3] or [nnz, 3]
@@ -82,9 +105,8 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
         }
 
         this->numCameras            = tileOffsets.size(0);
-        this->numGaussiansPerCamera = packed ? 0 : means2d.size(1);
+        this->numGaussiansPerCamera = IS_PACKED ? 0 : means2d.size(1);
         this->totalIntersections    = tileGaussianIds.size(0);
-        this->packed                = means2d.dim() == 2;
         this->imageWidth            = imageWidth;
         this->imageHeight           = imageHeight;
         this->imageOriginW          = imageOriginW;
@@ -95,12 +117,6 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
         this->numTilesW             = tileOffsets.size(2);
         this->numTilesH             = tileOffsets.size(1);
 
-        if constexpr (N_OUTER_DIMS == 1) {
-            TORCH_CHECK(packed, "means2d must be packed for N_OUTER_DIMS == 1");
-        }
-        if constexpr (N_OUTER_DIMS == 2) {
-            TORCH_CHECK(!packed, "means2d must be unpacked for N_OUTER_DIMS == 2");
-        }
         static_assert(N_OUTER_DIMS == 1 || N_OUTER_DIMS == 2, "N_OUTER_DIMS must be 1 or 2");
 
         this->means2d   = reinterpret_cast<vec2t *>(means2d.data_ptr<ScalarType>());
@@ -149,15 +165,45 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
             masks += offsetForTiles;
         }
     }
+
+    inline __device__ void
+    fetchGaussianIntoSharedMemory(const int32_t idx, Gaussian *sharedGaussians,
+                                  Color *sharedGaussianColors, const int32_t threadOrdinal) const {
+        const int32_t    g             = tileGaussianIds[idx]; // Gaussian index in [C * N] or [nnz]
+        const vec2t      xy            = means2d[g];
+        const ScalarType opac          = opacities[g];
+        const vec3t      conic         = conics[g];
+        sharedGaussians[threadOrdinal] = { g, xy, opac, conic };
+
+        if constexpr (IS_PACKED) {
+            const auto colorAccessor = colors[g];
+#pragma unroll COLOR_DIM
+            for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                sharedGaussianColors[threadOrdinal].rgb[k] = colorAccessor[k];
+            }
+        } else {
+            // colors: [C, N, COLOR_DIM]
+            // colors[c, n, k] = [c * N * COLOR_DIM + n * COLOR_DIM + k]
+            // g = c * N + n
+            const int32_t cid           = g / numGaussiansPerCamera;
+            const int32_t gid           = g % numGaussiansPerCamera;
+            const auto    colorAccessor = colors[cid][gid];
+#pragma unroll COLOR_DIM
+            for (uint32_t k = 0; k < COLOR_DIM; ++k) {
+                const ScalarType colorValueK               = colorAccessor[k];
+                sharedGaussianColors[threadOrdinal].rgb[k] = colorValueK;
+            }
+        }
+    }
+
     template <uint32_t WARP_TILE_SIZE>
     inline __device__ void
     volumeRenderTileBackward(const cooperative_groups::thread_block_tile<WARP_TILE_SIZE> &warp,
                              const uint32_t i, const uint32_t j,
                              const int32_t firstGaussianIdInBlock,
                              const int32_t lastGaussianIdInBlock, const uint32_t blockSize) {
-        namespace cg = cooperative_groups;
-        using vec3t  = typename Vec3Type<ScalarType>::type;
-        using vec2t  = typename Vec2Type<ScalarType>::type;
+        using vec3t = typename Vec3Type<ScalarType>::type;
+        using vec2t = typename Vec2Type<ScalarType>::type;
 
         // (i, j) coordinates are relative to the specified image origin which may be a crop
         // so we need to add the origin to get the absolute pixel coordinates
@@ -173,15 +219,7 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
         const bool pixelInImage = (i < imageHeight && j < imageWidth);
 
         extern __shared__ int s[];
-        struct Gaussian {
-            int32_t    id;                                           // 4 bytes
-            vec2t      xy;                                           // 8 bytes
-            ScalarType opacity;                                      // 4 bytes
-            vec3t      conic;                                        // 12 bytes
-        };
-        struct Color {
-            ScalarType rgb[COLOR_DIM];                               // 4 * COLOR_DIM bytes
-        };
+
         Gaussian *sharedGaussians = reinterpret_cast<Gaussian *>(s); // [blockSize]
         Color    *sharedGaussianColors =
             reinterpret_cast<Color *>(&sharedGaussians[blockSize]);  // [blockSize]
@@ -191,7 +229,7 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
         ScalarType       transmittance      = finalTransmittance;
 
         // the contribution from gaussians behind the current one
-        ScalarType buffer[COLOR_DIM] = { ScalarType{ 0 } };
+        ScalarType buffer[COLOR_DIM] = {};
 
         // Gradient of the loss with respect to the color output of the forward pass at this
         // pixel
@@ -227,30 +265,8 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
             const int32_t batchEnd = lastGaussianIdInBlock - 1 - blockSize * b;
             const int32_t idx      = batchEnd - threadOrdinal;
             if (idx >= firstGaussianIdInBlock) {
-                const int32_t    g     = tileGaussianIds[idx]; // flatten index in [C * N] or [nnz]
-                const vec2t      xy    = means2d[g];
-                const ScalarType opac  = opacities[g];
-                const vec3t      conic = conics[g];
-                sharedGaussians[threadOrdinal] = { g, xy, opac, conic };
-
-                if constexpr (IS_PACKED) {
-                    const ScalarType *c_ptr = colors[g].data(); // + g * COLOR_DIM;
-#pragma unroll COLOR_DIM
-                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                        sharedGaussianColors[threadOrdinal].rgb[k] = c_ptr[k];
-                    }
-                } else {
-                    // colors: [C, N, COLOR_DIM]
-                    // colors[c, n, k] = [c * N * COLOR_DIM + n * COLOR_DIM + k]
-                    // g = c * N + n
-                    const int32_t     cid   = g / numGaussiansPerCamera;
-                    const int32_t     gid   = g % numGaussiansPerCamera;
-                    const ScalarType *c_ptr = colors[cid][gid].data();
-#pragma unroll COLOR_DIM
-                    for (uint32_t k = 0; k < COLOR_DIM; ++k) {
-                        sharedGaussianColors[threadOrdinal].rgb[k] = c_ptr[k];
-                    }
-                }
+                fetchGaussianIntoSharedMemory(idx, sharedGaussians, sharedGaussianColors,
+                                              threadOrdinal);
             }
 
             // Sync threads so all gaussians for this batch are loaded in shared memory
@@ -272,13 +288,12 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
                 const vec3t      conic = sharedGaussians[t].conic;
                 const vec2t      xy    = sharedGaussians[t].xy;
                 const ScalarType opac  = sharedGaussians[t].opacity;
-                const vec2t      delta = { xy.x - px, xy.y - py };
-                const ScalarType sigma = ScalarType{ 0.5 } * (conic.x * delta.x * delta.x +
-                                                              conic.z * delta.y * delta.y) +
-                                         conic.y * delta.x * delta.y;
+                const vec2t      delta = sharedGaussians[t].delta(px, py);
+                const ScalarType sigma = sharedGaussians[t].sigma(delta);
                 const ScalarType vis   = __expf(-sigma);
                 const ScalarType alpha = min(ALPHA_THRESHOLD, opac * vis);
-                valid                  = valid &&
+
+                valid = valid &&
                         !(sigma < ScalarType{ 0 } || alpha < static_cast<ScalarType>(1.f / 255.f));
                 // if there are no active thread in this warp, skip this loop
                 if (!warp.any(valid)) {
@@ -298,7 +313,7 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
                     const ScalarType ra = 1.0f / (1.0f - alpha);
                     transmittance *= ra;
 
-                    // Update the contribution of this pixel to the color gradient if the
+                    // Update the contribution of this pixel to the color gradient of the
                     // Gaussian
                     const ScalarType fac = alpha * transmittance;
 #pragma unroll COLOR_DIM
@@ -420,8 +435,7 @@ template <typename ScalarType, uint32_t COLOR_DIM, bool IS_PACKED> struct Device
 
     std::size_t
     getSharedMemSize() const {
-        return tileSize * tileSize *
-               (sizeof(int32_t) + sizeof(vec3t) + sizeof(vec3t) + sizeof(ScalarType) * COLOR_DIM);
+        return tileSize * tileSize * (sizeof(Gaussian) + sizeof(Color));
     }
 
     const dim3
