@@ -554,6 +554,7 @@ MappedFile::filename() const
 SharedPtr<std::streambuf>
 MappedFile::createBuffer() const
 {
+#ifndef _WIN32
     if (!mImpl->mAutoDelete && mImpl->mLastWriteTime > 0) {
         // Warn if the file has been modified since it was opened
         // (but don't bother checking if it is a private, temporary file).
@@ -563,6 +564,7 @@ MappedFile::createBuffer() const
             mImpl->mLastWriteTime = 0; // suppress further warnings
         }
     }
+#endif
 
     return SharedPtr<std::streambuf>{
         new boost::iostreams::stream_buffer<boost::iostreams::array_source>{
