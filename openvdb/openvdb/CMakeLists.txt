@@ -484,6 +484,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/GridTransformer.h
   tools/Interpolation.h
   tools/LevelSetAdvect.h
+  tools/LevelSetDilatedMesh.h
   tools/LevelSetFilter.h
   tools/LevelSetFracture.h
   tools/LevelSetMeasure.h
@@ -492,6 +493,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h
   tools/LevelSetTracker.h
+  tools/LevelSetTubes.h
   tools/LevelSetUtil.h
   tools/Mask.h
   tools/Merge.h
@@ -520,6 +522,12 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/VolumeAdvect.h
   tools/VolumeToMesh.h
   tools/VolumeToSpheres.h
+)
+
+set(OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES
+  tools/impl/ConvexVoxelizer.h
+  tools/impl/LevelSetDilatedMeshImpl.h
+  tools/impl/LevelSetTubesImpl.h
 )
 
 set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
@@ -741,6 +749,7 @@ install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTAL
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points)
 install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points/impl)
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools)
+install(FILES ${OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools/impl)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/util)
 install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/thread)
