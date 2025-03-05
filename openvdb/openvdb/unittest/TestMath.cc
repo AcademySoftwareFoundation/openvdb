@@ -13,6 +13,185 @@ class TestMath: public ::testing::Test
 {
 };
 
+// Testing the operators within the member functions of Vec3
+template<typename ValueT>
+void testMemberOperatorsImpl()
+{
+    using namespace openvdb;
+    using Vec3T = math::Vec3<ValueT>;
+
+    {
+        Vec3T vecA(3.14,2.18,ValueT(-299792458.f));
+
+        // Alternative indexed the elements
+        EXPECT_EQ(vecA(0), ValueT(3.14));
+        EXPECT_EQ(vecA(1), ValueT(2.18));
+        EXPECT_EQ(vecA(2), ValueT(-299792458.f));
+
+        // Assignment operator
+        Vec3T vecB = vecA;
+        EXPECT_EQ(vecB(0), vecA(0));
+        EXPECT_EQ(vecB(1), vecA(1));
+        EXPECT_EQ(vecB(2), vecA(2));
+
+        // Negation operator
+        Vec3T vecC = -vecA;
+        EXPECT_EQ(vecC(0), -vecA(0));
+        EXPECT_EQ(vecC(1), -vecA(1));
+        EXPECT_EQ(vecC(2), -vecA(2));
+
+        // Multiply each element of the vector by a scalar
+        Vec3T vecD = vecA;
+        const ValueT gr = ValueT(1.6180339887);
+        vecD *= gr;
+        EXPECT_EQ(vecD(0), ValueT(gr * vecA(0)));
+        EXPECT_EQ(vecD(1), ValueT(gr * vecA(1)));
+        EXPECT_EQ(vecD(2), ValueT(gr * vecA(2)));
+
+        // Multiply each element of the vector by the corresponding element
+        Vec3T vecE = vecA;
+        Vec3T vecF(-2.5, 1.2, 3.14159);
+        vecE *= vecF;
+        EXPECT_EQ(vecE(0), ValueT(vecA(0) * vecF(0)));
+        EXPECT_EQ(vecE(1), ValueT(vecA(1) * vecF(1)));
+        EXPECT_EQ(vecE(2), ValueT(vecA(2) * vecF(2)));
+
+        // Divide each element of the vector by a scalar
+        Vec3T vecG = vecA;
+        vecG /= gr;
+        EXPECT_EQ(vecG(0), ValueT(vecA(0) / gr));
+        EXPECT_EQ(vecG(1), ValueT(vecA(1) / gr));
+        EXPECT_EQ(vecG(2), ValueT(vecA(2) / gr));
+
+        // Divide each element of the vector by the corresponding element of the given vector
+        Vec3T vecH = vecA;
+        vecH /= vecF;
+        EXPECT_EQ(vecH(0), ValueT(vecA(0) / vecF(0)));
+        EXPECT_EQ(vecH(1), ValueT(vecA(1) / vecF(1)));
+        EXPECT_EQ(vecH(2), ValueT(vecA(2) / vecF(2)));
+
+        // Add a scalar to each element of the vector
+        Vec3T vecI = vecA;
+        vecI += gr;
+        EXPECT_EQ(vecI(0), ValueT(vecA(0) + gr));
+        EXPECT_EQ(vecI(1), ValueT(vecA(1) + gr));
+        EXPECT_EQ(vecI(2), ValueT(vecA(2) + gr));
+
+        // Add each element of the given vector to the corresponding element of this vector
+        Vec3T vecJ = vecA;
+        vecJ += vecF;
+        EXPECT_EQ(vecJ(0), ValueT(vecA(0) + vecF(0)));
+        EXPECT_EQ(vecJ(1), ValueT(vecA(1) + vecF(1)));
+        EXPECT_EQ(vecJ(2), ValueT(vecA(2) + vecF(2)));
+
+        // Subtract a scalar from each element of this vector
+        Vec3T vecK = vecA;
+        vecK -= gr;
+        EXPECT_EQ(vecK(0), ValueT(vecA(0) - gr));
+        EXPECT_EQ(vecK(1), ValueT(vecA(1) - gr));
+        EXPECT_EQ(vecK(2), ValueT(vecA(2) - gr));
+
+        // Subtract each element of the given vector from the corresponding element of this vector
+        Vec3T vecL = vecA;
+        vecL -= vecF;
+        EXPECT_EQ(vecL(0), ValueT(vecA(0) - vecF(0)));
+        EXPECT_EQ(vecL(1), ValueT(vecA(1) - vecF(1)));
+        EXPECT_EQ(vecL(2), ValueT(vecA(2) - vecF(2)));
+    }
+}
+
+TEST_F(TestMath, testMemberOperators)
+{
+    using namespace openvdb;
+
+    testMemberOperatorsImpl<math::half>();
+    testMemberOperatorsImpl<float>();
+    testMemberOperatorsImpl<double>();
+}
+
+template<typename ValueT>
+void testFreeFunctionOperatorsImpl()
+{
+    using namespace openvdb;
+    using Vec3T = math::Vec3<ValueT>;
+
+    {
+        // Vec3T vecA(3.14,2.18,ValueT(-299792458.f));
+        Vec3T vecA(1,2,3);
+        Vec3T vecB(3,4,5);
+        const ValueT gr = ValueT(1.6180339887);
+
+        /// Equality operator, does exact floating point comparisons ==
+        bool eqRes = vecA == vecB;
+        EXPECT_FALSE(eqRes);
+
+        /// Inequality operator, does exact floating point comparisons !=
+        bool ineqRes = vecA != vecB;
+        EXPECT_TRUE(ineqRes);
+
+        /// Multiply each element of the given vector by @a scalar and return the result. scalar * vec
+        Vec3T scalarMultiplyA = gr * vecA;
+        EXPECT_EQ(scalarMultiplyA(0), ValueT(vecA(0) * gr));
+        EXPECT_EQ(scalarMultiplyA(1), ValueT(vecA(1) * gr));
+        EXPECT_EQ(scalarMultiplyA(2), ValueT(vecA(2) * gr));
+
+        /// Multiply each element of the given vector by @a scalar and return the result. vec * scalar
+        Vec3T scalarMultiplyB = vecA * gr;
+        EXPECT_EQ(scalarMultiplyB(0), ValueT(vecA(0) * gr));
+        EXPECT_EQ(scalarMultiplyB(1), ValueT(vecA(1) * gr));
+        EXPECT_EQ(scalarMultiplyB(2), ValueT(vecA(2) * gr));
+
+        /// Multiply corresponding elements of @a v0 and @a v1 and return the result. vec0 * vec1
+        Vec3T multiplyRes = vecA * vecB;
+        EXPECT_EQ(multiplyRes, Vec3T(3, 8, 15));
+
+        /// Divide @a scalar by each element of the given vector and return the result. a / vec
+        Vec3T scalarDivA = gr / vecA;
+        EXPECT_EQ(scalarDivA(0), ValueT(gr / vecA(0)));
+        EXPECT_EQ(scalarDivA(1), ValueT(gr / vecA(1)));
+        EXPECT_EQ(scalarDivA(2), ValueT(gr / vecA(2)));
+
+        /// Divide each element of the given vector by @a scalar and return the result. vec / scalar
+        Vec3T scalarDivB = vecA / gr;
+        EXPECT_EQ(scalarDivB(0), ValueT(vecA(0) / gr));
+        EXPECT_EQ(scalarDivB(1), ValueT(vecA(1) / gr));
+        EXPECT_EQ(scalarDivB(2), ValueT(vecA(2) / gr));
+
+        /// Divide corresponding elements of @a v0 and @a v1 and return the result. vec0 / vec1
+        Vec3T divRes = vecA / vecB;
+        EXPECT_EQ(divRes(0), ValueT(ValueT(vecA(0)) / ValueT(vecB(0))));
+        EXPECT_EQ(divRes(1), ValueT(ValueT(vecA(1)) / ValueT(vecB(1))));
+        EXPECT_EQ(divRes(2), ValueT(ValueT(vecA(2)) / ValueT(vecB(2))));
+
+        /// Add corresponding elements of @a v0 and @a v1 and return the result. vec0 + vec1
+        Vec3T addRes = vecA + vecB;
+        EXPECT_EQ(addRes, Vec3T(4, 6, 8));
+
+        /// Add @a scalar to each element of the given vector and return the result. a + vec
+        Vec3T addScalarRes = vecA + gr;
+        EXPECT_EQ(addScalarRes(0), ValueT(vecA(0) + gr));
+        EXPECT_EQ(addScalarRes(1), ValueT(vecA(1) + gr));
+        EXPECT_EQ(addScalarRes(2), ValueT(vecA(2) + gr));
+
+        /// Subtract corresponding elements of @a v0 and @a v1 and return the result. vec0 - vec1
+        Vec3T subtractRes = vecA - vecB;
+        EXPECT_EQ(subtractRes, Vec3T(-2, -2, -2));
+
+        /// Subtract @a scalar from each element of the given vector and return the result. vec0 - a
+        Vec3T subScalarRes = vecA - gr;
+        EXPECT_EQ(subScalarRes(0), ValueT(vecA(0) - gr));
+        EXPECT_EQ(subScalarRes(1), ValueT(vecA(1) - gr));
+        EXPECT_EQ(subScalarRes(2), ValueT(vecA(2) - gr));
+    }
+}
+
+TEST_F(TestMath, testFreeFunctionOperators)
+{
+    using namespace openvdb;
+    testFreeFunctionOperatorsImpl<math::half>();
+
+}
+
 
 // This suite of tests obviously needs to be expanded!
 TEST_F(TestMath, testAll)
@@ -23,6 +202,7 @@ TEST_F(TestMath, testAll)
         EXPECT_EQ(math::Sign( 3   ), 1);
         EXPECT_EQ(math::Sign(-1.0 ),-1);
         EXPECT_EQ(math::Sign( 0.0f), 0);
+        EXPECT_EQ(math::Sign(math::half(0.)), 0);
     }
     {// SignChange
         EXPECT_TRUE( math::SignChange( -1, 1));
