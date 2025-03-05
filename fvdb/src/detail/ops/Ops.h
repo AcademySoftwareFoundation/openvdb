@@ -416,7 +416,7 @@ dispatchGaussianRasterizeBackward(
     const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
     const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
     // options
-    bool absgrad);
+    const bool absgrad, const int64_t numSharedChannelsOverride = -1);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>

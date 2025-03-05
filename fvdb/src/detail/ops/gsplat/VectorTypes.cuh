@@ -162,11 +162,19 @@ warpSumMut(typename Vec3Type<ScalarT>::type &val, WarpT &warp) {
     val.z = cooperative_groups::reduce(warp, val.z, cooperative_groups::plus<ScalarT>());
 }
 
-template <uint32_t DIM, typename WarpT, typename ScalarT>
+template <size_t DIM, typename WarpT, typename ScalarT>
 inline __device__ void
 warpSumMut(ScalarT *val, WarpT &warp) {
 #pragma unroll DIM
     for (uint32_t i = 0; i < DIM; i++) {
+        warpSumMut<WarpT, ScalarT>(val[i], warp);
+    }
+}
+
+template <typename WarpT, typename ScalarT>
+inline __device__ void
+warpSumMut(ScalarT *val, size_t nDims, WarpT &warp) {
+    for (uint32_t i = 0; i < nDims; i++) {
         warpSumMut<WarpT, ScalarT>(val[i], warp);
     }
 }

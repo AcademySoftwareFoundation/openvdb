@@ -50,8 +50,16 @@ template <> struct OpType<c10::BFloat16> {
 template <uint32_t DIM, class T, class WarpT>
 inline __device__ void
 warpSum(T *val, WarpT &warp) {
-    GSPLAT_PRAGMA_UNROLL
+#pragma unroll DIM
     for (uint32_t i = 0; i < DIM; i++) {
+        val[i] = cooperative_groups::reduce(warp, val[i], cooperative_groups::plus<T>());
+    }
+}
+
+template <class T, class WarpT>
+inline __device__ void
+warpSum(T *val, size_t dim, WarpT &warp) {
+    for (uint32_t i = 0; i < dim; i++) {
         val[i] = cooperative_groups::reduce(warp, val[i], cooperative_groups::plus<T>());
     }
 }
