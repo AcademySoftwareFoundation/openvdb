@@ -74,6 +74,16 @@ template<> inline std::string zeroVal<std::string>() { return ""; }
 /// Return the @c bool value that corresponds to zero.
 template<> inline constexpr bool zeroVal<bool>() { return false; }
 
+
+/// @note Extends the implementation of std::is_arithmetic to support math::half
+template<typename T>
+struct is_arithmetic : std::is_arithmetic<T> {};
+template<>
+struct is_arithmetic<math::half> : std::true_type {};
+// Helper variable template (equivalent to std::is_arithmetic_v)
+template<typename T>
+inline constexpr bool is_arithmetic_v = is_arithmetic<T>::value;
+
 namespace math {
 
 /// @todo These won't be needed if we eliminate StringGrids.
@@ -981,10 +991,11 @@ enum RotationOrder {
     ZXZ_ROTATION
 };
 
-template <typename S, typename T, typename = std::enable_if_t<std::is_arithmetic_v<S>&& std::is_arithmetic_v<T>>>
+template <typename S, typename T, typename = std::enable_if_t<openvdb::is_arithmetic_v<S>&& openvdb::is_arithmetic_v<T>>>
 struct promote {
     using type = typename std::common_type_t<S,T>;
 };
+
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
 /// @note This methods assumes operator[] exists.
