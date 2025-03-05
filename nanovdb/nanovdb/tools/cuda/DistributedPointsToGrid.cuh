@@ -479,97 +479,105 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     // the elements less than and greater than/equal to the median onto the first and second device of the pair respectively.
     // This avoids the allocating memory for and gathering the values from both devices onto a single device.
 
+    std::vector<std::thread> threads;
     const size_t log2DeviceCount = log2(mDeviceMesh.deviceCount());
     for (auto deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
         const size_t deviceGroupCount = mDeviceMesh.deviceCount() >> deviceExponent;
         for (int deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
-            const int leftDeviceGroupId = deviceGroupId;
-            const int rightDeviceGroupId = deviceGroupId + 1;
-            const int leftDeviceId = leftDeviceGroupId << deviceExponent;
-            const int rightDeviceId = rightDeviceGroupId << deviceExponent;
+            threads.emplace_back([&, deviceGroupId]() {
+                const int leftDeviceGroupId = deviceGroupId;
+                const int rightDeviceGroupId = deviceGroupId + 1;
+                const int leftDeviceId = leftDeviceGroupId << deviceExponent;
+                const int rightDeviceId = rightDeviceGroupId << deviceExponent;
 
-            size_t deviceStripeCount = (coordCount + deviceGroupCount - 1) / deviceGroupCount;
-            const ptrdiff_t deviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
-            deviceStripeCount = std::min(deviceStripeCount, coordCount - deviceStripeOffset);
+                size_t deviceStripeCount = (coordCount + deviceGroupCount - 1) / deviceGroupCount;
+                const ptrdiff_t deviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
+                deviceStripeCount = std::min(deviceStripeCount, coordCount - deviceStripeOffset);
 
-            const auto leftDeviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
-            const auto leftDeviceStripeCount = std::min(deviceStripeCount, coordCount - leftDeviceStripeOffset);
-            const auto rightDeviceStripeOffset = deviceStripeCount * rightDeviceGroupId;
-            const auto rightDeviceStripeCount = std::min(deviceStripeCount, coordCount - rightDeviceStripeOffset);
+                const auto leftDeviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
+                const auto leftDeviceStripeCount = std::min(deviceStripeCount, coordCount - leftDeviceStripeOffset);
+                const auto rightDeviceStripeOffset = deviceStripeCount * rightDeviceGroupId;
+                const auto rightDeviceStripeCount = std::min(deviceStripeCount, coordCount - rightDeviceStripeOffset);
 
-            const uint64_t* inputKeys = (deviceExponent % 2) ? keys : mData->d_keys;
-            const uint32_t* inputIndices = (deviceExponent % 2) ? indices : mData->d_indx;
-            uint64_t* outputKeys = (deviceExponent % 2) ? mData->d_keys : keys;
-            uint32_t* outputIndices = (deviceExponent % 2) ? mData->d_indx : indices;
+                const uint64_t* inputKeys = (deviceExponent % 2) ? keys : mData->d_keys;
+                const uint32_t* inputIndices = (deviceExponent % 2) ? indices : mData->d_indx;
+                uint64_t* outputKeys = (deviceExponent % 2) ? mData->d_keys : keys;
+                uint32_t* outputIndices = (deviceExponent % 2) ? mData->d_indx : indices;
 
-            const uint64_t* leftDeviceInputKeys = inputKeys + leftDeviceStripeOffset;
-            const uint32_t* leftDeviceInputIndices = inputIndices + leftDeviceStripeOffset;
-            const uint64_t* rightDeviceInputKeys = inputKeys + rightDeviceStripeOffset;
-            const uint32_t* rightDeviceInputIndices = inputIndices + rightDeviceStripeOffset;
+                const uint64_t* leftDeviceInputKeys = inputKeys + leftDeviceStripeOffset;
+                const uint32_t* leftDeviceInputIndices = inputIndices + leftDeviceStripeOffset;
+                const uint64_t* rightDeviceInputKeys = inputKeys + rightDeviceStripeOffset;
+                const uint32_t* rightDeviceInputIndices = inputIndices + rightDeviceStripeOffset;
 
-            // Wait on the prior sort to finish on both devices before computing the median across both devices
-            auto mergePathFunc = [&](int deviceId, int otherDeviceId, int intervalIndex) {
-                cudaError_t cudaStatus = cudaSetDevice(deviceId);
-                assert(cudaStatus == cudaSuccess);
+                // Wait on the prior sort to finish on both devices before computing the median across both devices
+                auto mergePathFunc = [&](int deviceId, int otherDeviceId, int intervalIndex) {
+                    cudaError_t cudaStatus = cudaSetDevice(deviceId);
+                    assert(cudaStatus == cudaSuccess);
 
-                cudaStreamWaitEvent(mDeviceMesh[deviceId].stream, sortEvents[otherDeviceId]);
-                kernels::mergePathKernel<<<1, 1, 0, mDeviceMesh[deviceId].stream>>>(leftDeviceInputKeys, leftDeviceStripeCount, rightDeviceInputKeys, rightDeviceStripeCount, &leftIntervals[deviceId], &rightIntervals[deviceId], intervalIndex);
-                cudaStreamSynchronize(mDeviceMesh[deviceId].stream);
-            };
+                    cudaStreamWaitEvent(mDeviceMesh[deviceId].stream, sortEvents[otherDeviceId]);
+                    kernels::mergePathKernel<<<1, 1, 0, mDeviceMesh[deviceId].stream>>>(leftDeviceInputKeys, leftDeviceStripeCount, rightDeviceInputKeys, rightDeviceStripeCount, &leftIntervals[deviceId], &rightIntervals[deviceId], intervalIndex);
+                    cudaStreamSynchronize(mDeviceMesh[deviceId].stream);
+                };
 
-            std::thread leftMergePathThread(mergePathFunc, leftDeviceId, rightDeviceId, 0);
-            std::thread rightMergePathThread(mergePathFunc, rightDeviceId, leftDeviceId, 1);
-            leftMergePathThread.join();
-            rightMergePathThread.join();
+                std::thread leftMergePathThread(mergePathFunc, leftDeviceId, rightDeviceId, 0);
+                std::thread rightMergePathThread(mergePathFunc, rightDeviceId, leftDeviceId, 1);
+                leftMergePathThread.join();
+                rightMergePathThread.join();
 
-            // Wait on the median computation prior to merging the sorts
-            auto leftMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
-                cudaError_t cudaStatus = cudaSetDevice(leftDeviceId);
-                assert(cudaStatus == cudaSuccess);
+                // Wait on the median computation prior to merging the sorts
+                auto leftMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
+                    cudaError_t cudaStatus = cudaSetDevice(leftDeviceId);
+                    assert(cudaStatus == cudaSuccess);
 
-                const uint64_t* leftKeysIn = leftDeviceInputKeys + leftIntervals[leftDeviceId];
-                const uint32_t* leftIndicesIn = leftDeviceInputIndices + leftIntervals[leftDeviceId];
-                size_t leftCount = leftIntervals[rightDeviceId] - leftIntervals[leftDeviceId];
+                    const uint64_t* leftKeysIn = leftDeviceInputKeys + leftIntervals[leftDeviceId];
+                    const uint32_t* leftIndicesIn = leftDeviceInputIndices + leftIntervals[leftDeviceId];
+                    size_t leftCount = leftIntervals[rightDeviceId] - leftIntervals[leftDeviceId];
 
-                const uint64_t* rightKeysIn = rightDeviceInputKeys + rightIntervals[leftDeviceId];
-                const uint32_t* rightIndicesIn = rightDeviceInputIndices + rightIntervals[leftDeviceId];
-                size_t rightCount = rightIntervals[rightDeviceId] - rightIntervals[leftDeviceId];
+                    const uint64_t* rightKeysIn = rightDeviceInputKeys + rightIntervals[leftDeviceId];
+                    const uint32_t* rightIndicesIn = rightDeviceInputIndices + rightIntervals[leftDeviceId];
+                    size_t rightCount = rightIntervals[rightDeviceId] - rightIntervals[leftDeviceId];
 
-                size_t outputOffset = leftDeviceStripeOffset + leftIntervals[leftDeviceId] + rightIntervals[leftDeviceId];
-                uint64_t* keysOut = outputKeys + outputOffset;
-                uint32_t* indicesOut = outputIndices + outputOffset;
+                    size_t outputOffset = leftDeviceStripeOffset + leftIntervals[leftDeviceId] + rightIntervals[leftDeviceId];
+                    uint64_t* keysOut = outputKeys + outputOffset;
+                    uint32_t* indicesOut = outputIndices + outputOffset;
 
-                CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[leftDeviceId], mDeviceMesh[leftDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
-                cudaEventRecord(sortEvents[leftDeviceId], mDeviceMesh[leftDeviceId].stream);
-            };
+                    CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[leftDeviceId], mDeviceMesh[leftDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
+                    cudaEventRecord(sortEvents[leftDeviceId], mDeviceMesh[leftDeviceId].stream);
+                };
 
-            auto rightMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
-                cudaError_t cudaStatus = cudaSetDevice(rightDeviceId);
-                assert(cudaStatus == cudaSuccess);
+                auto rightMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
+                    cudaError_t cudaStatus = cudaSetDevice(rightDeviceId);
+                    assert(cudaStatus == cudaSuccess);
 
-                const uint64_t* leftKeysIn = leftDeviceInputKeys + leftIntervals[rightDeviceId];
-                const uint32_t* leftIndicesIn = leftDeviceInputIndices + leftIntervals[rightDeviceId];
-                size_t leftCount = leftDeviceStripeCount - leftIntervals[rightDeviceId];
+                    const uint64_t* leftKeysIn = leftDeviceInputKeys + leftIntervals[rightDeviceId];
+                    const uint32_t* leftIndicesIn = leftDeviceInputIndices + leftIntervals[rightDeviceId];
+                    size_t leftCount = leftDeviceStripeCount - leftIntervals[rightDeviceId];
 
-                const uint64_t* rightKeysIn = rightDeviceInputKeys + rightIntervals[rightDeviceId];
-                const uint32_t* rightIndicesIn = rightDeviceInputIndices + rightIntervals[rightDeviceId];
-                size_t rightCount = rightDeviceStripeCount - rightIntervals[rightDeviceId];
+                    const uint64_t* rightKeysIn = rightDeviceInputKeys + rightIntervals[rightDeviceId];
+                    const uint32_t* rightIndicesIn = rightDeviceInputIndices + rightIntervals[rightDeviceId];
+                    size_t rightCount = rightDeviceStripeCount - rightIntervals[rightDeviceId];
 
-                size_t outputOffset = leftDeviceStripeOffset + leftIntervals[rightDeviceId] + rightIntervals[rightDeviceId];
-                uint64_t* keysOut = outputKeys + outputOffset;
-                uint32_t* indicesOut = outputIndices + outputOffset;
+                    size_t outputOffset = leftDeviceStripeOffset + leftIntervals[rightDeviceId] + rightIntervals[rightDeviceId];
+                    uint64_t* keysOut = outputKeys + outputOffset;
+                    uint32_t* indicesOut = outputIndices + outputOffset;
 
-                CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[rightDeviceId], mDeviceMesh[rightDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
-                cudaEventRecord(sortEvents[rightDeviceId], mDeviceMesh[rightDeviceId].stream);
-            };
+                    CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[rightDeviceId], mDeviceMesh[rightDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
+                    cudaEventRecord(sortEvents[rightDeviceId], mDeviceMesh[rightDeviceId].stream);
+                };
 
-            // Merge the pairs less than the median to the left device
-            std::thread leftMergeThread(leftMergeFunc, leftDeviceId, rightDeviceId);
-            // Merge the pairs greater than/equal to the median to the right device
-            std::thread rightMergeThread(rightMergeFunc, leftDeviceId, rightDeviceId);
-            leftMergeThread.join();
-            rightMergeThread.join();
+                // Merge the pairs less than the median to the left device
+                std::thread leftMergeThread(leftMergeFunc, leftDeviceId, rightDeviceId);
+                // Merge the pairs greater than/equal to the median to the right device
+                std::thread rightMergeThread(rightMergeFunc, leftDeviceId, rightDeviceId);
+                leftMergeThread.join();
+                rightMergeThread.join();
+
+                cudaCheck(cudaEventSynchronize(sortEvents[leftDeviceId]));
+                cudaCheck(cudaEventSynchronize(sortEvents[rightDeviceId]));
+            });
         }
+        std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
+        threads.clear();
     }
 
     // There is no merging required for a single device so we simply copy the sorted result to the destination array (where the sort would have been merged to).
