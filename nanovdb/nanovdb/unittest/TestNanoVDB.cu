@@ -727,6 +727,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
     });
 
     //timer.stop();
+    cudaCheck(cudaFree(d_coords));
 }// Large_CudaPointsToGrid_DeviceBuffer
 
 TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
@@ -806,6 +807,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     });
 
     //timer.stop();
+    cudaCheck(cudaFree(d_coords));
 }// Large_CudaPointsToGrid_UnifiedBuffer
 
 TEST(TestNanoVDBCUDA, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
@@ -868,6 +870,7 @@ TEST(TestNanoVDBCUDA, Large_DistributedCudaPointsToGrid_UnifiedBuffer)
         }
     });
 
+    cudaCheck(cudaFree(voxels));
     cudaSetDevice(current); // restore device so subsequent tests don't fail
 }// Large_DistributedCudaPointsToGrid_UnifiedBuffer
 
