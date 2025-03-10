@@ -650,7 +650,7 @@ MeshAttrTransfer::operator()(IterRange &range) const
 
             const GA_Size vtxn = primRef->getVertexCount();
 
-            // Get vertex and point offests
+            // Get vertex and point offsets
             for (GA_Size vtx = 0; vtx < vtxn; ++vtx) {
                 const GA_Offset vtxoff = primRef->getVertexOffset(vtx);
                 ptnOffsetList[vtx] = mMeshGdp.vertexPoint(vtxoff);

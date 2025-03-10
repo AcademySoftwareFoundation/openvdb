@@ -72,7 +72,7 @@ inline void updateChecksum(GridData *d_gridData, cudaStream_t stream = 0)
 namespace util::cuda {
 
 /// @brief Cuda kernel that computes CRC32 checksums of blocks of data using a look-up-table
-/// @param d_data device pointer to raw data from wich to compute the CRC32 checksums
+/// @param d_data device pointer to raw data from which to compute the CRC32 checksums
 /// @param d_blockCRC device pointer to array of @c blockCount checksums for each block
 /// @param blockCount number of blocks and checksums
 /// @param blockSize size of each block in bytes
@@ -85,7 +85,7 @@ __global__ void crc32Kernel(const T *d_data, uint32_t* d_blockCRC, uint32_t bloc
 }
 
 /// @brief Cuda kernel that computes CRC32 checksums of blocks of data (without using a look-up-table)
-/// @param d_data device pointer to raw data from wich to compute the CRC32 checksums
+/// @param d_data device pointer to raw data from which to compute the CRC32 checksums
 /// @param d_blockCRC device pointer to array of @c blockCount checksums for each block
 /// @param blockCount number of blocks and checksums
 /// @param blockSize size of each block in bytes
@@ -374,7 +374,7 @@ inline Checksum getChecksum(const GridData *d_gridData, cudaStream_t stream)
 /// @param stream optional cuda stream (defaults to zero)
 /// @return The actual mode used for checksum computation. Eg. if @c d_gridData is NULL (or @c mode = CheckMode::Empty)
 ///         then CheckMode::Empty is always returned. Else if the grid has no nodes or blind data CheckMode::Partial
-///         is always returnd (even if @c mode = CheckMode::Full).
+///         is always returned (even if @c mode = CheckMode::Full).
 inline void updateChecksum(GridData *d_gridData, CheckMode mode, cudaStream_t stream)
 {
     NANOVDB_ASSERT(d_gridData);

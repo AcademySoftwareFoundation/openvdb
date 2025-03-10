@@ -50,7 +50,7 @@ public:
         return std::chrono::duration_cast<std::chrono::milliseconds>(mStop - mStart).count();
     }
 
-    /// @brief call record and return the elapsed time (since start) in miliseconds
+    /// @brief call record and return the elapsed time (since start) in milliseconds
     template <typename AccuracyT = std::chrono::milliseconds>
     auto elapsed()
     {

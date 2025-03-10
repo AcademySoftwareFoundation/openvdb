@@ -336,7 +336,7 @@ openvdb::math::Mat4d matrixBinv =
 // Create a new transform that maps the index space of linearTransformA
 // to the index space of linearTransformB.
 openvdb::math::Transform::Ptr linearTransformAtoB =
-    openvdb::math::Trasform::createLinearTransform(matrixA * matrixBinv);
+    openvdb::math::Transform::createLinearTransform(matrixA * matrixBinv);
 @endcode
 Notice that in the above example, the internal representation used by
 the transform will be simplified if possible to use one of the various

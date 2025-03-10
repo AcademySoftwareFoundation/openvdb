@@ -55,7 +55,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-/// @brief Provises a unified interface for sampling, i.e. interpolation.
+/// @brief Provides a unified interface for sampling, i.e. interpolation.
 /// @details Order = 0: closest point
 ///          Order = 1: tri-linear
 ///          Order = 2: tri-quadratic
@@ -476,7 +476,7 @@ public:
     {
     }
     /// @brief Return the value of the source grid at the index
-    /// coordinates, ijk, relative to the target grid (or its tranform).
+    /// coordinates, ijk, relative to the target grid (or its transform).
     inline ValueType operator()(const Coord& ijk) const
     {
         if (mAligned) return mSourceTree->getValue(ijk);
@@ -721,7 +721,7 @@ BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
     };
 
     // Trilinear interpolation:
-    // The eight surrounding latice values are used to construct the result. \n
+    // The eight surrounding lattice values are used to construct the result. \n
     // result(x,y,z) =
     //     v000 (1-x)(1-y)(1-z) + v001 (1-x)(1-y)z + v010 (1-x)y(1-z) + v011 (1-x)yz
     //   + v100 x(1-y)(1-z)     + v101 x(1-y)z     + v110 xy(1-z)     + v111 xyz

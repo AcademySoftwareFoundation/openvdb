@@ -1024,7 +1024,7 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 {
     const Index bytes = sourceArray.storageTypeSize();
     if (bytes != this->storageTypeSize()) {
-        OPENVDB_THROW(TypeError, "Cannot copy array data due to mis-match in storage type sizes.");
+        OPENVDB_THROW(TypeError, "Cannot copy array data due to mismatch in storage type sizes.");
     }
 
     // ensure both arrays have been loaded from disk

@@ -398,7 +398,7 @@ advect(ValueType time0, ValueType time1)
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
 
-            // Convex combine explict Euler step: t2 = t0 + dt
+            // Convex combine explicit Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * Speed(2) * |Grad[Phi(0)]|)
             mTask = std::bind(&Morph::euler12, ph::_1, ph::_2, dt);
 
@@ -413,14 +413,14 @@ advect(ValueType time0, ValueType time1)
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
             this->cook(PARALLEL_FOR, 1);
 
-            // Convex combine explict Euler step: t2 = t0 + dt/2
+            // Convex combine explicit Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * Speed(3) * |Grad[Phi(0)]|)
             mTask = std::bind(&Morph::euler34, ph::_1, ph::_2, dt);
 
             // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
             this->cook(PARALLEL_FOR, 2);
 
-            // Convex combine explict Euler step: t3 = t0 + dt
+            // Convex combine explicit Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * Speed(3) * |Grad[Phi(0)]|)
             mTask = std::bind(&Morph::euler13, ph::_1, ph::_2, dt);
 

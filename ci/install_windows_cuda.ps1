@@ -5,7 +5,7 @@
 ## Constants
 ## -------------------
 
-# Dictionary of known cuda versions and thier download URLS, which do not follow a consistent pattern :(
+# Dictionary of known cuda versions and their download URLS, which do not follow a consistent pattern :(
 $CUDA_KNOWN_URLS = @{
     "8.0.44" = "http://developer.nvidia.com/compute/cuda/8.0/Prod/network_installers/cuda_8.0.44_win10_network-exe";
     "8.0.61" = "http://developer.nvidia.com/compute/cuda/8.0/Prod2/network_installers/cuda_8.0.61_win10_network-exe";
@@ -30,7 +30,7 @@ $CUDA_KNOWN_URLS = @{
     "12.4.0" = "https://developer.download.nvidia.com/compute/cuda/12.4.0/network_installers/cuda_12.4.0_windows_network.exe"
 }
 
-# @todo - change this to be based on _MSC_VER intead, or invert it to be CUDA keyed instead?
+# @todo - change this to be based on _MSC_VER instead, or invert it to be CUDA keyed instead?
 $VISUAL_STUDIO_MIN_CUDA = @{
     "2022" = "12.4";
     "2019" = "10.1";
