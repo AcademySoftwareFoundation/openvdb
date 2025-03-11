@@ -349,7 +349,7 @@ class GaussianSplatOptimizer:
         n_split = is_split.sum().item()
 
         # Hardcode these for now but could be made configurable
-        dup_factor = 1
+        dup_factor = 1  # 1 means one gaussian becomes 2, 2 means one gaussian becomes 3, etc.
         split_factor = 2
 
         # First duplicate the Gaussians

@@ -11,7 +11,7 @@ namespace fvdb {
 namespace detail {
 namespace autograd {
 
-struct SphericalHarmonics : public torch::autograd::Function<SphericalHarmonics> {
+struct EvaluateSphericalHarmonics : public torch::autograd::Function<EvaluateSphericalHarmonics> {
     using variable_list   = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
@@ -25,27 +25,27 @@ struct SphericalHarmonics : public torch::autograd::Function<SphericalHarmonics>
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
 
-struct GaussianFullyFusedProjection
-    : public torch::autograd::Function<GaussianFullyFusedProjection> {
+struct ProjectGaussians : public torch::autograd::Function<ProjectGaussians> {
     using variable_list   = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx,
-                                 const Variable  &means,    // [N, 3]
-                                 const Variable  &quats,    // [N, 4]
-                                 const Variable  &scales,   // [N, 3]
-                                 const Variable  &viewmats, // [C, 4, 4]
-                                 const Variable  &Ks,       // [C, 3, 3]
-                                 const uint32_t image_width, const uint32_t image_height,
-                                 const float eps2d, const float near_plane, const float far_plane,
-                                 const float radius_clip, const bool calc_compensations,
-                                 const bool ortho);
+    static variable_list
+    forward(AutogradContext *ctx,
+            const Variable  &means,    // [N, 3]
+            const Variable  &quats,    // [N, 4]
+            const Variable  &scales,   // [N, 3]
+            const Variable  &viewmats, // [C, 4, 4]
+            const Variable  &Ks,       // [C, 3, 3]
+            const uint32_t image_width, const uint32_t image_height, const float eps2d,
+            const float near_plane, const float far_plane, const float radius_clip,
+            const bool calc_compensations, const bool ortho,
+            torch::optional<Variable> outBackwardNormalizedMeans2dGradient = torch::nullopt);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
 
-struct GaussianRasterizeToPixels : public torch::autograd::Function<GaussianRasterizeToPixels> {
+struct RasterizeGaussiansToPixels : public torch::autograd::Function<RasterizeGaussiansToPixels> {
     using variable_list   = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
@@ -65,8 +65,7 @@ struct GaussianRasterizeToPixels : public torch::autograd::Function<GaussianRast
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
 
-struct GaussianFullyFusedProjectionJagged
-    : public torch::autograd::Function<GaussianFullyFusedProjectionJagged> {
+struct ProjectGaussiansJagged : public torch::autograd::Function<ProjectGaussiansJagged> {
     using variable_list   = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;

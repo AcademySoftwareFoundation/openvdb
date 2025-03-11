@@ -10,12 +10,12 @@ namespace fvdb {
 namespace detail {
 namespace autograd {
 
-SphericalHarmonics::variable_list
-SphericalHarmonics::forward(
-    SphericalHarmonics::AutogradContext *ctx, const int sh_degree_to_use,
-    const torch::optional<SphericalHarmonics::Variable> maybe_dirs, // (C, N, 3) or (N, 3)
-    const SphericalHarmonics::Variable                 &sh_coeffs,  // (C, M, K, D) or (N, K, D)
-    const SphericalHarmonics::Variable                 &radii       // (C, N) or (N,) (optional)
+EvaluateSphericalHarmonics::variable_list
+EvaluateSphericalHarmonics::forward(
+    EvaluateSphericalHarmonics::AutogradContext *ctx, const int sh_degree_to_use,
+    const torch::optional<EvaluateSphericalHarmonics::Variable> maybe_dirs, // (C, N, 3) or (N, 3)
+    const EvaluateSphericalHarmonics::Variable &sh_coeffs, // (C, M, K, D) or (N, K, D)
+    const EvaluateSphericalHarmonics::Variable &radii      // (C, N) or (N,) (optional)
 ) {
     torch::Tensor dirs;
     if (maybe_dirs.has_value()) {
@@ -32,9 +32,9 @@ SphericalHarmonics::forward(
     return { colors };
 }
 
-SphericalHarmonics::variable_list
-SphericalHarmonics::backward(SphericalHarmonics::AutogradContext *ctx,
-                             SphericalHarmonics::variable_list    grad_output) {
+EvaluateSphericalHarmonics::variable_list
+EvaluateSphericalHarmonics::backward(EvaluateSphericalHarmonics::AutogradContext *ctx,
+                                     EvaluateSphericalHarmonics::variable_list    grad_output) {
     Variable v_colors = grad_output.at(0);
 
     // ensure the gradients are contiguous if they are not None
@@ -65,17 +65,17 @@ SphericalHarmonics::backward(SphericalHarmonics::AutogradContext *ctx,
     return { Variable(), v_dirs, v_sh_coeffs, Variable() };
 }
 
-GaussianFullyFusedProjection::variable_list
-GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradContext *ctx,
-                                      const GaussianFullyFusedProjection::Variable  &means,
-                                      const GaussianFullyFusedProjection::Variable  &quats,
-                                      const GaussianFullyFusedProjection::Variable  &scales,
-                                      const GaussianFullyFusedProjection::Variable  &viewmats,
-                                      const GaussianFullyFusedProjection::Variable  &Ks,
-                                      const uint32_t image_width, const uint32_t image_height,
-                                      const float eps2d, const float near_plane,
-                                      const float far_plane, const float radius_clip,
-                                      const bool calc_compensations, const bool ortho) {
+ProjectGaussians::variable_list
+ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
+                          const ProjectGaussians::Variable  &means,
+                          const ProjectGaussians::Variable  &quats,
+                          const ProjectGaussians::Variable  &scales,
+                          const ProjectGaussians::Variable  &viewmats,
+                          const ProjectGaussians::Variable &Ks, const uint32_t image_width,
+                          const uint32_t image_height, const float eps2d, const float near_plane,
+                          const float far_plane, const float radius_clip,
+                          const bool calc_compensations, const bool ortho,
+                          torch::optional<Variable> outBackwardNormalizedMeans2dGradient) {
     TORCH_CHECK(means.dim() == 2, "means must have shape (N, 3)");
     TORCH_CHECK(viewmats.dim() == 3, "viewmats must have shape (C, 4, 4)");
     TORCH_CHECK(Ks.dim() == 3, "Ks must have shape (C, 3, 3)");
@@ -96,6 +96,13 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     ctx->saved_data["calc_compensations"] = (bool)calc_compensations;
     ctx->saved_data["ortho"]              = (bool)ortho;
 
+    const bool saveNormalizedMeans2dGradient = outBackwardNormalizedMeans2dGradient.has_value();
+    ctx->saved_data["saveNormalizedMeans2dGradient"] = saveNormalizedMeans2dGradient;
+    if (saveNormalizedMeans2dGradient) {
+        ctx->saved_data["outBackwardNormalizedMeans2dGradient"] =
+            outBackwardNormalizedMeans2dGradient.value();
+    }
+
     if (calc_compensations) {
         Variable compensations = std::get<4>(variables);
         ctx->save_for_backward(
@@ -107,9 +114,9 @@ GaussianFullyFusedProjection::forward(GaussianFullyFusedProjection::AutogradCont
     }
 }
 
-GaussianFullyFusedProjection::variable_list
-GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradContext *ctx,
-                                       GaussianFullyFusedProjection::variable_list    grad_output) {
+ProjectGaussians::variable_list
+ProjectGaussians::backward(ProjectGaussians::AutogradContext *ctx,
+                           ProjectGaussians::variable_list    grad_output) {
     Variable v_radii   = grad_output.at(0);
     Variable v_means2d = grad_output.at(1);
     Variable v_depths  = grad_output.at(2);
@@ -154,14 +161,22 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
     const int   image_height = (int)ctx->saved_data["image_height"].toInt();
     const float eps2d        = (float)ctx->saved_data["eps2d"].toDouble();
     const bool  ortho        = (bool)ctx->saved_data["ortho"].toBool();
+    const bool  saveNormalizedMeans2dGradient =
+        ctx->saved_data["saveNormalizedMeans2dGradient"].toBool();
 
-    auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
+    torch::optional<torch::Tensor> maybeNormalizedMeans2dGradient = torch::nullopt;
+    if (saveNormalizedMeans2dGradient) {
+        maybeNormalizedMeans2dGradient =
+            ctx->saved_data["outBackwardNormalizedMeans2dGradient"].toTensor(); // [C, N, 2]
+    }
+    auto variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionBackward<DeviceTag>(
             means, quats, scales, viewmats, Ks, compensations, image_width, image_height, eps2d,
             radii, conics, v_means2d, v_depths, v_conics, v_compensations, ctx->needs_input_grad(4),
-            ortho);
+            ortho, maybeNormalizedMeans2dGradient);
     });
-    Variable v_means   = std::get<0>(variables);
+
+    Variable v_means = std::get<0>(variables);
     // Variable v_covars = std::get<1>(variables);
     Variable v_quats    = std::get<2>(variables);
     Variable v_scales   = std::get<3>(variables);
@@ -171,18 +186,18 @@ GaussianFullyFusedProjection::backward(GaussianFullyFusedProjection::AutogradCon
              Variable(), Variable(), Variable(), Variable(), Variable(), Variable() };
 }
 
-GaussianRasterizeToPixels::variable_list
-GaussianRasterizeToPixels::forward(
-    GaussianRasterizeToPixels::AutogradContext *ctx,
-    const GaussianRasterizeToPixels::Variable  &means2d,          // [C, N, 2]
-    const GaussianRasterizeToPixels::Variable  &conics,           // [C, N, 3]
-    const GaussianRasterizeToPixels::Variable  &colors,           // [C, N, 3]
-    const GaussianRasterizeToPixels::Variable  &opacities,        // [N]
+RasterizeGaussiansToPixels::variable_list
+RasterizeGaussiansToPixels::forward(
+    RasterizeGaussiansToPixels::AutogradContext *ctx,
+    const RasterizeGaussiansToPixels::Variable  &means2d,          // [C, N, 2]
+    const RasterizeGaussiansToPixels::Variable  &conics,           // [C, N, 3]
+    const RasterizeGaussiansToPixels::Variable  &colors,           // [C, N, 3]
+    const RasterizeGaussiansToPixels::Variable  &opacities,        // [N]
     const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
     const uint32_t image_origin_h, const uint32_t tile_size,
-    const GaussianRasterizeToPixels::Variable &tile_offsets,      // [C, tile_height, tile_width]
-    const GaussianRasterizeToPixels::Variable &tile_gaussian_ids, // [n_isects]
-    const bool                                 absgrad) {
+    const RasterizeGaussiansToPixels::Variable &tile_offsets,      // [C, tile_height, tile_width]
+    const RasterizeGaussiansToPixels::Variable &tile_gaussian_ids, // [n_isects]
+    const bool                                  absgrad) {
     // const int C = means2d.size(0);
     // const int N = means2d.size(1);
 
@@ -207,9 +222,9 @@ GaussianRasterizeToPixels::forward(
     return { render_colors, render_alphas };
 }
 
-GaussianRasterizeToPixels::variable_list
-GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *ctx,
-                                    GaussianRasterizeToPixels::variable_list    grad_output) {
+RasterizeGaussiansToPixels::variable_list
+RasterizeGaussiansToPixels::backward(RasterizeGaussiansToPixels::AutogradContext *ctx,
+                                     RasterizeGaussiansToPixels::variable_list    grad_output) {
     Variable v_render_colors = grad_output.at(0);
     Variable v_render_alphas = grad_output.at(1);
 
@@ -260,16 +275,16 @@ GaussianRasterizeToPixels::backward(GaussianRasterizeToPixels::AutogradContext *
     };
 }
 
-GaussianFullyFusedProjectionJagged::variable_list
-GaussianFullyFusedProjectionJagged::forward(
-    GaussianFullyFusedProjectionJagged::AutogradContext *ctx,
-    const GaussianFullyFusedProjectionJagged::Variable  &g_sizes,  // [B] gaussian sizes
-    const GaussianFullyFusedProjectionJagged::Variable  &means,    // [ggz, 3]
-    const GaussianFullyFusedProjectionJagged::Variable  &quats,    // [ggz, 4] optional
-    const GaussianFullyFusedProjectionJagged::Variable  &scales,   // [ggz, 3] optional
-    const GaussianFullyFusedProjectionJagged::Variable  &c_sizes,  // [B] camera sizes
-    const GaussianFullyFusedProjectionJagged::Variable  &viewmats, // [ccz, 4, 4]
-    const GaussianFullyFusedProjectionJagged::Variable  &Ks,       // [ccz, 3, 3]
+ProjectGaussiansJagged::variable_list
+ProjectGaussiansJagged::forward(
+    ProjectGaussiansJagged::AutogradContext *ctx,
+    const ProjectGaussiansJagged::Variable  &g_sizes,  // [B] gaussian sizes
+    const ProjectGaussiansJagged::Variable  &means,    // [ggz, 3]
+    const ProjectGaussiansJagged::Variable  &quats,    // [ggz, 4] optional
+    const ProjectGaussiansJagged::Variable  &scales,   // [ggz, 3] optional
+    const ProjectGaussiansJagged::Variable  &c_sizes,  // [B] camera sizes
+    const ProjectGaussiansJagged::Variable  &viewmats, // [ccz, 4, 4]
+    const ProjectGaussiansJagged::Variable  &Ks,       // [ccz, 3, 3]
     const uint32_t image_width, const uint32_t image_height, const float eps2d,
     const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
@@ -291,10 +306,9 @@ GaussianFullyFusedProjectionJagged::forward(
     return { radii, means2d, depths, conics };
 }
 
-GaussianFullyFusedProjectionJagged::variable_list
-GaussianFullyFusedProjectionJagged::backward(
-    GaussianFullyFusedProjectionJagged::AutogradContext *ctx,
-    GaussianFullyFusedProjectionJagged::variable_list    grad_output) {
+ProjectGaussiansJagged::variable_list
+ProjectGaussiansJagged::backward(ProjectGaussiansJagged::AutogradContext *ctx,
+                                 ProjectGaussiansJagged::variable_list    grad_output) {
     Variable v_radii   = grad_output.at(0);
     Variable v_means2d = grad_output.at(1);
     Variable v_depths  = grad_output.at(2);

@@ -9,7 +9,7 @@ if torch.cuda.is_available():
     torch.cuda.init()
 
 # isort: off
-from ._Cpp import JaggedTensor, GridBatch, SparseConvPackInfo, ConvPackBackend
+from ._Cpp import JaggedTensor, GridBatch, SparseConvPackInfo, ConvPackBackend, GaussianSplat3d
 from ._Cpp import (
     gridbatch_from_ijk,
     gridbatch_from_points,
@@ -70,6 +70,7 @@ __all__ = [
     "JaggedTensor",
     "SparseConvPackInfo",
     "ConvPackBackend",
+    "GaussianSplat3d",
     "gridbatch_from_ijk",
     "gridbatch_from_points",
     "gridbatch_from_nearest_voxels_to_points",

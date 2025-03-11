@@ -38,11 +38,13 @@ projectionBackwardKernel(
     const T *__restrict__ v_conics,        // [C, N, 3]
     const T *__restrict__ v_compensations, // [C, N] optional
     // grad inputs
-    T *__restrict__ v_means,      // [N, 3]
-    T *__restrict__ v_covars,     // [N, 6] optional
-    T *__restrict__ v_quats,      // [N, 4] optional
-    T *__restrict__ v_scales,     // [N, 3] optional
-    T *__restrict__ v_viewmats) { // [C, 4, 4] optional
+    T *__restrict__ v_means,                   // [N, 3]
+    T *__restrict__ v_covars,                  // [N, 6] optional
+    T *__restrict__ v_quats,                   // [N, 4] optional
+    T *__restrict__ v_scales,                  // [N, 3] optional
+    T *__restrict__ v_viewmats,                // [C, 4, 4] optional
+    T *__restrict__ outNormalizeddLossdMeans2d // [C, N, 2] optional
+) {
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N || radii[idx] <= 0) {
@@ -61,6 +63,13 @@ projectionBackwardKernel(
     v_means2d += idx * 2;
     v_depths += idx;
     v_conics += idx * 3;
+
+    if (outNormalizeddLossdMeans2d != nullptr) {
+        const T widthScale                      = T(image_width) / T(2) * T(C);
+        const T heightScale                     = T(image_height) / T(2);
+        outNormalizeddLossdMeans2d[idx * 2]     = v_means2d[0] * widthScale;
+        outNormalizeddLossdMeans2d[idx * 2 + 1] = v_means2d[1] * heightScale;
+    }
 
     // vjp: compute the inverse of the 2d covariance
     mat2<T> covar2d_inv   = mat2<T>(conics[0], conics[1], conics[1], conics[2]);
@@ -214,7 +223,8 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     const torch::Tensor               &v_depths,        // [C, N]
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho) {
+    const bool viewmats_requires_grad, const bool ortho,
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2d) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars = std::nullopt;
     // const at::optional<torch::Tensor> &compensations = std::nullopt;
@@ -278,7 +288,10 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr,
+                    outNormalizeddLossdMeans2d.has_value()
+                        ? outNormalizeddLossdMeans2d.value().data_ptr<float>()
+                        : nullptr);
         } else {
             projectionBackwardKernel<float, false>
                 <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
@@ -297,7 +310,10 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr,
+                    outNormalizeddLossdMeans2d.has_value()
+                        ? outNormalizeddLossdMeans2d.value().data_ptr<float>()
+                        : nullptr);
         }
 
         C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -324,7 +340,8 @@ dispatchGaussianProjectionBackward<torch::kCPU>(
     const torch::Tensor               &v_depths,        // [C, N]
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho) {
+    const bool viewmats_requires_grad, const bool ortho,
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 

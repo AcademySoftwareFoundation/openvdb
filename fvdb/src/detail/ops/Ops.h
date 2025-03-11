@@ -369,7 +369,8 @@ dispatchGaussianProjectionBackward(
     const torch::Tensor               &v_depths,        // [C, N]
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho);
+    const bool viewmats_requires_grad, const bool ortho,
+    at::optional<torch::Tensor> outNormalizedDLossdMeans2 = torch::nullopt);
 
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor>

@@ -25,8 +25,8 @@ evaluateSphericalHarmonics(const torch::optional<torch::Tensor> directions,
     const int actual_sh_degree = sh_degree_to_use < 0 ? (std::sqrt(K) - 1) : sh_degree_to_use;
     TORCH_CHECK(K >= (actual_sh_degree + 1) * (actual_sh_degree + 1),
                 "K must be at least (sh_degree_to_use + 1)^2");
-    auto sh_results =
-        detail::autograd::SphericalHarmonics::apply(actual_sh_degree, directions, sh_coeffs, radii);
+    auto sh_results = detail::autograd::EvaluateSphericalHarmonics::apply(
+        actual_sh_degree, directions, sh_coeffs, radii);
 
     return sh_results[0];
 }
@@ -64,7 +64,7 @@ computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Ten
     TORCH_CHECK(Ks.is_contiguous(), "Ks must be contiguous");
 
     // Project to image plane [differentiable]
-    const auto projection_results = detail::autograd::GaussianFullyFusedProjection::apply(
+    const auto projection_results = detail::autograd::ProjectGaussians::apply(
         means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane, far_plane,
         radius_clip, antialias, ortho);
     const torch::Tensor radii                 = projection_results[0];
@@ -167,7 +167,7 @@ gaussianRenderUnbatchedInternal(const torch::Tensor &means, const torch::Tensor 
     }
 
     // Rasterize projected Gaussians to pixels [differentiable]
-    auto outputs = detail::autograd::GaussianRasterizeToPixels::apply(
+    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
         means2d, conics, colors, opacities_compensated, image_width, image_height, 0, 0, tile_size,
         tile_offsets, tile_gaussian_ids, false);
     torch::Tensor render_colors = outputs[0];
@@ -259,7 +259,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     gaussian_ids += shifts_cumsum.repeat_interleave(tt, 0);
 
     // Project to image plane [differentiable]
-    auto projection_results = detail::autograd::GaussianFullyFusedProjectionJagged::apply(
+    auto projection_results = detail::autograd::ProjectGaussiansJagged::apply(
         g_sizes, means.jdata(), quats.jdata(), scales.jdata(), c_sizes, viewmats.jdata(),
         Ks.jdata(), image_width, image_height, eps2d, near_plane, far_plane, radius_clip, ortho);
     torch::Tensor radii   = projection_results[0];
@@ -320,7 +320,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     }
 
     // Rasterize projected Gaussians to pixels [differentiable]
-    auto outputs = detail::autograd::GaussianRasterizeToPixels::apply(
+    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
         means2d, conics, colors, opacities_batched.contiguous(), image_width, image_height, 0, 0,
         tile_size, tile_offsets, tile_gaussian_ids, false);
     torch::Tensor render_colors = outputs[0];
@@ -404,9 +404,9 @@ projectGaussiansToImages(const torch::Tensor &means, const torch::Tensor &quats,
                          const uint32_t image_height, const float near_plane, const float far_plane,
                          const float radius_clip, const float eps2d, const bool antialias,
                          const bool ortho) {
-    return detail::autograd::GaussianFullyFusedProjection::apply(
-        means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane, far_plane,
-        radius_clip, antialias, ortho);
+    return detail::autograd::ProjectGaussians::apply(means, quats, scales, viewmats, Ks,
+                                                     image_width, image_height, eps2d, near_plane,
+                                                     far_plane, radius_clip, antialias, ortho);
 }
 
 // Gaussian render for a single torch Tensor
@@ -441,7 +441,7 @@ renderPixelsFromPrecomputedGaussianRenderStateUnbatched(
     uint32_t image_width, uint32_t image_height, uint32_t image_origin_w, uint32_t image_origin_h,
     uint32_t tile_size, torch::Tensor tile_offsets, torch::Tensor tile_gaussian_ids) {
     // Rasterize projected Gaussians to pixels [differentiable]
-    auto outputs = detail::autograd::GaussianRasterizeToPixels::apply(
+    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
         means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
         image_origin_h, tile_size, tile_offsets, tile_gaussian_ids, false);
     torch::Tensor render_colors = outputs[0];

@@ -461,6 +461,155 @@ class SparseConvPackInfo:
     def cuda(self) -> SparseConvPackInfo: ...
     def to(self, device: TorchDeviceOrString) -> SparseConvPackInfo: ...
 
+class GaussianSplatRenderState:
+    @property
+    def means2d(self) -> torch.Tensor: ...
+    @property
+    def conics(self) -> torch.Tensor: ...
+    @property
+    def render_quantities(self) -> torch.Tensor: ...
+    @property
+    def opacities(self) -> torch.Tensor: ...
+    @property
+    def radii(self) -> torch.Tensor: ...
+    @property
+    def tile_offsets(self) -> torch.Tensor: ...
+    @property
+    def tile_gaussian_ids(self) -> torch.Tensor: ...
+    @property
+    def image_width(self) -> int: ...
+    @property
+    def image_height(self) -> int: ...
+    @property
+    def near_plane(self) -> float: ...
+    @property
+    def far_plane(self) -> float: ...
+    @property
+    def sh_degree_to_use(self) -> int: ...
+    @property
+    def min_radius_2d(self) -> float: ...
+    @property
+    def eps_2d(self) -> float: ...
+    @property
+    def antialias(self) -> bool: ...
+
+class GaussianSplat3d:
+    def __init__(
+        self,
+        means: torch.Tensor,
+        quats: torch.Tensor,
+        scales: torch.Tensor,
+        opacities: torch.Tensor,
+        sh_coeffs: torch.Tensor,
+    ) -> None: ...
+    @property
+    def means(self) -> torch.Tensor: ...
+    @property
+    def quats(self) -> torch.Tensor: ...
+    @property
+    def scales(self) -> torch.Tensor: ...
+    @property
+    def opacities(self) -> torch.Tensor: ...
+    @property
+    def sh_coeffs(self) -> torch.Tensor: ...
+    def render_images(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        sh_degree_to_use: int = -1,
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]: ...
+    def render_depths(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]: ...
+    def render_images_and_depths(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        sh_degree_to_use: int = -1,
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> Tuple[torch.Tensor, torch.Tensor]: ...
+    def precompute_render_state_for_images(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        sh_degree_to_use: int = -1,
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> GaussianSplatRenderState: ...
+    def precompute_render_state_for_depths(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> GaussianSplatRenderState: ...
+    def precompute_render_state_for_images_and_depths(
+        self,
+        world_to_camera_matrices: torch.Tensor,
+        projection_matrices: torch.Tensor,
+        image_width: int,
+        image_height: int,
+        near: float,
+        far: float,
+        projection_type: str = "perspective",
+        sh_degree_to_use: int = -1,
+        tile_size: int = 16,
+        min_radius_2d: float = 0.0,
+        eps_2d: float = 0.3,
+        antialias: bool = False,
+    ) -> GaussianSplatRenderState: ...
+    def render_from_state(
+        self,
+        state: GaussianSplatRenderState,
+        crop_width: int = -1,
+        crop_height: int = -1,
+        crop_origin_w: int = -1,
+        crop_origin_h: int = -1,
+        tile_size: int = 16,
+    ) -> Tuple[torch.Tensor, torch.Tensor]: ...
+
 @overload
 def jcat(grid_batches: List[GridBatch]) -> GridBatch: ...
 @overload

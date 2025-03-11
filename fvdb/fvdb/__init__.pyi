@@ -15,6 +15,7 @@ if torch.cuda.is_available():
 from . import nn
 from ._Cpp import (
     ConvPackBackend,
+    GaussianSplat3d,
     GridBatch,
     JaggedTensor,
     SparseConvPackInfo,
@@ -57,6 +58,7 @@ __all__ = [
     "JaggedTensor",
     "SparseConvPackInfo",
     "ConvPackBackend",
+    "GaussianSplat3d",
     "gridbatch_from_ijk",
     "gridbatch_from_points",
     "gridbatch_from_nearest_voxels_to_points",
