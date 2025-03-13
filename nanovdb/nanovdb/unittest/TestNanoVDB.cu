@@ -339,6 +339,8 @@ struct ProbeValueNew {
         ValueT value;
         operator bool() const { return state; }
     };
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    using Type = Probe;
     __hostdev__ static Probe get(const NanoRoot<BuildT>  &root) {
         return Probe{false, root.mBackground};
     }
@@ -361,7 +363,10 @@ struct AccessLeafMask;
 
 // template specialization of AccessLeafMask wrt ValueOnIndexMask
 template <>
-struct AccessLeafMask<ValueOnIndexMask>{
+struct AccessLeafMask<ValueOnIndexMask>
+{
+    using Type = bool;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
     __hostdev__ static bool get(const NanoRoot<ValueOnIndexMask>&) {return false;}
     __hostdev__ static bool get(const typename NanoRoot<ValueOnIndexMask>::Tile&) {return false;}
     __hostdev__ static bool get(const NanoUpper<ValueOnIndexMask>&, uint32_t) {return false;}
@@ -436,8 +441,15 @@ TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueIndex)
         const nanovdb::Coord ijk = coords[i];
         const auto *leaf = acc.get<nanovdb::GetLeaf<BuildT>>(ijk);
         EXPECT_TRUE(leaf);
+        EXPECT_EQ(0u, leaf->LEVEL);
         const auto offset = leaf->CoordToOffset(ijk);
         EXPECT_EQ(ijk, leaf->offsetToGlobalCoord(offset));
+        const auto *lower = acc.get<nanovdb::GetLower<BuildT>>(ijk);
+        EXPECT_TRUE(lower);
+        EXPECT_EQ(1u, lower->LEVEL);
+        const auto *upper = acc.get<nanovdb::GetUpper<BuildT>>(ijk);
+        EXPECT_TRUE(upper);
+        EXPECT_EQ(2u, upper->LEVEL);
     }
 }// Basic_CudaPointsToGrid_ValueIndex
 

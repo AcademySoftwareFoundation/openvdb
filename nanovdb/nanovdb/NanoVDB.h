@@ -3039,24 +3039,20 @@ public:
     __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildType>>(ijk); }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type get(const CoordType& ijk, ArgsT&&... args) const
     {
         if (const Tile* tile = this->probeTile(ijk)) {
-            if (tile->isChild())
-                return this->getChild(tile)->template get<OpT>(ijk, args...);
+            if constexpr(OpT::LEVEL < LEVEL) if (tile->isChild()) return this->getChild(tile)->template get<OpT>(ijk, args...);
             return OpT::get(*tile, args...);
         }
         return OpT::get(*this, args...);
     }
 
     template<typename OpT, typename... ArgsT>
-    // __hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(util::declval<Tile&>(), util::declval<ArgsT>()...))
-    set(const CoordType& ijk, ArgsT&&... args)
+    __hostdev__ void set(const CoordType& ijk, ArgsT&&... args)
     {
         if (Tile* tile = DataType::probeTile(ijk)) {
-            if (tile->isChild())
-                return this->getChild(tile)->template set<OpT>(ijk, args...);
+            if constexpr(OpT::LEVEL < LEVEL) if (tile->isChild()) return this->getChild(tile)->template set<OpT>(ijk, args...);
             return OpT::set(*tile, args...);
         }
         return OpT::set(*this, args...);
@@ -3087,15 +3083,15 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__  decltype(OpT::get(util::declval<const Tile&>(), util::declval<ArgsT>()...))
-    __hostdev__ auto
-    getAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type getAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args) const
     {
         if (const Tile* tile = this->probeTile(ijk)) {
-            if (tile->isChild()) {
-                const ChildT* child = this->getChild(tile);
-                acc.insert(ijk, child);
-                return child->template getAndCache<OpT>(ijk, acc, args...);
+            if constexpr(OpT::LEVEL < LEVEL) {
+                if (tile->isChild()) {
+                    const ChildT* child = this->getChild(tile);
+                    acc.insert(ijk, child);
+                    return child->template getAndCache<OpT>(ijk, acc, args...);
+                }
             }
             return OpT::get(*tile, args...);
         }
@@ -3103,15 +3099,15 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    // __hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(util::declval<Tile&>(), util::declval<ArgsT>()...))
-    setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
+    __hostdev__ void setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
         if (Tile* tile = DataType::probeTile(ijk)) {
-            if (tile->isChild()) {
-                ChildT* child = this->getChild(tile);
-                acc.insert(ijk, child);
-                return child->template setAndCache<OpT>(ijk, acc, args...);
+            if constexpr(OpT::LEVEL < LEVEL) {
+                if (tile->isChild()) {
+                    ChildT* child = this->getChild(tile);
+                    acc.insert(ijk, child);
+                    return child->template setAndCache<OpT>(ijk, acc, args...);
+                }
             }
             return OpT::set(*tile, args...);
         }
@@ -3539,22 +3535,18 @@ public:
     __hostdev__ bool isActive() const { return DataType::mFlags & uint32_t(2); }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type get(const CoordType& ijk, ArgsT&&... args) const
     {
         const uint32_t n = CoordToOffset(ijk);
-        if (this->isChild(n))
-            return this->getChild(n)->template get<OpT>(ijk, args...);
+        if constexpr(OpT::LEVEL < LEVEL) if (this->isChild(n)) return this->getChild(n)->template get<OpT>(ijk, args...);
         return OpT::get(*this, n, args...);
     }
 
     template<typename OpT, typename... ArgsT>
-    //__hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(util::declval<InternalNode&>(), util::declval<uint32_t>(), util::declval<ArgsT>()...))
-    set(const CoordType& ijk, ArgsT&&... args)
+    __hostdev__ void set(const CoordType& ijk, ArgsT&&... args)
     {
         const uint32_t n = CoordToOffset(ijk);
-        if (this->isChild(n))
-            return this->getChild(n)->template set<OpT>(ijk, args...);
+        if constexpr(OpT::LEVEL < LEVEL) if (this->isChild(n)) return this->getChild(n)->template set<OpT>(ijk, args...);
         return OpT::set(*this, n, args...);
     }
 
@@ -3586,29 +3578,31 @@ private:
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    __hostdev__ auto
-    //__hostdev__  decltype(OpT::get(util::declval<const InternalNode&>(), util::declval<uint32_t>(), util::declval<ArgsT>()...))
-    getAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type getAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args) const
     {
         const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n))
-            return OpT::get(*this, n, args...);
-        const ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->template getAndCache<OpT>(ijk, acc, args...);
+        if constexpr(OpT::LEVEL < LEVEL) {
+            if (this->isChild(n)) {
+                const ChildT* child = this->getChild(n);
+                acc.insert(ijk, child);
+                return child->template getAndCache<OpT>(ijk, acc, args...);
+            }
+        }
+        return OpT::get(*this, n, args...);
     }
 
     template<typename OpT, typename AccT, typename... ArgsT>
-    //__hostdev__ auto // occasionally fails with NVCC
-    __hostdev__ decltype(OpT::set(util::declval<InternalNode&>(), util::declval<uint32_t>(), util::declval<ArgsT>()...))
-    setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
+    __hostdev__ void setAndCache(const CoordType& ijk, const AccT& acc, ArgsT&&... args)
     {
         const uint32_t n = CoordToOffset(ijk);
-        if (DataType::mChildMask.isOff(n))
-            return OpT::set(*this, n, args...);
-        ChildT* child = this->getChild(n);
-        acc.insert(ijk, child);
-        return child->template setAndCache<OpT>(ijk, acc, args...);
+        if constexpr(OpT::LEVEL < LEVEL) {
+            if (this->isChild(n)) {
+                ChildT* child = this->getChild(n);
+                acc.insert(ijk, child);
+                return child->template setAndCache<OpT>(ijk, acc, args...);
+            }
+        }
+        return OpT::set(*this, n, args...);
     }
 
 }; // InternalNode class
@@ -4969,24 +4963,21 @@ public:
     template<typename RayT>
     __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
     {
-        if (this->isCached(ijk))
-            return mNode->getDimAndCache(ijk, ray, *this);
+        if (this->isCached(ijk)) return mNode->getDimAndCache(ijk, ray, *this);
         return mRoot->getDimAndCache(ijk, ray, *this);
     }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type get(const CoordType& ijk, ArgsT&&... args) const
     {
-        if (this->isCached(ijk))
-            return mNode->template getAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <= LEVEL0) if (this->isCached(ijk)) return mNode->template getAndCache<OpT>(ijk, *this, args...);
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
     }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto set(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ void set(const CoordType& ijk, ArgsT&&... args) const
     {
-        if (this->isCached(ijk))
-            return const_cast<NodeT*>(mNode)->template setAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <= LEVEL0) if (this->isCached(ijk)) return const_cast<NodeT*>(mNode)->template setAndCache<OpT>(ijk, *this, args...);
         return const_cast<RootT*>(mRoot)->template setAndCache<OpT>(ijk, *this, args...);
     }
 
@@ -5159,33 +5150,33 @@ public:
     }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type get(const CoordType& ijk, ArgsT&&... args) const
     {
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
         const CoordValueType dirty = this->computeDirty(ijk);
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached1(dirty)) {
-            return mNode1->template getAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached2(dirty)) {
-            return mNode2->template getAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <= LEVEL0) {
+            if (this->isCached1(dirty)) return mNode1->template getAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+            if (this->isCached2(dirty)) return mNode2->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
     }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto set(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ void set(const CoordType& ijk, ArgsT&&... args) const
     {
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
         const CoordValueType dirty = this->computeDirty(ijk);
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached1(dirty)) {
-            return const_cast<Node1T*>(mNode1)->template setAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached2(dirty)) {
-            return const_cast<Node2T*>(mNode2)->template setAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <= LEVEL0) {
+            if (this->isCached1(dirty)) return const_cast<Node1T*>(mNode1)->template setAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= LEVEL1) {
+            if (this->isCached2(dirty)) return const_cast<Node2T*>(mNode2)->template setAndCache<OpT>(ijk, *this, args...);
         }
         return const_cast<RootT*>(mRoot)->template setAndCache<OpT>(ijk, *this, args...);
     }
@@ -5342,10 +5333,7 @@ public:
     }
 #endif
 
-    __hostdev__ ValueType getValue(const CoordType& ijk) const
-    {
-        return this->template get<GetValue<BuildT>>(ijk);
-    }
+    __hostdev__ ValueType getValue(const CoordType& ijk) const {return this->template get<GetValue<BuildT>>(ijk);}
     __hostdev__ ValueType    getValue(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
     __hostdev__ ValueType    operator()(const CoordType& ijk) const { return this->template get<GetValue<BuildT>>(ijk); }
     __hostdev__ ValueType    operator()(int i, int j, int k) const { return this->template get<GetValue<BuildT>>(CoordType(i, j, k)); }
@@ -5355,37 +5343,37 @@ public:
     __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const { return this->template get<GetLeaf<BuildT>>(ijk); }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto get(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ typename OpT::Type get(const CoordType& ijk, ArgsT&&... args) const
     {
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
         const CoordValueType dirty = this->computeDirty(ijk);
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((const LeafT*)mNode[0])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((const NodeT1*)mNode[1])->template getAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((const NodeT2*)mNode[2])->template getAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <=0) {
+            if (this->isCached<LeafT>(dirty)) return ((const LeafT*)mNode[0])->template getAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= 1) {
+            if (this->isCached<NodeT1>(dirty)) return ((const NodeT1*)mNode[1])->template getAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= 2) {
+            if (this->isCached<NodeT2>(dirty)) return ((const NodeT2*)mNode[2])->template getAndCache<OpT>(ijk, *this, args...);
         }
         return mRoot->template getAndCache<OpT>(ijk, *this, args...);
     }
 
     template<typename OpT, typename... ArgsT>
-    __hostdev__ auto set(const CoordType& ijk, ArgsT&&... args) const
+    __hostdev__ void set(const CoordType& ijk, ArgsT&&... args) const
     {
 #ifdef NANOVDB_USE_SINGLE_ACCESSOR_KEY
         const CoordValueType dirty = this->computeDirty(ijk);
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<LeafT>(dirty)) {
-            return ((LeafT*)mNode[0])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->template setAndCache<OpT>(ijk, *this, args...);
-        } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->template setAndCache<OpT>(ijk, *this, args...);
+        if constexpr(OpT::LEVEL <= 0) {
+            if (this->isCached<LeafT>(dirty)) return ((LeafT*)mNode[0])->template setAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= 1) {
+            if (this->isCached<NodeT1>(dirty)) return ((NodeT1*)mNode[1])->template setAndCache<OpT>(ijk, *this, args...);
+        } else if constexpr(OpT::LEVEL <= 2) {
+            if (this->isCached<NodeT2>(dirty)) return ((NodeT2*)mNode[2])->template setAndCache<OpT>(ijk, *this, args...);
         }
         return ((RootT*)mRoot)->template setAndCache<OpT>(ijk, *this, args...);
     }
@@ -6030,41 +6018,76 @@ VecT<GridHandleT> readUncompressedGrids(const char* fileName, const typename Gri
 
 // ----------------------------> Implementations of random access methods <--------------------------------------
 
+/**
+* @brief Below is an example of a struct used for random get methods.
+* @note All member methods, data, and types are mandatory.
+* @code
+    template<typename BuildT>
+    struct GetOpT {
+        using Type = typename BuildToValueMap<BuildT>::Type;// return type
+        static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+        __hostdev__ static Type get(const NanoRoot<BuildT>& root, args...) { }
+        __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile& tile, args...) { }
+        __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n, args...) { }
+        __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n, args...) { }
+        __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf,  uint32_t n, args...) { }
+   };
+  @endcode
+
+  * @brief Below is an example of the struct used for random set methods
+  * @note All member methods and data are mandatory.
+  * @code
+    template<typename BuildT>
+    struct SetOpT {
+        static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+        __hostdev__ static void set(NanoRoot<BuildT>& root, args...) { }
+        __hostdev__ static void set(typename NanoRoot<BuildT>::Tile& tile, args...) { }
+        __hostdev__ static void set(NanoUpper<BuildT>& node, uint32_t n, args...) { }
+        __hostdev__ static void set(NanoLower<BuildT>& node, uint32_t n, args...) { }
+        __hostdev__ static void set(NanoLeaf<BuildT>& leaf,  uint32_t n, args...) { }
+   };
+  @endcode
+**/
+
 /// @brief Implements Tree::getValue(math::Coord), i.e. return the value associated with a specific coordinate @c ijk.
 /// @tparam BuildT Build type of the grid being called
-/// @details The value at a coordinate maps to the background, a tile value or a leaf value.
+/// @details The value at a coordinate either maps to the background, a tile value or a leaf value.
 template<typename BuildT>
 struct GetValue
 {
-    __hostdev__ static auto get(const NanoRoot<BuildT>& root) { return root.mBackground; }
-    __hostdev__ static auto get(const typename NanoRoot<BuildT>::Tile& tile) { return tile.value; }
-    __hostdev__ static auto get(const NanoUpper<BuildT>& node, uint32_t n) { return node.mTable[n].value; }
-    __hostdev__ static auto get(const NanoLower<BuildT>& node, uint32_t n) { return node.mTable[n].value; }
-    __hostdev__ static auto get(const NanoLeaf<BuildT>& leaf,  uint32_t n) { return leaf.getValue(n); } // works with all build types
+    using Type = typename NanoLeaf<BuildT>::ValueType;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>& root) { return root.mBackground; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile& tile) { return tile.value; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n) { return node.mTable[n].value; }
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n) { return node.mTable[n].value; }
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf,  uint32_t n) { return leaf.getValue(n); } // works with all build types
 }; // GetValue<BuildT>
 
 template<typename BuildT>
 struct SetValue
 {
-    static_assert(!BuildTraits<BuildT>::is_special, "SetValue does not support special value types");
+    static_assert(!BuildTraits<BuildT>::is_special, "SetValue does not support special value types, e.g. Fp4, Fp8, Fp16, FpN");
     using ValueT = typename NanoLeaf<BuildT>::ValueType;
-    __hostdev__ static auto set(NanoRoot<BuildT>&, const ValueT&) {} // no-op
-    __hostdev__ static auto set(typename NanoRoot<BuildT>::Tile& tile, const ValueT& v) { tile.value = v; }
-    __hostdev__ static auto set(NanoUpper<BuildT>& node, uint32_t n, const ValueT& v) { node.mTable[n].value = v; }
-    __hostdev__ static auto set(NanoLower<BuildT>& node, uint32_t n, const ValueT& v) { node.mTable[n].value = v; }
-    __hostdev__ static auto set(NanoLeaf<BuildT>& leaf,  uint32_t n, const ValueT& v) { leaf.mValues[n] = v; }
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static void set(NanoRoot<BuildT>&, const ValueT&) {} // no-op
+    __hostdev__ static void set(typename NanoRoot<BuildT>::Tile& tile, const ValueT& v) { tile.value = v; }
+    __hostdev__ static void set(NanoUpper<BuildT>& node, uint32_t n, const ValueT& v) { node.mTable[n].value = v; }
+    __hostdev__ static void set(NanoLower<BuildT>& node, uint32_t n, const ValueT& v) { node.mTable[n].value = v; }
+    __hostdev__ static void set(NanoLeaf<BuildT>& leaf,  uint32_t n, const ValueT& v) { leaf.mValues[n] = v; }
 }; // SetValue<BuildT>
 
 template<typename BuildT>
 struct SetVoxel
 {
-    static_assert(!BuildTraits<BuildT>::is_special, "SetVoxel does not support special value types");
+    static_assert(!BuildTraits<BuildT>::is_special, "SetVoxel does not support special value types. e.g. Fp4, Fp8, Fp16, FpN");
     using ValueT = typename NanoLeaf<BuildT>::ValueType;
-    __hostdev__ static auto set(NanoRoot<BuildT>&, const ValueT&) {} // no-op
-    __hostdev__ static auto set(typename NanoRoot<BuildT>::Tile&, const ValueT&) {} // no-op
-    __hostdev__ static auto set(NanoUpper<BuildT>&, uint32_t, const ValueT&) {} // no-op
-    __hostdev__ static auto set(NanoLower<BuildT>&, uint32_t, const ValueT&) {} // no-op
-    __hostdev__ static auto set(NanoLeaf<BuildT>& leaf, uint32_t n, const ValueT& v) { leaf.mValues[n] = v; }
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static void set(NanoRoot<BuildT>&, const ValueT&) {} // no-op
+    __hostdev__ static void set(typename NanoRoot<BuildT>::Tile&, const ValueT&) {} // no-op
+    __hostdev__ static void set(NanoUpper<BuildT>&, uint32_t, const ValueT&) {} // no-op
+    __hostdev__ static void set(NanoLower<BuildT>&, uint32_t, const ValueT&) {} // no-op
+    __hostdev__ static void set(NanoLeaf<BuildT>& leaf, uint32_t n, const ValueT& v) { leaf.mValues[n] = v; }
 }; // SetVoxel<BuildT>
 
 /// @brief Implements Tree::isActive(math::Coord)
@@ -6072,11 +6095,13 @@ struct SetVoxel
 template<typename BuildT>
 struct GetState
 {
-    __hostdev__ static auto get(const NanoRoot<BuildT>&) { return false; }
-    __hostdev__ static auto get(const typename NanoRoot<BuildT>::Tile& tile) { return tile.state > 0; }
-    __hostdev__ static auto get(const NanoUpper<BuildT>& node, uint32_t n) { return node.mValueMask.isOn(n); }
-    __hostdev__ static auto get(const NanoLower<BuildT>& node, uint32_t n) { return node.mValueMask.isOn(n); }
-    __hostdev__ static auto get(const NanoLeaf<BuildT>& leaf,  uint32_t n) { return leaf.mValueMask.isOn(n); }
+    using Type = bool;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return false; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile& tile) { return tile.state > 0; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n) { return node.mValueMask.isOn(n); }
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n) { return node.mValueMask.isOn(n); }
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf,  uint32_t n) { return leaf.mValueMask.isOn(n); }
 }; // GetState<BuildT>
 
 /// @brief Implements Tree::getDim(math::Coord)
@@ -6084,11 +6109,13 @@ struct GetState
 template<typename BuildT>
 struct GetDim
 {
-    __hostdev__ static uint32_t get(const NanoRoot<BuildT>&) { return 0u; } // background
-    __hostdev__ static uint32_t get(const typename NanoRoot<BuildT>::Tile&) { return 4096u; }
-    __hostdev__ static uint32_t get(const NanoUpper<BuildT>&, uint32_t) { return 128u; }
-    __hostdev__ static uint32_t get(const NanoLower<BuildT>&, uint32_t) { return 8u; }
-    __hostdev__ static uint32_t get(const NanoLeaf<BuildT>&, uint32_t) { return 1u; }
+    using Type = uint32_t;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return 0u; } // background
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile&) { return 4096u; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>&, uint32_t) { return 128u; }
+    __hostdev__ static Type get(const NanoLower<BuildT>&, uint32_t) { return 8u; }
+    __hostdev__ static Type get(const NanoLeaf<BuildT>&, uint32_t) { return 1u; }
 }; // GetDim<BuildT>
 
 /// @brief Return the pointer to the leaf node that contains math::Coord. Implements Tree::probeLeaf(math::Coord)
@@ -6096,11 +6123,13 @@ struct GetDim
 template<typename BuildT>
 struct GetLeaf
 {
-    __hostdev__ static const NanoLeaf<BuildT>* get(const NanoRoot<BuildT>&) { return nullptr; }
-    __hostdev__ static const NanoLeaf<BuildT>* get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
-    __hostdev__ static const NanoLeaf<BuildT>* get(const NanoUpper<BuildT>&, uint32_t) { return nullptr; }
-    __hostdev__ static const NanoLeaf<BuildT>* get(const NanoLower<BuildT>&, uint32_t) { return nullptr; }
-    __hostdev__ static const NanoLeaf<BuildT>* get(const NanoLeaf<BuildT>& leaf, uint32_t) { return &leaf; }
+    using Type = const NanoLeaf<BuildT>*;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return nullptr; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>&, uint32_t) { return nullptr; }
+    __hostdev__ static Type get(const NanoLower<BuildT>&, uint32_t) { return nullptr; }
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf, uint32_t) { return &leaf; }
 }; // GetLeaf<BuildT>
 
 /// @brief Return point to the lower internal node where math::Coord maps to one of its values, i.e. terminates
@@ -6108,11 +6137,12 @@ struct GetLeaf
 template<typename BuildT>
 struct GetLower
 {
-    __hostdev__ static const NanoLower<BuildT>* get(const NanoRoot<BuildT>&) { return nullptr; }
-    __hostdev__ static const NanoLower<BuildT>* get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
-    __hostdev__ static const NanoLower<BuildT>* get(const NanoUpper<BuildT>&, uint32_t) { return nullptr; }
-    __hostdev__ static const NanoLower<BuildT>* get(const NanoLower<BuildT>& node, uint32_t) { return &node; }
-    __hostdev__ static const NanoLower<BuildT>* get(const NanoLeaf<BuildT>&, uint32_t) { return nullptr; }
+    using Type = const NanoLower<BuildT>*;
+    static constexpr int LEVEL = 1;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return nullptr; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>&, uint32_t) { return nullptr; }
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t) { return &node; }
 }; // GetLower<BuildT>
 
 /// @brief Return point to the upper internal node where math::Coord maps to one of its values, i.e. terminates
@@ -6120,40 +6150,53 @@ struct GetLower
 template<typename BuildT>
 struct GetUpper
 {
-    __hostdev__ static const NanoUpper<BuildT>* get(const NanoRoot<BuildT>&) { return nullptr; }
-    __hostdev__ static const NanoUpper<BuildT>* get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
-    __hostdev__ static const NanoUpper<BuildT>* get(const NanoUpper<BuildT>& node, uint32_t) { return &node; }
-    __hostdev__ static const NanoUpper<BuildT>* get(const NanoLower<BuildT>& node, uint32_t) { return nullptr; }
-    __hostdev__ static const NanoUpper<BuildT>* get(const NanoLeaf<BuildT>&, uint32_t) { return nullptr; }
+    using Type = const NanoUpper<BuildT>*;
+    static constexpr int LEVEL = 2;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return nullptr; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile&) { return nullptr; }
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t) { return &node; }
 }; // GetUpper<BuildT>
+
+/// @brief Return point to the root Tile where math::Coord maps to one of its values, i.e. terminates
+/// @tparam BuildT Build type of the grid being called
+template<typename BuildT>
+struct GetTile
+{
+    using Type = const typename NanoRoot<BuildT>::Tile*;
+    static constexpr int LEVEL = 3;// minimum level for the descent during top-down traversal
+    __hostdev__ static Type get(const NanoRoot<BuildT>&) { return nullptr; }
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile &tile) { return &tile; }
+}; // GetTile<BuildT>
 
 /// @brief Implements Tree::probeLeaf(math::Coord)
 /// @tparam BuildT Build type of the grid being called
 template<typename BuildT>
 struct ProbeValue
 {
+    using Type = bool;
+    static constexpr int LEVEL = 0;// minimum level for the descent during top-down traversal
     using ValueT = typename BuildToValueMap<BuildT>::Type;
-    __hostdev__ static bool get(const NanoRoot<BuildT>& root, ValueT& v)
+    __hostdev__ static Type get(const NanoRoot<BuildT>& root, ValueT& v)
     {
         v = root.mBackground;
         return false;
     }
-    __hostdev__ static bool get(const typename NanoRoot<BuildT>::Tile& tile, ValueT& v)
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile& tile, ValueT& v)
     {
         v = tile.value;
         return tile.state > 0u;
     }
-    __hostdev__ static bool get(const NanoUpper<BuildT>& node, uint32_t n, ValueT& v)
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n, ValueT& v)
     {
         v = node.mTable[n].value;
         return node.mValueMask.isOn(n);
     }
-    __hostdev__ static bool get(const NanoLower<BuildT>& node, uint32_t n, ValueT& v)
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n, ValueT& v)
     {
         v = node.mTable[n].value;
         return node.mValueMask.isOn(n);
     }
-    __hostdev__ static bool get(const NanoLeaf<BuildT>& leaf, uint32_t n, ValueT& v)
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf, uint32_t n, ValueT& v)
     {
         v = leaf.getValue(n);
         return leaf.mValueMask.isOn(n);
@@ -6174,23 +6217,25 @@ struct GetNodeInfo
         FloatType average, stdDevi;
         CoordBBox bbox;
     };
-    __hostdev__ static NodeInfo get(const NanoRoot<BuildT>& root)
+    static constexpr int LEVEL = 0;
+    using Type = NodeInfo;
+    __hostdev__ static Type get(const NanoRoot<BuildT>& root)
     {
         return NodeInfo{3u, NanoUpper<BuildT>::DIM, root.minimum(), root.maximum(), root.average(), root.stdDeviation(), root.bbox()};
     }
-    __hostdev__ static NodeInfo get(const typename NanoRoot<BuildT>::Tile& tile)
+    __hostdev__ static Type get(const typename NanoRoot<BuildT>::Tile& tile)
     {
         return NodeInfo{3u, NanoUpper<BuildT>::DIM, tile.value, tile.value, static_cast<FloatType>(tile.value), 0, CoordBBox::createCube(tile.origin(), NanoUpper<BuildT>::DIM)};
     }
-    __hostdev__ static NodeInfo get(const NanoUpper<BuildT>& node, uint32_t n)
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n)
     {
         return NodeInfo{2u, node.dim(), node.minimum(), node.maximum(), node.average(), node.stdDeviation(), node.bbox()};
     }
-    __hostdev__ static NodeInfo get(const NanoLower<BuildT>& node, uint32_t n)
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n)
     {
         return NodeInfo{1u, node.dim(), node.minimum(), node.maximum(), node.average(), node.stdDeviation(), node.bbox()};
     }
-    __hostdev__ static NodeInfo get(const NanoLeaf<BuildT>& leaf, uint32_t n)
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf, uint32_t n)
     {
         return NodeInfo{0u, leaf.dim(), leaf.minimum(), leaf.maximum(), leaf.average(), leaf.stdDeviation(), leaf.bbox()};
     }
