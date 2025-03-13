@@ -18,6 +18,7 @@
 #include <nanovdb/NanoVDB.h>
 
 #ifdef NANOVDB_USE_TBB
+#include <memory>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 #endif

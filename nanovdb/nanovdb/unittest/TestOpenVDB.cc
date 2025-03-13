@@ -1667,7 +1667,7 @@ TEST_F(TestOpenVDB, File)
     EXPECT_TRUE(dstGrid);
 
     EXPECT_TRUE(handles[0].data());
-    EXPECT_TRUE(handles[0].size() > 0);
+    EXPECT_TRUE(handles[0].bufferSize() > 0);
 
     auto kernel = [&](const openvdb::CoordBBox& bbox) {
         using CoordT = const nanovdb::Coord;
@@ -2783,6 +2783,29 @@ TEST_F(TestOpenVDB, Benchmark_OpenVDB_PointDataGrid)
 
 }// Benchmark_OpenVDB_PointDataGrid
 #endif
+
+// make testOpenVDB && ./unittest/testOpenVDB --gtest_filter="*BBox"
+TEST_F(TestOpenVDB, BBox)
+{
+    const double voxelSize = 5.0;
+    auto nanoHandle = nanovdb::tools::createFogVolumeBox<float>(40, 60, 100, nanovdb::Vec3d(0.0), voxelSize);
+    auto nanoGrid = nanoHandle.grid<float>();
+    EXPECT_TRUE(nanoGrid);
+    auto openGrid = nanovdb::tools::nanoToOpenVDB(*nanoGrid);
+    auto indexBBox = openGrid->evalActiveVoxelBoundingBox();
+    //std::cerr << "OpenVDB index bbox:\t" << indexBBox << std::endl;
+    //std::cerr << "NanoVDB index bbox:\t" << nanoGrid->indexBBox() << std::endl;
+    auto worldBBoxMin = openGrid->transform().indexToWorld(indexBBox.min());
+    auto worldBBoxMax = openGrid->transform().indexToWorld(indexBBox.max().offsetBy(1));// <----- !!!!!!!!!
+    //std::cout << "OpenVDB world bbox:\t" << worldBBoxMin << " -> " << worldBBoxMax << std::endl;
+    //std::cerr << "NanoVDB world bbox:\t" << nanoGrid->worldBBox() << std::endl;
+    for (int i=0; i<3; ++i) {
+        EXPECT_EQ(  nanoGrid->indexBBox()[0][i], indexBBox.min()[i]);
+        EXPECT_EQ(  nanoGrid->indexBBox()[1][i], indexBBox.max()[i]);
+        EXPECT_NEAR(nanoGrid->worldBBox()[0][i], worldBBoxMin[i], 1e-6);
+        EXPECT_NEAR(nanoGrid->worldBBox()[1][i], worldBBoxMax[i], 1e-6);
+    }
+}// BBox
 
 int main(int argc, char** argv)
 {

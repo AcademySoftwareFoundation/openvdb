@@ -359,7 +359,9 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     mNodeAcc.meta  = mNodeAcc.node[0]  + NanoLeaf<DstBuildT>::DataType::memUsage()*mNodeAcc.nodeCount[0];// leaf nodes end and blind meta data begins
     mNodeAcc.blind = mNodeAcc.meta  + 0*sizeof(GridBlindMetaData); // meta data ends and blind data begins
     mNodeAcc.size  = mNodeAcc.blind;// end of buffer
-    auto buffer = BufferT::create(mNodeAcc.size, &pool, false, mStream);
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    auto buffer = BufferT::create(mNodeAcc.size, &pool, device, mStream);
     mNodeAcc.d_dstPtr = buffer.deviceData();
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
 
