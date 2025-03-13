@@ -365,8 +365,7 @@ public:
 
     void processLowerNodes();
 
-    template <typename PtrT>
-    void processLeafNodes(const PtrT points);
+    void processLeafNodes();
 
     template <typename PtrT>
     void processPoints(const PtrT points, size_t pointCount);
@@ -515,7 +514,7 @@ PointsToGrid<BuildT>::getHandle(const PtrT points,
     this->processLowerNodes();
 
     if (mVerbose==1) mTimer.restart("Process leaf nodes");
-    this->processLeafNodes(points);
+    this->processLeafNodes();
 
     if (mVerbose==1) mTimer.restart("Process points");
     this->processPoints(points, pointCount);
@@ -1101,8 +1100,7 @@ struct SetLeafInactiveVoxelValuesFunctor
 };
 
 template <typename BuildT>
-template <typename PtrT>
-inline void PointsToGrid<BuildT>::processLeafNodes(const PtrT points)
+inline void PointsToGrid<BuildT>::processLeafNodes()
 {
     const uint8_t flags = static_cast<uint8_t>(mData.flags.data());// mIncludeStats ? 16u : 0u;// 4th bit indicates stats
 
