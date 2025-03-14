@@ -835,7 +835,7 @@ SOP_OpenVDB_Filter_Level_Set::Cache::cookVDBSop(
                 continue;
             }
 
-            // Appply filters
+            // Apply filters
 
             bool wasFiltered = applyFilters<openvdb::FloatGrid>(
                 *it, filterParms, boss.interrupter(), context, *gdp, verbose);

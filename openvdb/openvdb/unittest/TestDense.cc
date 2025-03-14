@@ -43,7 +43,7 @@ TEST_F(TestDense, testDenseZYX)
                                   openvdb::Coord(-11, 7,22));
     openvdb::tools::Dense<float> dense(bbox);//LayoutZYX is the default
 
-    // Check Desne::origin()
+    // Check Dense::origin()
     EXPECT_TRUE(openvdb::Coord(-40,-5, 6) == dense.origin());
 
     // Check coordToOffset and offsetToCoord
@@ -118,7 +118,7 @@ TEST_F(TestDense, testDenseXYZ)
                                   openvdb::Coord(-11, 7,22));
     openvdb::tools::Dense<float, openvdb::tools::LayoutXYZ> dense(bbox);
 
-    // Check Desne::origin()
+    // Check Dense::origin()
     EXPECT_TRUE(openvdb::Coord(-40,-5, 6) == dense.origin());
 
     // Check coordToOffset and offsetToCoord
@@ -213,7 +213,7 @@ public:
     {
         openvdb::tree::ValueAccessor<const TreeT> acc(*mTree);
 
-        if (DenseT::memoryLayout() == openvdb::tools::LayoutZYX) {//resolved at compiletime
+        if (DenseT::memoryLayout() == openvdb::tools::LayoutZYX) {//resolved at compile time
             for (openvdb::Coord P(bbox.min()); P[0] <= bbox.max()[0]; ++P[0]) {
                 for (P[1] = bbox.min()[1]; P[1] <= bbox.max()[1]; ++P[1]) {
                     for (P[2] = bbox.min()[2]; P[2] <= bbox.max()[2]; ++P[2]) {
@@ -435,7 +435,7 @@ TestDense::testDense2Sparse()
     const CoordBBox bboxD = dense.bbox();
     // std::cerr <<  "\nDense bbox" << bboxD << std::endl;
 
-    // Verify that the CoordBBox is truely used as [inclusive, inclusive]
+    // Verify that the CoordBBox is truly used as [inclusive, inclusive]
     EXPECT_TRUE(int(dense.valueCount()) == int(sizeX * sizeY * sizeZ));
 
     // Fill the dense grid with constant value 1.
@@ -556,7 +556,7 @@ TestDense::testDense2Sparse2()
     const CoordBBox bboxD = dense.bbox();
     //std::cerr <<  "\nDense bbox" << bboxD << std::endl;
 
-    // Verify that the CoordBBox is truely used as [inclusive, inclusive]
+    // Verify that the CoordBBox is truly used as [inclusive, inclusive]
     EXPECT_EQ(sizeX * sizeY * sizeZ, static_cast<int>(dense.valueCount()));
 
     // Fill the dense grid with constant value 1.

@@ -1734,7 +1734,7 @@ tbb::parallel_for(leafManager.leafRange(/*grainsize=*/1000000), op);
 
 @subsection sPointGroups Creating and Assigning Point Groups
 
-Point groups in OpenVDB are analagous to Houdini point groups as an
+Point groups in OpenVDB are analogous to Houdini point groups as an
 efficient way of tagging specific points to belong to a named group.
 
 This example uses the data set generated in the @ref sPointsGeneration example.
@@ -1919,7 +1919,7 @@ point groups for a custom filter. This is using the same data set
 from the previous example.
 
 @code
-// Evalutate true for points that are positive in Y only
+// Evaluate true for points that are positive in Y only
 struct PositiveYFilter
 {
     using Handle = openvdb::points::AttributeHandle<openvdb::Vec3f>;

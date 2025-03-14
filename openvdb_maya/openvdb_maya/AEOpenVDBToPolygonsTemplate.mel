@@ -53,7 +53,7 @@ global proc replaceOpenVDBToPolygonsGridSelection(string $attr)
         for ($name in $gridNames) menuItem -l $name -parent vdbGridNameMenu;
     }
 
-    /// @todo re-select previous item if it exists, don't update VdbSelectedGridNames if the same item is selectd.
+    /// @todo re-select previous item if it exists, don't update VdbSelectedGridNames if the same item is selected.
 }
 
 global proc updateOpenVDBToPolygonsGridSelection(string $attr)

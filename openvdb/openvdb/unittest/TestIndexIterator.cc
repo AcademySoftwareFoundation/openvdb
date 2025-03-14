@@ -40,7 +40,7 @@ public:
     {
         (void)msg;
 #ifdef PROFILE
-        // padd string to 50 characters
+        // pad string to 50 characters
         std::string newMsg(msg);
         if (newMsg.size() < 50)     newMsg.insert(newMsg.end(), 50 - newMsg.size(), ' ');
         std::cerr << newMsg << " ... ";
@@ -50,7 +50,7 @@ public:
 
     ~ProfileTimer() { this->stop(); }
 
-    /// Return Time diference in milliseconds since construction or start was called.
+    /// Return Time difference in milliseconds since construction or start was called.
     inline double delta() const
     {
         tbb::tick_count::interval_t dt = tbb::tick_count::now() - mT0;

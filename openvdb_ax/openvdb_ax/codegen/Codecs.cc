@@ -309,7 +309,7 @@ const CodecTypeMap& getCodecTypeMap()
 {
     // Initialise the static codec registry of supported types.
     // This can easily be exposed to users so they can write their own codecs,
-    // but it would turn into either another static mutex regitry or another
+    // but it would turn into either another static mutex registry or another
     // object that would have to be passed from the codegen to the executables.
     // When we have AX pipelines we should expose this
 

@@ -466,7 +466,7 @@ private:
 /// @brief  A Block node represents a scoped list of statements. It may comprise
 ///         of 0 or more statements, and specifically indicates that a new scope
 ///         is activated, typically represented by curly braces. Note that a
-///         block does not alway have to be encapsulated by curly braces, but
+///         block does not always have to be encapsulated by curly braces, but
 ///         always represents a new scope.
 /// @note   Statements held by the block are guaranteed to be valid (non null).
 ///         nullptrs added to the block are implicitly dropped.
@@ -2246,7 +2246,7 @@ private:
 ///         the AX parser). Negative values are represented by a combination of
 ///         a UnaryOperator holding a Value AST node.
 /// @note   Note that Value AST nodes representing strings are specialized and
-///         are guranteed to be "well-formed" (there is no numerical conversion)
+///         are guaranteed to be "well-formed" (there is no numerical conversion)
 /// @note   A Value is a complete "leaf-level" AST node. It has no children and
 ///         nothing derives from it.
 template <typename T>

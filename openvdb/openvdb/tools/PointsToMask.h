@@ -128,8 +128,8 @@ public:
     {
         if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
         if (grainSize > 0) {
-            typename GridT::Ptr examplar = mGrid->copyWithNewTree();
-            PoolType pool( *examplar );//thread local storage pool of grids
+            typename GridT::Ptr exemplar = mGrid->copyWithNewTree();
+            PoolType pool( *exemplar );//thread local storage pool of grids
             AddPoints<PointListT, VecT> tmp(points, pool, grainSize, *this );
             if ( this->interrupt() ) return;
             ReducePool reducePool(pool, mGrid, size_t(0));

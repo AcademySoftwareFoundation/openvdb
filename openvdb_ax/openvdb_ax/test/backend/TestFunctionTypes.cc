@@ -992,7 +992,7 @@ TestFunctionTypes::testFunctionCall()
     call->eraseFromParent();
     VERIFY_MODULE_IR(&M);
 
-    // Test called with non castable args, but matchign signature size.
+    // Test called with non castable args, but matching signature size.
     // Test IR is invalid due to cast being off
 
     result = test->call(argsToCast, B, /*cast*/false);
@@ -1886,7 +1886,7 @@ TestFunctionTypes::testIRFunctions()
 
     CPPUNIT_ASSERT(!M.getFunction("ax.ir.retnull.test"));
     // will throw as the function expects a float ret, not void or null
-    // NOTE: The function will still be created, but be in an invaid state
+    // NOTE: The function will still be created, but be in an invalid state
     CPPUNIT_ASSERT_THROW(test->create(M), openvdb::AXCodeGenError);
     function = M.getFunction("ax.ir.retnull.test");
     CPPUNIT_ASSERT(function);

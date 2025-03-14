@@ -491,7 +491,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
                 for (std::vector<CoordBBox> bboxVec = { tileBBox }; !bboxVec.empty(); ) {
                     // For efficiency, subdivide sufficiently large tiles and discard
                     // subregions based on additional bounding box intersection tests.
-                    // The mimimum subregion size is chosen so that cost of the
+                    // The minimum subregion size is chosen so that cost of the
                     // bounding box test is comparable to testing every voxel.
                     if (bboxVec.back().volume() > 64 && bboxVec.back().is_divisible()) {
                         // Subdivide this region in-place and append the other half to the list.

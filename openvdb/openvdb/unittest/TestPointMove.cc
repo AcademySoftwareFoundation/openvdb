@@ -248,7 +248,7 @@ void TestPointMove::testCachedDeformer()
     cachedDeformer.apply(newPosition, indexIter);
     EXPECT_TRUE(math::isApproxEqual(position, newPosition));
 
-    // insert a new value into the leaf vector and verify tbe position is deformed
+    // insert a new value into the leaf vector and verify the position is deformed
     Vec3d deformedPosition(5,10,15);
     leaf.vecData.push_back(deformedPosition);
     cachedDeformer.apply(newPosition, indexIter);

@@ -562,7 +562,7 @@ ViewportModule::render()
     GLfloat modelview[16];
     glGetFloatv(GL_MODELVIEW_MATRIX, &modelview[0]);
 
-    // Stash current viewport settigs.
+    // Stash current viewport settings.
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, &viewport[0]);
 

@@ -620,7 +620,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
     const bool threaded = this->getThreaded();
 
     // Actual dilation op. main implementation is single threaded. Note that this
-    // is templated (auto-ed) as the threaded implemenation may call this with a
+    // is templated (auto-ed) as the threaded implementation may call this with a
     // different value type to the source morphology class
     // @note  GCC 6.4.0 crashes trying to compile this lambda with [&] capture
     auto dilate = [iter, nn, threaded](auto& manager, const bool collapse) {
@@ -715,7 +715,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
             topology.stealNodes(array);
         }
         else if (preserveMaskLeafNodes) {
-            mask = nullptr; // act as if theres no mask tree
+            mask = nullptr; // act as if there is no mask tree
             array.resize(mManager.leafCount());
             tbb::parallel_for(mManager.getRange(),
                 [&](const tbb::blocked_range<size_t>& r){
@@ -1143,7 +1143,7 @@ void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
 
     if (iterations <= 0) return;
 
-    // If the tile policiy is PRESERVE_TILES, peform the erosion on a
+    // If the tile policy is PRESERVE_TILES, perform the erosion on a
     // voxelized mask grid followed by a topology intersection such that
     // the original uneroded topology is preserved.
     if (mode == PRESERVE_TILES) {

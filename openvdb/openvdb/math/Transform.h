@@ -60,7 +60,7 @@ public:
     /// Return @c true if the transformation map is exclusively linear/affine.
     bool isLinear() const { return mMap->isLinear(); }
 
-    /// Return @c true if the transform is equivalent to an idenity.
+    /// Return @c true if the transform is equivalent to an identity.
     bool isIdentity() const ;
     /// Return the transformation map's type-name
     Name mapType() const { return mMap->type(); }
@@ -71,7 +71,7 @@ public:
     /// postfixing the appropriate operation.  In the case of
     /// a frustum, the pre-operations apply to the linear part
     /// of the transform and not the entire transform, while the
-    /// post-operations are allways applied last.
+    /// post-operations are always applied last.
     void preRotate(double radians, const Axis axis = X_AXIS);
     void preTranslate(const Vec3d&);
     void preScale(const Vec3d&);
@@ -215,7 +215,7 @@ doProcessTypedMap(const Transform& transform, OpType& op)
 
 
 /// @brief Utility function that, given a generic map pointer,
-/// calls a functor on the fully-resoved map
+/// calls a functor on the fully-resolved map
 ///
 /// Usage:
 /// @code

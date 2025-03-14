@@ -543,7 +543,7 @@ GU_PrimVDB::registerMyself(GA_PrimitiveFactory *factory)
     theDefinition->setMergeConstructor(&gaPrimitiveMergeConstructor);
     registerIntrinsics(*theDefinition);
 
-    // Register the GT tesselation too (now we know what type id we have)
+    // Register the GT tessellation too (now we know what type id we have)
     openvdb_houdini::GT_GEOPrimCollectVDB::registerPrimitive(theDefinition->getId());
 }
 #endif

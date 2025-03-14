@@ -411,7 +411,7 @@ compareAttributes<openvdb::points::PointDataTree::LeafNodeType>
 
         const std::string& type = array1.type().first;
         if (type != array2.type().first) {
-            // this mismatch is also loged by differing descriptors
+            // this mismatch is also logged by differing descriptors
             auto& arrayData = data.getDiagnosticArrayData(name);
             arrayData.mTypesMatch = false;
             continue;
@@ -601,7 +601,7 @@ bool compareGrids(ComparisonResult& resultData,
     differingTopology.setName("different_topology");
     differingValues.setName("different_values");
 
-    // Print diagnostic info to the stream and intialise the result topologies
+    // Print diagnostic info to the stream and initialise the result topologies
 
     openvdb::MaskGrid::Accessor accessorTopology = differingTopology.getAccessor();
     openvdb::MaskGrid::Accessor accessorValues = differingValues.getAccessor();
