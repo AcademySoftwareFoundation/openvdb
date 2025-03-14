@@ -1062,41 +1062,51 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_ValueOnIndex)
     idxHdl.deviceUpload();
     auto *idxGrid = idxHdl.grid<BuildT>();
     EXPECT_TRUE(idxGrid);
-    //timer.restart("Create value list on CPU");
-    float *values = new float[idxGrid->valueCount()], *d_values = nullptr;
-    values[0] = floatGrid->tree().root().background();
-    for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
-        EXPECT_EQ(acc.isActive(*it), idxGrid->tree().isActive(*it));
-        if (acc.isActive(*it)) {
-            const uint64_t idx = idxGrid->tree().getValue(*it);
-            EXPECT_TRUE(idx < idxGrid->valueCount());
-            values[idx] = acc.getValue(*it);
+
+    auto checkConvertedValueGrid = [&](const auto& fromOriginalData, const auto& toOriginalData) {
+        using FloatType = decltype(fromOriginalData(0.0f));
+
+        //timer.restart("Create value list on CPU");
+        FloatType *values = new FloatType[idxGrid->valueCount()], *d_values = nullptr;
+        values[0] = fromOriginalData(floatGrid->tree().root().background());
+        for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
+            EXPECT_EQ(acc.isActive(*it), idxGrid->tree().isActive(*it));
+            if (acc.isActive(*it)) {
+                const uint64_t idx = idxGrid->tree().getValue(*it);
+                EXPECT_TRUE(idx < idxGrid->valueCount());
+                values[idx] = fromOriginalData(acc.getValue(*it));
+            }
         }
-    }
-    //timer.restart("Allocate and copy values from CPU to GPU");
-    cudaCheck(cudaMalloc((void**)&d_values, idxGrid->valueCount()*sizeof(float)));
-    cudaCheck(cudaMemcpy(d_values, values, idxGrid->valueCount()*sizeof(float), cudaMemcpyHostToDevice));
-    EXPECT_FALSE(idxHdl.deviceGrid<float>());
-    auto *d_idxGrid = idxHdl.deviceGrid<BuildT>();
-    EXPECT_TRUE(d_idxGrid);
-    //timer.restart("Call CudaIndexToGrid");
-    auto hdl = nanovdb::tools::cuda::indexToGrid<float>(d_idxGrid, d_values);
-    //timer.restart("unit-test");
-    EXPECT_FALSE(hdl.grid<float>());// no host grid
-    EXPECT_TRUE(hdl.deviceGrid<float>());
-    hdl.deviceDownload();
-    auto *floatGrid2 = hdl.grid<float>();
-    EXPECT_TRUE(floatGrid2);
-    auto acc2 = floatGrid2->getAccessor();
-    EXPECT_EQ(floatGrid->indexBBox(), floatGrid2->indexBBox());
-    EXPECT_EQ(floatGrid->worldBBox(), floatGrid2->worldBBox());
-    EXPECT_EQ(floatGrid->tree().root().background(), floatGrid2->tree().root().background());
-    for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
-        EXPECT_EQ(acc.isActive(*it), acc2.isActive(*it));
-        if (acc.isActive(*it)) EXPECT_EQ(acc.getValue(*it), acc2.getValue(*it));
-    }
-    //timer.stop();
-    cudaFree(d_values);
+        //timer.restart("Allocate and copy values from CPU to GPU");
+        cudaCheck(cudaMalloc((void**)&d_values, idxGrid->valueCount()*sizeof(FloatType)));
+        cudaCheck(cudaMemcpy(d_values, values, idxGrid->valueCount()*sizeof(FloatType), cudaMemcpyHostToDevice));
+        EXPECT_FALSE(idxHdl.deviceGrid<FloatType>());
+        auto *d_idxGrid = idxHdl.deviceGrid<BuildT>();
+        EXPECT_TRUE(d_idxGrid);
+        //timer.restart("Call CudaIndexToGrid");
+        auto hdl = nanovdb::tools::cuda::indexToGrid<FloatType>(d_idxGrid, d_values);
+        //timer.restart("unit-test");
+        EXPECT_FALSE(hdl.template grid<FloatType>());// no host grid
+        EXPECT_TRUE(hdl.template deviceGrid<FloatType>());
+        hdl.deviceDownload();
+        auto *floatGrid2 = hdl.template grid<FloatType>();
+        EXPECT_TRUE(floatGrid2);
+        auto acc2 = floatGrid2->getAccessor();
+        EXPECT_EQ(floatGrid->indexBBox(), floatGrid2->indexBBox());
+        EXPECT_EQ(floatGrid->worldBBox(), floatGrid2->worldBBox());
+        EXPECT_EQ(floatGrid->tree().root().background(), toOriginalData(floatGrid2->tree().root().background()));
+        for (auto it = floatGrid->indexBBox().begin(); it; ++it) {
+            EXPECT_EQ(acc.isActive(*it), acc2.isActive(*it));
+            if (acc.isActive(*it)) EXPECT_EQ(acc.getValue(*it), toOriginalData(acc2.getValue(*it)));
+        }
+        //timer.stop();
+        cudaFree(d_values);
+    };
+    checkConvertedValueGrid([](float x) { return x; }, [](float x) { return x; });
+
+    // Convert index grid to grid of Vec3fs, whereat the original float data is just stored in all components of a Vec3f.
+    // This test covers code in indexToGrid that is only relevant if the size of grid data changes and does not align.
+    checkConvertedValueGrid([](float x) { return nanovdb::Vec3f(x); }, [](const nanovdb::Vec3f& x) { return x[0]; });
 }//  CudaPointToGrid_ValueOnIndex
 
 TEST(TestNanoVDBCUDA, CudaSignedFloodFill)
