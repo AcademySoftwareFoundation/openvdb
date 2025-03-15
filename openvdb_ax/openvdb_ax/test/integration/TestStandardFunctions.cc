@@ -13,8 +13,6 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/util/CpuTimer.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
@@ -28,136 +26,13 @@ class TestStandardFunctions : public unittest_util::AXTestCase
 {
 public:
 #ifdef PROFILE
-    void setUp() override {
+    void SetUp() override {
         // if PROFILE, generate more data for each test
         mHarness.reset(/*ppv*/8, openvdb::CoordBBox({0,0,0},{50,50,50}));
     }
 #endif
-
-    CPPUNIT_TEST_SUITE(TestStandardFunctions);
-    CPPUNIT_TEST(abs);
-    CPPUNIT_TEST(acos);
-    CPPUNIT_TEST(adjoint);
-    CPPUNIT_TEST(argsort);
-    CPPUNIT_TEST(asin);
-    CPPUNIT_TEST(atan);
-    CPPUNIT_TEST(atan2);
-    CPPUNIT_TEST(atof);
-    CPPUNIT_TEST(atoi);
-    CPPUNIT_TEST(cbrt);
-    CPPUNIT_TEST(clamp);
-    CPPUNIT_TEST(cofactor);
-    CPPUNIT_TEST(cosh);
-    CPPUNIT_TEST(cross);
-    CPPUNIT_TEST(curlsimplexnoise);
-    CPPUNIT_TEST(degrees);
-    CPPUNIT_TEST(determinant);
-    CPPUNIT_TEST(diag);
-    CPPUNIT_TEST(dot);
-    CPPUNIT_TEST(euclideanmod);
-    CPPUNIT_TEST(external);
-    CPPUNIT_TEST(fit);
-    CPPUNIT_TEST(floormod);
-    CPPUNIT_TEST(hash);
-    CPPUNIT_TEST(hsvtorgb);
-    CPPUNIT_TEST(identity3);
-    CPPUNIT_TEST(identity4);
-    CPPUNIT_TEST(intrinsic);
-    CPPUNIT_TEST(inverse);
-    CPPUNIT_TEST(isfinite);
-    CPPUNIT_TEST(isinf);
-    CPPUNIT_TEST(isnan);
-    CPPUNIT_TEST(length);
-    CPPUNIT_TEST(lengthsq);
-    CPPUNIT_TEST(lerp);
-    CPPUNIT_TEST(max);
-    CPPUNIT_TEST(min);
-    CPPUNIT_TEST(normalize);
-    CPPUNIT_TEST(polardecompose);
-    CPPUNIT_TEST(postscale);
-    CPPUNIT_TEST(pow);
-    CPPUNIT_TEST(prescale);
-    CPPUNIT_TEST(pretransform);
-    CPPUNIT_TEST(print);
-    CPPUNIT_TEST(radians);
-    CPPUNIT_TEST(rand);
-    CPPUNIT_TEST(rand32);
-    CPPUNIT_TEST(rgbtohsv);
-    CPPUNIT_TEST(sign);
-    CPPUNIT_TEST(signbit);
-    CPPUNIT_TEST(simplexnoise);
-    CPPUNIT_TEST(sinh);
-    CPPUNIT_TEST(sort);
-    CPPUNIT_TEST(tan);
-    CPPUNIT_TEST(tanh);
-    CPPUNIT_TEST(trace);
-    CPPUNIT_TEST(transform);
-    CPPUNIT_TEST(transpose);
-    CPPUNIT_TEST(truncatemod);
-    CPPUNIT_TEST_SUITE_END();
-
-    void abs();
-    void acos();
-    void adjoint();
-    void argsort();
-    void asin();
-    void atan();
-    void atan2();
-    void atof();
-    void atoi();
-    void cbrt();
-    void clamp();
-    void cofactor();
-    void cosh();
-    void cross();
-    void curlsimplexnoise();
-    void degrees();
-    void determinant();
-    void diag();
-    void dot();
-    void euclideanmod();
-    void external();
-    void fit();
-    void floormod();
-    void hash();
-    void hsvtorgb();
-    void identity3();
-    void identity4();
-    void intrinsic();
-    void inverse();
-    void isfinite();
-    void isinf();
-    void isnan();
-    void length();
-    void lengthsq();
-    void lerp();
-    void max();
-    void min();
-    void normalize();
-    void polardecompose();
-    void postscale();
-    void pow();
-    void prescale();
-    void pretransform();
-    void print();
-    void radians();
-    void rand();
-    void rand32();
-    void rgbtohsv();
-    void sign();
-    void signbit();
-    void simplexnoise();
-    void sinh();
-    void sort();
-    void tan();
-    void tanh();
-    void trace();
-    void transform();
-    void transpose();
-    void truncatemod();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestStandardFunctions);
 
 inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
                                 const std::string& name,
@@ -173,7 +48,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     const ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
     timer.stop();
 
-    CPPUNIT_ASSERT_MESSAGE(syntaxTree, "Invalid AX passed to testFunctionOptions.");
+    ASSERT_TRUE(syntaxTree) << "Invalid AX passed to testFunctionOptions.";
 
     // @warning  the first execution can take longer due to some llvm startup
     //           so if you're profiling a single function be aware of this.
@@ -231,8 +106,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     harness.mOpts = opts;
     harness.mCustomData = data;
     bool success = harness.executeCode(file);
-    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
-        success);
+    ASSERT_TRUE(success) << ("error thrown during test: " + file + "\n" + harness.errors());
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 
@@ -247,8 +121,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     harness.mOpts = opts;
     harness.mCustomData = data;
     success = harness.executeCode(file);
-    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
-        success);
+    ASSERT_TRUE(success) << ("error thrown during test: " + file + "\n" + harness.errors());
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 
@@ -263,14 +136,12 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     harness.mOpts = opts;
     harness.mCustomData = data;
     success = harness.executeCode(file);
-    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
-        success);
+    ASSERT_TRUE(success) << ("error thrown during test: " + file + "\n" + harness.errors());
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 }
 
-void
-TestStandardFunctions::abs()
+TEST_F(TestStandardFunctions, abs)
 {
     mHarness.addAttributes<int32_t>(unittest_util::nameSequence("test", 3), {
         std::abs(-3), std::abs(3), std::abs(0)
@@ -283,8 +154,7 @@ TestStandardFunctions::abs()
     testFunctionOptions(mHarness, "abs");
 }
 
-void
-TestStandardFunctions::acos()
+TEST_F(TestStandardFunctions, acos)
 {
     volatile double arg = 0.5;
     volatile float argf = 0.5f;
@@ -293,8 +163,7 @@ TestStandardFunctions::acos()
     testFunctionOptions(mHarness, "acos");
 }
 
-void
-TestStandardFunctions::adjoint()
+TEST_F(TestStandardFunctions, adjoint)
 {
     const openvdb::math::Mat3<double> inputd(
             1.0, -1.0, 0.0,
@@ -315,8 +184,7 @@ TestStandardFunctions::adjoint()
     testFunctionOptions(mHarness, "adjoint");
 }
 
-void
-TestStandardFunctions::argsort()
+TEST_F(TestStandardFunctions, argsort)
 {
     // const openvdb::Vec3d input3d(1.0, -1.0, 0.0);
     // const openvdb::Vec3f input3f(1.0f, -1.0f, 0.0f);
@@ -345,32 +213,28 @@ TestStandardFunctions::argsort()
 }
 
 
-void
-TestStandardFunctions::asin()
+TEST_F(TestStandardFunctions, asin)
 {
     mHarness.addAttribute<double>("test1", std::asin(-0.5));
     mHarness.addAttribute<float>("test2", std::asin(-0.5f));
     testFunctionOptions(mHarness, "asin");
 }
 
-void
-TestStandardFunctions::atan()
+TEST_F(TestStandardFunctions, atan)
 {
     mHarness.addAttribute<double>("test1", std::atan(1.0));
     mHarness.addAttribute<float>("test2", std::atan(1.0f));
     testFunctionOptions(mHarness, "atan");
 }
 
-void
-TestStandardFunctions::atan2()
+TEST_F(TestStandardFunctions, atan2)
 {
     mHarness.addAttribute<double>("test1", std::atan2(1.0, 1.0));
     mHarness.addAttribute<float>("test2", std::atan2(1.0f, 1.0f));
     testFunctionOptions(mHarness, "atan2");
 }
 
-void
-TestStandardFunctions::atoi()
+TEST_F(TestStandardFunctions, atoi)
 {
     const std::vector<int32_t> values {
         std::atoi(""),
@@ -392,8 +256,7 @@ TestStandardFunctions::atoi()
     testFunctionOptions(mHarness, "atoi");
 }
 
-void
-TestStandardFunctions::atof()
+TEST_F(TestStandardFunctions, atof)
 {
     const std::vector<double> values {
         std::atof(""),
@@ -415,8 +278,7 @@ TestStandardFunctions::atof()
     testFunctionOptions(mHarness, "atof");
 }
 
-void
-TestStandardFunctions::cbrt()
+TEST_F(TestStandardFunctions, cbrt)
 {
     volatile double arg = 729.0;
     volatile float argf = 729.0f;
@@ -425,15 +287,13 @@ TestStandardFunctions::cbrt()
     testFunctionOptions(mHarness, "cbrt");
 }
 
-void
-TestStandardFunctions::clamp()
+TEST_F(TestStandardFunctions, clamp)
 {
     mHarness.addAttributes<double>(unittest_util::nameSequence("double_test", 3), {-1.5, 0.0, 1.5});
     testFunctionOptions(mHarness, "clamp");
 }
 
-void
-TestStandardFunctions::cofactor()
+TEST_F(TestStandardFunctions, cofactor)
 {
     const openvdb::math::Mat3<double> inputd(
             1.0, -1.0, 0.0,
@@ -454,8 +314,7 @@ TestStandardFunctions::cofactor()
     testFunctionOptions(mHarness, "cofactor");
 }
 
-void
-TestStandardFunctions::cosh()
+TEST_F(TestStandardFunctions, cosh)
 {
     volatile float arg = 1.0f;
     mHarness.addAttribute<double>("test1", std::cosh(1.0));
@@ -463,8 +322,7 @@ TestStandardFunctions::cosh()
     testFunctionOptions(mHarness, "cosh");
 }
 
-void
-TestStandardFunctions::cross()
+TEST_F(TestStandardFunctions, cross)
 {
     const openvdb::Vec3d ad(1.0,2.2,3.4), bd(4.1,5.3,6.2);
     const openvdb::Vec3f af(1.0f,2.2f,3.4f), bf(4.1f,5.3f,6.2f);
@@ -475,8 +333,7 @@ TestStandardFunctions::cross()
     testFunctionOptions(mHarness, "cross");
 }
 
-void
-TestStandardFunctions::curlsimplexnoise()
+TEST_F(TestStandardFunctions, curlsimplexnoise)
 {
     struct Local {
         static inline double noise(double x, double y, double z) {
@@ -495,16 +352,14 @@ TestStandardFunctions::curlsimplexnoise()
     testFunctionOptions(mHarness, "curlsimplexnoise");
 }
 
-void
-TestStandardFunctions::degrees()
+TEST_F(TestStandardFunctions, degrees)
 {
     mHarness.addAttribute<double>("test1", 1.5708 * (180.0 / openvdb::math::pi<double>()));
     mHarness.addAttribute<float>("test2", -1.1344f * (180.0f / openvdb::math::pi<float>()));
     testFunctionOptions(mHarness, "degrees");
 }
 
-void
-TestStandardFunctions::determinant()
+TEST_F(TestStandardFunctions, determinant)
 {
     mHarness.addAttribute<float>("det3_float",  600.0f);
     mHarness.addAttribute<double>("det3_double", 600.0);
@@ -513,8 +368,7 @@ TestStandardFunctions::determinant()
     testFunctionOptions(mHarness, "determinant");
 }
 
-void
-TestStandardFunctions::diag()
+TEST_F(TestStandardFunctions, diag)
 {
     mHarness.addAttribute<openvdb::math::Mat3<double>>
         ("test1", openvdb::math::Mat3<double>(-1,0,0, 0,-2,0, 0,0,-3));
@@ -531,8 +385,7 @@ TestStandardFunctions::diag()
     testFunctionOptions(mHarness, "diag");
 }
 
-void
-TestStandardFunctions::dot()
+TEST_F(TestStandardFunctions, dot)
 {
     const openvdb::Vec3d ad(1.0,2.2,3.4), bd(4.1,5.3,6.2);
     const openvdb::Vec3f af(1.0f,2.2f,3.4f), bf(4.1f,5.3f,6.2f);
@@ -543,8 +396,7 @@ TestStandardFunctions::dot()
     testFunctionOptions(mHarness, "dot");
 }
 
-void
-TestStandardFunctions::euclideanmod()
+TEST_F(TestStandardFunctions, euclideanmod)
 {
     static auto emod = [](auto D, auto d) -> auto {
         using ValueType = decltype(D);
@@ -561,8 +413,7 @@ TestStandardFunctions::euclideanmod()
     testFunctionOptions(mHarness, "euclideanmod");
 }
 
-void
-TestStandardFunctions::external()
+TEST_F(TestStandardFunctions, external)
 {
     mHarness.addAttribute<float>("foo", 2.0f);
     mHarness.addAttribute<openvdb::Vec3f>("v", openvdb::Vec3f(1.0f, 2.0f, 3.0f));
@@ -610,8 +461,7 @@ TestStandardFunctions::external()
     AXTESTS_STANDARD_ASSERT()
 }
 
-void
-TestStandardFunctions::fit()
+TEST_F(TestStandardFunctions, fit)
 {
     std::vector<double> values{23.0, -23.0, -25.0, -15.0, -15.0, -18.0, -24.0, 0.0, 10.0,
         -5.0, 0.0, -1.0, 4.5, 4.5, 4.5, 4.5, 4.5};
@@ -619,8 +469,7 @@ TestStandardFunctions::fit()
     testFunctionOptions(mHarness, "fit");
 }
 
-void
-TestStandardFunctions::floormod()
+TEST_F(TestStandardFunctions, floormod)
 {
     auto axmod = [](auto D, auto d) -> auto {
         auto r = std::fmod(D, d);
@@ -646,8 +495,7 @@ TestStandardFunctions::floormod()
     testFunctionOptions(mHarness, "floormod");
 }
 
-void
-TestStandardFunctions::hash()
+TEST_F(TestStandardFunctions, hash)
 {
     const std::vector<int64_t> values{
         static_cast<int64_t>(std::hash<std::string>{}("")),
@@ -659,8 +507,7 @@ TestStandardFunctions::hash()
     testFunctionOptions(mHarness, "hash");
 }
 
-void
-TestStandardFunctions::hsvtorgb()
+TEST_F(TestStandardFunctions, hsvtorgb)
 {
     auto axmod = [](auto D, auto d) -> auto {
         auto r = std::fmod(D, d);
@@ -730,22 +577,19 @@ TestStandardFunctions::hsvtorgb()
     testFunctionOptions(mHarness, "hsvtorgb");
 }
 
-void
-TestStandardFunctions::identity3()
+TEST_F(TestStandardFunctions, identity3)
 {
     mHarness.addAttribute<openvdb::Mat3d>("test", openvdb::Mat3d::identity());
     testFunctionOptions(mHarness, "identity3");
 }
 
-void
-TestStandardFunctions::identity4()
+TEST_F(TestStandardFunctions, identity4)
 {
     mHarness.addAttribute<openvdb::Mat4d>("test", openvdb::Mat4d::identity());
     testFunctionOptions(mHarness, "identity4");
 }
 
-void
-TestStandardFunctions::intrinsic()
+TEST_F(TestStandardFunctions, intrinsic)
 {
     mHarness.addAttributes<double>(unittest_util::nameSequence("dtest", 12), {
         std::sqrt(9.0),
@@ -780,8 +624,7 @@ TestStandardFunctions::intrinsic()
     testFunctionOptions(mHarness, "intrinsic");
 }
 
-void
-TestStandardFunctions::inverse()
+TEST_F(TestStandardFunctions, inverse)
 {
     const openvdb::math::Mat3<double> inputd(
             1.0, -1.0, 0.0,
@@ -816,8 +659,7 @@ TestStandardFunctions::inverse()
     testFunctionOptions(mHarness, "inverse");
 }
 
-void
-TestStandardFunctions::isfinite()
+TEST_F(TestStandardFunctions, isfinite)
 {
     mHarness.addAttributes<bool>(
         {"test1","test2","test3","test4","test5","test6","test7","test8","test9","test10", "test11","test12",
@@ -828,8 +670,7 @@ TestStandardFunctions::isfinite()
     testFunctionOptions(mHarness, "isfinite");
 }
 
-void
-TestStandardFunctions::isinf()
+TEST_F(TestStandardFunctions, isinf)
 {
     mHarness.addAttributes<bool>(
         {"test1","test2","test3","test4","test5","test6","test7","test8","test9","test10", "test11","test12",
@@ -840,8 +681,7 @@ TestStandardFunctions::isinf()
     testFunctionOptions(mHarness, "isinf");
 }
 
-void
-TestStandardFunctions::isnan()
+TEST_F(TestStandardFunctions, isnan)
 {
     mHarness.addAttributes<bool>(
         {"test1","test2","test3","test4","test5","test6","test7","test8","test9","test10", "test11","test12",
@@ -853,8 +693,7 @@ TestStandardFunctions::isnan()
 }
 
 
-void
-TestStandardFunctions::length()
+TEST_F(TestStandardFunctions, length)
 {
     mHarness.addAttribute("test1", openvdb::Vec2d(2.2, 3.3).length());
     mHarness.addAttribute("test2", openvdb::Vec2f(2.2f, 3.3f).length());
@@ -870,8 +709,7 @@ TestStandardFunctions::length()
     testFunctionOptions(mHarness, "length");
 }
 
-void
-TestStandardFunctions::lengthsq()
+TEST_F(TestStandardFunctions, lengthsq)
 {
     mHarness.addAttribute("test1", openvdb::Vec2d(2.2, 3.3).lengthSqr());
     mHarness.addAttribute("test2", openvdb::Vec2f(2.2f, 3.3f).lengthSqr());
@@ -887,8 +725,7 @@ TestStandardFunctions::lengthsq()
     testFunctionOptions(mHarness, "lengthsq");
 }
 
-void
-TestStandardFunctions::lerp()
+TEST_F(TestStandardFunctions, lerp)
 {
     mHarness.addAttributes<double>(unittest_util::nameSequence("test", 9),
         {-1.1, 1.0000001, 1.0000001, -1.0000001, 1.1, -1.1, 6.0, 21.0, -19.0});
@@ -896,8 +733,7 @@ TestStandardFunctions::lerp()
     testFunctionOptions(mHarness, "lerp");
 }
 
-void
-TestStandardFunctions::max()
+TEST_F(TestStandardFunctions, max)
 {
     mHarness.addAttribute("test1", std::max(-1.5, 1.5));
     mHarness.addAttribute("test2", std::max(-1.5f, 1.5f));
@@ -905,8 +741,7 @@ TestStandardFunctions::max()
     testFunctionOptions(mHarness, "max");
 }
 
-void
-TestStandardFunctions::min()
+TEST_F(TestStandardFunctions, min)
 {
     mHarness.addAttribute("test1", std::min(-1.5, 1.5));
     mHarness.addAttribute("test2", std::min(-1.5f, 1.5f));
@@ -914,8 +749,7 @@ TestStandardFunctions::min()
     testFunctionOptions(mHarness, "min");
 }
 
-void
-TestStandardFunctions::normalize()
+TEST_F(TestStandardFunctions, normalize)
 {
     openvdb::Vec3f expected3f(1.f, 2.f, 3.f);
     openvdb::Vec3d expected3d(1., 2., 3.);
@@ -941,8 +775,7 @@ TestStandardFunctions::normalize()
     testFunctionOptions(mHarness, "normalize");
 }
 
-void
-TestStandardFunctions::polardecompose()
+TEST_F(TestStandardFunctions, polardecompose)
 {
     // See snippet/polardecompose for details
     const openvdb::Mat3d composite(
@@ -958,8 +791,7 @@ TestStandardFunctions::polardecompose()
     testFunctionOptions(mHarness, "polardecompose");
 }
 
-void
-TestStandardFunctions::postscale()
+TEST_F(TestStandardFunctions, postscale)
 {
 
     mHarness.addAttributes<openvdb::math::Mat4<float>>
@@ -1003,8 +835,7 @@ TestStandardFunctions::postscale()
     testFunctionOptions(mHarness, "postscale");
 }
 
-void
-TestStandardFunctions::pow()
+TEST_F(TestStandardFunctions, pow)
 {
     mHarness.addAttributes<float>(unittest_util::nameSequence("float_test", 5),{
         1.0f,
@@ -1018,8 +849,7 @@ TestStandardFunctions::pow()
     testFunctionOptions(mHarness, "pow");
 }
 
-void
-TestStandardFunctions::prescale()
+TEST_F(TestStandardFunctions, prescale)
 {
 
     mHarness.addAttributes<openvdb::math::Mat4<float>>
@@ -1063,8 +893,7 @@ TestStandardFunctions::prescale()
     testFunctionOptions(mHarness, "prescale");
 }
 
-void
-TestStandardFunctions::pretransform()
+TEST_F(TestStandardFunctions, pretransform)
 {
     mHarness.addAttributes<openvdb::math::Vec3<double>>
         ({"test1", "test3", "test7"}, {
@@ -1089,8 +918,7 @@ TestStandardFunctions::pretransform()
     testFunctionOptions(mHarness, "pretransform");
 }
 
-void
-TestStandardFunctions::print()
+TEST_F(TestStandardFunctions, print)
 {
     openvdb::math::Transform::Ptr transform =
         openvdb::math::Transform::createLinearTransform();
@@ -1123,7 +951,7 @@ TestStandardFunctions::print()
         expected += openvdb::Vec4i(3,4,5,6).str() + "\n";
         expected += "bcd\n";
 
-        CPPUNIT_ASSERT_EQUAL(expected, result);
+        ASSERT_EQ(expected, result);
     }
     catch (...) {
         std::cout.rdbuf(sbuf);
@@ -1133,16 +961,14 @@ TestStandardFunctions::print()
     std::cout.rdbuf(sbuf);
 }
 
-void
-TestStandardFunctions::radians()
+TEST_F(TestStandardFunctions, radians)
 {
     mHarness.addAttribute<double>("test1", 90.0 * (openvdb::math::pi<double>() / 180.0));
     mHarness.addAttribute<float>("test2", -65.0f * (openvdb::math::pi<float>() / 180.0f ));
     testFunctionOptions(mHarness, "radians");
 }
 
-void
-TestStandardFunctions::rand()
+TEST_F(TestStandardFunctions, rand)
 {
     std::mt19937_64 engine;
     std::uniform_real_distribution<double> uniform(0.0,1.0);
@@ -1163,8 +989,7 @@ TestStandardFunctions::rand()
     testFunctionOptions(mHarness, "rand");
 }
 
-void
-TestStandardFunctions::rand32()
+TEST_F(TestStandardFunctions, rand32)
 {
     auto hashToSeed = [](uint64_t hash) ->
         std::mt19937::result_type
@@ -1195,8 +1020,7 @@ TestStandardFunctions::rand32()
     testFunctionOptions(mHarness, "rand32");
 }
 
-void
-TestStandardFunctions::rgbtohsv()
+TEST_F(TestStandardFunctions, rgbtohsv)
 {
     // RGB to HSV conversion. Taken from OpenEXR's ImathColorAlgo
     auto convert = [](const openvdb::Vec3d& rgb) {
@@ -1235,23 +1059,20 @@ TestStandardFunctions::rgbtohsv()
     testFunctionOptions(mHarness, "rgbtohsv");
 }
 
-void
-TestStandardFunctions::sign()
+TEST_F(TestStandardFunctions, sign)
 {
     mHarness.addAttributes<int32_t>(unittest_util::nameSequence("test", 13),
         { 0,0,0,0,0,0,0, -1,-1,-1, 1,1,1 });
     testFunctionOptions(mHarness, "sign");
 }
 
-void
-TestStandardFunctions::signbit()
+TEST_F(TestStandardFunctions, signbit)
 {
     mHarness.addAttributes<bool>(unittest_util::nameSequence("test", 5), {true,false,true,false,false});
     testFunctionOptions(mHarness, "signbit");
 }
 
-void
-TestStandardFunctions::simplexnoise()
+TEST_F(TestStandardFunctions, simplexnoise)
 {
     const OSN::OSNoise noiseGenerator;
 
@@ -1268,16 +1089,14 @@ TestStandardFunctions::simplexnoise()
     testFunctionOptions(mHarness, "simplexnoise");
 }
 
-void
-TestStandardFunctions::sinh()
+TEST_F(TestStandardFunctions, sinh)
 {
     mHarness.addAttribute<double>("test1", std::sinh(1.0));
     mHarness.addAttribute<float>("test2", std::sinh(1.0f));
     testFunctionOptions(mHarness, "sinh");
 }
 
-void
-TestStandardFunctions::sort()
+TEST_F(TestStandardFunctions, sort)
 {
     // const openvdb::Vec3d input3d(1.0, -1.0, 0.0);
     // const openvdb::Vec3f input3f(1.0f, -1.0f, 0.0f);
@@ -1305,32 +1124,28 @@ TestStandardFunctions::sort()
     testFunctionOptions(mHarness, "sort");
 }
 
-void
-TestStandardFunctions::tan()
+TEST_F(TestStandardFunctions, tan)
 {
     mHarness.addAttribute<double>("test1", std::tan(1.0));
     mHarness.addAttribute<float>("test2", std::tan(1.0f));
     testFunctionOptions(mHarness, "tan");
 }
 
-void
-TestStandardFunctions::tanh()
+TEST_F(TestStandardFunctions, tanh)
 {
     mHarness.addAttribute<double>("test1", std::tanh(1.0));
     mHarness.addAttribute<float>("test2", std::tanh(1.0f));
     testFunctionOptions(mHarness, "tanh");
 }
 
-void
-TestStandardFunctions::trace()
+TEST_F(TestStandardFunctions, trace)
 {
     mHarness.addAttribute<double>("test1", 6.0);
     mHarness.addAttribute<float>("test2", 6.0f);
     testFunctionOptions(mHarness, "trace");
 }
 
-void
-TestStandardFunctions::truncatemod()
+TEST_F(TestStandardFunctions, truncatemod)
 {
     // @note these also test that these match % op
     const std::vector<int32_t> ivalues{ 2,-2,2,-2, };
@@ -1342,8 +1157,7 @@ TestStandardFunctions::truncatemod()
     testFunctionOptions(mHarness, "truncatemod");
 }
 
-void
-TestStandardFunctions::transform()
+TEST_F(TestStandardFunctions, transform)
 {
     mHarness.addAttributes<openvdb::math::Vec3<double>>
         ({"test1", "test3", "test7"}, {
@@ -1368,8 +1182,7 @@ TestStandardFunctions::transform()
     testFunctionOptions(mHarness, "transform");
 }
 
-void
-TestStandardFunctions::transpose()
+TEST_F(TestStandardFunctions, transpose)
 {
 
     mHarness.addAttribute("test1",

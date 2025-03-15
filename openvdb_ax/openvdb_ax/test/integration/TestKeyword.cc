@@ -3,37 +3,14 @@
 
 #include "TestHarness.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestKeyword : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestKeyword);
-    CPPUNIT_TEST(testKeywordSimpleReturn);
-    CPPUNIT_TEST(testKeywordReturnBranchIf);
-    CPPUNIT_TEST(testKeywordReturnBranchLoop);
-    CPPUNIT_TEST(testKeywordConditionalReturn);
-    CPPUNIT_TEST(testKeywordForLoopKeywords);
-    CPPUNIT_TEST(testKeywordWhileLoopKeywords);
-    CPPUNIT_TEST(testKeywordDoWhileLoopKeywords);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testKeywordSimpleReturn();
-    void testKeywordReturnBranchIf();
-    void testKeywordReturnBranchLoop();
-    void testKeywordConditionalReturn();
-    void testKeywordForLoopKeywords();
-    void testKeywordWhileLoopKeywords();
-    void testKeywordDoWhileLoopKeywords();
-
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestKeyword);
 
-void
-TestKeyword::testKeywordSimpleReturn()
+TEST_F(TestKeyword, testKeywordSimpleReturn)
 {
     mHarness.addAttribute<int>("return_test0", 0);
     mHarness.executeCode("test/snippets/keyword/simpleReturn");
@@ -41,8 +18,7 @@ TestKeyword::testKeywordSimpleReturn()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestKeyword::testKeywordReturnBranchIf()
+TEST_F(TestKeyword, testKeywordReturnBranchIf)
 {
     mHarness.addAttribute<int>("return_test1", 1);
     mHarness.executeCode("test/snippets/keyword/returnBranchIf");
@@ -50,8 +26,7 @@ TestKeyword::testKeywordReturnBranchIf()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestKeyword::testKeywordReturnBranchLoop()
+TEST_F(TestKeyword, testKeywordReturnBranchLoop)
 {
     mHarness.addAttribute<int>("return_test2", 1);
     mHarness.executeCode("test/snippets/keyword/returnBranchLoop");
@@ -59,8 +34,7 @@ TestKeyword::testKeywordReturnBranchLoop()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestKeyword::testKeywordConditionalReturn()
+TEST_F(TestKeyword, testKeywordConditionalReturn)
 {
     mHarness.addAttribute<int>("return_test3", 3);
     mHarness.executeCode("test/snippets/keyword/conditionalReturn");
@@ -68,8 +42,7 @@ TestKeyword::testKeywordConditionalReturn()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestKeyword::testKeywordForLoopKeywords()
+TEST_F(TestKeyword, testKeywordForLoopKeywords)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test4", openvdb::Vec3f(1.0,0.0,0.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test5", openvdb::Vec3f(1.0,0.0,3.0));
@@ -88,8 +61,7 @@ TestKeyword::testKeywordForLoopKeywords()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestKeyword::testKeywordWhileLoopKeywords()
+TEST_F(TestKeyword, testKeywordWhileLoopKeywords)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test10", openvdb::Vec3f(1.0,0.0,0.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test11", openvdb::Vec3f(0.0,0.0,2.0));
@@ -100,8 +72,7 @@ TestKeyword::testKeywordWhileLoopKeywords()
 }
 
 
-void
-TestKeyword::testKeywordDoWhileLoopKeywords()
+TEST_F(TestKeyword, testKeywordDoWhileLoopKeywords)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test13", openvdb::Vec3f(1.0,0.0,0.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test14", openvdb::Vec3f(0.0,0.0,2.0));

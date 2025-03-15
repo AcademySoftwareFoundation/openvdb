@@ -3,32 +3,13 @@
 
 #include "TestHarness.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestConditional : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestConditional);
-    CPPUNIT_TEST(testConditionalIfWithinElse);
-    CPPUNIT_TEST(testConditionalScopingStatement);
-    CPPUNIT_TEST(testConditionalSimpleStatement);
-    CPPUNIT_TEST(testConditionalSimpleElseIf);
-    CPPUNIT_TEST(testConditionalErrors);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testConditionalIfWithinElse();
-    void testConditionalSimpleStatement();
-    void testConditionalScopingStatement();
-    void testConditionalSimpleElseIf();
-    void testConditionalErrors();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestConditional);
-
-void
-TestConditional::testConditionalIfWithinElse()
+TEST_F(TestConditional, testConditionalIfWithinElse)
 {
     mHarness.addAttribute<bool>("bool_test", true);
     mHarness.executeCode("test/snippets/conditional/conditionalIfWithinElse");
@@ -36,8 +17,7 @@ TestConditional::testConditionalIfWithinElse()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestConditional::testConditionalSimpleStatement()
+TEST_F(TestConditional, testConditionalSimpleStatement)
 {
     mHarness.addAttribute<bool>("bool_test", true);
     mHarness.addAttribute<float>("float_test", 1.0f);
@@ -47,8 +27,7 @@ TestConditional::testConditionalSimpleStatement()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestConditional::testConditionalScopingStatement()
+TEST_F(TestConditional, testConditionalScopingStatement)
 {
     mHarness.addAttribute<int32_t>("int_test", 1);
     mHarness.executeCode("test/snippets/conditional/conditionalScopingStatement");
@@ -56,8 +35,7 @@ TestConditional::testConditionalScopingStatement()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestConditional::testConditionalSimpleElseIf()
+TEST_F(TestConditional, testConditionalSimpleElseIf)
 {
     mHarness.addAttribute("bool_test", true);
     mHarness.addAttribute("int_test", 2);
@@ -67,11 +45,10 @@ TestConditional::testConditionalSimpleElseIf()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestConditional::testConditionalErrors()
+TEST_F(TestConditional, testConditionalErrors)
 {
     const bool success = mHarness.executeCode("test/snippets/conditional/conditionalErrors");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 
 
