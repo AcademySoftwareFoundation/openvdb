@@ -1,0 +1,62 @@
+version: 0.2
+
+env:
+  variables:
+    PYTHONPATH: ""
+  secrets-manager:
+    GITHUB_TOKEN: "github-token:token"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.10
+    commands:
+      # Install Conda
+      - wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+      - bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
+      - eval "$($HOME/miniforge3/bin/conda shell.bash hook)"
+      - conda init
+      # Create and activate build environment
+      - conda env create -f fvdb/env/build_environment.yml -n fvdb_build
+      - conda activate fvdb_build
+      # Create test environment
+      - conda env create -f fvdb/env/test_environment.yml -n fvdb_test
+
+  pre_build:
+    commands:
+      - echo "Starting build phase"
+      - git config --global --add safe.directory "$(pwd)"
+
+  build:
+    commands:
+      # Build fvdb wheel
+      - cd fvdb
+      - export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+      - export MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')))
+      - conda run -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
+      - cd ..
+
+      # Install package in test environment
+      - conda activate fvdb_test
+      - pip install ./fvdb/dist/*.whl
+
+  post_build:
+    commands:
+      # Run unit tests
+      - cd fvdb/tests
+      - pytest -v unit
+
+      # Run documentation tests
+      - cd ..
+      - pytest --markdown-docs docs
+
+
+artifacts:
+  files:
+    - fvdb/dist/*.whl
+  name: fvdb-artifacts
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+    - '$HOME/miniforge3/**/*'
