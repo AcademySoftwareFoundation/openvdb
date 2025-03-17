@@ -1,0 +1,54 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+# GitHub Actions workflow file
+# https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions
+
+name: fVDB Codebuild
+
+on:
+  pull_request:
+    paths-ignore:
+        - 'CHANGES'
+        - 'CODEOWNERS'
+        - 'doc/**'
+        - 'openvdb/**'
+        - 'openvdb_cmd/**'
+        - 'openvdb_ax/**'
+        - 'openvdb_maya/**'
+        - 'openvdb_houdini/**'
+        - 'nanovdb/**'
+        - 'pendingchanges/**'
+        - '**.md'
+        - 'fvdb/debug/**'
+        - 'fvdb/docs/**'
+        - 'fvdb/examples/**'
+        - 'fvdb/notebooks/**'
+        - 'fvdb/scripts/**'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Linux GPU (AWS CodeBuild)
+  # ---------------------------------------------------------------------------
+
+  linux_gpu:
+    name: 'ci-openvdb 2024'
+    # Don't run on OCIO forks
+    if: github.repository == 'AcademySoftwareFoundation/openvdb'
+    # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
+    # AWS CodeBuild project.
+    # TODO: Add support for dynamic GH Action defined CodeBuild
+    #       container choice.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
+          aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
+          aws-region: us-west-2
+      - name: Run CodeBuild
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: OpenVDB
+          buildspec-override: ci/buildspec.yml
