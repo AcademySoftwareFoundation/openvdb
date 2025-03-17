@@ -37,6 +37,7 @@ function(ConfigureTest CMAKE_TEST_NAME)
     GTest::gtest_main
     $<TARGET_NAME_IF_EXISTS:conda_env>
   )
+  target_include_directories(${CMAKE_TEST_NAME} PRIVATE ${TORCH_INCLUDE_DIRS} ${TORCH_SOURCE_INCLUDE_DIRS})
   add_test(NAME ${CMAKE_TEST_NAME}
          COMMAND ${CMAKE_TEST_NAME}
          WORKING_DIRECTORY ${TEST_BINARY_DIRECTORY})
@@ -72,3 +73,4 @@ ConfigureTest(GaussianComputeSparseInfoTest "GaussianComputeSparseInfoTest.cpp")
 ConfigureTest(GaussianTileIntersectionTest "GaussianTileIntersectionTest.cpp")
 ConfigureTest(GaussianComputeNanInfMaskTest "GaussianComputeNanInfMaskTest.cpp")
 ConfigureTest(GaussianRasterizeBackwardTest "GaussianRasterizeBackwardTest.cpp")
+ConfigureTest(GaussianRasterizeForwardTest "GaussianRasterizeForwardTest.cpp")

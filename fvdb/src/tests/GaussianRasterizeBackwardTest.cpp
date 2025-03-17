@@ -27,8 +27,8 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
         const std::string inputsPath          = dataPath + std::string("/") + insPath;
         const std::string expectedOutputsPath = dataPath + std::string("/") + outsPath;
 
-        std::vector<torch::Tensor> inputs;
-        torch::load(inputs, inputsPath);
+        auto inputs = fvdb::test::loadTensors(inputsPath, inputNames);
+
         means2d                 = inputs[0].cuda();
         conics                  = inputs[1].cuda();
         colors                  = inputs[2].cuda();
@@ -40,8 +40,7 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
         dLossDRenderedColors    = inputs[8].cuda();
         dLossDRenderedAlphas    = inputs[9].cuda();
 
-        std::vector<torch::Tensor> expectedOutputs;
-        torch::load(expectedOutputs, expectedOutputsPath);
+        auto expectedOutputs    = fvdb::test::loadTensors(expectedOutputsPath, outputNames);
         expectedDLossDMeans2d   = expectedOutputs[0].cuda();
         expectedDLossDConics    = expectedOutputs[1].cuda();
         expectedDLossDColors    = expectedOutputs[2].cuda();
@@ -92,11 +91,18 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
         dLossDRenderedAlphas    = dLossDRenderedAlphas.to(device);
     }
 
-    uint32_t imageWidth   = 1297;
-    uint32_t imageHeight  = 840;
-    uint32_t imageOriginW = 0;
-    uint32_t imageOriginH = 0;
-    uint32_t tileSize     = 16;
+    const std::vector<std::string> inputNames  = { "means2d",
+                                                   "conics",
+                                                   "colors",
+                                                   "opacities",
+                                                   "tile_offsets",
+                                                   "tile_gaussian_ids",
+                                                   "rendered_alphas",
+                                                   "last_gaussian_ids_per_pixel",
+                                                   "d_loss_d_rendered_colors",
+                                                   "d_loss_d_rendered_alphas" };
+    const std::vector<std::string> outputNames = { "d_loss_d_means2d", "d_loss_d_conics",
+                                                   "d_loss_d_colors", "d_loss_d_opacities" };
 
     torch::Tensor means2d;
     torch::Tensor conics;
@@ -113,27 +119,31 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
     torch::Tensor expectedDLossDConics;
     torch::Tensor expectedDLossDColors;
     torch::Tensor expectedDLossDOpacities;
+
+    uint32_t imageWidth   = 1297;
+    uint32_t imageHeight  = 840;
+    uint32_t imageOriginW = 0;
+    uint32_t imageOriginH = 0;
+    uint32_t tileSize     = 16;
 };
 
 TEST_F(GaussianRasterizeTestFixture, TestBasicInputsAndOutputs) {
     loadTestData("rasterize_backward_inputs.pt", "rasterize_backward_outputs.pt");
 
-    const auto rasterizeBackwardOutputs =
+    const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
         fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
             means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
             tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
             dLossDRenderedColors, dLossDRenderedAlphas, false);
 
-    EXPECT_TRUE(torch::allclose(std::get<1>(rasterizeBackwardOutputs), expectedDLossDMeans2d));
+    EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
 
     // This is a big sum of products in parallel that is pretty ill conditioned and so we
     // only expect about 1 digit of accuracy.
-    EXPECT_TRUE(torch::allclose(std::get<2>(rasterizeBackwardOutputs), expectedDLossDConics,
-                                1e-1 /*rtol*/));
+    EXPECT_TRUE(torch::allclose(dLossDConics, expectedDLossDConics, 1e-1 /*rtol*/));
 
-    EXPECT_TRUE(torch::allclose(std::get<3>(rasterizeBackwardOutputs), expectedDLossDColors));
-    EXPECT_TRUE(
-        torch::allclose(std::get<4>(rasterizeBackwardOutputs), expectedDLossDOpacities, 1e-4));
+    EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
+    EXPECT_TRUE(torch::allclose(dLossDOpacities, expectedDLossDOpacities, 1e-4));
 }
 
 TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChannels) {
@@ -143,21 +153,20 @@ TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChannels) {
     dLossDRenderedColors = catChannelsToDim(dLossDRenderedColors, 64);
     expectedDLossDColors = catChannelsToDim(expectedDLossDColors, 64);
 
-    const auto rasterizeBackwardOutputs =
+    const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
         fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
             means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
             tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
             dLossDRenderedColors, dLossDRenderedAlphas, false);
 
-    const torch::Tensor dLossDMeans2d   = std::get<1>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDConics    = std::get<2>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDColors    = std::get<3>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDOpacities = std::get<4>(rasterizeBackwardOutputs);
+    EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
 
-    EXPECT_TRUE(torch::allclose(std::get<1>(rasterizeBackwardOutputs), expectedDLossDMeans2d));
-    EXPECT_TRUE(torch::allclose(std::get<3>(rasterizeBackwardOutputs), expectedDLossDColors));
-    EXPECT_TRUE(
-        torch::allclose(std::get<4>(rasterizeBackwardOutputs), expectedDLossDOpacities, 1e-4));
+    // This is a big sum of products in parallel that is pretty ill conditioned and so we
+    // only expect about 1 digit of accuracy.
+    EXPECT_TRUE(torch::allclose(dLossDConics, expectedDLossDConics, 1e-1 /*rtol*/));
+
+    EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
+    EXPECT_TRUE(torch::allclose(dLossDOpacities, expectedDLossDOpacities, 1e-4));
 }
 
 TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChunkedChannelsWithUnusedChannels) {
@@ -166,21 +175,15 @@ TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChunkedChannelsWithUnusedCh
     colors               = catChannelsToDim(colors, 47);
     dLossDRenderedColors = catChannelsToDim(dLossDRenderedColors, 47);
 
-    const auto rasterizeBackwardOutputs =
+    const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
         fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
             means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
             tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
             dLossDRenderedColors, dLossDRenderedAlphas, false, 32);
 
-    const torch::Tensor dLossDMeans2d   = std::get<1>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDConics    = std::get<2>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDColors    = std::get<3>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDOpacities = std::get<4>(rasterizeBackwardOutputs);
-
-    EXPECT_TRUE(torch::allclose(std::get<1>(rasterizeBackwardOutputs), expectedDLossDMeans2d));
-    EXPECT_TRUE(torch::allclose(std::get<3>(rasterizeBackwardOutputs), expectedDLossDColors));
-    EXPECT_TRUE(
-        torch::allclose(std::get<4>(rasterizeBackwardOutputs), expectedDLossDOpacities, 1e-4));
+    EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
+    EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
+    EXPECT_TRUE(torch::allclose(dLossDOpacities, expectedDLossDOpacities, 1e-4));
 }
 
 TEST_F(GaussianRasterizeTestFixture, TestChunkedChannels) {
@@ -190,21 +193,15 @@ TEST_F(GaussianRasterizeTestFixture, TestChunkedChannels) {
     dLossDRenderedColors = catChannelsToDim(dLossDRenderedColors, 64);
     expectedDLossDColors = catChannelsToDim(expectedDLossDColors, 64);
 
-    const auto rasterizeBackwardOutputs =
+    const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
         fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
             means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
             tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
             dLossDRenderedColors, dLossDRenderedAlphas, false, 32);
 
-    const torch::Tensor dLossDMeans2d   = std::get<1>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDConics    = std::get<2>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDColors    = std::get<3>(rasterizeBackwardOutputs);
-    const torch::Tensor dLossDOpacities = std::get<4>(rasterizeBackwardOutputs);
-
-    EXPECT_TRUE(torch::allclose(std::get<1>(rasterizeBackwardOutputs), expectedDLossDMeans2d));
-    EXPECT_TRUE(torch::allclose(std::get<3>(rasterizeBackwardOutputs), expectedDLossDColors));
-    EXPECT_TRUE(
-        torch::allclose(std::get<4>(rasterizeBackwardOutputs), expectedDLossDOpacities, 1e-4));
+    EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
+    EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
+    EXPECT_TRUE(torch::allclose(dLossDOpacities, expectedDLossDOpacities, 1e-4));
 }
 
 TEST_F(GaussianRasterizeTestFixture, CPUThrows) {
