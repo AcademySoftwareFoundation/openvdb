@@ -130,7 +130,22 @@ fvdbToNanovdbGridWithValues(const GridBatch &gridBatch, const JaggedTensor &data
                           "Grid name " + name + " exceeds maximum character length of " +
                               std::to_string(nanovdb::GridData::MaxNameSize) + ".");
 
-        auto proxyGrid         = std::make_shared<ProxyGridT>(GridValueT(0), name);
+        auto proxyGrid = std::make_shared<ProxyGridT>(GridValueT(0), name);
+
+        const double   sx        = gridBatch.voxel_size_at(bi, torch::kFloat64)[0].item<double>();
+        const double   sy        = gridBatch.voxel_size_at(bi, torch::kFloat64)[1].item<double>();
+        const double   sz        = gridBatch.voxel_size_at(bi, torch::kFloat64)[2].item<double>();
+        const double   mat[3][3] = { { sx, 0.0, 0.0 },            // row 0
+                                     { 0.0, sy, 0.0 },            // row 1
+                                     { 0.0, 0.0, sz } };          // row 2
+        const double   invMat[3][3] = { { 1.0 / sx, 0.0, 0.0 },   // row 0
+                                        { 0.0, 1.0 / sy, 0.0 },   // row 1
+                                        { 0.0, 0.0, 1.0 / sz } }; // row 2
+        nanovdb::Vec3d trans        = { gridBatch.origin_at(bi, torch::kFloat64)[0].item<double>(),
+                                        gridBatch.origin_at(bi, torch::kFloat64)[1].item<double>(),
+                                        gridBatch.origin_at(bi, torch::kFloat64)[2].item<double>() };
+        proxyGrid.get()->mMap.set(mat, invMat, trans);
+
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
         const int     start     = ijkValues.joffsets()[bi].item<int>();

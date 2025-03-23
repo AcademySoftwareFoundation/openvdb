@@ -305,20 +305,26 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        pts = torch.tensor(
-            [
-                [1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
-            ],
-            device=device,
-        )
+        pts = fvdb.JaggedTensor([torch.rand((100, 3)) for _ in range(8)]).to(device)
+
         test_grid = fvdb.gridbatch_from_points(
-            pts, voxel_sizes=np.random.random() + 0.00001, origins=[np.random.randint(-100, 100) for _ in range(3)]
+            pts,
+            voxel_sizes=[np.random.random() + 0.00001 for _ in range(3)],
+            origins=[np.random.randint(-100, 100) for _ in range(3)],
         )
 
         with tempfile.NamedTemporaryFile() as temp:
+            # test saving index grids by themselves which will be written as a NanoVDB index grid
             fvdb.save(temp.name, test_grid)
             test_grid_from_file, _, _ = fvdb.load(temp.name, device=device)
+
+            self.assertTrue(torch.all(test_grid.voxel_sizes == test_grid_from_file.voxel_sizes))
+            self.assertTrue(torch.all(test_grid.origins == test_grid_from_file.origins))
+
+            # test saving index grids with data of a channel size which will be written as a NanoVDB data grid
+            data = test_grid.jagged_like(torch.rand(test_grid.total_voxels, 3, device=device))
+            fvdb.save(temp.name, test_grid, data)
+            test_grid_from_file, data_from_file, _ = fvdb.load(temp.name, device=device)
 
             self.assertTrue(torch.all(test_grid.voxel_sizes == test_grid_from_file.voxel_sizes))
             self.assertTrue(torch.all(test_grid.origins == test_grid_from_file.origins))
