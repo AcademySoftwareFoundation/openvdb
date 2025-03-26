@@ -21,11 +21,11 @@ void testMemberOperatorsImpl()
     using Vec3T = math::Vec3<ValueT>;
 
     {
-        Vec3T vecA(ValueT(3.14), ValueT(2.18), ValueT(-299792458.f));
+        Vec3T vecA(ValueT(3.14f), ValueT(2.18f), ValueT(-299792458.f));
 
         // Alternative indexed the elements
-        EXPECT_EQ(vecA(0), ValueT(3.14));
-        EXPECT_EQ(vecA(1), ValueT(2.18));
+        EXPECT_EQ(vecA(0), ValueT(3.14f));
+        EXPECT_EQ(vecA(1), ValueT(2.18f));
         EXPECT_EQ(vecA(2), ValueT(-299792458.f));
 
         // Assignment operator
@@ -42,7 +42,7 @@ void testMemberOperatorsImpl()
 
         // Multiply each element of the vector by a scalar
         Vec3T vecD = vecA;
-        const ValueT gr = ValueT(1.6180339887); // golden ratio
+        const ValueT gr = ValueT(1.618034f); // golden ratio
         vecD *= gr;
         EXPECT_EQ(vecD(0), ValueT(gr * vecA(0)));
         EXPECT_EQ(vecD(1), ValueT(gr * vecA(1)));
@@ -50,7 +50,7 @@ void testMemberOperatorsImpl()
 
         // Multiply each element of the vector by the corresponding element
         Vec3T vecE = vecA;
-        Vec3T vecF(ValueT(-2.5), ValueT(1.2), ValueT(3.14159));
+        Vec3T vecF(ValueT(-2.5f), ValueT(1.2f), ValueT(3.14159f));
         vecE *= vecF;
         EXPECT_EQ(vecE(0), ValueT(vecA(0) * vecF(0)));
         EXPECT_EQ(vecE(1), ValueT(vecA(1) * vecF(1)));
@@ -119,7 +119,7 @@ void testFreeFunctionsOperatorsImpl()
     {
         Vec3T vecA(ValueT(1),ValueT(2),ValueT(3));
         Vec3T vecB(ValueT(3),ValueT(4),ValueT(5));
-        const ValueT gr = ValueT(1.6180339887); // golden ratio
+        const ValueT gr = ValueT(1.618034f); // golden ratio
 
         /// Check equality operator, does exact floating point comparisons ==
         bool eqRes = vecA == vecB;
