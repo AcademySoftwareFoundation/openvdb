@@ -663,11 +663,13 @@ using Vec3i = Vec3<int32_t>;
 using Vec3ui = Vec3<uint32_t>;
 using Vec3s = Vec3<float>;
 using Vec3d = Vec3<double>;
+using Vec3h = Vec3<math::half>;
 
 OPENVDB_IS_POD(Vec3i)
 OPENVDB_IS_POD(Vec3ui)
 OPENVDB_IS_POD(Vec3s)
 OPENVDB_IS_POD(Vec3d)
+OPENVDB_IS_POD(Vec3h)
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
