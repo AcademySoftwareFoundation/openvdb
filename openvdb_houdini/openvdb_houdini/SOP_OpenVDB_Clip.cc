@@ -41,12 +41,14 @@ public:
     {
     public:
         openvdb::math::Transform::Ptr frustum() const { return mFrustum; }
+        openvdb::math::Vec4d padding() const { return mPadding; }
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
     private:
         void getFrustum(OP_Context&);
 
         openvdb::math::Transform::Ptr mFrustum;
+        openvdb::math::Vec4d mPadding = openvdb::Vec4d::zero();
     }; // class Cache
 
 protected:
@@ -82,23 +84,36 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, keep voxels that lie inside the clipping region,"
             " otherwise keep voxels that lie outside the clipping region."));
 
-    parms.add(hutil::ParmFactory(PRM_STRING, "clipper", "Clip To")
+    parms.add(hutil::ParmFactory(PRM_STRING | PRM_TYPE_JOIN_NEXT, "clipper", "Clip To")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "camera",   "Camera",
-            "geometry", "Geometry Bounding Box",
+            "geometry", "Geometry",
             "mask",     "Mask VDB"
         })
         .setDefault("geometry")
         .setTooltip("Specify how the clipping region should be defined.")
-        .setDocumentation("\
-How to define the clipping region\n\
-\n\
-Camera:\n\
-    Use a camera frustum as the clipping region.\n\
-Geometry:\n\
-    Use the bounding box of geometry from the second input as the clipping region.\n\
-Mask VDB:\n\
-    Use the active voxels of a VDB volume from the second input as a clipping mask.\n"));
+        .setDocumentation("How to define the clipping region\n\n"
+            "Camera:\n"
+            "    Use a camera frustum as the clipping region.\n"
+            "Geometry:\n"
+            "    Use the bounding box of geometry from the second input as the clipping region.\n"
+            "Mask VDB:\n"
+            "    Use the active voxels of a VDB volume from the second input as a clipping mask.\n"));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE_E, "legacycamclip", "Legacy")
+        .setDefault(PRMzeroDefaults)
+        .setInvisible()
+        .setTooltip("Enables legacy camera clipping implementation and controls")
+        .setDocumentation(
+            "Enables legacy camera clipping implementation and controls.\n\n"
+            
+            "Implementation used prior to (OpenVDB version - / Houdini -). Overestimates "
+            "camera frustum height when the frame's height is not divisible by its width. Padding "
+            "is specified with separate X, Y, Z values. The X & Y padding values represent "
+            "a percentage of the original frame *width*, which is then added to both the sides of "
+            "the frame, expanding it uniformly. _Y_ padding is not scaled by aspect ratio.\n\n"
+            "The Z padding value translates the near and far planes further `(Z > 0)` or closer "
+            "`(Z < 0)` together by <<Z>> world-units. Extreme values can produce an invalid frustum."));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
@@ -139,22 +154,49 @@ Mask VDB:\n\
             "The position of the far clipping plane\n\n"
             "If enabled, this setting overrides the camera's clipping plane."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "setpadding", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "setpadding", "Padding")
         .setDefault(PRMzeroDefaults)
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip("If enabled, expand or shrink the clipping region."));
 
-    parms.add(hutil::ParmFactory(PRM_FLT_E, "padding", "Padding")
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "padding", "")
         .setVectorSize(3)
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Padding in world units to be added to the clipping region")
+        .setTooltip("Padding in world units to be added to the clipping region or mask")
         .setDocumentation(
-            "Padding in world units to be added to the clipping region\n\n"
-            "Negative values shrink the clipping region.\n\n"
-            "Nonuniform padding is not supported when clipping to a VDB volume.\n"
-            "The mask volume will be dilated or eroded uniformly"
-            " by the _x_-axis padding value."));
+            "Padding to be added to the clipping region or mask. Negative values shrink the "
+            "clipping region.\n\n"
 
+            "When in geometry mode, padding is measured in world units and is applied to the "
+            "input geometry's axis-aligned bounding box.\n\n"
+
+            "When in mask mode, the padding is the approximate world-space distance by which "
+            "to dilate or erode the mask. The padding value is rounded to a voxel-count, by which "
+            "the mask is then dilated/eroded. Mask padding is uniform, so only the <<X>> padding "
+            "value is utilized."));
+
+    const static PRM_Default winPaddingDefaults[4] = {
+        PRMzeroDefaults[0],
+        PRM_Default(0.0f, "ch('padwinx1')"),
+        PRMzeroDefaults[0],
+        PRM_Default(0.0f, "ch('padwiny1')")
+    };
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "padwinx", "(Left, Right)")
+        .setVectorSize(2)
+        .setDefault(winPaddingDefaults)
+        .setTooltip("Padding to be added to the left and right of the camera frame.")
+        .setDocumentation(
+            "Padding to be added to the left and right of the camera frame.\n\n"
+            "The camera frame uses normalized device coordinates (NDC), where the width of the "
+            "frame is always `1.0`. Likewise a value of `(.5, .5)` will double the frame's width."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "padwiny", "(Bottom, Top)")
+        .setVectorSize(2)
+        .setDefault(winPaddingDefaults+2)
+        .setTooltip("Padding to be added to the bottom and top of the frame.")
+        .setDocumentation(
+            "Padding to be added to the bottom and top of the camera frame.\n\n"
+            "The camera frame uses normalized device coordinates (NDC), where the height of the "
+            "frame is always `1.0`. Likewise a value of `(.5, .5)` will double the frame's height."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -220,20 +262,39 @@ SOP_OpenVDB_Clip::updateParmsFlags()
 {
     bool changed = false;
 
-    UT_String clipper;
-    evalString(clipper, "clipper", 0, 0.0);
+    const fpreal time = CHgetEvalTime();
+    UT_String clipper; evalString(clipper, "clipper", 0, time);
+    const bool pad = evalInt("setpadding", 0, time) != 0;
+    const bool useLegacyPadding = evalInt("legacycamclip", 0, 0.0f);
 
-    const bool clipToCamera = (clipper == "camera");
+    const bool clipToCamera = clipper == "camera";
+    const bool clipToMask = clipper == "mask";
 
-    changed |= enableParm("mask", clipper == "mask");
+    changed |= enableParm("mask", clipToMask);
     changed |= enableParm("camera", clipToCamera);
     changed |= enableParm("setnear", clipToCamera);
-    changed |= enableParm("near", clipToCamera && evalInt("setnear", 0, 0.0));
+    changed |= enableParm("near", clipToCamera && evalInt("setnear", 0, time));
     changed |= enableParm("setfar", clipToCamera);
-    changed |= enableParm("far", clipToCamera && evalInt("setfar", 0, 0.0));
-    changed |= enableParm("padding", 0 != evalInt("setpadding", 0, 0.0));
+    changed |= enableParm("far", clipToCamera && evalInt("setfar", 0, time));
 
-    changed |= setVisibleState("mask", clipper == "mask");
+    changed |= enableParm("legacycamclip", clipToCamera);
+    changed |= setVisibleState("legacycamclip", clipToCamera);
+
+    if (pad && clipToMask) {
+        // Disable all but the X component of padding Vec3 value
+        changed |= enableParm("padding", false);
+        changed |= enableParm("padding", true, 0);
+    } else {
+        changed |= enableParm("padding", pad && (!clipToCamera || useLegacyPadding));
+    }
+
+    changed |= setVisibleState("padding", (!clipToCamera || useLegacyPadding));
+    changed |= setVisibleState("padwinx", clipToCamera && !useLegacyPadding);
+    changed |= setVisibleState("padwiny", clipToCamera && !useLegacyPadding);
+    changed |= enableParm("padwinx", pad && clipToCamera && !useLegacyPadding);
+    changed |= enableParm("padwiny", pad && clipToCamera && !useLegacyPadding);
+
+    changed |= setVisibleState("mask", clipToMask);
     changed |= setVisibleState("camera", clipToCamera);
     changed |= setVisibleState("setnear", clipToCamera);
     changed |= setVisibleState("near", clipToCamera);
@@ -351,8 +412,8 @@ struct BBoxClipOp
 
 struct FrustumClipOp
 {
-    FrustumClipOp(const openvdb::math::Transform::Ptr& frustum_, bool inside_ = true):
-        frustum(frustum_), inside(inside_)
+    FrustumClipOp(const openvdb::math::Transform::Ptr& frustum_, bool inside_ = true, const openvdb::Vec4d& padding_ = openvdb::Vec4d(0.0)):
+        frustum(frustum_), inside(inside_), padding(padding_)
     {}
 
     template<typename GridType>
@@ -361,13 +422,14 @@ struct FrustumClipOp
         openvdb::math::NonlinearFrustumMap::ConstPtr mapPtr;
         if (frustum) mapPtr = frustum->constMap<openvdb::math::NonlinearFrustumMap>();
         if (mapPtr) {
-            outputGrid = openvdb::tools::clip(grid, *mapPtr, inside);
+            outputGrid = openvdb::tools::clip(grid, *mapPtr, inside, padding);
         }
     }
 
     const openvdb::math::Transform::ConstPtr frustum;
     const bool inside = true;
     hvdb::GridPtr outputGrid;
+    const openvdb::Vec4d padding;
 };
 
 
@@ -426,6 +488,7 @@ void
 SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
 {
     mFrustum.reset();
+    mPadding.setZero();
 
     const auto time = context.getTime();
 
@@ -454,24 +517,36 @@ SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
     }
 
     const bool pad = (0 != evalInt("setpadding", 0, time));
-    const auto padding = pad ? evalVec3f("padding", time) : openvdb::Vec3f{0};
+    const bool useLegacyPadding = evalInt("legacycamclip", 0, 0.0f);
+    const openvdb::Vec3f padding = pad ? evalVec3f("padding", time) : openvdb::Vec3f{0.0};
 
-    const float nearPlane = (evalInt("setnear", 0, time)
+    float nearPlane = (evalInt("setnear", 0, time)
         ? static_cast<float>(evalFloat("near", 0, time))
-        : static_cast<float>(camera->getNEAR(time))) - padding[2];
-    const float farPlane = (evalInt("setfar", 0, time)
+        : static_cast<float>(camera->getNEAR(time)));
+    float farPlane = (evalInt("setfar", 0, time)
         ? static_cast<float>(evalFloat("far", 0, time))
-        : static_cast<float>(camera->getFAR(time))) + padding[2];
+        : static_cast<float>(camera->getFAR(time)));
+    
+    if (useLegacyPadding) {
+        nearPlane -= padding[2];
+        farPlane += padding[2];
+    }
+        
+    const int voxelCountX = !useLegacyPadding ? std::ceil(camera->RESX(time)) : 100;
 
     mFrustum = hvdb::frustumTransformFromCamera(*self, context, *camera,
-        /*offset=*/0.f, nearPlane, farPlane, /*voxelDepth=*/1.f, /*voxelCountX=*/100);
+        /*offset=*/0.f, nearPlane, farPlane, /*voxelDepth=*/1.f, voxelCountX);
 
     if (!mFrustum || !mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()) {
         throw std::runtime_error{
             "failed to compute frustum bounds for camera " + cameraPath.toStdString()};
     }
 
-    if (pad) {
+    if (pad && !useLegacyPadding) {
+        const openvdb::Vec2d padX = evalVec2R("padwinx", time);
+        const openvdb::Vec2d padY = evalVec2R("padwiny", time);
+        mPadding = openvdb::Vec4d(padX[0], padY[0], padX[1], padY[1]);
+    } else if (pad) {
         const auto extents =
             mFrustum->constMap<openvdb::math::NonlinearFrustumMap>()->getBBox().extents();
         mFrustum->preScale(openvdb::Vec3d{
@@ -491,15 +566,17 @@ SOP_OpenVDB_Clip::cookMyGuide1(OP_Context&)
     myGuide1->clearAndDestroy();
 
     openvdb::math::Transform::ConstPtr frustum;
+    openvdb::math::Vec4d padding;
     // Attempt to extract the frustum from our cache.
     if (auto* cache = dynamic_cast<SOP_OpenVDB_Clip::Cache*>(myNodeVerbCache)) {
         frustum = cache->frustum();
+        padding = cache->padding();
     }
 
     if (frustum) {
         const UT_Vector3 color{0.9f, 0.0f, 0.0f};
         hvdb::drawFrustum(*myGuide1, *frustum, &color,
-            /*tickColor=*/nullptr, /*shaded=*/false, /*ticks=*/false);
+            /*tickColor=*/nullptr, /*shaded=*/false, /*ticks=*/false, /*padding=*/padding);
     }
     return error();
 }
@@ -525,8 +602,6 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
             pad = evalInt("setpadding", 0, time);
 
         const auto padding = pad ? evalVec3f("padding", time) : openvdb::Vec3f{0};
-
-        mFrustum.reset();
 
         openvdb::BBoxd clipBox;
         hvdb::GridCPtr maskGrid;
@@ -555,8 +630,8 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                 if (pad) {
                     // If padding is enabled and nonzero, dilate or erode the mask grid.
                     const auto paddingInVoxels = padding / maskGrid->voxelSize();
-                    if (!openvdb::math::isApproxEqual(paddingInVoxels[0], paddingInVoxels[1])
-                        || !openvdb::math::isApproxEqual(paddingInVoxels[1], paddingInVoxels[2]))
+
+                    if (!openvdb::math::isApproxZero(padding[1]) || !openvdb::math::isApproxZero(padding[2]))
                     {
                         addWarning(SOP_MESSAGE,
                             "nonuniform padding is not supported for mask clipping");
@@ -614,7 +689,7 @@ SOP_OpenVDB_Clip::Cache::cookVDBSop(OP_Context& context)
                         "only bounding box clipping is currently supported for point data grids");
                 }
             } else if (useCamera) {
-                FrustumClipOp op{mFrustum, inside};
+                FrustumClipOp op{mFrustum, inside, mPadding};
                 if (hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(**it, op)) { // all Houdini-supported volume grid types
                     outGrid = op.outputGrid;
                 } else if (inGrid.isType<openvdb::points::PointDataGrid>()) {
