@@ -184,7 +184,7 @@ public:
     /// does not involve square root
     T lengthSqr() const { return (this->mm[0]*this->mm[0] + this->mm[1]*this->mm[1]); }
 
-    /// Return a reference to itsef after the exponent has been
+    /// Return a reference to itself after the exponent has been
     /// applied to all the vector components.
     inline const Vec2<T>& exp()
     {

@@ -19,7 +19,7 @@ NanoVDB is now a module of the larger OpenVDB project. A user can build both lib
   foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
-Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overriden by passing on `-DNANOVDB_USE_OPENVDB=OFF`. The `Boost` library is included because it is a requirement for building OpenVDB.
+Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overridden by passing on `-DNANOVDB_USE_OPENVDB=OFF`. The `Boost` library is included because it is a requirement for building OpenVDB.
 
 In general, CMake will try to find every optional dependency when a user opts to add an additional dependency. Be sure to check the CMake log to see what dependencies were **not** found.
 

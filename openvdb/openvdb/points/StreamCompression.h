@@ -35,7 +35,7 @@ namespace compression {
 
 
 // This is the minimum number of bytes below which Blosc compression is not used to
-// avoid unecessary computation, as Blosc offers minimal compression until this limit
+// avoid unnecessary computation, as Blosc offers minimal compression until this limit
 static const int BLOSC_MINIMUM_BYTES = 48;
 
 // This is the minimum number of bytes below which the array is padded with zeros up

@@ -544,7 +544,7 @@ public:
     /// factory.@link OpFactory::english() english()@endlink.
     virtual std::string getLabelName(const OpFactory&);
 
-    /// @brief Return the inital default name of the operator.
+    /// @brief Return the initial default name of the operator.
     /// @note An empty first name will disable, reverting to the usual rules.
     virtual std::string getFirstName(const OpFactory&) { return ""; }
 

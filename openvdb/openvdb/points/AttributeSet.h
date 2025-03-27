@@ -220,7 +220,7 @@ public:
     /// In cases where the AttributeSet is due to be destroyed, a small performance
     /// advantage can be gained by leaving the attribute array as a nullptr and not
     /// updating the descriptor. However, this leaves the AttributeSet in an invalid
-    /// state making it unsafe to call any methods that implicitly derefence the attribute array.
+    /// state making it unsafe to call any methods that implicitly dereference the attribute array.
     /// @note AttributeArrays are stored as shared pointers, so they are not guaranteed
     /// to be unique. Check the reference count before blindly re-using in a new AttributeSet.
     /// @warning Only use this method if you're an expert and know the risks of not

@@ -651,7 +651,7 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
 bool ComputeGenerator::visit(const ast::UnaryOperator* node)
 {
     // If the unary operation is a +, keep the value ptr on the stack and
-    // continue (avoid any new allocations or unecessary loads)
+    // continue (avoid any new allocations or unnecessary loads)
 
     const ast::tokens::OperatorToken token = node->operation();
     if (token == ast::tokens::PLUS) return true;
@@ -1106,7 +1106,7 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     }
     else {
         // component0 = row, component1 = column. Index into the matrix array
-        // which is layed out in row major = (component0*dim + component1)
+        // which is laid out in row major = (component0*dim + component1)
         OPENVDB_ASSERT(size == 9 || size == 16);
         const int32_t dim = size == 9 ? 3 : 4;
         llvm::Value* offset =

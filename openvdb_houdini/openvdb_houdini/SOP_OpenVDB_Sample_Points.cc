@@ -454,7 +454,7 @@ SOP_OpenVDB_Sample_Points::Cache::cookVDBSop(OP_Context& context)
 
         // sanity checks - warn if there are no points on first input port.  Note that
         // each VDB primitive should have a single point associated with it so that we could
-        // theoretically only check if nPoints == 0, but we explictly check for 0 pointGrids
+        // theoretically only check if nPoints == 0, but we explicitly check for 0 pointGrids
         // for the sake of clarity
         if (nPoints == 0 && pointGrids.empty()) {
             const std::string msg = "Input 1 contains no points.";

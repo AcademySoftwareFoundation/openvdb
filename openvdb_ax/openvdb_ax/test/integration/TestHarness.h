@@ -142,7 +142,7 @@ struct AXTestHarness
         addExpectedAttributes<T>({name}, {expVal});
     }
 
-    /// @brief excecutes a snippet of code contained in a file to the input data sets
+    /// @brief executes a snippet of code contained in a file to the input data sets
     bool executeCode(const std::string& codeFile,
                      const std::string* const group = nullptr,
                      const bool createMissing = false);

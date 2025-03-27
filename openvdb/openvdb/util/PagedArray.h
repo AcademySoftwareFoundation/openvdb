@@ -9,7 +9,7 @@
 ///         structure with O(1) random access and STL-compliant
 ///         iterators. It is primarily intended for applications
 ///         that involve multi-threading push_back of (a possibly
-///         unkown number of) elements into a dynamically growing
+///         unknown number of) elements into a dynamically growing
 ///         linear array, and fast random access to said elements.
 
 #ifndef OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
@@ -38,7 +38,7 @@ namespace util {
 /// @brief   Concurrent, page-based, dynamically-sized linear data structure
 ///          with O(1) random access and STL-compliant iterators. It is
 ///          primarily intended for applications that concurrently insert
-///          (a possibly unkown number of) elements into a dynamically
+///          (a possibly unknown number of) elements into a dynamically
 ///          growing linear array, and fast random access to said elements.
 ///
 /// @note    Multiple threads can grow the page-table and push_back
@@ -46,14 +46,14 @@ namespace util {
 ///          and threadsafe push_back at the cost of potentially re-ordering
 ///          elements (when multiple instances are used).
 ///
-/// @details This data structure employes contiguous pages of elements
+/// @details This data structure employs contiguous pages of elements
 ///          (a std::deque) which avoids moving data when the
 ///          capacity is out-grown and new pages are allocated. The
 ///          size of the pages can be controlled with the Log2PageSize
 ///          template parameter (defaults to 1024 elements of type ValueT).
 ///
 /// There are three fundamentally different ways to insert elements to
-/// this container - each with different advanteges and disadvanteges.
+/// this container - each with different advantages and disadvantages.
 ///
 /// The simplest way to insert elements is to use PagedArray::push_back_unsafe
 /// which is @a not thread-safe:
@@ -114,7 +114,7 @@ namespace util {
 /// PagedArray::ValueBuffer are employed. This is typically the case
 /// in the context of multi-threading, where the
 /// ordering of inserts are undefined anyway. Note that a local scope
-/// can be used to guarentee that the ValueBuffer has inserted all its
+/// can be used to guarantee that the ValueBuffer has inserted all its
 /// elements by the time the scope ends. Alternatively the ValueBuffer
 /// can be explicitly flushed by calling ValueBuffer::flush.
 ///
@@ -146,7 +146,7 @@ private:
     static_assert(Log2PageSize > 1UL, "Expected Log2PageSize > 1");
     class Page;
 
-    // must allow mutiple threads to call operator[] as long as only one thread calls push_back
+    // must allow multiple threads to call operator[] as long as only one thread calls push_back
     using PageTableT = std::deque<Page*>;
 
 public:
@@ -554,7 +554,7 @@ public:
     /// @brief Add a value to the buffer and increment the size.
     ///
     /// @details If the internal memory page is full it will
-    /// automaically flush the page to the parent PagedArray.
+    /// automatically flush the page to the parent PagedArray.
     void push_back(const ValueT& v) {
         (*mPage)[mSize++] = v;
         if (mSize == Page::Size) this->flush();

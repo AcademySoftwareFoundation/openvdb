@@ -20,7 +20,7 @@ enum SphereMode { SPHERE_DENSE, SPHERE_DENSE_NARROW_BAND, SPHERE_SPARSE_NARROW_B
 ///
 /// @note This method is VERY SLOW and should only be used for debugging purposes!
 /// However it works for any transform and even with open level sets.
-/// A faster approch for closed narrow band generation is to only set voxels
+/// A faster approach for closed narrow band generation is to only set voxels
 /// sparsely and then use grid::signedFloodFill to define the sign
 /// of the background values and tiles! This is implemented in openvdb/tools/LevelSetSphere.h
 template<class GridType>

@@ -19,7 +19,7 @@
 /// @note Prolongation means interpolation from coarse -> fine
 /// @note Restriction means interpolation (or remapping) from fine -> coarse
 ///
-/// @todo Add option to define the level of the input grid (currenlty
+/// @todo Add option to define the level of the input grid (currently
 /// 0) so as to allow for super-sampling.
 
 #ifndef OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
@@ -688,7 +688,7 @@ struct MultiResGrid<TreeType>::MaskOp
     using VoxelIterT = typename ManagerT::LeafNodeType::ValueOnCIter;
 
     MaskOp(const TreeType& fineTree, TreeType& coarseTree, size_t grainSize = 1)
-        : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as examplar
+        : mPool(new PoolType( coarseTree ) )// empty coarse tree acts as exemplar
     {
         OPENVDB_ASSERT( coarseTree.empty() );
 
@@ -746,8 +746,8 @@ struct MultiResGrid<TreeType>::FractionOp
         OPENVDB_ASSERT( mTree0 != mTree1 );
 
         // Create a pool of  thread-local masks
-        MaskT examplar( false );
-        mPool = new PoolType( examplar );
+        MaskT exemplar( false );
+        mPool = new PoolType( exemplar );
 
         {// create mask from re-mapping coarse tree to mid-level tree
             tree::LeafManager<const TreeType> manager( *mTree1 );

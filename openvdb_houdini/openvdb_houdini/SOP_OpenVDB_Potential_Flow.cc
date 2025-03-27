@@ -239,7 +239,7 @@ newSopOperator(OP_OperatorTable* table)
     " The simplest workflow for multiple moving objects is to animate the polygonal geometry and"
     " then create SDFs and velocity VDBs by using the VDB from Polygons node."
     " The output can be fed directly into the first input of the Potential Flow SOP."
-    " The second input of the SOP allows a Mask VDB input for modifiying the solution domain"
+    " The second input of the SOP allows a Mask VDB input for modifying the solution domain"
     " created by the Potential Flow SOP."
     " The created domain can either be restricted to the active voxels of the Mask VDB, or"
     " restricted from creating a domain inside the active voxels."

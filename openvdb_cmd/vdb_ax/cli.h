@@ -39,7 +39,7 @@ template <typename T> struct BasicParamBuilder;
 /// @param maxWidth  column number of max output
 /// @param indent    function that returns an indent for each line
 /// @param ignoreNewLines  whether to ignore new lines in str
-/// @param trimWhitespace  whether to ignore whitespce at the start of lines
+/// @param trimWhitespace  whether to ignore whitespace at the start of lines
 inline void oswrap(std::ostream& os,
     const char* str,
     const size_t nchars,
@@ -70,7 +70,7 @@ inline void oswrap(std::ostream& os,
         const size_t endpos = pos + lineMaxWidth; // set new end
 
         if (!ignoreNewLines) {
-            // scane for new line in this range (memchr doesn't stop on \0)
+            // scan for new line in this range (memchr doesn't stop on \0)
             // hence the std::min on the max width
             const char* nl = (const char*)std::memchr(start, '\n',
                 std::min(lineMaxWidth, nchars-pos));
@@ -100,7 +100,7 @@ inline void oswrap(std::ostream& os,
 /// @param os        output stream
 /// @param opts      parameter options
 /// @param doc       parameter docs
-/// @param verbose   when false, only outputs the docs first sentance
+/// @param verbose   when false, only outputs the docs first sentence
 /// @param argSpace  minimum allowed whitespace between opts end and doc start
 /// @param docBegin  column number where doc printing should start
 /// @param maxWidth  column number of max output
@@ -137,7 +137,7 @@ inline void usage(std::ostream& os,
         current = 0;
     }
 
-    // doc chars to output. If not verbose, only first sentance
+    // doc chars to output. If not verbose, only first sentence
     size_t doclen = std::strlen(doc);
     if (!verbose) {
         // memchr doesn't stop on '\0' so needs max size
@@ -284,7 +284,7 @@ struct DefaultCallback<T,
             try { v = T(std::stol(arg)); }
             catch(...) {
                 OPENVDB_THROW(CLIError, "Unable to convert argument: '"
-                    << arg << "' to a valid interger");
+                    << arg << "' to a valid integer");
             }
         };
     }
