@@ -1,3 +1,0 @@
-NanoVDB:
-  Bug fix:
-    Map is now properly transposed when converting NanoVDB to OpenVDB.
