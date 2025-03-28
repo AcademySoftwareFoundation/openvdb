@@ -420,7 +420,7 @@ public:
     }
 
     /// @brief Return the cofactor matrix of this matrix.
-    Mat3 cofactor() const
+    [[nodiscard]] Mat3 cofactor() const
     {
         return Mat3<T>(
           MyBase::mm[4] * MyBase::mm[8] - MyBase::mm[5] * MyBase::mm[7],
@@ -435,7 +435,7 @@ public:
     }
 
     /// Return the adjoint of this matrix, i.e., the transpose of its cofactor.
-    Mat3 adjoint() const
+    [[nodiscard]] Mat3 adjoint() const
     {
         return Mat3<T>(
           MyBase::mm[4] * MyBase::mm[8] - MyBase::mm[5] * MyBase::mm[7],
@@ -462,7 +462,7 @@ public:
 
     /// returns inverse of this
     /// @throws ArithmeticError if singular
-    Mat3 inverse(T tolerance = 0) const
+    [[nodiscard]] Mat3 inverse(T tolerance = 0) const
     {
         Mat3<T> inv(this->adjoint());
 
@@ -518,7 +518,7 @@ public:
 
     /// @brief Treat @a diag as a diagonal matrix and return the product
     /// of this matrix with @a diag (from the right).
-    Mat3 timesDiagonal(const Vec3<T>& diag) const
+    [[nodiscard]] Mat3 timesDiagonal(const Vec3<T>& diag) const
     {
         Mat3 ret(*this);
 
