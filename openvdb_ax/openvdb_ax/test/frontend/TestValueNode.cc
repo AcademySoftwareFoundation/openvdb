@@ -8,7 +8,7 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <string>
 #include <cstdlib>
@@ -157,26 +157,18 @@ static const CodeTestMap value_tests =
 
 }
 
-class TestValueNode : public CppUnit::TestCase
+class TestValueNode : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestValueNode);
-    CPPUNIT_TEST(testSyntax);
-    CPPUNIT_TEST(testASTNode);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSyntax() {
-        for (const auto& tests : value_tests) {
-            TEST_SYNTAX_PASSES(tests.second);
-        }
-    }
-    void testASTNode();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestValueNode);
+TEST_F(TestValueNode, testSyntax)
+{
+    for (const auto& tests : value_tests) {
+        TEST_SYNTAX_PASSES(tests.second);
+    }
+}
 
-void TestValueNode::testASTNode()
+TEST_F(TestValueNode, testASTNode)
 {
     for (const auto& tests : value_tests) {
         const Node::NodeType nodeType = tests.first;
@@ -184,13 +176,12 @@ void TestValueNode::testASTNode()
             const std::string& code = test.first;
             const Node* expected = test.second.get();
             const Tree::ConstPtr tree = parse(code.c_str());
-            CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("No AST returned", code), static_cast<bool>(tree));
+            ASSERT_TRUE(static_cast<bool>(tree)) << ERROR_MSG("No AST returned", code);
 
             // get the first statement
             const Node* result = tree->child(0)->child(0);
-            CPPUNIT_ASSERT(result);
-            CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid AST node", code),
-                nodeType == result->nodetype());
+            ASSERT_TRUE(result);
+            ASSERT_TRUE(nodeType == result->nodetype()) << ERROR_MSG("Invalid AST node", code);
 
             std::vector<const Node*> resultList, expectedList;
             linearize(*result, resultList);
@@ -202,7 +193,7 @@ void TestValueNode::testASTNode()
                 openvdb::ax::ast::print(*expected, true, os);
                 os << "Result:\n";
                 openvdb::ax::ast::print(*result, true, os);
-                CPPUNIT_FAIL(ERROR_MSG("Mismatching Trees for Value (literal) code", code) + os.str());
+                FAIL() << ERROR_MSG("Mismatching Trees for Value (literal) code", code) + os.str();
             }
         }
     }
