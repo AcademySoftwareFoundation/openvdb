@@ -183,7 +183,15 @@ __global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAcce
     auto &dstTile = *nodeAcc->template dstRoot<DstBuildT>().tile(tid);
     dstTile.key   = srcTile.key;
     if (srcTile.child) {
-        dstTile.child = sizeof(NanoRoot<DstBuildT>) + sizeof(NanoRoot<DstBuildT>::Tile)*((srcTile.child - sizeof(NanoRoot<SrcBuildT>))/sizeof(NanoRoot<SrcBuildT>::Tile));
+        // IndexToGrid<>::NodeAccessor::nodeCount[4];// 0=leaf, 1=lower, 2=upper, 3=root tiles
+        // |<--NanoRoot-->|<--Tile[0]...Tile[nodeCount[3]-1]-->|<--Child[0]...Child[ChildID]-->|
+        // |<--------------------- offset ---------------------|
+        // |<------------------------------- srcTile.child ------------------------------------|
+        //                                                     |<---(srcTile.child-offset)---->|
+        uint64_t offset = sizeof(NanoRoot<SrcBuildT>::Tile)*nodeAcc->nodeCount[3] + sizeof(NanoRoot<SrcBuildT>);// source
+        const uint64_t childID = (srcTile.child - offset)/sizeof(NanoRoot<SrcBuildT>::ChildNodeType);// derived from source
+        offset = sizeof(NanoRoot<DstBuildT>::Tile)*nodeAcc->nodeCount[3] + sizeof(NanoRoot<DstBuildT>);// destination
+        dstTile.child = offset + childID*sizeof(NanoRoot<DstBuildT>::ChildNodeType);
         dstTile.value = srcValues[0];// set to background
         dstTile.state = false;
     } else {
