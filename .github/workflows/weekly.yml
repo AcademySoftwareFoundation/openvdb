@@ -203,7 +203,7 @@ jobs:
   #     - name: install_deps
   #       run: |
   #         if [ "$RUNNER_OS" == "Linux" ]; then
-  #           sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev
+  #           sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
   #           ./ci/install_nanobind.sh 2.0.0
   #         elif [ "$RUNNER_OS" == "macOS" ]; then
   #           ./ci/install_macos.sh 15
@@ -313,6 +313,7 @@ jobs:
   #         -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
   #         -DUSE_EXPLICIT_INSTANTIATION=OFF
   #         -DOPENVDB_CXX_STRICT=ON
+  #         -DOPENVDB_BUILD_VDB_TOOL=OFF
   #         \"
   #     - name: clean
   #       if: matrix.config.components == 'core'
@@ -328,6 +329,7 @@ jobs:
   #         -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
   #         -DUSE_EXPLICIT_INSTANTIATION=OFF
   #         -DOPENVDB_CXX_STRICT=ON
+  #         -DOPENVDB_BUILD_VDB_TOOL=OFF
   #         \"
   #     - name: test
   #       run: cd build && ctest -V
