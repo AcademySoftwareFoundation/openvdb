@@ -1101,10 +1101,11 @@ TEST(TestNanoVDBCUDA, CudaIndexGridToGrid_ValueOnIndex)
         }
         //timer.stop();
         cudaFree(d_values);
-    };
+    };// checkConvertedValueGrid lambda
     checkConvertedValueGrid([](float x) { return x; }, [](float x) { return x; });
+    checkConvertedValueGrid([](double x) { return float(x); }, [](float x) {return double(x); });
 
-    // Convert index grid to grid of Vec3fs, whereat the original float data is just stored in all components of a Vec3f.
+    // Convert index grid to grid of Vec3fs, whereas the original float data is just stored in all components of a Vec3f.
     // This test covers code in indexToGrid that is only relevant if the size of grid data changes and does not align.
     checkConvertedValueGrid([](float x) { return nanovdb::Vec3f(x); }, [](const nanovdb::Vec3f& x) { return x[0]; });
 }//  CudaPointToGrid_ValueOnIndex
