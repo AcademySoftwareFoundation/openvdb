@@ -188,10 +188,10 @@ __global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAcce
         // |<-------------------- offset -------------------|
         // |<-------------------------------- Tile::child ------------------------------------|
         //                                                  |<------ Tile::child-offset ----->|
-        //                                                  |<--- ChildID x sizeof(ChildT) -->|
-        uint64_t offset = sizeof(NanoRoot<SrcBuildT>) + tileCount*sizeof(NanoRoot<SrcBuildT>::Tile);// source offset
+        //                                                  |<--- childID x sizeof(ChildT) -->|
+        uint64_t offset = sizeof(NanoRoot<SrcBuildT>) + tileCount*sizeof(NanoRoot<SrcBuildT>::Tile);//  source offset
         const uint64_t childID = (srcTile.child - offset)/sizeof(NanoRoot<SrcBuildT>::ChildNodeType);// derived from source offset
-        offset          = sizeof(NanoRoot<DstBuildT>) + tileCount*sizeof(NanoRoot<DstBuildT>::Tile);// destination offset
+        offset          = sizeof(NanoRoot<DstBuildT>) + tileCount*sizeof(NanoRoot<DstBuildT>::Tile);//  destination offset
         dstTile.child   = offset + childID*sizeof(NanoRoot<DstBuildT>::ChildNodeType);
         dstTile.value   = srcValues[0];// set to background
         dstTile.state   = false;
