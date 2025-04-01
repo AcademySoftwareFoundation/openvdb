@@ -176,24 +176,25 @@ template<typename SrcBuildT, typename DstBuildT>
 __global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
                                        const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
-    const auto tid = blockIdx.x;
+    const auto tileID = blockIdx.x, tileCount = nodeAcc->nodeCount[3];// note: tileID != childID!
+    NANOVDB_ASSERT(tileID < tileCount);
 
-    // Process children and tiles
-    const auto &srcTile = *nodeAcc->srcRoot().tile(tid);
-    auto &dstTile = *nodeAcc->template dstRoot<DstBuildT>().tile(tid);
+    // Process child nodes and tiles of the root node
+    const auto &srcTile = *nodeAcc->srcRoot().tile(tileID);
+    auto &dstTile = *nodeAcc->template dstRoot<DstBuildT>().tile(tileID);
     dstTile.key   = srcTile.key;
     if (srcTile.child) {
-        // IndexToGrid<>::NodeAccessor::nodeCount[4];// 0=leaf, 1=lower, 2=upper, 3=root tiles
-        // |<--NanoRoot-->|<--Tile[0]...Tile[nodeCount[3]-1]-->|<--Child[0]...Child[ChildID]-->|
-        // |<--------------------- offset ---------------------|
-        // |<------------------------------- srcTile.child ------------------------------------|
-        //                                                     |<---(srcTile.child-offset)---->|
-        uint64_t offset = sizeof(NanoRoot<SrcBuildT>::Tile)*nodeAcc->nodeCount[3] + sizeof(NanoRoot<SrcBuildT>);// source
-        const uint64_t childID = (srcTile.child - offset)/sizeof(NanoRoot<SrcBuildT>::ChildNodeType);// derived from source
-        offset = sizeof(NanoRoot<DstBuildT>::Tile)*nodeAcc->nodeCount[3] + sizeof(NanoRoot<DstBuildT>);// destination
-        dstTile.child = offset + childID*sizeof(NanoRoot<DstBuildT>::ChildNodeType);
-        dstTile.value = srcValues[0];// set to background
-        dstTile.state = false;
+        // |<--NanoRoot-->|<--Tile[0]...Tile[tileCount-1]-->|<--Child[0]...child[childID-1]-->|
+        // |<-------------------- offset -------------------|
+        // |<-------------------------------- Tile::child ------------------------------------|
+        //                                                  |<------ Tile::child-offset ----->|
+        //                                                  |<--- ChildID x sizeof(ChildT) -->|
+        uint64_t offset = sizeof(NanoRoot<SrcBuildT>) + tileCount*sizeof(NanoRoot<SrcBuildT>::Tile);// source offset
+        const uint64_t childID = (srcTile.child - offset)/sizeof(NanoRoot<SrcBuildT>::ChildNodeType);// derived from source offset
+        offset          = sizeof(NanoRoot<DstBuildT>) + tileCount*sizeof(NanoRoot<DstBuildT>::Tile);// destination offset
+        dstTile.child   = offset + childID*sizeof(NanoRoot<DstBuildT>::ChildNodeType);
+        dstTile.value   = srcValues[0];// set to background
+        dstTile.state   = false;
     } else {
         dstTile.child = 0;// i.e. no child node
         dstTile.value = srcValues[srcTile.value];
