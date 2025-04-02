@@ -8,3 +8,5 @@ Added functions to independently stop and compute the elapsed time for timer cla
 
 Fixed ostream specializations being hidden within the nanovdb namespace
 Replaced CUB's CachingDeviceAllocator with the default asynchronous stream ordered allocator in PointsToGrid for improved performance
+
+Fixed offset bug in nanovdb::tools::cuda::IndexToGrid related to non-POD build types (contributed by Andreas Henne)
