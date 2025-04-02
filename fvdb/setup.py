@@ -158,13 +158,25 @@ class FVDBBuildCommand(cpp_extension.BuildExtension):
             git_tag="v1.10.0",
         )
 
-        self.download_external_dep(name="tinyply", git_url="https://github.com/ddiakopoulos/tinyply.git", git_tag="2.4")
+        _, tinyply_repo = self.download_external_dep(
+            name="tinyply", git_url="https://github.com/ddiakopoulos/tinyply.git", git_tag="2.4"
+        )
+        try:
+            # NOTE:  In python <=3.8, __file__ will be a relative path and >3.8 it is an absolute path
+            tinyply_repo.git.apply(Path(__file__).resolve().parent / "env" / "tinyply.patch")
+        except GitCommandError as e:
+            logging.info(f"Failed to apply tinyply patch: {str(e)}, continuing without patching")
 
-        blosc_source_dir, _ = self.download_external_dep(
+        blosc_source_dir, blosc_repo = self.download_external_dep(
             name="c-blosc",
             git_url="https://github.com/Blosc/c-blosc.git",
             git_tag="v1.21.4",
         )
+        try:
+            # NOTE:  In python <=3.8, __file__ will be a relative path and >3.8 it is an absolute path
+            blosc_repo.git.apply(Path(__file__).resolve().parent / "env" / "blosc.patch")
+        except GitCommandError as e:
+            logging.info(f"Failed to apply blosc patch: {str(e)}, continuing without patching")
         self.build_cmake_project(
             blosc_source_dir,
             [
