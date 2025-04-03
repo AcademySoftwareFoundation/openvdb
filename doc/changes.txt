@@ -4,7 +4,34 @@
 
 @htmlonly <a name="v12_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 12.0.1</B> - <I>In development</I>
+<B>Version 12.0.1</B> - <I>April 3, 2025</I>
+
+@par
+OpenVDB:
+- New features:
+  - Added read and write support for OFF (Object File Format) files to vdb_tool
+
+- Build:
+  - Fixed a build issue with vdb_render on Windows with newer versions of glew not including glu.h by default
+  - Fixed issues with newer versions of clang refusing to accept older ::template syntax
+
+@par
+NanoVDB:
+- New features:
+  - Added support for multiple GPUs to DeviceBuffer
+  - Added a UnifiedBuffer class that wraps CUDA unified memory
+  - Added example for multiGPU sparse convolution
+  - Added CUDA utility functions for device queries
+  - Added functions to independently stop and compute the elapsed time for timer classes
+
+- Improvements:
+  - Replaced CUB's CachingDeviceAllocator with the default asynchronous stream ordered allocator in PointsToGrid for improved performance
+
+- Bug fix:
+  - Map is now properly transposed when converting NanoVDB to OpenVDB.
+  - Fixed ostream specializations being hidden within the nanovdb namespace
+  - Fixed a call to a non-existent method in GridBuild.h
+
 
 @htmlonly <a name="v1_changes"></a>@endhtmlonly
 @par

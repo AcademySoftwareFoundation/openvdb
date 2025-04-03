@@ -1,0 +1,3 @@
+NanoVDB:
+  Bug fix:
+    - Fixed offset bug in nanovdb::tools::cuda::IndexToGrid related to non-POD build types (contributed by Andreas Henne)
