@@ -20,12 +20,13 @@ import tyro
 import viser
 import yaml
 from datasets import ColmapDataset, ColmapParser
+from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 from viz import CameraState, Viewer
 
-from fvdb.nn import GaussianSplat3D
+from fvdb import GaussianSplat3d
 from fvdb.optim import GaussianSplatOptimizer
 
 
@@ -54,7 +55,7 @@ class Config:
     # Initial opacity of each Gaussian
     initial_opacity: float = 0.1
     # Initial scale of each Gaussian
-    initial_scale: float = 1.0
+    initial_covariance_scale: float = 1.0
     # Weight for SSIM loss
     ssim_lambda: float = 0.2
     # Which network to use for LPIPS loss
@@ -70,6 +71,31 @@ class Config:
     near_plane: float = 0.01
     # Far plane clipping distance
     far_plane: float = 1e10
+
+    # Minimum screen space radius below which Gaussians are ignored after projection
+    min_radius_2d: float = 0.0
+
+    # Blur amount for anti-aliasing
+    eps_2d: float = 0.3
+
+    # Whether to use anti-aliasing or not
+    antialias: bool = False
+
+    # Size of tiles to use during rasterization
+    tile_size: int = 16
+
+    # When to start refining (split/duplicate/merge) Gaussians during optimization
+    refine_start_step: int = 500
+    # When to stop refining (split/duplicate/merge) Gaussians during optimization
+    refine_stop_step: int = 15_000
+    # How often to refine (split/duplicate/merge) Gaussians during optimization
+    refine_every: int = 100
+
+    # How often to reset the opacities of the Gaussians during optimization
+    reset_opacities_every: int = 3000
+
+    # When to stop using the 2d projected scale for refinement (default of 0 is to never use it)
+    refine_using_scale2d_stop_iter: int = 0
 
 
 def crop_image_batch(image: torch.Tensor, mask: Optional[torch.Tensor], ncrops: int):
@@ -185,6 +211,42 @@ class Runner:
 
         self.logger.info(f"Saving results to {self.output_dir}")
 
+    def init_model(
+        self,
+        points: np.ndarray,
+        colors: np.ndarray,
+    ):
+        def _knn(x_np: np.ndarray, k: int = 4) -> torch.Tensor:
+            model = NearestNeighbors(n_neighbors=k, metric="euclidean").fit(x_np)
+            distances, _ = model.kneighbors(x_np)
+            return torch.from_numpy(distances).to(device=self.device, dtype=torch.float32)
+
+        def _rgb_to_sh(rgb: torch.Tensor) -> torch.Tensor:
+            C0 = 0.28209479177387814
+            return (rgb - 0.5) / C0
+
+        num_gaussians = points.shape[0]
+
+        dist2_avg = (_knn(points, 4)[:, 1:] ** 2).mean(dim=-1)  # [N,]
+        dist_avg = torch.sqrt(dist2_avg)
+        log_scales = torch.log(dist_avg * self.cfg.initial_covariance_scale).unsqueeze(-1).repeat(1, 3)  # [N, 3]
+
+        means = torch.from_numpy(points).to(device=self.device, dtype=torch.float32)  # [N, 3]
+        quats = torch.rand((num_gaussians, 4), device=self.device)  # [N, 4]
+        logit_opacities = torch.logit(
+            torch.full((num_gaussians,), self.cfg.initial_opacity, device=self.device)
+        )  # [N,]
+
+        rgbs = torch.from_numpy(colors / 255.0).to(device=self.device, dtype=torch.float32)  # [N, 3]
+        sh_0 = _rgb_to_sh(rgbs).unsqueeze(0)  # [1, N, 3]
+
+        sh_n = torch.zeros(((self.cfg.sh_degree + 1) ** 2 - 1, num_gaussians, 3), device=self.device)  # [K, N, 3]
+
+        self.model = GaussianSplat3d(means, quats, log_scales, logit_opacities, sh_0, sh_n, True)
+
+        if self.cfg.refine_using_scale2d_stop_iter > 0:
+            self.model.track_max_2d_radii_for_grad = True
+
     def __init__(
         self,
         cfg: Config,
@@ -224,30 +286,25 @@ class Runner:
         self.writer = SummaryWriter(log_dir=self.tensorboard_dir) if not self.no_save else None
 
         # Load data: Training data should contain initial points and colors.
-        self.parser = ColmapParser(
+        colmap_parser = ColmapParser(
             data_dir=data_path,
             factor=data_scale_factor,
             normalization_type="ecef2enu" if normalize_ecef2enu else "pca",
             test_every=use_every_n_as_test,
         )
-        self.trainset = ColmapDataset(self.parser, split="train")
-        self.valset = ColmapDataset(self.parser, split="val")
-        self.scene_scale = self.parser.scene_scale * 1.1
-        self.logger.info(f"Created dataset. Scene scale = {self.scene_scale}")
+        self.trainset = ColmapDataset(colmap_parser, split="train")
+        self.valset = ColmapDataset(colmap_parser, split="val")
+        scene_scale = colmap_parser.scene_scale * 1.1
+        self.logger.info(f"Created dataset. Scene scale = {scene_scale}")
 
         # Initialize model
-        self.model = GaussianSplat3D.from_colmap(
-            self.parser.points,
-            self.parser.points_rgb,
-            initial_covariance_scale=cfg.initial_scale,
-            initial_opacity=cfg.initial_opacity,
-            scene_size=self.scene_scale,
-            sh_degree=cfg.sh_degree,
-        ).to(device)
+        self.init_model(colmap_parser.points, colmap_parser.points_rgb)
         self.logger.info(f"Model initialized with {self.model.num_gaussians} Gaussians")
 
         # Initialize optimizer
-        self.optimizer = GaussianSplatOptimizer(self.model, mean_lr_decay_exponent=0.01 ** (1.0 / cfg.max_steps))
+        self.optimizer = GaussianSplatOptimizer(
+            self.model, scene_scale=scene_scale, mean_lr_decay_exponent=0.01 ** (1.0 / cfg.max_steps)
+        )
 
         # Losses & Metrics.
         self.ssim = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
@@ -263,6 +320,7 @@ class Runner:
         # Viewer
         if not self.disable_viewer:
             self.server = viser.ViserServer(port=8080, verbose=False)
+            self.server.scene.set_up_direction("-z")
             self.viewer = Viewer(
                 server=self.server,
                 render_fn=self._viewer_render_fn,
@@ -311,33 +369,33 @@ class Runner:
             image_height, image_width = image.shape[1:3]
             num_pixels_in_minibatch = image.shape[0] * image.shape[1] * image.shape[2]
 
+            # Progressively use higher spherical harmonic degree as we optimize
+            sh_degree_to_use = min(step // self.cfg.increase_sh_degree_every, self.cfg.sh_degree)
+            projected_gaussians = self.model.project_gaussians_for_images(
+                world_to_cam_mats,
+                intrinsics_mats,
+                image_width,
+                image_height,
+                self.cfg.near_plane,
+                self.cfg.far_plane,
+                "perspective",
+                sh_degree_to_use,
+                self.cfg.min_radius_2d,
+                self.cfg.eps_2d,
+                self.cfg.antialias,
+            )
             # If you have very large images, you can iterate over disjoint crops and accumulate gradients
             # If cfg.crops_per_image is 1, then this just returns the image
             for pixels, mask_pixels, crop, is_last in crop_image_batch(image, mask, self.cfg.crops_per_image):
                 # Actual pixels to compute the loss on, normalized to [0, 1]
                 pixels = pixels.to(self.device) / 255.0  # [1, H, W, 3]
 
-                # Progressively use higher spherical harmonic degree as we optimize
-                sh_degree_to_use = min(step // self.cfg.increase_sh_degree_every, self.cfg.sh_degree)
-
                 # Render an image from the gaussian splats
                 # possibly using a crop of the full image
-                renders, alphas, info = self.model(
-                    image_w=image_width,
-                    image_h=image_height,
-                    extrinsics_mats=world_to_cam_mats,
-                    intrinsics_mats=intrinsics_mats,
-                    rasterize_mode="classic",
-                    sh_degree=sh_degree_to_use,
-                    image_crop=crop,
-                    cache_info=True,
+                crop_origin_w, crop_origin_h, crop_w, crop_h = crop
+                colors, alphas = self.model.render_from_projected_gaussians(
+                    projected_gaussians, crop_w, crop_h, crop_origin_w, crop_origin_h, self.cfg.tile_size
                 )
-                # If you specified depth rendering, grab the depth map as well
-                if renders.shape[-1] == 4:
-                    colors, depths = renders[..., 0:3], renders[..., 3:4]
-                else:
-                    colors, depths = renders, None
-
                 # If you want to add random background, we'll mix it in here
                 if self.cfg.random_bkgd:
                     bkgd = torch.rand(1, 3, device=self.device)
@@ -398,8 +456,28 @@ class Runner:
             if step in [i - 1 for i in self.cfg.save_steps] or step == self.cfg.max_steps - 1:
                 self.save_checkpoint(step)
 
-            # Update the model (update parameters and potentially grow/shrink the number of Gaussians)
-            self.optimizer.step(info)
+            # Refine the gaussians via splitting/duplication/pruning
+            if (
+                step > self.cfg.refine_start_step
+                and step % self.cfg.refine_every == 0
+                and step < self.cfg.refine_stop_step
+            ):
+                num_gaussians_before = self.model.num_gaussians
+                use_scales_for_refinement = step > self.cfg.reset_opacities_every
+                use_screen_space_scales_for_refinement = step < self.cfg.refine_using_scale2d_stop_iter
+                if not use_screen_space_scales_for_refinement:
+                    self.model.track_max_2d_radii_for_grad = False
+                num_dup, num_split, num_prune = self.optimizer.refine_gaussians(
+                    use_scales=use_scales_for_refinement, use_screen_space_scales=use_screen_space_scales_for_refinement
+                )
+                self.logger.info(
+                    f"Step {step}: Refinement: {num_dup} duplicated, {num_split} split, {num_prune} pruned. "
+                    f"Num Gaussians: {self.model.num_gaussians} (before: {num_gaussians_before})"
+                )
+            # Reset the opacity parameters every so often
+            if step % self.cfg.reset_opacities_every == 0:
+                self.optimizer.reset_opacities()
+            self.optimizer.step()
             self.optimizer.zero_grad(set_to_none=True)
 
             # Run evaluation every eval_steps
@@ -438,14 +516,19 @@ class Runner:
             torch.cuda.synchronize()
             tic = time.time()
 
-            colors, _, _ = self.model(
-                image_w=width,
-                image_h=height,
-                extrinsics_mats=world_to_cam_mats,
-                intrinsics_mats=intrinsics_mats,
-                rasterize_mode="classic",
-                sh_degree=cfg.sh_degree,
-                render_depth=False,
+            colors, _ = self.model.render_images(
+                world_to_cam_mats,
+                intrinsics_mats,
+                width,
+                height,
+                self.cfg.near_plane,
+                self.cfg.far_plane,
+                "perspective",
+                self.cfg.sh_degree,
+                self.cfg.tile_size,
+                self.cfg.min_radius_2d,
+                self.cfg.eps_2d,
+                self.cfg.antialias,
             )
             colors = torch.clamp(colors, 0.0, 1.0)
             # depths = colors[..., -1:] / alphas.clamp(min=1e-10)
@@ -509,20 +592,27 @@ class Runner:
     @torch.no_grad()
     def _viewer_render_fn(self, camera_state: CameraState, img_wh: Tuple[int, int]):
         """Callable function for the viewer."""
-        W, H = img_wh
-        c2w = camera_state.c2w
-        K = camera_state.get_K(img_wh)
-        c2w = torch.linalg.inv(torch.from_numpy(c2w).float().to(self.device)).contiguous()
-        K = torch.from_numpy(K).float().to(self.device)
+        img_w, img_h = img_wh
+        cam_to_world_matrix = camera_state.c2w
+        projection_matrix = camera_state.get_K(img_wh)
+        world_to_cam_matrix = torch.linalg.inv(
+            torch.from_numpy(cam_to_world_matrix).float().to(self.device)
+        ).contiguous()
+        projection_matrix = torch.from_numpy(projection_matrix).float().to(self.device)
 
-        render_colors, _, _ = self.model(
-            image_w=W,
-            image_h=H,
-            extrinsics_mats=c2w[None],
-            intrinsics_mats=K[None],
-            sh_degree=self.cfg.sh_degree,
-            radius_clip=3.0,
-            render_depth=False,
+        render_colors, _ = self.model.render_images(
+            world_to_cam_matrix[None],
+            projection_matrix[None],
+            img_w,
+            img_h,
+            self.cfg.near_plane,
+            self.cfg.far_plane,
+            "perspective",
+            self.cfg.sh_degree,
+            self.cfg.tile_size,
+            self.cfg.min_radius_2d,
+            self.cfg.eps_2d,
+            self.cfg.antialias,
         )
         rgb = render_colors[0, ..., :3].cpu().numpy()
         return rgb

@@ -26,12 +26,7 @@ from ._Cpp import (
     jzeros,
     jempty,
     volume_render,
-    gaussian_fully_fused_projection,
-    gaussian_render,
-    precompute_gaussian_render_state,
-    render_pixels_from_precomputed_gaussian_render_state,
-    gaussian_render_depth,
-    save_gaussian_ply,
+    gaussian_render_jagged,
 )
 
 # The following import needs to come after the GridBatch and JaggedTensor imports
@@ -87,10 +82,5 @@ __all__ = [
     "jzeros",
     "jempty",
     "volume_render",
-    "gaussian_fully_fused_projection",
-    "gaussian_render",
-    "precompute_gaussian_render_state",
-    "render_pixels_from_precomputed_gaussian_render_state",
-    "gaussian_render_depth",
-    "save_gaussian_ply",
+    "gaussian_render_jagged",
 ]

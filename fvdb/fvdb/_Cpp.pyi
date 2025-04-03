@@ -461,7 +461,7 @@ class SparseConvPackInfo:
     def cuda(self) -> SparseConvPackInfo: ...
     def to(self, device: TorchDeviceOrString) -> SparseConvPackInfo: ...
 
-class GaussianSplatRenderState:
+class ProjectedGaussianSplats:
     @property
     def means2d(self) -> torch.Tensor: ...
     @property
@@ -498,20 +498,76 @@ class GaussianSplat3d:
         self,
         means: torch.Tensor,
         quats: torch.Tensor,
-        scales: torch.Tensor,
-        opacities: torch.Tensor,
-        sh_coeffs: torch.Tensor,
+        log_scales: torch.Tensor,
+        logit_opacities: torch.Tensor,
+        sh0: torch.Tensor,
+        shN: torch.Tensor,
+        requires_grad: bool = False,
     ) -> None: ...
     @property
     def means(self) -> torch.Tensor: ...
+    @means.setter
+    def means(self, value: torch.Tensor) -> None: ...
     @property
     def quats(self) -> torch.Tensor: ...
+    @quats.setter
+    def quats(self, value: torch.Tensor) -> None: ...
     @property
     def scales(self) -> torch.Tensor: ...
     @property
+    def log_scales(self) -> torch.Tensor: ...
+    @log_scales.setter
+    def log_scales(self, value: torch.Tensor) -> None: ...
+    @property
     def opacities(self) -> torch.Tensor: ...
     @property
-    def sh_coeffs(self) -> torch.Tensor: ...
+    def logit_opacities(self) -> torch.Tensor: ...
+    @logit_opacities.setter
+    def logit_opacities(self, value: torch.Tensor) -> None: ...
+    @property
+    def sh0(self) -> torch.Tensor: ...
+    @sh0.setter
+    def sh0(self, value: torch.Tensor) -> None: ...
+    @property
+    def shN(self) -> torch.Tensor: ...
+    @shN.setter
+    def shN(self, value: torch.Tensor) -> None: ...
+    @property
+    def requires_grad(self) -> bool: ...
+    @requires_grad.setter
+    def requires_grad(self, value: bool) -> None: ...
+    @property
+    def num_gaussians(self) -> int: ...
+    @property
+    def num_sh_bases(self) -> int: ...
+    @property
+    def num_channels(self) -> int: ...
+    @property
+    def accumulated_mean_2d_gradient_norms_for_grad(self) -> torch.Tensor: ...
+    @property
+    def accumulated_max_2d_radii_for_grad(self) -> torch.Tensor: ...
+    @property
+    def accumulated_gradient_step_counts_for_grad(self) -> torch.Tensor: ...
+    @property
+    def track_max_2d_radii_for_grad(self) -> bool: ...
+    @track_max_2d_radii_for_grad.setter
+    def track_max_2d_radii_for_grad(self, value: bool) -> None: ...
+    def set_state(
+        self,
+        means: torch.Tensor,
+        quats: torch.Tensor,
+        log_scales: torch.Tensor,
+        logit_opacities: torch.Tensor,
+        sh0: torch.Tensor,
+        shN: torch.Tensor,
+        requires_grad: bool = False,
+    ) -> None: ...
+    def state_dict(self) -> Dict[str, torch.Tensor]: ...
+    def load_state_dict(self, state_dict: Dict[str, torch.Tensor]) -> None: ...
+    @staticmethod
+    def from_state_dict(state_dict: Dict[str, torch.Tensor]) -> GaussianSplat3d: ...
+    def reset_grad_state(self) -> None: ...
+    def save_ply(self, filename: str) -> None: ...
     def render_images(
         self,
         world_to_camera_matrices: torch.Tensor,
@@ -556,7 +612,7 @@ class GaussianSplat3d:
         eps_2d: float = 0.3,
         antialias: bool = False,
     ) -> Tuple[torch.Tensor, torch.Tensor]: ...
-    def precompute_render_state_for_images(
+    def project_gaussians_for_images(
         self,
         world_to_camera_matrices: torch.Tensor,
         projection_matrices: torch.Tensor,
@@ -566,12 +622,11 @@ class GaussianSplat3d:
         far: float,
         projection_type: str = "perspective",
         sh_degree_to_use: int = -1,
-        tile_size: int = 16,
         min_radius_2d: float = 0.0,
         eps_2d: float = 0.3,
         antialias: bool = False,
-    ) -> GaussianSplatRenderState: ...
-    def precompute_render_state_for_depths(
+    ) -> ProjectedGaussianSplats: ...
+    def project_gaussians_for_depths(
         self,
         world_to_camera_matrices: torch.Tensor,
         projection_matrices: torch.Tensor,
@@ -580,12 +635,11 @@ class GaussianSplat3d:
         near: float,
         far: float,
         projection_type: str = "perspective",
-        tile_size: int = 16,
         min_radius_2d: float = 0.0,
         eps_2d: float = 0.3,
         antialias: bool = False,
-    ) -> GaussianSplatRenderState: ...
-    def precompute_render_state_for_images_and_depths(
+    ) -> ProjectedGaussianSplats: ...
+    def project_gaussians_for_images_and_depths(
         self,
         world_to_camera_matrices: torch.Tensor,
         projection_matrices: torch.Tensor,
@@ -595,14 +649,13 @@ class GaussianSplat3d:
         far: float,
         projection_type: str = "perspective",
         sh_degree_to_use: int = -1,
-        tile_size: int = 16,
         min_radius_2d: float = 0.0,
         eps_2d: float = 0.3,
         antialias: bool = False,
-    ) -> GaussianSplatRenderState: ...
-    def render_from_state(
+    ) -> ProjectedGaussianSplats: ...
+    def render_from_projected_gaussians(
         self,
-        state: GaussianSplatRenderState,
+        projected_gaussians: ProjectedGaussianSplats,
         crop_width: int = -1,
         crop_height: int = -1,
         crop_origin_w: int = -1,
@@ -658,22 +711,7 @@ def volume_render(
     packInfo: torch.Tensor,
     transmittanceThresh: float,
 ) -> List[torch.Tensor]: ...
-def gaussian_fully_fused_projection(
-    means: torch.Tensor,
-    quats: torch.Tensor,
-    scales: torch.Tensor,
-    viewmats: torch.Tensor,
-    Ks: torch.Tensor,
-    image_width: int,
-    image_height: int,
-    near_plane: float = 0.01,
-    far_plane: float = 1e10,
-    radius_clip: float = 0.0,
-    eps2d: float = 0.3,
-    antialias: bool = False,
-    ortho: bool = False,
-) -> List[torch.Tensor]: ...
-def gaussian_render(
+def gaussian_render_jagged(
     means: JaggedTensorOrTensor,
     quats: JaggedTensorOrTensor,
     scales: JaggedTensorOrTensor,
@@ -691,71 +729,10 @@ def gaussian_render(
     eps2d: float = 0.3,
     antialias: bool = False,
     render_depth_channel: bool = False,
-    return_debug_info=False,
-    pixels_to_render: Optional[JaggedTensorOrTensor] = None,
+    return_debug_info: bool = False,
+    render_depth_only: bool = False,
     ortho: bool = False,
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
-def gaussian_render_depth(
-    means: JaggedTensorOrTensor,
-    quats: JaggedTensorOrTensor,
-    scales: JaggedTensorOrTensor,
-    opacities: JaggedTensorOrTensor,
-    viewmats: JaggedTensorOrTensor,
-    Ks: JaggedTensorOrTensor,
-    image_width: int,
-    image_height: int,
-    near_plane: float = 0.01,
-    far_plane: float = 1e10,
-    tile_size: int = 16,
-    radius_clip: float = 0.0,
-    eps2d: float = 0.3,
-    antialias: bool = False,
-    return_debug_info=False,
-    pixels_to_render: Optional[JaggedTensorOrTensor] = None,
-    ortho: bool = False,
-) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor | Any]]: ...
-def precompute_gaussian_render_state(
-    means: torch.Tensor,
-    quats: torch.Tensor,
-    scales: torch.Tensor,
-    opacities: torch.Tensor,
-    sh_coeffs: torch.Tensor,
-    viewmats: torch.Tensor,
-    Ks: torch.Tensor,
-    image_width: int,
-    image_height: int,
-    near_plane: float = 0.01,
-    far_plane: float = 1e10,
-    sh_degree_to_use: int = 3,
-    tile_size: int = 16,
-    radius_clip: float = 0.0,
-    eps2d: float = 0.3,
-    antialias: bool = False,
-    render_depth_channel: bool = False,
-    return_debug_info=False,
-    ortho: bool = False,
-) -> Dict[str, torch.Tensor | Any]: ...
-def render_pixels_from_precomputed_gaussian_render_state(
-    means2d: torch.Tensor,
-    conics: torch.Tensor,
-    colors: torch.Tensor,
-    opacities: torch.Tensor,
-    image_width: int,
-    image_height: int,
-    image_origin_w: int,
-    image_origin_h: int,
-    tile_size: int,
-    isect_offsets: torch.Tensor,
-    flatten_ids: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor]: ...
-def save_gaussian_ply(
-    filename: str,
-    means: JaggedTensorOrTensor,
-    quats: JaggedTensorOrTensor,
-    scales: JaggedTensorOrTensor,
-    opacities: JaggedTensorOrTensor,
-    sh_coeffs: JaggedTensorOrTensor,
-) -> None: ...
 def scaled_dot_product_attention(
     query: JaggedTensorOrTensor,
     key: JaggedTensorOrTensor,

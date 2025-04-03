@@ -4,7 +4,6 @@
 #include "TypeCasters.h"
 #include <Config.h>
 #include <FVDB.h>
-#include <GaussianSplatting.h>
 
 #include <torch/extension.h>
 
@@ -73,47 +72,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // TODO: (@fwilliams) JaggedTensor interface
     m.def("volume_render", &fvdb::volumeRender, py::arg("sigmas"), py::arg("rgbs"),
           py::arg("deltaTs"), py::arg("ts"), py::arg("packInfo"), py::arg("transmittanceThresh"));
-
-    // gaussian rendering
-    m.def("gaussian_fully_fused_projection", &fvdb::projectGaussiansToImages, py::arg("means"),
-          py::arg("quats"), py::arg("scales"), py::arg("viewmats"), py::arg("Ks"),
-          py::arg("image_width"), py::arg("image_height"), py::arg("near_plane") = 0.01,
-          py::arg("far_plane") = 1e10, py::arg("radius_clip") = 0.0, py::arg("eps2d") = 0.3,
-          py::arg("antialias") = false, py::arg("ortho") = false);
-
-    m.def("gaussian_render", &fvdb::gaussianRender, py::arg("means"), py::arg("quats"),
-          py::arg("scales"), py::arg("opacities"), py::arg("sh_coeffs"), py::arg("viewmats"),
-          py::arg("Ks"), py::arg("image_width"), py::arg("image_height"),
-          py::arg("near_plane") = 0.01, py::arg("far_plane") = 1e10,
-          py::arg("sh_degree_to_use") = 3, py::arg("tile_size") = 16, py::arg("radius_clip") = 0.0,
-          py::arg("eps2d") = 0.3, py::arg("antialias") = false,
-          py::arg("render_depth_channel") = false, py::arg("return_debug_info") = false,
-          py::arg("pixels_to_render") = torch::nullopt, py::arg("ortho") = false);
-
-    m.def("gaussian_render_depth", &fvdb::gaussianRenderDepth, py::arg("means"), py::arg("quats"),
-          py::arg("scales"), py::arg("opacities"), py::arg("viewmats"), py::arg("Ks"),
-          py::arg("image_width"), py::arg("image_height"), py::arg("near_plane") = 0.01,
-          py::arg("far_plane") = 1e10, py::arg("tile_size") = 16, py::arg("radius_clip") = 0.0,
-          py::arg("eps2d") = 0.3, py::arg("antialias") = false,
-          py::arg("return_debug_info") = false, py::arg("pixels_to_render") = torch::nullopt,
-          py::arg("ortho") = false);
-
-    m.def("precompute_gaussian_render_state", &fvdb::precomputeGaussianRenderStateUnbatched,
-          py::arg("means"), py::arg("quats"), py::arg("scales"), py::arg("opacities"),
-          py::arg("sh_coeffs"), py::arg("viewmats"), py::arg("Ks"), py::arg("image_width"),
-          py::arg("image_height"), py::arg("near_plane") = 0.01, py::arg("far_plane") = 1e10,
-          py::arg("sh_degree_to_use") = 3, py::arg("tile_size") = 16, py::arg("radius_clip") = 0.0,
-          py::arg("eps2d") = 0.3, py::arg("antialias") = false,
-          py::arg("render_depth_channel") = false, py::arg("ortho") = false);
-
-    m.def("render_pixels_from_precomputed_gaussian_render_state",
-          &fvdb::renderPixelsFromPrecomputedGaussianRenderStateUnbatched, py::arg("means2d"),
-          py::arg("conics"), py::arg("colors"), py::arg("opacities"), py::arg("image_width"),
-          py::arg("image_height"), py::arg("image_origin_w"), py::arg("image_origin_h"),
-          py::arg("tile_size"), py::arg("isect_offsets"), py::arg("flatten_ids"));
-
-    m.def("save_gaussian_ply", &fvdb::saveGaussianPly, py::arg("filename"), py::arg("means"),
-          py::arg("quats"), py::arg("scales"), py::arg("opacities"), py::arg("sh_coeffs"));
 
     // attention
     m.def("scaled_dot_product_attention", &fvdb::scaledDotProductAttention, py::arg("query"),

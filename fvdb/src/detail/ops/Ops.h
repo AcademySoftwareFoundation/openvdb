@@ -354,21 +354,21 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 /// appearance for Gaussian Splatting and other rendering techniques. The output colors are not
 /// limited to RGB; they can have any number of channels.
 ///
-/// @param[in] sh_degree_to_use Degree of spherical harmonics to use (0-3 typically, higher degrees
+/// @param[in] shDegreeToUse Degree of spherical harmonics to use (0-3 typically, higher degrees
 /// provide more detail)
-/// @param[in] dirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) normalized to unit
+/// @param[in] viewDirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) normalized to unit
 /// length, representing view directions
-/// @param[in] sh_coeffs Spherical harmonic coefficients [N, K, 3] (packed) or
+/// @param[in] shCoeffs Spherical harmonic coefficients [N, K, 3] (packed) or
 /// [K, C, N, 3] (unpacked), where K depends on sh_degree_to_use (K=(sh_degree_to_use+1)²)
 /// @param[in] radii radii [N] (packed) or [C, N] (unpacked) for view-dependent level-of-detail
 /// control
 ///
 /// @return color values [N, D] computed from the spherical harmonics evaluation
 template <c10::DeviceType>
-torch::Tensor dispatchSphericalHarmonicsForward(const int            sh_degree_to_use,
-                                                const torch::Tensor &dirs,      // [N, 3]
-                                                const torch::Tensor &sh_coeffs, // [N, ...]
-                                                const torch::Tensor &radii      // [N]
+torch::Tensor dispatchSphericalHarmonicsForward(const int            shDegreeToUse,
+                                                const torch::Tensor &viewDirs, // [N, 3]
+                                                const torch::Tensor &shCoeffs, // [N, ...]
+                                                const torch::Tensor &radii     // [N]
 );
 
 /// @brief Spherical harmonics evaluation backward pass
@@ -376,16 +376,16 @@ torch::Tensor dispatchSphericalHarmonicsForward(const int            sh_degree_t
 /// This function computes the vector-Jacobian product between the output gradients and the Jacobian
 /// of the spherical harmonics forward operation.
 ///
-/// @param[in] sh_degree_to_use Degree of spherical harmonics used in the forward pass
-/// @param[in] dirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) used in the forward
-/// pass
-/// @param[in] sh_coeffs Spherical harmonic coefficients [N, K, 3] (packed) or [K, C, N, 3]
+/// @param[in] shDegreeToUse Degree of spherical harmonics used in the forward pass
+/// @param[in] viewDirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) used in the
+/// forward pass
+/// @param[in] shCoeffs Spherical harmonic coefficients [N, K, 3] (packed) or [K, C, N, 3]
 /// (unpacked) where K depends on sh_degree_to_use
-/// @param[in] v_colors Gradients of the loss function with respect to output colors [N, 3] -
+/// @param[in] dLossDColors Gradients of the loss function with respect to output colors [N, 3] -
 /// ∂L/∂colors
 /// @param[in] radii radii [N] (packed) or [C, N] (unpacked) used in the forward pass for
 /// level-of-detail
-/// @param[in] compute_v_dirs Whether to compute gradients with respect to direction vectors
+/// @param[in] computeDLossDViewDirs Whether to compute gradients with respect to direction vectors
 ///
 /// @return std::tuple containing gradients of the loss function with respect to:
 ///         - SH coefficients [N, K, 3] - ∂L/∂sh_coeffs
@@ -393,12 +393,12 @@ torch::Tensor dispatchSphericalHarmonicsForward(const int            sh_degree_t
 ///         tensor)
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor>
-dispatchSphericalHarmonicsBackward(const int            sh_degree_to_use,
-                                   const torch::Tensor &dirs,      // [N, 3]
-                                   const torch::Tensor &sh_coeffs, // [N, K, 3]
-                                   const torch::Tensor &v_colors,
-                                   const torch::Tensor &radii,     // [N]
-                                   const bool           compute_v_dirs);
+dispatchSphericalHarmonicsBackward(const int            shDegreeToUse,
+                                   const torch::Tensor &viewDirs, // [N, 3]
+                                   const torch::Tensor &shCoeffs, // [N, K, 3]
+                                   const torch::Tensor &dLossDColors,
+                                   const torch::Tensor &radii,    // [N]
+                                   const bool           computeDLossDViewDirs);
 
 /// @brief Project 3D Gaussians to 2D screen space pixel coordinates for rendering
 ///
@@ -414,15 +414,15 @@ dispatchSphericalHarmonicsBackward(const int            sh_degree_to_use,
 /// @param[in] means 3D positions of Gaussians [N, 3] where N is number of Gaussians
 /// @param[in] quats Quaternion rotations of Gaussians [N, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [N, 3] representing extent in each dimension
-/// @param[in] viewmats Camera view matrices [C, 4, 4] where C is number of cameras
-/// @param[in] Ks Camera intrinsic matrices [C, 3, 3]
-/// @param[in] image_width Width of the output image in pixels
-/// @param[in] image_height Height of the output image in pixels
+/// @param[in] camToWorldMatrices Camera view matrices [C, 4, 4] where C is number of cameras
+/// @param[in] projectionMatrices Camera intrinsic matrices [C, 3, 3]
+/// @param[in] imageWidth Width of the output image in pixels
+/// @param[in] imageHeight Height of the output image in pixels
 /// @param[in] eps2d 2D projection epsilon for numerical stability
-/// @param[in] near_plane Near clipping plane distance
-/// @param[in] far_plane Far clipping plane distance
-/// @param[in] radius_clip Radius clipping value to limit the maximum size of projected Gaussians
-/// @param[in] calc_compensations Whether to calculate view-dependent compensation factors
+/// @param[in] nearPlane Near clipping plane distance
+/// @param[in] farPlane Far clipping plane distance
+/// @param[in] minRadius2d Radius clipping value to limit the maximum size of projected Gaussians
+/// @param[in] calcCompensations Whether to calculate view-dependent compensation factors
 /// @param[in] ortho Whether to use orthographic projection instead of perspective
 ///
 /// @return std::tuple containing:
@@ -433,14 +433,14 @@ dispatchSphericalHarmonicsBackward(const int            sh_degree_to_use,
 ///         - Compensation factors [C, N] (if calc_compensations is true, otherwise empty tensor)
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianProjectionForward(const torch::Tensor &means,    // [N, 3]
-                                  const torch::Tensor &quats,    // [N, 4]
-                                  const torch::Tensor &scales,   // [N, 3]
-                                  const torch::Tensor &viewmats, // [C, 4, 4]
-                                  const torch::Tensor &Ks,       // [C, 3, 3]
-                                  const uint32_t image_width, const uint32_t image_height,
-                                  const float eps2d, const float near_plane, const float far_plane,
-                                  const float radius_clip, const bool calc_compensations,
+dispatchGaussianProjectionForward(const torch::Tensor &means,              // [N, 3]
+                                  const torch::Tensor &quats,              // [N, 4]
+                                  const torch::Tensor &scales,             // [N, 3]
+                                  const torch::Tensor &camToWorldMatrices, // [C, 4, 4]
+                                  const torch::Tensor &projectionMatrices, // [C, 3, 3]
+                                  const uint32_t imageWidth, const uint32_t imageHeight,
+                                  const float eps2d, const float nearPlane, const float farPlane,
+                                  const float minRadius2d, const bool calcCompensations,
                                   const bool ortho);
 
 /// @brief Calculate gradients for the 3D to 2D Gaussian projection (backward pass)
@@ -455,20 +455,26 @@ dispatchGaussianProjectionForward(const torch::Tensor &means,    // [N, 3]
 /// @param[in] means 3D positions of Gaussians [N, 3]
 /// @param[in] quats Quaternion rotations of Gaussians [N, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [N, 3] representing extent in each dimension
-/// @param[in] viewmats Camera view matrices [C, 4, 4]
-/// @param[in] Ks Camera intrinsic matrices [C, 3, 3]
+/// @param[in] camToWorldMatrices Camera view matrices [C, 4, 4]
+/// @param[in] projectionMatrices Camera intrinsic matrices [C, 3, 3]
 /// @param[in] compensations View-dependent compensation factors [N, 6] (optional)
-/// @param[in] image_width Width of the image in pixels
-/// @param[in] image_height Height of the image in pixels
+/// @param[in] imageWidth Width of the image in pixels
+/// @param[in] imageHeight Height of the image in pixels
 /// @param[in] eps2d 2D projection epsilon for numerical stability
 /// @param[in] radii Output radii from forward pass [C, N]
 /// @param[in] conics Output conics from forward pass [C, N, 3]
-/// @param[out] v_means2d Gradients with respect to projected 2D means [C, N, 2]
-/// @param[out] v_depths Gradients with respect to depths [C, N]
-/// @param[out] v_conics Gradients with respect to conics [C, N, 3]
-/// @param[out] v_compensations Gradients with respect to compensations [C, N] (optional)
-/// @param[in] viewmats_requires_grad Whether viewmats requires gradient
+/// @param[out] dLossDMeans2d Gradients with respect to projected 2D means [C, N, 2]
+/// @param[out] dLossDDepths Gradients with respect to depths [C, N]
+/// @param[out] dLossDConics Gradients with respect to conics [C, N, 3]
+/// @param[out] dLossDCompensations Gradients with respect to compensations [C, N] (optional)
+/// @param[in] camToWorldMatricesRequiresGrad Whether viewmats requires gradient
 /// @param[in] ortho Whether orthographic projection was used in forward pass
+/// @param[in] outNormalizeddLossdMeans2dNormAccum Optional output for normalized gradients tracked
+/// across backward passes
+/// @param[in] outNormalizedMaxRadiiAccum Optional output for maximum radii tracked across backward
+/// passses
+/// @param[in] outGradientStepCounts Optional output for the number of times each gradient was
+/// counted tracked across backward passes
 ///
 /// @return std::tuple containing gradients of the loss function with respect to the input
 /// parameters:
@@ -480,24 +486,23 @@ dispatchGaussianProjectionForward(const torch::Tensor &means,    // [N, 3]
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionBackward(
-    // fwd inputs
-    const torch::Tensor               &means,         // [N, 3]
-    const torch::Tensor               &quats,         // [N, 4]
-    const torch::Tensor               &scales,        // [N, 3]
-    const torch::Tensor               &viewmats,      // [C, 4, 4]
-    const torch::Tensor               &Ks,            // [C, 3, 3]
-    const at::optional<torch::Tensor> &compensations, // [N, 6] optional
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    // fwd outputs
-    const torch::Tensor &radii,  // [C, N]
-    const torch::Tensor &conics, // [C, N, 3]
-    // grad outputs
-    const torch::Tensor               &v_means2d,       // [C, N, 2]
-    const torch::Tensor               &v_depths,        // [C, N]
-    const torch::Tensor               &v_conics,        // [C, N, 3]
-    const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizedDLossdMeans2 = torch::nullopt);
+    const torch::Tensor               &means,               // [N, 3]
+    const torch::Tensor               &quats,               // [N, 4]
+    const torch::Tensor               &scales,              // [N, 3]
+    const torch::Tensor               &camToWorldMatrices,  // [C, 4, 4]
+    const torch::Tensor               &projectionMatrices,  // [C, 3, 3]
+    const at::optional<torch::Tensor> &compensations,       // [N, 6] optional
+    const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
+    const torch::Tensor               &radii,               // [C, N]
+    const torch::Tensor               &conics,              // [C, N, 3]
+    const torch::Tensor               &dLossDMeans2d,       // [C, N, 2]
+    const torch::Tensor               &dLossDDepths,        // [C, N]
+    const torch::Tensor               &dLossDConics,        // [C, N, 3]
+    const at::optional<torch::Tensor> &dLossDCompensations, // [C, N] optional
+    const bool camToWorldMatricesRequiresGrad, const bool ortho,
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum = torch::nullopt,
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum          = torch::nullopt,
+    at::optional<torch::Tensor> outGradientStepCounts               = torch::nullopt);
 
 /// @brief Compute the intersection of 2D Gaussians with image tiles for efficient rasterization
 ///
@@ -511,12 +516,12 @@ dispatchGaussianProjectionBackward(
 /// @param[in] means2d 2D projected Gaussian centers [C, N, 2] or [M, 2]
 /// @param[in] radii Radii of 2D Gaussians [C, N] or [M]
 /// @param[in] depths Depths of Gaussians [C, N] or [M] used for occlusion handling
-/// @param[in] camera_ids Camera IDs for each Gaussian [M] (optional, NULL if using [C, N, ...]
+/// @param[in] cameraIds Camera IDs for each Gaussian [M] (optional, NULL if using [C, N, ...]
 /// format)
-/// @param[in] num_cameras Number of cameras
-/// @param[in] tile_size Size of each tile in pixels (typically 16x16)
-/// @param[in] num_tiles_h Number of tiles in the vertical dimension
-/// @param[in] num_tiles_w Number of tiles in the horizontal dimension
+/// @param[in] numCameras Number of cameras
+/// @param[in] tileSize Size of each tile in pixels (typically 16x16)
+/// @param[in] numTilesH Number of tiles in the vertical dimension
+/// @param[in] numTilesW Number of tiles in the horizontal dimension
 ///
 /// @return std::tuple containing:
 ///         - Tile offsets [C, num_tiles_h, num_tiles_w] indicating for each tile where its
@@ -528,9 +533,9 @@ std::tuple<torch::Tensor, torch::Tensor>
 dispatchGaussianTileIntersection(const torch::Tensor               &means2d, // [C, N, 2] or [M, 2]
                                  const torch::Tensor               &radii,   // [C, N] or [M]
                                  const torch::Tensor               &depths,  // [C, N] or [M]
-                                 const at::optional<torch::Tensor> &camera_ids, // NULL or [M]
-                                 const uint32_t num_cameras, const uint32_t tile_size,
-                                 const uint32_t num_tiles_h, const uint32_t num_tiles_w);
+                                 const at::optional<torch::Tensor> &cameraIds, // NULL or [M]
+                                 const uint32_t numCameras, const uint32_t tileSize,
+                                 const uint32_t numTilesH, const uint32_t numTilesW);
 
 /// @brief Perform Gaussian rasterization to render an image (forward pass)
 ///
@@ -546,33 +551,31 @@ dispatchGaussianTileIntersection(const torch::Tensor               &means2d, // 
 /// ax² + 2bxy + cy²
 /// @param[in] colors RGB colors of Gaussians [C, N, D]
 /// @param[in] opacities Opacity values for each Gaussian [N]
-/// @param[in] image_width Width of the output image in pixels
-/// @param[in] image_height Height of the output image in pixels
-/// @param[in] image_origin_w X-coordinate of the image origin (left)
-/// @param[in] image_origin_h Y-coordinate of the image origin (top)
-/// @param[in] tile_size Size of tiles used for rasterization optimization
-/// @param[in] tile_offsets Offsets for tiles [C, tile_height, tile_width] indicating for each tile
+/// @param[in] imageWidth Width of the output image in pixels
+/// @param[in] imageHeightimageHeight Height of the output image in pixels
+/// @param[in] imageOriginW X-coordinate of the image origin (left)
+/// @param[in] imageOriginH Y-coordinate of the image origin (top)
+/// @param[in] tileSize Size of tiles used for rasterization optimization
+/// @param[in] tileOffsets Offsets for tiles [C, tile_height, tile_width] indicating for each tile
 /// where its Gaussians start
-/// @param[in] flatten_ids Flattened Gaussian IDs for tile intersection [n_isects] indicating which
-/// Gaussians affect each tile
+/// @param[in] tileGaussianIds Flattened Gaussian IDs for tile intersection [n_isects] indicating
+/// which Gaussians affect each tile
 ///
 /// @return std::tuple containing:
 ///         - Rendered image colors [C, image_height, image_width, D]
 ///         - Alpha values [C, image_height, image_width, 1]
 ///         - Last Gaussian ID rendered at each pixel [C, image_height, image_width]
 template <c10::DeviceType>
-std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> dispatchGaussianRasterizeForward(
-    // Gaussian parameters
-    const torch::Tensor &means2d,   // [C, N, 2]
-    const torch::Tensor &conics,    // [C, N, 3]
-    const torch::Tensor &colors,    // [C, N, D]
-    const torch::Tensor &opacities, // [N]
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids   // [n_isects]
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
+                                 const torch::Tensor &conics,    // [C, N, 3]
+                                 const torch::Tensor &colors,    // [C, N, D]
+                                 const torch::Tensor &opacities, // [N]
+                                 const uint32_t imageWidth, const uint32_t imageHeight,
+                                 const uint32_t imageOriginW, const uint32_t imageOriginH,
+                                 const uint32_t       tileSize,
+                                 const torch::Tensor &tileOffsets, // [C, tile_height, tile_width]
+                                 const torch::Tensor &tileGaussianIds // [n_isects]
 );
 
 /// @brief Calculate gradients for the Gaussian rasterization process (backward pass)
@@ -588,19 +591,19 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> dispatchGaussianRasteriz
 /// ax² + 2bxy + cy²
 /// @param[in] colors RGB colors of Gaussians [C, N, D]
 /// @param[in] opacities Opacity values for each Gaussian [N]
-/// @param[in] image_width Width of the rendered image
-/// @param[in] image_height Height of the rendered image
-/// @param[in] image_origin_w X-coordinate of the image origin (left)
-/// @param[in] image_origin_h Y-coordinate of the image origin (top)
-/// @param[in] tile_size Size of tiles used for rasterization optimization
-/// @param[in] tile_offsets Offsets for tiles [C, tile_height, tile_width]
-/// @param[in] flatten_ids Flattened Gaussian IDs for tile intersection [n_isects]
-/// @param[in] render_alphas Alpha values from forward pass [C, image_height, image_width, 1]
-/// @param[in] last_ids Last Gaussian IDs per pixel from forward pass [C, image_height, image_width]
-/// @param[out] v_render_colors Gradients of loss with respect to rendered colors [C, image_height,
-/// image_width, 3]
-/// @param[out] v_render_alphas Gradients of loss with respect to rendered alphas [C, image_height,
-/// image_width, 1]
+/// @param[in] imageWidth Width of the rendered image
+/// @param[in] imageHeight Height of the rendered image
+/// @param[in] imageOriginW X-coordinate of the image origin (left)
+/// @param[in] imageOriginH Y-coordinate of the image origin (top)
+/// @param[in] tileSize Size of tiles used for rasterization optimization
+/// @param[in] tileOffsets Offsets for tiles [C, tile_height, tile_width]
+/// @param[in] tileGaussianIds Flattened Gaussian IDs for tile intersection [n_isects]
+/// @param[in] renderedAlphas Alpha values from forward pass [C, image_height, image_width, 1]
+/// @param[in] lastIds Last Gaussian IDs per pixel from forward pass [C, image_height, image_width]
+/// @param[out] dLossDRenderedColors Gradients of loss with respect to rendered colors [C,
+/// image_height, image_width, 3]
+/// @param[out] dLossDRenderedAlphas Gradients of loss with respect to rendered alphas [C,
+/// image_height, image_width, 1]
 /// @param[in] absgrad Whether to use absolute gradients
 /// @param[in] numSharedChannelsOverride Override for number of shared memory channels (-1 means
 /// auto-select)
@@ -616,23 +619,18 @@ template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeBackward(
     // Gaussian parameters
-    const torch::Tensor &means2d,   // [C, N, 2]
-    const torch::Tensor &conics,    // [C, N, 3]
-    const torch::Tensor &colors,    // [C, N, 3]
-    const torch::Tensor &opacities, // [N]
-    // image size
-    const uint32_t image_width, const uint32_t image_height, const uint32_t image_origin_w,
-    const uint32_t image_origin_h, const uint32_t tile_size,
-    // intersections
-    const torch::Tensor &tile_offsets, // [C, tile_height, tile_width]
-    const torch::Tensor &flatten_ids,  // [n_isects]
-    // forward outputs
-    const torch::Tensor &render_alphas, // [C, image_height, image_width, 1]
-    const torch::Tensor &last_ids,      // [C, image_height, image_width]
-    // gradients of outputs
-    const torch::Tensor &v_render_colors, // [C, image_height, image_width, 3]
-    const torch::Tensor &v_render_alphas, // [C, image_height, image_width, 1]
-    // options
+    const torch::Tensor &means2d,              // [C, N, 2]
+    const torch::Tensor &conics,               // [C, N, 3]
+    const torch::Tensor &colors,               // [C, N, 3]
+    const torch::Tensor &opacities,            // [N]
+    const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
+    const uint32_t imageOriginH, const uint32_t tileSize,
+    const torch::Tensor &tileOffsets,          // [C, tile_height, tile_width]
+    const torch::Tensor &tileGaussianIds,      // [n_isects]
+    const torch::Tensor &renderedAlphas,       // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastIds,              // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedColors, // [C, imageHeight, imageWidth, D]
+    const torch::Tensor &dLossDRenderedAlphas, // [C, imageHeight, imageWidth, 1]
     const bool absgrad, const int64_t numSharedChannelsOverride = -1);
 
 /// @brief Project 3D Gaussians to 2D screen space using jagged tensors for batched processing
@@ -643,19 +641,19 @@ dispatchGaussianRasterizeBackward(
 ///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
 ///
-/// @param[in] g_sizes Batch sizes for Gaussians [B]
+/// @param[in] gSizes Batch sizes for Gaussians [B]
 /// @param[in] means 3D positions of Gaussians [M, 3]
 /// @param[in] quats Quaternion rotations of Gaussians [M, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [M, 3] representing extent in each dimension
-/// @param[in] c_sizes Batch sizes for cameras [B]
-/// @param[in] viewmats Camera view matrices [BC, 4, 4]
-/// @param[in] Ks Camera intrinsic matrices [BC, 3, 3]
-/// @param[in] image_width Width of the output image in pixels
-/// @param[in] image_height Height of the output image in pixels
+/// @param[in] cSizes Batch sizes for cameras [B]
+/// @param[in] camToWorldMatrices Camera view matrices [BC, 4, 4]
+/// @param[in] projectionMatrices Camera intrinsic matrices [BC, 3, 3]
+/// @param[in] imageWidth Width of the output image in pixels
+/// @param[in] imageHeight Height of the output image in pixels
 /// @param[in] eps2d 2D projection epsilon for numerical stability
-/// @param[in] near_plane Near clipping plane distance
-/// @param[in] far_plane Far clipping plane distance
-/// @param[in] radius_clip Radius clipping value to limit the maximum size of projected Gaussians
+/// @param[in] nearPlane Near clipping plane distance
+/// @param[in] farPlane Far clipping plane distance
+/// @param[in] minRadius2d Radius clipping value to limit the maximum size of projected Gaussians
 /// @param[in] ortho Whether to use orthographic projection instead of perspective
 ///
 /// @return std::tuple containing:
@@ -666,16 +664,16 @@ dispatchGaussianRasterizeBackward(
 ///         - Flattened camera indices [M] indicating which camera each projection corresponds to
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianProjectionJaggedForward(const torch::Tensor &g_sizes,  // [B] gaussian sizes
-                                        const torch::Tensor &means,    // [M, 3]
-                                        const torch::Tensor &quats,    // [M, 4] optional
-                                        const torch::Tensor &scales,   // [M, 3] optional
-                                        const torch::Tensor &c_sizes,  // [B] camera sizes
-                                        const torch::Tensor &viewmats, // [BC, 4, 4]
-                                        const torch::Tensor &Ks,       // [BC, 3, 3]
-                                        const uint32_t image_width, const uint32_t image_height,
-                                        const float eps2d, const float near_plane,
-                                        const float far_plane, const float radius_clip,
+dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaussian sizes
+                                        const torch::Tensor &means,  // [M, 3]
+                                        const torch::Tensor &quats,  // [M, 4] optional
+                                        const torch::Tensor &scales, // [M, 3] optional
+                                        const torch::Tensor &cSizes, // [B] camera sizes
+                                        const torch::Tensor &camToWorldMatrices, // [ccz, 4, 4]
+                                        const torch::Tensor &projectionMatrices, // [ccz, 3, 3]
+                                        const uint32_t imageWidth, const uint32_t imageHeight,
+                                        const float eps2d, const float nearPlane,
+                                        const float farPlane, const float minRadius2d,
                                         const bool ortho);
 
 /// @brief Calculate gradients for the jagged 3D to 2D Gaussian projection (backward pass)
@@ -687,22 +685,22 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &g_sizes,  // [B] ga
 ///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
 ///
-/// @param[in] g_sizes Batch sizes for Gaussians [B]
+/// @param[in] gSizes Batch sizes for Gaussians [B]
 /// @param[in] means 3D positions of Gaussians [M, 3]
 /// @param[in] quats Quaternion rotations of Gaussians [M, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [M, 3] representing extent in each dimension
-/// @param[in] c_sizes Batch sizes for cameras [B]
-/// @param[in] viewmats Camera view matrices [BC, 4, 4]
-/// @param[in] Ks Camera intrinsic matrices [BC, 3, 3]
-/// @param[in] image_width Width of the output image in pixels
-/// @param[in] image_height Height of the output image in pixels
+/// @param[in] cSizes Batch sizes for cameras [B]
+/// @param[in] camToWorldMatrices Camera view matrices [BC, 4, 4]
+/// @param[in] projectionMatrices Camera intrinsic matrices [BC, 3, 3]
+/// @param[in] imageWidth Width of the output image in pixels
+/// @param[in] imageHeight Height of the output image in pixels
 /// @param[in] eps2d 2D projection epsilon for numerical stability
 /// @param[in] radii Output radii from forward pass [M]
 /// @param[in] conics Output conics from forward pass [M, 3]
-/// @param[out] v_means2d Gradients with respect to projected 2D means [M, 2]
-/// @param[out] v_depths Gradients with respect to depths [M]
-/// @param[out] v_conics Gradients with respect to conics [M, 3]
-/// @param[in] viewmats_requires_grad Whether viewmats requires gradient
+/// @param[out] dLossDMeans2d Gradients with respect to projected 2D means [M, 2]
+/// @param[out] dLossDDepths Gradients with respect to depths [M]
+/// @param[out] dLossDConics Gradients with respect to conics [M, 3]
+/// @param[in] camToWorldRequiresGrad Whether viewmats requires gradient
 /// @param[in] ortho Whether orthographic projection was used in forward pass
 ///
 /// @return std::tuple containing gradients of the loss function with respect to the input
@@ -715,21 +713,21 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &g_sizes,  // [B] ga
 ///         - Camera intrinsics [BC, 3, 3] - ∂L/∂Ks
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchGaussianProjectionJaggedBackward(const torch::Tensor &g_sizes,   // [B] gaussian sizes
-                                         const torch::Tensor &means,     // [M, 3]
-                                         const torch::Tensor &quats,     // [M, 4] optional
-                                         const torch::Tensor &scales,    // [M, 3] optional
-                                         const torch::Tensor &c_sizes,   // [B] camera sizes
-                                         const torch::Tensor &viewmats,  // [BC, 4, 4]
-                                         const torch::Tensor &Ks,        // [BC, 3, 3]
-                                         const uint32_t image_width, const uint32_t image_height,
+dispatchGaussianProjectionJaggedBackward(const torch::Tensor &gSizes, // [B] gaussian sizes
+                                         const torch::Tensor &means,  // [ggz, 3]
+                                         const torch::Tensor &quats,  // [ggz, 4] optional
+                                         const torch::Tensor &scales, // [ggz, 3] optional
+                                         const torch::Tensor &cSizes, // [B] camera sizes
+                                         const torch::Tensor &camToWorldMatrices, // [ccz, 4, 4]
+                                         const torch::Tensor &projectionMatrices, // [ccz, 3, 3]
+                                         const uint32_t imageWidth, const uint32_t imageHeight,
                                          const float          eps2d,
-                                         const torch::Tensor &radii,     // [M]
-                                         const torch::Tensor &conics,    // [M, 3]
-                                         const torch::Tensor &v_means2d, // [M, 2]
-                                         const torch::Tensor &v_depths,  // [M]
-                                         const torch::Tensor &v_conics,  // [M, 3]
-                                         const bool viewmats_requires_grad, const bool ortho);
+                                         const torch::Tensor &radii,              // [nnz]
+                                         const torch::Tensor &conics,             // [nnz, 3]
+                                         const torch::Tensor &dLossDMeans2d,      // [nnz, 2]
+                                         const torch::Tensor &dLossDDepths,       // [nnz]
+                                         const torch::Tensor &dLossDConics,       // [nnz, 3]
+                                         const bool camToWorldRequiresGrad, const bool ortho);
 
 /// @brief Create a mask identifying NaN or Inf values in Gaussian parameters
 ///
@@ -744,15 +742,17 @@ dispatchGaussianProjectionJaggedBackward(const torch::Tensor &g_sizes,   // [B] 
 /// @param[in] quats Quaternion rotations of Gaussians as a jagged tensor [C, N, 4]
 /// @param[in] scales Scale factors of Gaussians as a jagged tensor [C, N, 3]
 /// @param[in] opacities Opacity values of Gaussians as a jagged tensor [N]
-/// @param[in] sh_coeffs Spherical harmonic coefficients of Gaussians as a jagged tensor
+/// @param[in] sh0 Constant term (degree 0) spherical harmonic coefficients as a jagged tensor
+/// @param[in] shN Higher degree spherical harmonic coefficients as a jagged tensor
 ///
 /// @return A jagged tensor mask where True indicates valid values (no NaN/Inf) and False indicates
 /// invalid values
 template <c10::DeviceType>
 fvdb::JaggedTensor
 dispatchGaussianNanInfMask(const fvdb::JaggedTensor &means, const fvdb::JaggedTensor &quats,
-                           const fvdb::JaggedTensor &scales, const fvdb::JaggedTensor &opacities,
-                           const fvdb::JaggedTensor &sh_coeffs);
+                           const fvdb::JaggedTensor &logScales,
+                           const fvdb::JaggedTensor &logitOpacities, const fvdb::JaggedTensor &sh0,
+                           const fvdb::JaggedTensor &shN);
 
 /// @} // end of ops_gsplat doxygen group
 

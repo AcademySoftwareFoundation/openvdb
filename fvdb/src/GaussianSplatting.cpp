@@ -14,182 +14,637 @@
 
 namespace fvdb {
 
-namespace {
+using RenderMode     = fvdb::detail::ops::RenderSettings::RenderMode;
+using RenderSettings = fvdb::detail::ops::RenderSettings;
 
 torch::Tensor
-evaluateSphericalHarmonics(const torch::optional<torch::Tensor> directions,
-                           const torch::Tensor                 &sh_coeffs,
-                           const torch::Tensor                  radii            = torch::Tensor(),
-                           const int                            sh_degree_to_use = -1) {
-    const int K                = sh_coeffs.size(0); // number of SH bases
-    const int actual_sh_degree = sh_degree_to_use < 0 ? (std::sqrt(K) - 1) : sh_degree_to_use;
-    TORCH_CHECK(K >= (actual_sh_degree + 1) * (actual_sh_degree + 1),
-                "K must be at least (sh_degree_to_use + 1)^2");
-    auto sh_results = detail::autograd::EvaluateSphericalHarmonics::apply(
-        actual_sh_degree, directions, sh_coeffs, radii);
-
-    return sh_results[0];
+evaluateSphericalHarmonics(const torch::Tensor &shCoeffs, const torch::Tensor &radii,
+                           const torch::optional<torch::Tensor> directions,
+                           const int                            shDegreeToUse = -1) {
+    const int K              = shCoeffs.size(0); // number of SH bases
+    const int actualShDegree = shDegreeToUse < 0 ? (std::sqrt(K) - 1) : shDegreeToUse;
+    TORCH_CHECK(K >= (actualShDegree + 1) * (actualShDegree + 1),
+                "K must be at least (shDegreeToUse + 1)^2");
+    auto shResults = detail::autograd::EvaluateSphericalHarmonics::apply(actualShDegree, directions,
+                                                                         shCoeffs, radii);
+    return shResults[0];
 }
 
-std::array<torch::Tensor, 7>
-computeGaussianRenderStateUnbatched(const torch::Tensor &means, const torch::Tensor &quats,
-                                    const torch::Tensor &scales, const torch::Tensor &opacities,
-                                    const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
-                                    const torch::Tensor &Ks, const uint32_t image_width,
-                                    const uint32_t image_height, const float near_plane,
-                                    const float far_plane, const int sh_degree_to_use,
-                                    const int tile_size, const float radius_clip, const float eps2d,
-                                    const bool antialias, const bool render_depth_channel,
-                                    const bool render_depth_only, const bool ortho) {
-    const int C = viewmats.size(0);                           // number of cameras
-    const int N = means.size(0);                              // number of gaussians
-    const int K = render_depth_only ? 1 : sh_coeffs.size(0);  // number of SH bases
-    const int D = render_depth_only ? 1 : sh_coeffs.size(-1); // Dimension of output
+void
+GaussianSplat3d::checkState(const torch::Tensor &means, const torch::Tensor &quats,
+                            const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
+                            const torch::Tensor &sh0, const torch::Tensor &shN) {
+    const int64_t N = means.size(0); // number of gaussians
 
-    TORCH_CHECK(means.sizes() == torch::IntArrayRef({ N, 3 }), "means must have shape (N, 3)");
-    TORCH_CHECK(quats.sizes() == torch::IntArrayRef({ N, 4 }), "quats must have shape (N, 4)");
-    TORCH_CHECK(scales.sizes() == torch::IntArrayRef({ N, 3 }), "scales must have shape (N, 3)");
-    TORCH_CHECK(opacities.sizes() == torch::IntArrayRef({ N }), "opacities must have shape (N)");
-    TORCH_CHECK(viewmats.sizes() == torch::IntArrayRef({ C, 4, 4 }),
-                "viewmats must have shape (C, 4, 4)");
-    TORCH_CHECK(Ks.sizes() == torch::IntArrayRef({ C, 3, 3 }), "Ks must have shape (C, 3, 3)");
-    TORCH_CHECK(render_depth_only || sh_coeffs.sizes() == torch::IntArrayRef({ K, N, D }),
-                "sh_coeffs must have shape (K, N, D)");
+    TORCH_CHECK_VALUE(means.sizes() == torch::IntArrayRef({ N, 3 }),
+                      "means must have shape (N, 3)");
+    TORCH_CHECK_VALUE(quats.sizes() == torch::IntArrayRef({ N, 4 }),
+                      "quats must have shape (N, 4)");
+    TORCH_CHECK_VALUE(logScales.sizes() == torch::IntArrayRef({ N, 3 }),
+                      "scales must have shape (N, 3)");
+    TORCH_CHECK_VALUE(logitOpacities.sizes() == torch::IntArrayRef({ N }),
+                      "opacities must have shape (N)");
+    TORCH_CHECK_VALUE(sh0.size(0) == 1, "sh0 must have shape (1, N, D)");
+    TORCH_CHECK_VALUE(sh0.size(1) == N, "sh0 must have shape (1, N, D)");
+    TORCH_CHECK_VALUE(sh0.dim() == 3, "sh0 must have shape (1, N, D)");
+    TORCH_CHECK_VALUE(shN.size(1) == N, "shN must have shape (K-1, N, D)");
+    TORCH_CHECK_VALUE(shN.dim() == 3, "shN must have shape (K-1, N, D)");
 
-    TORCH_CHECK(means.is_contiguous(), "means must be contiguous");
-    TORCH_CHECK(quats.is_contiguous(), "quats must be contiguous");
-    TORCH_CHECK(scales.is_contiguous(), "scales must be contiguous");
-    TORCH_CHECK(opacities.is_contiguous(), "opacities must be contiguous");
-    TORCH_CHECK(viewmats.is_contiguous(), "viewmats must be contiguous");
-    TORCH_CHECK(Ks.is_contiguous(), "Ks must be contiguous");
+    TORCH_CHECK_VALUE(means.device() == quats.device(), "All tensors must be on the same device");
+    TORCH_CHECK_VALUE(means.device() == logScales.device(),
+                      "All tensors must be on the same device");
+    TORCH_CHECK_VALUE(means.device() == logitOpacities.device(),
+                      "All tensors must be on the same device");
+    TORCH_CHECK_VALUE(means.device() == sh0.device(), "All tensors must be on the same device");
+    TORCH_CHECK_VALUE(means.device() == shN.device(), "All tensors must be on the same device");
 
-    // Project to image plane [differentiable]
-    const auto projection_results = detail::autograd::ProjectGaussians::apply(
-        means, quats, scales, viewmats, Ks, image_width, image_height, eps2d, near_plane, far_plane,
-        radius_clip, antialias, ortho);
-    const torch::Tensor radii                 = projection_results[0];
-    const torch::Tensor means2d               = projection_results[1];
-    const torch::Tensor depths                = projection_results[2];
-    const torch::Tensor conics                = projection_results[3];
-    torch::Tensor       opacities_compensated = opacities.repeat({ C, 1 });
-    if (antialias) {
-        opacities_compensated *= projection_results[4];
+    TORCH_CHECK_VALUE(torch::isFloatingType(means.scalar_type()),
+                      "All tensors must be of floating point type");
+    TORCH_CHECK_VALUE(means.scalar_type() == quats.scalar_type(),
+                      "All tensors must be of the same type");
+    TORCH_CHECK_VALUE(means.scalar_type() == logScales.scalar_type(),
+                      "All tensors must be of the same type");
+    TORCH_CHECK_VALUE(means.scalar_type() == logitOpacities.scalar_type(),
+                      "All tensors must be of the same type");
+    TORCH_CHECK_VALUE(means.scalar_type() == sh0.scalar_type(),
+                      "All tensors must be of the same type");
+    TORCH_CHECK_VALUE(means.scalar_type() == shN.scalar_type(),
+                      "All tensors must be of the same type");
+}
+
+GaussianSplat3d::GaussianSplat3d(const torch::Tensor &means, const torch::Tensor &quats,
+                                 const torch::Tensor &logScales,
+                                 const torch::Tensor &logitOpacities, const torch::Tensor &sh0,
+                                 const torch::Tensor &shN, const bool requiresGrad)
+    : mMeans(means.contiguous()), mQuats(quats.contiguous()), mLogScales(logScales.contiguous()),
+      mLogitOpacities(logitOpacities.contiguous()), mSh0(sh0.contiguous()), mShN(shN),
+      mRequiresGrad(requiresGrad) {
+    const int64_t N = means.size(0); // number of gaussians
+    if (mSh0.dim() == 2) {
+        TORCH_CHECK(mSh0.size(0) == N, "sh0 must have shape (1, N, D) or (N, D)");
+        mSh0 = mSh0.unsqueeze(0);
+    }
+
+    checkState(mMeans, mQuats, mLogScales, mLogitOpacities, mSh0, mShN);
+
+    mMeans.requires_grad_(requiresGrad);
+    mQuats.requires_grad_(requiresGrad);
+    mLogScales.requires_grad_(requiresGrad);
+    mLogitOpacities.requires_grad_(requiresGrad);
+    mSh0.requires_grad_(requiresGrad);
+    mShN.requires_grad_(requiresGrad);
+}
+
+void
+GaussianSplat3d::setState(const torch::Tensor &means, const torch::Tensor &quats,
+                          const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
+                          const torch::Tensor &sh0, const torch::Tensor &shN,
+                          const bool requiresGrad) {
+    checkState(means, quats, logScales, logitOpacities, sh0, shN);
+    if (mRequiresGrad) {
+        resetGradState();
+    }
+    mMeans          = means;
+    mQuats          = quats;
+    mLogScales      = logScales;
+    mLogitOpacities = logitOpacities;
+    mSh0            = sh0;
+    mShN            = shN;
+    mRequiresGrad   = requiresGrad;
+
+    mMeans.requires_grad_(requiresGrad);
+    mQuats.requires_grad_(requiresGrad);
+    mLogScales.requires_grad_(requiresGrad);
+    mLogitOpacities.requires_grad_(requiresGrad);
+    mSh0.requires_grad_(requiresGrad);
+    mShN.requires_grad_(requiresGrad);
+}
+
+std::unordered_map<std::string, torch::Tensor>
+GaussianSplat3d::stateDict() const {
+    auto ret =
+        std::unordered_map<std::string, torch::Tensor>{ { "means", mMeans },
+                                                        { "quats", mQuats },
+                                                        { "log_scales", mLogScales },
+                                                        { "logit_opacities", mLogitOpacities },
+                                                        { "sh0", mSh0 },
+                                                        { "shN", mShN } };
+
+    const auto boolOpts  = torch::TensorOptions().dtype(torch::kBool);
+    ret["requires_grad"] = mRequiresGrad ? torch::ones({}, boolOpts) : torch::zeros({}, boolOpts);
+    ret["track_max_2d_radii_for_grad"] =
+        mTrackMax2dRadiiForGrad ? torch::ones({}, boolOpts) : torch::zeros({}, boolOpts);
+    ret["track_max_2d_radii_for_grad"] = torch::zeros({}, boolOpts);
+
+    if (mAccumulatedNormalized2dMeansGradientNormsForGrad.numel() != 0) {
+        ret["accumulated_mean_2d_gradient_norms_for_grad"] =
+            mAccumulatedNormalized2dMeansGradientNormsForGrad;
+    }
+    if (mAccumulated2dRadiiForGrad.numel() != 0) {
+        ret["accumulated_max_2d_radii_for_grad"] = mAccumulated2dRadiiForGrad;
+    }
+    if (mGradientStepCountForGrad.numel() != 0) {
+        ret["accumulated_gradient_step_counts_for_grad"] = mGradientStepCountForGrad;
+    }
+    return ret;
+}
+
+void
+GaussianSplat3d::loadStateDict(const std::unordered_map<std::string, torch::Tensor> &stateDict) {
+    TORCH_CHECK_VALUE(stateDict.count("means") == 1, "Missing key 'means' in state dict");
+    TORCH_CHECK_VALUE(stateDict.count("quats") == 1, "Missing key 'quats' in state dict");
+    TORCH_CHECK_VALUE(stateDict.count("log_scales") == 1, "Missing key 'log_scales' in state dict");
+    TORCH_CHECK_VALUE(stateDict.count("logit_opacities") == 1,
+                      "Missing key 'logit_opacities' in state dict");
+    TORCH_CHECK_VALUE(stateDict.count("sh0") == 1, "Missing key 'sh0' in state dict");
+    TORCH_CHECK_VALUE(stateDict.count("shN") == 1, "Missing key 'shN' in state dict");
+
+    TORCH_CHECK_VALUE(stateDict.count("requires_grad") == 1,
+                      "Missing key 'requires_grad' in state dict");
+
+    TORCH_CHECK_VALUE(stateDict.count("track_max_2d_radii_for_grad") == 1,
+                      "Missing key 'track_max_2d_radii_for_grad' in state dict");
+
+    const torch::Tensor means          = stateDict.at("means");
+    const torch::Tensor quats          = stateDict.at("quats");
+    const torch::Tensor logScales      = stateDict.at("log_scales");
+    const torch::Tensor logitOpacities = stateDict.at("logit_opacities");
+    const torch::Tensor sh0            = stateDict.at("sh0");
+    const torch::Tensor shN            = stateDict.at("shN");
+
+    const int64_t N = means.size(0); // number of gaussians
+
+    checkState(means, quats, logScales, logitOpacities, sh0, shN);
+
+    const bool requiresGrad           = stateDict.at("requires_grad").item().toBool();
+    const bool trackMax2dRadiiForGrad = stateDict.at("track_max_2d_radii_for_grad").item().toBool();
+    torch::Tensor accumulatedNormalized2dMeansGradientNormsForGrad;
+    torch::Tensor accumulated2dRadiiForGrad;
+    torch::Tensor gradientStepCountForGrad;
+
+    if (stateDict.count("accumulated_mean_2d_gradient_norms_for_grad") > 0) {
+        accumulatedNormalized2dMeansGradientNormsForGrad =
+            stateDict.at("accumulated_mean_2d_gradient_norms_for_grad");
+        TORCH_CHECK_VALUE(accumulatedNormalized2dMeansGradientNormsForGrad.numel() == N,
+                          "accumulated_mean_2d_gradient_norms_for_grad must have shape (N)");
+        TORCH_CHECK_VALUE(
+            accumulatedNormalized2dMeansGradientNormsForGrad.device() == means.device(),
+            "accumulated_mean_2d_gradient_norms_for_grad must be on the same device as "
+            "means");
+        TORCH_CHECK_VALUE(accumulatedNormalized2dMeansGradientNormsForGrad.dim() == 1,
+                          "accumulated_mean_2d_gradient_norms_for_grad must have one dimension");
+        TORCH_CHECK_VALUE(accumulatedNormalized2dMeansGradientNormsForGrad.scalar_type() ==
+                              means.scalar_type(),
+                          "accumulated_mean_2d_gradient_norms_for_grad must have the same type as "
+                          "means");
+        TORCH_CHECK_VALUE(stateDict.count("accumulated_gradient_step_counts_for_grad") != 0,
+                          "gradient_step_counts_for_grad "
+                          "must be non-empty if "
+                          "accumulated_mean_2d_gradient_norms_for_grad "
+                          "is non-empty");
+        gradientStepCountForGrad = stateDict.at("accumulated_gradient_step_counts_for_grad");
+        TORCH_CHECK_VALUE(gradientStepCountForGrad.numel() != 0,
+                          "gradient_step_counts_for_grad "
+                          "must be non-empty if "
+                          "accumulated_mean_2d_gradient_norms_for_grad "
+                          "is non-empty");
+        TORCH_CHECK_VALUE(gradientStepCountForGrad.numel() == N,
+                          "accumulated_gradient_step_counts_for_grad must have shape (N)");
+        TORCH_CHECK_VALUE(gradientStepCountForGrad.device() == means.device(),
+                          "accumulated_gradient_step_counts_for_grad must be on the same device as "
+                          "means");
+        TORCH_CHECK_VALUE(gradientStepCountForGrad.dim() == 1,
+                          "accumulated_gradient_step_counts_for_grad must have one dimension");
+        TORCH_CHECK_VALUE(gradientStepCountForGrad.scalar_type() == torch::kInt32,
+                          "accumulated_gradient_step_counts_for_grad must be of type int32");
+    }
+
+    if (stateDict.count("accumulated_max_2d_radii_for_grad") > 0) {
+        accumulated2dRadiiForGrad = stateDict.at("accumulated_max_2d_radii_for_grad");
+        TORCH_CHECK_VALUE(trackMax2dRadiiForGrad,
+                          "accumulated_max_2d_radii_for_grad must be non-empty only if "
+                          "track_max_2d_radii_for_grad is true");
+        TORCH_CHECK_VALUE(accumulated2dRadiiForGrad.numel() == N,
+                          "accumulated_max_2d_radii_for_grad must have shape (N)");
+        TORCH_CHECK_VALUE(accumulated2dRadiiForGrad.device() == means.device(),
+                          "accumulated_max_2d_radii_for_grad must be on the same device as "
+                          "means");
+        TORCH_CHECK_VALUE(accumulated2dRadiiForGrad.dim() == 1,
+                          "accumulated_max_2d_radii_for_grad must have one dimension");
+        TORCH_CHECK_VALUE(accumulated2dRadiiForGrad.scalar_type() == torch::kInt32,
+                          "accumulated_max_2d_radii_for_grad must be of type int32");
+    }
+
+    mMeans          = means;
+    mQuats          = quats;
+    mLogScales      = logScales;
+    mLogitOpacities = logitOpacities;
+    mSh0            = sh0;
+    mShN            = shN;
+
+    mRequiresGrad           = requiresGrad;
+    mTrackMax2dRadiiForGrad = trackMax2dRadiiForGrad;
+    mAccumulatedNormalized2dMeansGradientNormsForGrad =
+        accumulatedNormalized2dMeansGradientNormsForGrad;
+    mAccumulated2dRadiiForGrad = accumulated2dRadiiForGrad;
+    mGradientStepCountForGrad  = gradientStepCountForGrad;
+
+    mMeans.requires_grad_(requiresGrad);
+    mQuats.requires_grad_(requiresGrad);
+    mLogScales.requires_grad_(requiresGrad);
+    mLogitOpacities.requires_grad_(requiresGrad);
+    mSh0.requires_grad_(requiresGrad);
+    mShN.requires_grad_(requiresGrad);
+}
+
+GaussianSplat3d::ProjectedGaussianSplats
+GaussianSplat3d::projectGaussiansImpl(const torch::Tensor  &worldToCameraMatrices,
+                                      const torch::Tensor  &projectionMatrices,
+                                      const RenderSettings &settings) {
+    const bool ortho = settings.projectionType == fvdb::detail::ops::ProjectionType::ORTHOGRAPHIC;
+    const int  C     = worldToCameraMatrices.size(0); // number of cameras
+    const int  N     = mMeans.size(0);                // number of gaussians
+    const int  K     = mShN.size(0) + 1;              // number of SH bases
+    const int  D     = mSh0.size(-1);                 // Dimension of output
+
+    TORCH_CHECK(worldToCameraMatrices.sizes() == torch::IntArrayRef({ C, 4, 4 }),
+                "worldToCameraMatrices must have shape (C, 4, 4)");
+    TORCH_CHECK(projectionMatrices.sizes() == torch::IntArrayRef({ C, 3, 3 }),
+                "projectionMatrices must have shape (C, 3, 3)");
+    TORCH_CHECK(worldToCameraMatrices.is_contiguous(), "worldToCameraMatrices must be contiguous");
+    TORCH_CHECK(projectionMatrices.is_contiguous(), "projectionMatrices must be contiguous");
+
+    ProjectedGaussianSplats ret;
+    ret.mRenderSettings = settings;
+
+    // Track gradients for the 2D means in the backward pass if you're optimizing
+    torch::optional<torch::Tensor> maybeNormalizedMeans2dGradientNorms = torch::nullopt;
+    torch::optional<torch::Tensor> maybePerGaussianRadiiForGrad        = torch::nullopt;
+    torch::optional<torch::Tensor> maybeGradientStepCount              = torch::nullopt;
+    if (mRequiresGrad) {
+        if (mAccumulatedNormalized2dMeansGradientNormsForGrad.numel() != N) {
+            mAccumulatedNormalized2dMeansGradientNormsForGrad =
+                torch::zeros({ N }, mMeans.options());
+        }
+        if (mAccumulated2dRadiiForGrad.numel() != N && mTrackMax2dRadiiForGrad) {
+            mAccumulated2dRadiiForGrad = torch::zeros(
+                { N }, torch::TensorOptions().dtype(torch::kInt32).device(mMeans.device()));
+        }
+        if (mGradientStepCountForGrad.numel() != N) {
+            mGradientStepCountForGrad = torch::zeros(
+                { N }, torch::TensorOptions().dtype(torch::kInt32).device(mMeans.device()));
+        }
+        maybeNormalizedMeans2dGradientNorms = mAccumulatedNormalized2dMeansGradientNormsForGrad;
+        maybeGradientStepCount              = mGradientStepCountForGrad;
+        if (mTrackMax2dRadiiForGrad) {
+            maybePerGaussianRadiiForGrad = mAccumulated2dRadiiForGrad;
+        }
+    }
+
+    // Project to image plane
+    const auto projectionResults = detail::autograd::ProjectGaussians::apply(
+        mMeans, mQuats, scales(), worldToCameraMatrices, projectionMatrices, settings.imageWidth,
+        settings.imageHeight, settings.eps2d, settings.nearPlane, settings.farPlane,
+        settings.radiusClip, settings.antialias, ortho, maybeNormalizedMeans2dGradientNorms,
+        maybePerGaussianRadiiForGrad, maybeGradientStepCount);
+    ret.perGaussianRadius = projectionResults[0];
+    ret.perGaussian2dMean = projectionResults[1];
+    ret.perGaussianDepth  = projectionResults[2];
+    ret.perGaussianConic  = projectionResults[3];
+    // FIXME: Use accessors in the kernel and use exapand
+    ret.perGaussianOpacity = opacities().repeat({ C, 1 });
+    if (settings.antialias) {
+        ret.perGaussianOpacity *= projectionResults[4];
         // FIXME (Francis): The contiguity requirement is dumb and should be
         // removed by using accessors in the kernel
-        opacities_compensated = opacities_compensated.contiguous();
+        ret.perGaussianOpacity = ret.perGaussianOpacity.contiguous();
     }
 
-    torch::Tensor colors;
-    if (render_depth_only) {
-        colors = depths.unsqueeze(-1); // [C, N, 1]
-    } else {
-        if (K == 1 || sh_degree_to_use == 0) {
-            // Handle the case where we only have degree zero spherical harmonics, which just
-            // represent diffuse colors. This means that each Gaussian receives the same color
-            // regardless of which camera sees it, and we can just expand the colors to the correct
-            // shape (without reallocating memory). i.e. the color tensor has shape [C, N, D] but
-            // only allocates NxD floats in memory.
-            // This is useful for rendering e.g. high dimensional diffuse features.
-            colors = evaluateSphericalHarmonics(torch::nullopt, sh_coeffs.unsqueeze(1), radii,
-                                                sh_degree_to_use);
-            colors = colors.expand({ C, -1, -1 });
+    ret.perGaussianRenderQuantity = [&]() {
+        torch::Tensor renderQuantity;
+        if (settings.renderMode == RenderMode::DEPTH) {
+            renderQuantity = ret.perGaussianDepth.unsqueeze(-1); // [C, N, 1]
+        } else if (settings.renderMode == RenderMode::RGB ||
+                   settings.renderMode == RenderMode::RGBD) {
+            if (K == 1 || settings.shDegreeToUse == 0) {
+                // Handle the case where we only have degree zero spherical harmonics, which just
+                // represent diffuse colors. This means that each Gaussian receives the same color
+                // regardless of which camera sees it, and we can just expand the colors to the
+                // correct shape (without reallocating memory). i.e. the color tensor has shape [C,
+                // N, D] but only allocates NxD floats in memory. This is useful for rendering e.g.
+                // high dimensional diffuse features.
+                renderQuantity =
+                    evaluateSphericalHarmonics(mSh0.unsqueeze(1), ret.perGaussianRadius,
+                                               torch::nullopt, settings.shDegreeToUse);
+                renderQuantity = renderQuantity.expand({ C, -1, -1 });
 
+            } else {
+                // FIXME (Francis): Do this in the kernel instead of materializing a large
+                //                  tensor here. It's a bit annoying because we'll have to update
+                //                  the current backward pass
+                const torch::Tensor camToWorldMatrices = torch::inverse(worldToCameraMatrices);
+                // Equivalent to dirs = means[None, :, :] - camToWorldMatrices[:, None, :3, 3]
+                // NOTE: dirs are not normalized here, they get normalized in the spherical
+                //       harmonics evaluation kernel
+                const torch::Tensor dirs =
+                    mMeans.index({ torch::indexing::None, torch::indexing::Slice(),
+                                   torch::indexing::Slice() }) -
+                    camToWorldMatrices.index({ torch::indexing::Slice(), torch::indexing::None,
+                                               torch::indexing::Slice(0, 3),
+                                               3 }); // [1, N, 3] - [C, 1, 3]
+                const torch::Tensor shCoeffs = torch::cat({ mSh0, mShN }, 0); // [K, N, D]
+                renderQuantity =
+                    evaluateSphericalHarmonics(shCoeffs.unsqueeze(1).expand({ -1, C, -1, -1 }),
+                                               ret.perGaussianRadius, dirs, settings.shDegreeToUse);
+            }
+
+            if (settings.renderMode == RenderMode::RGBD) {
+                renderQuantity = torch::cat({ renderQuantity, ret.perGaussianDepth.unsqueeze(-1) },
+                                            -1); // [C, N, D + 1]
+            }
         } else {
-            // FIXME (Francis): Do this in the kernel instead of materializing a large
-            //                  tensor here. It's a bit annoying because we'll have to update
-            //                  the current backward pass
-            const torch::Tensor camtoworlds = torch::inverse(viewmats);
-            const torch::Tensor dirs =
-                means.index(
-                    { torch::indexing::None, torch::indexing::Slice(), torch::indexing::Slice() }) -
-                camtoworlds.index({ torch::indexing::Slice(), torch::indexing::None,
-                                    torch::indexing::Slice(0, 3), 3 }); // [1, N, 3] - [C, 1, 3]
-            colors = evaluateSphericalHarmonics(
-                dirs, sh_coeffs.unsqueeze(1).expand({ -1, C, -1, -1 }), radii, sh_degree_to_use);
+            TORCH_CHECK_VALUE(false, "Invalid render mode");
         }
-
-        if (render_depth_channel) {
-            colors = torch::cat({ colors, depths.unsqueeze(-1) }, -1); // [C, N, D + 1]
-        }
-    }
+        return renderQuantity;
+    }();
 
     // Intersect projected Gaussians with image tiles [non-differentiable]
-    const int num_tiles_w = std::ceil(image_width / static_cast<float>(tile_size));
-    const int num_tiles_h = std::ceil(image_height / static_cast<float>(tile_size));
-    const int num_cameras = viewmats.size(0);
-    const std::tuple<torch::Tensor, torch::Tensor> tile_intersections =
-        FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-            return detail::ops::dispatchGaussianTileIntersection<DeviceTag>(
-                means2d, radii, depths, at::nullopt, num_cameras, tile_size, num_tiles_h,
-                num_tiles_w);
-        });
-    const torch::Tensor tile_offsets      = std::get<0>(tile_intersections); // [C, TH, TW]
-    const torch::Tensor tile_gaussian_ids = std::get<1>(tile_intersections); // [M]
-    return {
-        means2d, conics, opacities_compensated, radii, colors, tile_offsets, tile_gaussian_ids
-    };
+    const int numTilesW = std::ceil(settings.imageWidth / static_cast<float>(settings.tileSize));
+    const int numTilesH = std::ceil(settings.imageHeight / static_cast<float>(settings.tileSize));
+    const auto [tileOffsets, tileGaussianIds] = FVDB_DISPATCH_KERNEL_DEVICE(mMeans.device(), [&]() {
+        return detail::ops::dispatchGaussianTileIntersection<DeviceTag>(
+            ret.perGaussian2dMean, ret.perGaussianRadius, ret.perGaussianDepth, at::nullopt, C,
+            settings.tileSize, numTilesH, numTilesW);
+    });
+    ret.tileOffsets                           = tileOffsets;     // [C, TH, TW]
+    ret.tileGaussianIds                       = tileGaussianIds; // [TOT_INTERSECTIONS]
+
+    return ret;
 }
 
-// Gaussian render for a single torch Tensor
-std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
-gaussianRenderUnbatchedInternal(const torch::Tensor &means, const torch::Tensor &quats,
-                                const torch::Tensor &scales, const torch::Tensor &opacities,
-                                const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
-                                const torch::Tensor &Ks, const uint32_t image_width,
-                                const uint32_t image_height, const float near_plane,
-                                const float far_plane, const int sh_degree_to_use,
-                                const int tile_size, const float radius_clip, const float eps2d,
-                                const bool antialias, const bool render_depth_channel,
-                                const bool return_debug_info, const bool render_depth_only,
-                                const bool ortho) {
-    std::array<torch::Tensor, 7> renderState = computeGaussianRenderStateUnbatched(
-        means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
-        near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, render_depth_only, ortho);
-
-    torch::Tensor means2d               = renderState[0];
-    torch::Tensor conics                = renderState[1];
-    torch::Tensor opacities_compensated = renderState[2];
-    torch::Tensor radii                 = renderState[3];
-    torch::Tensor colors                = renderState[4];
-    torch::Tensor tile_offsets          = renderState[5];
-    torch::Tensor tile_gaussian_ids     = renderState[6];
-
-    std::unordered_map<std::string, torch::Tensor> info;
-    if (return_debug_info) {
-        info["means2d"]           = means2d;
-        info["conics"]            = conics;
-        info["opacities"]         = opacities;
-        info["radii"]             = radii;
-        info["colors"]            = colors;
-        info["tile_offsets"]      = tile_offsets;
-        info["tile_gaussian_ids"] = tile_gaussian_ids;
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderCropFromProjectedGaussiansImpl(
+    const ProjectedGaussianSplats &projectedGaussians, const size_t tileSize,
+    const ssize_t cropWidth, const ssize_t cropHeight, const ssize_t cropOriginW,
+    const ssize_t cropOriginH) {
+    // Negative values mean use the whole image, but all values must be negative
+    if (cropWidth <= 0 || cropHeight <= 0 || cropOriginW < 0 || cropOriginH < 0) {
+        TORCH_CHECK_VALUE(cropWidth <= 0 && cropHeight <= 0 && cropOriginW <= 0 && cropOriginH <= 0,
+                          "Invalid crop dimensions");
+    } else {
+        TORCH_CHECK_VALUE(cropWidth > 0 && cropHeight > 0 && cropOriginW >= 0 && cropOriginH >= 0,
+                          "Invalid crop dimensions");
     }
 
-    // Rasterize projected Gaussians to pixels [differentiable]
-    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
-        means2d, conics, colors, opacities_compensated, image_width, image_height, 0, 0, tile_size,
-        tile_offsets, tile_gaussian_ids, false);
-    torch::Tensor render_colors = outputs[0];
-    torch::Tensor render_alphas = outputs[1];
+    const size_t cropWidth_   = cropWidth <= 0 ? projectedGaussians.imageWidth() : cropWidth;
+    const size_t cropHeight_  = cropHeight <= 0 ? projectedGaussians.imageHeight() : cropHeight;
+    const size_t cropOriginW_ = cropOriginW < 0 ? 0 : cropOriginW;
+    const size_t cropOriginH_ = cropOriginH < 0 ? 0 : cropOriginH;
 
-    return { render_colors, render_alphas, info };
+    // Rasterize projected Gaussians to pixels (differentiable)
+    // NOTE:  projectGaussians* performs input checking, we need to apply some further
+    // checking before GaussianRasterizeToPixels
+    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
+        projectedGaussians.perGaussian2dMean, projectedGaussians.perGaussianConic,
+        projectedGaussians.perGaussianRenderQuantity, projectedGaussians.perGaussianOpacity,
+        cropWidth_, cropHeight_, cropOriginW_, cropOriginH_, tileSize,
+        projectedGaussians.tileOffsets, projectedGaussians.tileGaussianIds, false);
+    torch::Tensor renderedImage  = outputs[0];
+    torch::Tensor renderedAlphas = outputs[1];
+
+    return { renderedImage, renderedAlphas };
 }
 
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderImpl(const torch::Tensor                     &worldToCameraMatrices,
+                            const torch::Tensor                     &projectionMatrices,
+                            const fvdb::detail::ops::RenderSettings &settings) {
+    const ProjectedGaussianSplats state =
+        projectGaussiansImpl(worldToCameraMatrices, projectionMatrices, settings);
+    return renderCropFromProjectedGaussiansImpl(state, settings.tileSize, settings.imageWidth,
+                                                settings.imageHeight, 0, 0);
+}
+
+GaussianSplat3d::ProjectedGaussianSplats
+GaussianSplat3d::projectGaussiansForImages(const torch::Tensor &worldToCameraMatrices,
+                                           const torch::Tensor &projectionMatrices,
+                                           size_t imageWidth, size_t imageHeight, const float near,
+                                           const float far, const ProjectionType projectionType,
+                                           const int64_t shDegreeToUse, const float minRadius2d,
+                                           const float eps2d, const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = shDegreeToUse;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.antialias      = antialias;
+    settings.shDegreeToUse  = shDegreeToUse;
+
+    settings.renderMode = RenderMode::RGB;
+
+    return projectGaussiansImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+GaussianSplat3d::ProjectedGaussianSplats
+GaussianSplat3d::projectGaussiansForDepths(const torch::Tensor &worldToCameraMatrices,
+                                           const torch::Tensor &projectionMatrices,
+                                           size_t imageWidth, size_t imageHeight, const float near,
+                                           const float far, const ProjectionType projectionType,
+                                           const float minRadius2d, const float eps2d,
+                                           const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = -1;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.antialias      = antialias;
+    settings.renderMode     = RenderMode::DEPTH;
+
+    return projectGaussiansImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+GaussianSplat3d::ProjectedGaussianSplats
+GaussianSplat3d::projectGaussiansForImagesAndDepths(
+    const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
+    size_t imageWidth, size_t imageHeight, const float near, const float far,
+    const GaussianSplat3d::ProjectionType projectionType, const int64_t shDegreeToUse,
+    const float minRadius2d, const float eps2d, const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = shDegreeToUse;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.antialias      = antialias;
+
+    settings.renderMode = RenderMode::RGBD;
+
+    return projectGaussiansImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+void
+GaussianSplat3d::savePly(const std::string &filename) const {
+    using namespace tinyply;
+
+    const fvdb::JaggedTensor validMask = FVDB_DISPATCH_KERNEL_DEVICE(mMeans.device(), [&]() {
+        return detail::ops::dispatchGaussianNanInfMask<DeviceTag>(mMeans, mQuats, mLogScales,
+                                                                  mLogitOpacities, mSh0, mShN);
+    });
+
+    std::filebuf fb;
+    fb.open(filename, std::ios::out | std::ios::binary);
+
+    std::ostream outstream(&fb);
+    TORCH_CHECK(!outstream.fail(), "failed to open " + filename);
+
+    PlyFile plyf;
+
+    const torch::Tensor meansCPU =
+        mMeans.index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor quatsCPU =
+        mQuats.index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor scalesCPU =
+        mLogScales.index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    const torch::Tensor opacitiesCPU =
+        mLogitOpacities.index({ validMask.jdata() }).cpu().contiguous();
+
+    // [N, D]
+    const torch::Tensor shCoeffs0CPU =
+        mSh0.index({ 0, validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+    // [N, K-1, D]
+    const torch::Tensor shCoeffsNCPU =
+        mShN.index({ torch::indexing::Slice(), validMask.jdata(), torch::indexing::Ellipsis })
+            .cpu()
+            .permute({ 1, 0, 2 })
+            .reshape({ mMeans.size(0), -1 });
+    std::cerr << shCoeffsNCPU.sizes() << std::endl;
+
+    plyf.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, meansCPU.size(0),
+                                   detail::tensorBytePointer(meansCPU), Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "opacity" }, Type::FLOAT32, opacitiesCPU.size(0),
+                                   detail::tensorBytePointer(opacitiesCPU), Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "scale_0", "scale_1", "scale_2" }, Type::FLOAT32,
+                                   scalesCPU.size(0), detail::tensorBytePointer(scalesCPU),
+                                   Type::INVALID, 0);
+    plyf.add_properties_to_element("vertex", { "rot_0", "rot_1", "rot_2", "rot_3" }, Type::FLOAT32,
+                                   quatsCPU.size(0), detail::tensorBytePointer(quatsCPU),
+                                   Type::INVALID, 0);
+
+    std::vector<std::string> shCoeff0Names(shCoeffs0CPU.size(1));
+    std::generate(shCoeff0Names.begin(), shCoeff0Names.end(),
+                  [i = 0]() mutable { return "f_dc_" + std::to_string(i++); });
+    plyf.add_properties_to_element("vertex", shCoeff0Names, Type::FLOAT32, shCoeffs0CPU.size(0),
+                                   detail::tensorBytePointer(shCoeffs0CPU), Type::INVALID, 0);
+
+    std::vector<std::string> shCoeffNNames(shCoeffsNCPU.size(1));
+    std::generate(shCoeffNNames.begin(), shCoeffNNames.end(),
+                  [i = 0]() mutable { return "f_rest_" + std::to_string(i++); });
+    plyf.add_properties_to_element("vertex", shCoeffNNames, Type::FLOAT32, shCoeffsNCPU.size(0),
+                                   detail::tensorBytePointer(shCoeffsNCPU), Type::INVALID, 0);
+
+    plyf.write(outstream, true);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderFromProjectedGaussians(
+    const GaussianSplat3d::ProjectedGaussianSplats &projectedGaussians, const ssize_t cropWidth,
+    const ssize_t cropHeight, const ssize_t cropOriginW, const ssize_t cropOriginH,
+    const size_t tileSize) {
+    return renderCropFromProjectedGaussiansImpl(projectedGaussians, tileSize, cropWidth, cropHeight,
+                                                cropOriginW, cropOriginH);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderImages(const torch::Tensor &worldToCameraMatrices,
+                              const torch::Tensor &projectionMatrices, const size_t imageWidth,
+                              const size_t imageHeight, const float near, const float far,
+                              const ProjectionType projectionType, const int64_t shDegreeToUse,
+                              const size_t tileSize, const float minRadius2d, const float eps2d,
+                              const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = shDegreeToUse;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.antialias      = antialias;
+    settings.tileSize       = tileSize;
+    settings.renderMode     = RenderSettings::RenderMode::RGB;
+
+    return renderImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderDepths(const torch::Tensor &worldToCameraMatrices,
+                              const torch::Tensor &projectionMatrices, const size_t imageWidth,
+                              const size_t imageHeight, const float near, const float far,
+                              const ProjectionType projectionType, const size_t tileSize,
+                              const float minRadius2d, const float eps2d, const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = -1;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.tileSize       = tileSize;
+    settings.renderMode     = RenderSettings::RenderMode::DEPTH;
+
+    return renderImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+std::tuple<torch::Tensor, torch::Tensor>
+GaussianSplat3d::renderImagesAndDepths(
+    const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
+    const size_t imageWidth, const size_t imageHeight, const float near, const float far,
+    const ProjectionType projectionType, const int64_t shDegreeToUse, const size_t tileSize,
+    const float minRadius2d, const float eps2d, const bool antialias) {
+    RenderSettings settings;
+    settings.imageWidth     = imageWidth;
+    settings.imageHeight    = imageHeight;
+    settings.nearPlane      = near;
+    settings.farPlane       = far;
+    settings.projectionType = projectionType;
+    settings.shDegreeToUse  = shDegreeToUse;
+    settings.radiusClip     = minRadius2d;
+    settings.eps2d          = eps2d;
+    settings.antialias      = antialias;
+    settings.tileSize       = tileSize;
+    settings.renderMode     = RenderSettings::RenderMode::RGBD;
+
+    return renderImpl(worldToCameraMatrices, projectionMatrices, settings);
+}
+
+// TODO: Make a batched class
 std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
-gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
-                       const JaggedTensor &quats,     // [N1 + N2 + ..., 4]
-                       const JaggedTensor &scales,    // [N1 + N2 + ..., 3]
-                       const JaggedTensor &opacities, // [N1 + N2 + ...]
-                       const JaggedTensor &sh_coeffs, // [N1 + N2 + ..., K, 3]
-                       const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
-                       const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
-                       const uint32_t image_width, const uint32_t image_height,
-                       const float near_plane, const float far_plane, const int sh_degree_to_use,
-                       const int tile_size, const float radius_clip, const float eps2d,
-                       const bool antialias, const bool render_depth_channel,
-                       const bool return_debug_info, const bool render_depth_only,
-                       const bool ortho) {
+gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
+                     const JaggedTensor &quats,     // [N1 + N2 + ..., 4]
+                     const JaggedTensor &scales,    // [N1 + N2 + ..., 3]
+                     const JaggedTensor &opacities, // [N1 + N2 + ...]
+                     const JaggedTensor &sh_coeffs, // [N1 + N2 + ..., K, 3]
+                     const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
+                     const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
+                     const uint32_t image_width, const uint32_t image_height,
+                     const float near_plane, const float far_plane, const int sh_degree_to_use,
+                     const int tile_size, const float radius_clip, const float eps2d,
+                     const bool antialias, const bool render_depth_channel,
+                     const bool return_debug_info, const bool render_depth_only, const bool ortho) {
     const int ccz = viewmats.rsize(0);                           // number of cameras
     const int ggz = means.rsize(0);                              // number of gaussians
     const int D   = render_depth_only ? 1 : sh_coeffs.rsize(-1); // Dimension of output
@@ -212,14 +667,6 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     TORCH_CHECK(opacities.is_contiguous(), "opacities must be contiguous");
     TORCH_CHECK(viewmats.is_contiguous(), "viewmats must be contiguous");
     TORCH_CHECK(Ks.is_contiguous(), "Ks must be contiguous");
-
-    if (means.num_tensors() == 1) {
-        return gaussianRenderUnbatchedInternal(
-            means.jdata(), quats.jdata(), scales.jdata(), opacities.jdata(), sh_coeffs.jdata(),
-            viewmats.jdata(), Ks.jdata(), image_width, image_height, near_plane, far_plane,
-            sh_degree_to_use, tile_size, radius_clip, eps2d, antialias, render_depth_channel,
-            return_debug_info, render_depth_only, ortho);
-    }
 
     // Check after we dispatch the unbatched version since the unbatched version accepts a
     // [K, N, D] tensor for sh_coeffs while the batched version accepts a [ggz, K, D] tensor,
@@ -297,7 +744,7 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
         const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [ccz, 4, 4]
         const torch::Tensor dirs        = means.jdata().index({ gaussian_ids, Slice() }) -
                                    camtoworlds.index({ camera_ids, Slice(None, 3), 3 });
-        colors = evaluateSphericalHarmonics(dirs, sh_coeffs_batched, radii, sh_degree_to_use);
+        colors = evaluateSphericalHarmonics(sh_coeffs_batched, radii, dirs, sh_degree_to_use);
 
         if (render_depth_channel) {
             colors = torch::cat({ colors, depths.index({ gaussian_ids }).unsqueeze(-1) }, -1);
@@ -328,163 +775,4 @@ gaussianRenderInternal(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
 
     return { render_colors, render_alphas, debug_info };
 }
-
-} // namespace
-
-void
-saveGaussianPly(const std::string filename, const fvdb::JaggedTensor &means,
-                const fvdb::JaggedTensor &quats, const fvdb::JaggedTensor &scales,
-                const fvdb::JaggedTensor &opacities, const fvdb::JaggedTensor &sh_coeffs) {
-    using namespace tinyply;
-
-    const fvdb::JaggedTensor validMask = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
-        return detail::ops::dispatchGaussianNanInfMask<DeviceTag>(means, quats, scales, opacities,
-                                                                  sh_coeffs);
-    });
-
-    std::filebuf fb;
-    fb.open(filename, std::ios::out | std::ios::binary);
-
-    std::ostream outstream(&fb);
-    TORCH_CHECK(!outstream.fail(), "failed to open " + filename);
-
-    PlyFile plyf;
-
-    const torch::Tensor meansCPU =
-        means.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
-    const torch::Tensor quatsCPU =
-        quats.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
-    const torch::Tensor scalesCPU =
-        scales.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
-    const torch::Tensor opacitiesCPU =
-        opacities.jdata().index({ validMask.jdata() }).cpu().contiguous();
-
-    const torch::Tensor shCoeffsMasked =
-        sh_coeffs.jdata().index({ validMask.jdata(), torch::indexing::Ellipsis });
-
-    const torch::Tensor shCoeffs0CPU =
-        shCoeffsMasked.index({ torch::indexing::Slice(), 0 }).cpu().contiguous();
-    const torch::Tensor shCoeffsNCPU =
-        shCoeffsMasked
-            .index({ torch::indexing::Slice(), torch::indexing::Slice(1, sh_coeffs.rsize(1)) })
-            .reshape({ meansCPU.size(0), -1 })
-            .cpu()
-            .contiguous();
-
-    plyf.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, meansCPU.size(0),
-                                   detail::tensorBytePointer(meansCPU), Type::INVALID, 0);
-    plyf.add_properties_to_element("vertex", { "opacity" }, Type::FLOAT32, opacitiesCPU.size(0),
-                                   detail::tensorBytePointer(opacitiesCPU), Type::INVALID, 0);
-    plyf.add_properties_to_element("vertex", { "scale_0", "scale_1", "scale_2" }, Type::FLOAT32,
-                                   scalesCPU.size(0), detail::tensorBytePointer(scalesCPU),
-                                   Type::INVALID, 0);
-    plyf.add_properties_to_element("vertex", { "rot_0", "rot_1", "rot_2", "rot_3" }, Type::FLOAT32,
-                                   quatsCPU.size(0), detail::tensorBytePointer(quatsCPU),
-                                   Type::INVALID, 0);
-
-    std::vector<std::string> shCoeff0Names(shCoeffs0CPU.size(1));
-    std::generate(shCoeff0Names.begin(), shCoeff0Names.end(),
-                  [i = 0]() mutable { return "f_dc_" + std::to_string(i++); });
-    plyf.add_properties_to_element("vertex", shCoeff0Names, Type::FLOAT32, shCoeffs0CPU.size(0),
-                                   detail::tensorBytePointer(shCoeffs0CPU), Type::INVALID, 0);
-
-    std::vector<std::string> shCoeffNNames(shCoeffsNCPU.size(1));
-    std::generate(shCoeffNNames.begin(), shCoeffNNames.end(),
-                  [i = 0]() mutable { return "f_rest_" + std::to_string(i++); });
-    plyf.add_properties_to_element("vertex", shCoeffNNames, Type::FLOAT32, shCoeffsNCPU.size(0),
-                                   detail::tensorBytePointer(shCoeffsNCPU), Type::INVALID, 0);
-
-    plyf.write(outstream, true);
-};
-
-std::vector<torch::Tensor>
-projectGaussiansToImages(const torch::Tensor &means, const torch::Tensor &quats,
-                         const torch::Tensor &scales, const torch::Tensor &viewmats,
-                         const torch::Tensor &Ks, const uint32_t image_width,
-                         const uint32_t image_height, const float near_plane, const float far_plane,
-                         const float radius_clip, const float eps2d, const bool antialias,
-                         const bool ortho) {
-    return detail::autograd::ProjectGaussians::apply(means, quats, scales, viewmats, Ks,
-                                                     image_width, image_height, eps2d, near_plane,
-                                                     far_plane, radius_clip, antialias, ortho);
-}
-
-// Gaussian render for a single torch Tensor
-std::unordered_map<std::string, torch::Tensor>
-precomputeGaussianRenderStateUnbatched(
-    const torch::Tensor &means, const torch::Tensor &quats, const torch::Tensor &scales,
-    const torch::Tensor &opacities, const torch::Tensor &sh_coeffs, const torch::Tensor &viewmats,
-    const torch::Tensor &Ks, const uint32_t image_width, const uint32_t image_height,
-    const float near_plane, const float far_plane, const int sh_degree_to_use, const int tile_size,
-    const float radius_clip, const float eps2d, const bool antialias,
-    const bool render_depth_channel, const bool ortho) {
-    const bool                   render_depth_only = false;
-    std::array<torch::Tensor, 7> renderState       = computeGaussianRenderStateUnbatched(
-        means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
-        near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, render_depth_only, ortho);
-
-    std::unordered_map<std::string, torch::Tensor> info;
-    info["means2d"]           = renderState[0];
-    info["conics"]            = renderState[1];
-    info["opacities"]         = renderState[2];
-    info["radii"]             = renderState[3];
-    info["colors"]            = renderState[4];
-    info["tile_offsets"]      = renderState[5];
-    info["tile_gaussian_ids"] = renderState[6];
-    return info;
-}
-
-std::tuple<torch::Tensor, torch::Tensor>
-renderPixelsFromPrecomputedGaussianRenderStateUnbatched(
-    torch::Tensor means2d, torch::Tensor conics, torch::Tensor colors, torch::Tensor opacities,
-    uint32_t image_width, uint32_t image_height, uint32_t image_origin_w, uint32_t image_origin_h,
-    uint32_t tile_size, torch::Tensor tile_offsets, torch::Tensor tile_gaussian_ids) {
-    // Rasterize projected Gaussians to pixels [differentiable]
-    auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
-        means2d, conics, colors, opacities, image_width, image_height, image_origin_w,
-        image_origin_h, tile_size, tile_offsets, tile_gaussian_ids, false);
-    torch::Tensor render_colors = outputs[0];
-    torch::Tensor render_alphas = outputs[1];
-
-    return { render_colors, render_alphas };
-}
-
-std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
-gaussianRender(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
-               const JaggedTensor &quats,     // [N1 + N2 + ..., 4]
-               const JaggedTensor &scales,    // [N1 + N2 + ..., 3]
-               const JaggedTensor &opacities, // [N1 + N2 + ...]
-               const JaggedTensor &sh_coeffs, // [N1 + N2 + ..., K, 3]
-               const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
-               const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
-               const uint32_t image_width, const uint32_t image_height, const float near_plane,
-               const float far_plane, const int sh_degree_to_use, const int tile_size,
-               const float radius_clip, const float eps2d, const bool antialias,
-               const bool render_depth_channel, const bool return_debug_info,
-               const torch::optional<JaggedTensor> pixels_to_render, const bool ortho) {
-    return gaussianRenderInternal(
-        means, quats, scales, opacities, sh_coeffs, viewmats, Ks, image_width, image_height,
-        near_plane, far_plane, sh_degree_to_use, tile_size, radius_clip, eps2d, antialias,
-        render_depth_channel, return_debug_info, false /* render_depth_only*/, ortho);
-}
-
-std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>
-gaussianRenderDepth(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
-                    const JaggedTensor &quats,     // [N1 + N2 + ..., 4]
-                    const JaggedTensor &scales,    // [N1 + N2 + ..., 3]
-                    const JaggedTensor &opacities, // [N1 + N2 + ...]
-                    const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
-                    const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
-                    const uint32_t image_width, const uint32_t image_height, const float near_plane,
-                    const float far_plane, const int tile_size, const float radius_clip,
-                    const float eps2d, const bool antialias, const bool return_debug_info,
-                    const torch::optional<JaggedTensor> pixels_to_render, const bool ortho) {
-    fvdb::JaggedTensor dummy_coeffs;
-    return gaussianRenderInternal(
-        means, quats, scales, opacities, dummy_coeffs, viewmats, Ks, image_width, image_height,
-        near_plane, far_plane, -1 /* sh_degree_to_use */, tile_size, radius_clip, eps2d, antialias,
-        false /* render_depth_channel */, return_debug_info, true, ortho);
-}
-
-} // namespace fvdb
+}; // namespace fvdb

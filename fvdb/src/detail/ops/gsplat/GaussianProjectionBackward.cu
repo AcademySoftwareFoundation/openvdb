@@ -4,6 +4,8 @@
 #include "GsplatUtils.cuh"
 #include <detail/ops/Ops.h>
 
+#include <nanovdb/math/Math.h>
+
 #include <ATen/cuda/Atomic.cuh>
 
 #include <cooperative_groups.h>
@@ -15,6 +17,47 @@ namespace detail {
 namespace ops {
 
 namespace cg = cooperative_groups;
+
+template <typename T, bool TRACK_MAX_RADII>
+__global__ void
+computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
+                     const size_t imageHeight, const int32_t *__restrict__ radii,
+                     const T *__restrict__ dLossdMeans2d, T *__restrict__ outDLossdMeans2dNormAccum,
+                     int32_t *__restrict__ outMaxRadiiAccum,
+                     int32_t *__restrict__ outGradientStepCounts) {
+    const auto idx = cg::this_grid().thread_rank();
+
+    if (idx >= N) {
+        return;
+    }
+
+    T       accum = T(0);
+    int32_t count = 0;
+    for (auto i = 0; i < C; i += N) {
+        const int32_t ri = radii[idx + i];
+        if (ri <= 0) {
+            continue;
+        }
+        const T dldm2x = dLossdMeans2d[(idx + i) * 2] * (T(imageWidth) / T(2) * T(C));
+        const T dldm2y = dLossdMeans2d[(idx + i) * 2 + 1] * (T(imageHeight) / T(2) * T(C));
+        accum += nanovdb::math::Sqrt(dldm2x * dldm2x + dldm2y * dldm2y);
+        // maxRad = nanovdb::math::Max(maxRad, ri);
+        count += 1;
+    }
+    if constexpr (TRACK_MAX_RADII) {
+        int32_t maxRad = 0;
+        for (auto i = 0; i < C; i += N) {
+            const int32_t ri = radii[idx + i];
+            if (ri <= 0) {
+                continue;
+            }
+            maxRad = nanovdb::math::Max(maxRad, ri);
+        }
+        outMaxRadiiAccum[idx] = nanovdb::math::Max(outMaxRadiiAccum[idx], radii[idx]);
+    }
+    outDLossdMeans2dNormAccum[idx] += accum;
+    outGradientStepCounts[idx] += count;
+}
 
 template <typename T, bool Ortho>
 __global__ void
@@ -38,12 +81,11 @@ projectionBackwardKernel(
     const T *__restrict__ v_conics,        // [C, N, 3]
     const T *__restrict__ v_compensations, // [C, N] optional
     // grad inputs
-    T *__restrict__ v_means,                   // [N, 3]
-    T *__restrict__ v_covars,                  // [N, 6] optional
-    T *__restrict__ v_quats,                   // [N, 4] optional
-    T *__restrict__ v_scales,                  // [N, 3] optional
-    T *__restrict__ v_viewmats,                // [C, 4, 4] optional
-    T *__restrict__ outNormalizeddLossdMeans2d // [C, N, 2] optional
+    T *__restrict__ v_means,   // [N, 3]
+    T *__restrict__ v_covars,  // [N, 6] optional
+    T *__restrict__ v_quats,   // [N, 4] optional
+    T *__restrict__ v_scales,  // [N, 3] optional
+    T *__restrict__ v_viewmats // [C, 4, 4] optional
 ) {
     // parallelize over C * N.
     uint32_t idx = cg::this_grid().thread_rank();
@@ -63,13 +105,6 @@ projectionBackwardKernel(
     v_means2d += idx * 2;
     v_depths += idx;
     v_conics += idx * 3;
-
-    if (outNormalizeddLossdMeans2d != nullptr) {
-        const T widthScale                      = T(image_width) / T(2) * T(C);
-        const T heightScale                     = T(image_height) / T(2);
-        outNormalizeddLossdMeans2d[idx * 2]     = v_means2d[0] * widthScale;
-        outNormalizeddLossdMeans2d[idx * 2 + 1] = v_means2d[1] * heightScale;
-    }
 
     // vjp: compute the inverse of the 2d covariance
     mat2<T> covar2d_inv   = mat2<T>(conics[0], conics[1], conics[1], conics[2]);
@@ -224,7 +259,9 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
     const bool viewmats_requires_grad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizeddLossdMeans2d) {
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum,
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,
+    at::optional<torch::Tensor> outGradientStepCounts) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars = std::nullopt;
     // const at::optional<torch::Tensor> &compensations = std::nullopt;
@@ -288,10 +325,7 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr,
-                    outNormalizeddLossdMeans2d.has_value()
-                        ? outNormalizeddLossdMeans2d.value().data_ptr<float>()
-                        : nullptr);
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
         } else {
             projectionBackwardKernel<float, false>
                 <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
@@ -310,13 +344,34 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr,
-                    outNormalizeddLossdMeans2d.has_value()
-                        ? outNormalizeddLossdMeans2d.value().data_ptr<float>()
-                        : nullptr);
+                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
         }
-
         C10_CUDA_KERNEL_LAUNCH_CHECK();
+
+        if (outNormalizeddLossdMeans2dNormAccum.has_value()) {
+            float *outNormalizeddLossdMeans2dNormAccumPtr =
+                outNormalizeddLossdMeans2dNormAccum.value().data_ptr<float>();
+            int32_t *outGradientStepCountsPtr = outGradientStepCounts.value().data_ptr<int32_t>();
+            constexpr size_t NUM_GRAD_STATE_THREADS = 1024;
+            if (outNormalizedMaxRadiiAccum.has_value()) {
+                int32_t *outNormalizedMaxRadiiAccumPtr =
+                    outNormalizedMaxRadiiAccum.value().data_ptr<int32_t>();
+                computeGradientState<float, true>
+                    <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
+                       NUM_GRAD_STATE_THREADS, 0, stream>>>(
+                        C, N, image_width, image_height, radii.data_ptr<int32_t>(),
+                        v_means2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
+                        outNormalizedMaxRadiiAccumPtr, outGradientStepCountsPtr);
+            } else {
+                computeGradientState<float, false>
+                    <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
+                       NUM_GRAD_STATE_THREADS, 0, stream>>>(
+                        C, N, image_width, image_height, radii.data_ptr<int32_t>(),
+                        v_means2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
+                        nullptr, outGradientStepCountsPtr);
+            }
+            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        }
     }
     return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);
 }
@@ -341,7 +396,9 @@ dispatchGaussianProjectionBackward<torch::kCPU>(
     const torch::Tensor               &v_conics,        // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
     const bool viewmats_requires_grad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizeddLossdMeans2) {
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum,
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,
+    at::optional<torch::Tensor> outGradientStepCounts) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 

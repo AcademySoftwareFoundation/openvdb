@@ -1,7 +1,6 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 #
-from .gaussian_splatting import GaussianSplat3D
 from .modules import (
     CELU,
     ELU,

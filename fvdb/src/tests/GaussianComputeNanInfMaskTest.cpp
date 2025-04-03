@@ -18,15 +18,16 @@ TEST(NanInfMaskTests, TestEmptyGaussians) {
 
     auto const floatOptsCUDA = fvdb::test::tensorOpts<float>(torch::kCUDA);
 
-    // means, quats, scales, opacities, sh
+    // means, quats, scales, opacities, sh0, shN
     auto const means     = torch::rand({ numGaussians, 3 }, floatOptsCUDA);
     auto const quats     = torch::rand({ numGaussians, 4 }, floatOptsCUDA);
     auto const scales    = torch::rand({ numGaussians, 3 }, floatOptsCUDA);
     auto const opacities = torch::rand({ numGaussians }, floatOptsCUDA);
-    auto const sh        = torch::rand({ numGaussians, 27, 3 }, floatOptsCUDA);
+    auto const sh0       = torch::rand({ 1, numGaussians, 3 }, floatOptsCUDA);
+    auto const shN       = torch::rand({ 26, numGaussians, 3 }, floatOptsCUDA);
 
     auto mask = fvdb::detail::ops::dispatchGaussianNanInfMask<torch::kCUDA>(means, quats, scales,
-                                                                            opacities, sh);
+                                                                            opacities, sh0, shN);
 
     EXPECT_TRUE(mask.jdata().numel() == 0);
     EXPECT_TRUE(mask.jdata().is_cuda());
@@ -35,23 +36,24 @@ TEST(NanInfMaskTests, TestEmptyGaussians) {
 TEST(NanInfMaskTests, TestExceptionForInconsistentGaussians) {
     auto const floatOptsCUDA = fvdb::test::tensorOpts<float>(torch::kCUDA);
 
-    // number of gaussians for means, quats, scales, opacities, sh
+    // number of gaussians for means, quats, scales, opacities, sh0, shN
     int64_t const                       ng = 10; // base number of gaussians
-    std::vector<std::vector<int>> const configs{ { ng - 2, ng, ng, ng, ng },
-                                                 { ng, ng + 1, ng, ng, ng },
-                                                 { ng, ng, ng + 5, ng, ng },
-                                                 { ng, ng, ng, ng - 5, ng },
-                                                 { ng, ng, ng, ng, ng + 1 } };
+    std::vector<std::vector<int>> const configs{
+        { ng - 2, ng, ng, ng, ng, ng }, { ng, ng + 1, ng, ng, ng, ng },
+        { ng, ng, ng + 5, ng, ng, ng }, { ng, ng, ng, ng - 5, ng, ng },
+        { ng, ng, ng, ng, ng + 1, ng }, { ng, ng, ng, ng, ng, ng + 1 }
+    };
 
     for (auto const &config: configs) {
         auto const means     = torch::rand({ config[0], 3 }, floatOptsCUDA);
         auto const quats     = torch::rand({ config[1], 4 }, floatOptsCUDA);
         auto const scales    = torch::rand({ config[2], 3 }, floatOptsCUDA);
         auto const opacities = torch::rand({ config[3] }, floatOptsCUDA);
-        auto const sh        = torch::rand({ config[4], 27, 3 }, floatOptsCUDA);
+        auto const sh0       = torch::rand({ 1, config[4], 3 }, floatOptsCUDA);
+        auto const shN       = torch::rand({ 26, config[5], 3 }, floatOptsCUDA);
 
         EXPECT_THROW(fvdb::detail::ops::dispatchGaussianNanInfMask<torch::kCUDA>(
-                         means, quats, scales, opacities, sh),
+                         means, quats, scales, opacities, sh0, shN),
                      c10::ValueError);
     }
 }
@@ -70,35 +72,41 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
     std::vector<torch::Tensor> quatsVec;
     std::vector<torch::Tensor> scalesVec;
     std::vector<torch::Tensor> opacitiesVec;
-    std::vector<torch::Tensor> shVec;
+    std::vector<torch::Tensor> sh0Vec;
+    std::vector<torch::Tensor> shNVec;
 
     std::int64_t totalElements = 0;
     for (auto i = 0; i < batchSize; i += 1) {
+        // Use the same number of Gaussians for all tensors in this batch
         auto const numGaussians = 10 + (std::rand() % 100);
 
-        // means, quats, scales, opacities, sh
+        // means, quats, scales, opacities, sh0, shN
         std::vector<torch::Tensor> parameters{ torch::rand({ numGaussians, 3 }, floatOptsCPU),
                                                torch::rand({ numGaussians, 4 }, floatOptsCPU),
                                                torch::rand({ numGaussians, 3 }, floatOptsCPU),
                                                torch::rand({ numGaussians, 1 }, floatOptsCPU),
-                                               torch::rand({ numGaussians, 27, 3 }, floatOptsCPU) };
+                                               torch::rand({ 1, numGaussians, 3 }, floatOptsCPU),
+                                               torch::rand({ 26, numGaussians, 3 }, floatOptsCPU) };
+
+        auto const nanDimension      = whichTensorHasNans < 4 ? 1 : 0;
+        auto const gaussianDimension = whichTensorHasNans < 4 ? 0 : 1;
 
         // -1 means no tensor has nans or infs
         if (whichTensorHasNans > 0) {
             torch::Tensor tensorToCorrupt = parameters[whichTensorHasNans];
-            for (auto j = 0; j < tensorToCorrupt.size(1); j += 1) {
-                auto const randomGaussianIndex = std::rand() % tensorToCorrupt.size(0);
-                auto const numNans             = std::rand() % tensorToCorrupt.size(1);
+            for (auto j = 0; j < tensorToCorrupt.size(nanDimension); j += 1) {
+                auto const randomGaussianIndex =
+                    std::rand() % tensorToCorrupt.size(gaussianDimension);
+                auto const numNans = std::rand() % tensorToCorrupt.size(nanDimension);
                 for (auto k = 0; k < numNans; k += 1) {
-                    auto const randomIndex = std::rand() % tensorToCorrupt.size(1);
+                    auto const randomIndex = std::rand() % tensorToCorrupt.size(nanDimension);
 
-                    if (std::rand() % 2 == 0) {
-                        tensorToCorrupt[randomGaussianIndex][randomIndex] =
-                            std::numeric_limits<float>::quiet_NaN();
-                    } else {
-                        tensorToCorrupt[randomGaussianIndex][randomIndex] =
-                            std::numeric_limits<float>::infinity();
-                    }
+                    bool nanOrInf = std::rand() % 2 == 0;
+
+                    tensorToCorrupt[gaussianDimension == 0 ? randomGaussianIndex : randomIndex]
+                                   [nanDimension == 1 ? randomIndex : randomGaussianIndex] =
+                                       nanOrInf ? std::numeric_limits<float>::quiet_NaN()
+                                                : std::numeric_limits<float>::infinity();
                 }
                 if (numNans > 0) {
                     badIndices.push_back(totalElements + randomGaussianIndex);
@@ -110,7 +118,9 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
         quatsVec.push_back(parameters[1]);
         scalesVec.push_back(parameters[2]);
         opacitiesVec.push_back(parameters[3].squeeze());
-        shVec.push_back(parameters[4]);
+        // Transpose sh0 and shN to match JaggedTensor expectations
+        sh0Vec.push_back(parameters[4].transpose(0, 1)); // [1, N, 3] -> [N, 1, 3]
+        shNVec.push_back(parameters[5].transpose(0, 1)); // [26, N, 3] -> [N, 26, 3]
 
         totalElements += numGaussians;
     }
@@ -124,13 +134,18 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
     auto const quatsJT     = fvdb::JaggedTensor(quatsVec).to(torch::kCUDA);
     auto const scalesJT    = fvdb::JaggedTensor(scalesVec).to(torch::kCUDA);
     auto const opacitiesJT = fvdb::JaggedTensor(opacitiesVec).to(torch::kCUDA);
-    auto const shJT        = fvdb::JaggedTensor(shVec).to(torch::kCUDA);
+    auto const sh0JT       = fvdb::JaggedTensor(sh0Vec).to(torch::kCUDA);
+    auto const shNJT       = fvdb::JaggedTensor(shNVec).to(torch::kCUDA);
+
+    // Transpose the jdata back to match function expectations
+    auto const sh0JTData = sh0JT.jdata().transpose(0, 1); // [N, 1, 3] -> [1, N, 3]
+    auto const shNJTData = shNJT.jdata().transpose(0, 1); // [N, 26, 3] -> [26, N, 3]
 
     auto const mask = fvdb::detail::ops::dispatchGaussianNanInfMask<torch::kCUDA>(
-        meansJT, quatsJT, scalesJT, opacitiesJT, shJT);
+        meansJT, quatsJT, scalesJT, opacitiesJT, sh0JTData, shNJTData);
 
     EXPECT_TRUE(torch::equal(expectedMask.to(torch::kCUDA), mask.jdata()));
 }
 
 INSTANTIATE_TEST_CASE_P(NanInfMaskTests, NanInfMaskTestFixture,
-                        ::testing::Values(-1, 0, 1, 2, 3, 4));
+                        ::testing::Values(-1, 0, 1, 2, 3, 4, 5));
