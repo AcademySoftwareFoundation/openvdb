@@ -70,7 +70,7 @@ GridJIdx(const GridBatchImpl &gridBatch, bool ignoreDisabledVoxels) {
             nanovdb::util::is_same<GridType, nanovdb::ValueOnIndex>::value) {
             return ops::dispatchJIdxForJOffsets<DeviceTag>(
                 gridBatch.voxelOffsets(ignoreDisabledVoxels), gridBatch.totalVoxels());
-        } else if (nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value) {
+        } else {
             TORCH_CHECK(!ignoreDisabledVoxels, "This should never happen");
             return EnabledVoxelsJIdx<DeviceTag>(gridBatch);
         }

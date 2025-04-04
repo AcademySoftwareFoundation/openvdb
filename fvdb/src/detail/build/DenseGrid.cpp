@@ -47,10 +47,9 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
     nanovdb::GridHandle<TorchDeviceBuffer> ret =
         nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(*proxyGrid, 0u,
                                                                                 false, false);
-    ret.buffer().setDevice(torch::kCPU, true /* sync */);
+    ret.buffer().to(torch::kCPU);
 
-    TorchDeviceBuffer guide(0, nullptr);
-    guide.setDevice(torch::kCPU, true);
+    TorchDeviceBuffer guide(0, nullptr, torch::kCPU);
 
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(batchSize);

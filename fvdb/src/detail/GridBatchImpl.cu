@@ -153,8 +153,7 @@ GridBatchImpl::clone(torch::Device device, bool blocking) const {
     // The guide buffer is a hack to perform the correct copy (i.e. host -> device / device -> host
     // etc...) The guide carries the desired target device to the copy. The reason we do this is to
     // conform with the nanovdb which can only accept a buffer as an extra argument.
-    TorchDeviceBuffer guideBuffer(0, nullptr);
-    guideBuffer.setDevice(device, true);
+    TorchDeviceBuffer guideBuffer(0, nullptr, device);
 
     // Make a copy of this gridHandle on the same device as the guide buffer
     nanovdb::GridHandle<TorchDeviceBuffer> clonedHdl =
@@ -523,12 +522,11 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
         return c10::make_intrusive<GridBatchImpl>(device, isMutable);
     }
 
-    const bool        isHost = device.is_cpu();
-    TorchDeviceBuffer buffer(totalByteSize, nullptr, isHost, device.index());
+    TorchDeviceBuffer buffer(totalByteSize, nullptr, device);
 
     int count         = 0;
     int nonEmptyCount = 0;
-    if (isHost) {
+    if (device.is_cpu()) {
         for (size_t i = 0; i < elements.size(); i += 1) {
             if (elements[i]->batchSize() == 0) {
                 continue;
@@ -593,15 +591,14 @@ GridBatchImpl::contiguous(c10::intrusive_ptr<GridBatchImpl> input) {
         totalByteSize += input->numBytes(i);
     }
 
-    const bool        isHost = input->device().is_cpu();
-    TorchDeviceBuffer buffer(totalByteSize, nullptr, isHost, input->device().index());
+    TorchDeviceBuffer buffer(totalByteSize, nullptr, input->device());
 
     int64_t                     writeOffset = 0;
     std::vector<nanovdb::Vec3d> voxelSizes, voxelOrigins;
     voxelSizes.reserve(input->batchSize());
     voxelOrigins.reserve(input->batchSize());
 
-    if (isHost) {
+    if (input->device().is_cpu()) {
         for (size_t i = 0; i < input->batchSize(); i += 1) {
             voxelSizes.push_back(input->voxelSize(i));
             voxelOrigins.push_back(input->voxelOrigin(i));
@@ -797,7 +794,7 @@ GridBatchImpl::deserializeV0(const torch::Tensor &serialized) {
         sizeof(V01Header) + sizeof(GridBatchMetadata) + numGrids * sizeof(GridMetadata);
     const uint64_t sizeofGrid = header->totalBytes - sizeofMetadata;
 
-    auto buf = TorchDeviceBuffer(sizeofGrid, nullptr, true /* host */, -1 /* deviceIndex */);
+    auto buf = TorchDeviceBuffer(sizeofGrid, nullptr, torch::kCPU);
     memcpy(buf.data(), gridBuffer, sizeofGrid);
 
     nanovdb::GridHandle gridHdl = nanovdb::GridHandle<TorchDeviceBuffer>(std::move(buf));

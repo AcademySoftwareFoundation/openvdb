@@ -58,7 +58,7 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
