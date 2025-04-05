@@ -14,7 +14,7 @@
 ///   transform, but this transform can differ from the source PointDataGrid
 ///   (multiple instantiations of rasterize() should instead be invoked to
 ///   transfer to grids of different transforms). Arbitrary attributes can be
-///   accessed and transfered to arbitrary trees.
+///   accessed and transferred to arbitrary trees.
 ///
 
 #ifndef OPENVEB_POINTS_TRANSFER_HAS_BEEN_INCLUDED

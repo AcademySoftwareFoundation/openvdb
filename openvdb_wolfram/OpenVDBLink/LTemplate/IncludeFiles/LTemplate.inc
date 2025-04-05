@@ -58,9 +58,9 @@ namespace detail { // private
 std::ostream mout(&detail::mbuf);
 
 
-// It would be natural for fatal_error() to take a messae argument that will be printed before returning.
+// It would be natural for fatal_error() to take a message argument that will be printed before returning.
 // However, that would create an incentive to construct a string object that would need to be freed.
-// longjmp() prevents calls to desctructors, thus freeing the string would be complicated.
+// longjmp() prevents calls to destructors, thus freeing the string would be complicated.
 void fatal_error() {
     std::longjmp(detail::jmpbuf, 1);
 }

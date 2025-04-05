@@ -25,7 +25,7 @@ struct LockedMetadataTypeRegistry {
     MetadataFactoryMap mMap;
 };
 
-// Global function for accessing the regsitry
+// Global function for accessing the registry
 static LockedMetadataTypeRegistry*
 getMetadataTypeRegistry()
 {

@@ -5,7 +5,7 @@
 
 /// @brief Read a NanoVDB grid form file, check pointer and access a single value
 ///
-/// @note This example does NOT dpend on OpenVDB (or CUDA), only NanoVDB.
+/// @note This example does NOT depend on OpenVDB (or CUDA), only NanoVDB.
 int main()
 {
     try {

@@ -65,13 +65,13 @@ void TestAll()
         EXPECT_TRUE(!m.isOff());
         EXPECT_TRUE(m.countOn() == MaskType::SIZE);
         EXPECT_TRUE(m.countOff()== 0);
-        m = MaskType();//copy asignment
+        m = MaskType();//copy assignment
         EXPECT_TRUE(m.isOff());
         EXPECT_TRUE(!m.isOn());
         EXPECT_TRUE(m.countOn() == 0);
         EXPECT_TRUE(m.countOff()== MaskType::SIZE);
     }
-    {// test setOn, setOff, findFirstOn and findFiratOff
+    {// test setOn, setOff, findFirstOn and findFirstOff
         MaskType m;
         for (Index i=0; i<SIZE; ++i) {
             m.setOn(i);
@@ -255,7 +255,7 @@ TEST_F(TestNodeMask, testCompress)
         EXPECT_EQ(maskCompress.inactiveVal[1], background);
     }
 
-    { // mask selects between backgd and one other inactive val
+    { // mask selects between background and one other inactive value
         MaskT valueMask;
         MaskT childMask;
         std::vector<int> values = {0,500,500,10,4,500,10,500};

@@ -162,7 +162,7 @@
 %destructor { for (auto& ptr : *$$) delete ptr; delete $$; } <explist>
 %destructor { delete $$; } <*> // all other AST nodes
 
-/*  Operator Precedence Definitions. Precendence goes from lowest to
+/*  Operator Precedence Definitions. Precedence goes from lowest to
  *  highest, e.g. assignment operations are generally lowest. Note
  *  that this precedence and associativity is heavily based off of C++:
  *  https://en.cppreference.com/w/cpp/language/operator_precedence

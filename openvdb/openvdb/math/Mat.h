@@ -654,7 +654,7 @@ unit(const MatType &mat, typename MatType::value_type eps = 1.0e-8)
 
 /// @brief Return a copy of the given matrix with its upper 3&times;3 rows normalized,
 /// and return the length of each of these rows in @a scaling.
-/// @details This can be geometrically interpretted as a matrix with no scaling
+/// @details This can be geometrically interpreted as a matrix with no scaling
 /// along its major axes, and the scaling in the input vector
 template<class MatType>
 MatType
@@ -767,7 +767,7 @@ snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::valu
 
     // Find angle between our basis and the one specified
     T angleBetween(angle(unitDir, ourUnitAxis));
-    // Caclulate axis to rotate along
+    // Calculate axis to rotate along
     Vec3<T> rotationAxis = unitDir.cross(ourUnitAxis);
 
     MatType rotation;

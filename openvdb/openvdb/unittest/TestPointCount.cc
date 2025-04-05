@@ -157,7 +157,7 @@ TEST_F(TestPointCount, testCount)
     LeafType* leaf2Ptr = tree.touchLeaf(openvdb::Coord(0, 0, 8));
     LeafType& leaf2(*leaf2Ptr);
 
-    // on adding, tree now obtains ownership and is reponsible for deletion
+    // on adding, tree now obtains ownership and is responsible for deletion
 
     for (unsigned int i = 0; i < LeafType::SIZE; i++) {
         leaf2.setOffsetOn(i, i);
@@ -459,7 +459,7 @@ TEST_F(TestPointCount, testOffsets)
         EXPECT_EQ(total, Index64(5));
     }
 
-    { // all point offsets when using a non-existant exclude group
+    { // all point offsets when using a non-existent exclude group
 
         std::vector<Index64> offsets;
 

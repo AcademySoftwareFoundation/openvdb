@@ -38,7 +38,7 @@ endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
-  # Configure Boost library varient on Windows
+  # Configure Boost library variant on Windows
   if(NOT Boost_USE_STATIC_RUNTIME)
     set(Boost_USE_STATIC_RUNTIME OFF)
     if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
@@ -324,7 +324,7 @@ if(OPENVDB_ENABLE_ASSERTS)
   message(STATUS "OpenVDB asserts are ENABLED")
 endif()
 
-# Intialize extra build type targets where possible
+# Initialize extra build type targets where possible
 
 if(NOT TARGET gcov_html)
   find_program(GCOVR_PATH gcovr)
