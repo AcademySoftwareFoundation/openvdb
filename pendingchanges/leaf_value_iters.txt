@@ -1,6 +1,8 @@
 OpenVDB:
  - Improvements:
-    - Significantly improved the performance of all LeafNode ValueIterators,
-    especially when delay loading is enabled. Construction of a ValueIterator
-    on a leaf node now requests the leaf buffers ahead of iteration to avoid
-    expensive API calls.
+   - Significantly improved the performance of all LeafNode ValueIterators,
+     up to 5x on some platforms and up to 10x when delay loading is enabled.
+     Construction of a ValueIterator from a leaf node now requests the leaf
+     buffers ahead of iteration to avoid potentially expensive API calls.
+   - Added OPENVDB_ASSUME macros to mimic builtin assume and C++23 assume
+     attributes.

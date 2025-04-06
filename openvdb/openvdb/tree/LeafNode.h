@@ -242,6 +242,8 @@ protected:
                     "ValueIter::setItem cannot be called on const iterators");
             }
             else {
+                OPENVDB_ASSERT(pos < SIZE);
+                OPENVDB_ASSUME(pos < SIZE);
                 mData[pos] = value;
             }
         }
@@ -257,6 +259,8 @@ protected:
                     "ValueIter::modifyItem cannot be called on const iterators");
             }
             else {
+                OPENVDB_ASSERT(n < SIZE);
+                OPENVDB_ASSUME(n < SIZE);
                 op(mData[n]);
                 this->parent().setValueOn(n);
             }
