@@ -1,0 +1,6 @@
+OpenVDB:
+ - Improvements:
+    - Significantly improved the performance of all LeafNode ValueIterators,
+    especially when delay loading is enabled. Construction of a ValueIterator
+    on a leaf node now requests the leaf buffers ahead of iteration to avoid
+    expensive API calls.
