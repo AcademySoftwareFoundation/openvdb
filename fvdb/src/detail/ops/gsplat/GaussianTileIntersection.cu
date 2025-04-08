@@ -52,45 +52,44 @@ count_tiles_per_gaussian(const uint32_t total_gaussians, const uint32_t num_gaus
         const OpT radius = radii[idx];
         if (radius <= 0) {
             out_num_tiles_per_gaussian[idx] = static_cast<CountT>(0);
-            return;
-        }
+        } else {
+            using vec2f = typename Vec2Type<OpT>::type;
 
-        using vec2f = typename Vec2Type<OpT>::type;
+            const vec2f mean2d      = *reinterpret_cast<const vec2f *>(means2d + idx * 2);
+            const OpT   tile_radius = radius / static_cast<OpT>(tile_size);
+            const OpT   tile_mean_u = mean2d.x / static_cast<OpT>(tile_size);
+            const OpT   tile_mean_v = mean2d.y / static_cast<OpT>(tile_size);
 
-        const vec2f mean2d      = *reinterpret_cast<const vec2f *>(means2d + idx * 2);
-        const OpT   tile_radius = radius / static_cast<OpT>(tile_size);
-        const OpT   tile_mean_u = mean2d.x / static_cast<OpT>(tile_size);
-        const OpT   tile_mean_v = mean2d.y / static_cast<OpT>(tile_size);
+            // tile_min is inclusive, tile_max is exclusive
+            uint2 tile_min, tile_max;
+            tile_min.x = min(max(0, (uint32_t)floor(tile_mean_u - tile_radius)), num_tiles_w);
+            tile_min.y = min(max(0, (uint32_t)floor(tile_mean_v - tile_radius)), num_tiles_h);
+            tile_max.x = min(max(0, (uint32_t)ceil(tile_mean_u + tile_radius)), num_tiles_w);
+            tile_max.y = min(max(0, (uint32_t)ceil(tile_mean_v + tile_radius)), num_tiles_h);
 
-        // tile_min is inclusive, tile_max is exclusive
-        uint2 tile_min, tile_max;
-        tile_min.x = min(max(0, (uint32_t)floor(tile_mean_u - tile_radius)), num_tiles_w);
-        tile_min.y = min(max(0, (uint32_t)floor(tile_mean_v - tile_radius)), num_tiles_h);
-        tile_max.x = min(max(0, (uint32_t)ceil(tile_mean_u + tile_radius)), num_tiles_w);
-        tile_max.y = min(max(0, (uint32_t)ceil(tile_mean_v + tile_radius)), num_tiles_h);
-
-        out_num_tiles_per_gaussian[idx] = [&]() {
-            if (tile_mask) {
-                CountT        num_tiles = 0;
-                const int32_t cidx      = (camera_jidx == nullptr)
-                                              ? static_cast<int32_t>(idx / num_gaussians_per_camera)
-                                              : camera_jidx[idx];
-                // loop min / max range and count number of tiles
-                for (uint32_t i = tile_min.y; i < tile_max.y; ++i) {
-                    for (uint32_t j = tile_min.x; j < tile_max.x; ++j) {
-                        if (tile_mask[cidx * num_tiles_h * num_tiles_w + i * num_tiles_w + j]) {
-                            num_tiles++;
+            out_num_tiles_per_gaussian[idx] = [&]() {
+                if (tile_mask) {
+                    CountT        num_tiles = 0;
+                    const int32_t cidx      = (camera_jidx == nullptr)
+                                                  ? static_cast<int32_t>(idx / num_gaussians_per_camera)
+                                                  : camera_jidx[idx];
+                    // loop min / max range and count number of tiles
+                    for (uint32_t i = tile_min.y; i < tile_max.y; ++i) {
+                        for (uint32_t j = tile_min.x; j < tile_max.x; ++j) {
+                            if (tile_mask[cidx * num_tiles_h * num_tiles_w + i * num_tiles_w + j]) {
+                                num_tiles++;
+                            }
                         }
                     }
+                    return num_tiles;
+                } else {
+                    // write out number of tiles per gaussian
+                    const CountT num_tiles =
+                        static_cast<CountT>((tile_max.y - tile_min.y) * (tile_max.x - tile_min.x));
+                    return num_tiles;
                 }
-                return num_tiles;
-            } else {
-                // write out number of tiles per gaussian
-                const CountT num_tiles =
-                    static_cast<CountT>((tile_max.y - tile_min.y) * (tile_max.x - tile_min.x));
-                return num_tiles;
-            }
-        }();
+            }();
+        }
     }
 }
 
@@ -171,50 +170,49 @@ compute_gaussian_tile_intersections(
             camera_jidx == nullptr ? idx / num_gaussians_per_camera : camera_jidx[idx];
 
         const OpT radius = radii[idx];
-        if (radius <= 0) {
-            return;
-        }
+        if (radius > 0) {
+            using vec2f = typename Vec2Type<OpT>::type;
 
-        using vec2f = typename Vec2Type<OpT>::type;
+            const vec2f mean2d      = *reinterpret_cast<const vec2f *>(means2d + 2 * idx);
+            const OpT   tile_radius = radius / static_cast<OpT>(tile_size);
+            const OpT   tile_mean_u = mean2d.x / static_cast<OpT>(tile_size);
+            const OpT   tile_mean_v = mean2d.y / static_cast<OpT>(tile_size);
 
-        const vec2f mean2d      = *reinterpret_cast<const vec2f *>(means2d + 2 * idx);
-        const OpT   tile_radius = radius / static_cast<OpT>(tile_size);
-        const OpT   tile_mean_u = mean2d.x / static_cast<OpT>(tile_size);
-        const OpT   tile_mean_v = mean2d.y / static_cast<OpT>(tile_size);
+            // tile_min is inclusive, tile_max is exclusive
+            uint2 tile_min, tile_max;
+            tile_min.x = min(max(0, (uint32_t)floor(tile_mean_u - tile_radius)), num_tiles_w);
+            tile_min.y = min(max(0, (uint32_t)floor(tile_mean_v - tile_radius)), num_tiles_h);
+            tile_max.x = min(max(0, (uint32_t)ceil(tile_mean_u + tile_radius)), num_tiles_w);
+            tile_max.y = min(max(0, (uint32_t)ceil(tile_mean_v + tile_radius)), num_tiles_h);
 
-        // tile_min is inclusive, tile_max is exclusive
-        uint2 tile_min, tile_max;
-        tile_min.x = min(max(0, (uint32_t)floor(tile_mean_u - tile_radius)), num_tiles_w);
-        tile_min.y = min(max(0, (uint32_t)floor(tile_mean_v - tile_radius)), num_tiles_h);
-        tile_max.x = min(max(0, (uint32_t)ceil(tile_mean_u + tile_radius)), num_tiles_w);
-        tile_max.y = min(max(0, (uint32_t)ceil(tile_mean_v + tile_radius)), num_tiles_h);
+            // If you use float64, we're casting you to float32 so we can
+            // pack the depth into the key. In principle this loses precision,
+            // in practice it's fine.
+            const float depth = depths[idx];
 
-        // If you use float64, we're casting you to float32 so we can
-        // pack the depth into the key. In principle this loses precision,
-        // in practice it's fine.
-        const float depth = depths[idx];
+            // Suppose you're using tile_id_bits = 22, then the output for this intersection is
+            // camera id (10 bits) | tile id (22 bits) | depth (32 bits)
+            // which we pack into an int64_t
+            const int64_t depth_enc = encode_depth(depth);
 
-        // Suppose you're using tile_id_bits = 22, then the output for this intersection is
-        // camera id (10 bits) | tile id (22 bits) | depth (32 bits)
-        // which we pack into an int64_t
-        const int64_t depth_enc = encode_depth(depth);
-
-        // For each tile this Gaussian intersects, write out an intersection tuple
-        // (camera_id, tile_id, depth, gaussian_id) packed as a uint3
-        int64_t cur_isect = (idx == 0) ? 0 : cum_tiles_per_gaussian[idx - 1];
-        for (int32_t i = tile_min.y; i < tile_max.y; ++i) {
-            for (int32_t j = tile_min.x; j < tile_max.x; ++j) {
-                // Skip if tile is masked out
-                if (tile_mask &&
-                    !tile_mask[cidx * num_tiles_h * num_tiles_w + i * num_tiles_w + j]) {
-                    continue;
+            // For each tile this Gaussian intersects, write out an intersection tuple
+            // (camera_id, tile_id, depth, gaussian_id) packed as a uint3
+            int64_t cur_isect = (idx == 0) ? 0 : cum_tiles_per_gaussian[idx - 1];
+            for (int32_t i = tile_min.y; i < tile_max.y; ++i) {
+                for (int32_t j = tile_min.x; j < tile_max.x; ++j) {
+                    // Skip if tile is masked out
+                    if (tile_mask &&
+                        !tile_mask[cidx * num_tiles_h * num_tiles_w + i * num_tiles_w + j]) {
+                        continue;
+                    }
+                    const int64_t tile_idx =
+                        (i * num_tiles_w + j); // Needs to fit in tile_id_bits bits
+                    const int64_t packed_cam_idx_and_tile_idx =
+                        encode_cam_tile_depth_key(cidx, tile_idx, depth_enc, tile_id_bits);
+                    intersection_keys[cur_isect]   = packed_cam_idx_and_tile_idx;
+                    intersection_values[cur_isect] = idx;
+                    cur_isect += 1;
                 }
-                const int64_t tile_idx = (i * num_tiles_w + j); // Needs to fit in tile_id_bits bits
-                const int64_t packed_cam_idx_and_tile_idx =
-                    encode_cam_tile_depth_key(cidx, tile_idx, depth_enc, tile_id_bits);
-                intersection_keys[cur_isect]   = packed_cam_idx_and_tile_idx;
-                intersection_values[cur_isect] = idx;
-                cur_isect += 1;
             }
         }
     }
@@ -232,36 +230,35 @@ compute_tile_offsets_sparse(
          idx += blockDim.x * gridDim.x) {
         if (idx == num_active_tiles) {
             out_offsets[idx] = num_intersections;
-            return;
+        } else {
+            // get the first intersection for this tile
+            const int64_t tile_start_idx_dense = active_tiles[idx];
+            const int64_t cam_idx              = tile_start_idx_dense / num_tiles;
+            const int64_t tile_idx             = tile_start_idx_dense % num_tiles;
+
+            auto depth_enc = encode_depth(0.0f); // Don't care what depth
+
+            const int64_t packed_cam_idx_and_tile_idx =
+                encode_cam_tile_depth_key(cam_idx, tile_idx, depth_enc, tile_id_bits);
+
+            // search in sorted_intersection_keys for the start of the range matching
+            // packed_cam_idx_and_tile_idx
+
+            auto compare_keys_ignore_depth = [tile_id_bits](int64_t lhs, int64_t rhs) {
+                auto [lhs_cam_idx, lhs_tile_idx] = decode_cam_tile_key(lhs, tile_id_bits);
+                auto [rhs_cam_idx, rhs_tile_idx] = decode_cam_tile_key(rhs, tile_id_bits);
+                return (lhs_cam_idx < rhs_cam_idx) ||
+                       ((lhs_cam_idx == rhs_cam_idx) && (lhs_tile_idx < rhs_tile_idx));
+            };
+
+            auto const tile_start =
+                thrust::lower_bound(thrust::seq, sorted_intersection_keys,
+                                    sorted_intersection_keys + num_intersections,
+                                    packed_cam_idx_and_tile_idx, compare_keys_ignore_depth) -
+                sorted_intersection_keys;
+
+            out_offsets[idx] = tile_start;
         }
-
-        // get the first intersection for this tile
-        const int64_t tile_start_idx_dense = active_tiles[idx];
-        const int64_t cam_idx              = tile_start_idx_dense / num_tiles;
-        const int64_t tile_idx             = tile_start_idx_dense % num_tiles;
-
-        auto depth_enc = encode_depth(0.0f); // Don't care what depth
-
-        const int64_t packed_cam_idx_and_tile_idx =
-            encode_cam_tile_depth_key(cam_idx, tile_idx, depth_enc, tile_id_bits);
-
-        // search in sorted_intersection_keys for the start of the range matching
-        // packed_cam_idx_and_tile_idx
-
-        auto compare_keys_ignore_depth = [tile_id_bits](int64_t lhs, int64_t rhs) {
-            auto [lhs_cam_idx, lhs_tile_idx] = decode_cam_tile_key(lhs, tile_id_bits);
-            auto [rhs_cam_idx, rhs_tile_idx] = decode_cam_tile_key(rhs, tile_id_bits);
-            return (lhs_cam_idx < rhs_cam_idx) ||
-                   ((lhs_cam_idx == rhs_cam_idx) && (lhs_tile_idx < rhs_tile_idx));
-        };
-
-        auto const tile_start =
-            thrust::lower_bound(thrust::seq, sorted_intersection_keys,
-                                sorted_intersection_keys + num_intersections,
-                                packed_cam_idx_and_tile_idx, compare_keys_ignore_depth) -
-            sorted_intersection_keys;
-
-        out_offsets[idx] = tile_start;
     }
 }
 
@@ -313,7 +310,7 @@ compute_tile_offsets(const uint32_t num_intersections, const uint32_t num_camera
             const int64_t prev_tile_key = sorted_intersection_keys[idx - 1] >> 32;
 
             if (prev_tile_key == tile_key) {
-                return;
+                continue;
             }
 
             auto [prev_cam_idx, prev_tile_idx] =
