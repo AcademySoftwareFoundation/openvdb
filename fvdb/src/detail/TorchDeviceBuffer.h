@@ -4,6 +4,7 @@
 #ifndef FVDB_DETAIL_TORCHDEVICEBUFFER_H
 #define FVDB_DETAIL_TORCHDEVICEBUFFER_H
 
+#include <nanovdb/GridHandle.h>
 #include <nanovdb/HostBuffer.h> // for BufferTraits
 
 #include <torch/types.h>
@@ -121,6 +122,13 @@ namespace nanovdb {
 template <> struct BufferTraits<fvdb::detail::TorchDeviceBuffer> {
     static const bool hasDeviceDual = true;
 };
+
+template <>
+template <>
+GridHandle<fvdb::detail::TorchDeviceBuffer>
+GridHandle<fvdb::detail::TorchDeviceBuffer>::copy<fvdb::detail::TorchDeviceBuffer>(
+    const fvdb::detail::TorchDeviceBuffer &guide) const;
+
 } // namespace nanovdb
 
 #endif // FVDB_DETAIL_TORCHDEVICEBUFFER_H
