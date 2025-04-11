@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
@@ -391,8 +391,8 @@ public:
     /// return normalized this, or (1, 0, 0) if this is null vector
     Vec3<T> unitSafe() const
     {
-        T l2 = lengthSqr();
-        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
+        const T l2 = lengthSqr();
+        return !isApproxZero(l2) ? *this / static_cast<T>(sqrt(l2)) : Vec3<T>(1, 0 ,0);
     }
 
     // Number of cols, rows, elements

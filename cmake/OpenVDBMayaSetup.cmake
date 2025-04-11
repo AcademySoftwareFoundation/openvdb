@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[.rst:
 
@@ -51,7 +51,7 @@ variables may be provided to tell this module where to look.
 # Find the Maya installation and use Maya's CMake to initialize
 # the Maya lib
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 
 set(_FIND_MAYA_ADDITIONAL_OPTIONS "")

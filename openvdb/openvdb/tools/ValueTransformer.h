@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @file ValueTransformer.h
 ///
@@ -135,12 +135,14 @@ inline void foreach(const IterT& iter, const XformOp& op,
 /// consider using @c tbb::parallel_for() or @c tbb::parallel_reduce() in conjunction
 /// with a tree::IteratorRange that wraps a grid or tree iterator.
 template<typename InIterT, typename OutGridT, typename XformOp>
-inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
+inline OPENVDB_UBSAN_SUPPRESS("undefined")
+void transformValues(const InIterT& inIter, OutGridT& outGrid,
     XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
 
 template<typename InIterT, typename OutGridT, typename XformOp>
-inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
+inline OPENVDB_UBSAN_SUPPRESS("undefined")
+void transformValues(const InIterT& inIter, OutGridT& outGrid,
     const XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
 
@@ -585,8 +587,8 @@ private:
 
 
 template<typename InIterT, typename OutGridT, typename XformOp>
-inline void
-transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
+inline OPENVDB_UBSAN_SUPPRESS("undefined")
+void transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
     bool threaded, bool shared, MergePolicy merge)
 {
     using Adapter = TreeAdapter<OutGridT>;
@@ -603,8 +605,8 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
 }
 
 template<typename InIterT, typename OutGridT, typename XformOp>
-inline void
-transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
+inline OPENVDB_UBSAN_SUPPRESS("undefined")
+void transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
     bool threaded, bool /*share*/, MergePolicy merge)
 {
     using Adapter = TreeAdapter<OutGridT>;

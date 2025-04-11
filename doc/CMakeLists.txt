@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(OpenVDBDocs LANGUAGES NONE)
 
 include(GNUInstallDirs)
@@ -44,6 +44,7 @@ set(DOXY_FILES
   openvdb/openvdb/points/impl
   openvdb/openvdb/python/pyopenvdb.h
   openvdb/openvdb/tools
+  openvdb/openvdb/tools/impl
   openvdb/openvdb/tree
   openvdb/openvdb/util
   doc/build.txt

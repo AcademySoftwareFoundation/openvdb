@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Merge.h>
@@ -82,7 +82,7 @@ TEST_F(TestMerge, testTreeToMerge)
     { // non-const tree
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
-        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
 
         tools::TreeToMerge<FloatTree> treeToMerge{grid->tree(), Steal()};
         EXPECT_EQ(&grid->constTree().root(), treeToMerge.rootPtr());
@@ -98,14 +98,14 @@ TEST_F(TestMerge, testTreeToMerge)
         const LeafNode* leafNode = treeToMerge.probeConstNode<LeafNode>(Coord(8));
         EXPECT_TRUE(leafNode);
         EXPECT_EQ(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
-        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
         EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
         // steal leaf node
 
         std::unique_ptr<LeafNode> leafNodePtr = treeToMerge.stealOrDeepCopyNode<LeafNode>(Coord(8));
         EXPECT_TRUE(leafNodePtr);
-        EXPECT_EQ(Index(0), grid->tree().leafCount());
+        EXPECT_EQ(Index64(0), grid->tree().leafCount());
         EXPECT_EQ(leafNodePtr->origin(), Coord(8));
         EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
@@ -139,7 +139,7 @@ TEST_F(TestMerge, testTreeToMerge)
     { // const tree
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
-        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
 
         tools::TreeToMerge<FloatTree> treeToMerge{grid->constTree(), DeepCopy(), /*initialize=*/false};
         EXPECT_TRUE(!treeToMerge.hasMask());
@@ -158,14 +158,14 @@ TEST_F(TestMerge, testTreeToMerge)
         const LeafNode* leafNode = treeToMerge.probeConstNode<LeafNode>(Coord(8));
         EXPECT_TRUE(leafNode);
         EXPECT_EQ(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
-        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
         EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
         { // deep copy leaf node
             tools::TreeToMerge<FloatTree> treeToMerge2{grid->constTree(), DeepCopy()};
             std::unique_ptr<LeafNode> leafNodePtr = treeToMerge2.stealOrDeepCopyNode<LeafNode>(Coord(8));
             EXPECT_TRUE(leafNodePtr);
-            EXPECT_EQ(Index(1), grid->tree().leafCount()); // leaf has not been stolen
+            EXPECT_EQ(Index64(1), grid->tree().leafCount()); // leaf has not been stolen
             EXPECT_EQ(leafNodePtr->origin(), Coord(8));
             EXPECT_EQ(Index(1), grid->tree().root().childCount());
         }
@@ -221,7 +221,7 @@ TEST_F(TestMerge, testTreeToMerge)
 
             FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
             grid->tree().touchLeaf(Coord(8));
-            EXPECT_EQ(Index(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
 
             treeToMerge.reset(grid->treePtr(), Steal());
         }
@@ -241,7 +241,7 @@ TEST_F(TestMerge, testTreeToMerge)
 
         EXPECT_TRUE(!treeToMerge2.treeToSteal());
         EXPECT_TRUE(treeToMerge2.treeToDeepCopy());
-        EXPECT_EQ(Index(0), treeToMerge2.treeToDeepCopy()->leafCount());
+        EXPECT_EQ(Index64(0), treeToMerge2.treeToDeepCopy()->leafCount());
 
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
@@ -249,7 +249,7 @@ TEST_F(TestMerge, testTreeToMerge)
 
         EXPECT_TRUE(treeToMerge2.treeToSteal());
         EXPECT_TRUE(!treeToMerge2.treeToDeepCopy());
-        EXPECT_EQ(Index(1), treeToMerge2.treeToSteal()->leafCount());
+        EXPECT_EQ(Index64(1), treeToMerge2.treeToSteal()->leafCount());
     }
 }
 
@@ -908,7 +908,7 @@ TEST_F(TestMerge, testCsgUnion)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
         }
 
         { // merge a leaf node into a grid with an outside tile
@@ -955,8 +955,8 @@ TEST_F(TestMerge, testCsgUnion)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), grid->tree().leafCount());
-            EXPECT_EQ(Index32(0), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid2->tree().leafCount());
 
             // test background values are remapped
 
@@ -1027,8 +1027,8 @@ TEST_F(TestMerge, testCsgUnion)
             FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
             grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-            EXPECT_EQ(Index32(0), grid->tree().leafCount());
-            EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid2->tree().leafCount());
 
             // merge from a const tree
 
@@ -1038,9 +1038,9 @@ TEST_F(TestMerge, testCsgUnion)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
             // leaf has been deep copied not stolen
-            EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid2->tree().leafCount());
         }
     }
 
@@ -1772,7 +1772,7 @@ TEST_F(TestMerge, testCsgIntersection)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(0), grid->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid->tree().leafCount());
         }
 
         { // merge a leaf node into a grid with a background tile
@@ -1785,7 +1785,7 @@ TEST_F(TestMerge, testCsgIntersection)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(0), grid->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid->tree().leafCount());
         }
 
         { // merge a leaf node into a grid with an outside tile
@@ -1828,8 +1828,8 @@ TEST_F(TestMerge, testCsgIntersection)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), grid->tree().leafCount());
-            EXPECT_EQ(Index32(0), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid2->tree().leafCount());
 
             // test background values are remapped
 
@@ -1901,8 +1901,8 @@ TEST_F(TestMerge, testCsgIntersection)
             FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
             grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-            EXPECT_EQ(Index32(0), grid->tree().leafCount());
-            EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(0), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid2->tree().leafCount());
 
             // merge from a const tree
 
@@ -1912,9 +1912,9 @@ TEST_F(TestMerge, testCsgIntersection)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), grid->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid->tree().leafCount());
             // leaf has been deep copied not stolen
-            EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+            EXPECT_EQ(Index64(1), grid2->tree().leafCount());
         }
 
         { // merge three leaf nodes from four grids
@@ -2472,15 +2472,15 @@ TEST_F(TestMerge, testCsgDifference)
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        EXPECT_EQ(Index32(0), grid->tree().leafCount());
-        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index64(0), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        EXPECT_EQ(Index32(1), grid->tree().leafCount());
-        EXPECT_EQ(Index32(0), grid2->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(0), grid2->tree().leafCount());
     }
 
     { // merge two leaf nodes into a grid
@@ -2489,8 +2489,8 @@ TEST_F(TestMerge, testCsgDifference)
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        EXPECT_EQ(Index32(1), grid->tree().leafCount());
-        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
@@ -2556,15 +2556,15 @@ TEST_F(TestMerge, testCsgDifference)
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        EXPECT_EQ(Index32(0), grid->tree().leafCount());
-        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index64(0), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->constTree(), DeepCopy());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        EXPECT_EQ(Index32(1), grid->tree().leafCount());
-        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid->tree().leafCount());
+        EXPECT_EQ(Index64(1), grid2->tree().leafCount());
     }
 }
 
@@ -2887,7 +2887,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(tree.cbeginLeaf()->getFirstValue(), 0.0f);
         }
 
@@ -2902,7 +2902,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 10.0f);
@@ -2924,7 +2924,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 210.0f);
@@ -2949,7 +2949,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 210.0f);
@@ -2973,7 +2973,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 15.0f);
@@ -2995,7 +2995,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 10.0f);
@@ -3017,7 +3017,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 10.0f);
@@ -3039,7 +3039,7 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             EXPECT_EQ(Index(0), getTileCount(tree.root()));
             auto iter = tree.cbeginLeaf();
             EXPECT_EQ(iter->getValue(0), 10.0f);
@@ -3155,8 +3155,8 @@ TEST_F(TestMerge, testSum)
             FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
             tree2.touchLeaf(Coord(0, 0, 0));
 
-            EXPECT_EQ(Index32(0), tree.leafCount());
-            EXPECT_EQ(Index32(1), tree2.leafCount());
+            EXPECT_EQ(Index64(0), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree2.leafCount());
 
             // merge from a const tree
 
@@ -3168,9 +3168,9 @@ TEST_F(TestMerge, testSum)
             tree::DynamicNodeManager<FloatTree, 3> nodeManager(tree);
             nodeManager.foreachTopDown(mergeOp);
 
-            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.leafCount());
             // leaf has been deep copied not stolen
-            EXPECT_EQ(Index32(1), tree2.leafCount());
+            EXPECT_EQ(Index64(1), tree2.leafCount());
         }
     }
 
@@ -3185,7 +3185,7 @@ TEST_F(TestMerge, testSum)
         tree::DynamicNodeManager<Vec3STree, 3> nodeManager(tree);
         nodeManager.foreachTopDown(mergeOp);
 
-        EXPECT_EQ(Index32(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         EXPECT_EQ(Index(0), getTileCount(tree.root()));
         auto iter = tree.cbeginLeaf();
         EXPECT_EQ(iter->getValue(0), Vec3s(1.0f, 2.0f, 3.0f));
@@ -3206,7 +3206,7 @@ TEST_F(TestMerge, testSum)
         tree::DynamicNodeManager<MaskTree, 3> nodeManager(tree);
         nodeManager.foreachTopDown(mergeOp);
 
-        EXPECT_EQ(Index32(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         EXPECT_EQ(Index(0), getTileCount(tree.root()));
         auto iter = tree.cbeginLeaf();
         EXPECT_FALSE(iter->isValueOn(0));

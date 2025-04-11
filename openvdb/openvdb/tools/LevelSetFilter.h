@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 //
 /// @author Ken Museth
 ///
@@ -96,6 +96,23 @@ public:
         Filter f(this, mask); f.meanCurvature();
     }
 
+    /// @brief One iteration of filleting on the level set.
+    /// @param mask Optional alpha mask.
+    ///
+    /// @note This filter rounds off concave edges to create a smoother
+    /// transition between surfaces. Fillets a level set by offsetting
+    /// at locations with a negative principal curvature, proportional
+    /// to its magnitude leaves locations with non-negative principal
+    /// curvatures untouched. This filter converges to the convex hull
+    /// if iterated enough times.
+    ///
+    /// @details See also Level Set Methods and Fast Marching Methods
+    /// by James Sethian, pp. 204.
+    void fillet(const MaskType* mask = nullptr)
+    {
+        Filter f(this, mask); f.fillet();
+    }
+
     /// @brief One iteration of Laplacian flow of the level set.
     /// @param mask Optional alpha mask.
     void laplacian(const MaskType* mask = nullptr)
@@ -169,6 +186,7 @@ private:
         void gaussian(int width);
         void laplacian();
         void meanCurvature();
+        void fillet();
         void offset(ComputeType value);
         void operator()(const LeafRange& r) const
         {
@@ -211,6 +229,7 @@ private:
 
         void medianImpl(const LeafRange&, int);
         void meanCurvatureImpl(const LeafRange&);
+        void filletImpl(const LeafRange&);
         void laplacianImpl(const LeafRange&);
         void offsetImpl(const LeafRange&, ComputeType);
 
@@ -304,6 +323,22 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvature()
 
 template<typename GridT, typename MaskT, typename InterruptT>
 inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::fillet()
+{
+    mParent->startInterrupter("Filleting level set");
+
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
+
+    mTask = std::bind(&Filter::filletImpl, std::placeholders::_1, std::placeholders::_2);
+    this->cook(true);
+
+    mParent->track();
+
+    mParent->endInterrupter();
+}
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacian()
 {
     mParent->startInterrupter("Laplacian flow of level set");
@@ -376,6 +411,52 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 stencil.moveTo(iter);
                 buffer[iter.pos()] = ComputeType(*iter) + dt*stencil.meanCurvatureNormGrad();
+            }
+        }
+    }
+}
+
+/// Fillets a level set by offsetting at locations with a negative principal
+/// curvature, proportional to its magnitude. Leaves locations with non-negative
+/// principal curvatures untouched. This filter converges to the convex hull if
+/// iterated enough times.
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::filletImpl(const LeafRange& range)
+{
+    mParent->checkInterrupter();
+
+    const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(3);
+    math::CurvatureStencil<GridType> stencil(mParent->grid(), dx);
+
+    if (mMask) {
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+                         mParent->maxMask(), mParent->isMaskInverted());
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                if (alpha(iter.getCoord(), a, b)) {
+                    stencil.moveTo(iter);
+
+                    const ValueType kappa = stencil.principalCurvatures().first;
+
+                    const ValueType phi0 = *iter,
+                                    phi1 = phi0 + math::Min(ValueType(0), dt*kappa);
+                    buffer[iter.pos()] = b * phi0 + a * phi1;
+                }
+            }
+        }
+    } else {
+        for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                stencil.moveTo(iter);
+
+                const ValueType kappa = stencil.principalCurvatures().first;
+
+                if (math::isNegative(kappa))
+                    buffer[iter.pos()] = *iter + dt*kappa;
             }
         }
     }

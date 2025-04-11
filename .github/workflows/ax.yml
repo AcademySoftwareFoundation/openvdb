@@ -14,6 +14,7 @@ on:
       - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -26,6 +27,7 @@ on:
       - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
+      - 'fvdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
@@ -68,16 +70,14 @@ jobs:
           - { image: '2023-clang15', cxx: 'clang++', build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'g++',     build: 'Release', cmake: '' }
           - { image: '2023-clang15', cxx: 'clang++', build: 'Debug',   cmake: '' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', cmake: '' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', cmake: '' }
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
-      - name: pybind11
+      - name: nanobind
         #if: contains(matrix.config.image, '2023') == false
-        run: ./ci/install_pybind11.sh 2.10.0
+        run: ./ci/install_nanobind.sh 2.0.0
+      - name: install_gtest
+        run: ./ci/install_gtest.sh 1.15.2
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -122,15 +122,16 @@ jobs:
     strategy:
       matrix:
         config:
-          #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '13' }
+          # Last macos runner before M1 (macos-14)
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '15' }
+          - { runner: 'macos-13', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+        run: |
+          ./ci/install_macos.sh ${{ matrix.config.llvm }}
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
@@ -139,7 +140,8 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          -DLLVM_DIR=/opt/homebrew/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V
@@ -152,13 +154,13 @@ jobs:
       github.event.inputs.type == 'grammar'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
-      image: aswf/ci-openvdb:2022-clang11
+      image: aswf/ci-openvdb:2023-clang15
     steps:
     - uses: actions/checkout@v3
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ax_grammar
         path: ./build/openvdb_ax/openvdb_ax/openvdb_ax/grammar

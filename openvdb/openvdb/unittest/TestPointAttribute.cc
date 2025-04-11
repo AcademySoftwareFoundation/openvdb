@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/PointAttribute.h>
@@ -36,7 +36,7 @@ TEST_F(TestPointAttribute, testAppendDrop)
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    EXPECT_EQ(tree.leafCount(), Index32(4));
+    EXPECT_EQ(tree.leafCount(), Index64(4));
 
     // retrieve first and last leaf attribute sets
 
@@ -298,7 +298,7 @@ TEST_F(TestPointAttribute, testRename)
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    EXPECT_EQ(tree.leafCount(), Index32(4));
+    EXPECT_EQ(tree.leafCount(), Index64(4));
 
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
@@ -373,7 +373,7 @@ TEST_F(TestPointAttribute, testBloscCompress)
     PointDataTree& tree = grid->tree();
 
     // check two leaves
-    EXPECT_EQ(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index64(2));
 
     // retrieve first and last leaf attribute sets
 

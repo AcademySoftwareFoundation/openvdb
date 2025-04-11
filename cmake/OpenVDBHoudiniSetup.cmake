@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[.rst:
 
@@ -73,7 +73,7 @@ may be provided to tell this module where to look.
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 
 # Include utility functions for version information
 include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
@@ -288,7 +288,11 @@ endif()
 
 # Jemalloc
 
-if(NOT JEMALLOC_LIBRARYDIR)
+# * On Mac OSX, linking against Jemalloc < 4.3.0 seg-faults with this error:
+#     malloc: *** malloc_zone_unregister() failed for 0xaddress
+#   As of Houdini 20, it still ships with Jemalloc 3.6.0, so don't expose it
+#   on Mac OSX (https://github.com/jemalloc/jemalloc/issues/420).
+if(NOT APPLE AND NOT JEMALLOC_LIBRARYDIR)
   set(JEMALLOC_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointRasterizeSDF.h>
@@ -135,7 +135,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(8), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(8), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(485), sdf->tree().activeVoxelCount());
 
@@ -163,7 +163,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(8), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(8), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(739), sdf->tree().activeVoxelCount());
 
@@ -192,7 +192,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.transform->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(27), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(27), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(5005), sdf->tree().activeVoxelCount());
 
@@ -236,7 +236,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(8), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(8), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(485), sdf->tree().activeVoxelCount());
 
@@ -265,7 +265,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(38), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(38), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(485*8), sdf->tree().activeVoxelCount()); // 485 per sphere
 
@@ -306,7 +306,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.transform->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(46), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(46), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(7198), sdf->tree().activeVoxelCount());
 
@@ -359,7 +359,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(17), sdf->tree().leafCount()); // less leaf nodes, active points are on a single face
+        EXPECT_EQ(Index64(17), sdf->tree().leafCount()); // less leaf nodes, active points are on a single face
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(485*4), sdf->tree().activeVoxelCount()); // 485 per sphere
 
@@ -568,7 +568,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeVariableSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(8), sdf->tree().leafCount()); // less leaf nodes, active points are on a single face
+        EXPECT_EQ(Index64(8), sdf->tree().leafCount()); // less leaf nodes, active points are on a single face
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(1454), sdf->tree().activeVoxelCount()); // 485 per sphere
 
@@ -732,7 +732,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeSmoothSpheres)
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
 
-        EXPECT_EQ(Index32(44), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(44), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(6303), sdf->tree().activeVoxelCount());
         const CoordBBox bounds(Coord(-7), Coord(7));
@@ -874,7 +874,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeVariableSmoothSpheres)
         EXPECT_TRUE(sdf->transform() == s.points->transform());
         EXPECT_EQ(GRID_LEVEL_SET, sdf->getGridClass());
         EXPECT_EQ(float(s.halfband * s.points->voxelSize()[0]), sdf->background());
-        EXPECT_EQ(Index32(64), sdf->tree().leafCount());
+        EXPECT_EQ(Index64(64), sdf->tree().leafCount());
         EXPECT_EQ(Index64(0), sdf->tree().activeTileCount());
         EXPECT_EQ(Index64(15011), sdf->tree().activeVoxelCount());
         for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {

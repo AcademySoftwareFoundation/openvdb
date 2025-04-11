@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file ForEach.h
+    \file nanovdb/util/ForEach.h
 
     \author Ken Museth
 
@@ -11,10 +11,10 @@
     \brief A unified wrapper for tbb::parallel_for and a naive std::thread fallback
 */
 
-#ifndef NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
-#define NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_UTIL_FOREACH_H_HAS_BEEN_INCLUDED
+#define NANOVDB_UTIL_FOREACH_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D
+#include <nanovdb/util/Range.h>// for Range1D
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_for.h>
@@ -25,6 +25,8 @@
 #endif
 
 namespace nanovdb {
+
+namespace util {
 
 /// @brief simple wrapper for tbb::parallel_for with a naive std fallback
 ///
@@ -83,6 +85,32 @@ inline void forEach(const ContainerT<T...> &c, size_t grainSize, const FuncT& fu
     forEach(Range1D(0, c.size(), grainSize), func);
 }
 
+}// namespace util
+
+/// @brief Simple wrapper for the function defined above
+template <typename FuncT>
+[[deprecated("Use nanovdb::util::forEach instead")]]
+inline void forEach(size_t begin, size_t end, size_t grainSize, const FuncT& func)
+{
+    util::forEach(util::Range1D(begin, end, grainSize), func);
+}
+
+/// @brief Simple wrapper for the function defined above, which works with std::containers
+template <template<typename...> class ContainerT, typename... T, typename FuncT>
+[[deprecated("Use nanovdb::util::forEach instead")]]
+inline void forEach(const ContainerT<T...> &c, const FuncT& func)
+{
+    util::forEach(util::Range1D(0, c.size(), 1), func);
+}
+
+/// @brief Simple wrapper for the function defined above, which works with std::containers
+template <template<typename...> class ContainerT, typename... T, typename FuncT>
+[[deprecated("Use nanovdb::util::forEach instead")]]
+inline void forEach(const ContainerT<T...> &c, size_t grainSize, const FuncT& func)
+{
+    util::forEach(util::Range1D(0, c.size(), grainSize), func);
+}
+
 }// namespace nanovdb
 
-#endif // NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
+#endif // NANOVDB_UTIL_FOREACH_H_HAS_BEEN_INCLUDED

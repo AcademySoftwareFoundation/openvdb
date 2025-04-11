@@ -1,17 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 #define OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl.h>
+#include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 #include <openvdb/openvdb.h>
 #include "pyutil.h"
 
 namespace pyAccessor {
 
-namespace py = pybind11;
+namespace nb = nanobind;
 using namespace openvdb::OPENVDB_VERSION_NAME;
 
 
@@ -69,7 +69,7 @@ struct AccessorTraits<const _GridT>
 
     static void notWritable()
     {
-        throw py::type_error("accessor is read-only");
+        throw nb::type_error("accessor is read-only");
     }
 };
 //@}
@@ -173,86 +173,71 @@ public:
     }
 
     /// @brief Define a Python wrapper class for this C++ class.
-    static void wrap(py::module_ m)
+    static void wrap(nb::module_ m)
     {
         const std::string
             pyGridTypeName = pyutil::GridTraits<GridType>::name(),
-            pyValueTypeName = openvdb::typeNameAsString<typename GridType::ValueType>(),
             pyAccessorTypeName = Traits::typeName();
 
-        py::class_<AccessorWrap>(m,
-            (pyGridTypeName + pyAccessorTypeName).c_str(), //pybind11 requires a unique class name for each template instantiation
+        nb::class_<AccessorWrap>(m,
+            (pyGridTypeName + pyAccessorTypeName).c_str(), //nanobind requires a unique class name for each template instantiation
             (std::string(Traits::IsConst ? "Read-only" : "Read/write")
                 + " access by (i, j, k) index coordinates to the voxels\nof a "
                 + pyGridTypeName).c_str())
             .def("copy", &AccessorWrap::copy,
-                ("copy() -> " + pyAccessorTypeName + "\n\n"
-                 "Return a copy of this accessor.").c_str())
+                 "Return a copy of this accessor.")
 
             .def("clear", &AccessorWrap::clear,
-                "clear()\n\n"
                 "Clear this accessor of all cached data.")
 
-            .def_property_readonly("parent", &AccessorWrap::parent,
+            .def_prop_ro("parent", &AccessorWrap::parent,
                 ("this accessor's parent " + pyGridTypeName).c_str())
 
             //
             // Voxel access
             //
             .def("getValue", &AccessorWrap::getValue,
-                py::arg("ijk"),
-                ("getValue(ijk) -> " + pyValueTypeName + "\n\n"
-                 "Return the value of the voxel at coordinates (i, j, k).").c_str())
+                nb::arg("ijk"),
+                "Return the value of the voxel at coordinates (i, j, k).")
 
             .def("getValueDepth", &AccessorWrap::getValueDepth,
-                py::arg("ijk"),
-                "getValueDepth(ijk) -> int\n\n"
+                nb::arg("ijk"),
                 "Return the tree depth (0 = root) at which the value of voxel\n"
                 "(i, j, k) resides.  If (i, j, k) isn't explicitly represented in\n"
                 "the tree (i.e., it is implicitly a background voxel), return -1.")
 
             .def("isVoxel", &AccessorWrap::isVoxel,
-                py::arg("ijk"),
-                "isVoxel(ijk) -> bool\n\n"
+                nb::arg("ijk"),
                 "Return True if voxel (i, j, k) resides at the leaf level of the tree.")
 
             .def("probeValue", &AccessorWrap::probeValue,
-                py::arg("ijk"),
-                "probeValue(ijk) -> value, bool\n\n"
+                nb::arg("ijk"),
                 "Return the value of the voxel at coordinates (i, j, k)\n"
                 "together with the voxel's active state.")
 
             .def("isValueOn", &AccessorWrap::isValueOn,
-                py::arg("ijk"),
-                "isValueOn(ijk) -> bool\n\n"
+                nb::arg("ijk"),
                 "Return the active state of the voxel at coordinates (i, j, k).")
             .def("setActiveState", &AccessorWrap::setActiveState,
-                py::arg("ijk"), py::arg("on"),
-                "setActiveState(ijk, on)\n\n"
+                nb::arg("ijk"), nb::arg("on"),
                 "Mark voxel (i, j, k) as either active or inactive (True or False),\n"
                 "but don't change its value.")
 
             .def("setValueOnly", &AccessorWrap::setValueOnly,
-                py::arg("ijk"), py::arg("value"),
-                "setValueOnly(ijk, value)\n\n"
+                nb::arg("ijk"), nb::arg("value"),
                 "Set the value of voxel (i, j, k), but don't change its active state.")
 
             .def("setValueOn", &AccessorWrap::setValueOn,
-                py::arg("ijk"), py::arg("value") = py::none(),
-                "setValueOn(ijk, value)\n\n"
-                "Mark voxel (i, j, k) as active and set the voxel's value if specified.\n")
+                nb::arg("ijk"), nb::arg("value") = nb::none(),
+                "Mark voxel (i, j, k) as active and set the voxel's value if specified.")
 
             .def("setValueOff", &AccessorWrap::setValueOff,
-                py::arg("ijk"), py::arg("value") = py::none(),
-                "setValueOff(ijk, value)\n\n"
+                nb::arg("ijk"), nb::arg("value") = nb::none(),
                 "Mark voxel (i, j, k) as inactive and set the voxel's value if specified.")
 
             .def("isCached", &AccessorWrap::isCached,
-                py::arg("ijk"),
-                "isCached(ijk) -> bool\n\n"
-                "Return True if this accessor has cached the path to voxel (i, j, k).")
-
-            ; // py::class_<ValueAccessor>
+                nb::arg("ijk"),
+                "Return True if this accessor has cached the path to voxel (i, j, k).");
     }
 
 private:

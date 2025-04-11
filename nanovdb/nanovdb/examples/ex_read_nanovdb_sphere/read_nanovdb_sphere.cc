@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
-#include <nanovdb/util/IO.h>
+#include <nanovdb/io/IO.h>
 
 /// @brief Read a NanoVDB grid form file, check pointer and access a single value
 ///

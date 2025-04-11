@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include "RenderModules.h"
 
@@ -12,6 +12,11 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
+
+#if defined(_WIN32)
+#include <GL/glu.h>
+#endif
+
 #include <algorithm> // for std::min()
 #include <cmath> // for std::abs(), std::fabs(), std::floor()
 #include <limits>

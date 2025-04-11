@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(NanoVDBExamples LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -78,7 +78,7 @@ function(NANOVDB_EXAMPLE)
   target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util)
   target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb)
 
-  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
+  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${NANOVDB_INSTALL_DOCDIR}/examples)
 endfunction()
 
 # -----------------------------------------------------------------------
@@ -108,6 +108,11 @@ nanovdb_example(NAME "ex_bump_pool_buffer")
 nanovdb_example(NAME "ex_collide_level_set")
 nanovdb_example(NAME "ex_raytrace_fog_volume")
 nanovdb_example(NAME "ex_raytrace_level_set")
+
+if(CUDAToolkit_FOUND)
+  nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND
+  target_link_libraries(ex_make_mgpu_nanovdb PRIVATE CUDA::curand)
+endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)
   nanovdb_example(NAME "ex_vox_to_nanovdb")

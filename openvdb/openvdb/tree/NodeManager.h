@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file tree/NodeManager.h
 ///
@@ -107,7 +107,7 @@ public:
     {
         // Compute the node counts for each node
 
-        std::vector<Index32> nodeCounts;
+        std::vector<Index64> nodeCounts;
         if (serial) {
             nodeCounts.reserve(parents.nodeCount());
             for (size_t i = 0; i < parents.nodeCount(); i++) {
@@ -328,7 +328,7 @@ private:
         void operator()(const NodeRange& range) const
         {
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
-                OpT::template eval(mNodeOp, it);
+                OpT::eval(mNodeOp, it);
             }
         }
         const NodeOp mNodeOp;
@@ -348,7 +348,7 @@ private:
         void operator()(const NodeRange& range) const
         {
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
-                OpT::template eval(mNodeOp, it);
+                OpT::eval(mNodeOp, it);
             }
         }
         const NodeOp& mNodeOp;
@@ -373,7 +373,7 @@ private:
         void operator()(const NodeRange& range)
         {
             for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
-                OpT::template eval(*mNodeOp, it);
+                OpT::eval(*mNodeOp, it);
             }
         }
         void join(const NodeReducer& other)

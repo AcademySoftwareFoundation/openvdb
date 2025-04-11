@@ -1,19 +1,19 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <chrono>
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/util/cuda/CudaDeviceBuffer.h>
-using BufferT = nanovdb::CudaDeviceBuffer;
+#include <nanovdb/cuda/DeviceBuffer.h>
+using BufferT = nanovdb::cuda::DeviceBuffer;
 #else
 using BufferT = nanovdb::HostBuffer;
 #endif
-#include <nanovdb/util/GridHandle.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/Ray.h>
+#include <nanovdb/GridHandle.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/math/Ray.h>
 
 #include "common.h"
 
@@ -22,10 +22,10 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     using GridT = nanovdb::FloatGrid;
     using CoordT = nanovdb::Coord;
     using RealT = float;
-    using Vec3T = nanovdb::Vec3<RealT>;
-    using RayT = nanovdb::Ray<RealT>;
+    using Vec3T = nanovdb::math::Vec3<RealT>;
+    using RayT = nanovdb::math::Ray<RealT>;
 
-    auto* h_grid = handle.grid<float>();
+    auto *h_grid = handle.grid<float>();
     if (!h_grid)
         throw std::runtime_error("GridHandle does not contain a valid host grid");
 

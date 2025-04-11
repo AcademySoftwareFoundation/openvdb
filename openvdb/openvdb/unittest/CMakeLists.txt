@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -111,6 +111,7 @@ else()
     TestInt32Metadata.cc
     TestInt64Metadata.cc
     TestInternalOrigin.cc
+    TestInternalNode.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -118,7 +119,10 @@ else()
     TestLeafManager.cc
     TestLeafMask.cc
     TestLeafOrigin.cc
+    TestLevelSetDilatedMesh.cc
+    TestLevelSetFilter.cc
     TestLevelSetRayIntersector.cc
+    TestLevelSetTubes.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
     TestMaps.cc
@@ -166,6 +170,7 @@ else()
     TestQuantizedUnitVec.cc
     TestQuat.cc
     TestRay.cc
+    TestRootNode.cc
     TestStats.cc
     TestStencils.cc
     TestStream.cc

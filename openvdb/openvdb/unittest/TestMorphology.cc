@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
@@ -113,7 +113,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         EXPECT_EQ(Index64(1), tree.activeVoxelCount());
         openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         EXPECT_EQ(Index64(0), tree.activeVoxelCount());
-        EXPECT_EQ(Index32(1), tree.leafCount());
+        EXPECT_EQ(Index64(1), tree.leafCount());
         // check values
         if (!IsMask) {
             EXPECT_EQ(tree.getValue(xyz), ValueType(1.0));
@@ -124,7 +124,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
     { // Create an active, leaf node-sized tile and a single edge/corner voxel
         tree.clear();
         tree.addTile(/*level*/1, Coord(0), ValueType(1.0), true);
-        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree.activeVoxelCount());
         EXPECT_EQ(Index64(1), tree.activeTileCount());
 
@@ -143,7 +143,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected += 22; // 4 overlapping
         EXPECT_EQ(expected, tree.activeVoxelCount());
         EXPECT_EQ(Index64(1), tree.activeTileCount());
-        Index32 leafs;
+        Index64 leafs;
         if (NN == openvdb::tools::NN_FACE)             leafs = 3;
         if (NN == openvdb::tools::NN_FACE_EDGE)        leafs = 6;
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) leafs = 7;
@@ -434,7 +434,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
     { // Test behaviour with an existing active tile at (0,0,0)
         tree.clear();
         tree.addTile(/*level*/1, Coord(0), ValueType(1.0), true);
-        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree.activeVoxelCount());
         EXPECT_EQ(Index64(1), tree.activeTileCount());
 
@@ -450,7 +450,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             TreeT erodeexp(tree), erodepres(tree);
             openvdb::tools::erodeActiveValues(erodeexp, 1, NN, openvdb::tools::EXPAND_TILES);
             Index64 expected = (leafDim-2) * (leafDim-2) * (leafDim-2);
-            EXPECT_EQ(Index32(1), erodeexp.leafCount());
+            EXPECT_EQ(Index64(1), erodeexp.leafCount());
             EXPECT_EQ(expected, erodeexp.activeVoxelCount());
             EXPECT_EQ(Index64(0), erodeexp.activeTileCount());
             EXPECT_TRUE(erodeexp.probeConstLeaf(Coord(0)));
@@ -465,7 +465,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             if (NN == openvdb::tools::NN_FACE)             expected +=  (leafDim * leafDim) * 6; // faces
             if (NN == openvdb::tools::NN_FACE_EDGE)        expected += ((leafDim * leafDim) * 6) +  (leafDim) * 12; // edges
             if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected += ((leafDim * leafDim) * 6) + ((leafDim) * 12) + 8; // edges
-            EXPECT_EQ(Index32(1+offsets), tree.leafCount());
+            EXPECT_EQ(Index64(1+offsets), tree.leafCount());
             EXPECT_EQ(expected, tree.activeVoxelCount());
             EXPECT_EQ(Index64(0), tree.activeTileCount());
             // Check actual values around center node faces
@@ -492,7 +492,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             TreeT erode(tree);
             openvdb::tools::erodeActiveValues(erode, 1, NN, openvdb::tools::IGNORE_TILES);
             Index64 expected = leafDim * leafDim * leafDim;
-            EXPECT_EQ(Index32(1+offsets), erode.leafCount());
+            EXPECT_EQ(Index64(1+offsets), erode.leafCount());
             EXPECT_EQ(expected, erode.activeVoxelCount());
             EXPECT_EQ(Index64(0), erode.activeTileCount());
             EXPECT_TRUE(erode.probeConstLeaf(Coord(0)));
@@ -514,7 +514,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             if (NN == openvdb::tools::NN_FACE_EDGE)        expected += ((leafDim * leafDim) * 6) +  (leafDim) * 12; // edges
             if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected += ((leafDim * leafDim) * 6) + ((leafDim) * 12) + 8; // edges
 
-            EXPECT_EQ(Index32(offsets), tree.leafCount());
+            EXPECT_EQ(Index64(offsets), tree.leafCount());
             EXPECT_EQ(expected, tree.activeVoxelCount());
             EXPECT_EQ(Index64(1), tree.activeTileCount());
             EXPECT_TRUE(copy.hasSameTopology(tree));
@@ -539,7 +539,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             openvdb::tools::erodeActiveValues(erode, 1, NN, openvdb::tools::PRESERVE_TILES);
             // PRESERVE_TILES will prune the result
             Index64 expected = leafDim * leafDim * leafDim;
-            EXPECT_EQ(Index32(0), erode.leafCount());
+            EXPECT_EQ(Index64(0), erode.leafCount());
             EXPECT_EQ(expected, erode.activeVoxelCount());
             EXPECT_EQ(Index64(1), erode.activeTileCount());
             EXPECT_TRUE(!erode.probeConstLeaf(Coord(0)));
@@ -549,7 +549,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
     { // Test tile preservation with voxel topology - create an active, leaf node-sized tile and a single edge voxel
         tree.clear();
         tree.addTile(/*level*/1, Coord(0), ValueType(1.0), true);
-        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index64(0), tree.leafCount());
         EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree.activeVoxelCount());
         EXPECT_EQ(Index64(1), tree.activeTileCount());
 
@@ -575,7 +575,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
 
             // Check actual values around center node faces
             EXPECT_EQ(Index64(1), tree.activeTileCount());
-            EXPECT_EQ(Index32(offsets), tree.leafCount());
+            EXPECT_EQ(Index64(offsets), tree.leafCount());
             EXPECT_TRUE(!tree.probeConstLeaf(Coord(0)));
             EXPECT_TRUE(tree.isValueOn(Coord(0)));
             for (int i = 0; i < int(leafDim); ++i) {
@@ -592,7 +592,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
         { // Test tile is preserved with erosions IGNORE_TILES, irrespective of iterations
             openvdb::tools::erodeActiveValues(tree, 10, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_EQ(Index64(1), tree.activeTileCount());
-            EXPECT_EQ(Index32(offsets), tree.leafCount());
+            EXPECT_EQ(Index64(offsets), tree.leafCount());
             EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree.activeVoxelCount());
             EXPECT_TRUE(!tree.probeConstLeaf(Coord(0)));
             EXPECT_TRUE(tree.isValueOn(Coord(0)));
@@ -613,7 +613,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
         tree.touchLeaf(Coord(leafDim*6, 0, 0))->setValuesOn();
         Index64 expected = (leafDim * leafDim * leafDim) +
             ((leafDim * leafDim * leafDim) - (leafDim * leafDim)) * 2;
-        EXPECT_EQ(Index32(3), tree.leafCount());
+        EXPECT_EQ(Index64(3), tree.leafCount());
         EXPECT_EQ(expected, tree.activeVoxelCount());
         EXPECT_EQ(Index64(0), tree.activeTileCount());
 
@@ -631,7 +631,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
         if (NN == openvdb::tools::NN_FACE_EDGE)        expected = offsets*3 -10;
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected = offsets*3 -18;
         if (!IsMask) expected += 1;
-        EXPECT_EQ(Index32(expected), tree.leafCount());
+        EXPECT_EQ(Index64(expected), tree.leafCount());
         // first
         if (IsMask) {
             // should have been pruned
@@ -654,7 +654,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
             openvdb::tools::PRESERVE_TILES);
         expected = (leafDim * leafDim * leafDim) +
             ((leafDim * leafDim * leafDim) - (leafDim * leafDim)) * 2;
-        EXPECT_EQ(Index32(2), tree.leafCount());
+        EXPECT_EQ(Index64(2), tree.leafCount());
         EXPECT_EQ(expected, tree.activeVoxelCount());
         EXPECT_EQ(Index64(1), tree.activeTileCount());
     }

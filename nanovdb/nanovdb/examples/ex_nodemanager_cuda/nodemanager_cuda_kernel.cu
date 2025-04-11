@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
-#include <nanovdb/util/NodeManager.h>
-#include <nanovdb/util/cuda/CudaGridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
-#include <nanovdb/util/cuda/CudaNodeManager.cuh>
+#include <nanovdb/NodeManager.h>
+#include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
+#include <nanovdb/cuda/NodeManager.cuh>
 #include <stdio.h> // for printf
 
 // This is called by the host only
@@ -29,9 +29,9 @@ extern "C" void launch_kernels(const nanovdb::NodeManager<float>* deviceMgr,
     cpu_kernel(cpuMgr); // Launch the host "kernel" (synchronously)
 }
 
-// Simple wrapper that makes sure nanovdb::cudaCreateNodeManager is initiated
+// Simple wrapper that makes sure nanovdb::cuda::createNodeManager is initiated
 extern "C" void cudaCreateNodeManager(const nanovdb::NanoGrid<float> *d_grid,
                                       nanovdb::NodeManagerHandle<nanovdb::CudaDeviceBuffer> *handle)
 {
-    *handle = std::move(nanovdb::cudaCreateNodeManager<float>(d_grid));
+    *handle = std::move(nanovdb::cuda::createNodeManager<float>(d_grid));
 }

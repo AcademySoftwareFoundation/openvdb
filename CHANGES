@@ -1,7 +1,235 @@
 OpenVDB Version History
 =======================
 
-Version 11.0.1 - In development
+Version 12.0.1 - April 3, 2025
+
+  OpenVDB:
+    New features:
+    - Added read and write support for OFF (Object File Format) files to vdb_tool
+
+    Build:
+    - Fixed a build issue with vdb_render on Windows with newer versions of glew not including glu.h by default
+    - Fixed issues with newer versions of clang refusing to accept older ::template syntax
+
+  NanoVDB:
+    New features:
+    - Added support for multiple GPUs to DeviceBuffer
+    - Added a UnifiedBuffer class that wraps CUDA unified memory
+    - Added example for multiGPU sparse convolution
+    - Added CUDA utility functions for device queries
+    - Added functions to independently stop and compute the elapsed time for timer classes
+
+    Improvements:
+    - Replaced CUB's CachingDeviceAllocator with the default asynchronous stream ordered allocator in PointsToGrid for improved performance
+
+    Bug fix:
+    - Map is now properly transposed when converting NanoVDB to OpenVDB.
+    - Fixed ostream specializations being hidden within the nanovdb namespace
+    - Fixed a call to a non-existent method in GridBuild.h
+
+
+Version 12.0.0 - October 31, 2024
+
+      OpenVDB is now licensed under the Apache 2.0 license, instead of the MPL 2.0 license.
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 10 for
+      Houdini 20.0 and 11 for Houdini 20.5.
+
+      GCC 9 is no longer supported.
+
+  OpenVDB:
+    New features:
+    - Added fillet() method in tools::LevelSetFilter to round off concave edges
+      to create smoother transition between surfaces.
+
+    Improvements:
+    - Added openvdb::assertAbort to replace cassert and a
+      OPENVDB_ENABLE_ASSERTS cmake argument/compile define to toggle
+      assertions in OpenVDB code, independantly of NDEBUG. Asserts are
+      no longer enabled by default in when NDEBUG is absent (e.g.
+      Debug builds).
+    - Removed last traces of Boost when OPENVDB_USE_DELAYED_LOADING is OFF
+      [Reported by Brian McKinnon]
+    - RootNode code cleanup to eliminate redundant key conversion and
+      to create map values in-place.
+    - Add RootNode::deleteChildOrTile() to delete a child or tile of
+      the root node.
+    - ValueAccessors are now defined and created in the Tree class
+      instead of in the Grid class so that custom Tree implementations
+      may define and create their own ValueAccessors if desired.
+    - Added support for PDAL to vdb_tool [Contributed by Tom Matterson]
+    - LeafManager and NodeManager now use Index64 for leaf counts internally.
+    - Added RootNode::probeChild() const.
+    - Added RootNode::probeChild() and RootNode::probeConstChild().
+    - Added RootNode::probe() and RootNode::probeConst() to query key presence,
+      child node, value and active state.
+    - Added InternalNode::probeChild() const.
+    - Added InternalNode::probeChild() and probeChildConst() with coord access
+      and optionally value and active state.
+    - Added InternalNode::probeChild() and probeChildConst() with index access
+      and optionally value and active state.
+    - Added InternalNode::isValueOff(), LeafNode::isValueOff(),
+      LeafNodeBool::isValueOff(), LeafNodeMask::isValueOff().
+    - Added LeafNodeMask::probeValue(Index,val), LeafNodeBool::probeValue(Index,val).
+    - Added RootNode::getValueUnsafe(), RootNode::getChildUnsafe(),
+      RootNode::getConstChildUnsafe().
+    - Added InternalNode::getValueUnsafe(), InternalNode::getChildUnsafe(),
+      InternalNode::getConstChildUnsafe().
+    - Added InternalNode::setActiveStateUnsafe(), InternalNode::setValueOnlyUnsafe(),
+      InternalNode::setValueOnUnsafe(), InternalNode::setValueOffUnsafe().
+    - Added InternalNode::setChildUnsafe(), InternalNode::resetChildUnsafe(),
+      InternalNode::stealChildUnsafe(), InternalNode::deleteChildUnsafe().
+    - For LeafNode, LeafNodeBool and LeafNodeMask - added
+      LeafNode::getValueUnsafe(), LeafNode::setActiveStateunsafe(),
+      LeafNode::setValueOnlyUnsafe(), LeafNode::setValueOnUnsafe(),
+      LeafNode::setValueOffUnsafe().
+
+    ABI changes:
+    - Tree::leafCount(), Tree::unallocatedLeafCount(),
+      Tree::nonLeafCount() and Tree::nodeCount() now use Index64 in their
+      return types instead of Index32.
+
+    API Changes:
+    - RootNode::tileCount(), RootNode::activeTileCount() and
+      RootNode::inactiveTileCount() are now public.
+    - RootNode::hasKey() and RootNode::coordToKey() are now public.
+    - RootNode::leafCount(), RootNode::nonLeafCount() and RootNode::nodeCount()
+      now use Index64 instead of Index32. The Index32 variant is deprecated.
+    - InternalNode::leafCount(), InternalNode::nonLeafCount() and
+      InternalNode::nodeCount() now use Index64 instead of Index32. The Index32
+      variant is deprecated.
+    - LeafNode::leafCount() and LeafNode::nonLeafCount() now use Index64 instead
+      of Index32. The Index32 variant is deprecated.
+
+    Bug Fixes:
+    - Fix potential crash reading corrupt .vdb files with invalid
+      blosc or zip chunks.
+      [Fix thanks to Matthias Ueberheide]
+    - Fix a bug in RootNode::setOrigin() where the origin was updated
+      before the error was thrown potentially leaving the root in an
+      invalid state.
+    - Fixed a thread sanitizer issue which could cause undefined
+      behaviour in VolumeToSpheres::fillWithSpheres
+      [Reported by Jérémie Dumas]
+    - Fixed an occurance of undefined behaviour in tools::activate
+      (though this would typically not have manifested with any
+      unintended behaviour)
+
+  NanoVDB:
+    Bug fix:
+    - nanovdb::readGrids works with raw grid buffer.
+
+    Improvements:
+    - Restructure files location and namespace to be more align with
+      OpenVDB. The namespaces touched by the restructuring are: io,
+      cuda, util, tools, and math.
+    - Add two scripts updateFiles.sh and updateFiles.py to update the
+      files using NanoVDB. The script updateFiles.py works on both
+      Windows and Linux.  For a more complete list of changes, see API
+      Changes (details).
+
+    - cuda::PointsToGrid supports target density.
+    - Add support for NanoVDB Grid of type UInt8.
+    - Add ability to use externally managed CUDA buffer.
+    - Add create methods for CudaDeviceBuffer and exceptions.
+    - Improve GridValidator logic, e.g. include check for grid count.
+    - Add operator > and >= for class Coord according to lexicographical order.
+    - Add toCodec to convert string to Codec enumeration type.
+    - Add nanovdb::strlen<GridType>().
+    - Add strncpy util.
+    - Add NANOVDB_DISABLE_SYNC_CUDA_MALLOC that maps cudaMallocAsync
+      and cudaFreeAsync to cudaMalloc and cudaFree respectively.
+    - Add guard to UINT64_C.
+    - Remove use of cudaMallocAsync in PointsToGrid.cuh.
+    - Align PNanoVDB blind metadata to NanoVDB.
+
+    API Changes:
+    - Change mapToGridType to toGridType.
+    - Change mapToMagic to toMagic.
+    - Change CpuTimer.h to Timer.h.
+
+    API Changes (details):
+    - These APIs are now under the math namespace: Ray, DDA, HDDA,
+      Vec3, Vec4, BBox, ZeroCrossing, TreeMarcher, PointTreeMarcher,
+      BoxStencil, CurvatureStencil, GradStencil, WenoStencil, AlignUp,
+      Min, Max, Abs, Clamp, Sqrt, Sign, Maximum, Delta, RoundDown, pi,
+      isApproxZero, Round, createSampler, SampleFromVoxels.
+
+    - These APIs are now under the tools namespace: createNanoGrid,
+      StatsMode, createLevelSetSphere, createFogVolumeSphere,
+      createFogVolumeSphere, createFogVolumeSphere,
+      createFogVolumeTorus, createLevelSetBox, CreateNanoGrid,
+      updateGridStats, evalChecksum, validateChecksum, checkGrid,
+      Extrema.
+    - These APIs are now under the util namespace: is_floating_point,
+      findLowestOn, findHighestOn, Range, streq, strcpy, strcat,
+      empty, Split, invoke, forEach, reduce, prefixSum, is_same,
+      is_specialization, PtrAdd, PtrDiff.
+
+    - Move nanovdb::build to nanovdb::tools::build.
+    - Rename nanovdb::BBoxR to nanovdb::Vec3dBBox.
+    - Rename nanovdb::BBox<nanovdb::Vec3d> to nanovdb::Vec3dBbox.
+    - Move nanovdb::cudaCreateNodeManager to nanovdb::cuda::createNodeManager.
+    - Move and rename nanovdb::cudaVoxelsToGrid to nanovdb::cuda::voxelsToGrid.
+    - Move and rename nanovdb::cudaPointsToGrid to nanovdb::cuda::pointsToGrid.
+    - Move nanovdb::DitherLUT to nanovdb::math::DitherLUT.
+    - Move and rename nanovdb::PackedRGBA8 to nanovdb::math::Rgba8.
+    - Move nanovdb::Rgba8 to nanovdb::math::Rgba8.
+    - Move and rename nanovdb::CpuTimer to nanovdb::util::Timer.
+    - Move nanovdb::GpuTimer to nanovdb::util::cuda::Timer.
+    - Move and rename nanovdb::CountOn to nanovdb::util::countOn.
+
+    - Move util/GridHandle.h to GridHandle.h.
+    - Move util/BuildGrid.h to tools/GridBuilder.h.
+    - Move util/GridBuilder.h to tools/GridBuilder.h.
+    - Move util/IO.h to io/IO.h.
+    - Move util/CSampleFromVoxels.h to math/CSampleFromVoxels.h.
+    - Move util/DitherLUT.h to math/DitherLUT.h.
+    - Move util/HDDA.h to math/HDDA.h.
+    - Move util/Ray.h to math/Ray.h.
+    - Move util/SampleFromVoxels.h to math/SampleFromVoxels.h.
+    - Move util/Stencils.h to nanovdb/math/Stencils.h.
+    - Move util/CreateNanoGrid.h to tools/CreateNanoGrid.h.
+    - Move and rename util/Primitives.h to tools/CreatePrimitives.h.
+    - Move util/GridChecksum.h to tools/GridChecksum.h.
+    - Move util/GridStats.h to tools/GridStats.h.
+    - Move util/GridChecksum.h to tools/GridChecksum.h.
+    - Move util/GridValidator.h to tools/GridValidator.h.
+    - Move util/NanoToOpenVDB.h to tools/NanoToOpenVDB.h.
+    - Move util/cuda/CudaGridChecksum.cuh to tools/cuda/CudaGridChecksum.cuh.
+    - Move util/cuda/CudaGridStats.cuh to tools/cuda/CudaGridStats.cuh.
+    - Move util/cuda/CudaGridValidator.cuh to tools/cuda/CudaGridValidator.cuh.
+    - Move util/cuda/CudaIndexToGrid.cuh to tools/cuda/CudaIndexToGrid.cuh.
+    - Move and rename util/cuda/CudaPointsToGrid.cuh to tools/cuda/PointsToGrid.cuh.
+    - Move util/cuda/CudaSignedFloodFill.cuh to tools/cuda/CudaSignedFloodFill.cuh.
+    - Move and rename util/cuda/CudaDeviceBuffer.h to cuda/DeviceBuffer.h.
+    - Move and rename util/cuda/CudaGridHandle.cuh to cuda/GridHandle.cuh.
+    - Move and rename util/cuda/CudaUtils.h to util/cuda/Util.h.
+    - Move and consolidate util/cuda/GpuTimer.h to util/cuda/Timer.h.
+
+  Houdini:
+    - When OPENVDB_ENABLE_RPATH is ON, the location of
+      libopenvdb_houdini is now added to the rpath of all Houdini
+      dsos.
+
+  Python:
+    - OpenVDB Python bindings are now implemented using nanobind
+      instead of pybind11
+    - The OpenVDB Python module has been changed from pyopenvdb to openvdb
+    - Added Python bindings for NanoVDB
+
+  Build:
+    - Fixed an issue with OpenVDB AX's CMake on Windows where the
+      static and shared library targets would have the same name
+      [Reported by Nicholas Yue]
+    - USE_EXPLICIT_INSTANTIATION is now disabled on Windows by default
+      due to OOM linker issues.
+    - Jemalloc is now the preferred allocator of choice on all
+      platforms when CONCURRENT_MALLOC is set to Auto.
+    - Fixed an issue with the Blosc CMake FindPackage for the OpenVDB
+      Windows static library.
 
 
 Version 11.0.0 - November 1, 2023
@@ -399,7 +627,6 @@ Version 9.1.0 - June 9, 2022
       Positional arguments as input files are deprecated.
     - Added tools::minMax() which supports multithreaded evaluation of active
       minimum and maximum values. Grid::evalMinMax() has been deprecated.
-      [Contributed by Greg Hurst]
     - Significant performance improvements to AX point kernels, primarily due to
       providing AX access to attribute buffers for superior code generation.
     - vdb_print now prints both the in-core memory and total memory usage for

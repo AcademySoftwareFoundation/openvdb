@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 # Python script to download the latest Houdini builds
 # using the SideFX download API:
@@ -94,7 +94,7 @@ def get_access_token_and_expiry_time(
             ),
         })
     if response.status_code != 200:
-        raise AuthorizationError(response.status_code, reponse.text)
+        raise AuthorizationError(response.status_code, response.text)
 
     response_json = response.json()
     access_token_expiry_time = time.time() - 2 + response_json["expires_in"]

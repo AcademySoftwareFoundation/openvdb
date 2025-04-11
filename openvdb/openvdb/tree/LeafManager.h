@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /// @file LeafManager.h
 ///
@@ -596,7 +596,7 @@ private:
 
         // Compute the leaf counts for each node
 
-        std::vector<Index32> leafCounts;
+        std::vector<Index64> leafCounts;
         if (serial) {
             leafCounts.reserve(leafParents.size());
             for (LeafParentT* leafParent : leafParents) {

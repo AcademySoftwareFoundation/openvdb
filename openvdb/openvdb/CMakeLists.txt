@@ -1,5 +1,5 @@
 # Copyright Contributors to the OpenVDB Project
-# SPDX-License-Identifier: MPL-2.0
+# SPDX-License-Identifier: Apache-2.0
 #
 #[=======================================================================[
 
@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.20)
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -110,16 +110,14 @@ endif()
 
 if(OPENVDB_USE_DELAYED_LOADING)
   find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
-else()
-  find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS headers)
-endif()
 
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
-  # The X.Y.Z boost version value isn't available until CMake 3.14
-  set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
-  if(${FULL_BOOST_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
-    message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
-      "is deprecated and will be removed.")
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
+    # The X.Y.Z boost version value isn't available until CMake 3.14
+    set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
+    if(${FULL_BOOST_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
+      message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 endif()
 
@@ -246,20 +244,17 @@ endif()
 
 if(OPENVDB_USE_DELAYED_LOADING)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
-else()
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::headers)
-endif()
-
-if(WIN32)
-  # Boost headers contain #pragma commands on Windows which causes Boost
-  # libraries to be linked in automatically. Custom boost installations
-  # may find that these naming conventions don't always match and can
-  # cause linker errors. This option disables this feature of Boost. Note
-  # -DBOOST_ALL_NO_LIB can also be provided manually.
-  if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
-      list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-        Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
-      )
+  if(WIN32)
+    # Boost headers contain #pragma commands on Windows which causes Boost
+    # libraries to be linked in automatically. Custom boost installations
+    # may find that these naming conventions don't always match and can
+    # cause linker errors. This option disables this feature of Boost. Note
+    # -DBOOST_ALL_NO_LIB can also be provided manually.
+    if(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING)
+        list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+          Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
+        )
+    endif()
   endif()
 endif()
 
@@ -490,6 +485,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/GridTransformer.h
   tools/Interpolation.h
   tools/LevelSetAdvect.h
+  tools/LevelSetDilatedMesh.h
   tools/LevelSetFilter.h
   tools/LevelSetFracture.h
   tools/LevelSetMeasure.h
@@ -498,6 +494,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h
   tools/LevelSetTracker.h
+  tools/LevelSetTubes.h
   tools/LevelSetUtil.h
   tools/Mask.h
   tools/Merge.h
@@ -526,6 +523,12 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/VolumeAdvect.h
   tools/VolumeToMesh.h
   tools/VolumeToSpheres.h
+)
+
+set(OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES
+  tools/impl/ConvexVoxelizer.h
+  tools/impl/LevelSetDilatedMeshImpl.h
+  tools/impl/LevelSetTubesImpl.h
 )
 
 set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
@@ -726,27 +729,28 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   install(TARGETS openvdb_static
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
   )
 endif()
 
 if(OPENVDB_CORE_SHARED)
   install(TARGETS openvdb_shared
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
   )
 endif()
 
-install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb)
-install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/io)
-install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/math)
-install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points)
-install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points/impl)
-install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tools)
-install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
-install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)
-install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/thread)
+install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb)
+install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/io)
+install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/math)
+install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points)
+install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/points/impl)
+install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools)
+install(FILES ${OPENVDB_LIBRARY_TOOLS_IMPL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tools/impl)
+install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/tree)
+install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/util)
+install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/thread)

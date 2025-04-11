@@ -70,12 +70,11 @@ jobs:
     strategy:
       matrix:
         config:
-          - { houdini_version: '19.5', platform: 'linux_x86_64_gcc9.3',  hou_hash: '19_5' }
-          - { houdini_version: '20.0', platform: 'linux_x86_64_gcc9.3',  hou_hash: '20_0-oldabi' }
           - { houdini_version: '20.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_0-newabi' }
+          - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
-      image: aswf/ci-base:2023
+      image: aswf/ci-base:2024
     steps:
     - uses: actions/checkout@v3
     # We bumped from the 2021 CI image to 2023 here to fix some OpenSSL issues
@@ -111,6 +110,8 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
+    # Note that macos-14 (current macos-latest) switches to M1. We could instead test
+    # the arm build here instead of the x86 one.
     runs-on: macos-latest
     name: macos-houdini-20
     env:
@@ -122,7 +123,7 @@ jobs:
       id: timestamp
       run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
     - name: download_houdini
-      run: ./ci/download_houdini.sh 20.0 macosx_x86_64_clang12.0_11 --prod
+      run: ./ci/download_houdini.sh 20.0 macosx_arm64_clang14.0_13 --prod
     - name: install_houdini
       run: |
         mkdir $HOME/houdini_install
@@ -148,10 +149,7 @@ jobs:
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
-      # @note  we specifically use clang15.0 (not clang15) here as the newest
-      #  versions of the clang15.X containers have some issues with the GLFW
-      #  installation
-      image: aswf/ci-openvdb:2023-clang15.0
+      image: aswf/ci-openvdb:2024
     env:
       CXX: clang++
     strategy:
@@ -163,16 +161,16 @@ jobs:
           - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=SSE42' }
           - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DOPENVDB_SIMD=AVX' }
           - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
-          - { name: 'asan',  build: 'asan',    components: 'core,test,axcore,axtest',                        cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { name: 'ubsan', build: 'ubsan',   components: 'core,test,axcore,axtest',                        cmake: '' }
-          - { name: 'c++20', build: 'Release', components: 'core,test,axcore,axtest',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test,axcore,axtest', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
+          - { name: 'asan',  build: 'asan',    components: 'core,test',                                      cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan', build: 'ubsan',   components: 'core,test',                                      cmake: '-DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
+          - { name: 'c++20', build: 'Release', components: 'core,test',                                      cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'conf',  build: 'Release', components: 'core,python,bin,view,render,test',               cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
-    - name: pybind11
+    - name: nanobind
       #if: contains(container.image, '2023') == false
-      run: ./ci/install_pybind11.sh 2.10.0
+      run: ./ci/install_nanobind.sh 2.0.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -198,16 +196,18 @@ jobs:
           # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
           # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
           # @todo gcc on macos
-          - { runson: macos-latest,  cxx: '',      cmake: '-D CMAKE_CXX_COMPILER=/usr/local/opt/llvm@15/bin/clang++' }
+          - { runson: macos-latest,  cxx: '',      cmake: '-DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@15/bin/clang++ -DLLVM_DIR=/opt/homebrew/opt/llvm@15/lib/cmake/llvm' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev pybind11-dev
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
+            ./ci/install_nanobind.sh 2.0.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 15
+            ./ci/install_tbb_macos.sh
           else
             echo "$RUNNER_OS not supported"; exit 1
           fi
@@ -215,10 +215,65 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=Release
-          --components=\"core,axcore,python,bin,render,test,axtest,axbin\"
-          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
+          --components=\"core,axcore,python,bin,render,test,axbin\"
+          --cargs=\"-DCMAKE_CXX_STANDARD=20 -DOPENVDB_USE_DELAYED_LOADING=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ${{ matrix.config.cmake }}\"
       - name: test
         run: cd build && ctest -V
+
+  windows:
+    # Windows CI. Tests static and dynamic builds with MT and MD respectively.
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'win'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
+          # due to disk space constraints
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: path
+      shell: pwsh
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install
+      shell: powershell
+      run: .\ci\install_windows.ps1
+    - name: build
+      run: >
+        ./ci/build.sh -v
+        --config=${{ matrix.config.build }}
+        --components=${{ matrix.config.components }}
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXR=ON
+        -DUSE_PNG=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: size
+      # Print the build directy size (monitor if we're hitting runner limits)
+      run: du -h build
+    - name: test
+      # Always run tests on weekly builds but skip Debug on commits as they take a while.
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
+      run: cd build && ctest -V -C ${{ matrix.config.build }}
 
   #############################################################################
   ############################ AX Library Extras ##############################
@@ -240,21 +295,14 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          # Standalone
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', components: 'core', cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   components: 'core', cmake: '' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', components: 'core', cmake: '' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', components: 'core', cmake: '' }
+          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
-      - name: pybind11
+      - name: nanobind
         #f: contains(matrix.config.image, '2023') == false
-        run: ./ci/install_pybind11.sh 2.10.0
+        run: ./ci/install_nanobind.sh 2.0.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -265,6 +313,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: clean
         if: matrix.config.components == 'core'
@@ -280,6 +329,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: test
         run: cd build && ctest -V
@@ -291,21 +341,21 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: macos-latest
+    runs-on: macos-13
     name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
         config:
-          - { cxx: 'clang++', build: 'Release', llvm: '14' }
           - { cxx: 'clang++', build: 'Release', llvm: '15' }
-          #- { cxx: 'clang++', build: 'Release', llvm: '16' } - not supported yet
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
       - name: install_deps
-        run: ./ci/install_macos.sh ${{ matrix.config.llvm }}
+        run: |
+          ./ci/install_macos.sh ${{ matrix.config.llvm }}
+          ./ci/install_tbb_macos.sh
       - name: build
         run: >
           ./ci/build.sh -v
@@ -314,7 +364,8 @@ jobs:
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
+          -DLLVM_DIR=/opt/homebrew/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V
@@ -350,7 +401,8 @@ jobs:
     - name: llvm
       run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
     - name: install
-      run: ./ci/install_windows.sh
+      shell: powershell
+      run: .\ci\install_windows.ps1
     - name: build
       run: >
         ./ci/build.sh -v
@@ -375,6 +427,65 @@ jobs:
         echo "$Env:VDB_INSTALL_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: test
       run: cd build && ctest -V -C ${{ matrix.config.build }}
+
+  #############################################################################
+  ################################## Blosc ####################################
+  #############################################################################
+
+  windows-nanovdb:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'win'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      visual_studio: "Visual Studio 17 2022"
+      cuda: "12.4.0"
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
+          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
+          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: path
+      shell: powershell
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install_cuda
+      shell: powershell
+      run: .\ci\install_windows_cuda.ps1
+    - name: install
+      shell: powershell
+      run: .\ci\install_windows.ps1
+    - name: build
+      shell: bash
+      run: >
+        ./ci/build.sh -v
+        --config=${{ matrix.config.build }}
+        --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXPLICIT_INSTANTIATION=OFF
+        -DNANOVDB_USE_CUDA=ON
+        -DCMAKE_CUDA_ARCHITECTURES="80"
+        -DNANOVDB_USE_OPENVDB=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: test
+      shell: bash
+      run: cd build && ctest -V -E ".*cuda.*"
 
   #############################################################################
   ################################## Blosc ####################################
@@ -420,6 +531,9 @@ jobs:
       # may not have this build type. See OpenVDBCXX.cmake
       CXXFLAGS: "-gdwarf-4 -g3 -ggdb -Og"
     steps:
+    - name: Enable Node 16
+      run: |
+        echo "ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true" >> $GITHUB_ENV
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
@@ -478,7 +592,7 @@ jobs:
         -strict
         -extended
     - name: upload_report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: abi_report

@@ -1,5 +1,5 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 #ifndef OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
@@ -149,7 +149,7 @@ public:
     /// Get ith row, e.g.    Vec4f v = m.row(1);
     Vec4<T> row(int i) const
     {
-        OPENVDB_ASSERT(i>=0 && i<3);
+        OPENVDB_ASSERT(i>=0 && i<4);
         return Vec4<T>((*this)(i,0), (*this)(i,1), (*this)(i,2), (*this)(i,3));
     }
 
