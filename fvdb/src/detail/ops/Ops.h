@@ -414,7 +414,7 @@ dispatchSphericalHarmonicsBackward(const int            shDegreeToUse,
 /// @param[in] means 3D positions of Gaussians [N, 3] where N is number of Gaussians
 /// @param[in] quats Quaternion rotations of Gaussians [N, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [N, 3] representing extent in each dimension
-/// @param[in] camToWorldMatrices Camera view matrices [C, 4, 4] where C is number of cameras
+/// @param[in] worldToCamMatrices Camera view matrices [C, 4, 4] where C is number of cameras
 /// @param[in] projectionMatrices Camera intrinsic matrices [C, 3, 3]
 /// @param[in] imageWidth Width of the output image in pixels
 /// @param[in] imageHeight Height of the output image in pixels
@@ -436,7 +436,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 dispatchGaussianProjectionForward(const torch::Tensor &means,              // [N, 3]
                                   const torch::Tensor &quats,              // [N, 4]
                                   const torch::Tensor &scales,             // [N, 3]
-                                  const torch::Tensor &camToWorldMatrices, // [C, 4, 4]
+                                  const torch::Tensor &worldToCamMatrices, // [C, 4, 4]
                                   const torch::Tensor &projectionMatrices, // [C, 3, 3]
                                   const uint32_t imageWidth, const uint32_t imageHeight,
                                   const float eps2d, const float nearPlane, const float farPlane,
@@ -455,7 +455,7 @@ dispatchGaussianProjectionForward(const torch::Tensor &means,              // [N
 /// @param[in] means 3D positions of Gaussians [N, 3]
 /// @param[in] quats Quaternion rotations of Gaussians [N, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [N, 3] representing extent in each dimension
-/// @param[in] camToWorldMatrices Camera view matrices [C, 4, 4]
+/// @param[in] worldToCamMatrices Camera view matrices [C, 4, 4]
 /// @param[in] projectionMatrices Camera intrinsic matrices [C, 3, 3]
 /// @param[in] compensations View-dependent compensation factors [N, 6] (optional)
 /// @param[in] imageWidth Width of the image in pixels
@@ -467,7 +467,7 @@ dispatchGaussianProjectionForward(const torch::Tensor &means,              // [N
 /// @param[out] dLossDDepths Gradients with respect to depths [C, N]
 /// @param[out] dLossDConics Gradients with respect to conics [C, N, 3]
 /// @param[out] dLossDCompensations Gradients with respect to compensations [C, N] (optional)
-/// @param[in] camToWorldMatricesRequiresGrad Whether viewmats requires gradient
+/// @param[in] worldToCamMatricesRequiresGrad Whether viewmats requires gradient
 /// @param[in] ortho Whether orthographic projection was used in forward pass
 /// @param[in] outNormalizeddLossdMeans2dNormAccum Optional output for normalized gradients tracked
 /// across backward passes
@@ -489,7 +489,7 @@ dispatchGaussianProjectionBackward(
     const torch::Tensor               &means,               // [N, 3]
     const torch::Tensor               &quats,               // [N, 4]
     const torch::Tensor               &scales,              // [N, 3]
-    const torch::Tensor               &camToWorldMatrices,  // [C, 4, 4]
+    const torch::Tensor               &worldToCamMatrices,  // [C, 4, 4]
     const torch::Tensor               &projectionMatrices,  // [C, 3, 3]
     const at::optional<torch::Tensor> &compensations,       // [N, 6] optional
     const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
@@ -499,7 +499,7 @@ dispatchGaussianProjectionBackward(
     const torch::Tensor               &dLossDDepths,        // [C, N]
     const torch::Tensor               &dLossDConics,        // [C, N, 3]
     const at::optional<torch::Tensor> &dLossDCompensations, // [C, N] optional
-    const bool camToWorldMatricesRequiresGrad, const bool ortho,
+    const bool worldToCamMatricesRequiresGrad, const bool ortho,
     at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum = torch::nullopt,
     at::optional<torch::Tensor> outNormalizedMaxRadiiAccum          = torch::nullopt,
     at::optional<torch::Tensor> outGradientStepCounts               = torch::nullopt);
@@ -646,7 +646,7 @@ dispatchGaussianRasterizeBackward(
 /// @param[in] quats Quaternion rotations of Gaussians [M, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [M, 3] representing extent in each dimension
 /// @param[in] cSizes Batch sizes for cameras [B]
-/// @param[in] camToWorldMatrices Camera view matrices [BC, 4, 4]
+/// @param[in] worldToCamMatrices Camera view matrices [BC, 4, 4]
 /// @param[in] projectionMatrices Camera intrinsic matrices [BC, 3, 3]
 /// @param[in] imageWidth Width of the output image in pixels
 /// @param[in] imageHeight Height of the output image in pixels
@@ -669,8 +669,8 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaus
                                         const torch::Tensor &quats,  // [M, 4] optional
                                         const torch::Tensor &scales, // [M, 3] optional
                                         const torch::Tensor &cSizes, // [B] camera sizes
-                                        const torch::Tensor &camToWorldMatrices, // [ccz, 4, 4]
-                                        const torch::Tensor &projectionMatrices, // [ccz, 3, 3]
+                                        const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
+                                        const torch::Tensor &projectionMatrices, // [BC, 3, 3]
                                         const uint32_t imageWidth, const uint32_t imageHeight,
                                         const float eps2d, const float nearPlane,
                                         const float farPlane, const float minRadius2d,
@@ -690,7 +690,7 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaus
 /// @param[in] quats Quaternion rotations of Gaussians [M, 4] in format (x, y, z, w)
 /// @param[in] scales Scale factors of Gaussians [M, 3] representing extent in each dimension
 /// @param[in] cSizes Batch sizes for cameras [B]
-/// @param[in] camToWorldMatrices Camera view matrices [BC, 4, 4]
+/// @param[in] worldToCamMatrices Camera view matrices [BC, 4, 4]
 /// @param[in] projectionMatrices Camera intrinsic matrices [BC, 3, 3]
 /// @param[in] imageWidth Width of the output image in pixels
 /// @param[in] imageHeight Height of the output image in pixels
@@ -700,7 +700,7 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaus
 /// @param[out] dLossDMeans2d Gradients with respect to projected 2D means [M, 2]
 /// @param[out] dLossDDepths Gradients with respect to depths [M]
 /// @param[out] dLossDConics Gradients with respect to conics [M, 3]
-/// @param[in] camToWorldRequiresGrad Whether viewmats requires gradient
+/// @param[in] worldToCamRequiresGrad Whether viewmats requires gradient
 /// @param[in] ortho Whether orthographic projection was used in forward pass
 ///
 /// @return std::tuple containing gradients of the loss function with respect to the input
@@ -718,7 +718,7 @@ dispatchGaussianProjectionJaggedBackward(const torch::Tensor &gSizes, // [B] gau
                                          const torch::Tensor &quats,  // [ggz, 4] optional
                                          const torch::Tensor &scales, // [ggz, 3] optional
                                          const torch::Tensor &cSizes, // [B] camera sizes
-                                         const torch::Tensor &camToWorldMatrices, // [ccz, 4, 4]
+                                         const torch::Tensor &worldToCamMatrices, // [ccz, 4, 4]
                                          const torch::Tensor &projectionMatrices, // [ccz, 3, 3]
                                          const uint32_t imageWidth, const uint32_t imageHeight,
                                          const float          eps2d,
@@ -727,7 +727,7 @@ dispatchGaussianProjectionJaggedBackward(const torch::Tensor &gSizes, // [B] gau
                                          const torch::Tensor &dLossDMeans2d,      // [nnz, 2]
                                          const torch::Tensor &dLossDDepths,       // [nnz]
                                          const torch::Tensor &dLossDConics,       // [nnz, 3]
-                                         const bool camToWorldRequiresGrad, const bool ortho);
+                                         const bool worldToCamRequiresGrad, const bool ortho);
 
 /// @brief Create a mask identifying NaN or Inf values in Gaussian parameters
 ///

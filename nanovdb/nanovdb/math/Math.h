@@ -965,25 +965,285 @@ __hostdev__ inline Vec2<double> Coord2::asVec2d() const
     return Vec2<double>(double(mVec[0]), double(mVec[1]));
 }
 
+
+// Forward declarations
+template<typename T> class Mat2;
+template<typename T> class Mat2x3;
+template<typename T> class Mat3x2;
+template<typename T> class Mat3;
+template<typename T> class Mat4;
+
+
+
 template <typename T>
-class Mat32 {
+class Mat2 {
+    T mMat[2][2];
+public:
+    Mat2() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        @endverbatim */
+    __hostdev__ Mat2(T a, T b, T c, T d) {
+        mMat[0][0] = a; mMat[0][1] = b;
+        mMat[1][0] = c; mMat[1][1] = d;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat2<T> transpose() const {
+        return Mat2<T>(mMat[0][0], mMat[1][0], mMat[0][1], mMat[1][1]);
+    }
+
+    /// @brief returns inverse of this
+    __hostdev__ Mat2<T> inverse() const {
+        T det = mMat[0][0] * mMat[1][1] - mMat[0][1] * mMat[1][0];
+        if (det <= 0) {
+            return Mat2<T>();
+        }
+        T invDet   = 1.f / det;
+        return Mat2<T>(mMat[1][1] * invDet, -mMat[0][1] * invDet, -mMat[0][1] * invDet, mMat[0][0] * invDet);
+    }
+};
+
+template <typename T>
+class Mat2x3 {
+    T mMat[2][3];
+public:
+    Mat2x3() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        @endverbatim */
+    __hostdev__ Mat2x3(T a, T b, T c, T d, T e, T f) {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c;
+        mMat[1][0] = d; mMat[1][1] = e; mMat[1][2] = f;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat3x2<T> transpose() const {
+        return Mat3x2<T>(
+            mMat[0][0], mMat[1][0],  // First row
+            mMat[0][1], mMat[1][1],  // Second row
+            mMat[0][2], mMat[1][2]   // Third row
+        );
+    }
+};
+
+template <typename T>
+class Mat3x2 {
     T mMat[3][2];
+public:
+    Mat3x2() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        e f
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3x2(Source *a)
+    {
+        for (int i = 0; i < 6; i++) {
+            mMat[i/2][i%2] = static_cast<T>(a[i]);
+        }
+    }
+
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        e f
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3x2(Source a, Source b, Source c, Source d, Source e, Source f)
+    {
+        mMat[0][0] = a; mMat[0][1] = b;
+        mMat[1][0] = c; mMat[1][1] = d;
+        mMat[2][0] = e; mMat[2][1] = f;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat2x3<T> transpose() const {
+        return Mat2x3<T>(mMat[0][0], mMat[1][0], mMat[2][0], // First row
+                   mMat[0][1], mMat[1][1], mMat[2][1]); // Second row
+    }
+
 };
 
 template <typename T>
 class Mat3 {
     T mMat[3][3];
+public:
+    Mat3() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        g h i
+        @endverbatim */
+    template<typename Source>
+   __hostdev__ Mat3(Source *a)
+    {
+        for (int i = 0; i < 9; i++) {
+            mMat[i/3][i%3] = static_cast<T>(a[i]);
+        }
+    }
+
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        g h i
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3(Source a, Source b, Source c,
+         Source d, Source e, Source f,
+         Source g, Source h, Source i)
+    {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c;
+        mMat[1][0] = d; mMat[1][1] = e; mMat[1][2] = f;
+        mMat[2][0] = g; mMat[2][1] = h; mMat[2][2] = i;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief Multiply by @a v and return the resulting vector.
+    __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const {
+        return Vec3<T>(
+            mMat[0][0] * v[0] + mMat[0][1] * v[1] + mMat[0][2] * v[2],
+            mMat[1][0] * v[0] + mMat[1][1] * v[1] + mMat[1][2] * v[2],
+            mMat[2][0] * v[0] + mMat[2][1] * v[1] + mMat[2][2] * v[2]
+        );
+    }
+
+    /// @brief Multiply by 3x3 matrix @a m and return the resulting matrix.
+    __hostdev__ Mat3<T> operator*(const Mat3<T>& m) const {
+        return Mat3<T>(
+            mMat[0][0] * m[0][0] + mMat[0][1] * m[1][0] + mMat[0][2] * m[2][0],
+            mMat[0][0] * m[0][1] + mMat[0][1] * m[1][1] + mMat[0][2] * m[2][1],
+            mMat[0][0] * m[0][2] + mMat[0][1] * m[1][2] + mMat[0][2] * m[2][2],
+            mMat[1][0] * m[0][0] + mMat[1][1] * m[1][0] + mMat[1][2] * m[2][0],
+            mMat[1][0] * m[0][1] + mMat[1][1] * m[1][1] + mMat[1][2] * m[2][1],
+            mMat[1][0] * m[0][2] + mMat[1][1] * m[1][2] + mMat[1][2] * m[2][2],
+            mMat[2][0] * m[0][0] + mMat[2][1] * m[1][0] + mMat[2][2] * m[2][0],
+            mMat[2][0] * m[0][1] + mMat[2][1] * m[1][1] + mMat[2][2] * m[2][1],
+            mMat[2][0] * m[0][2] + mMat[2][1] * m[1][2] + mMat[2][2] * m[2][2]
+        );
+    }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat3 transpose() const {
+        return Mat3(mMat[0][0], mMat[1][0], mMat[2][0],
+                   mMat[0][1], mMat[1][1], mMat[2][1],
+                   mMat[0][2], mMat[1][2], mMat[2][2]);
+    }
 };
 
 template <typename T>
 class Mat4 {
     T mMat[4][4];
+public:
+    Mat4() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a[ 0] a[1]  a[ 2] a[ 3]
+        a[ 4] a[5]  a[ 6] a[ 7]
+        a[ 8] a[9]  a[10] a[11]
+        a[12] a[13] a[14] a[15]
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat4(Source *a)
+    {
+        for (int i = 0; i < 16; i++) {
+            mMat[i/4][i%4] = static_cast<T>(a[i]);
+        }
+    }
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c d
+        e f g h
+        i j k l
+        m n o p
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat4(Source a, Source b, Source c, Source d,
+         Source e, Source f, Source g, Source h,
+         Source i, Source j, Source k, Source l,
+         Source m, Source n, Source o, Source p)
+    {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c; mMat[0][3] = d;
+        mMat[1][0] = e; mMat[1][1] = f; mMat[1][2] = g; mMat[1][3] = h;
+        mMat[2][0] = i; mMat[2][1] = j; mMat[2][2] = k; mMat[2][3] = l;
+        mMat[3][0] = m; mMat[3][1] = n; mMat[3][2] = o; mMat[3][3] = p;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat4 transpose() const {
+        return Mat4(mMat[0][0], mMat[1][0], mMat[2][0], mMat[3][0],
+                   mMat[0][1], mMat[1][1], mMat[2][1], mMat[3][1],
+                   mMat[0][2], mMat[1][2], mMat[2][2], mMat[3][2],
+                   mMat[0][3], mMat[1][3], mMat[2][3], mMat[3][3]);
+    }
 };
 
+/// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
+template<typename T>
+__hostdev__ Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
+    return Mat2<T>(
+        // First row
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],    // [0][0]
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],    // [0][1]
 
+        // Second row
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],    // [1][0]
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1]     // [1][1]
+    );
+}
 
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const Mat3<T>& lhs, const Mat2x3<T>& rhs) {
+    return Mat2x3<T>(
+        // First row
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
 
+        // Second row
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
+    );
+}
 
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
+    return Mat2x3<T>(
+        // First row (3 elements)
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2] + lhs[0][2] * rhs[2][2],
+
+        // Second row (3 elements)
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2] + lhs[1][2] * rhs[2][2]
+    );
+}
 
 
 // ----------------------------> Vec3 <--------------------------------------

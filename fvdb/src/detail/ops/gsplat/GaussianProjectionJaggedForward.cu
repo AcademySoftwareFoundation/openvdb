@@ -14,132 +14,129 @@ namespace ops {
 
 template <typename T, bool Ortho>
 __global__ void
-jaggedProjectionForwardKernel(const uint32_t B, const int64_t nnz,
-                              const int64_t *__restrict__ g_sizes,  // [B]
-                              const int64_t *__restrict__ c_sizes,  // [B]
-                              const int64_t *__restrict__ g_indptr, // [B] start indices
-                              const int64_t *__restrict__ c_indptr, // [B] start indices
-                              const int64_t *__restrict__ n_indptr, // [B] start indices
-                              const T *__restrict__ means,          // [ggz, 3]
-                              const T *__restrict__ covars,         // [ggz, 6] optional
-                              const T *__restrict__ quats,          // [ggz, 4] optional
-                              const T *__restrict__ scales,         // [ggz, 3] optional
-                              const T *__restrict__ viewmats,       // [ccz, 4, 4]
-                              const T *__restrict__ Ks,             // [ccz, 3, 3]
-                              const int32_t image_width, const int32_t image_height, const T eps2d,
-                              const T near_plane, const T far_plane, const T radius_clip,
+jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
+                              const int64_t *__restrict__ gSizes,       // [B]
+                              const int64_t *__restrict__ cSizes,       // [B]
+                              const int64_t *__restrict__ gIndex,       // [B] start indices
+                              const int64_t *__restrict__ cIndex,       // [B] start indices
+                              const int64_t *__restrict__ nIndex,       // [B] start indices
+                              const T *__restrict__ means,              // [M, 3]
+                              const T *__restrict__ covars,             // [M, 6] optional
+                              const T *__restrict__ quats,              // [M, 4] optional
+                              const T *__restrict__ scales,             // [M, 3] optional
+                              const T *__restrict__ worldToCamMatrices, // [BC, 4, 4]
+                              const T *__restrict__ projectionMatrices, // [BC, 3, 3]
+                              const int32_t imageWidth, const int32_t imageHeight, const T eps2d,
+                              const T nearPlane, const T farPlane, const T radiusClip,
                               // outputs
-                              int32_t *__restrict__ radii,     // [nnz]
-                              T *__restrict__ means2d,         // [nnz, 2]
-                              T *__restrict__ depths,          // [nnz]
-                              T *__restrict__ conics,          // [nnz, 3]
-                              T *__restrict__ compensations) { // [nnz] optional
-    // parallelize over nnz.
+                              int32_t *__restrict__ radii,     // [M]
+                              T *__restrict__ means2d,         // [M, 2]
+                              T *__restrict__ depths,          // [M]
+                              T *__restrict__ conics,          // [M, 3]
+                              T *__restrict__ compensations) { // [M] optional
+    // parallelize over M.
     const auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= nnz) {
+    if (idx >= M) {
         return;
     }
 
     // TODO: too many global memory accesses.
-    int64_t bid       = bin_search(n_indptr, B, static_cast<int64_t>(idx)); // batch id
-    int64_t idx_local = idx - n_indptr[bid];       // local elem idx within Ci * Ni
-    int64_t cid_local = idx_local / g_sizes[bid];  // local camera id within Ci
-    int64_t gid_local = idx_local % g_sizes[bid];  // local gaussian id within Ni
-    int64_t cid       = cid_local + c_indptr[bid]; // camera id
-    int64_t gid       = gid_local + g_indptr[bid]; // gaussian id
+    const int64_t bId      = bin_search(nIndex, B, static_cast<int64_t>(idx)); // batch id
+    const int64_t idxLocal = idx - nIndex[bId];      // local elem idx within Ci * Ni
+    const int64_t cidLocal = idxLocal / gSizes[bId]; // local camera id within Ci
+    const int64_t gidLocal = idxLocal % gSizes[bId]; // local gaussian id within Ni
+    const int64_t cId      = cidLocal + cIndex[bId]; // camera id
+    const int64_t gId      = gidLocal + gIndex[bId]; // gaussian id
 
     // shift pointers to the current camera and gaussian
-    means += gid * 3;
-    viewmats += cid * 16;
-    Ks += cid * 9;
+    means += gId * 3;
+    worldToCamMatrices += cId * 16;
+    projectionMatrices += cId * 9;
 
-    // glm is column-major but input is row-major
-    mat3<T> R = mat3<T>(viewmats[0], viewmats[4],
-                        viewmats[8], // 1st column
-                        viewmats[1], viewmats[5],
-                        viewmats[9], // 2nd column
-                        viewmats[2], viewmats[6],
-                        viewmats[10] // 3rd column
-    );
-    vec3<T> t = vec3<T>(viewmats[3], viewmats[7], viewmats[11]);
-
+    // input is row-major
+    const nanovdb::math::Mat3<T> R(
+        worldToCamMatrices[0], worldToCamMatrices[1], worldToCamMatrices[2],   // 1st row
+        worldToCamMatrices[4], worldToCamMatrices[5], worldToCamMatrices[6],   // 2nd row
+        worldToCamMatrices[8], worldToCamMatrices[9], worldToCamMatrices[10]); // 3rd row
+    const nanovdb::math::Vec3<T> t(worldToCamMatrices[3], worldToCamMatrices[7],
+                                   worldToCamMatrices[11]);
     // transform Gaussian center to camera space
-    vec3<T> mean_c;
-    pos_world_to_cam(R, t, glm::make_vec3(means), mean_c);
-    if (mean_c.z < near_plane || mean_c.z > far_plane) {
+    const nanovdb::math::Vec3<T> meansCamSpace =
+        transformPointWorldToCam(R, t, nanovdb::math::Vec3<T>(means[0], means[1], means[2]));
+
+    if (meansCamSpace[2] < nearPlane || meansCamSpace[2] > farPlane) {
         radii[idx] = 0;
         return;
     }
 
     // transform Gaussian covariance to camera space
-    mat3<T> covar;
+    nanovdb::math::Mat3<T> covar;
     if (covars != nullptr) {
-        covars += gid * 6;
-        covar = mat3<T>(covars[0], covars[1],
-                        covars[2], // 1st column
-                        covars[1], covars[3],
-                        covars[4], // 2nd column
-                        covars[2], covars[4],
-                        covars[5]  // 3rd column
+        covars += gId * 6;
+        covar = nanovdb::math::Mat3<T>(covars[0], covars[1], covars[2], // 1st row
+                                       covars[1], covars[3], covars[4], // 2nd row
+                                       covars[2], covars[4], covars[5]  // 3rd row
         );
     } else {
         // compute from quaternions and scales
-        quats += gid * 4;
-        scales += gid * 3;
-        quat_scale_to_covar_preci<T>(glm::make_vec4(quats), glm::make_vec3(scales), &covar,
-                                     nullptr);
+        quats += gId * 4;
+        scales += gId * 3;
+        covar = quatAndScaleToCovariance<T>(
+            nanovdb::math::Vec4<T>(quats[0], quats[1], quats[2], quats[3]),
+            nanovdb::math::Vec3<T>(scales[0], scales[1], scales[2]));
     }
-    mat3<T> covar_c;
-    covar_world_to_cam(R, covar, covar_c);
+    const nanovdb::math::Mat3<T> covarCamSpace = transformCovarianceWorldToCam(R, covar);
 
     // camera projection
-    const T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
+    const T fx = projectionMatrices[0], cx = projectionMatrices[2], fy = projectionMatrices[4],
+            cy             = projectionMatrices[5];
     auto [covar2d, mean2d] = [&]() {
         if constexpr (Ortho) {
-            return ortho_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+            return ortho_proj<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth,
+                                 imageHeight);
         } else {
-            return persp_proj<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height);
+            return persp_proj<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth,
+                                 imageHeight);
         }
     }();
 
-    T compensation;
-    T det = add_blur(eps2d, covar2d, compensation);
+    T       compensation;
+    const T det = add_blur(eps2d, covar2d, compensation);
     if (det <= 0.f) {
         radii[idx] = 0;
         return;
     }
 
     // compute the inverse of the 2d covariance
-    mat2<T> covar2d_inv;
-    inverse(covar2d, covar2d_inv);
+    const nanovdb::math::Mat2<T> covar2dInverse = covar2d.inverse();
 
     // take 3 sigma as the radius (non differentiable)
-    T b      = 0.5f * (covar2d[0][0] + covar2d[1][1]);
-    T v1     = b + sqrt(max(0.01f, b * b - det));
-    T radius = ceil(3.f * sqrt(v1));
+    const T b      = 0.5f * (covar2d[0][0] + covar2d[1][1]);
+    const T v1     = b + sqrt(max(0.01f, b * b - det));
+    const T radius = ceil(3.f * sqrt(v1));
     // T v2 = b - sqrt(max(0.1f, b * b - det));
     // T radius = ceil(3.f * sqrt(max(v1, v2)));
 
-    if (radius <= radius_clip) {
+    if (radius <= radiusClip) {
         radii[idx] = 0;
         return;
     }
 
     // mask out gaussians outside the image region
-    if (mean2d.x + radius <= 0 || mean2d.x - radius >= image_width || mean2d.y + radius <= 0 ||
-        mean2d.y - radius >= image_height) {
+    if (mean2d[0] + radius <= 0 || mean2d[0] - radius >= imageWidth || mean2d[1] + radius <= 0 ||
+        mean2d[1] - radius >= imageHeight) {
         radii[idx] = 0;
         return;
     }
 
     // write to outputs
     radii[idx]           = (int32_t)radius;
-    means2d[idx * 2]     = mean2d.x;
-    means2d[idx * 2 + 1] = mean2d.y;
-    depths[idx]          = mean_c.z;
-    conics[idx * 3]      = covar2d_inv[0][0];
-    conics[idx * 3 + 1]  = covar2d_inv[0][1];
-    conics[idx * 3 + 2]  = covar2d_inv[1][1];
+    means2d[idx * 2]     = mean2d[0];
+    means2d[idx * 2 + 1] = mean2d[1];
+    depths[idx]          = meansCamSpace[2];
+    conics[idx * 3]      = covar2dInverse[0][0];
+    conics[idx * 3 + 1]  = covar2dInverse[0][1];
+    conics[idx * 3 + 2]  = covar2dInverse[1][1];
     if (compensations != nullptr) {
         compensations[idx] = compensation;
     }
@@ -148,21 +145,21 @@ jaggedProjectionForwardKernel(const uint32_t B, const int64_t nnz,
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
-    const torch::Tensor &g_sizes,  // [B] gaussian sizes
-    const torch::Tensor &means,    // [ggz, 3]
-    const torch::Tensor &quats,    // [ggz, 4] optional
-    const torch::Tensor &scales,   // [ggz, 3] optional
-    const torch::Tensor &c_sizes,  // [B] camera sizes
-    const torch::Tensor &viewmats, // [ccz, 4, 4]
-    const torch::Tensor &Ks,       // [ccz, 3, 3]
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
+    const torch::Tensor &gSizes,             // [B] gaussian sizes
+    const torch::Tensor &means,              // [M, 3]
+    const torch::Tensor &quats,              // [M, 4] optional
+    const torch::Tensor &scales,             // [M, 3] optional
+    const torch::Tensor &cSizes,             // [B] camera sizes
+    const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
+    const torch::Tensor &projectionMatrices, // [BC, 3, 3]
+    const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d, const float nearPlane,
+    const float farPlane, const float minRadius2d, const bool ortho) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars             = std::nullopt;
     constexpr bool                     calc_compensations = false;
 
     GSPLAT_DEVICE_GUARD(means);
-    GSPLAT_CHECK_INPUT(g_sizes);
+    GSPLAT_CHECK_INPUT(gSizes);
     GSPLAT_CHECK_INPUT(means);
     if (covars.has_value()) {
         GSPLAT_CHECK_INPUT(covars.value());
@@ -170,56 +167,58 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
         GSPLAT_CHECK_INPUT(quats);
         GSPLAT_CHECK_INPUT(scales);
     }
-    GSPLAT_CHECK_INPUT(c_sizes);
-    GSPLAT_CHECK_INPUT(viewmats);
-    GSPLAT_CHECK_INPUT(Ks);
+    GSPLAT_CHECK_INPUT(cSizes);
+    GSPLAT_CHECK_INPUT(worldToCamMatrices);
+    GSPLAT_CHECK_INPUT(projectionMatrices);
 
     // TODO: use inclusive sum
-    uint32_t      B        = g_sizes.size(0);
-    torch::Tensor c_indptr = torch::cumsum(c_sizes, 0, torch::kInt64) - c_sizes;
-    torch::Tensor g_indptr = torch::cumsum(g_sizes, 0, torch::kInt64) - g_sizes;
-    torch::Tensor n_sizes  = c_sizes * g_sizes;            // element size = Ci * Ni
-    torch::Tensor n_indptr = torch::cumsum(n_sizes, 0, torch::kInt64);
-    int64_t       nnz      = n_indptr[-1].item<int64_t>(); // total number of elements
-    n_indptr               = n_indptr - n_sizes;
+    const uint32_t B      = gSizes.size(0);
+    torch::Tensor  cIndex = torch::cumsum(cSizes, 0, torch::kInt64) - cSizes;
+    torch::Tensor  gIndex = torch::cumsum(gSizes, 0, torch::kInt64) - gSizes;
+    torch::Tensor  nSize  = cSizes * gSizes;            // element size = Ci * Ni
+    torch::Tensor  nIndex = torch::cumsum(nSize, 0, torch::kInt64);
+    const int64_t  M      = nIndex[-1].item<int64_t>(); // total number of elements
+    nIndex                = nIndex - nSize;
 
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
-    torch::Tensor radii   = torch::empty({ nnz }, means.options().dtype(torch::kInt32));
-    torch::Tensor means2d = torch::empty({ nnz, 2 }, means.options());
-    torch::Tensor depths  = torch::empty({ nnz }, means.options());
-    torch::Tensor conics  = torch::empty({ nnz, 3 }, means.options());
+    torch::Tensor radii   = torch::empty({ M }, means.options().dtype(torch::kInt32));
+    torch::Tensor means2d = torch::empty({ M, 2 }, means.options());
+    torch::Tensor depths  = torch::empty({ M }, means.options());
+    torch::Tensor conics  = torch::empty({ M, 3 }, means.options());
     torch::Tensor compensations;
     if (calc_compensations) {
         // we dont want NaN to appear in this tensor, so we zero intialize it
-        compensations = torch::zeros({ nnz }, means.options());
+        compensations = torch::zeros({ M }, means.options());
     }
-    if (nnz) {
+    if (M) {
         if (ortho) {
             jaggedProjectionForwardKernel<float, true>
-                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
-                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
-                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                <<<(M + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, M, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
+                    gIndex.data_ptr<int64_t>(), cIndex.data_ptr<int64_t>(),
+                    nIndex.data_ptr<int64_t>(), means.data_ptr<float>(),
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : scales.data_ptr<float>(),
-                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
-                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
-                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    worldToCamMatrices.data_ptr<float>(), projectionMatrices.data_ptr<float>(),
+                    imageWidth, imageHeight, eps2d, nearPlane, farPlane, minRadius2d,
+                    radii.data_ptr<int32_t>(), means2d.data_ptr<float>(), depths.data_ptr<float>(),
+                    conics.data_ptr<float>(),
                     calc_compensations ? compensations.data_ptr<float>() : nullptr);
         } else {
             jaggedProjectionForwardKernel<float, false>
-                <<<(nnz + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                    B, nnz, g_sizes.data_ptr<int64_t>(), c_sizes.data_ptr<int64_t>(),
-                    g_indptr.data_ptr<int64_t>(), c_indptr.data_ptr<int64_t>(),
-                    n_indptr.data_ptr<int64_t>(), means.data_ptr<float>(),
+                <<<(M + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, M, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
+                    gIndex.data_ptr<int64_t>(), cIndex.data_ptr<int64_t>(),
+                    nIndex.data_ptr<int64_t>(), means.data_ptr<float>(),
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : scales.data_ptr<float>(),
-                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
-                    eps2d, near_plane, far_plane, radius_clip, radii.data_ptr<int32_t>(),
-                    means2d.data_ptr<float>(), depths.data_ptr<float>(), conics.data_ptr<float>(),
+                    worldToCamMatrices.data_ptr<float>(), projectionMatrices.data_ptr<float>(),
+                    imageWidth, imageHeight, eps2d, nearPlane, farPlane, minRadius2d,
+                    radii.data_ptr<int32_t>(), means2d.data_ptr<float>(), depths.data_ptr<float>(),
+                    conics.data_ptr<float>(),
                     calc_compensations ? compensations.data_ptr<float>() : nullptr);
         }
 
@@ -231,15 +230,15 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedForward<torch::kCPU>(
-    const torch::Tensor &g_sizes,  // [B] gaussian sizes
-    const torch::Tensor &means,    // [ggz, 3]
-    const torch::Tensor &quats,    // [ggz, 4] optional
-    const torch::Tensor &scales,   // [ggz, 3] optional
-    const torch::Tensor &c_sizes,  // [B] camera sizes
-    const torch::Tensor &viewmats, // [ccz, 4, 4]
-    const torch::Tensor &Ks,       // [ccz, 3, 3]
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
-    const float near_plane, const float far_plane, const float radius_clip, const bool ortho) {
+    const torch::Tensor &gSizes,             // [B] gaussian sizes
+    const torch::Tensor &means,              // [M, 3]
+    const torch::Tensor &quats,              // [M, 4] optional
+    const torch::Tensor &scales,             // [M, 3] optional
+    const torch::Tensor &cSizes,             // [B] camera sizes
+    const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
+    const torch::Tensor &projectionMatrices, // [BC, 3, 3]
+    const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d, const float nearPlane,
+    const float farPlane, const float minRadius2d, const bool ortho) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
 

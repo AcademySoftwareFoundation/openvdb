@@ -7,6 +7,8 @@
 #include "CameraProjections.cuh"
 #include "GsplatTypes.cuh"
 
+#include <nanovdb/math/Math.h>
+
 namespace fvdb {
 namespace detail {
 namespace ops {
@@ -16,7 +18,7 @@ inline __device__ uint32_t
 bin_search(const T *arr, const uint32_t len, const T val) {
     uint32_t low = 0, high = len - 1;
     while (low <= high) {
-        uint32_t mid = (low + high) / 2;
+        const uint32_t mid = (low + high) / 2;
         if (arr[mid] <= val) {
             low = mid + 1;
         } else {
@@ -46,6 +48,29 @@ inline __device__ mat3<T>
                                      (2.f * (xz + wy)), (2.f * (yz - wx)),
                                      (1.f - 2.f * (x2 + y2)) // 3rd col
                       );
+}
+
+/// @brief Convert a quaternion to a rotation matrix
+/// @param quat: the quaternion
+/// @return the rotation matrix
+template <typename T>
+inline __device__ nanovdb::math::Mat3<T>
+                  quatToRotMat(nanovdb::math::Vec4<T> const &quat) {
+    T w = quat[0], x = quat[1], y = quat[2], z = quat[3];
+    // normalize
+    T inv_norm = rsqrt(x * x + y * y + z * z + w * w);
+    x *= inv_norm;
+    y *= inv_norm;
+    z *= inv_norm;
+    w *= inv_norm;
+    T x2 = x * x, y2 = y * y, z2 = z * z;
+    T xy = x * y, xz = x * z, yz = y * z;
+    T wx = w * x, wy = w * y, wz = w * z;
+    return nanovdb::math::Mat3<T>(
+        (1.f - 2.f * (y2 + z2)), (2.f * (xy - wz)), (2.f * (xz + wy)), // 1st row
+        (2.f * (xy + wz)), (1.f - 2.f * (x2 + z2)), (2.f * (yz - wx)), // 2nd row
+        (2.f * (xz - wy)), (2.f * (yz + wx)), (1.f - 2.f * (x2 + y2))  // 3rd row
+    );
 }
 
 template <typename T>
@@ -128,6 +153,20 @@ quat_scale_to_covar_preci(const vec4<T> quat, const vec3<T> scale,
     }
 }
 
+/// @brief Convert a quaternion and scale to a covariance and precision matrix
+/// @param quat: the quaternion
+/// @param scale: the scale
+/// @param outCovar: the covariance matrix
+template <typename T>
+inline __device__ nanovdb::math::Mat3<T>
+quatAndScaleToCovariance(const nanovdb::math::Vec4<T> &quat, const nanovdb::math::Vec3<T> &scale) {
+    nanovdb::math::Mat3<T> const R = quatToRotMat<T>(quat);
+    // C = R * S * S * Rt
+    nanovdb::math::Mat3<T> S(scale[0], 0.f, 0.f, 0.f, scale[1], 0.f, 0.f, 0.f, scale[2]);
+    nanovdb::math::Mat3<T> M = R * S;
+    return M * M.transpose();
+}
+
 template <typename T>
 inline __device__ T
 add_blur(const T eps2d, mat2<T> &covar, T &compensation) {
@@ -136,6 +175,17 @@ add_blur(const T eps2d, mat2<T> &covar, T &compensation) {
     covar[1][1] += eps2d;
     T det_blur   = covar[0][0] * covar[1][1] - covar[0][1] * covar[1][0];
     compensation = sqrt(max(0.f, det_orig / det_blur));
+    return det_blur;
+}
+
+template <typename T>
+inline __device__ T
+add_blur(const T eps2d, nanovdb::math::Mat2<T> &outCovar, T &outCompensation) {
+    const T det_orig = outCovar[0][0] * outCovar[1][1] - outCovar[0][1] * outCovar[1][0];
+    outCovar[0][0] += eps2d;
+    outCovar[1][1] += eps2d;
+    const T det_blur = outCovar[0][0] * outCovar[1][1] - outCovar[0][1] * outCovar[1][0];
+    outCompensation  = sqrt(max(0.f, det_orig / det_blur));
     return det_blur;
 }
 
@@ -176,6 +226,18 @@ pos_world_to_cam(
     p_c = R * p + t;
 }
 
+// @brief Transform a point from world to camera coordinates
+// @param camToWorldRotation: the rotation matrix from camera to world
+// @param camToWorldTranslation: the translation vector from camera to world
+// @param worldSpacePoint: the point in world coordinates
+template <typename T>
+inline __device__ nanovdb::math::Vec3<T>
+                  transformPointWorldToCam(nanovdb::math::Mat3<T> const &camToWorldRotation,
+                                           nanovdb::math::Vec3<T> const &camToWorldTranslation,
+                                           nanovdb::math::Vec3<T> const &worldSpacePoint) {
+    return camToWorldRotation * worldSpacePoint + camToWorldTranslation;
+}
+
 template <typename T>
 inline __device__ void
 pos_world_to_cam_vjp(
@@ -200,6 +262,17 @@ covar_world_to_cam(
     covar_c = R * covar * glm::transpose(R);
 }
 
+/// @brief Transform a covariance matrix from world to camera coordinates
+/// @param R: the rotation matrix from world to camera
+/// @param covar: the covariance matrix in world coordinates
+/// @return the covariance matrix in camera coordinates
+template <typename T>
+inline __device__ nanovdb::math::Mat3<T>
+                  transformCovarianceWorldToCam(nanovdb::math::Mat3<T> const &R,
+                                                nanovdb::math::Mat3<T> const &covar) {
+    return R * covar * R.transpose();
+}
+
 template <typename T>
 inline __device__ void
 covar_world_to_cam_vjp(
@@ -217,21 +290,6 @@ covar_world_to_cam_vjp(
     // = G * W * XT + GT * W * X
     v_R += v_covar_c * R * glm::transpose(covar) + glm::transpose(v_covar_c) * R * covar;
     v_covar += glm::transpose(R) * v_covar_c * R;
-}
-
-template <typename T>
-inline __device__ T
-inverse(const mat2<T> M, mat2<T> &Minv) {
-    T det = M[0][0] * M[1][1] - M[0][1] * M[1][0];
-    if (det <= 0.f) {
-        return det;
-    }
-    T invDet   = 1.f / det;
-    Minv[0][0] = M[1][1] * invDet;
-    Minv[0][1] = -M[0][1] * invDet;
-    Minv[1][0] = Minv[0][1];
-    Minv[1][1] = M[0][0] * invDet;
-    return det;
 }
 
 template <typename T>
