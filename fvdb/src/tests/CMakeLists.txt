@@ -1,14 +1,12 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 
-add_custom_command(
-  OUTPUT FVDB_TESTS
-  COMMAND echo Running tests
-  #COMMAND mkdir -p results
-  VERBATIM
-  COMMENT "Running fvdb C++ tests."
-  USES_TERMINAL
-)
+# Enable testing
+enable_testing()
+
+# Get GTest via CPM
+include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_google_test.cmake)
+include(GoogleTest)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_test_data.cmake)
 
@@ -38,14 +36,15 @@ function(ConfigureTest CMAKE_TEST_NAME)
     $<TARGET_NAME_IF_EXISTS:conda_env>
   )
   target_include_directories(${CMAKE_TEST_NAME} PRIVATE ${TORCH_INCLUDE_DIRS} ${TORCH_SOURCE_INCLUDE_DIRS})
+
+  # Register with CTest
   add_test(NAME ${CMAKE_TEST_NAME}
-         COMMAND ${CMAKE_TEST_NAME}
-         WORKING_DIRECTORY ${TEST_BINARY_DIRECTORY})
-  add_custom_command(
-    OUTPUT FVDB_TESTS
-    COMMAND ${CMAKE_TEST_NAME}
-    APPEND
-    COMMENT "Adding ${CMAKE_TEST_NAME}"
+           COMMAND ${CMAKE_TEST_NAME}
+           WORKING_DIRECTORY ${TEST_BINARY_DIRECTORY})
+
+  # Set test properties
+  set_tests_properties(${CMAKE_TEST_NAME} PROPERTIES
+    ENVIRONMENT "FVDB_EXTERNAL_TEST_DATA_PATH=${FVDB_TEST_DATA_DIR}"
   )
 
   target_compile_options(${CMAKE_TEST_NAME} PRIVATE
@@ -62,8 +61,6 @@ function(ConfigureTest CMAKE_TEST_NAME)
     EXCLUDE_FROM_ALL
   )
 endfunction()
-
-enable_testing()
 
 # Configure an example test
 ConfigureTest(ExampleTest "ExampleTest.cpp")

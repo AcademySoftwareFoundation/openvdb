@@ -4,6 +4,7 @@
 CPMAddPackage(
     NAME blosc
     GITHUB_REPOSITORY Blosc/c-blosc
+    PATCH_COMMAND git apply --ignore-space-change --ignore-whitespace ${CMAKE_CURRENT_SOURCE_DIR}/../env/blosc.patch || exit 0
     GIT_TAG v1.21.4
     OPTIONS
         "BUILD_SHARED OFF"

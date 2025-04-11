@@ -35,12 +35,12 @@ dependencies:
   - pip
   - polyscope
   - psutil
-  - pybind11
   - pyrender
   - pytest-benchmark
   - python=3.11
   - pytorch-gpu=2.4.1[build=cuda120*]
   - rich
+  - scikit-build-core
   - setuptools>=68.2.2
   - sparsehash
   - sphinx_rtd_theme
@@ -48,6 +48,7 @@ dependencies:
   - tensorboard
   - torchvision=0.19
   - tqdm
+  - zlib
     ## 3dgs
   - fastai::opencv-python-headless
   - imageio

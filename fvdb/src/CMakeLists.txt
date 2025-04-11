@@ -5,15 +5,7 @@ cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
 project(fvdb LANGUAGES CXX CUDA)
 
-### Conda environment
-if(DEFINED ENV{CONDA_PREFIX})
-    set(CONDA_ENV_PATH $ENV{CONDA_PREFIX})
-    message(STATUS "Conda environment path: ${CONDA_ENV_PATH}")
-else()
-    message(FATAL_ERROR "Conda environment path not found. Please activate the fvdb conda environment.")
-endif()
-
-### Get dependencies
+# ## Get dependencies
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cpm.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_nvtx.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_torch.cmake)
@@ -23,20 +15,17 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cutlass.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cudnn_frontend.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_blosc.cmake)
 
-### Build options
-option(BUILD_TESTS "Configure CMake to build tests" ON)
-option(BUILD_BENCHMARKS "Configure CMake to build (google & nvbench) benchmarks" OFF)
+# ## Build options
+option(FVDB_BUILD_TESTS "Configure CMake to build tests" ON)
+option(FVDB_BUILD_BENCHMARKS "Configure CMake to build (google & nvbench) benchmarks" OFF)
 
-message(VERBOSE "FVDB: Configure CMake to build tests: ${BUILD_TESTS}")
-message(VERBOSE "FVDB: Configure CMake to build (google & nvbench) benchmarks: ${BUILD_BENCHMARKS}")
+message(STATUS "FVDB: Configure CMake to build tests: ${FVDB_BUILD_TESTS}")
+message(STATUS "FVDB: Configure CMake to build (google & nvbench) benchmarks: ${FVDB_BUILD_BENCHMARKS}")
 
-set(FVDB_BUILD_TESTS ${BUILD_TESTS})
-set(FVDB_BUILD_BENCHMARKS ${BUILD_BENCHMARKS})
-
-### Generate compile_commands.json
+# ## Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-### Source files
+# ## Source files
 set(FVDB_CPP_FILES
     Config.cpp
     FVDB.cpp
@@ -140,21 +129,21 @@ set(FVDB_CU_FILES
     detail/ops/jagged/JaggedReduce.cu
     detail/GridBatchImpl.cu)
 
-### Build library
+# ## Build library
 add_library(fvdb SHARED ${FVDB_CPP_FILES} ${FVDB_CU_FILES})
 
-### Target properties
+# ## Target properties
 set_target_properties(
     fvdb
     PROPERTIES BUILD_RPATH "\$ORIGIN"
-               INSTALL_RPATH "\$ORIGIN"
-               CXX_STANDARD 20
-               CXX_STANDARD_REQUIRED ON
-               CXX_EXTENSIONS ON
-               CUDA_STANDARD 20
-               CUDA_STANDARD_REQUIRED ON
-               POSITION_INDEPENDENT_CODE ON
-               INTERFACE_POSITION_INDEPENDENT_CODE ON)
+    INSTALL_RPATH "\$ORIGIN"
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS ON
+    CUDA_STANDARD 20
+    CUDA_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+    INTERFACE_POSITION_INDEPENDENT_CODE ON)
 
 message(STATUS "fvdb: TORCH_INCLUDE_DIRS: ${TORCH_INCLUDE_DIRS}")
 
@@ -179,43 +168,39 @@ target_compile_options(fvdb PRIVATE
     $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CUDA>>:-G -Xcompiler=-O0>
     $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CXX>>:-O0>
     $<$<COMPILE_LANGUAGE:CXX>:
-        "-Wno-unknown-pragmas"
-        "-Wno-class-memaccess"
-        "-fdiagnostics-color=always"
-        "-DNANOVDB_USE_BLOSC"
-        "-fvisibility=default"
+    "-Wno-unknown-pragmas"
+    "-Wno-class-memaccess"
+    "-fdiagnostics-color=always"
+    "-DNANOVDB_USE_BLOSC"
+    "-fvisibility=default"
     >
     $<$<COMPILE_LANGUAGE:CUDA>:
-        "--extended-lambda"
-        "-Xfatbin=-compress-all"
-        "-fvisibility=default"
-        ${TORCH_CUDA_COMMON_FLAGS}
+    "--extended-lambda"
+    "-Xfatbin=-compress-all"
+    "-fvisibility=default"
+    ${TORCH_CUDA_COMMON_FLAGS}
     >)
 
 target_link_libraries(fvdb PRIVATE
     ${TORCH_LIBRARIES} ${Python3_LIBRARIES} tinyply glm::glm cudnn_frontend cudnn cutlass blosc::blosc)
 
-### Install rules
+# ## Install rules
 install(TARGETS fvdb
     EXPORT fvdb-targets
     LIBRARY DESTINATION lib)
 
-install(FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/*.h
-    DESTINATION include)
+# Use pattern exclusion to prevent recursion
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h"
+    PATTERN "*/*" EXCLUDE)
 
-### Add tests
+# Add tests subdirectory if tests are enabled
 if(FVDB_BUILD_TESTS)
-    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_google_test.cmake)
-    # include CTest module -- automatically calls enable_testing()
-    include(CTest)
-
-    # Always print verbose output when tests fail if run using `make test`.
-    list(APPEND CMAKE_CTEST_ARGUMENTS "--output-on-failure")
     add_subdirectory(tests)
 endif()
 
-### Add benchmarks
+# ## Add benchmarks
 if(FVDB_BUILD_BENCHMARKS)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_google_benchmark.cmake)
     add_subdirectory(benchmarks)

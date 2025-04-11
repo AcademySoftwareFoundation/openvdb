@@ -26,10 +26,11 @@ dependencies:
   - numpy<2
   - openssl
   - psutil
-  - pybind11
   - python=3.11
   - pytorch-gpu=2.4.1[build=cuda120*]
+  - scikit-build-core
   - setuptools>=68.2.2
   - sphinx_rtd_theme
   - sphinx>=7.0.0
   - tqdm
+  - zlib

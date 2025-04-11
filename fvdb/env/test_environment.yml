@@ -30,6 +30,7 @@ dependencies:
   - py-opencv=4.10[build=headless*]
   - imageio
   - scikit-learn
+  - zlib
   - pip:
     - gsplat
     - pytest-markdown-docs

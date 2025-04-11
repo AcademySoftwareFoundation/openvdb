@@ -1,7 +1,12 @@
+# Generated version file
+fvdb/version.py
+
+# Build files
 /build/*
 /src/benchmarks/build/*
 /src/tests/build/*
 /src/build/*
+
 *.creator
 *.includes
 *.files

@@ -15,11 +15,11 @@ After [installing *f*VDB](#installing-fvdb), we recommend starting with our walk
 
 Once familiar with the basics, [Usage Examples](#usage-examples) introduces a few of the practical python scripts that can be further explored in the [examples](examples) directory.
 
-Lastly, our [documentation](docs) provides deeper details on the concepts as well as an exhaustive set of illustrations of all the operations available in *f*VDB and an API reference. The [documentation can be built locally](#building-documentation) or can be accessed online at [TODO: insert link to online documentation].
+Lastly, our [documentation](docs) provides deeper details on the concepts as well as an exhaustive set of illustrations of all the operations available in *f*VDB and an API reference. The [documentation can be built locally](#building-documentation) or can be accessed online at https://www.openvdb.org/documentation/fvdb/.
 
 ## Installing *f*VDB
 
-During the project's initial stage of release, it is necessary to [run the build steps](#building-fvdb-from-source) to install ƒVDB. Eventually, ƒVDB will be provided as a pre-built, installable package from anaconda.  We support building the latest ƒVDB version for the following dependent library configurations:
+During the project's initial development stages, it is necessary to [run the build steps](#building-fvdb-from-source) to install ƒVDB. Eventually, ƒVDB will be provided as a pre-built, installable package from anaconda.  We support building the latest ƒVDB version for the following dependent library configurations:
 
 |   PyTorch      | Python      | CUDA |
 | -------------- | ----------- | ------------ |
@@ -43,38 +43,24 @@ During the project's initial stage of release, it is necessary to [run the build
 
 Running a docker container is a great way to ensure that you have a consistent environment for building and running ƒVDB.
 
-Our provided [`Dockerfile`](Dockerfile) has two modes for building the image: `dev` and `production`.  `production` constructs an image capable of building ƒVDB, builds and installs the ƒVDB libraries and is ready for you to start running python code that uses the `fvdb` module.  `dev` mode constructs an image which is ready to build ƒVDB but does not build the ƒVDB libraries.
+Our provided [`Dockerfile`](Dockerfile) constructs a Docker image which is ready to build ƒVDB.  The docker image is configured to install miniforge and the `fvdb` conda environment with all the dependencies needed to build and run ƒVDB.
 
-Building the docker image in `production` mode is the default and is as simple as running the following command from the root of this repository:
+Building and starting the docker image is done by running the following command from the fvdb directory:
 ```shell
-# Build the docker image in production mode
-docker build -t fvdb/prod .
+docker compose run --rm fvdb-dev
 ```
 
-Building the docker mage in `dev` mode is done by setting the `MODE` argument to `dev`:
+When you are ready to build ƒVDB, run the following command within the docker container.  `TORCH_CUDA_ARCH_LIST` specifies which CUDA architectures to build for.
 ```shell
-# Build the docker image in dev mode
-docker build --build-arg  MODE=dev -t fvdb/dev .
-```
-
-Running the docker container is done with the following command:
-```shell
-# Run an interactive bash shell (or replace with your command)
-docker run -it --ipc=host --gpus all --rm \
-  fvdb/dev:latest \
-  /bin/bash
-```
-
-When running the docker container in `dev` mode and when you are ready to build ƒVDB, you can run the following command to build ƒVDB for the recommended set of CUDA architectures:
-```shell
-MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')  \
-     TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" \
-     python setup.py install
+conda activate fvdb;
+cd /openvdb/fvdb;
+TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" \
+./build.sh install
 ```
 
 #### Setting up a Conda Environment
 
-*f*VDB can be used with any Conda distribution. Below is an installation guide using
+*f*VDB can be used with any Conda distribution installed on your system. Below is an installation guide using
 [miniforge](https://github.com/conda-forge/miniforge). You can skip steps 1-3 if you already have a Conda installation.
 
 1. Download and Run Install Script. Copy the command below to download and run the [miniforge install script](https://github.com/conda-forge/miniforge?tab=readme-ov-file#unix-like-platforms-macos--linux):
@@ -88,7 +74,7 @@ bash Miniforge3-$(uname)-$(uname -m).sh
 
 3. Start Conda. Open a new terminal window, which should now show Conda initialized to the `(base)` environment.
 
-4. Create the `fvdb` conda environment. Run the following command from the root of this repository:
+4. Create the `fvdb` conda environment. Run the following command from the directory containing this README:
 
 ```shell
 conda env create -f env/dev_environment.yml
@@ -107,24 +93,17 @@ conda activate fvdb
 
 ### Building *f*VDB
 
-**:warning: Note:** Compilation can be very memory-consuming. We recommend setting the `MAX_JOBS` environment variable to control compilation job parallelism with a value that allows for one job every 2.5GB of memory:
+**:warning: Note:** Compilation can be very memory-consuming. As part of our build script, we set the `CMAKE_BUILD_PARALLEL_LEVEL` environment variable to control compilation job parallelism with a value that we find works well for most machines (allowing for one job every 2.5GB of memory) but this can be overridden by setting the `CMAKE_BUILD_PARALLEL_LEVEL` environment variable to a different value.
 
-```bash
-export MAX_JOBS=$(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')
+
+You can either perform an install:
+```shell
+./build.sh
 ```
 
-You could either perform an editable install with setuptools:
+or if you would like to build a packaged wheel for installing in other environments, you can run the following command:
 ```shell
-python setup.py develop
-```
-or install a 'read-only' copy to your site package folder:
-```shell
-pip install .
-```
-
-If you would like to build a packaged wheel for installing in other environments, you can run the following command:
-```shell
-python setup.py bdist_wheel
+./build.sh wheel
 ```
 
 
@@ -149,7 +128,7 @@ open build/sphinx/index.html
 
 
 ## Usage Examples
-The [examples](examples) directory contains a number of useful illustrations using the `fvdb` Python package. The sections below show some notable examples and their outputs. Run all commands from the root of the repository.
+The [examples](examples) directory contains a number of useful illustrations using the `fvdb` Python package. The sections below show some notable examples and their outputs. Run all commands from the directory containing this README.
 
 ### Trilinear sampling of grids
 ```
