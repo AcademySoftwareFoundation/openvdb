@@ -3,6 +3,9 @@
 
 cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
+# Set global download timeout to 600 seconds (10 minutes)
+set(CMAKE_DOWNLOAD_TIMEOUT 600 CACHE STRING "Time allowed for downloads in seconds")
+
 project(${SKBUILD_PROJECT_NAME} VERSION ${SKBUILD_PROJECT_VERSION} LANGUAGES CXX)
 
 find_package(Python3 COMPONENTS Development Interpreter)
