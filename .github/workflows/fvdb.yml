@@ -48,6 +48,22 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch base branch
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin feature/fvdb
+          # Save the current branch name (the one that triggered the workflow)
+          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
+          # Checkout the target branch
+          git checkout feature/fvdb
+
+      - name: Apply PR changes
+        run: |
+          # Get the commit hash of the PR branch
+          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
+          # Use read-tree to apply changes without committing
+          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
 
       - name: Set up fvdb_build Conda env
         uses: conda-incubator/setup-miniconda@v3
@@ -93,6 +109,22 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch base branch
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin feature/fvdb
+          # Save the current branch name (the one that triggered the workflow)
+          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
+          # Checkout the target branch
+          git checkout feature/fvdb
+
+      - name: Apply PR changes
+        run: |
+          # Get the commit hash of the PR branch
+          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
+          # Use read-tree to apply changes without committing
+          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -139,6 +171,22 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch base branch
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin feature/fvdb
+          # Save the current branch name (the one that triggered the workflow)
+          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
+          # Checkout the target branch
+          git checkout feature/fvdb
+
+      - name: Apply PR changes
+        run: |
+          # Get the commit hash of the PR branch
+          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
+          # Use read-tree to apply changes without committing
+          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -184,6 +232,23 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch base branch
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin feature/fvdb
+          # Save the current branch name (the one that triggered the workflow)
+          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
+          # Checkout the target branch
+          git checkout feature/fvdb
+
+      - name: Apply PR changes
+        run: |
+          # Get the commit hash of the PR branch
+          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
+          # Use read-tree to apply changes without committing
+          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
+
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
