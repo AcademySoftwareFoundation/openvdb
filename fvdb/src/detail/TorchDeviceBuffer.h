@@ -33,12 +33,8 @@ class TorchDeviceBuffer {
     /// @note This has a weird API because it has to match other buffer classes in nanovdb like
     /// nanovdb::HostBuffer
     /// @param size The size (in bytes to allocate for this buffer)
-    /// @param data If non-null, the data pointer to use for this buffer
-    /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
-    /// @param deviceIndex If host is false, then this specifies the device index to use for the
-    /// buffer (must be set to a nonzero value when host is false)
-    TorchDeviceBuffer(uint64_t size = 0, void *data = nullptr,
-                      const torch::Device &device = torch::kCPU);
+    /// @param device Specifies the device to use for the buffer
+    TorchDeviceBuffer(uint64_t size = 0, const torch::Device &device = torch::kCPU);
 
     /// @brief Disallow copy-construction
     TorchDeviceBuffer(const TorchDeviceBuffer &) = delete;
@@ -52,51 +48,32 @@ class TorchDeviceBuffer {
     /// @brief Move copy assignment operation
     TorchDeviceBuffer &operator=(TorchDeviceBuffer &&other) noexcept;
 
-    /// @brief Destructor frees memory on both the host and device
-    ~TorchDeviceBuffer() { this->clear(); };
+    /// @brief Destructor frees memory on specified device
+    ~TorchDeviceBuffer();
 
     /// @brief Returns the device used by this buffer
     /// @return The device used by this buffer
-    const torch::Device &
-    device() const {
-        return mDevice;
-    }
+    const torch::Device &device() const;
 
     /// @brief Moves the buffer to the specified device
     void to(const torch::Device &device);
 
-    /// @brief Retuns a pointer to the raw memory buffer managed by this allocator.
-    /// @warning Note that the pointer can be NULL is the allocator was not initialized!
-    uint8_t *
-    data() const {
-        if (mDevice.is_cpu())
-            return mData;
-        else
-            return nullptr;
-    }
-    uint8_t *
-    deviceData() const {
-        if (mDevice.is_cuda())
-            return mData;
-        else
-            return nullptr;
-    }
+    /// @brief Returns a pointer to the CPU memory buffer managed by this allocator if the device is
+    /// torch::kCPU, nullptr otherwise.
+    uint8_t *data() const;
+
+    /// @brief Returns a pointer to the GPU memory buffer managed by this allocator if the device is
+    /// torch::kCUDA, nullptr otherwise.
+    uint8_t *deviceData() const;
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this allocator.
-    uint64_t
-    size() const {
-        return mSize;
-    }
+    uint64_t size() const;
 
     /// @brief Returns true if this allocator is empty, i.e. has no allocated memory
-    bool
-    empty() const {
-        return mSize == 0;
-    }
-    bool
-    isEmpty() const {
-        return this->empty();
-    }
+    bool empty() const;
+
+    /// @copydoc empty()
+    bool isEmpty() const;
 
     /// @brief De-allocate all memory managed by this allocator and set all pointer to NULL
     void clear();

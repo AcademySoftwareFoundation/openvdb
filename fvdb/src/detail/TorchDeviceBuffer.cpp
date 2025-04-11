@@ -20,7 +20,7 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>
 GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
     const fvdb::detail::TorchDeviceBuffer &guide) const {
     if (mBuffer.isEmpty()) {
-        fvdb::detail::TorchDeviceBuffer retbuf(0, nullptr, guide.device());
+        fvdb::detail::TorchDeviceBuffer retbuf(0, guide.device());
         return GridHandle<fvdb::detail::TorchDeviceBuffer>(
             std::move(retbuf)); // return an empty handle
     }
@@ -61,31 +61,22 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
 namespace fvdb {
 namespace detail {
 
-TorchDeviceBuffer::TorchDeviceBuffer(uint64_t size /* = 0*/, void *data /* = nullptr*/,
+TorchDeviceBuffer::TorchDeviceBuffer(uint64_t             size /* = 0*/,
                                      const torch::Device &device /* = torch::kCPU*/)
-    : mSize(0), mData(nullptr), mDevice(device) {
-    if (size == 0)
+    : mSize(size), mData(nullptr), mDevice(device) {
+    if (!mSize) {
         return;
-
-    // Initalize on the host
-    if (mDevice.is_cpu()) {
-        if (data) {
-            mData = reinterpret_cast<uint8_t *>(data);
-        } else {
-            mData = reinterpret_cast<uint8_t *>(malloc(size));
-        }
-        // Initalize on the device
-    } else {
-        if (data) {
-            mData = reinterpret_cast<uint8_t *>(data);
-        } else {
-            c10::cuda::CUDAGuard deviceGuard(mDevice);
-            mData = reinterpret_cast<uint8_t *>(c10::cuda::CUDACachingAllocator::raw_alloc(size));
-            checkPtr(mData, "failed to allocate device data");
-        }
     }
 
-    mSize = size;
+    if (mDevice.is_cpu()) {
+        // Initalize on the host
+        mData = reinterpret_cast<uint8_t *>(malloc(size));
+    } else if (mDevice.is_cuda()) {
+        // Initalize on the device
+        c10::cuda::CUDAGuard deviceGuard(mDevice);
+        mData = reinterpret_cast<uint8_t *>(c10::cuda::CUDACachingAllocator::raw_alloc(size));
+        checkPtr(mData, "failed to allocate device data");
+    }
 }
 
 TorchDeviceBuffer::TorchDeviceBuffer(TorchDeviceBuffer &&other) noexcept
@@ -103,6 +94,15 @@ TorchDeviceBuffer::operator=(TorchDeviceBuffer &&other) noexcept {
     other.mSize = 0;
     other.mData = nullptr;
     return *this;
+}
+
+TorchDeviceBuffer::~TorchDeviceBuffer() {
+    this->clear();
+};
+
+const torch::Device &
+TorchDeviceBuffer::device() const {
+    return mDevice;
 }
 
 void
@@ -137,7 +137,6 @@ TorchDeviceBuffer::to(const torch::Device &device) {
             c10::cuda::CUDAGuard deviceGuard(mDevice);
             c10::cuda::CUDACachingAllocator::raw_delete(mData);
         }
-
     } else {
         TORCH_CHECK(false, "Unsupported source and destination device combination");
     }
@@ -146,12 +145,42 @@ TorchDeviceBuffer::to(const torch::Device &device) {
     mDevice = device;
 }
 
+uint8_t *
+TorchDeviceBuffer::data() const {
+    return mDevice.is_cpu() ? mData : nullptr;
+}
+
+uint8_t *
+TorchDeviceBuffer::deviceData() const {
+    return mDevice.is_cuda() ? mData : nullptr;
+}
+
+uint64_t
+TorchDeviceBuffer::size() const {
+    return mSize;
+}
+
+bool
+TorchDeviceBuffer::empty() const {
+    return mSize == 0;
+}
+
+bool
+TorchDeviceBuffer::isEmpty() const {
+    return this->empty();
+}
+
 void
 TorchDeviceBuffer::clear() {
-    if (mDevice.is_cuda() && mData) {
+    if (!mData) {
+        mSize = 0;
+        return;
+    }
+
+    if (mDevice.is_cuda()) {
         c10::cuda::CUDAGuard deviceGuard(mDevice);
         c10::cuda::CUDACachingAllocator::raw_delete(mData);
-    } else if (mDevice.is_cpu() && mData) {
+    } else if (mDevice.is_cpu()) {
         free(mData);
     }
 
@@ -165,11 +194,11 @@ TorchDeviceBuffer::create(uint64_t size, const TorchDeviceBuffer *proto, int dev
         // This is a hack to pass in the device index when creating grids from nanovdb. Since we
         // can't pass arguments through nanovdb creation functions, we use a prototype grid to pass
         // in the device index.
-        return TorchDeviceBuffer(size, nullptr, proto->device());
+        return TorchDeviceBuffer(size, proto->device());
     } else if (device == cudaCpuDeviceId) {
-        return TorchDeviceBuffer(size, nullptr, torch::kCPU);
+        return TorchDeviceBuffer(size, torch::kCPU);
     } else if (device > cudaCpuDeviceId) {
-        return TorchDeviceBuffer(size, nullptr, torch::Device(torch::kCUDA, device));
+        return TorchDeviceBuffer(size, torch::Device(torch::kCUDA, device));
     } else {
         TORCH_CHECK(false, "Invalid parameters specified for TorchDeviceBuffer::create");
     }

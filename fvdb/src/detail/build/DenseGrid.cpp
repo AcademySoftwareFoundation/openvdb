@@ -49,7 +49,7 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
                                                                                 false, false);
     ret.buffer().to(torch::kCPU);
 
-    TorchDeviceBuffer guide(0, nullptr, torch::kCPU);
+    TorchDeviceBuffer guide(0, torch::kCPU);
 
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(batchSize);

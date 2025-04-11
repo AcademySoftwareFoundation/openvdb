@@ -153,11 +153,10 @@ GridBatchImpl::clone(torch::Device device, bool blocking) const {
     // The guide buffer is a hack to perform the correct copy (i.e. host -> device / device -> host
     // etc...) The guide carries the desired target device to the copy. The reason we do this is to
     // conform with the nanovdb which can only accept a buffer as an extra argument.
-    TorchDeviceBuffer guideBuffer(0, nullptr, device);
+    TorchDeviceBuffer guide(0, device);
 
     // Make a copy of this gridHandle on the same device as the guide buffer
-    nanovdb::GridHandle<TorchDeviceBuffer> clonedHdl =
-        mGridHdl->copy<TorchDeviceBuffer>(guideBuffer);
+    nanovdb::GridHandle<TorchDeviceBuffer> clonedHdl = mGridHdl->copy<TorchDeviceBuffer>(guide);
 
     // Copy the voxel sizes and origins for this grid
     std::vector<nanovdb::Vec3d> voxelSizes, voxelOrigins;
@@ -522,7 +521,7 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
         return c10::make_intrusive<GridBatchImpl>(device, isMutable);
     }
 
-    TorchDeviceBuffer buffer(totalByteSize, nullptr, device);
+    TorchDeviceBuffer buffer(totalByteSize, device);
 
     int count         = 0;
     int nonEmptyCount = 0;
@@ -591,7 +590,7 @@ GridBatchImpl::contiguous(c10::intrusive_ptr<GridBatchImpl> input) {
         totalByteSize += input->numBytes(i);
     }
 
-    TorchDeviceBuffer buffer(totalByteSize, nullptr, input->device());
+    TorchDeviceBuffer buffer(totalByteSize, input->device());
 
     int64_t                     writeOffset = 0;
     std::vector<nanovdb::Vec3d> voxelSizes, voxelOrigins;
@@ -794,7 +793,7 @@ GridBatchImpl::deserializeV0(const torch::Tensor &serialized) {
         sizeof(V01Header) + sizeof(GridBatchMetadata) + numGrids * sizeof(GridMetadata);
     const uint64_t sizeofGrid = header->totalBytes - sizeofMetadata;
 
-    auto buf = TorchDeviceBuffer(sizeofGrid, nullptr, torch::kCPU);
+    auto buf = TorchDeviceBuffer(sizeofGrid, torch::kCPU);
     memcpy(buf.data(), gridBuffer, sizeofGrid);
 
     nanovdb::GridHandle gridHdl = nanovdb::GridHandle<TorchDeviceBuffer>(std::move(buf));
