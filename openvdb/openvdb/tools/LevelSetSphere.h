@@ -14,7 +14,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Grid.h>
-#include <openvdb/Types.h>
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
 
@@ -84,15 +84,16 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 /// @note The leapfrog algorithm employed in this class is best
 /// suited for a single large sphere. For multiple small spheres consider
 /// using the faster algorithm in tools/ParticlesToLevelSet.h
-template<typename GridT, typename InterruptT = util::NullInterrupter>
+template<typename GridT, typename InterruptT = util::NullInterrupter,
+    typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
 class LevelSetSphere
 {
 public:
     using TreeT  = typename GridT::TreeType;
     using ValueT = typename GridT::ValueType;
-    using ComputeT = typename GridT::ComputeType;
     using Vec3T  = typename math::Vec3<ComputeT>;
-    static_assert(openvdb::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value
+               && openvdb::is_floating_point<ComputeT>::value,
         "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor
@@ -221,12 +222,16 @@ typename GridType::Ptr
 createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize,
     float halfWidth, InterruptT* interrupt, bool threaded)
 {
+    using ValueT   = typename GridType::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
+    using Vec3T    = typename math::Vec3<ComputeT>;
+    
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(openvdb::is_floating_point<typename GridType::ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value
+               && openvdb::is_floating_point<ComputeT>::value,
         "level set grids must have scalar, floating-point value types");
 
-    using ComputeT = typename GridType::ComputeType;
-    LevelSetSphere<GridType, InterruptT> factory(ComputeT(radius), center, interrupt);
+    LevelSetSphere<GridType, InterruptT, ComputeT> factory(ComputeT(radius), Vec3T(center), interrupt);
     return factory.getLevelSet(ComputeT(voxelSize), ComputeT(halfWidth), threaded);
 }
 

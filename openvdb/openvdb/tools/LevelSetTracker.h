@@ -12,7 +12,7 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -53,7 +53,9 @@ enum class TrimMode {
 
 
 /// @brief Performs multi-threaded interface tracking of narrow band level sets
-template<typename GridT, typename InterruptT = util::NullInterrupter>
+template<typename GridT,
+         typename InterruptT = util::NullInterrupter,
+         typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
 class LevelSetTracker
 {
 public:
@@ -63,12 +65,13 @@ public:
     using TreeType = typename GridT::TreeType;
     using LeafType = typename TreeType::LeafNodeType;
     using ValueType = typename TreeType::ValueType;
-    using ComputeType = typename TreeType::ComputeType;
+    using ComputeType = ComputeT;
     using LeafManagerType = typename tree::LeafManager<TreeType>; // leafs + buffers
     using LeafRange = typename LeafManagerType::LeafRange;
     using BufferType = typename LeafManagerType::BufferType;
     using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
-    static_assert(openvdb::is_floating_point<ValueType>::value,
+    static_assert(openvdb::is_floating_point<ValueType>::value
+               && openvdb::is_floating_point<ComputeType>::value,
         "LevelSetTracker requires a level set grid with floating-point values");
 
     /// Lightweight struct that stores the state of the LevelSetTracker
@@ -256,8 +259,8 @@ private:
     TrimMode           mTrimMode = TrimMode::kAll;
 }; // end of LevelSetTracker class
 
-template<typename GridT, typename InterruptT>
-LevelSetTracker<GridT, InterruptT>::
+template<typename GridT, typename InterruptT, typename ComputeT>
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 LevelSetTracker(GridT& grid, InterruptT* interrupt):
     mGrid(&grid),
     mLeafs(new LeafManagerType(grid.tree())),
@@ -277,9 +280,9 @@ LevelSetTracker(GridT& grid, InterruptT* interrupt):
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 prune()
 {
     this->startInterrupter("Pruning Level Set");
@@ -300,9 +303,9 @@ prune()
     this->endInterrupter();
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 track()
 {
     // Dilate narrow-band (this also rebuilds the leaf array!)
@@ -315,9 +318,9 @@ track()
     this->prune();
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 dilate(int iterations)
 {
     if (this->getNormCount() == 0) {
@@ -338,9 +341,9 @@ dilate(int iterations)
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 erode(int iterations)
 {
     tools::erodeActiveValues(*mLeafs, iterations, tools::NN_FACE, tools::IGNORE_TILES);
@@ -350,9 +353,9 @@ erode(int iterations)
     tools::changeLevelSetBackground(this->leafs(), background);
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 bool
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 resize(Index halfWidth)
 {
     const int wOld = static_cast<int>(math::RoundDown(this->getHalfWidth()));
@@ -365,25 +368,25 @@ resize(Index halfWidth)
     return wOld != wNew;
 }
 
-template<typename GridT,  typename InterruptT>
+template<typename GridT,  typename InterruptT, typename ComputeT>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 startInterrupter(const char* msg)
 {
     if (mInterrupter) mInterrupter->start(msg);
 }
 
-template<typename GridT,  typename InterruptT>
+template<typename GridT,  typename InterruptT, typename ComputeT>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 endInterrupter()
 {
     if (mInterrupter) mInterrupter->end();
 }
 
-template<typename GridT,  typename InterruptT>
+template<typename GridT,  typename InterruptT, typename ComputeT>
 inline bool
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
@@ -393,10 +396,10 @@ checkInterrupter()
     return true;
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<typename MaskT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 normalize(const MaskT* mask)
 {
     switch (this->getSpatialScheme()) {
@@ -416,10 +419,10 @@ normalize(const MaskT* mask)
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 normalize1(const MaskT* mask)
 {
     switch (this->getTemporalScheme()) {
@@ -435,12 +438,12 @@ normalize1(const MaskT* mask)
     }
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 normalize2(const MaskT* mask)
 {
     Normalizer<SpatialScheme, TemporalScheme, MaskT> tmp(*this, mask);
@@ -451,10 +454,10 @@ normalize2(const MaskT* mask)
 ////////////////////////////////////////////////////////////////////////////
 
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<lstrack::TrimMode Trimming>
 void
-LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
+LevelSetTracker<GridT, InterruptT, ComputeT>::Trim<Trimming>::trim()
 {
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     if (Trimming != TrimMode::kNone) {
@@ -472,10 +475,11 @@ LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
 
 
 /// Trim away voxels that have moved outside the narrow band
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<lstrack::TrimMode Trimming>
 inline void
-LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::operator()(const LeafRange& range) const
+LevelSetTracker<GridT, InterruptT, ComputeT>::
+Trim<Trimming>::operator()(const LeafRange& range) const
 {
     mTracker.checkInterrupter();
     const ValueType gamma = mTracker.mGrid->background();
@@ -510,12 +514,12 @@ LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::operator()(const LeafRange& 
 
 ////////////////////////////////////////////////////////////////////////////
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 inline
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 Normalizer(LevelSetTracker& tracker, const MaskT* mask)
     : mTracker(tracker)
@@ -528,12 +532,12 @@ Normalizer(LevelSetTracker& tracker, const MaskT* mask)
 {
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 normalize()
 {
@@ -602,12 +606,12 @@ normalize()
 
 /// Private method to perform the task (serial or threaded) and
 /// subsequently swap the leaf buffers.
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme      SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 cook(const char* msg, int swapBuffer)
 {
@@ -623,13 +627,13 @@ cook(const char* msg, int swapBuffer)
     mTracker.endInterrupter();
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme      SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 template <int Nominator, int Denominator>
 inline void
-LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 {
@@ -645,13 +649,13 @@ eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
     result[n] = Nominator ? ComputeType(alpha * ComputeType(phi[n]) + beta * v) : v;
 }
 
-template<typename GridT, typename InterruptT>
+template<typename GridT, typename InterruptT, typename ComputeT>
 template<math::BiasedGradientScheme      SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
 template <int Nominator, int Denominator>
 inline void
-LevelSetTracker<GridT,InterruptT>::
+LevelSetTracker<GridT, InterruptT, ComputeT>::
 Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 {
@@ -690,9 +694,9 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetTracker<HalfGrid, util::NullInterrupter>;
-OPENVDB_INSTANTIATE_CLASS LevelSetTracker<FloatGrid, util::NullInterrupter>;
-OPENVDB_INSTANTIATE_CLASS LevelSetTracker<DoubleGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetTracker<HalfGrid, util::NullInterrupter, float>;
+OPENVDB_INSTANTIATE_CLASS LevelSetTracker<FloatGrid, util::NullInterrupter, float>;
+OPENVDB_INSTANTIATE_CLASS LevelSetTracker<DoubleGrid, util::NullInterrupter, double>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 

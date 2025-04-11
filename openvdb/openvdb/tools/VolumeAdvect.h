@@ -13,7 +13,7 @@
 #ifndef OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_ADVECT_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
+#include <openvdb/Types.h> // for ComputeTypeFor
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Assert.h>
@@ -365,7 +365,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     using TreeT = typename VolumeGridT::TreeType;
     using AccT = typename VolumeGridT::ConstAccessor;
     using ValueT = typename TreeT::ValueType;
-    using ComputeT = typename TreeT::ComputeType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
     using LeafManagerT = typename tree::LeafManager<TreeT>;
     using LeafNodeT = typename LeafManagerT::LeafNodeType;
     using LeafRangeT = typename LeafManagerT::LeafRange;
