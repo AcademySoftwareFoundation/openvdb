@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "VectorTypes.cuh"
+#include "GaussianVectorTypes.cuh"
 #include <detail/ops/Ops.h>
 
 #include <ATen/cuda/Atomic.cuh>

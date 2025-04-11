@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_OPS_GSPLAT_CAMERAPROJECTIONS_CUH
-#define FVDB_DETAIL_OPS_GSPLAT_CAMERAPROJECTIONS_CUH
+#ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANCAMERAPROJECTIONS_CUH
+#define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANCAMERAPROJECTIONS_CUH
 
-#include "GsplatTypes.cuh"
+#include "GaussianTypes.cuh"
 
 #include <nanovdb/math/Math.h>
 
@@ -248,4 +248,4 @@ ortho_proj_vjp(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy
 } // namespace detail
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_OPS_GSPLAT_CAMERAPROJECTIONS_CUH
+#endif // FVDB_DETAIL_OPS_GSPLAT_GAUSSIANCAMERAPROJECTIONS_CUH

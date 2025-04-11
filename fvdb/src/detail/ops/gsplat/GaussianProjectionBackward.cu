@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "GsplatUtils.cuh"
+#include "GaussianUtils.cuh"
 #include <detail/ops/Ops.h>
 
 #include <nanovdb/math/Math.h>

@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_OPS_GSPLAT_VECTORTYPES_CUH
-#define FVDB_DETAIL_OPS_GSPLAT_VECTORTYPES_CUH
+#ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANVECTORTYPES_CUH
+#define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANVECTORTYPES_CUH
 
 #include <ATen/native/Math.h>
 
@@ -181,4 +181,4 @@ warpSumMut(ScalarT *val, size_t nDims, WarpT &warp) {
 
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_OPS_GSPLAT_VECTORTYPES_CUH
+#endif // FVDB_DETAIL_OPS_GSPLAT_GAUSSIANVECTORTYPES_CUH

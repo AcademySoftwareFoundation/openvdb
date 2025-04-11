@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "GaussianSplatSparse.h"
-#include "VectorTypes.cuh"
+#include "GaussianVectorTypes.cuh"
 #include <detail/ops/Ops.h>
 
 #include <c10/cuda/CUDACachingAllocator.h>

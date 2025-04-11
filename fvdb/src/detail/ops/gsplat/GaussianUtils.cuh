@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_OPS_GSPLAT_GSPLATUTILS_CUH
-#define FVDB_DETAIL_OPS_GSPLAT_GSPLATUTILS_CUH
+#ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANUTILS_CUH
+#define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANUTILS_CUH
 
-#include "CameraProjections.cuh"
-#include "GsplatTypes.cuh"
+#include "GaussianCameraProjections.cuh"
+#include "GaussianTypes.cuh"
 
 #include <nanovdb/math/Math.h>
 
@@ -304,4 +304,4 @@ inverse_vjp(const T Minv, const T v_Minv, T &v_M) {
 } // namespace detail
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_OPS_GSPLAT_GSPLATUTILS_CUH
+#endif // FVDB_DETAIL_OPS_GSPLAT_GAUSSIANUTILS_CUH

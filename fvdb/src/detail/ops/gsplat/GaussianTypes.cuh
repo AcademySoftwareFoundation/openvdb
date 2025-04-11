@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_OPS_GSPLAT_GSPLATTYPES_CUH
-#define FVDB_DETAIL_OPS_GSPLAT_GSPLATTYPES_CUH
+#ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANTYPES_CUH
+#define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANTYPES_CUH
 
-#include "GsplatMacros.cuh"
+#include "GaussianMacros.cuh"
 
 #include <ATen/native/Math.h>
 
@@ -113,4 +113,4 @@ warpSum(mat2<ScalarT> &val, WarpT &warp) {
 } // namespace detail
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_OPS_GSPLAT_GSPLATTYPES_CUH
+#endif // FVDB_DETAIL_OPS_GSPLAT_GAUSSIANTYPES_CUH

@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_OPS_GSPLAT_GSPLATMACROS_CUH
-#define FVDB_DETAIL_OPS_GSPLAT_GSPLATMACROS_CUH
+#ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANMACROS_CUH
+#define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANMACROS_CUH
 
 #define GSPLAT_CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
 #define GSPLAT_CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
@@ -13,4 +13,4 @@
 
 #define GSPLAT_PRAGMA_UNROLL _Pragma("unroll")
 
-#endif // FVDB_DETAIL_OPS_GSPLAT_GSPLATMACROS_CUH
+#endif // FVDB_DETAIL_OPS_GSPLAT_GAUSSIANMACROS_CUH
