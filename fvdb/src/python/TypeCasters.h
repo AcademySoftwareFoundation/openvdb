@@ -73,33 +73,6 @@ template <> struct type_caster<torch::ScalarType> : public type_caster_base<torc
 #endif
 
 template <>
-struct type_caster<fvdb::TorchDeviceOrString> : public type_caster_base<fvdb::TorchDeviceOrString> {
-    using base = type_caster_base<fvdb::TorchDeviceOrString>;
-
-  public:
-    fvdb::TorchDeviceOrString dev_value;
-
-    bool
-    load(handle src, bool convert) {
-        std::string deviceString;
-        try {
-            deviceString = src.cast<std::string>();
-        } catch (pybind11::cast_error &e) {
-            if (THPDevice_Check(src.ptr())) {
-                dev_value = reinterpret_cast<THPDevice *>(src.ptr())->device;
-                value     = &dev_value;
-                return true;
-            } else {
-                return false;
-            }
-        }
-        dev_value = deviceString;
-        value     = &dev_value;
-        return true;
-    }
-};
-
-template <>
 struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::JaggedTensorIndex> {
     fvdb::JaggedTensorIndex idx_value = c10::nullopt;
 

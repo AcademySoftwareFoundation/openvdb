@@ -16,29 +16,26 @@ namespace detail {
 namespace io {
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-fromNVDB(nanovdb::GridHandle<nanovdb::HostBuffer>        &handle,
-         const torch::optional<fvdb::TorchDeviceOrString> maybeDevice =
-             torch::optional<fvdb::TorchDeviceOrString>());
+fromNVDB(nanovdb::GridHandle<nanovdb::HostBuffer> &handle,
+         const std::optional<torch::Device>        maybeDevice = std::optional<torch::Device>());
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
-         const torch::optional<fvdb::TorchDeviceOrString>             maybeDevice =
-             torch::optional<fvdb::TorchDeviceOrString>());
+         const std::optional<torch::Device> maybeDevice = std::optional<torch::Device>());
 
-nanovdb::GridHandle<nanovdb::HostBuffer>
-toNVDB(const GridBatch                             &gridBatch,
-       const torch::optional<JaggedTensor>          maybeData = torch::optional<JaggedTensor>(),
-       const torch::optional<StringOrListOfStrings> maybeNames =
-           torch::optional<StringOrListOfStrings>());
+nanovdb::GridHandle<nanovdb::HostBuffer> toNVDB(
+    const GridBatch                           &gridBatch,
+    const std::optional<JaggedTensor>          maybeData  = std::optional<JaggedTensor>(),
+    const std::optional<StringOrListOfStrings> maybeNames = std::optional<StringOrListOfStrings>());
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 loadNVDB(const std::string &path, const fvdb::NanoVDBFileGridIdentifier &gridIdentifier,
-         fvdb::TorchDeviceOrString device, bool verbose);
+         const torch::Device &device, bool verbose);
 
 void saveNVDB(const std::string &path, const GridBatch &gridBatch,
-              const torch::optional<fvdb::JaggedTensor>          maybeData,
-              const torch::optional<fvdb::StringOrListOfStrings> maybeNames,
-              bool compressed = false, bool verbose = false);
+              const std::optional<fvdb::JaggedTensor>          maybeData,
+              const std::optional<fvdb::StringOrListOfStrings> maybeNames, bool compressed = false,
+              bool verbose = false);
 
 } // namespace io
 } // namespace detail

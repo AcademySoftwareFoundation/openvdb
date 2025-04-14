@@ -89,15 +89,15 @@ jaggedArgReduceCallback(int32_t tidx, int32_t eidx, const TensorAccessor<scalar_
 }
 
 template <c10::DeviceType DeviceTag, ReductionType REDUCE>
-std::tuple<torch::Tensor, torch::optional<torch::Tensor>>
+std::tuple<torch::Tensor, std::optional<torch::Tensor>>
 JaggedReduce(const torch::Tensor &jdataRaw, const torch::Tensor &jidx,
              const torch::Tensor &joffsets, int64_t dimSize) {
     torch::Tensor jdata = featureCoalescedView(jdataRaw);
 
     static constexpr bool isMinMax = (REDUCE == ReductionType::MIN || REDUCE == ReductionType::MAX);
 
-    torch::Tensor                  out = torch::empty({ dimSize, jdata.size(1) }, jdata.options());
-    torch::optional<torch::Tensor> argOut = torch::nullopt;
+    torch::Tensor                out    = torch::empty({ dimSize, jdata.size(1) }, jdata.options());
+    std::optional<torch::Tensor> argOut = std::nullopt;
     if constexpr (isMinMax) {
         argOut = torch::empty({ dimSize, jdata.size(1) }, jidx.options().dtype(torch::kLong));
     }
@@ -149,8 +149,8 @@ JaggedReduce(const torch::Tensor &jdataRaw, const torch::Tensor &jidx,
         }
     });
 
-    torch::Tensor                  rOut    = out.reshape(spliceShape({ out.size(0) }, jdataRaw));
-    torch::optional<torch::Tensor> rArgOut = torch::nullopt;
+    torch::Tensor                rOut    = out.reshape(spliceShape({ out.size(0) }, jdataRaw));
+    std::optional<torch::Tensor> rArgOut = std::nullopt;
     if constexpr (isMinMax) {
         rArgOut = argOut.value().reshape(spliceShape({ out.size(0) }, jdataRaw));
     }

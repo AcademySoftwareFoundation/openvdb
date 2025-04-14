@@ -71,8 +71,8 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle) {
 }
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
-to_nanovdb(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData,
-           const torch::optional<StringOrListOfStrings> maybeNames) {
+to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
+           const std::optional<StringOrListOfStrings> maybeNames) {
     return detail::io::toNVDB(gridBatch, maybeData, maybeNames);
 }
 
@@ -85,20 +85,30 @@ jcat(const std::vector<GridBatch> &vec) {
 }
 
 JaggedTensor
-jcat(const std::vector<JaggedTensor> &vec, torch::optional<int64_t> dim) {
+jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dim) {
     return JaggedTensor::jcat(vec, dim);
 }
 
 void
 save(const std::string &path, const GridBatch &gridBatch,
-     const torch::optional<JaggedTensor>          maybeData,
-     const torch::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
+     const std::optional<JaggedTensor>          maybeData,
+     const std::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
     detail::io::saveNVDB(path, gridBatch, maybeData, maybeNames, compressed, verbose);
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, TorchDeviceOrString device,
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, const torch::Device &device,
      bool verbose) {
+    return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
+}
+
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier,
+     const std::string &device_string, bool verbose) {
+    torch::Device device(device_string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
     return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
 }
 
@@ -132,11 +142,24 @@ gridbatch_from_nearest_voxels_to_points(const JaggedTensor       &points,
 GridBatch
 gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
                      const Vec3dBatchOrScalar &voxel_sizes, const Vec3dBatch &origins,
-                     torch::optional<torch::Tensor> mask, TorchDeviceOrString device,
+                     std::optional<torch::Tensor> mask, const torch::Device &device,
                      bool is_mutable) {
     auto ret = GridBatch(device, is_mutable);
     ret.set_from_dense_grid(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask);
     return ret;
+}
+
+GridBatch
+gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
+                     const Vec3dBatchOrScalar &voxel_sizes, const Vec3dBatch &origins,
+                     std::optional<torch::Tensor> mask, const std::string &device_string,
+                     bool is_mutable) {
+    torch::Device device(device_string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
+    return gridbatch_from_dense(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask, device,
+                                is_mutable);
 }
 
 GridBatch

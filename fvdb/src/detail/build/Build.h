@@ -30,10 +30,10 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildEmptyGrid(torch::Device device, bool
 /// size)
 /// @return A handle to the nanovdb grid
 nanovdb::GridHandle<TorchDeviceBuffer> buildDenseGrid(torch::Device device, bool isMutable,
-                                                      const uint32_t        batchSize,
-                                                      const nanovdb::Coord &size,
-                                                      const nanovdb::Coord &ijkMin,
-                                                      const torch::optional<torch::Tensor> &mask);
+                                                      const uint32_t                      batchSize,
+                                                      const nanovdb::Coord               &size,
+                                                      const nanovdb::Coord               &ijkMin,
+                                                      const std::optional<torch::Tensor> &mask);
 
 /// @brief Build a NanoVDB grid representing the coarse grid of a given fine grid
 /// @param isMutable Whether the grid should be mutable or not
@@ -55,8 +55,8 @@ buildCoarseGridFromFineGrid(bool isMutable, const GridBatchImpl &fineGridHdl,
 /// @return A handle to the nanovdb grid (the device will match coarseGridHdl)
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseGridHdl,
-                            const torch::optional<JaggedTensor> &subdivMask,
-                            const nanovdb::Coord                 subdivisionFactor);
+                            const std::optional<JaggedTensor> &subdivMask,
+                            const nanovdb::Coord               subdivisionFactor);
 
 nanovdb::GridHandle<TorchDeviceBuffer> buildConvGridFromGrid(bool                  isMutable,
                                                              const GridBatchImpl  &baseGridHdl,

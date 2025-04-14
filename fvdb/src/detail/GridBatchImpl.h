@@ -346,7 +346,7 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     GridBatchImpl() = default;
 
-    GridBatchImpl(torch::Device device, bool isMutable);
+    GridBatchImpl(const torch::Device &device, bool isMutable);
 
     GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
                   const std::vector<nanovdb::Vec3d>       &voxelSizes,
@@ -515,7 +515,8 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     torch::Tensor gridToWorldMatrix(int64_t bi) const;
 
-    c10::intrusive_ptr<GridBatchImpl> clone(torch::Device device, bool blocking = false) const;
+    c10::intrusive_ptr<GridBatchImpl> clone(const torch::Device &device,
+                                            bool                 blocking = false) const;
 
     void
     checkNonEmptyGrid() const {

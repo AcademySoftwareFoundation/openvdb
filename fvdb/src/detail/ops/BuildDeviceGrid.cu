@@ -193,8 +193,8 @@ template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord origin,
                                               nanovdb::Coord size, bool isMutable,
-                                              torch::Device                         device,
-                                              const torch::optional<torch::Tensor> &maybeMask) {
+                                              torch::Device                       device,
+                                              const std::optional<torch::Tensor> &maybeMask) {
     TORCH_CHECK(device.is_cuda(), "device must be cuda");
     TORCH_CHECK(device.has_index(), "device must have index");
 

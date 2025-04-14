@@ -18,9 +18,9 @@ struct EvaluateSphericalHarmonics : public torch::autograd::Function<EvaluateSph
 
     static VariableList
     forward(AutogradContext *ctx, const int shDegreeToUse,
-            const torch::optional<Variable> maybeViewDirs, // [N, 3] or empty for deg 0
-            const Variable                 &shCoeffs,      // [K, N, 3]
-            const Variable                 &radii          // [N,]
+            const std::optional<Variable> maybeViewDirs, // [N, 3] or empty for deg 0
+            const Variable               &shCoeffs,      // [K, N, 3]
+            const Variable               &radii          // [N,]
     );
 
     static VariableList backward(AutogradContext *ctx, VariableList gradOutput);
@@ -41,9 +41,9 @@ struct ProjectGaussians : public torch::autograd::Function<ProjectGaussians> {
             const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
             const float nearPlane, const float farPlane, const float minRadius2D,
             const bool calcCompensions, const bool ortho,
-            torch::optional<Variable> outNormalizeddLossdMeans2dNormAccum = torch::nullopt,
-            torch::optional<Variable> outNormalizedMaxRadiiAccum          = torch::nullopt,
-            torch::optional<Variable> outGradientStepCount                = torch::nullopt);
+            std::optional<Variable> outNormalizeddLossdMeans2dNormAccum = std::nullopt,
+            std::optional<Variable> outNormalizedMaxRadiiAccum          = std::nullopt,
+            std::optional<Variable> outGradientStepCount                = std::nullopt);
 
     static VariableList backward(AutogradContext *ctx, VariableList gradOutput);
 };

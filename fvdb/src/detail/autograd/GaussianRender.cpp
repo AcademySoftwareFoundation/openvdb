@@ -13,10 +13,9 @@ namespace autograd {
 EvaluateSphericalHarmonics::VariableList
 EvaluateSphericalHarmonics::forward(
     EvaluateSphericalHarmonics::AutogradContext *ctx, const int shDegreeToUse,
-    const torch::optional<EvaluateSphericalHarmonics::Variable>
-                                                maybeViewDirs, // (C, N, 3) or (N, 3)
-    const EvaluateSphericalHarmonics::Variable &shCoeffs,      // (C, M, K, D) or (N, K, D)
-    const EvaluateSphericalHarmonics::Variable &radii          // (C, N) or (N,) (optional)
+    const std::optional<EvaluateSphericalHarmonics::Variable> maybeViewDirs, // (C, N, 3) or (N, 3)
+    const EvaluateSphericalHarmonics::Variable               &shCoeffs, // (C, M, K, D) or (N, K, D)
+    const EvaluateSphericalHarmonics::Variable               &radii     // (C, N) or (N,) (optional)
 ) {
     const Variable viewDirs = maybeViewDirs.value_or(
         shCoeffs.dim() == 3 ? torch::empty({ 0, 3 }) : torch::empty({ 0, 0, 3 }));
@@ -66,9 +65,9 @@ ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
                           const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
                           const float nearPlane, const float farPlane, const float minRadius2D,
                           const bool calcCompensations, const bool ortho,
-                          torch::optional<Variable> outNormalizeddLossdMeans2dNormAccum,
-                          torch::optional<Variable> outNormalizedMaxRadiiAccum,
-                          torch::optional<Variable> outGradientStepCount) {
+                          std::optional<Variable> outNormalizeddLossdMeans2dNormAccum,
+                          std::optional<Variable> outNormalizedMaxRadiiAccum,
+                          std::optional<Variable> outGradientStepCount) {
     TORCH_CHECK(means.dim() == 2, "means must have shape (N, 3)");
     TORCH_CHECK(camToWorldMatrices.dim() == 3, "camToWorldMatrices must have shape (C, 4, 4)");
     TORCH_CHECK(projectionMatrices.dim() == 3, "projectionMatrices must have shape (C, 3, 3)");
@@ -166,15 +165,15 @@ ProjectGaussians::backward(ProjectGaussians::AutogradContext *ctx,
 
     auto [normalizeddLossdMeans2dNormAccum, normalizedMaxRadiiAccum, gradientStepCount] = [&]() {
         return std::make_tuple(
-            saveAccumState ? torch::optional<at::Tensor>(
+            saveAccumState ? std::optional<at::Tensor>(
                                  ctx->saved_data["outNormalizeddLossdMeans2dNormAccum"].toTensor())
-                           : torch::nullopt,
-            trackMaxRadii ? torch::optional<at::Tensor>(
+                           : std::nullopt,
+            trackMaxRadii ? std::optional<at::Tensor>(
                                 ctx->saved_data["outNormalizedMaxRadiiAccum"].toTensor())
-                          : torch::nullopt,
+                          : std::nullopt,
             saveAccumState
-                ? torch::optional<at::Tensor>(ctx->saved_data["outGradientStepCount"].toTensor())
-                : torch::nullopt);
+                ? std::optional<at::Tensor>(ctx->saved_data["outGradientStepCount"].toTensor())
+                : std::nullopt);
     }();
     auto variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionBackward<DeviceTag>(

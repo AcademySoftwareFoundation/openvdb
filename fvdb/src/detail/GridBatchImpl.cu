@@ -35,7 +35,7 @@ computeBatchOffsetsFromMetadata(
 namespace fvdb {
 namespace detail {
 
-GridBatchImpl::GridBatchImpl(torch::Device device, bool isMutable) {
+GridBatchImpl::GridBatchImpl(const torch::Device &device, bool isMutable) {
     std::vector<nanovdb::Vec3d> dummy;
     dummy.push_back(nanovdb::Vec3d(1.0, 1.0, 1.0));
     // TODO (Francis): No list-of-lists support for now, so we just pass an empty list of indices
@@ -143,7 +143,7 @@ GridBatchImpl::gridToWorldMatrix(int64_t bi) const {
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-GridBatchImpl::clone(torch::Device device, bool blocking) const {
+GridBatchImpl::clone(const torch::Device &device, bool blocking) const {
     // If you're cloning an empty grid, just create a new empty grid on the right device and return
     // it
     if (batchSize() == 0) {

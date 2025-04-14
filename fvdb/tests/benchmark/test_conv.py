@@ -24,7 +24,7 @@ PTS_CACHE = [torch.empty((10_000, 3), dtype=torch.float32).normal_() for _ in ra
     warmup_iterations=3,
 )
 def test_forward_conv3d(benchmark, i_ch, o_ch, backend):
-    device = torch.device("cuda")
+    device = torch.device("cuda", torch.cuda.current_device())
     pts = random.choice(PTS_CACHE).to(device=device) * 4
 
     coords = torch.floor(pts / 0.01).to(torch.int32)

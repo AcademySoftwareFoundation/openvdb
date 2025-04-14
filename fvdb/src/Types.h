@@ -40,29 +40,6 @@ using Vec3dBatch =
 using Vec3iBatch =
     detail::Vec3BatchImpl<nanovdb::Coord, false /*AllowScalar*/, true /*AllowBroadcast*/>;
 
-/// @brief A class that can be constructed from a torch::Device or a string.
-///        Calling value() returns a torch::device
-class TorchDeviceOrString {
-    torch::Device mValue;
-    void
-    setIndex() {
-        if (mValue.is_cuda() && !mValue.has_index()) {
-            mValue.set_index(c10::cuda::current_device());
-        }
-    }
-
-  public:
-    TorchDeviceOrString() : mValue(torch::kCPU) { setIndex(); }
-    TorchDeviceOrString(torch::Device device) : mValue(device) { setIndex(); }
-    TorchDeviceOrString(c10::DeviceType deviceType) : mValue(deviceType) { setIndex(); }
-    TorchDeviceOrString(std::string &str) : mValue(str) { setIndex(); }
-
-    const torch::Device &
-    value() const {
-        return mValue;
-    }
-};
-
 /// @brief A class that con be constructed from a string or a list of strings but always returns a
 /// list of strings
 ///        Used to enable broadcasting for arguments that specify a single value or a list of values

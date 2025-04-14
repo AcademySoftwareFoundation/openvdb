@@ -46,7 +46,7 @@ template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromDense(uint32_t batchSize, nanovdb::Coord origin, nanovdb::Coord size,
                                 bool isMutable, torch::Device device,
-                                const torch::optional<torch::Tensor> &maybeMask);
+                                const std::optional<torch::Tensor> &maybeMask);
 template <c10::DeviceType>
 void dispatchPopulateGridMetadata(const nanovdb::GridHandle<TorchDeviceBuffer> &batchHdl,
                                   const std::vector<nanovdb::Vec3d>            &voxelSizes,
@@ -299,9 +299,9 @@ JaggedTensor dispatchCoarseIJKForFineGrid(const GridBatchImpl &batchHdl,
                                           nanovdb::Coord       coarseningFactor);
 
 template <c10::DeviceType>
-JaggedTensor dispatchFineIJKForCoarseGrid(const GridBatchImpl                 &batchHdl,
-                                          nanovdb::Coord                       upsamplingFactor,
-                                          const torch::optional<JaggedTensor> &maybeMask);
+JaggedTensor dispatchFineIJKForCoarseGrid(const GridBatchImpl               &batchHdl,
+                                          nanovdb::Coord                     upsamplingFactor,
+                                          const std::optional<JaggedTensor> &maybeMask);
 
 template <c10::DeviceType>
 JaggedTensor dispatchConvIJKForGrid(const GridBatchImpl &batchHdl, const nanovdb::Coord &kernelSize,
@@ -500,9 +500,9 @@ dispatchGaussianProjectionBackward(
     const torch::Tensor               &dLossDConics,        // [C, N, 3]
     const at::optional<torch::Tensor> &dLossDCompensations, // [C, N] optional
     const bool worldToCamMatricesRequiresGrad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum = torch::nullopt,
-    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum          = torch::nullopt,
-    at::optional<torch::Tensor> outGradientStepCounts               = torch::nullopt);
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum = std::nullopt,
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum          = std::nullopt,
+    at::optional<torch::Tensor> outGradientStepCounts               = std::nullopt);
 
 /// @brief Compute the intersection of 2D Gaussians with image tiles for efficient rasterization
 ///

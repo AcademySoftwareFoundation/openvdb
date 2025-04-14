@@ -470,8 +470,8 @@ saveIndexGridWithBlindData(const std::string &path, const GridBatch &gridBatch,
 }
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
-toNVDB(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData,
-       const torch::optional<StringOrListOfStrings> maybeNames) {
+toNVDB(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
+       const std::optional<StringOrListOfStrings> maybeNames) {
     // Get optional names
     std::vector<std::string> names;
     if (maybeNames.has_value()) {
@@ -492,8 +492,8 @@ toNVDB(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData
 
 void
 saveNVDB(const std::string &path, const GridBatch &gridBatch,
-         const torch::optional<JaggedTensor>          maybeData,
-         const torch::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
+         const std::optional<JaggedTensor>          maybeData,
+         const std::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
     // Which Codec to use for saving
     nanovdb::io::Codec codec = compressed ? nanovdb::io::Codec::BLOSC : nanovdb::io::Codec::NONE;
 

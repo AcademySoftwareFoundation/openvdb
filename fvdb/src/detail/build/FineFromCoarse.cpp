@@ -71,8 +71,8 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
 
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseBatchHdl,
-                            const torch::optional<JaggedTensor> &subdivMask,
-                            const nanovdb::Coord                 subdivisionFactor) {
+                            const std::optional<JaggedTensor> &subdivMask,
+                            const nanovdb::Coord               subdivisionFactor) {
     if (coarseBatchHdl.device().is_cuda()) {
         JaggedTensor coords = ops::dispatchFineIJKForCoarseGrid<torch::kCUDA>(
             coarseBatchHdl, subdivisionFactor, subdivMask);

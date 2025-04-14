@@ -30,8 +30,7 @@ GridBatch jcat(const std::vector<GridBatch> &vec);
 /// @param dim The dimension to concatenate along or nullptr to concatenate the outermost tensor
 /// lists
 /// @return A JaggedTensor representing the concatenated JaggedTensor
-JaggedTensor jcat(const std::vector<JaggedTensor> &vec,
-                  torch::optional<int64_t>         dim = torch::nullopt);
+JaggedTensor jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dim = std::nullopt);
 
 /// @brief Create a JaggedTensor filled with random numbers from a uniform distribution
 ///        on the interval [0, 1) with the specified lshape an rshape
@@ -157,10 +156,31 @@ GridBatch gridbatch_from_ijk(const JaggedTensor       &ijk,
 /// @param mutable If the returned grid batch should be mutable
 /// @return A GridBatch containing a batch of dense grids
 GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
-                               const Vec3dBatchOrScalar      &voxel_sizes = 1.0,
-                               const Vec3dBatch              &origins     = torch::zeros({ 3 }),
-                               torch::optional<torch::Tensor> mask        = torch::nullopt,
-                               TorchDeviceOrString device = torch::kCPU, bool is_mutable = false);
+                               const Vec3dBatchOrScalar    &voxel_sizes = 1.0,
+                               const Vec3dBatch            &origins     = torch::zeros({ 3 }),
+                               std::optional<torch::Tensor> mask        = std::nullopt,
+                               const torch::Device &device = torch::kCPU, bool is_mutable = false);
+
+/// @brief Return a grid batch densely from ijkMin to ijkMin + size
+/// @param numGrids The number of grids to create in the batch
+/// @param denseDims The size of each dense grid (shape [3,] = [W, H, D])
+/// @param ijkMin The minimum ijk coordinate of each dense grid in the batch (shape [3,])
+/// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid in
+/// the batch or one voxel size for all grids
+/// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the [0,
+/// 0, 0] voxel
+///                     for each grid in the batch, or one origin for all grids
+/// @param mask Optional mask of shape [W, H, D] to specify voxels which are included in the dense
+/// grid.
+///             Note that the same mask will be re-used for all the grids in the batch.
+/// @param device String specifying which device to build the grid batch on
+/// @param mutable If the returned grid batch should be mutable
+/// @return A GridBatch containing a batch of dense grids
+GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
+                               const Vec3dBatchOrScalar    &voxel_sizes = 1.0,
+                               const Vec3dBatch            &origins     = torch::zeros({ 3 }),
+                               std::optional<torch::Tensor> mask        = std::nullopt,
+                               const std::string &device_string = "cpu", bool is_mutable = false);
 
 /// @brief Return a grid batch from a jagged batch of triangle meshes (i.e. each voxel intersects
 /// the mesh)
@@ -197,11 +217,10 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle);
 /// for every grid)
 /// @return A nanovdb grid handle, whose type is inferred from the data, containing the converted
 /// grids
-nanovdb::GridHandle<nanovdb::HostBuffer>
-to_nanovdb(const GridBatch                             &gridBatch,
-           const torch::optional<JaggedTensor>          maybeData = torch::optional<JaggedTensor>(),
-           const torch::optional<StringOrListOfStrings> maybeNames =
-               torch::optional<StringOrListOfStrings>());
+nanovdb::GridHandle<nanovdb::HostBuffer> to_nanovdb(
+    const GridBatch                           &gridBatch,
+    const std::optional<JaggedTensor>          maybeData  = std::optional<JaggedTensor>(),
+    const std::optional<StringOrListOfStrings> maybeNames = std::optional<StringOrListOfStrings>());
 
 /// @brief Save a grid batch and optional jagged tensor to a .nvdb file. Will overwrite existing
 /// files.
@@ -213,11 +232,11 @@ to_nanovdb(const GridBatch                             &gridBatch,
 /// every grid)
 /// @param compressed Whether to compress the stored grid using Blosc (https://www.blosc.org/)
 /// @param verbose Whether to print information about the saved grids
-void save(const std::string &path, const GridBatch &gridBatch,
-          const torch::optional<JaggedTensor>          maybeData = torch::optional<JaggedTensor>(),
-          const torch::optional<StringOrListOfStrings> maybeNames =
-              torch::optional<StringOrListOfStrings>(),
-          bool compressed = false, bool verbose = false);
+void
+save(const std::string &path, const GridBatch &gridBatch,
+     const std::optional<JaggedTensor>          maybeData  = std::optional<JaggedTensor>(),
+     const std::optional<StringOrListOfStrings> maybeNames = std::optional<StringOrListOfStrings>(),
+     bool compressed = false, bool verbose = false);
 
 /// @brief Load a grid batch from a .nvdb file. This function loads each nanovdb grid into the batch
 /// as well
@@ -233,8 +252,25 @@ void save(const std::string &path, const GridBatch &gridBatch,
 ///         data is a JaggedTensor containing the data of the grids, and names is a list of strings
 ///         containing the name of each grid
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, TorchDeviceOrString device,
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, const torch::Device &device,
      bool verbose = false);
+
+/// @brief Load a grid batch from a .nvdb file. This function loads each nanovdb grid into the batch
+/// as well
+///        as a list of tensors containing the data at each grid in the batch
+///        (e.g. a Vec3d grid will load a [num_voxels, 3] float64 tensor)
+/// @param path The path to the .nvdb file to load
+/// @param gridIdentifier The identifier (index, list of indices, name, list of names) to load from
+/// the file
+/// @param device_string String specifying which device to load the grid batch on
+/// @param verbose If set to true, print information about the loaded grids
+/// @return A triple (gridbatch, data, names) where gridbatch is a GridBatch containing the loaded
+/// grids,
+///         data is a JaggedTensor containing the data of the grids, and names is a list of strings
+///         containing the name of each grid
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier,
+     const std::string &device_string, bool verbose = false);
 
 } // namespace fvdb
 

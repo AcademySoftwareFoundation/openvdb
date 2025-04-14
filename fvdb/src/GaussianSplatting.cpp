@@ -19,8 +19,8 @@ using RenderSettings = fvdb::detail::ops::RenderSettings;
 
 torch::Tensor
 evaluateSphericalHarmonics(const torch::Tensor &shCoeffs, const torch::Tensor &radii,
-                           const torch::optional<torch::Tensor> directions,
-                           const int                            shDegreeToUse = -1) {
+                           const std::optional<torch::Tensor> directions,
+                           const int                          shDegreeToUse = -1) {
     const int K              = shCoeffs.size(0); // number of SH bases
     const int actualShDegree = shDegreeToUse < 0 ? (std::sqrt(K) - 1) : shDegreeToUse;
     TORCH_CHECK(K >= (actualShDegree + 1) * (actualShDegree + 1),
@@ -278,9 +278,9 @@ GaussianSplat3d::projectGaussiansImpl(const torch::Tensor  &worldToCameraMatrice
     ret.mRenderSettings = settings;
 
     // Track gradients for the 2D means in the backward pass if you're optimizing
-    torch::optional<torch::Tensor> maybeNormalizedMeans2dGradientNorms = torch::nullopt;
-    torch::optional<torch::Tensor> maybePerGaussianRadiiForGrad        = torch::nullopt;
-    torch::optional<torch::Tensor> maybeGradientStepCount              = torch::nullopt;
+    std::optional<torch::Tensor> maybeNormalizedMeans2dGradientNorms = std::nullopt;
+    std::optional<torch::Tensor> maybePerGaussianRadiiForGrad        = std::nullopt;
+    std::optional<torch::Tensor> maybeGradientStepCount              = std::nullopt;
     if (mRequiresGrad) {
         if (mAccumulatedNormalized2dMeansGradientNormsForGrad.numel() != N) {
             mAccumulatedNormalized2dMeansGradientNormsForGrad =
@@ -333,9 +333,8 @@ GaussianSplat3d::projectGaussiansImpl(const torch::Tensor  &worldToCameraMatrice
                 // correct shape (without reallocating memory). i.e. the color tensor has shape [C,
                 // N, D] but only allocates NxD floats in memory. This is useful for rendering e.g.
                 // high dimensional diffuse features.
-                renderQuantity =
-                    evaluateSphericalHarmonics(mSh0.unsqueeze(1), ret.perGaussianRadius,
-                                               torch::nullopt, settings.shDegreeToUse);
+                renderQuantity = evaluateSphericalHarmonics(
+                    mSh0.unsqueeze(1), ret.perGaussianRadius, std::nullopt, settings.shDegreeToUse);
                 renderQuantity = renderQuantity.expand({ C, -1, -1 });
 
             } else {

@@ -63,7 +63,7 @@ class GridBuildingConfig(BaseConfig):
     in_channels: int = 32
 
     def get_aux_inputs(self, vdb_tensor: VDBTensor) -> dict:
-        if vdb_tensor.device != torch.device("cuda"):
+        if vdb_tensor.device != torch.device("cuda", torch.cuda.current_device()):
             vdb_tensor = vdb_tensor.to("cuda")
         coord = vdb_tensor.grid.ijk
         feats = vdb_tensor.feature.jdata

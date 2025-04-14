@@ -12,9 +12,18 @@
 
 namespace fvdb {
 
-GridBatch::GridBatch(TorchDeviceOrString device, bool isMutable) {
-    detail::RAIIDeviceGuard guard(device.value());
-    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device.value(), isMutable);
+GridBatch::GridBatch(const torch::Device &device, bool isMutable) {
+    detail::RAIIDeviceGuard guard(device);
+    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device, isMutable);
+}
+
+GridBatch::GridBatch(const std::string &device_string, bool isMutable) {
+    torch::Device device(device_string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
+    detail::RAIIDeviceGuard guard(device);
+    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device, isMutable);
 }
 
 GridBatch::GridBatch() {
@@ -25,7 +34,7 @@ GridBatch::GridBatch() {
 
 std::pair<JaggedTensor, GridBatch>
 GridBatch::max_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOrScalar stride,
-                    torch::optional<GridBatch> coarse_grid) const {
+                    std::optional<GridBatch> coarse_grid) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
@@ -57,7 +66,7 @@ GridBatch::max_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOr
 
 std::pair<JaggedTensor, GridBatch>
 GridBatch::avg_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOrScalar stride,
-                    torch::optional<GridBatch> coarse_grid) const {
+                    std::optional<GridBatch> coarse_grid) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
@@ -89,8 +98,8 @@ GridBatch::avg_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOr
 
 std::pair<JaggedTensor, GridBatch>
 GridBatch::subdivide(Vec3iOrScalar subdiv_factor, const JaggedTensor &data,
-                     const torch::optional<JaggedTensor> mask,
-                     torch::optional<GridBatch>          fine_grid) const {
+                     const std::optional<JaggedTensor> mask,
+                     std::optional<GridBatch>          fine_grid) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
@@ -126,9 +135,9 @@ GridBatch::read_from_dense(const torch::Tensor &dense_data, const Vec3iBatch &de
 }
 
 torch::Tensor
-GridBatch::write_to_dense(const JaggedTensor                &sparse_data,
-                          const torch::optional<Vec3iBatch> &min_coord,
-                          const torch::optional<Vec3i>      &grid_size) const {
+GridBatch::write_to_dense(const JaggedTensor              &sparse_data,
+                          const std::optional<Vec3iBatch> &min_coord,
+                          const std::optional<Vec3i>      &grid_size) const {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         sparse_data.ldim() == 1,
@@ -685,7 +694,7 @@ GridBatch::set_from_ijk(const JaggedTensor &coords, const Vec3i &pad_min, const 
 void
 GridBatch::set_from_dense_grid(const int64_t num_grids, const Vec3i &dense_dims,
                                const Vec3i &ijk_min, const Vec3dBatchOrScalar &voxel_sizes,
-                               const Vec3dBatch &origins, torch::optional<torch::Tensor> mask) {
+                               const Vec3dBatch &origins, std::optional<torch::Tensor> mask) {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(num_grids >= 0, "num_grids must be non-negative");
 
@@ -754,8 +763,8 @@ GridBatch::coarsened_grid(Vec3iOrScalar branch_factor) const {
 }
 
 GridBatch
-GridBatch::subdivided_grid(Vec3iOrScalar                       subdiv_factor,
-                           const torch::optional<JaggedTensor> mask) const {
+GridBatch::subdivided_grid(Vec3iOrScalar                     subdiv_factor,
+                           const std::optional<JaggedTensor> mask) const {
     detail::RAIIDeviceGuard guard(device());
 
     if (mask.has_value()) {
@@ -917,9 +926,9 @@ GridBatch::buildCoarseFromFineGrid(const GridBatch &fineGrid, nanovdb::Coord bra
 }
 
 void
-GridBatch::buildFineFromCoarseGrid(const GridBatch                     &coarseGrid,
-                                   const torch::optional<JaggedTensor> &subdivMask,
-                                   nanovdb::Coord                       subdivFactor) {
+GridBatch::buildFineFromCoarseGrid(const GridBatch                   &coarseGrid,
+                                   const std::optional<JaggedTensor> &subdivMask,
+                                   nanovdb::Coord                     subdivFactor) {
     detail::RAIIDeviceGuard guard(device());
     if (subdivMask.has_value()) {
         TORCH_CHECK_VALUE(

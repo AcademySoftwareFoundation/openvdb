@@ -349,8 +349,8 @@ dispatchGaussianRasterizeForward<torch::kCUDA>(
     CHECK_INPUT(colors);
     const uint32_t channels = colors.size(-1);
 
-    const torch::optional<torch::Tensor> backgrounds = torch::nullopt;
-    const torch::optional<torch::Tensor> masks       = torch::nullopt;
+    const std::optional<torch::Tensor> backgrounds = std::nullopt;
+    const std::optional<torch::Tensor> masks       = std::nullopt;
 
 #define __CALL_FWD_(N)                                                                         \
     case N:                                                                                    \
