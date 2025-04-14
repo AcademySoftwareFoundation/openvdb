@@ -30,6 +30,8 @@ concurrency:
 permissions:
   contents: write
   deployments: write
+  pull-requests: read
+  issues: read
 
 jobs:
   fvdb-build:
@@ -47,23 +49,68 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
+      ### Get the PR branch and apply changes to the target branch
       - uses: actions/checkout@v4
-      - name: Fetch base branch
+        with:
+          fetch-depth: 0 # Fetch all history for all branches
+      - name: Determine the target branch of the PR
         run: |
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin feature/fvdb
-          # Save the current branch name (the one that triggered the workflow)
-          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
-          # Checkout the target branch
-          git checkout feature/fvdb
+          echo "Fetching pull request metadata..."
+          # Install GitHub CLI and jq
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          yum install -y gh
+          which jq || yum install -y jq
+          # Extract PR number from branch name if it follows pattern "pull-request/123"
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch name: $BRANCH_NAME"
 
-      - name: Apply PR changes
+          # Setup GitHub CLI authentication
+          echo "${{ github.token }}" | gh auth login --with-token
+
+          # Get default branch from repository
+          echo "Getting default branch from repository..."
+          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
+          echo "Repository default branch is: $DEFAULT_BRANCH"
+
+          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
+            PR_NUMBER=${BASH_REMATCH[1]}
+            echo "Found PR number from branch name: $PR_NUMBER"
+
+            echo "Using gh CLI to get PR details..."
+            # Get PR info using GitHub CLI and extract the base branch
+            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
+            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+
+            echo "Target branch is $TARGET_BRANCH"
+
+            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
+              echo "Could not determine target branch, using default branch"
+              TARGET_BRANCH="$DEFAULT_BRANCH"
+            fi
+          else
+            echo "Branch doesn't match the expected pattern, using default branch"
+            TARGET_BRANCH="$DEFAULT_BRANCH"
+          fi
+
+          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
+          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
+      - name: Set up Git user
         run: |
-          # Get the commit hash of the PR branch
-          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
-          # Use read-tree to apply changes without committing
-          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Merge pushed branch into target branch
+        run: |
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "No pull request metadata found. Skipping merge."
+            exit 0
+          fi
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin $TARGET_BRANCH
+          git checkout $TARGET_BRANCH
+          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      #### End of git merge
 
       - name: Set up fvdb_build Conda env
         uses: conda-incubator/setup-miniconda@v3
@@ -72,7 +119,6 @@ jobs:
           conda-remove-defaults: "true"
           activate-environment: fvdb_build
           environment-file: fvdb/env/build_environment.yml
-
 
       - name: Buid fvdb
         run: |
@@ -108,23 +154,69 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
+      ### Get the PR branch and apply changes to the target branch
       - uses: actions/checkout@v4
-      - name: Fetch base branch
+        with:
+          fetch-depth: 0 # Fetch all history for all branches
+      - name: Determine the target branch of the PR
         run: |
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin feature/fvdb
-          # Save the current branch name (the one that triggered the workflow)
-          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
-          # Checkout the target branch
-          git checkout feature/fvdb
+          echo "Fetching pull request metadata..."
+          # Install GitHub CLI and jq
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          yum install -y gh
+          which jq || yum install -y jq
+          # Extract PR number from branch name if it follows pattern "pull-request/123"
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch name: $BRANCH_NAME"
 
-      - name: Apply PR changes
+          # Setup GitHub CLI authentication
+          echo "${{ github.token }}" | gh auth login --with-token
+
+          # Get default branch from repository
+          echo "Getting default branch from repository..."
+          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
+          echo "Repository default branch is: $DEFAULT_BRANCH"
+
+          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
+            PR_NUMBER=${BASH_REMATCH[1]}
+            echo "Found PR number from branch name: $PR_NUMBER"
+
+            echo "Using gh CLI to get PR details..."
+            # Get PR info using GitHub CLI and extract the base branch
+            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
+            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+
+            echo "Target branch is $TARGET_BRANCH"
+
+            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
+              echo "Could not determine target branch, using default branch"
+              TARGET_BRANCH="$DEFAULT_BRANCH"
+            fi
+          else
+            echo "Branch doesn't match the expected pattern, using default branch"
+            TARGET_BRANCH="$DEFAULT_BRANCH"
+          fi
+
+          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
+          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
+      - name: Set up Git user
         run: |
-          # Get the commit hash of the PR branch
-          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
-          # Use read-tree to apply changes without committing
-          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Merge pushed branch into target branch
+        run: |
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "No pull request metadata found. Skipping merge."
+            exit 0
+          fi
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin $TARGET_BRANCH
+          git checkout $TARGET_BRANCH
+          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      #### End of git merge
+
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -170,23 +262,69 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
+      ### Get the PR branch and apply changes to the target branch
       - uses: actions/checkout@v4
-      - name: Fetch base branch
+        with:
+          fetch-depth: 0 # Fetch all history for all branches
+      - name: Determine the target branch of the PR
         run: |
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin feature/fvdb
-          # Save the current branch name (the one that triggered the workflow)
-          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
-          # Checkout the target branch
-          git checkout feature/fvdb
+          echo "Fetching pull request metadata..."
+          # Install GitHub CLI and jq
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          yum install -y gh
+          which jq || yum install -y jq
+          # Extract PR number from branch name if it follows pattern "pull-request/123"
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch name: $BRANCH_NAME"
 
-      - name: Apply PR changes
+          # Setup GitHub CLI authentication
+          echo "${{ github.token }}" | gh auth login --with-token
+
+          # Get default branch from repository
+          echo "Getting default branch from repository..."
+          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
+          echo "Repository default branch is: $DEFAULT_BRANCH"
+
+          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
+            PR_NUMBER=${BASH_REMATCH[1]}
+            echo "Found PR number from branch name: $PR_NUMBER"
+
+            echo "Using gh CLI to get PR details..."
+            # Get PR info using GitHub CLI and extract the base branch
+            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
+            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+
+            echo "Target branch is $TARGET_BRANCH"
+
+            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
+              echo "Could not determine target branch, using default branch"
+              TARGET_BRANCH="$DEFAULT_BRANCH"
+            fi
+          else
+            echo "Branch doesn't match the expected pattern, using default branch"
+            TARGET_BRANCH="$DEFAULT_BRANCH"
+          fi
+
+          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
+          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
+      - name: Set up Git user
         run: |
-          # Get the commit hash of the PR branch
-          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
-          # Use read-tree to apply changes without committing
-          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Merge pushed branch into target branch
+        run: |
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "No pull request metadata found. Skipping merge."
+            exit 0
+          fi
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin $TARGET_BRANCH
+          git checkout $TARGET_BRANCH
+          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      #### End of git merge
+
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -231,23 +369,68 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
+      ### Get the PR branch and apply changes to the target branch
       - uses: actions/checkout@v4
-      - name: Fetch base branch
+        with:
+          fetch-depth: 0 # Fetch all history for all branches
+      - name: Determine the target branch of the PR
         run: |
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin feature/fvdb
-          # Save the current branch name (the one that triggered the workflow)
-          TRIGGER_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-          echo "TRIGGER_BRANCH=$TRIGGER_BRANCH" >> $GITHUB_ENV
-          # Checkout the target branch
-          git checkout feature/fvdb
+          echo "Fetching pull request metadata..."
+          # Install GitHub CLI and jq
+          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+          yum install -y gh
+          which jq || yum install -y jq
+          # Extract PR number from branch name if it follows pattern "pull-request/123"
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch name: $BRANCH_NAME"
 
-      - name: Apply PR changes
+          # Setup GitHub CLI authentication
+          echo "${{ github.token }}" | gh auth login --with-token
+
+          # Get default branch from repository
+          echo "Getting default branch from repository..."
+          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
+          echo "Repository default branch is: $DEFAULT_BRANCH"
+
+          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
+            PR_NUMBER=${BASH_REMATCH[1]}
+            echo "Found PR number from branch name: $PR_NUMBER"
+
+            echo "Using gh CLI to get PR details..."
+            # Get PR info using GitHub CLI and extract the base branch
+            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
+            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
+
+            echo "Target branch is $TARGET_BRANCH"
+
+            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
+              echo "Could not determine target branch, using default branch"
+              TARGET_BRANCH="$DEFAULT_BRANCH"
+            fi
+          else
+            echo "Branch doesn't match the expected pattern, using default branch"
+            TARGET_BRANCH="$DEFAULT_BRANCH"
+          fi
+
+          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
+          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
+      - name: Set up Git user
         run: |
-          # Get the commit hash of the PR branch
-          PR_COMMIT=$(git rev-parse origin/${{ env.TRIGGER_BRANCH }})
-          # Use read-tree to apply changes without committing
-          git read-tree -u -m $(git rev-parse HEAD) $PR_COMMIT
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Merge pushed branch into target branch
+        run: |
+          if [ -z "$TARGET_BRANCH" ]; then
+            echo "No pull request metadata found. Skipping merge."
+            exit 0
+          fi
+          git config --global --add safe.directory "$(pwd)"
+          git fetch origin $TARGET_BRANCH
+          git checkout $TARGET_BRANCH
+          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
+        env:
+          GITHUB_REF: ${{ github.ref }}
+      #### End of git merge
 
       - name: Set up fvdb_test Conda env
         uses: conda-incubator/setup-miniconda@v3
