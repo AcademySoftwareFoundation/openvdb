@@ -25,14 +25,14 @@ function(configure_torch_pybind11 target_name)
   # PyTorch typically either has _GLIBCXX_USE_CXX11_ABI=0 or _GLIBCXX_USE_CXX11_ABI=1
   # NOTE: disabled because it seems to be redundant with TORCH_CXX_FLAGS
   # execute_process(
-  #   COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.append('${Python3_SITELIB}'); import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)"
+  #   COMMAND "${CMAKE_COMMAND}" -E env PYTHONPATH="${Python3_SITELIB}" ${Python3_EXECUTABLE} -c "import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)"
   #   OUTPUT_VARIABLE TORCH_CXX11_ABI
   #   OUTPUT_STRIP_TRAILING_WHITESPACE
   # )
 
   # Extract PyTorch's pybind11 ABI constants
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.append('${Python3_SITELIB}'); import torch; print(f'COMPILER_TYPE:{torch._C._PYBIND11_COMPILER_TYPE if hasattr(torch._C, \"_PYBIND11_COMPILER_TYPE\") else \"\"};STDLIB:{torch._C._PYBIND11_STDLIB if hasattr(torch._C, \"_PYBIND11_STDLIB\") else \"\"};BUILD_ABI:{torch._C._PYBIND11_BUILD_ABI if hasattr(torch._C, \"_PYBIND11_BUILD_ABI\") else \"\"}')"
+    COMMAND "${CMAKE_COMMAND}" -E env PYTHONPATH="${Python3_SITELIB}" ${Python3_EXECUTABLE} -c "import torch; print(f'COMPILER_TYPE:{torch._C._PYBIND11_COMPILER_TYPE if hasattr(torch._C, \"_PYBIND11_COMPILER_TYPE\") else \"\"};STDLIB:{torch._C._PYBIND11_STDLIB if hasattr(torch._C, \"_PYBIND11_STDLIB\") else \"\"};BUILD_ABI:{torch._C._PYBIND11_BUILD_ABI if hasattr(torch._C, \"_PYBIND11_BUILD_ABI\") else \"\"}')"
     OUTPUT_VARIABLE TORCH_PYBIND11_ABI
     OUTPUT_STRIP_TRAILING_WHITESPACE
   )
@@ -77,7 +77,7 @@ function(configure_torch_pybind11 target_name)
 
     # Check if we can add CUDA arch flags
     execute_process(
-      COMMAND ${Python3_EXECUTABLE} -c "import sys; sys.path.append('${Python3_SITELIB}'); import torch.utils.cpp_extension; print(';'.join(torch.utils.cpp_extension.CUDA_HOME is not None and hasattr(torch.utils.cpp_extension, 'COMMON_NVCC_FLAGS') and torch.utils.cpp_extension.COMMON_NVCC_FLAGS or []))"
+      COMMAND "${CMAKE_COMMAND}" -E env PYTHONPATH="${Python3_SITELIB}" ${Python3_EXECUTABLE} -c "import torch.utils.cpp_extension; print(';'.join(torch.utils.cpp_extension.CUDA_HOME is not None and hasattr(torch.utils.cpp_extension, 'COMMON_NVCC_FLAGS') and torch.utils.cpp_extension.COMMON_NVCC_FLAGS or []))"
       OUTPUT_VARIABLE TORCH_COMMON_NVCC_FLAGS
       OUTPUT_STRIP_TRAILING_WHITESPACE
     )
