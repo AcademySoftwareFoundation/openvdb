@@ -3,7 +3,7 @@ setuptools >= 68.2.2
 wheel
 GitPython
 ninja
-requests
+nvidia-cudnn-cu12
 tqdm
 numpy<2.0.0
 torch

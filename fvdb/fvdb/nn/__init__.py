@@ -18,6 +18,7 @@ from .modules import (
     Sigmoid,
     SiLU,
     SparseConv3d,
+    SyncBatchNorm,
     Tanh,
     UpsamplingNearest,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "SparseConv3d",
     "GroupNorm",
     "BatchNorm",
+    "SyncBatchNorm",
     "Linear",
     "ReLU",
     "LeakyReLU",
