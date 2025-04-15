@@ -28,7 +28,7 @@ dependencies:
   - matplotlib
   - myst-parser
   - ninja
-  - numpy<2
+  - numpy
   - openssl
   - pandas
   - parameterized

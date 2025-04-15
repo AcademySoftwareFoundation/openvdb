@@ -23,7 +23,7 @@ dependencies:
   - make
   - myst-parser
   - ninja
-  - numpy<2
+  - numpy
   - openssl
   - psutil
   - python=3.11

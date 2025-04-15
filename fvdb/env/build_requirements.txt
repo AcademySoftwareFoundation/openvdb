@@ -5,5 +5,5 @@ GitPython
 ninja
 nvidia-cudnn-cu12
 tqdm
-numpy<2.0.0
+numpy
 torch

@@ -23,7 +23,7 @@ dependencies:
   - pandas
   - rich
   - pytest-benchmark
-  - numpy<2
+  - numpy
   - linkify-it-py
   - glm
   - polyscope
