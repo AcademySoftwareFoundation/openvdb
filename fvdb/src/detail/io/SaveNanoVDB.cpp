@@ -471,13 +471,11 @@ saveIndexGridWithBlindData(const std::string &path, const GridBatch &gridBatch,
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
 toNVDB(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
-       const std::optional<StringOrListOfStrings> maybeNames) {
+       const std::vector<std::string> &names) {
     // Get optional names
-    std::vector<std::string> names;
-    if (maybeNames.has_value()) {
-        names = maybeNames.value().value();
+    if (!names.empty()) {
         TORCH_CHECK_VALUE(
-            names.size() == 0 || names.size() == (size_t)gridBatch.grid_count(),
+            names.size() == (size_t)gridBatch.grid_count(),
             "Invalid parameter for names, must be empty or a list of the same length as the batch size. Got " +
                 std::to_string(names.size()) + " names for batch size " +
                 std::to_string(gridBatch.grid_count()));
@@ -492,17 +490,15 @@ toNVDB(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
 
 void
 saveNVDB(const std::string &path, const GridBatch &gridBatch,
-         const std::optional<JaggedTensor>          maybeData,
-         const std::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
+         const std::optional<JaggedTensor> maybeData, const std::vector<std::string> &names,
+         bool compressed, bool verbose) {
     // Which Codec to use for saving
     nanovdb::io::Codec codec = compressed ? nanovdb::io::Codec::BLOSC : nanovdb::io::Codec::NONE;
 
     // Get optional names
-    std::vector<std::string> names;
-    if (maybeNames.has_value()) {
-        names = maybeNames.value().value();
+    if (!names.empty()) {
         TORCH_CHECK_VALUE(
-            names.size() == 0 || names.size() == (size_t)gridBatch.grid_count(),
+            names.size() == (size_t)gridBatch.grid_count(),
             "Invalid parameter for names, must be empty or a list of the same length as the batch size. Got " +
                 std::to_string(names.size()) + " names for batch size " +
                 std::to_string(gridBatch.grid_count()));

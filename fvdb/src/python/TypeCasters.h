@@ -126,31 +126,6 @@ struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::Jagg
 };
 
 template <>
-struct type_caster<fvdb::StringOrListOfStrings>
-    : public type_caster_base<fvdb::StringOrListOfStrings> {
-    using base = type_caster_base<fvdb::StringOrListOfStrings>;
-
-  public:
-    fvdb::StringOrListOfStrings strlist_value;
-
-    bool
-    load(handle src, bool convert) {
-        try {
-            std::string deviceString = src.cast<std::string>();
-            strlist_value            = fvdb::StringOrListOfStrings(deviceString);
-            value                    = &strlist_value;
-            return true;
-        } catch (pybind11::cast_error &e) {
-            std::vector<std::string> stringList = src.cast<std::vector<std::string>>();
-            strlist_value                       = fvdb::StringOrListOfStrings(stringList);
-            value                               = &strlist_value;
-            return true;
-        }
-        return false;
-    }
-};
-
-template <>
 struct type_caster<fvdb::NanoVDBFileGridIdentifier>
     : public type_caster_base<fvdb::NanoVDBFileGridIdentifier> {
     using base = type_caster_base<fvdb::NanoVDBFileGridIdentifier>;

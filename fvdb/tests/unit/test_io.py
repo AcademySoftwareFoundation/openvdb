@@ -67,11 +67,12 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        names = None
+        name = ""
+        names = []
         if include_names:
             names = [f"grid-{i}" for i in range(batch_size)]
             if batch_size == 1 and np.random.rand() > 0.5:
-                names = names[0]
+                name = names[0]
 
         sizes = [np.random.randint(100, 200) for _ in range(batch_size)]
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(device)
@@ -81,12 +82,15 @@ class TestIO(unittest.TestCase):
         data = fvdb.JaggedTensor([(torch.rand(*sizes[i], device=device) * 256).to(dtype) for i in range(batch_size)])
 
         with tempfile.NamedTemporaryFile() as temp:
-            fvdb.save(temp.name, grid, data, names=names, compressed=compressed)
+            if name:
+                fvdb.save(temp.name, grid, data, name=name, compressed=compressed)
+            else:
+                fvdb.save(temp.name, grid, data, names=names, compressed=compressed)
             grid2, data2, names2 = fvdb.load(temp.name, device=device)
 
-            if isinstance(names, str):
-                names = [names] * batch_size
-            elif names is None:
+            if name:
+                names = [name] * batch_size
+            elif not names:
                 names = [""] * batch_size
 
             self.assertTrue(names == names2, f"{names}, {names2}")
@@ -130,7 +134,7 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        names = None
+        names = []
 
         sizes = [np.random.randint(10, 20) for _ in range(batch_size)]
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(device)
@@ -140,10 +144,7 @@ class TestIO(unittest.TestCase):
             fvdb.save(temp.name, grid, names=names, compressed=True)
             grid2, data2, names2 = fvdb.load(temp.name, device=device)
 
-            if isinstance(names, str):
-                names = [names] * batch_size
-            elif names is None:
-                names = [""] * batch_size
+            names = [""] * batch_size
 
             self.assertTrue(names == names2, f"{names}, {names2}")
 

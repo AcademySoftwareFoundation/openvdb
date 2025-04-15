@@ -1000,11 +1000,21 @@ def load(
 def load(
     path: str, grid_id: NanoVDBFileGridIdentifier = ..., device: str = ..., verbose: bool = ...
 ) -> tuple[GridBatch, JaggedTensor, list[str]]: ...
+@overload
 def save(
     path: str,
     grid_batch: GridBatch,
     data: JaggedTensor | None = ...,
-    names=...,
+    names: list[str] = ...,
+    compressed: bool = ...,
+    verbose: bool = ...,
+) -> None: ...
+@overload
+def save(
+    path: str,
+    grid_batch: GridBatch,
+    data: JaggedTensor | None = ...,
+    name: str = ...,
     compressed: bool = ...,
     verbose: bool = ...,
 ) -> None: ...

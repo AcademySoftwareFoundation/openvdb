@@ -178,8 +178,20 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
                             const std::string &, bool>(&fvdb::load),
           py::arg("path"), py::arg("grid_id") = py::none(), py::arg("device") = "cpu",
           py::arg("verbose") = false);
-    m.def("save", &fvdb::save, py::arg("path"), py::arg("grid_batch"), py::arg("data") = py::none(),
-          py::arg("names") = py::none(), py::arg("compressed") = false, py::arg("verbose") = false);
+    m.def("save",
+          py::overload_cast<const std::string &, const fvdb::GridBatch &,
+                            const std::optional<fvdb::JaggedTensor>,
+                            const std::vector<std::string> &, bool, bool>(&fvdb::save),
+          py::arg("path"), py::arg("grid_batch"), py::arg("data") = py::none(),
+          py::arg("names") = std::vector<std::string>(), py::arg("compressed") = false,
+          py::arg("verbose") = false);
+    m.def(
+        "save",
+        py::overload_cast<const std::string &, const fvdb::GridBatch &,
+                          const std::optional<fvdb::JaggedTensor>, const std::string &, bool, bool>(
+            &fvdb::save),
+        py::arg("path"), py::arg("grid_batch"), py::arg("data") = py::none(),
+        py::arg("name") = std::string(), py::arg("compressed") = false, py::arg("verbose") = false);
 
     /*
               py::overload_cast<const std::vector<int64_t>&,

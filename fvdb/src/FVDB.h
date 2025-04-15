@@ -217,10 +217,9 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle);
 /// for every grid)
 /// @return A nanovdb grid handle, whose type is inferred from the data, containing the converted
 /// grids
-nanovdb::GridHandle<nanovdb::HostBuffer> to_nanovdb(
-    const GridBatch                           &gridBatch,
-    const std::optional<JaggedTensor>          maybeData  = std::optional<JaggedTensor>(),
-    const std::optional<StringOrListOfStrings> maybeNames = std::optional<StringOrListOfStrings>());
+nanovdb::GridHandle<nanovdb::HostBuffer>
+to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData = std::nullopt,
+           const std::vector<std::string> &names = {});
 
 /// @brief Save a grid batch and optional jagged tensor to a .nvdb file. Will overwrite existing
 /// files.
@@ -228,15 +227,26 @@ nanovdb::GridHandle<nanovdb::HostBuffer> to_nanovdb(
 /// @param gridBatch The gridbatch to save
 /// @param maybeData Optional JaggedTensor of data to save with the grid batch (one element per
 /// voxel)
-/// @param maybeNames Optional list of names for each grid in the batch (or a single name to use for
-/// every grid)
+/// @param names Optional list of names for each grid in the batch
 /// @param compressed Whether to compress the stored grid using Blosc (https://www.blosc.org/)
 /// @param verbose Whether to print information about the saved grids
-void
-save(const std::string &path, const GridBatch &gridBatch,
-     const std::optional<JaggedTensor>          maybeData  = std::optional<JaggedTensor>(),
-     const std::optional<StringOrListOfStrings> maybeNames = std::optional<StringOrListOfStrings>(),
-     bool compressed = false, bool verbose = false);
+void save(const std::string &path, const GridBatch &gridBatch,
+          const std::optional<JaggedTensor> maybeData = std::nullopt,
+          const std::vector<std::string> &names = {}, bool compressed = false,
+          bool verbose = false);
+
+/// @brief Save a grid batch and optional jagged tensor to a .nvdb file. Will overwrite existing
+/// files.
+/// @param path The path to save the file to.
+/// @param gridBatch The gridbatch to save
+/// @param maybeData Optional JaggedTensor of data to save with the grid batch (one element per
+/// voxel)
+/// @param names Optional single name to use for every grid in the batch
+/// @param compressed Whether to compress the stored grid using Blosc (https://www.blosc.org/)
+/// @param verbose Whether to print information about the saved grids
+void save(const std::string &path, const GridBatch &gridBatch,
+          const std::optional<JaggedTensor> maybeData = std::nullopt,
+          const std::string &name = std::string(), bool compressed = false, bool verbose = false);
 
 /// @brief Load a grid batch from a .nvdb file. This function loads each nanovdb grid into the batch
 /// as well

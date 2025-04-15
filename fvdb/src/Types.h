@@ -40,24 +40,6 @@ using Vec3dBatch =
 using Vec3iBatch =
     detail::Vec3BatchImpl<nanovdb::Coord, false /*AllowScalar*/, true /*AllowBroadcast*/>;
 
-/// @brief A class that con be constructed from a string or a list of strings but always returns a
-/// list of strings
-///        Used to enable broadcasting for arguments that specify a single value or a list of values
-///        for a whole batch
-class StringOrListOfStrings {
-    std::vector<std::string> mValue;
-
-  public:
-    StringOrListOfStrings() : mValue() {}
-    StringOrListOfStrings(std::string str) : mValue({ str }) {}
-    StringOrListOfStrings(std::vector<std::string> str) : mValue(str) {}
-
-    const std::vector<std::string> &
-    value() const {
-        return mValue;
-    }
-};
-
 /// @brief A class representing a set of unique IDs for a nanovdb grid (used to specify which grids
 /// to load
 ///        from an .nvdb file). You can specify the set of grids to load as a integer index, a

@@ -72,8 +72,8 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle) {
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
 to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
-           const std::optional<StringOrListOfStrings> maybeNames) {
-    return detail::io::toNVDB(gridBatch, maybeData, maybeNames);
+           const std::vector<std::string> &names) {
+    return detail::io::toNVDB(gridBatch, maybeData, names);
 }
 
 GridBatch
@@ -91,9 +91,22 @@ jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dim) {
 
 void
 save(const std::string &path, const GridBatch &gridBatch,
-     const std::optional<JaggedTensor>          maybeData,
-     const std::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
-    detail::io::saveNVDB(path, gridBatch, maybeData, maybeNames, compressed, verbose);
+     const std::optional<JaggedTensor> maybeData, const std::vector<std::string> &names,
+     bool compressed, bool verbose) {
+    detail::io::saveNVDB(path, gridBatch, maybeData, names, compressed, verbose);
+}
+
+void
+save(const std::string &path, const GridBatch &gridBatch,
+     const std::optional<JaggedTensor> maybeData, const std::string &name, bool compressed,
+     bool verbose) {
+    if (name.empty()) {
+        detail::io::saveNVDB(path, gridBatch, maybeData, {}, compressed, verbose);
+    } else {
+        std::vector<std::string> names(gridBatch.grid_count());
+        std::fill(names.begin(), names.end(), name);
+        detail::io::saveNVDB(path, gridBatch, maybeData, names, compressed, verbose);
+    }
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
