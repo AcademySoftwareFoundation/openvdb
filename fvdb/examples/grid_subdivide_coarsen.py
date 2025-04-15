@@ -28,7 +28,7 @@ if __name__ == "__main__":
     ps.set_ground_plane_mode("shadow_only")
     ps.set_navigation_style("free")
 
-    [p] = load_dragon_mesh(mode="v", device=torch.device("cuda"))
+    [p] = load_dragon_mesh(mode="v", device=torch.device("cuda", torch.cuda.current_device()))
 
     grid_origin = fvdb.gridbatch_from_points(p, voxel_sizes=[0.005] * 3, origins=[0.0] * 3)
     visualize_grid(grid_origin, 0.0)

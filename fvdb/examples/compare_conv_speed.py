@@ -32,7 +32,7 @@ def benchmark_kmap_conv(grid: GridBatch, in_feature, in_kernel):
 
 
 def main():
-    device = torch.device("cuda")
+    device = torch.device("cuda", torch.cuda.current_device())
     dtype = torch.float32
     kernel_size = 3
     in_channel, out_channel = 128, 64
