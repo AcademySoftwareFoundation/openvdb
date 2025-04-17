@@ -18,16 +18,31 @@ using RenderMode     = fvdb::detail::ops::RenderSettings::RenderMode;
 using RenderSettings = fvdb::detail::ops::RenderSettings;
 
 torch::Tensor
-evaluateSphericalHarmonics(const torch::Tensor &shCoeffs, const torch::Tensor &radii,
-                           const std::optional<torch::Tensor> directions,
-                           const int                          shDegreeToUse = -1) {
-    const int K              = shCoeffs.size(0); // number of SH bases
-    const int actualShDegree = shDegreeToUse < 0 ? (std::sqrt(K) - 1) : shDegreeToUse;
-    TORCH_CHECK(K >= (actualShDegree + 1) * (actualShDegree + 1),
-                "K must be at least (shDegreeToUse + 1)^2");
-    auto shResults = detail::autograd::EvaluateSphericalHarmonics::apply(actualShDegree, directions,
-                                                                         shCoeffs, radii);
-    return shResults[0];
+GaussianSplat3d::evalSphericalHarmonicsImpl(const int64_t        shDegreeToUse,
+                                            const torch::Tensor &worldToCameraMatrices,
+                                            const torch::Tensor &perGaussianProjectedRadii) const {
+    const auto K              = mShN.size(0) + 1;              // number of SH bases
+    const auto C              = worldToCameraMatrices.size(0); // number of cameras
+    const auto actualShDegree = shDegreeToUse < 0 ? (int64_t(std::sqrt(K)) - 1) : shDegreeToUse;
+    if (actualShDegree == 0) {
+        return detail::autograd::EvaluateSphericalHarmonics::apply(
+            actualShDegree, C, torch::nullopt, mSh0, torch::nullopt, perGaussianProjectedRadii)[0];
+    } else {
+        // FIXME (Francis): Do this in the kernel instead of materializing a large
+        //                  tensor here. It's a bit annoying because we'll have to update
+        //                  the current backward pass
+        const torch::Tensor camToWorldMatrices = torch::inverse(worldToCameraMatrices);
+        // Equivalent to viewDirs = means[None, :, :] - camToWorldMatrices[:, None, :3, 3]
+        // NOTE: viewDirs are not normalized here, they get normalized in the spherical
+        //       harmonics evaluation kernel
+        const torch::Tensor viewDirs =
+            mMeans.index(
+                { torch::indexing::None, torch::indexing::Slice(), torch::indexing::Slice() }) -
+            camToWorldMatrices.index({ torch::indexing::Slice(), torch::indexing::None,
+                                       torch::indexing::Slice(0, 3), 3 }); // [1, N, 3] - [C, 1, 3]
+        return detail::autograd::EvaluateSphericalHarmonics::apply(
+            actualShDegree, C, viewDirs, mSh0, mShN, perGaussianProjectedRadii)[0];
+    }
 }
 
 void
@@ -326,36 +341,8 @@ GaussianSplat3d::projectGaussiansImpl(const torch::Tensor  &worldToCameraMatrice
             renderQuantity = ret.perGaussianDepth.unsqueeze(-1); // [C, N, 1]
         } else if (settings.renderMode == RenderMode::RGB ||
                    settings.renderMode == RenderMode::RGBD) {
-            if (K == 1 || settings.shDegreeToUse == 0) {
-                // Handle the case where we only have degree zero spherical harmonics, which just
-                // represent diffuse colors. This means that each Gaussian receives the same color
-                // regardless of which camera sees it, and we can just expand the colors to the
-                // correct shape (without reallocating memory). i.e. the color tensor has shape [C,
-                // N, D] but only allocates NxD floats in memory. This is useful for rendering e.g.
-                // high dimensional diffuse features.
-                renderQuantity = evaluateSphericalHarmonics(
-                    mSh0.unsqueeze(1), ret.perGaussianRadius, std::nullopt, settings.shDegreeToUse);
-                renderQuantity = renderQuantity.expand({ C, -1, -1 });
-
-            } else {
-                // FIXME (Francis): Do this in the kernel instead of materializing a large
-                //                  tensor here. It's a bit annoying because we'll have to update
-                //                  the current backward pass
-                const torch::Tensor camToWorldMatrices = torch::inverse(worldToCameraMatrices);
-                // Equivalent to dirs = means[None, :, :] - camToWorldMatrices[:, None, :3, 3]
-                // NOTE: dirs are not normalized here, they get normalized in the spherical
-                //       harmonics evaluation kernel
-                const torch::Tensor dirs =
-                    mMeans.index({ torch::indexing::None, torch::indexing::Slice(),
-                                   torch::indexing::Slice() }) -
-                    camToWorldMatrices.index({ torch::indexing::Slice(), torch::indexing::None,
-                                               torch::indexing::Slice(0, 3),
-                                               3 }); // [1, N, 3] - [C, 1, 3]
-                const torch::Tensor shCoeffs = torch::cat({ mSh0, mShN }, 0); // [K, N, D]
-                renderQuantity =
-                    evaluateSphericalHarmonics(shCoeffs.unsqueeze(1).expand({ -1, C, -1, -1 }),
-                                               ret.perGaussianRadius, dirs, settings.shDegreeToUse);
-            }
+            renderQuantity = evalSphericalHarmonicsImpl(
+                settings.shDegreeToUse, worldToCameraMatrices, ret.perGaussianRadius);
 
             if (settings.renderMode == RenderMode::RGBD) {
                 renderQuantity = torch::cat({ renderQuantity, ret.perGaussianDepth.unsqueeze(-1) },
@@ -714,7 +701,7 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
     torch::Tensor conics  = projection_results[3];
 
     // Turn [N1 + N2 + N3 + ..., ...] into [C1*N1 + C2*N2 + ..., ...]
-    torch::Tensor opacities_batched = opacities.jdata().index({ gaussian_ids }); // [nnz]
+    torch::Tensor opacities_batched = opacities.jdata().index({ gaussian_ids }); // [M]
     if (antialias) {
         opacities_batched *= projection_results[4];
     }
@@ -730,23 +717,43 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
         debug_info["opacities"]    = opacities_batched;
     }
 
-    torch::Tensor colors;
+    torch::Tensor renderQuantities;
     if (render_depth_only) {
-        colors = depths.index({ gaussian_ids }).unsqueeze(-1); // [nnz, 1]
+        renderQuantities = depths.index({ gaussian_ids }).unsqueeze(-1); // [nnz, 1]
     } else {
-        // Colors from SH coefficients [differentiable]
+        // Render quantities from SH coefficients [differentiable]
         const torch::Tensor sh_coeffs_batched =
             sh_coeffs.jdata()
                 .permute({ 1, 0, 2 })
-                .index({ Slice(), gaussian_ids, Slice() });                 // [K, nnz, 3]
+                .index({ Slice(), gaussian_ids, Slice() });   // [K, M, 3]
 
-        const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [ccz, 4, 4]
-        const torch::Tensor dirs        = means.jdata().index({ gaussian_ids, Slice() }) -
-                                   camtoworlds.index({ camera_ids, Slice(None, 3), 3 });
-        colors = evaluateSphericalHarmonics(sh_coeffs_batched, radii, dirs, sh_degree_to_use);
+        const int K              = sh_coeffs_batched.size(0); // number of SH bases
+        const int actualShDegree = sh_degree_to_use < 0 ? (std::sqrt(K) - 1) : sh_degree_to_use;
+        TORCH_CHECK(K >= (actualShDegree + 1) * (actualShDegree + 1),
+                    "K must be at least (shDegreeToUse + 1)^2");
+
+        if (actualShDegree == 0) {
+            const auto sh0 =
+                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0); // [1, M, 3]
+            renderQuantities = detail::autograd::EvaluateSphericalHarmonics::apply(
+                actualShDegree, 1, torch::nullopt, sh0, torch::nullopt, radii.unsqueeze(0))[0];
+        } else {
+            const auto sh0 =
+                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0);  // [1, M, 3]
+            const auto shN =
+                sh_coeffs_batched.index({ Slice(1, None), Slice(), Slice() });  // [K-1, M, 3]
+            const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [BC, 4, 4]
+            const torch::Tensor dirs        = means.jdata().index({ gaussian_ids, Slice() }) -
+                                       camtoworlds.index({ camera_ids, Slice(None, 3), 3 });
+            renderQuantities =
+                detail::autograd::EvaluateSphericalHarmonics::apply(
+                    actualShDegree, 1, dirs.unsqueeze(0), sh0, shN, radii.unsqueeze(0))[0]
+                    .squeeze(0);
+        }
 
         if (render_depth_channel) {
-            colors = torch::cat({ colors, depths.index({ gaussian_ids }).unsqueeze(-1) }, -1);
+            renderQuantities =
+                torch::cat({ renderQuantities, depths.index({ gaussian_ids }).unsqueeze(-1) }, -1);
         }
     }
 
@@ -767,11 +774,11 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
 
     // Rasterize projected Gaussians to pixels [differentiable]
     auto outputs = detail::autograd::RasterizeGaussiansToPixels::apply(
-        means2d, conics, colors, opacities_batched.contiguous(), image_width, image_height, 0, 0,
-        tile_size, tile_offsets, tile_gaussian_ids, false);
-    torch::Tensor render_colors = outputs[0];
-    torch::Tensor render_alphas = outputs[1];
+        means2d, conics, renderQuantities, opacities_batched.contiguous(), image_width,
+        image_height, 0, 0, tile_size, tile_offsets, tile_gaussian_ids, false);
+    torch::Tensor renderedImages      = outputs[0];
+    torch::Tensor renderedAlphaImages = outputs[1];
 
-    return { render_colors, render_alphas, debug_info };
+    return { renderedImages, renderedAlphaImages, debug_info };
 }
 }; // namespace fvdb

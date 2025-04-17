@@ -38,6 +38,7 @@ set(FVDB_CPP_FILES
     detail/autograd/GaussianRender.cpp
     detail/autograd/JaggedReduce.cpp
     detail/autograd/MaxPoolGrid.cpp
+    detail/autograd/EvaluateSphericalHarmonics.cpp
     detail/autograd/ReadIntoDense.cpp
     detail/autograd/SampleGrid.cpp
     detail/autograd/SparseConvolutionHalo.cpp
@@ -80,7 +81,8 @@ set(FVDB_CU_FILES
     detail/ops/gsplat/GaussianSplatSparse.cu
     detail/ops/gsplat/GaussianProjectionJaggedBackward.cu
     detail/ops/gsplat/GaussianProjectionForward.cu
-    detail/ops/gsplat/SphericalHarmonics.cu
+    detail/ops/gsplat/GaussianSphericalHarmonicsForward.cu
+    detail/ops/gsplat/GaussianSphericalHarmonicsBackward.cu
     detail/ops/gsplat/GaussianRasterizeBackward.cu
     detail/ops/gsplat/GaussianProjectionBackward.cu
     detail/ops/gsplat/GaussianRasterizeForward.cu

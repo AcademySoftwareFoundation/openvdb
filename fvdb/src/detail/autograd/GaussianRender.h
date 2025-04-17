@@ -11,21 +11,6 @@ namespace fvdb {
 namespace detail {
 namespace autograd {
 
-struct EvaluateSphericalHarmonics : public torch::autograd::Function<EvaluateSphericalHarmonics> {
-    using VariableList    = torch::autograd::variable_list;
-    using AutogradContext = torch::autograd::AutogradContext;
-    using Variable        = torch::autograd::Variable;
-
-    static VariableList
-    forward(AutogradContext *ctx, const int shDegreeToUse,
-            const std::optional<Variable> maybeViewDirs, // [N, 3] or empty for deg 0
-            const Variable               &shCoeffs,      // [K, N, 3]
-            const Variable               &radii          // [N,]
-    );
-
-    static VariableList backward(AutogradContext *ctx, VariableList gradOutput);
-};
-
 struct ProjectGaussians : public torch::autograd::Function<ProjectGaussians> {
     using VariableList    = torch::autograd::variable_list;
     using AutogradContext = torch::autograd::AutogradContext;

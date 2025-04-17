@@ -575,9 +575,9 @@ class GaussianSplat3d {
     bool          mRequiresGrad           = false;
     bool          mTrackMax2dRadiiForGrad = false;
 
-    void checkState(const torch::Tensor &means, const torch::Tensor &quats,
-                    const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
-                    const torch::Tensor &sh0, const torch::Tensor &shN);
+    static void checkState(const torch::Tensor &means, const torch::Tensor &quats,
+                           const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
+                           const torch::Tensor &sh0, const torch::Tensor &shN);
 
     ProjectedGaussianSplats projectGaussiansImpl(const torch::Tensor &worldToCameraMatrices,
                                                  const torch::Tensor &projectionMatrices,
@@ -590,6 +590,10 @@ class GaussianSplat3d {
     std::tuple<torch::Tensor, torch::Tensor>
     renderImpl(const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
                const fvdb::detail::ops::RenderSettings &settings);
+
+    torch::Tensor evalSphericalHarmonicsImpl(const int64_t        shDegreeToUse,
+                                             const torch::Tensor &worldToCameraMatrices,
+                                             const torch::Tensor &perGaussianProjectedRadii) const;
 };
 
 std::tuple<torch::Tensor, torch::Tensor, std::unordered_map<std::string, torch::Tensor>>

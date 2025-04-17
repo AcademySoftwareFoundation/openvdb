@@ -356,6 +356,7 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 ///
 /// @param[in] shDegreeToUse Degree of spherical harmonics to use (0-3 typically, higher degrees
 /// provide more detail)
+/// @param[in] numCameras Number of cameras used for rendering
 /// @param[in] viewDirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) normalized to unit
 /// length, representing view directions
 /// @param[in] shCoeffs Spherical harmonic coefficients [N, K, 3] (packed) or
@@ -365,39 +366,45 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 ///
 /// @return color values [N, D] computed from the spherical harmonics evaluation
 template <c10::DeviceType>
-torch::Tensor dispatchSphericalHarmonicsForward(const int            shDegreeToUse,
-                                                const torch::Tensor &viewDirs, // [N, 3]
-                                                const torch::Tensor &shCoeffs, // [N, ...]
-                                                const torch::Tensor &radii     // [N]
+torch::Tensor dispatchSphericalHarmonicsForward(const int64_t        shDegreeToUse,
+                                                const int64_t        numCameras,
+                                                const torch::Tensor &viewDirs,  // [C, N, 3]
+                                                const torch::Tensor &sh0Coeffs, // [1, N, D]
+                                                const torch::Tensor &shNCoeffs, // [K-1, N, D]
+                                                const torch::Tensor &radii      // [C, N]
 );
 
 /// @brief Spherical harmonics evaluation backward pass
 ///
-/// This function computes the vector-Jacobian product between the output gradients and the Jacobian
-/// of the spherical harmonics forward operation.
+/// This function computes the vector-Jacobian product between the output gradients and the
+/// Jacobian of the spherical harmonics forward operation.
 ///
 /// @param[in] shDegreeToUse Degree of spherical harmonics used in the forward pass
+/// @param[in] numCameras Number of cameras used in the forward pass
+/// @param[in] numGaussians Number of Gaussians used in the forward pass
 /// @param[in] viewDirs Direction vectors [N, 3] (packed) or [C, N, 3] (unpacked) used in the
 /// forward pass
 /// @param[in] shCoeffs Spherical harmonic coefficients [N, K, 3] (packed) or [K, C, N, 3]
 /// (unpacked) where K depends on sh_degree_to_use
-/// @param[in] dLossDColors Gradients of the loss function with respect to output colors [N, 3] -
-/// ∂L/∂colors
+/// @param[in] dLossDColors Gradients of the loss function with respect to output colors [N, 3]
+/// - ∂L/∂colors
 /// @param[in] radii radii [N] (packed) or [C, N] (unpacked) used in the forward pass for
 /// level-of-detail
-/// @param[in] computeDLossDViewDirs Whether to compute gradients with respect to direction vectors
+/// @param[in] computeDLossDViewDirs Whether to compute gradients with respect to direction
+/// vectors
 ///
 /// @return std::tuple containing gradients of the loss function with respect to:
 ///         - SH coefficients [N, K, 3] - ∂L/∂sh_coeffs
 ///         - Direction vectors [N, 3] - ∂L/∂dirs (if compute_v_dirs is true, otherwise empty
 ///         tensor)
 template <c10::DeviceType>
-std::tuple<torch::Tensor, torch::Tensor>
-dispatchSphericalHarmonicsBackward(const int            shDegreeToUse,
-                                   const torch::Tensor &viewDirs, // [N, 3]
-                                   const torch::Tensor &shCoeffs, // [N, K, 3]
+std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
+dispatchSphericalHarmonicsBackward(const int64_t shDegreeToUse, const int64_t numCameras,
+                                   const int64_t        numGaussians,
+                                   const torch::Tensor &viewDirs,  // [N, 3]
+                                   const torch::Tensor &shNCoeffs, // [K-1, N, D]
                                    const torch::Tensor &dLossDColors,
-                                   const torch::Tensor &radii,    // [N]
+                                   const torch::Tensor &radii,     // [N]
                                    const bool           computeDLossDViewDirs);
 
 /// @brief Project 3D Gaussians to 2D screen space pixel coordinates for rendering

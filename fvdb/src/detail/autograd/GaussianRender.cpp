@@ -10,51 +10,6 @@ namespace fvdb {
 namespace detail {
 namespace autograd {
 
-EvaluateSphericalHarmonics::VariableList
-EvaluateSphericalHarmonics::forward(
-    EvaluateSphericalHarmonics::AutogradContext *ctx, const int shDegreeToUse,
-    const std::optional<EvaluateSphericalHarmonics::Variable> maybeViewDirs, // (C, N, 3) or (N, 3)
-    const EvaluateSphericalHarmonics::Variable               &shCoeffs, // (C, M, K, D) or (N, K, D)
-    const EvaluateSphericalHarmonics::Variable               &radii     // (C, N) or (N,) (optional)
-) {
-    const Variable viewDirs = maybeViewDirs.value_or(
-        shCoeffs.dim() == 3 ? torch::empty({ 0, 3 }) : torch::empty({ 0, 0, 3 }));
-    const Variable renderQuantities = FVDB_DISPATCH_KERNEL_DEVICE(shCoeffs.device(), [&]() {
-        return ops::dispatchSphericalHarmonicsForward<DeviceTag>(shDegreeToUse, viewDirs, shCoeffs,
-                                                                 radii);
-    });
-    ctx->save_for_backward({ viewDirs, shCoeffs, radii });
-    ctx->saved_data["shDegreeToUse"] = static_cast<int64_t>(shDegreeToUse);
-    return { renderQuantities };
-}
-
-EvaluateSphericalHarmonics::VariableList
-EvaluateSphericalHarmonics::backward(EvaluateSphericalHarmonics::AutogradContext *ctx,
-                                     EvaluateSphericalHarmonics::VariableList     gradOutput) {
-    Variable dLossDColors = gradOutput.at(0);
-
-    // ensure the gradients are contiguous if they are not None
-    auto const dLossdColors =
-        gradOutput.at(0).defined() ? gradOutput.at(0).contiguous() : gradOutput.at(0);
-
-    VariableList saved    = ctx->get_saved_variables();
-    Variable     viewDirs = saved.at(0);
-    Variable     shCoeffs = saved.at(1);
-    Variable     radii    = saved.at(2);
-
-    const int  shDegreeToUse         = static_cast<int>(ctx->saved_data["shDegreeToUse"].toInt());
-    const bool computeDLossDViewDirs = ctx->needs_input_grad(1);
-
-    auto     variables      = FVDB_DISPATCH_KERNEL_DEVICE(shCoeffs.device(), [&]() {
-        return ops::dispatchSphericalHarmonicsBackward<DeviceTag>(
-            shDegreeToUse, viewDirs, shCoeffs, dLossDColors, radii, computeDLossDViewDirs);
-    });
-    Variable dLossDShCoeffs = std::get<0>(variables);
-    Variable dLossDViewDirs = std::get<1>(variables);
-
-    return { Variable(), dLossDViewDirs, dLossDShCoeffs, Variable() };
-}
-
 ProjectGaussians::VariableList
 ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
                           const ProjectGaussians::Variable  &means,
