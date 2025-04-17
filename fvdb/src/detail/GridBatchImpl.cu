@@ -36,14 +36,16 @@ namespace fvdb {
 namespace detail {
 
 GridBatchImpl::GridBatchImpl(const torch::Device &device, bool isMutable) {
-    std::vector<nanovdb::Vec3d> dummy;
-    dummy.push_back(nanovdb::Vec3d(1.0, 1.0, 1.0));
-    // TODO (Francis): No list-of-lists support for now, so we just pass an empty list of indices
-    const torch::Tensor lidx =
-        torch::empty({ 0, 1 }, torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(device));
-    setGrid(build::buildEmptyGrid(device, isMutable), lidx, dummy, dummy, false);
-    mHostGridMetadata.clear();
-    syncMetadataToDeviceIfCUDA(false);
+    auto deviceTensorOptions = torch::TensorOptions().device(device);
+    // TODO (Francis): No list-of-lists support for now, so we just assign an empty list of indices
+    mLeafBatchIndices = torch::empty({ 0 }, deviceTensorOptions.dtype(fvdb::JIdxScalarType));
+    mBatchOffsets     = torch::zeros({ 1 }, deviceTensorOptions.dtype(fvdb::JOffsetsScalarType));
+    mListIndices      = torch::empty({ 0, 1 }, deviceTensorOptions.dtype(fvdb::JLIdxScalarType));
+
+    auto gridHdl = build::buildEmptyGrid(device, isMutable);
+    mGridHdl     = std::make_shared<nanovdb::GridHandle<TorchDeviceBuffer>>(std::move(gridHdl));
+
+    mBatchMetadata.mIsMutable    = isMutable;
     mBatchMetadata.mIsContiguous = true;
 }
 
@@ -56,7 +58,6 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
         TORCH_CHECK_VALUE(voxelSizes[i][0] > 0 && voxelSizes[i][1] > 0 && voxelSizes[i][2] > 0,
                           "Voxel size must be greater than 0");
     }
-    mDeviceGridMetadata = nullptr;
     // TODO (Francis): No list-of-lists support for now, so we just pass an empty list of indices
     const torch::Tensor lidx = torch::empty(
         { 0, 1 },
@@ -72,7 +73,6 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
                 "Cannot create a batched grid handle from an empty grid handle");
     TORCH_CHECK_VALUE(globalVoxelSize[0] > 0 && globalVoxelSize[1] > 0 && globalVoxelSize[2] > 0,
                       "Voxel size must be greater than 0");
-    mDeviceGridMetadata = nullptr;
     std::vector<nanovdb::Vec3d> voxelSizes, voxelOrigins;
     for (size_t i = 0; i < gridHdl.gridCount(); ++i) {
         voxelSizes.push_back(globalVoxelSize);
@@ -88,7 +88,7 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 
 GridBatchImpl::~GridBatchImpl() {
     torch::Device device = mGridHdl->buffer().device();
-    mHostGridMetadata.clear();
+    delete[] mHostGridMetadata;
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
@@ -118,7 +118,6 @@ GridBatchImpl::worldToGridMatrix(int64_t bi) const {
 
 void
 GridBatchImpl::recomputeBatchOffsets() {
-    TORCH_CHECK(batchSize() == mHostGridMetadata.size(), "Batch size does not match metadata size");
     mBatchOffsets =
         torch::empty({ batchSize() + 1 },
                      torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(device()));
@@ -130,10 +129,90 @@ GridBatchImpl::recomputeBatchOffsets() {
     } else {
         auto outBatchOffsets = mBatchOffsets.accessor<fvdb::JOffsetsType, 1>();
         outBatchOffsets[0]   = 0;
-        for (int i = 1; i < (mHostGridMetadata.size() + 1); i += 1) {
+        for (int i = 1; i < (mBatchSize + 1); i += 1) {
             outBatchOffsets[i] = outBatchOffsets[i - 1] + mHostGridMetadata[i - 1].mNumVoxels;
         }
     }
+}
+
+template <typename Indexable>
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::indexInternal(const Indexable &idx, int64_t size) const {
+    if (size == 0) {
+        return c10::make_intrusive<GridBatchImpl>(device(), isMutable());
+    }
+    TORCH_CHECK(size >= 0,
+                "Indexing with negative size is not supported (this should never happen)");
+    c10::intrusive_ptr<GridBatchImpl> ret = c10::make_intrusive<GridBatchImpl>();
+    ret->mGridHdl                         = mGridHdl;
+
+    int64_t            cumVoxels    = 0;
+    int64_t            cumLeaves    = 0;
+    int64_t            maxVoxels    = 0;
+    uint32_t           maxLeafCount = 0;
+    int64_t            count        = 0;
+    nanovdb::CoordBBox totalBbox;
+
+    std::vector<torch::Tensor> leafBatchIdxs;
+
+    // If the grid we're creating a view over is contiguous, we inherit that
+    bool isContiguous      = mBatchMetadata.mIsContiguous;
+    ret->mHostGridMetadata = new GridMetadata[size];
+    ret->mBatchSize        = size;
+    for (size_t i = 0; i < size; i += 1) {
+        int64_t bi = idx[i];
+        bi         = negativeToPositiveIndexWithRangecheck(bi);
+
+        // If indices are not contiguous or the grid we're viewing is not contiguous, then we're
+        // no longer contiguous
+        isContiguous = isContiguous && (bi == count);
+
+        const uint32_t            numLeaves = mHostGridMetadata[bi].mNumLeaves;
+        const int64_t             numVoxels = mHostGridMetadata[bi].mNumVoxels;
+        const nanovdb::CoordBBox &bbox      = mHostGridMetadata[bi].mBBox;
+
+        ret->mHostGridMetadata[count]            = mHostGridMetadata[bi];
+        ret->mHostGridMetadata[count].mCumLeaves = cumLeaves;
+        ret->mHostGridMetadata[count].mCumVoxels = cumVoxels;
+
+        if (count == 0) {
+            totalBbox = bbox;
+        } else {
+            totalBbox.expand(bbox);
+        }
+        cumLeaves += numLeaves;
+        cumVoxels += numVoxels;
+        maxVoxels    = std::max(maxVoxels, numVoxels);
+        maxLeafCount = std::max(maxLeafCount, numLeaves);
+        leafBatchIdxs.push_back(
+            torch::full({ numLeaves }, torch::Scalar(count),
+                        torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(device())));
+        count += 1;
+    }
+
+    // If all the indices were contiguous and the grid we're viewing is contiguous, then we're
+    // contiguous
+    ret->mBatchMetadata.mIsContiguous = isContiguous && (count == batchSize());
+    ret->mBatchMetadata.mTotalLeaves  = cumLeaves;
+    ret->mBatchMetadata.mTotalVoxels  = cumVoxels;
+    ret->mBatchMetadata.mMaxVoxels    = maxVoxels;
+    ret->mBatchMetadata.mMaxLeafCount = maxLeafCount;
+    ret->mBatchMetadata.mTotalBBox    = totalBbox;
+    ret->mBatchMetadata.mIsMutable    = isMutable();
+
+    if (leafBatchIdxs.size() > 0) {
+        ret->mLeafBatchIndices = torch::cat(leafBatchIdxs, 0);
+    }
+
+    ret->syncMetadataToDeviceIfCUDA(false);
+    ret->recomputeBatchOffsets();
+
+    if (mListIndices.size(0) > 0) {
+        TORCH_CHECK(false, "Nested lists of GridBatches are not supported yet");
+    } else {
+        ret->mListIndices = mListIndices;
+    }
+    return ret;
 }
 
 torch::Tensor
@@ -170,95 +249,211 @@ GridBatchImpl::clone(const torch::Device &device, bool blocking) const {
 
 void
 GridBatchImpl::syncMetadataToDeviceIfCUDA(bool blocking) {
-    if (device().is_cuda()) { // There is something to sync and we're on a cuda device
+    if (!device().is_cuda()) {
+        return;
+    }
 
-        // Global device guards as we operate on this.
-        c10::cuda::CUDAGuard deviceGuard(device());
+    // There is something to sync and we're on a cuda device
+    // Global device guards as we operate on this.
+    c10::cuda::CUDAGuard deviceGuard(device());
+    at::cuda::CUDAStream wrapper = at::cuda::getCurrentCUDAStream(device().index());
 
-        // We haven't allocated the cuda memory yet, so we need to do that now
-        if (mDeviceGridMetadata == nullptr) {
-            // We need to allocate the memory on the device
-            size_t               metaDataByteSize = sizeof(GridMetadata) * mHostGridMetadata.size();
-            at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(device().index());
-            mDeviceGridMetadata =
-                static_cast<GridMetadata *>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
-                    metaDataByteSize, defaultStream.stream()));
-        }
+    // There are no grids in the batch so we need to free the device metadata if it exists
+    if (!mHostGridMetadata && mDeviceGridMetadata) {
+        c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
+        mDeviceGridMetadata = nullptr;
+        return;
+    }
 
-        // Copy host grid metadata to device buffer
-        size_t               metaDataByteSize = sizeof(GridMetadata) * mHostGridMetadata.size();
-        at::cuda::CUDAStream defaultStream =
-            at::cuda::getCurrentCUDAStream(mGridHdl->buffer().device().index());
-        C10_CUDA_CHECK(cudaMemcpyAsync(mDeviceGridMetadata, mHostGridMetadata.data(),
-                                       metaDataByteSize, cudaMemcpyHostToDevice,
-                                       defaultStream.stream()));
-        // Block if you asked for it
-        if (blocking) {
-            C10_CUDA_CHECK(cudaStreamSynchronize(defaultStream.stream()));
-        }
+    const size_t metadataByteSize = sizeof(GridMetadata) * mBatchSize;
+    if (!mDeviceGridMetadata) { // Allocate the CUDA memory if it hasn't been allocated already
+        mDeviceGridMetadata =
+            static_cast<GridMetadata *>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
+                metadataByteSize, wrapper.stream()));
+    }
+
+    // Copy host grid metadata to device grid metadata
+    C10_CUDA_CHECK(cudaMemcpyAsync(mDeviceGridMetadata, mHostGridMetadata, metadataByteSize,
+                                   cudaMemcpyHostToDevice, wrapper.stream()));
+    // Block if you asked for it
+    if (blocking) {
+        C10_CUDA_CHECK(cudaStreamSynchronize(wrapper.stream()));
     }
 }
 
+namespace {
+
+__global__ void
+setGlobalPrimalTransformKernel(GridBatchImpl::GridMetadata *metadata,
+                               VoxelCoordTransform          transform) {
+    unsigned int i               = threadIdx.x;
+    metadata[i].mPrimalTransform = transform;
+}
+
+__global__ void
+setGlobalDualTransformKernel(GridBatchImpl::GridMetadata *metadata, VoxelCoordTransform transform) {
+    unsigned int i             = threadIdx.x;
+    metadata[i].mDualTransform = transform;
+}
+
+__global__ void
+setGlobalVoxelSizeKernel(GridBatchImpl::GridMetadata *metadata, nanovdb::Vec3d voxelSize) {
+    unsigned int i = threadIdx.x;
+    metadata[i].setTransform(voxelSize, metadata[i].voxelOrigin());
+}
+
+__global__ void
+setGlobalVoxelOriginKernel(GridBatchImpl::GridMetadata *metadata, nanovdb::Vec3d voxelOrigin) {
+    unsigned int i = threadIdx.x;
+    metadata[i].setTransform(metadata[i].mVoxelSize, voxelOrigin);
+}
+
+__global__ void
+setGlobalVoxelSizeAndOriginKernel(GridBatchImpl::GridMetadata *metadata, nanovdb::Vec3d voxelSize,
+                                  nanovdb::Vec3d voxelOrigin) {
+    unsigned int i = threadIdx.x;
+    metadata[i].setTransform(voxelSize, voxelOrigin);
+}
+
+__global__ void
+setPrimalTransformFromDualGridKernel(GridBatchImpl::GridMetadata       *metadata,
+                                     const GridBatchImpl::GridMetadata *dualMetadata) {
+    unsigned int i               = threadIdx.x;
+    metadata[i].mDualTransform   = dualMetadata[i].mPrimalTransform;
+    metadata[i].mPrimalTransform = dualMetadata[i].mDualTransform;
+    metadata[i].mVoxelSize       = dualMetadata[i].mVoxelSize;
+}
+
+__hostdev__ nanovdb::Vec3d
+            fineVoxelSize(const nanovdb::Vec3d &voxelSize, const nanovdb::Coord &subdivFactor) {
+    return voxelSize / subdivFactor.asVec3d();
+}
+
+__hostdev__ nanovdb::Vec3d
+            fineVoxelOrigin(const nanovdb::Vec3d &voxelSize, const nanovdb::Vec3d &voxelOrigin,
+                            const nanovdb::Coord &subdivFactor) {
+    return voxelOrigin - (subdivFactor.asVec3d() - nanovdb::Vec3d(1.0)) *
+                             (voxelSize / subdivFactor.asVec3d()) * 0.5;
+}
+
+__hostdev__ nanovdb::Vec3d
+coarseVoxelSize(const nanovdb::Vec3d &voxelSize, const nanovdb::Coord &coarseningFactor) {
+    return coarseningFactor.asVec3d() * voxelSize;
+}
+
+__hostdev__ nanovdb::Vec3d
+            coarseVoxelOrigin(const nanovdb::Vec3d &voxelSize, const nanovdb::Vec3d &voxelOrigin,
+                              const nanovdb::Coord &coarseningFactor) {
+    return (coarseningFactor.asVec3d() - nanovdb::Vec3d(1.0)) * voxelSize * 0.5 + voxelOrigin;
+}
+
+__global__ void
+setFineTransformFromCoarseGridKernel(GridBatchImpl::GridMetadata       *metadata,
+                                     const GridBatchImpl::GridMetadata *coarseMetadata,
+                                     nanovdb::Coord                     subdivisionFactor) {
+    unsigned int i = threadIdx.x;
+    metadata[i].setTransform(fineVoxelSize(coarseMetadata[i].mVoxelSize, subdivisionFactor),
+                             fineVoxelOrigin(coarseMetadata[i].mVoxelSize,
+                                             coarseMetadata[i].voxelOrigin(), subdivisionFactor));
+}
+
+__global__ void
+setCoarseTransformFromFineGridKernel(GridBatchImpl::GridMetadata       *metadata,
+                                     const GridBatchImpl::GridMetadata *fineMetadata,
+                                     nanovdb::Coord                     coarseningFactor) {
+    unsigned int i = threadIdx.x;
+    metadata[i].setTransform(coarseVoxelSize(fineMetadata[i].mVoxelSize, coarseningFactor),
+                             coarseVoxelOrigin(fineMetadata[i].mVoxelSize,
+                                               fineMetadata[i].voxelOrigin(), coarseningFactor));
+}
+
+} // namespace
+
 void
-GridBatchImpl::setGlobalPrimalTransform(const VoxelCoordTransform &transform, bool syncToDevice) {
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+GridBatchImpl::setGlobalPrimalTransform(const VoxelCoordTransform &transform) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].mPrimalTransform = transform;
     }
 
-    if (syncToDevice) {
-        syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setGlobalPrimalTransformKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(mDeviceGridMetadata,
+                                                                               transform);
     }
 }
 
 void
-GridBatchImpl::setGlobalDualTransform(const VoxelCoordTransform &transform, bool syncToDevice) {
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+GridBatchImpl::setGlobalDualTransform(const VoxelCoordTransform &transform) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].mDualTransform = transform;
     }
 
-    if (syncToDevice) {
-        syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setGlobalDualTransformKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(mDeviceGridMetadata,
+                                                                             transform);
     }
 }
 
 void
-GridBatchImpl::setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize, bool syncToDevice) {
+GridBatchImpl::setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize) {
     TORCH_CHECK(batchSize() > 0, "Cannot set global voxel size on an empty batch of grids");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].setTransform(voxelSize, mHostGridMetadata[i].voxelOrigin());
     }
 
-    if (syncToDevice) {
-        syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setGlobalVoxelSizeKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(mDeviceGridMetadata,
+                                                                         voxelSize);
     }
 }
 
 void
-GridBatchImpl::setGlobalVoxelOrigin(const nanovdb::Vec3d &voxelOrigin, bool syncToDevice) {
+GridBatchImpl::setGlobalVoxelOrigin(const nanovdb::Vec3d &voxelOrigin) {
     TORCH_CHECK(batchSize() > 0, "Cannot set global voxel origin on an empty batch of grids");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].setTransform(mHostGridMetadata[i].mVoxelSize, voxelOrigin);
     }
 
-    if (syncToDevice) {
-        syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setGlobalVoxelOriginKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(mDeviceGridMetadata,
+                                                                           voxelOrigin);
     }
 }
 
 void
 GridBatchImpl::setGlobalVoxelSizeAndOrigin(const nanovdb::Vec3d &voxelSize,
-                                           const nanovdb::Vec3d &voxelOrigin, bool syncToDevice) {
+                                           const nanovdb::Vec3d &voxelOrigin) {
     TORCH_CHECK(batchSize() > 0,
                 "Cannot set global voxel size and origin on an empty batch of grids");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].setTransform(voxelSize, voxelOrigin);
     }
 
-    if (syncToDevice) {
-        syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setGlobalVoxelSizeAndOriginKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(
+            mDeviceGridMetadata, voxelSize, voxelOrigin);
     }
 }
 
@@ -267,13 +462,25 @@ GridBatchImpl::setFineTransformFromCoarseGrid(const GridBatchImpl &coarseBatch,
                                               nanovdb::Coord       subdivisionFactor) {
     TORCH_CHECK(coarseBatch.batchSize() == batchSize(),
                 "Coarse grid batch size must match fine grid batch size");
+    TORCH_CHECK(subdivisionFactor[0] > 0 && subdivisionFactor[1] > 0 && subdivisionFactor[2] > 0,
+                "Subdivision factor must be greater than 0");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
-        auto sizeAndOrigin = coarseBatch.fineVoxSizeAndOrigin(i, subdivisionFactor);
-        mHostGridMetadata[i].setTransform(sizeAndOrigin.first, sizeAndOrigin.second);
+    for (size_t i = 0; i < mBatchSize; i++) {
+        mHostGridMetadata[i].setTransform(
+            fineVoxelSize(coarseBatch.voxelSize(i), subdivisionFactor),
+            fineVoxelOrigin(coarseBatch.voxelSize(i), coarseBatch.voxelOrigin(i),
+                            subdivisionFactor));
     }
 
-    syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        TORCH_CHECK(coarseBatch.mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setFineTransformFromCoarseGridKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(
+            mDeviceGridMetadata, coarseBatch.mDeviceGridMetadata, subdivisionFactor);
+    }
 }
 
 void
@@ -281,13 +488,24 @@ GridBatchImpl::setCoarseTransformFromFineGrid(const GridBatchImpl &fineBatch,
                                               nanovdb::Coord       coarseningFactor) {
     TORCH_CHECK(fineBatch.batchSize() == batchSize(),
                 "Fine grid batch size must match coarse grid batch size");
+    TORCH_CHECK(coarseningFactor[0] > 0 && coarseningFactor[1] > 0 && coarseningFactor[2] > 0,
+                "Coarsening factor must be greater than 0");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
-        auto sizeAndOrigin = fineBatch.coarseVoxSizeAndOrigin(i, coarseningFactor);
-        mHostGridMetadata[i].setTransform(sizeAndOrigin.first, sizeAndOrigin.second);
+    for (size_t i = 0; i < mBatchSize; i++) {
+        mHostGridMetadata[i].setTransform(
+            coarseVoxelSize(fineBatch.voxelSize(i), coarseningFactor),
+            coarseVoxelOrigin(fineBatch.voxelSize(i), fineBatch.voxelOrigin(i), coarseningFactor));
     }
 
-    syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        TORCH_CHECK(fineBatch.mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setCoarseTransformFromFineGridKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(
+            mDeviceGridMetadata, fineBatch.mDeviceGridMetadata, coarseningFactor);
+    }
 }
 
 void
@@ -295,13 +513,20 @@ GridBatchImpl::setPrimalTransformFromDualGrid(const GridBatchImpl &dualBatch) {
     TORCH_CHECK(dualBatch.batchSize() == batchSize(),
                 "Dual grid batch size must match primal grid batch size");
 
-    for (size_t i = 0; i < mHostGridMetadata.size(); i++) {
+    for (size_t i = 0; i < mBatchSize; i++) {
         mHostGridMetadata[i].mDualTransform   = dualBatch.mHostGridMetadata[i].mPrimalTransform;
         mHostGridMetadata[i].mPrimalTransform = dualBatch.mHostGridMetadata[i].mDualTransform;
         mHostGridMetadata[i].mVoxelSize       = dualBatch.mHostGridMetadata[i].mVoxelSize;
     }
 
-    syncMetadataToDeviceIfCUDA(false);
+    if (device().is_cuda() && mBatchSize) {
+        TORCH_CHECK(mDeviceGridMetadata);
+        c10::cuda::CUDAGuard deviceGuard(device());
+
+        auto wrapper = at::cuda::getCurrentCUDAStream(device().index());
+        setPrimalTransformFromDualGridKernel<<<1, mBatchSize, 0, wrapper.stream()>>>(
+            mDeviceGridMetadata, dualBatch.mDeviceGridMetadata);
+    }
 }
 
 void
@@ -321,15 +546,18 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     const torch::Device device = gridHdl.buffer().device();
 
     // Clear out old grid metadata
-    mHostGridMetadata.clear();
+    delete[] mHostGridMetadata;
+    mHostGridMetadata = nullptr;
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
         mDeviceGridMetadata = nullptr;
     }
+    mBatchSize = 0;
 
     // Allocate host memory for metadata
-    mHostGridMetadata.resize(gridHdl.gridCount());
+    mHostGridMetadata = new GridMetadata[gridHdl.gridCount()];
+    mBatchSize        = gridHdl.gridCount();
 
     FVDB_DISPATCH_KERNEL_DEVICE(device, [&]() {
         // Allocate device memory for metadata
@@ -349,8 +577,8 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
         // Populate host and/or device metadata
         const bool isGridMutable = gridHdl.gridType(0) == nanovdb::GridType::OnIndexMask;
         ops::dispatchPopulateGridMetadata<DeviceTag>(
-            gridHdl, voxelSizes, voxelOrigins, isGridMutable, mBatchOffsets,
-            mHostGridMetadata.data(), mDeviceGridMetadata, &mBatchMetadata, deviceBatchMetadataPtr);
+            gridHdl, voxelSizes, voxelOrigins, isGridMutable, mBatchOffsets, mHostGridMetadata,
+            mDeviceGridMetadata, &mBatchMetadata, deviceBatchMetadataPtr);
         TORCH_CHECK(listIndices.numel() == 0 || listIndices.size(0) == (mBatchOffsets.size(0) - 1),
                     "Invalid list indices when building grid");
         mListIndices = listIndices;
@@ -742,7 +970,7 @@ GridBatchImpl::serializeV0() const {
     memcpy(retPtr, &self->mBatchMetadata, sizeof(GridBatchMetadata));
     retPtr += sizeof(GridBatchMetadata);
 
-    memcpy(retPtr, self->mHostGridMetadata.data(), numGrids * sizeof(GridMetadata));
+    memcpy(retPtr, self->mHostGridMetadata, numGrids * sizeof(GridMetadata));
     retPtr += numGrids * sizeof(GridMetadata);
 
     memcpy(retPtr, self->nanoGridHandle().buffer().data(), hdlBufSize);
@@ -808,6 +1036,11 @@ GridBatchImpl::deserializeV0(const torch::Tensor &serialized) {
 
     return c10::make_intrusive<GridBatchImpl>(std::move(gridHdl), voxelSizes, voxelOrigins);
 }
+
+template c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::indexInternal(const torch::TensorAccessor<int64_t, 1> &idx, int64_t size) const;
+template c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::indexInternal(const std::vector<int64_t> &idx, int64_t size) const;
 
 } // namespace detail
 } // namespace fvdb

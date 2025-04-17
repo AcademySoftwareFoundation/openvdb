@@ -42,8 +42,8 @@ class GridBatchImpl : public torch::CustomClassHolder {
         uint64_t           mNumBytes;         // Number of bytes in the buffer of this grid
         nanovdb::CoordBBox mBBox;             // Bounding box of this grid
 
-        nanovdb::Vec3d
-        voxelOrigin() const {
+        __hostdev__ nanovdb::Vec3d
+                    voxelOrigin() const {
             return mPrimalTransform.applyInv<double>(0., 0., 0.);
         }
 
@@ -84,10 +84,11 @@ class GridBatchImpl : public torch::CustomClassHolder {
     // Metadata for each grid in the batch. There is a seperate host and device version of these.
     // The caller of this class sets the host version and is responsible for syncing the device
     // version with the host version by calling syncMetadataToDeviceIfCUDA
-    std::vector<GridMetadata> mHostGridMetadata;             // CPU only
-    GridMetadata             *mDeviceGridMetadata = nullptr; // CUDA only
+    GridMetadata *mHostGridMetadata{ nullptr };   // CPU only
+    GridMetadata *mDeviceGridMetadata{ nullptr }; // CUDA only
+    int64_t       mBatchSize{ 0 };
 
-    GridBatchMetadata mBatchMetadata;                        // Metadata about the whole batch
+    GridBatchMetadata mBatchMetadata;             // Metadata about the whole batch
 
     std::shared_ptr<nanovdb::GridHandle<TorchDeviceBuffer>> mGridHdl; // NanoVDB grid handle
     torch::Tensor mLeafBatchIndices; // Indices of leaf nodes in the batch shape = [total_leafs]
@@ -96,27 +97,6 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     // Write back changes to host metadata to the device if we're a cuda handle
     void syncMetadataToDeviceIfCUDA(bool blocking);
-
-    inline std::pair<nanovdb::Vec3d, nanovdb::Vec3d>
-    fineVoxSizeAndOrigin(int64_t bi, nanovdb::Coord subdivFactor) const {
-        TORCH_CHECK(subdivFactor[0] > 0 && subdivFactor[1] > 0 && subdivFactor[2] > 0,
-                    "Subdivision factor must be greater than 0");
-        const nanovdb::Vec3d w = voxelSize(bi) / subdivFactor.asVec3d();
-        const nanovdb::Vec3d tx =
-            voxelOrigin(bi) - (subdivFactor.asVec3d() - nanovdb::Vec3d(1.0)) * w * 0.5;
-        return std::make_pair(w, tx);
-    }
-
-    inline std::pair<nanovdb::Vec3d, nanovdb::Vec3d>
-    coarseVoxSizeAndOrigin(int64_t bi, nanovdb::Coord branchingFactor) const {
-        TORCH_CHECK(branchingFactor[0] > 0 && branchingFactor[1] > 0 && branchingFactor[2] > 0,
-                    "Coarsening factor must be greater than 0");
-        const nanovdb::Vec3d w = branchingFactor.asVec3d() * voxelSize(bi);
-        const nanovdb::Vec3d tx =
-            (branchingFactor.asVec3d() - nanovdb::Vec3d(1.0)) * voxelSize(bi) * 0.5 +
-            voxelOrigin(bi);
-        return std::make_pair(w, tx);
-    }
 
     inline int64_t
     negativeToPositiveIndexWithRangecheck(int64_t bi) const {
@@ -131,86 +111,10 @@ class GridBatchImpl : public torch::CustomClassHolder {
     void recomputeBatchOffsets();
 
     template <typename Indexable>
-    c10::intrusive_ptr<GridBatchImpl>
-    indexInternal(const Indexable &idx, int64_t size) const {
-        if (size == 0) {
-            return c10::make_intrusive<GridBatchImpl>(device(), isMutable());
-        }
-        TORCH_CHECK(size >= 0,
-                    "Indexing with negative size is not supported (this should never happen)");
-        c10::intrusive_ptr<GridBatchImpl> ret = c10::make_intrusive<GridBatchImpl>();
-        ret->mGridHdl                         = mGridHdl;
-
-        int64_t            cumVoxels    = 0;
-        int64_t            cumLeaves    = 0;
-        int64_t            maxVoxels    = 0;
-        uint32_t           maxLeafCount = 0;
-        int64_t            count        = 0;
-        nanovdb::CoordBBox totalBbox;
-
-        std::vector<torch::Tensor> leafBatchIdxs;
-
-        // If the grid we're creating a view over is contiguous, we inherit that
-        bool isContiguous = mBatchMetadata.mIsContiguous;
-        for (size_t i = 0; i < size; i += 1) {
-            int64_t bi = idx[i];
-            bi         = negativeToPositiveIndexWithRangecheck(bi);
-
-            // If indices are not contiguous or the grid we're viewing is not contiguous, then we're
-            // no longer contiguous
-            isContiguous = isContiguous && (bi == count);
-
-            const uint32_t            numLeaves = mHostGridMetadata[bi].mNumLeaves;
-            const int64_t             numVoxels = mHostGridMetadata[bi].mNumVoxels;
-            const nanovdb::CoordBBox &bbox      = mHostGridMetadata[bi].mBBox;
-
-            ret->mHostGridMetadata.push_back(mHostGridMetadata[bi]);
-            ret->mHostGridMetadata[count].mCumLeaves = cumLeaves;
-            ret->mHostGridMetadata[count].mCumVoxels = cumVoxels;
-
-            if (count == 0) {
-                totalBbox = bbox;
-            } else {
-                totalBbox.expand(bbox);
-            }
-            cumLeaves += numLeaves;
-            cumVoxels += numVoxels;
-            maxVoxels    = std::max(maxVoxels, numVoxels);
-            maxLeafCount = std::max(maxLeafCount, numLeaves);
-            leafBatchIdxs.push_back(
-                torch::full({ numLeaves }, torch::Scalar(count),
-                            torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(device())));
-            count += 1;
-        }
-
-        // If all the indices were contiguous and the grid we're viewing is contiguous, then we're
-        // contiguous
-        ret->mBatchMetadata.mIsContiguous = isContiguous && (count == batchSize());
-        ret->mBatchMetadata.mTotalLeaves  = cumLeaves;
-        ret->mBatchMetadata.mTotalVoxels  = cumVoxels;
-        ret->mBatchMetadata.mMaxVoxels    = maxVoxels;
-        ret->mBatchMetadata.mMaxLeafCount = maxLeafCount;
-        ret->mBatchMetadata.mTotalBBox    = totalBbox;
-        ret->mBatchMetadata.mIsMutable    = isMutable();
-
-        if (leafBatchIdxs.size() > 0) {
-            ret->mLeafBatchIndices = torch::cat(leafBatchIdxs, 0);
-        }
-
-        ret->syncMetadataToDeviceIfCUDA(false);
-        ret->recomputeBatchOffsets();
-
-        if (mListIndices.size(0) > 0) {
-            TORCH_CHECK(false, "Nested lists of GridBatches are not supported yet");
-        } else {
-            ret->mListIndices = mListIndices;
-        }
-        return ret;
-    }
+    c10::intrusive_ptr<GridBatchImpl> indexInternal(const Indexable &idx, int64_t size) const;
 
   public:
     template <typename GridType> class Accessor {
-        friend class GridBatchImpl;
         const GridBatchImpl::GridMetadata *__restrict__ mMetadata = nullptr; // 8 bytes
         const nanovdb::NanoGrid<GridType> *__restrict__ mGridPtr  = nullptr; // 8 bytes
         fvdb::JIdxType *__restrict__ mLeafBatchIndices            = nullptr; // 8 bytes
@@ -231,6 +135,14 @@ class GridBatchImpl : public torch::CustomClassHolder {
         }
 
       public:
+        Accessor(const GridBatchImpl::GridMetadata *metadata,
+                 const nanovdb::NanoGrid<GridType> *gridPtr, fvdb::JIdxType *leafBatchIndices,
+                 int64_t totalVoxels, int64_t totalLeaves, int64_t maxVoxels, uint32_t maxLeafCount,
+                 int64_t gridCount)
+            : mMetadata(metadata), mGridPtr(gridPtr), mLeafBatchIndices(leafBatchIndices),
+              mTotalVoxels(totalVoxels), mTotalLeaves(totalLeaves), mMaxVoxels(maxVoxels),
+              mMaxLeafCount(maxLeafCount), mGridCount(gridCount) {}
+
         __hostdev__ const nanovdb::NanoGrid<GridType>                   *
         grid(int64_t bi) const {
             bi = negativeToPositiveIndexWithRangecheck(bi);
@@ -311,17 +223,11 @@ class GridBatchImpl : public torch::CustomClassHolder {
     Accessor<GridType>
     hostAccessor() const {
         TORCH_CHECK(!isEmpty(), "Cannot access empty grid");
-        Accessor<GridType> ret;
-        ret.mMetadata = mHostGridMetadata.data();
-        ret.mGridPtr  = mGridHdl->template grid<GridType>();
-        TORCH_CHECK(ret.mGridPtr != nullptr, "Failed to get host grid pointer");
-        ret.mTotalVoxels      = mBatchMetadata.mTotalVoxels;
-        ret.mTotalLeaves      = mBatchMetadata.mTotalLeaves;
-        ret.mMaxVoxels        = mBatchMetadata.mMaxVoxels;
-        ret.mMaxLeafCount     = mBatchMetadata.mMaxLeafCount;
-        ret.mGridCount        = static_cast<int64_t>(mHostGridMetadata.size());
-        ret.mLeafBatchIndices = mLeafBatchIndices.data_ptr<fvdb::JIdxType>();
-
+        TORCH_CHECK(mGridHdl->template grid<GridType>(), "Failed to get host grid pointer");
+        Accessor<GridType> ret(mHostGridMetadata, mGridHdl->template grid<GridType>(),
+                               mLeafBatchIndices.data_ptr<fvdb::JIdxType>(),
+                               mBatchMetadata.mTotalVoxels, mBatchMetadata.mTotalLeaves,
+                               mBatchMetadata.mMaxVoxels, mBatchMetadata.mMaxLeafCount, mBatchSize);
         return ret;
     }
 
@@ -330,17 +236,11 @@ class GridBatchImpl : public torch::CustomClassHolder {
     deviceAccessor() const {
         TORCH_CHECK(!isEmpty(), "Cannot access empty grid");
         TORCH_CHECK(device().is_cuda(), "Cannot access device accessor on non-CUDA device");
-        Accessor<GridType> ret;
-        ret.mMetadata = mDeviceGridMetadata;
-        ret.mGridPtr  = mGridHdl->template deviceGrid<GridType>();
-        TORCH_CHECK(ret.mGridPtr != nullptr, "Failed to get device grid pointer");
-        ret.mTotalVoxels      = mBatchMetadata.mTotalVoxels;
-        ret.mTotalLeaves      = mBatchMetadata.mTotalLeaves;
-        ret.mMaxVoxels        = mBatchMetadata.mMaxVoxels;
-        ret.mMaxLeafCount     = mBatchMetadata.mMaxLeafCount;
-        ret.mGridCount        = static_cast<int64_t>(mHostGridMetadata.size());
-        ret.mLeafBatchIndices = mLeafBatchIndices.data_ptr<fvdb::JIdxType>();
-
+        TORCH_CHECK(mGridHdl->template deviceGrid<GridType>(), "Failed to get device grid pointer");
+        Accessor<GridType> ret(mDeviceGridMetadata, mGridHdl->template deviceGrid<GridType>(),
+                               mLeafBatchIndices.data_ptr<fvdb::JIdxType>(),
+                               mBatchMetadata.mTotalVoxels, mBatchMetadata.mTotalLeaves,
+                               mBatchMetadata.mMaxVoxels, mBatchMetadata.mMaxLeafCount, mBatchSize);
         return ret;
     }
 
@@ -394,14 +294,14 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     int64_t
     batchSize() const {
-        return static_cast<int64_t>(mHostGridMetadata.size());
+        return mBatchSize;
     }
 
     uint64_t
     totalBytes() const {
         uint64_t sum = 0;
-        for (const auto &grid: mHostGridMetadata) {
-            sum += grid.mNumBytes;
+        for (int64_t i = 0; i < mBatchSize; ++i) {
+            sum += mHostGridMetadata[i].mNumBytes;
         }
         return sum;
     }
@@ -541,12 +441,12 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     JaggedTensor jaggedTensor(const torch::Tensor &data, bool ignoreDisabledVoxels) const;
 
-    void setGlobalPrimalTransform(const VoxelCoordTransform &transform, bool syncToDevice = true);
-    void setGlobalDualTransform(const VoxelCoordTransform &transform, bool syncToDevice = true);
-    void setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize, bool syncToDevice = true);
-    void setGlobalVoxelOrigin(const nanovdb::Vec3d &voxelOrigin, bool syncToDevice = true);
+    void setGlobalPrimalTransform(const VoxelCoordTransform &transform);
+    void setGlobalDualTransform(const VoxelCoordTransform &transform);
+    void setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize);
+    void setGlobalVoxelOrigin(const nanovdb::Vec3d &voxelOrigin);
     void setGlobalVoxelSizeAndOrigin(const nanovdb::Vec3d &voxelSize,
-                                     const nanovdb::Vec3d &voxelOrigin, bool syncToDevice = true);
+                                     const nanovdb::Vec3d &voxelOrigin);
 
     void setFineTransformFromCoarseGrid(const GridBatchImpl &coarseBatch,
                                         nanovdb::Coord       subdivisionFactor);
