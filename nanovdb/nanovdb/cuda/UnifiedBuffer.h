@@ -175,8 +175,8 @@ public:
     /// @brief Resize the memory block managed by this buffer. If the current capacity is larger than the new size this method
     ///        simply redefines size. Otherwise a new page-table is defined, with the specified advice, and the old block is copied to the new block.
     /// @param size size of the new memory block
-    /// @param dev
-    /// @param list
+    /// @param dev the device ID on which to apply each advice provided in list, cudaCpuDeviceId = -1, 0, 1, ...
+    /// @param list advices to be applied to the resized range
     void resize(size_t size, int dev = cudaCpuDeviceId, std::initializer_list<cudaMemoryAdvise> list = {cudaMemAdviseSetPreferredLocation})
     {
         if (size <= mCapacity) {
@@ -197,8 +197,8 @@ public:
     /// @brief Apply a single advise to a memory block
     /// @param byteOffset offset in bytes marking the beginning of the memory block to be advised
     /// @param size size in bytes of the memory block to be advised.
-    /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
-    /// @param adv cuda device
+    /// @param dev the device ID on which to apply the advice provided in adv, cudaCpuDeviceId = -1, 0, 1, ...
+    /// @param adv advice to be applied to the resized range
     void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv) const
     {
         cudaCheck(cudaMemAdvise(util::PtrAdd(mPtr, byteOffset), size, adv, dev));

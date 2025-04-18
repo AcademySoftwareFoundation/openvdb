@@ -301,7 +301,7 @@ public:
     {
         mData.map = map;
         mData.flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
-        mDeviceData = mAllocator.template alloc<Data>(mStream);
+        mDeviceData = Allocator::template alloc<Data>(mStream);
     }
 
     /// @brief Default constructor that calls the Map constructor defined above
@@ -321,6 +321,8 @@ public:
         mTolerance = tolerance;
         mMaxIterations = maxIterations;
     }
+
+    ~PointsToGrid(){ Allocator::free(mDeviceData, mStream); }
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -365,8 +367,7 @@ public:
 
     void processLowerNodes();
 
-    template <typename PtrT>
-    void processLeafNodes(const PtrT points);
+    void processLeafNodes();
 
     template <typename PtrT>
     void processPoints(const PtrT points, size_t pointCount);
@@ -394,22 +395,18 @@ private:
     CheckMode         mChecksum{CheckMode::Disable};
 
     struct Allocator {
-        Allocator() = default;
-        ~Allocator() = default;
-
         template <typename T>
-        T* alloc(size_t count, cudaStream_t stream) {
+        static T* alloc(size_t count, cudaStream_t stream) {
             T* d_ptr = nullptr;
             cudaCheck(cudaMallocAsync((void**)&d_ptr, sizeof(T)*count, stream));
             return d_ptr;
         }
 
         template <typename T>
-        T* alloc(cudaStream_t stream) {return this->template alloc<T>(1, stream);}
+        static T* alloc(cudaStream_t stream) {return Allocator::template alloc<T>(1, stream);}
 
-        void free(void *d_ptr, cudaStream_t stream) {cudaCheck(cudaFreeAsync(d_ptr, stream));}
-
-    } mAllocator;
+        static void free(void *d_ptr, cudaStream_t stream) {cudaCheck(cudaFreeAsync(d_ptr, stream));}
+    };
     nanovdb::cuda::TempDevicePool mTempDevicePool;
 
     template<typename PtrT, typename BufferT>
@@ -515,7 +512,7 @@ PointsToGrid<BuildT>::getHandle(const PtrT points,
     this->processLowerNodes();
 
     if (mVerbose==1) mTimer.restart("Process leaf nodes");
-    this->processLeafNodes(points);
+    this->processLeafNodes();
 
     if (mVerbose==1) mTimer.restart("Process points");
     this->processPoints(points, pointCount);
@@ -612,13 +609,13 @@ void PointsToGrid<BuildT>::countNodes(const PtrT points, size_t pointCount)
 
 jump:// this marks the beginning of the actual algorithm
 
-    mData.d_keys = mAllocator.template alloc<uint64_t>(pointCount, mStream);
-    mData.d_indx = mAllocator.template alloc<uint32_t>(pointCount, mStream);// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
+    mData.d_keys = Allocator::template alloc<uint64_t>(pointCount, mStream);
+    mData.d_indx = Allocator::template alloc<uint32_t>(pointCount, mStream);// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
     cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(Data), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
 
     if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
-    auto *d_keys = mAllocator.template alloc<uint64_t>(pointCount, mStream);
-    auto *d_indx = mAllocator.template alloc<uint32_t>(pointCount, mStream);
+    auto *d_keys = Allocator::template alloc<uint64_t>(pointCount, mStream);
+    auto *d_indx = Allocator::template alloc<uint32_t>(pointCount, mStream);
 
     if (mVerbose==2) mTimer.restart("Generate tile keys");
     util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
@@ -628,20 +625,20 @@ jump:// this marks the beginning of the actual algorithm
     std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx
 
     if (mVerbose==2) mTimer.restart("Allocate runs");
-    auto *d_points_per_tile = mAllocator.template alloc<uint32_t>(pointCount, mStream);
-    uint32_t *d_node_count  = mAllocator.template alloc<uint32_t>(3, mStream);
+    auto *d_points_per_tile = Allocator::template alloc<uint32_t>(pointCount, mStream);
+    uint32_t *d_node_count  = Allocator::template alloc<uint32_t>(3, mStream);
 
     if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
     CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
     cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_tile_keys = mAllocator.template alloc<uint64_t>(mData.nodeCount[2], mStream);
+    mData.d_tile_keys = Allocator::template alloc<uint64_t>(mData.nodeCount[2], mStream);
     cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
     if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
     uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
     cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    mAllocator.free(d_points_per_tile, mStream);
+    Allocator::free(d_points_per_tile, mStream);
 
     for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
         const uint32_t count = points_per_tile[id];
@@ -650,28 +647,28 @@ jump:// this marks the beginning of the actual algorithm
         CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);// 9+12+15=36
         offset += count;
     }
-    mAllocator.free(d_indx, mStream);
+    Allocator::free(d_indx, mStream);
     delete [] points_per_tile;
 
     if (mVerbose==2) mTimer.restart("Count points per voxel");
 
     cudaEvent_t copyEvent;
     cudaCheck(cudaEventCreate(&copyEvent));
-    mData.pointsPerVoxel    = mAllocator.template alloc<uint32_t>(pointCount, mStream);
-    uint32_t *d_voxel_count = mAllocator.template alloc<uint32_t>(mStream);
+    mData.pointsPerVoxel    = Allocator::template alloc<uint32_t>(pointCount, mStream);
+    uint32_t *d_voxel_count = Allocator::template alloc<uint32_t>(mStream);
     CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
     cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaEventRecord(copyEvent, mStream));
-    mAllocator.free(d_voxel_count, mStream);
+    Allocator::free(d_voxel_count, mStream);
 
     if (util::is_same<BuildT, Point>::value) {
         if (mVerbose==2) mTimer.restart("Count max points per voxel");
-        uint32_t *d_maxPointsPerVoxel = mAllocator.template alloc<uint32_t>(mStream), maxPointsPerVoxel;
+        uint32_t *d_maxPointsPerVoxel = Allocator::template alloc<uint32_t>(mStream), maxPointsPerVoxel;
         cudaCheck(cudaEventSynchronize(copyEvent));
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
         cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaEventRecord(copyEvent, mStream));
-        mAllocator.free(d_maxPointsPerVoxel, mStream);
+        Allocator::free(d_maxPointsPerVoxel, mStream);
         double dx = mData.map.getVoxelSize()[0];
         cudaCheck(cudaEventSynchronize(copyEvent));
         if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
@@ -692,12 +689,12 @@ jump:// this marks the beginning of the actual algorithm
             }
             if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
             mData.map = Map(dx);
-            mAllocator.free(mData.d_keys, mStream);
-            mAllocator.free(mData.d_indx, mStream);
-            mAllocator.free(d_keys, mStream);
-            mAllocator.free(mData.d_tile_keys, mStream);
-            mAllocator.free(d_node_count, mStream);
-            mAllocator.free(mData.pointsPerVoxel, mStream);
+            Allocator::free(mData.d_keys, mStream);
+            Allocator::free(mData.d_indx, mStream);
+            Allocator::free(d_keys, mStream);
+            Allocator::free(mData.d_tile_keys, mStream);
+            Allocator::free(d_node_count, mStream);
+            Allocator::free(mData.pointsPerVoxel, mStream);
             goto jump;
         }
     }
@@ -705,16 +702,16 @@ jump:// this marks the beginning of the actual algorithm
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerVoxelPrefix = mAllocator.template alloc<uint32_t>(mData.voxelCount, mStream);
+    mData.pointsPerVoxelPrefix = Allocator::template alloc<uint32_t>(mData.voxelCount, mStream);
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerVoxel, mData.pointsPerVoxelPrefix, mData.voxelCount);
 
-    mData.pointsPerLeaf = mAllocator.template alloc<uint32_t>(pointCount, mStream);
+    mData.pointsPerLeaf = Allocator::template alloc<uint32_t>(pointCount, mStream);
     CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), d_keys, mData.pointsPerLeaf, d_node_count, pointCount);
     cudaCheck(cudaMemcpyAsync(mData.nodeCount, d_node_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaEventRecord(copyEvent, mStream));
 
     if constexpr(util::is_same<BuildT, Point>::value) {
-        uint32_t *d_maxPointsPerLeaf = mAllocator.template alloc<uint32_t>(mStream);
+        uint32_t *d_maxPointsPerLeaf = Allocator::template alloc<uint32_t>(mStream);
         cudaCheck(cudaEventSynchronize(copyEvent));
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerLeaf, d_maxPointsPerLeaf, mData.nodeCount[0]);
         cudaCheck(cudaMemcpyAsync(&mMaxPointsPerLeaf, d_maxPointsPerLeaf, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
@@ -722,25 +719,25 @@ jump:// this marks the beginning of the actual algorithm
         if (mMaxPointsPerLeaf > std::numeric_limits<uint16_t>::max()) {
             throw std::runtime_error("Too many points per leaf: "+std::to_string(mMaxPointsPerLeaf));
         }
-        mAllocator.free(d_maxPointsPerLeaf, mStream);
+        Allocator::free(d_maxPointsPerLeaf, mStream);
     }
 
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerLeafPrefix = mAllocator.template alloc<uint32_t>(mData.nodeCount[0], mStream);
+    mData.pointsPerLeafPrefix = Allocator::template alloc<uint32_t>(mData.nodeCount[0], mStream);
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerLeaf, mData.pointsPerLeafPrefix, mData.nodeCount[0]);
 
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_leaf_keys = mAllocator.template alloc<uint64_t>(mData.nodeCount[0], mStream);
+    mData.d_leaf_keys = Allocator::template alloc<uint64_t>(mData.nodeCount[0], mStream);
     cudaCheck(cudaMemcpyAsync(mData.d_leaf_keys, d_keys, mData.nodeCount[0]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
     CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), d_keys, d_node_count+1, mData.nodeCount[0]);// count lower nodes
     cudaCheck(cudaMemcpyAsync(mData.nodeCount+1, d_node_count+1, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_lower_keys = mAllocator.template alloc<uint64_t>(mData.nodeCount[1], mStream);
+    mData.d_lower_keys = Allocator::template alloc<uint64_t>(mData.nodeCount[1], mStream);
     cudaCheck(cudaMemcpyAsync(mData.d_lower_keys, d_keys, mData.nodeCount[1]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
-    mAllocator.free(d_keys, mStream);
-    mAllocator.free(d_node_count, mStream);
+    Allocator::free(d_keys, mStream);
+    Allocator::free(d_node_count, mStream);
     if (mVerbose==2) mTimer.stop();
     cudaCheck(cudaEventDestroy(copyEvent));
 
@@ -980,7 +977,7 @@ inline void PointsToGrid<BuildT>::processUpperNodes()
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], BuildUpperNodesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mAllocator.free(mData.d_tile_keys, mStream);
+    Allocator::free(mData.d_tile_keys, mStream);
 
     const uint64_t valueCount = mData.nodeCount[2] << 15;
     util::cuda::lambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, mStream>>>(valueCount, SetUpperBackgroundValuesFunctor<BuildT>(), mDeviceData);
@@ -1101,8 +1098,7 @@ struct SetLeafInactiveVoxelValuesFunctor
 };
 
 template <typename BuildT>
-template <typename PtrT>
-inline void PointsToGrid<BuildT>::processLeafNodes(const PtrT points)
+inline void PointsToGrid<BuildT>::processLeafNodes()
 {
     const uint8_t flags = static_cast<uint8_t>(mData.flags.data());// mIncludeStats ? 16u : 0u;// 4th bit indicates stats
 
@@ -1116,11 +1112,11 @@ inline void PointsToGrid<BuildT>::processLeafNodes(const PtrT points)
     util::cuda::lambdaKernel<<<numBlocks(mData.voxelCount), mNumThreads, 0, mStream>>>(mData.voxelCount, SetLeafActiveVoxelStateAndValuesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mAllocator.free(mData.d_keys, mStream);
-    mAllocator.free(mData.pointsPerVoxel, mStream);
-    mAllocator.free(mData.pointsPerVoxelPrefix, mStream);
-    mAllocator.free(mData.pointsPerLeafPrefix, mStream);
-    mAllocator.free(mData.pointsPerLeaf, mStream);
+    Allocator::free(mData.d_keys, mStream);
+    Allocator::free(mData.pointsPerVoxel, mStream);
+    Allocator::free(mData.pointsPerVoxelPrefix, mStream);
+    Allocator::free(mData.pointsPerLeafPrefix, mStream);
+    Allocator::free(mData.pointsPerLeaf, mStream);
 
     if (mVerbose==2) mTimer.restart("set inactive voxel values");
     const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
@@ -1129,15 +1125,15 @@ inline void PointsToGrid<BuildT>::processLeafNodes(const PtrT points)
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
         if (mVerbose==2) mTimer.restart("prefix-sum for index grid");
-        uint64_t *devValueIndex = mAllocator.template alloc<uint64_t>(mData.nodeCount[0], mStream);
-        auto devValueIndexPrefix = mAllocator.template alloc<uint64_t>(mData.nodeCount[0], mStream);
+        uint64_t *devValueIndex = Allocator::template alloc<uint64_t>(mData.nodeCount[0], mStream);
+        auto devValueIndexPrefix = Allocator::template alloc<uint64_t>(mData.nodeCount[0], mStream);
         kernels::fillValueIndexKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndex, mDeviceData);
         cudaCheckError();
         CALL_CUBS(DeviceScan::InclusiveSum, devValueIndex, devValueIndexPrefix, mData.nodeCount[0]);
-        mAllocator.free(devValueIndex, mStream);
+        Allocator::free(devValueIndex, mStream);
         kernels::leafPrefixSumKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndexPrefix, mDeviceData);
         cudaCheckError();
-        mAllocator.free(devValueIndexPrefix, mStream);
+        Allocator::free(devValueIndexPrefix, mStream);
     }
 
     if constexpr(BuildTraits<BuildT>::is_indexmask) {
@@ -1154,7 +1150,7 @@ template <typename BuildT>
 template <typename PtrT>
 inline void PointsToGrid<BuildT>::processPoints(const PtrT, size_t)
 {
-    mAllocator.free(mData.d_indx, mStream);
+    Allocator::free(mData.d_indx, mStream);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1215,7 +1211,7 @@ inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCo
     default:
         printf("Internal error in PointsToGrid<Point>::processPoints\n");
     }
-    mAllocator.free(mData.d_indx, mStream);
+    Allocator::free(mData.d_indx, mStream);
 }// PointsToGrid<Point>::processPoints
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1286,8 +1282,8 @@ template <typename BuildT>
 inline void PointsToGrid<BuildT>::processBBox()
 {
     if (mData.flags.isMaskOff(GridFlags::HasBBox)) {
-        mAllocator.free(mData.d_leaf_keys, mStream);
-        mAllocator.free(mData.d_lower_keys, mStream);
+        Allocator::free(mData.d_leaf_keys, mStream);
+        Allocator::free(mData.d_lower_keys, mStream);
         return;
     }
 
@@ -1297,7 +1293,7 @@ inline void PointsToGrid<BuildT>::processBBox()
 
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mDeviceData);
-    mAllocator.free(mData.d_leaf_keys, mStream);
+    Allocator::free(mData.d_leaf_keys, mStream);
     cudaCheckError();
 
     // reset bbox in upper nodes
@@ -1306,7 +1302,7 @@ inline void PointsToGrid<BuildT>::processBBox()
 
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], PropagateLowerBBoxFunctor<BuildT>(), mDeviceData);
-    mAllocator.free(mData.d_lower_keys, mStream);
+    Allocator::free(mData.d_lower_keys, mStream);
     cudaCheckError()
 
     // propagate bbox from upper -> root/parent node
