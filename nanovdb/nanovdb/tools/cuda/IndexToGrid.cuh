@@ -233,7 +233,6 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstNode.mStdDevi = srcValues[srcNode.mStdDevi];
         }
     }
-    const uint64_t nodeSkip = nodeAcc->nodeCount[LEVEL] - blockIdx.x, srcOff = sizeof(SrcNodeT)*nodeSkip, dstOff = sizeof(DstNodeT)*nodeSkip;// offset to first node of child type
     const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
     for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
         const int i = off + threadIdx_z;
@@ -241,6 +240,7 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if constexpr(sizeof(SrcNodeT)==sizeof(DstNodeT) && sizeof(SrcChildT)==sizeof(DstChildT)) {
                 dstNode.mTable[i].child = srcNode.mTable[i].child;
             } else {
+                const uint64_t nodeSkip = nodeAcc->nodeCount[LEVEL] - blockIdx.x, srcOff = sizeof(SrcNodeT)*nodeSkip, dstOff = sizeof(DstNodeT)*nodeSkip;// offset to first node of child type
                 const uint64_t childID = (srcNode.mTable[i].child - srcOff)/sizeof(SrcChildT);
                 dstNode.mTable[i].child = dstOff + childID*sizeof(DstChildT);
             }
