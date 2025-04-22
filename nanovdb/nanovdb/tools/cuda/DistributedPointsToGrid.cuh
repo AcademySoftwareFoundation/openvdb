@@ -92,8 +92,8 @@ void mergePath(KeyIteratorIn keys1, size_t keys1Count, KeyIteratorIn keys2, size
             }
 
             if (leftKey <= rightKey) {
-                key1Intervals[intervalIndex] = leftMid;
-                key2Intervals[intervalIndex] = rightMid;
+                *key1Intervals = leftMid;
+                *key2Intervals = rightMid;
                 break;
             }
             else {
@@ -152,14 +152,14 @@ void rightRebalanceKernel(DistanceIteratorIn leftDistance, DistanceIteratorIn ri
 #ifndef CUB_LAUNCH
 #ifdef _WIN32
 #define CUB_LAUNCH(func, pool, stream, ...) \
-    cub::func(nullptr, pool.requestedSize(), __VA_ARGS__, stream); \
+    cudaCheck(cub::func(nullptr, pool.requestedSize(), __VA_ARGS__, stream)); \
     pool.reallocate(stream); \
-    cub::func(pool.data(), pool.size(), __VA_ARGS__, stream);
+    cudaCheck(cub::func(pool.data(), pool.size(), __VA_ARGS__, stream));
 #else// fdef _WIN32
 #define CUB_LAUNCH(func, pool, stream, args...) \
-    cub::func(nullptr, pool.requestedSize(), args, stream); \
+    cudaCheck(cub::func(nullptr, pool.requestedSize(), args, stream)); \
     pool.reallocate(stream); \
-    cub::func(pool.data(), pool.size(), args, stream);
+    cudaCheck(cub::func(pool.data(), pool.size(), args, stream));
 #endif// ifdef _WIN32
 #endif// ifndef CUB_LAUNCH
 
@@ -173,7 +173,7 @@ void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
         cudaCheck(cudaSetDevice(deviceId));
 
         // Required for the host to pass the correct value of counts[deviceId]
-        cudaEventSynchronize(preEvents[deviceId]);
+        cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
         uint32_t deviceNumItems = counts[deviceId];
         if (deviceId < (deviceMesh.deviceCount() - 1))
             ++deviceNumItems;
@@ -182,13 +182,13 @@ void exclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
             CUB_LAUNCH(DeviceScan::ExclusiveScan, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), 0, deviceNumItems);
         }
         else {
-            cudaStreamWaitEvent(stream, postEvents[deviceId - 1]);
+            cudaCheck(cudaStreamWaitEvent(stream, postEvents[deviceId - 1]));
             deviceIn += counts[deviceId - 1];
             deviceOut += counts[deviceId - 1];
             cub::FutureValue<uint32_t> futureValue(deviceOut);
             CUB_LAUNCH(DeviceScan::ExclusiveScan, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), futureValue, deviceNumItems);
         }
-        cudaEventRecord(postEvents[deviceId], stream);
+        cudaCheck(cudaEventRecord(postEvents[deviceId], stream));
     }
 }
 
@@ -199,24 +199,23 @@ void inclusiveSumAsync(const nanovdb::cuda::DeviceMesh& deviceMesh, nanovdb::cud
     InputIteratorT deviceIn = in;
     OutputIteratorT deviceOut = out;
     for (const auto& [deviceId, stream] : deviceMesh) {
-        cudaError_t cudaStatus = cudaSetDevice(deviceId);
-        assert(cudaStatus == cudaSuccess);
+        cudaCheck(cudaSetDevice(deviceId));
 
         // Required for the host to pass the correct value of counts[deviceId]
-        cudaEventSynchronize(preEvents[deviceId]);
+        cudaCheck(cudaEventSynchronize(preEvents[deviceId]));
         uint32_t deviceNumItems = counts[deviceId];
 
         if (deviceId == 0) {
             CUB_LAUNCH(DeviceScan::InclusiveScanInit, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), 0, deviceNumItems);
         }
         else {
-            cudaStreamWaitEvent(stream, postEvents[deviceId - 1]);
+            cudaCheck(cudaStreamWaitEvent(stream, postEvents[deviceId - 1]));
             deviceIn += counts[deviceId - 1];
             deviceOut += counts[deviceId - 1];
             cub::FutureValue<uint64_t> futureValue(deviceOut - 1);
             CUB_LAUNCH(DeviceScan::InclusiveScanInit, pools[deviceId], stream, deviceIn, deviceOut, ::cuda::std::plus(), futureValue, deviceNumItems);
         }
-        cudaEventRecord(postEvents[deviceId], stream);
+        cudaCheck(cudaEventRecord(postEvents[deviceId], stream));
     }
 }
 
@@ -256,12 +255,7 @@ public:
     template <typename PtrT>
     void processGridTreeRoot(const PtrT points, size_t pointCount);
 
-    void processUpperNodes();
-
-    void processLowerNodes();
-
-    template <typename PtrT>
-    void processLeafNodes(const PtrT points);
+    void processNodes();
 
     template <typename PtrT>
     void processPoints(const PtrT points, size_t pointCount);
@@ -290,6 +284,14 @@ private:
     uint32_t* mNodeOffsets;
     uint32_t* mVoxelCounts;
     uint32_t* mVoxelOffsets;
+    size_t* mLeftIntervals;
+    size_t* mRightIntervals;
+
+    uint64_t* mKeys;
+    uint32_t* mIndices;
+    uint32_t* mPointsPerTile;
+    uint64_t* mValueIndex;
+    uint64_t* mValueIndexPrefix;
 };
 
 template <typename BuildT>
@@ -314,6 +316,10 @@ DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::De
     cudaCheck(cudaMallocManaged(&mVoxelCounts, mDeviceMesh.deviceCount() * sizeof(uint32_t)));
     mVoxelOffsets = nullptr;
     cudaCheck(cudaMallocManaged(&mVoxelOffsets, mDeviceMesh.deviceCount() * sizeof(uint32_t)));
+    mLeftIntervals = nullptr;
+    cudaCheck(cudaMallocManaged(&mLeftIntervals, mDeviceMesh.deviceCount() * sizeof(size_t)));
+    mRightIntervals = nullptr;
+    cudaCheck(cudaMallocManaged(&mRightIntervals, mDeviceMesh.deviceCount() * sizeof(size_t)));
 }
 
 template <typename BuildT>
@@ -325,6 +331,8 @@ DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::De
 template <typename BuildT>
 DistributedPointsToGrid<BuildT>::~DistributedPointsToGrid()
 {
+    cudaCheck(cudaFree(mRightIntervals));
+    cudaCheck(cudaFree(mLeftIntervals));
     cudaCheck(cudaFree(mVoxelOffsets));
     cudaCheck(cudaFree(mVoxelCounts));
     cudaCheck(cudaFree(mNodeOffsets));
@@ -348,11 +356,7 @@ DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount)
 
     this->processGridTreeRoot(points, pointCount);
 
-    this->processUpperNodes();
-
-    this->processLowerNodes();
-
-    this->processLeafNodes(points);
+    this->processNodes();
 
     this->processPoints(points, pointCount);
 
@@ -386,24 +390,19 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     cudaCheck(cudaMallocManaged(&mData->pointsPerVoxel, coordCount * sizeof(uint32_t)));
     cudaCheck(cudaMallocManaged(&mData->pointsPerVoxelPrefix, coordCount * sizeof(uint32_t)));
 
-    uint64_t* keys = nullptr;
-    cudaCheck(cudaMallocManaged(&keys, coordCount * sizeof(uint64_t)));
-    uint32_t* indices = nullptr;
-    cudaCheck(cudaMallocManaged(&indices, coordCount * sizeof(uint32_t)));
+    cudaCheck(cudaMallocManaged(&mKeys, coordCount * sizeof(uint64_t)));
+    cudaCheck(cudaMallocManaged(&mIndices, coordCount * sizeof(uint32_t)));
 
-    uint32_t* pointsPerTile = nullptr;
-    cudaCheck(cudaMallocManaged(&pointsPerTile, coordCount * sizeof(uint32_t)));
+    cudaCheck(cudaMallocManaged(&mPointsPerTile, coordCount * sizeof(uint32_t)));
 
-    size_t* leftIntervals = nullptr;
-    cudaCheck(cudaMallocManaged(&leftIntervals, (mDeviceMesh.deviceCount() + 1) * sizeof(size_t)));
-    size_t* rightIntervals = nullptr;
-    cudaCheck(cudaMallocManaged(&rightIntervals, (mDeviceMesh.deviceCount() + 1) * sizeof(size_t)));
+    if constexpr(BuildTraits<BuildT>::is_onindex) {
+        cudaCheck(cudaMallocManaged(&mValueIndex, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
+        cudaCheck(cudaMallocManaged(&mValueIndexPrefix, coordCount * sizeof(uint64_t))); // oversubscribe to avoid sync point later
+    }
 
     // Create events required for host-device and cross-device synchronization. Disable timing if not needed in order
     // to reduce overhead.
     std::vector<cudaEvent_t> sortEvents(mDeviceMesh.deviceCount());
-    std::vector<cudaEvent_t> mergePathEvents(mDeviceMesh.deviceCount());
-    std::vector<cudaEvent_t> mergeEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> runLengthEncodeEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> transformReduceEvents(mDeviceMesh.deviceCount());
     std::vector<cudaEvent_t> rebalanceEvents(mDeviceMesh.deviceCount());
@@ -416,8 +415,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
         cudaEventCreateWithFlags(&sortEvents[deviceId], cudaEventDisableTiming);
-        cudaEventCreateWithFlags(&mergePathEvents[deviceId], cudaEventDisableTiming);
-        cudaEventCreateWithFlags(&mergeEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&runLengthEncodeEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&transformReduceEvents[deviceId], cudaEventDisableTiming);
         cudaEventCreateWithFlags(&rebalanceEvents[deviceId], cudaEventDisableTiming);
@@ -441,8 +438,8 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         mStripeOffsets[deviceId] = deviceStripeOffset;
 
         nanovdb::Coord* deviceCoords = coords + deviceStripeOffset;
-        uint64_t* deviceInputKeys = keys + deviceStripeOffset;
-        uint32_t* deviceInputIndices = indices + deviceStripeOffset;
+        uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
+        uint32_t* deviceInputIndices = mIndices + deviceStripeOffset;
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
@@ -454,18 +451,9 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaMemAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
         cudaMemAdvise(deviceOutputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
 
-        uint32_t* devicePointsPerTile = pointsPerTile + deviceStripeOffset;
+        uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
         cudaMemAdvise(devicePointsPerTile, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
         cudaMemAdvise(deviceNodeCount(deviceId), 3 * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
-    }
-
-    for (const auto& [deviceId, stream] : mDeviceMesh) {
-        size_t deviceStripeCount = (coordCount + mDeviceMesh.deviceCount() - 1) / mDeviceMesh.deviceCount();
-        const ptrdiff_t deviceStripeOffset = deviceStripeCount * deviceId;
-        deviceStripeCount = std::min(deviceStripeCount, coordCount - deviceStripeOffset);
-
-        mStripeCounts[deviceId] = deviceStripeCount;
-        mStripeOffsets[deviceId] = deviceStripeOffset;
     }
 
     // Radix sort the subset of keys assigned to each device in parallel
@@ -476,98 +464,139 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         auto deviceStripeOffset = mStripeOffsets[deviceId];
 
         const PtrT deviceCoords = coords + deviceStripeOffset;
-        uint64_t* deviceInputKeys = keys + deviceStripeOffset;
-        uint32_t* deviceInputIndices = indices + deviceStripeOffset;
+        uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
+        uint32_t* deviceInputIndices = mIndices + deviceStripeOffset;
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-        nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, keys, indices);
+        cudaMemPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
+
+        nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, mKeys, mIndices);
 
         CUB_LAUNCH(DeviceRadixSort::SortPairs, mTempDevicePools[deviceId], stream, deviceInputKeys, deviceOutputKeys, deviceInputIndices, deviceOutputIndices, deviceStripeCount, 0, 63);
         cudaEventRecord(sortEvents[deviceId], stream);
     });
 
-    // TODO: Generalize to more than two devices once we have a test machine
+    // TODO: Generalize to numbers of GPUs that aren't powers of two
 
     // For each pair of devices, merge the local sorts by first computing the median across the two devices followed by merging
     // the elements less than and greater than/equal to the median onto the first and second device of the pair respectively.
     // This avoids the allocating memory for and gathering the values from both devices onto a single device.
-    for (int devicePairId = 0; devicePairId < mDeviceMesh.deviceCount() / 2; ++devicePairId)
-    {
-        const int leftDeviceId = 2 * devicePairId;
-        const int rightDeviceId = 2 * devicePairId + 1;
 
-        auto leftDeviceStripeCount = mStripeCounts[leftDeviceId];
-        auto rightDeviceStripeCount = mStripeCounts[rightDeviceId];
-        auto leftDeviceStripeOffset = mStripeOffsets[leftDeviceId];
-        auto rightDeviceStripeOffset = mStripeOffsets[rightDeviceId];
+    std::vector<std::thread> threads;
+    const size_t log2DeviceCount = log2(mDeviceMesh.deviceCount());
+    for (auto deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
+        const size_t deviceGroupCount = mDeviceMesh.deviceCount() >> deviceExponent;
+        for (int deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
+            threads.emplace_back([&, deviceGroupId]() {
+                const int leftDeviceGroupId = deviceGroupId;
+                const int rightDeviceGroupId = deviceGroupId + 1;
+                const int leftDeviceId = leftDeviceGroupId << deviceExponent;
+                const int rightDeviceId = rightDeviceGroupId << deviceExponent;
 
-        uint64_t* leftDeviceOutputKeys = mData->d_keys + leftDeviceStripeOffset;
-        uint32_t* leftDeviceOutputIndices = mData->d_indx + leftDeviceStripeOffset;
-        uint64_t* rightDeviceOutputKeys = mData->d_keys + rightDeviceStripeOffset;
-        uint32_t* rightDeviceOutputIndices = mData->d_indx + rightDeviceStripeOffset;
+                size_t deviceStripeCount = (coordCount + deviceGroupCount - 1) / deviceGroupCount;
+                const ptrdiff_t deviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
+                deviceStripeCount = std::min(deviceStripeCount, coordCount - deviceStripeOffset);
 
-        leftIntervals[2] = leftDeviceStripeCount;
-        rightIntervals[2] = rightDeviceStripeCount;
+                const auto leftDeviceStripeOffset = deviceStripeCount * leftDeviceGroupId;
+                const auto leftDeviceStripeCount = std::min(deviceStripeCount, coordCount - leftDeviceStripeOffset);
+                const auto rightDeviceStripeOffset = deviceStripeCount * rightDeviceGroupId;
+                const auto rightDeviceStripeCount = std::min(deviceStripeCount, coordCount - rightDeviceStripeOffset);
 
-        // Wait on the prior sort to finish on both devices before computing the median across both devices
-        auto mergePathFunc = [&](int deviceId, int otherDeviceId) {
-            cudaError_t cudaStatus = cudaSetDevice(deviceId);
-            assert(cudaStatus == cudaSuccess);
+                const uint64_t* inputKeys = (deviceExponent % 2) ? mKeys : mData->d_keys;
+                const uint32_t* inputIndices = (deviceExponent % 2) ? mIndices : mData->d_indx;
+                uint64_t* outputKeys = (deviceExponent % 2) ? mData->d_keys : mKeys;
+                uint32_t* outputIndices = (deviceExponent % 2) ? mData->d_indx : mIndices;
 
-            cudaStreamWaitEvent(mDeviceMesh[deviceId].stream, sortEvents[otherDeviceId]);
-            kernels::mergePathKernel<<<1, 1, 0, mDeviceMesh[deviceId].stream>>>(leftDeviceOutputKeys, leftDeviceStripeCount, rightDeviceOutputKeys, rightDeviceStripeCount, leftIntervals, rightIntervals, deviceId);
-            cudaEventRecord(mergePathEvents[deviceId], mDeviceMesh[deviceId].stream);
-        };
+                const uint64_t* leftDeviceInputKeys = inputKeys + leftDeviceStripeOffset;
+                const uint32_t* leftDeviceInputIndices = inputIndices + leftDeviceStripeOffset;
+                const uint64_t* rightDeviceInputKeys = inputKeys + rightDeviceStripeOffset;
+                const uint32_t* rightDeviceInputIndices = inputIndices + rightDeviceStripeOffset;
 
-        // Wait on the median computation prior to merging the sorts
-        auto mergeFunc = [&](int deviceId, int otherDeviceId) {
-            cudaError_t cudaStatus = cudaSetDevice(deviceId);
-            assert(cudaStatus == cudaSuccess);
+                // Wait on the prior sort to finish on both devices before computing the median across both devices
+                auto mergePathFunc = [&](int deviceId, int otherDeviceId, int intervalIndex) {
+                    cudaError_t cudaStatus = cudaSetDevice(deviceId);
+                    assert(cudaStatus == cudaSuccess);
 
-            cudaEventSynchronize(mergePathEvents[deviceId]);
-            cudaEventSynchronize(mergePathEvents[otherDeviceId]);
-            const uint64_t* leftKeys = leftDeviceOutputKeys + leftIntervals[deviceId];
-            const uint32_t* leftIndices = leftDeviceOutputIndices + leftIntervals[deviceId];
-            size_t leftCount = leftIntervals[deviceId + 1] - leftIntervals[deviceId];
+                    cudaStreamWaitEvent(mDeviceMesh[deviceId].stream, sortEvents[otherDeviceId]);
+                    kernels::mergePathKernel<<<1, 1, 0, mDeviceMesh[deviceId].stream>>>(leftDeviceInputKeys, leftDeviceStripeCount, rightDeviceInputKeys, rightDeviceStripeCount, &mLeftIntervals[deviceId], &mRightIntervals[deviceId], intervalIndex);
+                    cudaStreamSynchronize(mDeviceMesh[deviceId].stream);
+                };
 
-            const uint64_t* rightKeys = rightDeviceOutputKeys + rightIntervals[deviceId];
-            const uint32_t* rightIndices = rightDeviceOutputIndices + rightIntervals[deviceId];
-            size_t rightCount = rightIntervals[deviceId + 1] - rightIntervals[deviceId];
+                std::thread leftMergePathThread(mergePathFunc, leftDeviceId, rightDeviceId, 0);
+                std::thread rightMergePathThread(mergePathFunc, rightDeviceId, leftDeviceId, 1);
+                leftMergePathThread.join();
+                rightMergePathThread.join();
 
-            uint64_t* keysOut = keys + leftIntervals[deviceId] + rightIntervals[deviceId];
-            uint32_t* indicesOut = indices + leftIntervals[deviceId] + rightIntervals[deviceId];
+                // Wait on the median computation prior to merging the sorts
+                auto leftMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
+                    cudaError_t cudaStatus = cudaSetDevice(leftDeviceId);
+                    assert(cudaStatus == cudaSuccess);
 
-            CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[deviceId], mDeviceMesh[deviceId].stream, leftKeys, leftIndices, leftCount, rightKeys, rightIndices, rightCount, keysOut, indicesOut, {});
-            cudaEventRecord(mergeEvents[deviceId], mDeviceMesh[deviceId].stream);
-        };
+                    const uint64_t* leftKeysIn = leftDeviceInputKeys + mLeftIntervals[leftDeviceId];
+                    const uint32_t* leftIndicesIn = leftDeviceInputIndices + mLeftIntervals[leftDeviceId];
+                    size_t leftCount = mLeftIntervals[rightDeviceId] - mLeftIntervals[leftDeviceId];
 
-        std::thread leftMergePathThread(mergePathFunc, leftDeviceId, rightDeviceId);
-        std::thread rightMergePathThread(mergePathFunc, rightDeviceId, leftDeviceId);
-        leftMergePathThread.join();
-        rightMergePathThread.join();
+                    const uint64_t* rightKeysIn = rightDeviceInputKeys + mRightIntervals[leftDeviceId];
+                    const uint32_t* rightIndicesIn = rightDeviceInputIndices + mRightIntervals[leftDeviceId];
+                    size_t rightCount = mRightIntervals[rightDeviceId] - mRightIntervals[leftDeviceId];
 
-        // Merge the pairs less than the median to the left device
-        std::thread leftMergeThread(mergeFunc, leftDeviceId, rightDeviceId);
-        // Merge the pairs greater than/equal to the median to the right device
-        std::thread rightMergeThread(mergeFunc, rightDeviceId, leftDeviceId);
-        leftMergeThread.join();
-        rightMergeThread.join();
+                    size_t outputOffset = leftDeviceStripeOffset + mLeftIntervals[leftDeviceId] + mRightIntervals[leftDeviceId];
+                    uint64_t* keysOut = outputKeys + outputOffset;
+                    uint32_t* indicesOut = outputIndices + outputOffset;
+
+                    CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[leftDeviceId], mDeviceMesh[leftDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
+                    cudaEventRecord(sortEvents[leftDeviceId], mDeviceMesh[leftDeviceId].stream);
+                };
+
+                auto rightMergeFunc = [&](int leftDeviceId, int rightDeviceId) {
+                    cudaError_t cudaStatus = cudaSetDevice(rightDeviceId);
+                    assert(cudaStatus == cudaSuccess);
+
+                    const uint64_t* leftKeysIn = leftDeviceInputKeys + mLeftIntervals[rightDeviceId];
+                    const uint32_t* leftIndicesIn = leftDeviceInputIndices + mLeftIntervals[rightDeviceId];
+                    size_t leftCount = leftDeviceStripeCount - mLeftIntervals[rightDeviceId];
+
+                    const uint64_t* rightKeysIn = rightDeviceInputKeys + mRightIntervals[rightDeviceId];
+                    const uint32_t* rightIndicesIn = rightDeviceInputIndices + mRightIntervals[rightDeviceId];
+                    size_t rightCount = rightDeviceStripeCount - mRightIntervals[rightDeviceId];
+
+                    size_t outputOffset = leftDeviceStripeOffset + mLeftIntervals[rightDeviceId] + mRightIntervals[rightDeviceId];
+                    uint64_t* keysOut = outputKeys + outputOffset;
+                    uint32_t* indicesOut = outputIndices + outputOffset;
+
+                    CUB_LAUNCH(DeviceMerge::MergePairs, mTempDevicePools[rightDeviceId], mDeviceMesh[rightDeviceId].stream, leftKeysIn, leftIndicesIn, leftCount, rightKeysIn, rightIndicesIn, rightCount, keysOut, indicesOut, {});
+                    cudaEventRecord(sortEvents[rightDeviceId], mDeviceMesh[rightDeviceId].stream);
+                };
+
+                // Merge the pairs less than the median to the left device
+                std::thread leftMergeThread(leftMergeFunc, leftDeviceId, rightDeviceId);
+                // Merge the pairs greater than/equal to the median to the right device
+                std::thread rightMergeThread(rightMergeFunc, leftDeviceId, rightDeviceId);
+                leftMergeThread.join();
+                rightMergeThread.join();
+
+                cudaCheck(cudaEventSynchronize(sortEvents[leftDeviceId]));
+                cudaCheck(cudaEventSynchronize(sortEvents[rightDeviceId]));
+            });
+        }
+        std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
+        threads.clear();
     }
 
     // There is no merging required for a single device so we simply copy the sorted result to the destination array (where the sort would have been merged to).
-    if (mDeviceMesh.deviceCount() < 2) {
-        for (const auto& [deviceId, stream] : mDeviceMesh) {
+    if (!(log2DeviceCount % 2)) {
+        parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
             cudaCheck(cudaSetDevice(deviceId));
 
             auto deviceStripeCount = mStripeCounts[deviceId];
             auto deviceStripeOffset = mStripeOffsets[deviceId];
 
-            cudaMemcpyAsync(keys + deviceStripeOffset, mData->d_keys + deviceStripeOffset, deviceStripeCount * sizeof(uint64_t), cudaMemcpyDeviceToDevice, stream);
-            cudaMemcpyAsync(indices + deviceStripeOffset, mData->d_indx + deviceStripeOffset, deviceStripeCount * sizeof(uint32_t), cudaMemcpyDeviceToDevice, stream);
+            cudaMemcpyAsync(mKeys + deviceStripeOffset, mData->d_keys + deviceStripeOffset, deviceStripeCount * sizeof(uint64_t), cudaMemcpyDefault, stream);
+            cudaMemcpyAsync(mIndices + deviceStripeOffset, mData->d_indx + deviceStripeOffset, deviceStripeCount * sizeof(uint32_t), cudaMemcpyDefault, stream);
 
-            cudaEventRecord(mergeEvents[deviceId], stream);
-        }
+            cudaEventRecord(sortEvents[deviceId], stream);
+        });
     }
 
     // For each segment of sorted keys on each device, we count how many of the leftmost key occur past the left boundary of the segment. The same is done for the rightmost key with the right boundary of the segment.
@@ -576,20 +605,24 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
         auto deviceStripeCount = mStripeCounts[deviceId];
         auto deviceStripeOffset = mStripeOffsets[deviceId];
-        uint64_t* deviceInputKeys = keys + deviceStripeOffset;
+        uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
 
-        if (deviceId > 0)
-        {
-            cudaStreamWaitEvent(stream, mergeEvents[deviceId - 1]);
+        if (deviceId > 0) {
+            cudaStreamWaitEvent(stream, sortEvents[deviceId - 1]);
             EqualityIndicator<uint64_t> indicator(deviceInputKeys - 1);
-            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, rightIntervals, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
+            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, mRightIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
+        }
+        else {
+            mRightIntervals[deviceId] = 0;
         }
 
-        if (deviceId < mDeviceMesh.deviceCount() - 1)
-        {
-            cudaStreamWaitEvent(stream, mergeEvents[deviceId + 1]);
+        if (deviceId < mDeviceMesh.deviceCount() - 1) {
+            cudaStreamWaitEvent(stream, sortEvents[deviceId + 1]);
             EqualityIndicator<uint64_t> indicator(deviceInputKeys + deviceStripeCount);
-            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, leftIntervals, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
+            CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, mLeftIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
+        }
+        else {
+            mLeftIntervals[deviceId] = 0;
         }
         cudaEventRecord(transformReduceEvents[deviceId], stream);
     });
@@ -601,13 +634,13 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         if (deviceId > 0)
         {
             cudaStreamWaitEvent(stream, transformReduceEvents[deviceId - 1]);
-            kernels::rightRebalanceKernel<<<1, 1, 0, stream>>>(leftIntervals, rightIntervals, mStripeCounts + deviceId, mStripeOffsets + deviceId);
+            kernels::rightRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId - 1, mRightIntervals + deviceId, mStripeCounts + deviceId, mStripeOffsets + deviceId);
         }
 
         if (deviceId < mDeviceMesh.deviceCount() - 1)
         {
             cudaStreamWaitEvent(stream, transformReduceEvents[deviceId + 1]);
-            kernels::leftRebalanceKernel<<<1, 1, 0, stream>>>(leftIntervals, rightIntervals, mStripeCounts + deviceId, mStripeOffsets + deviceId);
+            kernels::leftRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId, mRightIntervals + deviceId + 1, mStripeCounts + deviceId, mStripeOffsets + deviceId);
         }
         cudaEventRecord(rebalanceEvents[deviceId], stream);
     });
@@ -616,28 +649,28 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
         cudaCheck(cudaSetDevice(deviceId));
 
-        cudaEventSynchronize(rebalanceEvents[deviceId]);
+        cudaCheck(cudaEventSynchronize(rebalanceEvents[deviceId]));
 
         auto deviceStripeCount = mStripeCounts[deviceId];
         auto deviceStripeOffset = mStripeOffsets[deviceId];
 
-        uint64_t* deviceInputKeys = keys + deviceStripeOffset;
+        uint64_t* deviceInputKeys = mKeys + deviceStripeOffset;
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
-        uint32_t* devicePointsPerTile = pointsPerTile + deviceStripeOffset;
+        uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
 
         // cudaMemPrefetchAsync(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), deviceId, stream);
 
         CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceInputKeys, deviceOutputKeys, devicePointsPerTile, deviceNodeCount(deviceId) + 2, deviceStripeCount);
-        cudaEventRecord(runLengthEncodeEvents[deviceId], stream);
+        cudaCheck(cudaEventRecord(runLengthEncodeEvents[deviceId], stream));
     });
 
     uint32_t upperOffset = 0;
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
-        cudaEventSynchronize(runLengthEncodeEvents[deviceId]);
+        cudaCheck(cudaEventSynchronize(runLengthEncodeEvents[deviceId]));
         auto deviceStripeOffset = mStripeOffsets[deviceId];
         uint64_t* deviceKeys = mData->d_keys + deviceStripeOffset;
-        cudaMemcpyAsync(mData->d_tile_keys + upperOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[2], cudaMemcpyDeviceToDevice, stream);
+        cudaCheck(cudaMemcpyAsync(mData->d_tile_keys + upperOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[2], cudaMemcpyDefault, stream));
         deviceNodeOffset(deviceId)[2] = upperOffset;
         upperOffset += deviceNodeCount(deviceId)[2];
     }
@@ -647,14 +680,14 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         auto stream = mDeviceMesh[deviceId].stream;
         cudaCheck(cudaSetDevice(deviceId));
 
-        uint32_t* devicePointsPerTile = pointsPerTile + mStripeOffsets[deviceId];
+        uint32_t* devicePointsPerTile = mPointsPerTile + mStripeOffsets[deviceId];
         for (uint32_t i = 0, tileOffset = 0; i < deviceNodeCount(deviceId)[2]; ++i) {
             if (!devicePointsPerTile[i]) continue;
 
-            nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + mStripeOffsets[deviceId], VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, keys, indices);
+            nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(devicePointsPerTile[i]), mNumThreads, 0, stream>>>(devicePointsPerTile[i], tileOffset + mStripeOffsets[deviceId], VoxelKeyFunctor<BuildT, PtrT>(), mData, coords, id, mKeys, mIndices);
 
-            uint64_t* tileInputKeys = keys + tileOffset + mStripeOffsets[deviceId];
-            uint32_t* tileInputIndices = indices + tileOffset + mStripeOffsets[deviceId];
+            uint64_t* tileInputKeys = mKeys + tileOffset + mStripeOffsets[deviceId];
+            uint32_t* tileInputIndices = mIndices + tileOffset + mStripeOffsets[deviceId];
             uint64_t* tileOutputKeys = mData->d_keys + tileOffset + mStripeOffsets[deviceId];
             uint32_t* tileOutputIndices = mData->d_indx + tileOffset + mStripeOffsets[deviceId];
 
@@ -664,47 +697,97 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         }
     }
 
-    // Parallel RLE with (shifted) keys in order to count voxels and points per voxel
+    // For each of the following operations, the input on the current device depends on the output of the prior device. Thus, for maximum throughput, we pipeline these operations.
+    // 1) RLE for pointsPerLeaf
+    // 2) RLE for pointsPerVoxel
+    // 3) Prefix sum over pointsPerLeaf
+    // 4) Prefix sum over pointsPerVoxel
+    // Without this pipelining, each operation would have to wait until ALL devices to finish their prior operation instead of just the previous device which significantly degrades scaling.
+    // Based on profiling, we launch the per-device kernels for steps 1 through 3 in a single loop, followed by launching the per-device kernels for step 4 in a separate loop.
+    // This can be improved when/if CUB implements cub::FutureValue support for size parameters.
     {
+        LeafCountIterator leafCountIterator(mNodeCounts);
         uint32_t* devicePointsPerVoxel = mData->pointsPerVoxel;
         uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
+        uint32_t* devicePointsPerVoxelPrefix = mData->pointsPerVoxelPrefix;
         for (const auto& [deviceId, stream] : mDeviceMesh) {
             cudaCheck(cudaSetDevice(deviceId));
 
-            uint64_t* deviceInputKeys = keys + mStripeOffsets[deviceId];
+            uint64_t* deviceInputKeys = mKeys + mStripeOffsets[deviceId];
             uint64_t* deviceOutputKeys = mData->d_keys + mStripeOffsets[deviceId];
 
             if (deviceId == 0) {
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceOutputKeys, deviceInputKeys, devicePointsPerVoxel, mVoxelCounts + deviceId, mStripeCounts[deviceId]);
-                cudaEventRecord(voxelCountEvents[deviceId], stream);
+                cudaCheck(cudaEventRecord(voxelCountEvents[deviceId], stream));
 
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<9>()), deviceInputKeys, devicePointsPerLeaf, deviceNodeCount(deviceId), mStripeCounts[deviceId]);
-                cudaEventRecord(leafCountEvents[deviceId], stream);
+                cudaCheck(cudaEventRecord(leafCountEvents[deviceId], stream));
             }
             else
             {
-                cudaEventSynchronize(voxelCountEvents[deviceId - 1]);
+                cudaCheck(cudaEventSynchronize(voxelCountEvents[deviceId - 1]));
                 devicePointsPerVoxel += mVoxelCounts[deviceId - 1];
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceOutputKeys, deviceInputKeys, devicePointsPerVoxel, mVoxelCounts + deviceId, mStripeCounts[deviceId]);
-                cudaEventRecord(voxelCountEvents[deviceId], stream);
+                cudaCheck(cudaEventRecord(voxelCountEvents[deviceId], stream));
 
-                cudaEventSynchronize(leafCountEvents[deviceId - 1]);
+                cudaCheck(cudaEventSynchronize(leafCountEvents[deviceId - 1]));
                 devicePointsPerLeaf += deviceNodeCount(deviceId - 1)[0];
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<9>()), deviceInputKeys, devicePointsPerLeaf, deviceNodeCount(deviceId), mStripeCounts[deviceId]);
-                cudaEventRecord(leafCountEvents[deviceId], stream);
+                cudaCheck(cudaEventRecord(leafCountEvents[deviceId], stream));
             }
+
+            cudaCheck(cudaEventSynchronize(voxelCountEvents[deviceId]));
+            uint32_t deviceNumItems = mVoxelCounts[deviceId];
+            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+                ++deviceNumItems;
+
+            if (deviceId == 0) {
+                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerVoxel, devicePointsPerVoxelPrefix, ::cuda::std::plus(), 0, deviceNumItems);
+            }
+            else {
+                cudaCheck(cudaStreamWaitEvent(stream, voxelPrefixSumEvents[deviceId - 1]));
+                devicePointsPerVoxelPrefix += mVoxelCounts[deviceId - 1];
+                cub::FutureValue<uint32_t> futureValue(devicePointsPerVoxelPrefix);
+                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerVoxel, devicePointsPerVoxelPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
+            }
+
+            cudaCheck(cudaEventRecord(voxelPrefixSumEvents[deviceId], stream));
+
         }
     }
 
-    // Compute prefix sum for pointsPerVoxel
-    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerVoxel, mData->pointsPerVoxelPrefix, mVoxelCounts, voxelCountEvents.data(), voxelPrefixSumEvents.data());
+    {
+        LeafCountIterator leafCountIterator(mNodeCounts);
+        uint32_t* devicePointsPerLeaf = mData->pointsPerLeaf;
+        uint32_t* devicePointsPerLeafPrefix = mData->pointsPerLeafPrefix;
+        for (const auto& [deviceId, stream] : mDeviceMesh) {
+            cudaCheck(cudaSetDevice(deviceId));
+
+            // Required for the host to pass the correct value of counts[deviceId]
+            cudaCheck(cudaEventSynchronize(leafCountEvents[deviceId]));
+            uint32_t deviceNumItems = leafCountIterator[deviceId];
+            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+                ++deviceNumItems;
+
+            if (deviceId == 0) {
+                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerLeaf, devicePointsPerLeafPrefix, ::cuda::std::plus(), 0, deviceNumItems);
+            }
+            else {
+                cudaCheck(cudaStreamWaitEvent(stream, leafPrefixSumEvents[deviceId - 1]));
+                devicePointsPerLeaf += leafCountIterator[deviceId - 1];
+                devicePointsPerLeafPrefix += leafCountIterator[deviceId - 1];
+                cub::FutureValue<uint32_t> futureValue(devicePointsPerLeafPrefix);
+                CUB_LAUNCH(DeviceScan::ExclusiveScan, mTempDevicePools[deviceId], stream, devicePointsPerLeaf, devicePointsPerLeafPrefix, ::cuda::std::plus(), futureValue, deviceNumItems);
+            }
+            cudaCheck(cudaEventRecord(leafPrefixSumEvents[deviceId], stream));
+        }
+    }
 
     uint32_t leafOffset = 0;
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
-        cudaEventSynchronize(leafCountEvents[deviceId]);
-        uint64_t* deviceKeys = keys + mStripeOffsets[deviceId];
-        cudaMemcpyAsync(mData->d_leaf_keys + leafOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[0], cudaMemcpyDeviceToDevice, stream);
+        uint64_t* deviceKeys = mKeys + mStripeOffsets[deviceId];
+        cudaCheck(cudaMemcpyAsync(mData->d_leaf_keys + leafOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[0], cudaMemcpyDefault, stream));
         deviceNodeOffset(deviceId)[0] = leafOffset;
         leafOffset += deviceNodeCount(deviceId)[0];
     }
@@ -713,23 +796,19 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
         cudaCheck(cudaSetDevice(deviceId));
 
-        uint64_t* deviceInputKeys = keys + mStripeOffsets[deviceId];
+        uint64_t* deviceInputKeys = mKeys + mStripeOffsets[deviceId];
         uint64_t* deviceOutputKeys = mData->d_keys + mStripeOffsets[deviceId];
 
         CUB_LAUNCH(DeviceSelect::Unique, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<21>()), deviceInputKeys, deviceNodeCount(deviceId) + 1, mStripeCounts[deviceId]);
         cudaEventRecord(lowerCountEvents[deviceId], stream);
     });
 
-    // Compute prefix sum for pointsPerLeaf
-    LeafCountIterator leafCountIterator(mNodeCounts);
-    exclusiveSumAsync(mDeviceMesh, mTempDevicePools, mData->pointsPerLeaf, mData->pointsPerLeafPrefix, leafCountIterator, leafCountEvents.data(), leafPrefixSumEvents.data());
-
     uint32_t lowerOffset = 0;
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
-        cudaEventSynchronize(lowerCountEvents[deviceId]);
-        uint64_t* deviceKeys = keys + mStripeOffsets[deviceId];
-        cudaMemcpyAsync(mData->d_lower_keys + lowerOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[1], cudaMemcpyDeviceToDevice, stream);
+        cudaCheck(cudaEventSynchronize(lowerCountEvents[deviceId]));
+        uint64_t* deviceKeys = mKeys + mStripeOffsets[deviceId];
+        cudaCheck(cudaMemcpyAsync(mData->d_lower_keys + lowerOffset, deviceKeys, sizeof(uint64_t) * deviceNodeCount(deviceId)[1], cudaMemcpyDefault, stream));
         deviceNodeOffset(deviceId)[1] = lowerOffset;
         lowerOffset += deviceNodeCount(deviceId)[1];
     }
@@ -748,8 +827,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     for (const auto& [deviceId, stream] : mDeviceMesh) {
         cudaCheck(cudaSetDevice(deviceId));
         cudaEventDestroy(sortEvents[deviceId]);
-        cudaEventDestroy(mergePathEvents[deviceId]);
-        cudaEventDestroy(mergeEvents[deviceId]);
         cudaEventDestroy(runLengthEncodeEvents[deviceId]);
         cudaEventDestroy(transformReduceEvents[deviceId]);
         cudaEventDestroy(rebalanceEvents[deviceId]);
@@ -760,13 +837,6 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         cudaEventDestroy(voxelPrefixSumEvents[deviceId]);
         cudaEventDestroy(leafPrefixSumEvents[deviceId]);
     }
-
-    cudaCheck(cudaFree(rightIntervals));
-    cudaCheck(cudaFree(leftIntervals));
-
-    cudaCheck(cudaFree(pointsPerTile));
-    cudaCheck(cudaFree(indices));
-    cudaCheck(cudaFree(keys));
 } // DistributedPointsToGrid<BuildT>::countNodes
 
 template <typename BuildT>
@@ -848,69 +918,52 @@ inline void DistributedPointsToGrid<BuildT>::processGridTreeRoot(const PtrT poin
 }// DistributedPointsToGrid<BuildT>::processGridTreeRoot
 
 template <typename BuildT>
-inline void DistributedPointsToGrid<BuildT>::processUpperNodes()
+inline void DistributedPointsToGrid<BuildT>::processNodes()
 {
-    // Parallel construction of upper nodes
-    parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
-        cudaCheck(cudaSetDevice(deviceId));
-
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], BuildUpperNodesFunctor<BuildT>(), mData);
-        cudaCheckError();
-
-        const uint64_t valueCount = deviceNodeCount(deviceId)[2] << 15;
-        const uint64_t valueOffset = deviceNodeOffset(deviceId)[2] << 15;
-        util::cuda::offsetLambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, stream>>>(valueCount, valueOffset, SetUpperBackgroundValuesFunctor<BuildT>(), mData);
-        cudaCheckError();
-    });
-}// DistributedPointsToGrid<BuildT>::processUpperNodes
-
-template <typename BuildT>
-inline void DistributedPointsToGrid<BuildT>::processLowerNodes()
-{
-    // Parallel construction of lower nodes
-    parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
-        cudaCheck(cudaSetDevice(deviceId));
-
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], BuildLowerNodesFunctor<BuildT>(), mData);
-        cudaCheckError();
-
-        const uint64_t valueCount = deviceNodeCount(deviceId)[1] << 12;
-        const uint64_t valueOffset = deviceNodeOffset(deviceId)[1] << 12;
-        util::cuda::offsetLambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, stream>>>(valueCount, valueOffset, SetLowerBackgroundValuesFunctor<BuildT>(), mData);
-        cudaCheckError();
-    });
-}// DistributedPointsToGrid<BuildT>::processLowerNodes
-
-template <typename BuildT>
-template <typename PtrT>
-inline void DistributedPointsToGrid<BuildT>::processLeafNodes(const PtrT points)
-{
-    // Parallel construction of leaf nodes
+    // Parallel construction of upper, lower, and leaf nodes
     const uint8_t flags = static_cast<uint8_t>(mData->flags.data());// mIncludeStats ? 16u : 0u;// 4th bit indicates stats
 
     parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
         cudaCheck(cudaSetDevice(deviceId));
 
-        // loop over leaf nodes and add it to its parent node
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], ProcessLeafMetaDataFunctor<BuildT>(), mData, flags);
-        cudaCheckError();
+        if (deviceNodeCount(deviceId)[2]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], BuildUpperNodesFunctor<BuildT>(), mData);
+            cudaCheckError();
 
-        // loop over all active voxels and set LeafNode::mValueMask and LeafNode::mValues
-        util::cuda::offsetLambdaKernel<<<numBlocks(mVoxelCounts[deviceId]), mNumThreads, 0, stream>>>(mVoxelCounts[deviceId], mVoxelOffsets[deviceId], SetLeafActiveVoxelStateAndValuesFunctor<BuildT>(), mData);
-        cudaCheckError();
+            const uint64_t valueCount = deviceNodeCount(deviceId)[2] << 15;
+            const uint64_t valueOffset = deviceNodeOffset(deviceId)[2] << 15;
+            util::cuda::offsetLambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, stream>>>(valueCount, valueOffset, SetUpperBackgroundValuesFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
 
-        const uint64_t denseVoxelCount = deviceNodeCount(deviceId)[0] << 9;
-        const uint64_t denseVoxelOffset = deviceNodeOffset(deviceId)[0] << 9;
-        util::cuda::offsetLambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, stream>>>(denseVoxelCount, denseVoxelOffset, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mData);
-        cudaCheckError();
+        if (deviceNodeCount(deviceId)[1]) {
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], BuildLowerNodesFunctor<BuildT>(), mData);
+            cudaCheckError();
+
+            const uint64_t valueCount = deviceNodeCount(deviceId)[1] << 12;
+            const uint64_t valueOffset = deviceNodeOffset(deviceId)[1] << 12;
+            util::cuda::offsetLambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, stream>>>(valueCount, valueOffset, SetLowerBackgroundValuesFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
+
+
+        if (deviceNodeCount(deviceId)[0]) {
+            // loop over leaf nodes and add it to its parent node
+            util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], ProcessLeafMetaDataFunctor<BuildT>(), mData, flags);
+            cudaCheckError();
+
+            // loop over all active voxels and set LeafNode::mValueMask and LeafNode::mValues
+            util::cuda::offsetLambdaKernel<<<numBlocks(mVoxelCounts[deviceId]), mNumThreads, 0, stream>>>(mVoxelCounts[deviceId], mVoxelOffsets[deviceId], SetLeafActiveVoxelStateAndValuesFunctor<BuildT>(), mData);
+            cudaCheckError();
+
+            const uint64_t denseVoxelCount = deviceNodeCount(deviceId)[0] << 9;
+            const uint64_t denseVoxelOffset = deviceNodeOffset(deviceId)[0] << 9;
+            util::cuda::offsetLambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, stream>>>(denseVoxelCount, denseVoxelOffset, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mData);
+            cudaCheckError();
+        }
     });
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
-        uint64_t* valueIndex = nullptr;
-        uint64_t* valueIndexPrefix = nullptr;
-        cudaCheck(cudaMallocManaged(&valueIndex, mData->nodeCount[0] * sizeof(uint64_t)));
-        cudaCheck(cudaMallocManaged(&valueIndexPrefix, mData->nodeCount[0] * sizeof(uint64_t)));
-
         std::vector<cudaEvent_t> leafCountEvents(mDeviceMesh.deviceCount());
         std::vector<cudaEvent_t> valueIndexPrefixSumEvents(mDeviceMesh.deviceCount());
 
@@ -919,40 +972,41 @@ inline void DistributedPointsToGrid<BuildT>::processLeafNodes(const PtrT points)
             cudaEventCreateWithFlags(&leafCountEvents[deviceId], cudaEventDisableTiming);
             cudaEventCreateWithFlags(&valueIndexPrefixSumEvents[deviceId], cudaEventDisableTiming);
 
-            kernels::fillValueIndexKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], valueIndex, mData);
-            cudaCheckError();
+            if (deviceNodeCount(deviceId)[0]) {
+                kernels::fillValueIndexKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mValueIndex, mData);
+                cudaCheckError();
+            }
         });
 
         LeafCountIterator leafCountIterator(mNodeCounts);
-        inclusiveSumAsync(mDeviceMesh, mTempDevicePools, valueIndex, valueIndexPrefix, leafCountIterator, leafCountEvents.data(), valueIndexPrefixSumEvents.data());
-        cudaCheck(cudaEventSynchronize(valueIndexPrefixSumEvents.back()));
+        inclusiveSumAsync(mDeviceMesh, mTempDevicePools, mValueIndex, mValueIndexPrefix, leafCountIterator, leafCountEvents.data(), valueIndexPrefixSumEvents.data());
 
         parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
             cudaSetDevice(deviceId);
-            kernels::leafPrefixSumKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], valueIndexPrefix, mData);
-            cudaCheckError();
+            cudaStreamWaitEvent(stream, valueIndexPrefixSumEvents.back());
+            if (deviceNodeCount(deviceId)[0]) {
+                kernels::leafPrefixSumKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mValueIndexPrefix, mData);
+                cudaCheckError();
+            }
+        });
 
+        parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
+            cudaSetDevice(deviceId);
             cudaEventDestroy(valueIndexPrefixSumEvents[deviceId]);
             cudaEventDestroy(leafCountEvents[deviceId]);
         });
-
-        parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
-            cudaSetDevice(deviceId);
-            cudaStreamSynchronize(stream);
-        });
-
-        cudaCheck(cudaFree(valueIndexPrefix));
-        cudaCheck(cudaFree(valueIndex));
     }
 
     if constexpr(BuildTraits<BuildT>::is_indexmask) {
         parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
             cudaCheck(cudaSetDevice(deviceId));
-            kernels::setMaskEqValMaskKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mData);
-            cudaCheckError();
+            if (deviceNodeCount(deviceId)[0]) {
+                kernels::setMaskEqValMaskKernel<BuildT><<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], mData);
+                cudaCheckError();
+            }
         });
     }
-}// DistributedPointsToGrid<BuildT>::processLeafNodes
+}// DistributedPointsToGrid<BuildT>::processNodes
 
 template <typename BuildT>
 template <typename PtrT>
@@ -963,52 +1017,58 @@ inline void DistributedPointsToGrid<BuildT>::processPoints(const PtrT, size_t)
 template <typename BuildT>
 inline void DistributedPointsToGrid<BuildT>::processBBox()
 {
-    if (mData->flags.isMaskOff(GridFlags::HasBBox)) {
-        return;
-    }
+    if (mData->flags.isMaskOn(GridFlags::HasBBox)) {
+        // Compute and propagate bounding boxes for the upper nodes and their descendents belonging to each device in parallel.
+        std::vector<cudaEvent_t> propagateLowerBBoxEvents(mDeviceMesh.deviceCount());
+        parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
+            cudaCheck(cudaSetDevice(deviceId));
+            // reset bbox in lower nodes
+            if (deviceNodeCount(deviceId)[1]) {
+                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], ResetLowerNodeBBoxFunctor<BuildT>(), mData);
+                cudaCheckError();
+            }
 
-    // Compute and propagate bounding boxes for the upper nodes and their descendents belonging to each device in parallel.
-    std::vector<cudaEvent_t> propagateLowerBBoxEvents(mDeviceMesh.deviceCount());
-    parallelForEach(mDeviceMesh, [&](int deviceId, cudaStream_t stream) {
-        cudaCheck(cudaSetDevice(deviceId));
-        // reset bbox in lower nodes
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], ResetLowerNodeBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
+            // update and propagate bbox from leaf -> lower/parent nodes
+            if (deviceNodeCount(deviceId)[0]) {
+                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mData);
+                cudaCheckError();
+            }
 
-        // update and propagate bbox from leaf -> lower/parent nodes
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[0]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[0], deviceNodeOffset(deviceId)[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
+            // reset bbox in upper nodes
+            if (deviceNodeCount(deviceId)[2]) {
+                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], ResetUpperNodeBBoxFunctor<BuildT>(), mData);
+                cudaCheckError();
+            }
 
-        // reset bbox in upper nodes
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[2]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[2], deviceNodeOffset(deviceId)[2], ResetUpperNodeBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
+            // propagate bbox from lower -> upper/parent node
+            if (deviceNodeCount(deviceId)[1]) {
+                util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], PropagateLowerBBoxFunctor<BuildT>(), mData);
+                cudaCheckError();
+            }
 
-        // propagate bbox from lower -> upper/parent node
-        util::cuda::offsetLambdaKernel<<<numBlocks(deviceNodeCount(deviceId)[1]), mNumThreads, 0, stream>>>(deviceNodeCount(deviceId)[1], deviceNodeOffset(deviceId)[1], PropagateLowerBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
+            cudaEventCreate(&propagateLowerBBoxEvents[deviceId]);
+            cudaEventRecord(propagateLowerBBoxEvents[deviceId], stream);
+        });
 
-        cudaEventCreate(&propagateLowerBBoxEvents[deviceId]);
-        cudaEventRecord(propagateLowerBBoxEvents[deviceId], stream);
-    });
-
-    // Wait until bounding boxes are computed for each upper node and then compute the root bounding box on the zeroth device
-    {
-        int deviceId = 0;
-        auto stream = mDeviceMesh[deviceId].stream;
-        cudaCheck(cudaSetDevice(deviceId));
-        for (const auto& propagateLowerBBoxEvent : propagateLowerBBoxEvents)
+        // Wait until bounding boxes are computed for each upper node and then compute the root bounding box on the zeroth device
         {
-            cudaStreamWaitEvent(stream, propagateLowerBBoxEvent);
+            int deviceId = 0;
+            auto stream = mDeviceMesh[deviceId].stream;
+            cudaCheck(cudaSetDevice(deviceId));
+            for (const auto& propagateLowerBBoxEvent : propagateLowerBBoxEvents)
+            {
+                cudaStreamWaitEvent(stream, propagateLowerBBoxEvent);
+            }
+            // propagate bbox from upper -> root/parent node
+            util::cuda::lambdaKernel<<<numBlocks(mData->nodeCount[2]), mNumThreads, 0, stream>>>(mData->nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
+
+            // update the world-bbox in the root node
+            util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, UpdateRootWorldBBoxFunctor<BuildT>(), mData);
+            cudaCheckError();
+
+            cudaCheck(cudaEventDestroy(propagateLowerBBoxEvents[deviceId]));
         }
-        // propagate bbox from upper -> root/parent node
-        util::cuda::lambdaKernel<<<numBlocks(mData->nodeCount[2]), mNumThreads, 0, stream>>>(mData->nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
-
-        // update the world-bbox in the root node
-        util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, UpdateRootWorldBBoxFunctor<BuildT>(), mData);
-        cudaCheckError();
-
-        cudaCheck(cudaEventDestroy(propagateLowerBBoxEvents[deviceId]));
     }
 
     // Explicitly synchronize so that move constructor in getHandle doesn't fail
@@ -1016,6 +1076,15 @@ inline void DistributedPointsToGrid<BuildT>::processBBox()
         cudaCheck(cudaSetDevice(deviceId));
         cudaStreamSynchronize(stream);
     });
+
+    if constexpr(BuildTraits<BuildT>::is_onindex) {
+        cudaCheck(cudaFree(mValueIndexPrefix));
+        cudaCheck(cudaFree(mValueIndex));
+    }
+
+    cudaCheck(cudaFree(mPointsPerTile));
+    cudaCheck(cudaFree(mIndices));
+    cudaCheck(cudaFree(mKeys));
 
     cudaCheck(cudaFree(mData->pointsPerLeafPrefix));
     cudaCheck(cudaFree(mData->pointsPerLeaf));

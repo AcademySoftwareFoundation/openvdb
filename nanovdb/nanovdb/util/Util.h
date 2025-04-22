@@ -154,7 +154,7 @@ __hostdev__ inline size_t strlen(const char *str)
 {
     NANOVDB_ASSERT(str != nullptr);
     const char *s = str;
-    while(*s) ++s;               ;
+    while(*s) ++s;
     return (s - str);
 }// util::strlen
 
