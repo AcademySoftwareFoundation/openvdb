@@ -254,14 +254,15 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     const torch::Tensor &radii,  // [C, N]
     const torch::Tensor &conics, // [C, N, 3]
     // grad outputs
-    const torch::Tensor               &v_means2d,       // [C, N, 2]
-    const torch::Tensor               &v_depths,        // [C, N]
-    const torch::Tensor               &v_conics,        // [C, N, 3]
-    const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
+    const torch::Tensor               &v_means2d,                    // [C, N, 2]
+    const torch::Tensor               &v_depths,                     // [C, N]
+    const torch::Tensor               &v_conics,                     // [C, N, 3]
+    const at::optional<torch::Tensor> &v_compensations,              // [C, N] optional
     const bool viewmats_requires_grad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum,
-    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,
-    at::optional<torch::Tensor> outGradientStepCounts) {
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum, // [C]
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,          // [C]
+    at::optional<torch::Tensor> outGradientStepCounts                // [C]
+) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars = std::nullopt;
     // const at::optional<torch::Tensor> &compensations = std::nullopt;

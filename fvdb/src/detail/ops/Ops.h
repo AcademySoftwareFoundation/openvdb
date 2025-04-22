@@ -416,6 +416,10 @@ dispatchSphericalHarmonicsBackward(const int64_t shDegreeToUse, const int64_t nu
 /// The origin of the 2D pixel coordinates is the top-left corner of the image, with positive x-axis
 /// pointing to the right and positive y-axis pointing downwards.
 ///
+/// @attention The output radii of 3D Gaussians that are discarded (due to clipping or projection
+/// too small) are set to zero, but the other output values of discarded Gaussians are uninitialized
+/// (undefined).
+///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
 ///
 /// @param[in] means 3D positions of Gaussians [N, 3] where N is number of Gaussians
@@ -645,6 +649,10 @@ dispatchGaussianRasterizeBackward(
 /// This function transforms batches of 3D Gaussians to 2D screen space by applying camera
 /// projections. It handles jagged (variable-sized) inputs for efficient batch processing, where
 /// each batch element may contain a different number of Gaussians and cameras.
+///
+/// @attention The output radii of 3D Gaussians that are discarded (due to clipping or projection
+/// too small) are set to zero, but the other output values of discarded Gaussians are uninitialized
+/// (undefined).
 ///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
 ///
