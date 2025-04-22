@@ -50,6 +50,7 @@ Building and starting the docker image is done by running the following command 
 docker compose run --rm fvdb-dev
 ```
 
+
 When you are ready to build ƒVDB, run the following command within the docker container.  `TORCH_CUDA_ARCH_LIST` specifies which CUDA architectures to build for.
 ```shell
 conda activate fvdb;
@@ -57,6 +58,35 @@ cd /openvdb/fvdb;
 TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" \
 ./build.sh install
 ```
+
+##### WSL2 Docker Errors
+
+If you see an error about GPU access being blocked when attempting to run docker in WSL2 Ubuntu,
+similar to this:
+
+```shell
+$ sudo docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi
+Failed to initialize NVML: GPU access blocked by the operating system
+Failed to properly shut down NVML: GPU access blocked by the operating system
+```
+
+Use an editor to open the file `/etc/nvidia-container-runtime/config.toml`, and change
+the property `no-cgroups` to `false`:
+
+```
+#...
+no=cgroups = false
+#...
+```
+
+You'll then have to close the WSL2 Ubuntu shells, and from a CMD or PowerShell terminal, shutdown
+wsl:
+
+```
+wsl --shutdown
+```
+
+When you restart WSL2 Ubuntu, the change will have taken effect.
 
 #### Setting up a Conda Environment
 
