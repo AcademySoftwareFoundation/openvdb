@@ -54,18 +54,21 @@ template <typename scalar_t, ReductionType REDUCE> struct Reducer {
 };
 
 template <typename scalar_t, template <typename T, int32_t D> typename TensorAccessor,
-          c10::DeviceType DeviceTag, ReductionType REDUCE>
-__hostdev__ void
-jaggedReduceCallback(int32_t tidx, int32_t eidx, const TensorAccessor<scalar_t, 2> data,
-                     const TensorAccessor<fvdb::JIdxType, 1> jidx,
-                     TensorAccessor<scalar_t, 2>             out) {
-    using RCD = Reducer<scalar_t, REDUCE>;
+          ReductionType REDUCE>
+void
+jaggedReduceHostCallback(int32_t tidx, int32_t eidx, const TensorAccessor<scalar_t, 2> data,
+                         const TensorAccessor<fvdb::JIdxType, 1> jidx,
+                         TensorAccessor<scalar_t, 2>             out) {
+    Reducer<scalar_t, REDUCE>::atomicWriteCPU(&out[jidx[tidx]][eidx], data[tidx][eidx]);
+}
 
-    if constexpr (DeviceTag == torch::kCUDA) {
-        RCD::atomicWriteCUDA(&out[jidx[tidx]][eidx], data[tidx][eidx]);
-    } else {
-        RCD::atomicWriteCPU(&out[jidx[tidx]][eidx], data[tidx][eidx]);
-    }
+template <typename scalar_t, template <typename T, int32_t D> typename TensorAccessor,
+          ReductionType REDUCE>
+__device__ void
+jaggedReduceDeviceCallback(int32_t tidx, int32_t eidx, const TensorAccessor<scalar_t, 2> data,
+                           const TensorAccessor<fvdb::JIdxType, 1> jidx,
+                           TensorAccessor<scalar_t, 2>             out) {
+    Reducer<scalar_t, REDUCE>::atomicWriteCUDA(&out[jidx[tidx]][eidx], data[tidx][eidx]);
 }
 
 template <typename scalar_t, template <typename T, int32_t D> typename TensorAccessor,
@@ -112,14 +115,14 @@ JaggedReduce(const torch::Tensor &jdataRaw, const torch::Tensor &jidx,
 
         if constexpr (DeviceTag == torch::kCUDA) {
             auto cb = [=] __device__(int32_t ridx, int32_t cidx, TorchRAcc32<scalar_t, 2> dataAcc) {
-                jaggedReduceCallback<scalar_t, TorchRAcc32, DeviceTag, REDUCE>(
+                jaggedReduceDeviceCallback<scalar_t, TorchRAcc32, REDUCE>(
                     ridx, cidx, dataAcc, jidxAccessor, outAccessor);
             };
             forEachTensorElementChannelCUDA<scalar_t, 2>(256, jdata.size(1), jdata, cb);
         } else {
             auto cb = [=](int32_t ridx, int32_t cidx, TorchAcc<scalar_t, 2> dataAcc) {
-                jaggedReduceCallback<scalar_t, TorchAcc, DeviceTag, REDUCE>(
-                    ridx, cidx, dataAcc, jidxAccessor, outAccessor);
+                jaggedReduceHostCallback<scalar_t, TorchAcc, REDUCE>(ridx, cidx, dataAcc,
+                                                                     jidxAccessor, outAccessor);
             };
             forEachTensorElementChannelCPU<scalar_t, 2>(jdata.size(1), jdata, cb);
         }
