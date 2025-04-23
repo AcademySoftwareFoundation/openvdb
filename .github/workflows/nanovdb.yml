@@ -103,6 +103,7 @@ jobs:
   #     shell: powershell
   #     run: .\ci\install_windows.ps1
   #   - name: build
+  #   # nvcc doesn't set _WIN32 when run in bash so we need to set it manually
   #     shell: bash
   #     run: >
   #       ./ci/build.sh -v
@@ -114,6 +115,7 @@ jobs:
   #       -DUSE_EXPLICIT_INSTANTIATION=OFF
   #       -DNANOVDB_USE_CUDA=ON
   #       -DCMAKE_CUDA_ARCHITECTURES="80"
+  #       -DCMAKE_CUDA_FLAGS="-D_WIN32"
   #       -DNANOVDB_USE_OPENVDB=ON
   #       -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
   #       -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
