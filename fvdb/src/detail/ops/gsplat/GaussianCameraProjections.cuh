@@ -60,30 +60,35 @@ persp_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, co
 // in the pixel coordinates of the image.
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
-persp_proj(const nanovdb::math::Vec3<T> &mean3d, const nanovdb::math::Mat3<T> &cov3d, const T fx,
-           const T fy, const T cx, const T cy, const uint32_t width, const uint32_t height) {
+                  projectGaussianPerspective(const nanovdb::math::Vec3<T> &mean3d,
+                                             const nanovdb::math::Mat3<T> &cov3d, const T fx, const T fy, const T cx,
+                                             const T cy, const int64_t width, const int64_t height) {
+    using Mat2x3 = nanovdb::math::Mat2x3<T>;
+    using Mat2   = nanovdb::math::Mat2<T>;
+    using Vec2   = nanovdb::math::Vec2<T>;
+
     const T x = mean3d[0];
     const T y = mean3d[1];
     const T z = mean3d[2];
 
-    const T tan_fovx  = 0.5f * width / fx;
-    const T tan_fovy  = 0.5f * height / fy;
-    const T lim_x_pos = (width - cx) / fx + 0.3f * tan_fovx;
-    const T lim_x_neg = cx / fx + 0.3f * tan_fovx;
-    const T lim_y_pos = (height - cy) / fy + 0.3f * tan_fovy;
-    const T lim_y_neg = cy / fy + 0.3f * tan_fovy;
+    const T tanFovX = T(0.5) * width / fx;
+    const T tanFovY = T(0.5) * height / fy;
+    const T limXPos = (width - cx) / fx + T(0.3) * tanFovX;
+    const T limXNeg = cx / fx + T(0.3) * tanFovX;
+    const T limYPos = (height - cy) / fy + T(0.3) * tanFovY;
+    const T limYNeg = cy / fy + T(0.3) * tanFovY;
 
-    const T rz  = 1.f / z;
+    const T rz  = T(1.0) / z;
     const T rz2 = rz * rz;
-    const T tx  = z * min(lim_x_pos, max(-lim_x_neg, x * rz));
-    const T ty  = z * min(lim_y_pos, max(-lim_y_neg, y * rz));
+    const T tx  = z * min(limXPos, max(-limXNeg, x * rz));
+    const T ty  = z * min(limYPos, max(-limYNeg, y * rz));
 
-    const nanovdb::math::Mat2x3<T> J(fx * rz, 0.f, -fx * tx * rz2, // 1st row (was 1st column)
+    const Mat2x3 J(fx * rz, 0.f, -fx * tx * rz2, // 1st row (was 1st column)
                                      0.f, fy * rz, -fy * ty * rz2  // 2nd row (was 2nd column)
-    );
+                      );
 
-    const nanovdb::math::Mat2<T> cov2d = J * cov3d * J.transpose();
-    const nanovdb::math::Vec2<T> mean2d({ fx * x * rz + cx, fy * y * rz + cy });
+    const Mat2 cov2d = J * cov3d * J.transpose();
+    const Vec2 mean2d({ fx * x * rz + cx, fy * y * rz + cy });
 
     return { cov2d, mean2d };
 }
@@ -192,18 +197,23 @@ ortho_proj(const vec3<T> mean3d, const mat3<T> cov3d, const T fx, const T fy, co
 // in the pixel coordinates of the image.
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
-ortho_proj(const nanovdb::math::Vec3<T> &mean3d, const nanovdb::math::Mat3<T> &cov3d, const T fx,
-           const T fy, const T cx, const T cy, const uint32_t width, const uint32_t height) {
+                  projectGaussianOrthographic(const nanovdb::math::Vec3<T> &mean3d,
+                                              const nanovdb::math::Mat3<T> &cov3d, const T fx, const T fy, const T cx,
+                                              const T cy, const uint32_t width, const uint32_t height) {
+    using Mat2x3 = nanovdb::math::Mat2x3<T>;
+    using Mat2   = nanovdb::math::Mat2<T>;
+    using Vec2   = nanovdb::math::Vec2<T>;
+
     const T x = mean3d[0];
     const T y = mean3d[1];
     const T z = mean3d[2];
 
-    const nanovdb::math::Mat2x3<T> J(fx, 0.f, 0.f, // 1st row
+    const Mat2x3 J(fx, 0.f, 0.f, // 1st row
                                      0.f, fy, 0.f  // 2nd row
-    );
+                      );
 
-    const nanovdb::math::Mat2<T> cov2d = J * cov3d * J.transpose();
-    const nanovdb::math::Vec2<T> mean2d({ fx * x + cx, fy * y + cy });
+    const Mat2 cov2d = J * cov3d * J.transpose();
+    const Vec2 mean2d({ fx * x + cx, fy * y + cy });
 
     return { cov2d, mean2d };
 }

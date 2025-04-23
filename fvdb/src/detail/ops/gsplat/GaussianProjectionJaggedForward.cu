@@ -26,7 +26,7 @@ jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
                               const T *__restrict__ scales,             // [M, 3] optional
                               const T *__restrict__ worldToCamMatrices, // [BC, 4, 4]
                               const T *__restrict__ projectionMatrices, // [BC, 3, 3]
-                              const int32_t imageWidth, const int32_t imageHeight, const T eps2d,
+                              const int64_t imageWidth, const int64_t imageHeight, const T eps2d,
                               const T nearPlane, const T farPlane, const T radiusClip,
                               // outputs
                               int32_t *__restrict__ radii,     // [M]
@@ -92,11 +92,11 @@ jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
             cy             = projectionMatrices[5];
     auto [covar2d, mean2d] = [&]() {
         if constexpr (Ortho) {
-            return ortho_proj<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth,
-                                 imageHeight);
+            return projectGaussianOrthographic<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy,
+                                                  imageWidth, imageHeight);
         } else {
-            return persp_proj<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth,
-                                 imageHeight);
+            return projectGaussianPerspective<T>(meansCamSpace, covarCamSpace, fx, fy, cx, cy,
+                                                 imageWidth, imageHeight);
         }
     }();
 
