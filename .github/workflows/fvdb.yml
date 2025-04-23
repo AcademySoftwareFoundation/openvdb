@@ -160,6 +160,7 @@ jobs:
       image: aswf/ci-openvdb:2024
       env:
         PYTHONPATH: ""
+        CPM_SOURCE_CACHE: "/__w/cpm_cache"
       options: --rm
     defaults:
       run:

@@ -70,15 +70,58 @@ elif [ "$BUILD_TYPE" == "install" ]; then
 #     echo "pip install $PIP_ARGS -e .  "
 #     pip install $PIP_ARGS -e .
 elif [ "$BUILD_TYPE" == "ctest" ]; then
-    BUILD_DIR=$(find build -name tests -type d)
+
+    # --- Ensure Test Data is Cached via CMake Configure Step ---
+    echo "Ensuring test data is available in CPM cache..."
+
+    if [ -z "$CPM_SOURCE_CACHE" ]; then
+         echo "CPM_SOURCE_CACHE is not set"
+    else
+        echo "Using CPM_SOURCE_CACHE: $CPM_SOURCE_CACHE"
+    fi
+
+    # Assume this script runs from the source root directory
+    SOURCE_DIR=$(pwd)
+    TEMP_BUILD_DIR="build_temp_download_data"
+
+    # Clean up previous temp dir and create anew
+    rm -rf "$TEMP_BUILD_DIR"
+    mkdir "$TEMP_BUILD_DIR"
+
+    echo "Running CMake configure in temporary directory ($TEMP_BUILD_DIR) to trigger data download..."
+    pushd "$TEMP_BUILD_DIR" > /dev/null
+    cmake "$SOURCE_DIR/src/cmake/download_test_data"
+    popd > /dev/null # Back to SOURCE_DIR
+
+    # Clean up temporary directory
+    rm -rf "$TEMP_BUILD_DIR"
+    echo "Test data caching step finished."
+    # --- End Test Data Caching ---
+
+    # --- Find and Run Tests ---
+    echo "Searching for test build directory..."
+    # Find the directory containing the compiled tests (adjust if needed)
+    # Using -print -quit to stop after the first match for efficiency
+    BUILD_DIR=$(find build -name tests -type d -print -quit)
+
     if [ -z "$BUILD_DIR" ]; then
         echo "Error: Could not find build directory with tests"
         echo "Please enable tests by building with pip argument"
         echo "-C cmake.define.FVDB_BUILD_TESTS=ON"
         exit 1
     fi
-    cd "$BUILD_DIR"
+    echo "Found test build directory: $BUILD_DIR"
+
+    # Run ctest within the test build directory
+    pushd "$BUILD_DIR" > /dev/null
+    echo "Running ctest..."
     ctest --output-on-failure
+    CTEST_EXIT_CODE=$?
+    popd > /dev/null # Back to SOURCE_DIR
+
+    echo "ctest finished with exit code $CTEST_EXIT_CODE."
+    exit $CTEST_EXIT_CODE
+
 else
     echo "Invalid build/run type: $BUILD_TYPE"
     echo "Valid build/run types are: wheel, install, ctest"
