@@ -46,7 +46,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-vfx:${{ matrix.config.image }}-
       abi:${{ matrix.config.abi }}-
