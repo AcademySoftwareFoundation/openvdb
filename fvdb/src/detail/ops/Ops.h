@@ -333,7 +333,7 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 ///      M can also be thought of as the number of Gaussian-camera pairs.
 /// - BC: total Cameras across all batches
 /// - K: degree of the spherical harmonics
-/// - D: number of color channels
+/// - D: number of feature/color channels
 ///
 /// Gaussians splats are represented by:
 /// - means: 3D positions of Gaussians [N, 3]
@@ -347,12 +347,12 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 /// - Ks: Camera intrinsic (projection) matrices [C, 3, 3]
 /// @{
 
-/// @brief Evaluate spherical harmonics functions to compute colors.
+/// @brief Evaluate spherical harmonics functions to compute features/colors.
 ///
-/// This function computes the color values for points in 3D space using spherical harmonics (SH)
-/// representation. Spherical harmonics provide an efficient way to represent view-dependent
-/// appearance for Gaussian Splatting and other rendering techniques. The output colors are not
-/// limited to RGB; they can have any number of channels.
+/// This function computes the features/colors for points in 3D space using spherical harmonics
+/// (SH) representation. Spherical harmonics provide an efficient way to represent view-dependent
+/// appearance for Gaussian Splatting and other rendering techniques. The output features are not
+/// limited to RGB colors; they can have any number of channels.
 ///
 /// @param[in] shDegreeToUse Degree of spherical harmonics to use (0-3 typically, higher degrees
 /// provide more detail)
@@ -364,7 +364,7 @@ dispatchScaledDotProductAttention(const torch::Tensor &query, const torch::Tenso
 /// @param[in] radii radii [N] (packed) or [C, N] (unpacked) for view-dependent level-of-detail
 /// control
 ///
-/// @return color values [N, D] computed from the spherical harmonics evaluation
+/// @return Features/colors [N, D] computed from the spherical harmonics evaluation
 template <c10::DeviceType>
 torch::Tensor dispatchSphericalHarmonicsForward(const int64_t        shDegreeToUse,
                                                 const int64_t        numCameras,
@@ -552,7 +552,7 @@ dispatchGaussianTileIntersection(const torch::Tensor               &means2d, // 
 ///
 /// This function rasterizes 2D Gaussians into an image using a tile-based approach for efficiency.
 /// Each Gaussian is represented by its 2D projected center, covariance matrix in conic form,
-/// color, and opacity. The function performs alpha-blending of the Gaussians to generate
+/// feature/color, and opacity. The function performs alpha-blending of the Gaussians to generate
 /// the final rendered image.
 ///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
@@ -560,7 +560,7 @@ dispatchGaussianTileIntersection(const torch::Tensor               &means2d, // 
 /// @param[in] means2d 2D projected Gaussian centers [C, N, 2]
 /// @param[in] conics Gaussian covariance matrices in conic form [C, N, 3] representing (a, b, c) in
 /// ax² + 2bxy + cy²
-/// @param[in] colors RGB colors of Gaussians [C, N, D]
+/// @param[in] features Feature / color values of Gaussians [C, N, D]
 /// @param[in] opacities Opacity values for each Gaussian [N]
 /// @param[in] imageWidth Width of the output image in pixels
 /// @param[in] imageHeightimageHeight Height of the output image in pixels
@@ -573,14 +573,14 @@ dispatchGaussianTileIntersection(const torch::Tensor               &means2d, // 
 /// which Gaussians affect each tile
 ///
 /// @return std::tuple containing:
-///         - Rendered image colors [C, image_height, image_width, D]
+///         - Rendered image features/colors [C, image_height, image_width, D]
 ///         - Alpha values [C, image_height, image_width, 1]
 ///         - Last Gaussian ID rendered at each pixel [C, image_height, image_width]
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
                                  const torch::Tensor &conics,    // [C, N, 3]
-                                 const torch::Tensor &colors,    // [C, N, D]
+                                 const torch::Tensor &features,  // [C, N, D]
                                  const torch::Tensor &opacities, // [N]
                                  const uint32_t imageWidth, const uint32_t imageHeight,
                                  const uint32_t imageOriginW, const uint32_t imageOriginH,
@@ -592,7 +592,7 @@ dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
 /// @brief Calculate gradients for the Gaussian rasterization process (backward pass)
 ///
 /// This function computes the gradients of the Gaussian splatting rendering with respect to
-/// its input parameters: 2D projected Gaussian means, conics, colors, and opacities.
+/// its input parameters: 2D projected Gaussian means, conics, features/colors, and opacities.
 /// It is used during backpropagation to update the Gaussian parameters during training.
 ///
 /// @tparam DeviceType Device type template parameter (torch::kCUDA or torch::kCPU)
@@ -600,7 +600,7 @@ dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
 /// @param[in] means2d 2D projected Gaussian centers [C, N, 2]
 /// @param[in] conics Gaussian covariance matrices in conic form [C, N, 3] representing (a, b, c) in
 /// ax² + 2bxy + cy²
-/// @param[in] colors RGB colors of Gaussians [C, N, D]
+/// @param[in] features Feature / color values of Gaussians [C, N, D]
 /// @param[in] opacities Opacity values for each Gaussian [N]
 /// @param[in] imageWidth Width of the rendered image
 /// @param[in] imageHeight Height of the rendered image
@@ -611,8 +611,8 @@ dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
 /// @param[in] tileGaussianIds Flattened Gaussian IDs for tile intersection [n_isects]
 /// @param[in] renderedAlphas Alpha values from forward pass [C, image_height, image_width, 1]
 /// @param[in] lastIds Last Gaussian IDs per pixel from forward pass [C, image_height, image_width]
-/// @param[out] dLossDRenderedColors Gradients of loss with respect to rendered colors [C,
-/// image_height, image_width, 3]
+/// @param[out] dLossDRenderedFeatures Gradients of loss with respect to rendered features [C,
+/// image_height, image_width, D]
 /// @param[out] dLossDRenderedAlphas Gradients of loss with respect to rendered alphas [C,
 /// image_height, image_width, 1]
 /// @param[in] absgrad Whether to use absolute gradients
@@ -624,24 +624,24 @@ dispatchGaussianRasterizeForward(const torch::Tensor &means2d,   // [C, N, 2]
 ///         - (empty tensor placeholder for compatibility with forward pass)
 ///         - 2D means [C, N, 2] - gradients ∂L/∂means2d
 ///         - conics [C, N, 3] - gradients ∂L/∂conics
-///         - colors [C, N, D] - gradients ∂L/∂colors
+///         - features [C, N, D] - gradients ∂L/∂features
 ///         - opacities [N] - gradients ∂L/∂opacities
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeBackward(
     // Gaussian parameters
-    const torch::Tensor &means2d,              // [C, N, 2]
-    const torch::Tensor &conics,               // [C, N, 3]
-    const torch::Tensor &colors,               // [C, N, 3]
-    const torch::Tensor &opacities,            // [N]
+    const torch::Tensor &means2d,                // [C, N, 2]
+    const torch::Tensor &conics,                 // [C, N, 3]
+    const torch::Tensor &features,               // [C, N, D]
+    const torch::Tensor &opacities,              // [N]
     const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
     const uint32_t imageOriginH, const uint32_t tileSize,
-    const torch::Tensor &tileOffsets,          // [C, tile_height, tile_width]
-    const torch::Tensor &tileGaussianIds,      // [n_isects]
-    const torch::Tensor &renderedAlphas,       // [C, imageHeight, imageWidth, 1]
-    const torch::Tensor &lastIds,              // [C, imageHeight, imageWidth]
-    const torch::Tensor &dLossDRenderedColors, // [C, imageHeight, imageWidth, D]
-    const torch::Tensor &dLossDRenderedAlphas, // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &tileOffsets,            // [C, tile_height, tile_width]
+    const torch::Tensor &tileGaussianIds,        // [n_isects]
+    const torch::Tensor &renderedAlphas,         // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastIds,                // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedFeatures, // [C, imageHeight, imageWidth, D]
+    const torch::Tensor &dLossDRenderedAlphas,   // [C, imageHeight, imageWidth, 1]
     const bool absgrad, const int64_t numSharedChannelsOverride = -1);
 
 /// @brief Project 3D Gaussians to 2D screen space using jagged tensors for batched processing

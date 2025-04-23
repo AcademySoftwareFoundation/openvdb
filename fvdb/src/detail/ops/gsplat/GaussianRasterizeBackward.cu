@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include "Gaussian2D.cuh"
 #include "GaussianVectorTypes.cuh"
 #include <detail/ops/Ops.h>
 #include <detail/utils/cuda/Utils.cuh>
@@ -10,34 +11,14 @@
 #include <cooperative_groups.h>
 
 namespace fvdb::detail::ops {
-
-template <typename ScalarType> struct alignas(32) Gaussian { // 28 bytes
-    using vec2t = typename Vec2Type<ScalarType>::type;
-    using vec3t = typename Vec3Type<ScalarType>::type;
-
-    int32_t    id;      // 4 bytes
-    vec2t      xy;      // 8 bytes
-    ScalarType opacity; // 4 bytes
-    vec3t      conic;   // 12 bytes
-
-    inline __device__ vec2t
-    delta(const ScalarType px, const ScalarType py) const {
-        return { xy.x - px, xy.y - py };
-    }
-
-    inline __device__ ScalarType
-    sigma(const vec2t delta) const {
-        return ScalarType{ 0.5 } * (conic.x * delta.x * delta.x + conic.z * delta.y * delta.y) +
-               conic.y * delta.x * delta.y;
-    }
-};
+namespace {
 
 template <typename ScalarType, size_t NUM_CHANNELS, size_t NUM_SHARED_CHANNELS, bool IS_PACKED>
 struct DeviceArgs {
     constexpr static size_t NUM_OUTER_DIMS = IS_PACKED ? 1 : 2;
     using vec2t                            = typename Vec2Type<ScalarType>::type;
     using vec3t                            = typename Vec3Type<ScalarType>::type;
-    using ColorAccessorType                = fvdb::TorchRAcc64<ScalarType, NUM_OUTER_DIMS + 1>;
+    using FeatureAccessorType              = fvdb::TorchRAcc64<ScalarType, NUM_OUTER_DIMS + 1>;
 
     constexpr static bool IS_CHUNKED = (NUM_CHANNELS != NUM_SHARED_CHANNELS);
 
@@ -55,26 +36,26 @@ struct DeviceArgs {
     uint32_t mNumTilesH;
     vec2t *__restrict__ mMeans2d;                     // [C, N, 2] or [nnz, 2]
     vec3t *__restrict__ mConics;                      // [C, N, 3] or [nnz, 3]
-    ColorAccessorType mColors;                        // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
+    FeatureAccessorType mFeatures;                    // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
     ScalarType *__restrict__ mOpacities;              // [C, N] or [nnz]
     ScalarType *__restrict__ mBackgrounds;            // [C, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
     bool *__restrict__ mMasks;                        // [C, nTilesH, nTilesW]
     int32_t *__restrict__ mTileOffsets;               // [C, nTilesH, nTilesW]
     int32_t *__restrict__ mTileGaussianIds;           // [totalIntersections]
     ScalarType *__restrict__ mRenderedAlphas;         // [C, imgH, imgW, 1]
-    int32_t *__restrict__ mLastGaussianIdsPerPixel;   // [C, imgH, imgW]
-    ScalarType *__restrict__ mDLossDRenderedColors;   // [C, imgH, imgW, NUM_CHANNELS]
+    int32_t *__restrict__ mLastGaussianIds;           // [C, imgH, imgW]
+    ScalarType *__restrict__ mDLossDRenderedFeatures; // [C, imgH, imgW, NUM_CHANNELS]
     ScalarType *__restrict__ mDLossDRenderedAlphas;   // [C, imgH, imgW, 1]
     vec2t *__restrict__ mOutDLossDMeans2dAbs;         // [C, N, 2] or [nnz, 2]
     vec2t *__restrict__ mOutDLossDMeans2d;            // [C, N, 2] or [nnz, 2]
     vec3t *__restrict__ mOutDLossDConics;             // [C, N, 3] or [nnz, 3]
-    ScalarType *__restrict__ mOutDLossDColors;        // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
+    ScalarType *__restrict__ mOutDLossDFeatures;      // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
     ScalarType *__restrict__ mOutDLossDOpacities;     // [C, N] or [nnz]
 
     DeviceArgs(
         const torch::Tensor               &means2d,   // [C, N, 2] or [nnz, 2]
         const torch::Tensor               &conics,    // [C, N, 3] or [nnz, 3]
-        const torch::Tensor               &colors,    // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
+        const torch::Tensor               &features,  // [C, N, NUM_CHANNELS] or [nnz, NUM_CHANNELS]
         const torch::Tensor               &opacities, // [C, N] or [nnz]
         const at::optional<torch::Tensor> &backgrounds, // [C, NUM_CHANNELS]
         const at::optional<torch::Tensor> &masks,       // [C, numTilesH, numTilesW]
@@ -83,14 +64,14 @@ struct DeviceArgs {
         const torch::Tensor &tileOffsets,               // [C, numTilesH, numTilesW]
         const torch::Tensor &tileGaussianIds,           // [totalIntersections]
         const torch::Tensor &renderedAlphas,            // [C, imageHeight, imageWidth, 1]
-        const torch::Tensor &lastGaussianIdsPerPixel,   // [C, imageHeight, imageWidth]
-        const torch::Tensor &dLossDRenderedColors, // [C, imageHeight, imageWidth, NUM_CHANNELS]
-        const torch::Tensor &dLossDRenderedAlphas  // [C, imageHeight, imageWidth, 1]
+        const torch::Tensor &lastGaussianIds,           // [C, imageHeight, imageWidth]
+        const torch::Tensor &dLossDRenderedFeatures, // [C, imageHeight, imageWidth, NUM_CHANNELS]
+        const torch::Tensor &dLossDRenderedAlphas    // [C, imageHeight, imageWidth, 1]
         )
-        : mColors(
-              colors
+        : mFeatures(
+              features
                   .packed_accessor64<ScalarType, NUM_OUTER_DIMS + 1, torch::RestrictPtrTraits>()) {
-        TORCH_CHECK(colors.is_cuda(), "Input must be a CUDA tensor");
+        TORCH_CHECK(features.is_cuda(), "Input must be a CUDA tensor");
 
         checkInputTensor(means2d, "means2d");
         checkInputTensor(conics, "conics");
@@ -98,8 +79,8 @@ struct DeviceArgs {
         checkInputTensor(tileOffsets, "tileOffsets");
         checkInputTensor(tileGaussianIds, "tileGaussianIds");
         checkInputTensor(renderedAlphas, "renderedAlphas");
-        checkInputTensor(lastGaussianIdsPerPixel, "lastGaussianIdsPerPixel");
-        checkInputTensor(dLossDRenderedColors, "dLossDRenderedColors");
+        checkInputTensor(lastGaussianIds, "lastGaussianIds");
+        checkInputTensor(dLossDRenderedFeatures, "dLossDRenderedFeatures");
         checkInputTensor(dLossDRenderedAlphas, "dLossDRenderedAlphas");
         if (backgrounds.has_value()) {
             checkInputTensor(backgrounds.value(), "backgrounds");
@@ -123,9 +104,9 @@ struct DeviceArgs {
             TORCH_CHECK_VALUE(totalGaussians == conics.size(0), "Bad size for conics");
             TORCH_CHECK_VALUE(3 == conics.size(1), "Bad size for conics");
 
-            TORCH_CHECK_VALUE(colors.dim() == 2, "Bad number of dims for colors");
-            TORCH_CHECK_VALUE(totalGaussians == colors.size(0), "Bad size for colors");
-            TORCH_CHECK_VALUE(NUM_CHANNELS == colors.size(1), "Bad size for colors");
+            TORCH_CHECK_VALUE(features.dim() == 2, "Bad number of dims for features");
+            TORCH_CHECK_VALUE(totalGaussians == features.size(0), "Bad size for features");
+            TORCH_CHECK_VALUE(NUM_CHANNELS == features.size(1), "Bad size for features");
 
             TORCH_CHECK_VALUE(opacities.dim() == 1, "Bad number of dims for opacities");
             TORCH_CHECK_VALUE(totalGaussians == opacities.size(0), "Bad size for opacities");
@@ -140,10 +121,10 @@ struct DeviceArgs {
             TORCH_CHECK_VALUE(numGaussiansPerCamera == conics.size(1), "Bad size for conics");
             TORCH_CHECK_VALUE(3 == conics.size(2), "Bad size for conics");
 
-            TORCH_CHECK_VALUE(colors.dim() == 3, "Bad number of dims for colors");
-            TORCH_CHECK_VALUE(numCameras == colors.size(0), "Bad size for colors");
-            TORCH_CHECK_VALUE(numGaussiansPerCamera == colors.size(1), "Bad size for colors");
-            TORCH_CHECK_VALUE(NUM_CHANNELS == colors.size(2), "Bad size for colors");
+            TORCH_CHECK_VALUE(features.dim() == 3, "Bad number of dims for features");
+            TORCH_CHECK_VALUE(numCameras == features.size(0), "Bad size for features");
+            TORCH_CHECK_VALUE(numGaussiansPerCamera == features.size(1), "Bad size for features");
+            TORCH_CHECK_VALUE(NUM_CHANNELS == features.size(2), "Bad size for features");
 
             TORCH_CHECK_VALUE(opacities.dim() == 2, "Bad number of dims for opacities");
             TORCH_CHECK_VALUE(numCameras == opacities.size(0), "Bad size for opacities");
@@ -175,23 +156,20 @@ struct DeviceArgs {
         TORCH_CHECK_VALUE(imageWidth == renderedAlphas.size(2), "Bad size for renderedAlphas");
         TORCH_CHECK_VALUE(1 == renderedAlphas.size(3), "Bad size for renderedAlphas");
 
-        TORCH_CHECK_VALUE(numCameras == lastGaussianIdsPerPixel.size(0),
-                          "Bad size for lastGaussianIdsPerPixel");
-        TORCH_CHECK_VALUE(imageHeight == lastGaussianIdsPerPixel.size(1),
-                          "Bad size for lastGaussianIdsPerPixel");
-        TORCH_CHECK_VALUE(imageWidth == lastGaussianIdsPerPixel.size(2),
-                          "Bad size for lastGaussianIdsPerPixel");
+        TORCH_CHECK_VALUE(numCameras == lastGaussianIds.size(0), "Bad size for lastGaussianIds");
+        TORCH_CHECK_VALUE(imageHeight == lastGaussianIds.size(1), "Bad size for lastGaussianIds");
+        TORCH_CHECK_VALUE(imageWidth == lastGaussianIds.size(2), "Bad size for lastGaussianIds");
 
-        TORCH_CHECK_VALUE(dLossDRenderedColors.dim() == 4,
-                          "Bad number of dims for dLossDRenderedColors");
-        TORCH_CHECK_VALUE(numCameras == dLossDRenderedColors.size(0),
-                          "Bad size for dLossDRenderedColors");
-        TORCH_CHECK_VALUE(imageHeight == dLossDRenderedColors.size(1),
-                          "Bad size for dLossDRenderedColors");
-        TORCH_CHECK_VALUE(imageWidth == dLossDRenderedColors.size(2),
-                          "Bad size for dLossDRenderedColors");
-        TORCH_CHECK_VALUE(NUM_CHANNELS == dLossDRenderedColors.size(3),
-                          "Bad size for dLossDRenderedColors");
+        TORCH_CHECK_VALUE(dLossDRenderedFeatures.dim() == 4,
+                          "Bad number of dims for dLossDRenderedFeatures");
+        TORCH_CHECK_VALUE(numCameras == dLossDRenderedFeatures.size(0),
+                          "Bad size for dLossDRenderedFeatures");
+        TORCH_CHECK_VALUE(imageHeight == dLossDRenderedFeatures.size(1),
+                          "Bad size for dLossDRenderedFeatures");
+        TORCH_CHECK_VALUE(imageWidth == dLossDRenderedFeatures.size(2),
+                          "Bad size for dLossDRenderedFeatures");
+        TORCH_CHECK_VALUE(NUM_CHANNELS == dLossDRenderedFeatures.size(3),
+                          "Bad size for dLossDRenderedFeatures");
 
         TORCH_CHECK_VALUE(dLossDRenderedAlphas.dim() == 4,
                           "Bad number of dims for dLossDRenderedAlphas");
@@ -223,18 +201,18 @@ struct DeviceArgs {
         mOpacities = opacities.data_ptr<ScalarType>();
         mBackgrounds =
             backgrounds.has_value() ? backgrounds.value().data_ptr<ScalarType>() : nullptr;
-        mMasks                   = masks.has_value() ? masks.value().data_ptr<bool>() : nullptr;
-        mTileOffsets             = tileOffsets.data_ptr<int32_t>();
-        mTileGaussianIds         = tileGaussianIds.data_ptr<int32_t>();
-        mRenderedAlphas          = renderedAlphas.data_ptr<ScalarType>();
-        mLastGaussianIdsPerPixel = lastGaussianIdsPerPixel.data_ptr<int32_t>();
-        mDLossDRenderedColors    = dLossDRenderedColors.data_ptr<ScalarType>();
-        mDLossDRenderedAlphas    = dLossDRenderedAlphas.data_ptr<ScalarType>();
+        mMasks                  = masks.has_value() ? masks.value().data_ptr<bool>() : nullptr;
+        mTileOffsets            = tileOffsets.data_ptr<int32_t>();
+        mTileGaussianIds        = tileGaussianIds.data_ptr<int32_t>();
+        mRenderedAlphas         = renderedAlphas.data_ptr<ScalarType>();
+        mLastGaussianIds        = lastGaussianIds.data_ptr<int32_t>();
+        mDLossDRenderedFeatures = dLossDRenderedFeatures.data_ptr<ScalarType>();
+        mDLossDRenderedAlphas   = dLossDRenderedAlphas.data_ptr<ScalarType>();
     }
 
     void
     setOutputArguments(const torch::Tensor &outDLossDMeans2d, const torch::Tensor &outDLossDConics,
-                       const torch::Tensor &outDLossDColors,
+                       const torch::Tensor &outDLossDFeatures,
                        const torch::Tensor &outDLossDOpacities,
                        const torch::Tensor &outDLossDMeans2dAbs, const bool absgrad) {
         mOutDLossDMeans2dAbs =
@@ -242,7 +220,7 @@ struct DeviceArgs {
                     : nullptr;
         mOutDLossDMeans2d   = reinterpret_cast<vec2t *>(outDLossDMeans2d.data_ptr<ScalarType>());
         mOutDLossDConics    = reinterpret_cast<vec3t *>(outDLossDConics.data_ptr<ScalarType>());
-        mOutDLossDColors    = outDLossDColors.data_ptr<ScalarType>();
+        mOutDLossDFeatures  = outDLossDFeatures.data_ptr<ScalarType>();
         mOutDLossDOpacities = outDLossDOpacities.data_ptr<ScalarType>();
     }
 
@@ -254,8 +232,8 @@ struct DeviceArgs {
 
         mTileOffsets += offsetForTiles;
         mRenderedAlphas += offsetForPixels;
-        mLastGaussianIdsPerPixel += offsetForPixels;
-        mDLossDRenderedColors += offsetForPixels * NUM_CHANNELS;
+        mLastGaussianIds += offsetForPixels;
+        mDLossDRenderedFeatures += offsetForPixels * NUM_CHANNELS;
         mDLossDRenderedAlphas += offsetForPixels;
         if (mBackgrounds != nullptr) {
             mBackgrounds += cameraId * NUM_CHANNELS;
@@ -266,7 +244,7 @@ struct DeviceArgs {
     }
 
     inline __device__ void
-    fetchGaussianIntoSharedMemory(const int32_t g, Gaussian<ScalarType> *outGaussian) const {
+    fetchGaussianIntoSharedMemory(const int32_t g, Gaussian2D<ScalarType> *outGaussian) const {
         const vec2t      xy    = mMeans2d[g];
         const ScalarType opac  = mOpacities[g];
         const vec3t      conic = mConics[g];
@@ -274,49 +252,49 @@ struct DeviceArgs {
     }
 
     inline __device__ void
-    fetchGaussianColorIntoSharedMemory(const int32_t g, const size_t channelStart,
-                                       const size_t numChannels, ScalarType *outColor) {
+    fetchGaussianFeatureIntoSharedMemory(const int32_t g, const size_t channelStart,
+                                         const size_t numChannels, ScalarType *outFeatures) {
         if constexpr (IS_PACKED) {
-            const auto colorAccessor = mColors[g];
+            const auto featureAccessor = mFeatures[g];
             for (uint32_t k = 0; k < numChannels; ++k) {
-                outColor[k] = colorAccessor[k + channelStart];
+                outFeatures[k] = featureAccessor[k + channelStart];
             }
         } else {
             // colors: [C, N, NUM_CHANNELS]
             // colors[c, n, k] = [c * N * NUM_CHANNELS + n * NUM_CHANNELS + k]
             // g = c * N + n
-            const int32_t cid           = g / mNumGaussiansPerCamera;
-            const int32_t gid           = g % mNumGaussiansPerCamera;
-            const auto    colorAccessor = mColors[cid][gid];
+            const int32_t cid             = g / mNumGaussiansPerCamera;
+            const int32_t gid             = g % mNumGaussiansPerCamera;
+            const auto    featureAccessor = mFeatures[cid][gid];
             if constexpr (IS_CHUNKED) {
                 for (auto k = 0; k < numChannels; ++k) {
-                    outColor[k] = colorAccessor[k + channelStart];
+                    outFeatures[k] = featureAccessor[k + channelStart];
                 }
             } else {
 #pragma unroll NUM_CHANNELS
                 for (auto k = 0; k < NUM_CHANNELS; ++k) {
-                    outColor[k] = colorAccessor[k];
+                    outFeatures[k] = featureAccessor[k];
                 }
             }
         }
     }
 
     inline __device__ void
-    atomicAddRGBGradientContributions(const int32_t     g,
-                                      const ScalarType *pixelRGBGradientContribution,
-                                      const size_t channelStart, const size_t numChannels) {
+    atomicAddFeatureGradientContributions(const int32_t     g,
+                                          const ScalarType *featureGradientContribution,
+                                          const size_t channelStart, const size_t numChannels) {
         // Accumulate the gradient contribution from this pixel to the global
-        // gradient for the color of this Gaussian
-        ScalarType *dlLossDColorsGaussianPtr = &mOutDLossDColors[NUM_CHANNELS * g];
+        // gradient for the features of this Gaussian
+        ScalarType *dLossDFeaturesGaussianPtr = &mOutDLossDFeatures[NUM_CHANNELS * g];
         if constexpr (IS_CHUNKED) {
             for (uint32_t k = 0; k < numChannels; ++k) {
-                gpuAtomicAdd(dlLossDColorsGaussianPtr + channelStart + k,
-                             pixelRGBGradientContribution[k]);
+                gpuAtomicAdd(dLossDFeaturesGaussianPtr + channelStart + k,
+                             featureGradientContribution[k]);
             }
         } else {
 #pragma unroll NUM_CHANNELS
             for (uint32_t k = 0; k < NUM_CHANNELS; ++k) {
-                gpuAtomicAdd(dlLossDColorsGaussianPtr + k, pixelRGBGradientContribution[k]);
+                gpuAtomicAdd(dLossDFeaturesGaussianPtr + k, featureGradientContribution[k]);
             }
         }
     }
@@ -354,56 +332,58 @@ struct DeviceArgs {
     }
 
     inline __device__ void
-    accumulateColorStep(const ScalarType *gaussianColor, const ScalarType fac,
-                        const size_t numChannels, ScalarType *outAccumColor) const {
+    accumulateFeaturesStep(const ScalarType *gaussianFeatures, const ScalarType fac,
+                           const size_t numChannels, ScalarType *outAccumFeatures) const {
         if constexpr (IS_CHUNKED) {
             for (uint32_t k = 0; k < numChannels; ++k) {
-                outAccumColor[k] += gaussianColor[k] * fac;
+                outAccumFeatures[k] += gaussianFeatures[k] * fac;
             }
         } else {
 #pragma unroll NUM_CHANNELS
             for (uint32_t k = 0; k < NUM_CHANNELS; ++k) {
-                outAccumColor[k] += gaussianColor[k] * fac;
+                outAccumFeatures[k] += gaussianFeatures[k] * fac;
             }
         }
     }
 
     inline __device__ void
-    calculatePixelRGBGradientContribution(const ScalarType  fac,
-                                          const ScalarType *dLossDRenderedPixelColor,
-                                          ScalarType       *outPixelRGBGradientContribution) const {
+    calculateFeatureGradientContribution(const ScalarType  fac,
+                                         const ScalarType *dLossDRenderedFeatures,
+                                         ScalarType       *outFeatureGradientContribution) const {
 #pragma unroll NUM_SHARED_CHANNELS
         for (uint32_t k = 0; k < NUM_SHARED_CHANNELS; ++k) {
-            outPixelRGBGradientContribution[k] = fac * dLossDRenderedPixelColor[k];
+            outFeatureGradientContribution[k] = fac * dLossDRenderedFeatures[k];
         }
     }
 
     inline __device__ ScalarType
-    calculatePixelAlphaGradientContribution(
-        const ScalarType finalTransmittance, const ScalarType oneOverOneMinusAlpha,
-        const ScalarType accumTransmittance, const ScalarType *accumColor,
-        const ScalarType *gaussianColor, const ScalarType *dLossDRenderedPixelColor,
-        const ScalarType dLossDRenderPixelAlpha, const size_t numChannels,
-        const bool includeLastTerm) const {
-        ScalarType pixelAlphaGradientContribution = ScalarType{ 0 };
+    calculateAlphaGradientContribution(const ScalarType  finalTransmittance,
+                                       const ScalarType  oneOverOneMinusAlpha,
+                                       const ScalarType  accumTransmittance,
+                                       const ScalarType *accumFeature,
+                                       const ScalarType *gaussianFeature,
+                                       const ScalarType *dLossDRenderedFeature,
+                                       const ScalarType  dLossDRenderedAlpha,
+                                       const size_t numChannels, const bool includeLastTerm) const {
+        ScalarType alphaGradientContribution = ScalarType{ 0 };
         if constexpr (IS_CHUNKED) {
             for (uint32_t k = 0; k < numChannels; ++k) {
-                pixelAlphaGradientContribution +=
-                    (gaussianColor[k] * accumTransmittance - accumColor[k] * oneOverOneMinusAlpha) *
-                    dLossDRenderedPixelColor[k];
+                alphaGradientContribution += (gaussianFeature[k] * accumTransmittance -
+                                              accumFeature[k] * oneOverOneMinusAlpha) *
+                                             dLossDRenderedFeature[k];
             }
         } else {
 #pragma unroll NUM_CHANNELS
             for (uint32_t k = 0; k < NUM_CHANNELS; ++k) {
-                pixelAlphaGradientContribution +=
-                    (gaussianColor[k] * accumTransmittance - accumColor[k] * oneOverOneMinusAlpha) *
-                    dLossDRenderedPixelColor[k];
+                alphaGradientContribution += (gaussianFeature[k] * accumTransmittance -
+                                              accumFeature[k] * oneOverOneMinusAlpha) *
+                                             dLossDRenderedFeature[k];
             }
         }
 
         if (includeLastTerm) {
-            pixelAlphaGradientContribution +=
-                finalTransmittance * oneOverOneMinusAlpha * dLossDRenderPixelAlpha;
+            alphaGradientContribution +=
+                finalTransmittance * oneOverOneMinusAlpha * dLossDRenderedAlpha;
         }
 
         // Factor in the contribution from the background to this pixel
@@ -411,58 +391,56 @@ struct DeviceArgs {
             ScalarType accum = ScalarType{ 0 };
             if constexpr (IS_CHUNKED) {
                 for (uint32_t k = 0; k < numChannels; ++k) {
-                    accum += mBackgrounds[k] * dLossDRenderedPixelColor[k];
+                    accum += mBackgrounds[k] * dLossDRenderedFeature[k];
                 }
             } else {
 #pragma unroll NUM_CHANNELS
                 for (uint32_t k = 0; k < NUM_CHANNELS; ++k) {
-                    accum += mBackgrounds[k] * dLossDRenderedPixelColor[k];
+                    accum += mBackgrounds[k] * dLossDRenderedFeature[k];
                 }
             }
             if (includeLastTerm) {
-                pixelAlphaGradientContribution +=
-                    -finalTransmittance * oneOverOneMinusAlpha * accum;
+                alphaGradientContribution += -finalTransmittance * oneOverOneMinusAlpha * accum;
             }
         }
 
-        return pixelAlphaGradientContribution;
+        return alphaGradientContribution;
     }
 
     inline __device__ void
-    calculateMeansConicsAndOpacitiesPixelGradientContribution(
-        ScalarType opac, ScalarType vis, ScalarType pixelAlphaGradientContribution,
-        const vec3t &conic, const vec2t &delta, vec3t &outPixelConicGradientContribution,
-        vec2t &outPixelMean2dGradientContribution, vec2t &outPixelMean2dAbsGradientContribution,
-        ScalarType &outPixelOpacityGradientContribution) const {
+    calculateMeansConicsAndOpacitiesGradientContribution(
+        ScalarType opac, ScalarType vis, ScalarType alphaGradientContribution, const vec3t &conic,
+        const vec2t &delta, vec3t &outConicGradientContribution,
+        vec2t &outMean2dGradientContribution, vec2t &outMean2dAbsGradientContribution,
+        ScalarType &outOpacityGradientContribution) const {
         // Contribution from this pixel to sigma for this Gaussian
-        const ScalarType pixelSigmaGradientContribution =
-            -opac * vis * pixelAlphaGradientContribution;
-        outPixelConicGradientContribution = {
-            ScalarType{ 0.5 } * pixelSigmaGradientContribution * delta.x * delta.x,
-            pixelSigmaGradientContribution * delta.x * delta.y,
-            ScalarType{ 0.5 } * pixelSigmaGradientContribution * delta.y * delta.y
+        const ScalarType sigmaGradientContribution = -opac * vis * alphaGradientContribution;
+        outConicGradientContribution               = {
+            ScalarType{ 0.5 } * sigmaGradientContribution * delta.x * delta.x,
+            sigmaGradientContribution * delta.x * delta.y,
+            ScalarType{ 0.5 } * sigmaGradientContribution * delta.y * delta.y
         };
-        outPixelMean2dGradientContribution = {
-            pixelSigmaGradientContribution * (conic.x * delta.x + conic.y * delta.y),
-            pixelSigmaGradientContribution * (conic.y * delta.x + conic.z * delta.y)
+        outMean2dGradientContribution = {
+            sigmaGradientContribution * (conic.x * delta.x + conic.y * delta.y),
+            sigmaGradientContribution * (conic.y * delta.x + conic.z * delta.y)
         };
         if (mOutDLossDMeans2dAbs != nullptr) {
-            outPixelMean2dAbsGradientContribution = { abs(outPixelMean2dGradientContribution.x),
-                                                      abs(outPixelMean2dGradientContribution.y) };
+            outMean2dAbsGradientContribution = { abs(outMean2dGradientContribution.x),
+                                                 abs(outMean2dGradientContribution.y) };
         }
-        outPixelOpacityGradientContribution = vis * pixelAlphaGradientContribution;
+        outOpacityGradientContribution = vis * alphaGradientContribution;
     }
 
     inline __device__ bool
     calculateGradientContributions(
-        const Gaussian<ScalarType> &gaussian, const ScalarType *gaussianColor,
-        const ScalarType *dLossDRenderedPixelColor, const ScalarType dLossDRenderPixelAlpha,
+        const Gaussian2D<ScalarType> &gaussian, const ScalarType *gaussianFeature,
+        const ScalarType *dLossDRenderedFeature, const ScalarType dLossDRenderedAlpha,
         const ScalarType px, const ScalarType py, const ScalarType finalTransmittance,
         const size_t numChannels, const bool calculateMeansConicsAndOpacitiesGradient,
-        ScalarType &accumTransmittance, ScalarType *accumColor,
-        ScalarType *outPixelRGBGradientContribution, vec3t &outPixelConicGradientContribution,
-        vec2t &outPixelMean2dGradientContribution, vec2t &outPixelMean2dAbsGradientContribution,
-        ScalarType &outPixelOpacityGradientContribution) const {
+        ScalarType &accumTransmittance, ScalarType *accumFeature,
+        ScalarType *outFeatureGradientContribution, vec3t &outConicGradientContribution,
+        vec2t &outMean2dGradientContribution, vec2t &outMean2dAbsGradientContribution,
+        ScalarType &outOpacityGradientContribution) const {
         constexpr ScalarType ALPHA_THRESHOLD = ScalarType{ 0.999 };
 
         const vec3t      conic = gaussian.conic;
@@ -486,23 +464,23 @@ struct DeviceArgs {
         // Update the contribution of this pixel to the color gradient of the
         // Gaussian
         const ScalarType fac = alpha * accumTransmittance;
-        calculatePixelRGBGradientContribution(fac, dLossDRenderedPixelColor,
-                                              outPixelRGBGradientContribution);
+        calculateFeatureGradientContribution(fac, dLossDRenderedFeature,
+                                             outFeatureGradientContribution);
 
         // Contribution from this pixel to the alpha value for this Gaussian
-        const ScalarType pixelAlphaGradientContribution = calculatePixelAlphaGradientContribution(
-            finalTransmittance, oneOverOneMinusAlpha, accumTransmittance, accumColor, gaussianColor,
-            dLossDRenderedPixelColor, dLossDRenderPixelAlpha, numChannels,
+        const ScalarType alphaGradientContribution = calculateAlphaGradientContribution(
+            finalTransmittance, oneOverOneMinusAlpha, accumTransmittance, accumFeature,
+            gaussianFeature, dLossDRenderedFeature, dLossDRenderedAlpha, numChannels,
             calculateMeansConicsAndOpacitiesGradient);
 
         if (opac * vis <= ALPHA_THRESHOLD) {
-            calculateMeansConicsAndOpacitiesPixelGradientContribution(
-                opac, vis, pixelAlphaGradientContribution, conic, delta,
-                outPixelConicGradientContribution, outPixelMean2dGradientContribution,
-                outPixelMean2dAbsGradientContribution, outPixelOpacityGradientContribution);
+            calculateMeansConicsAndOpacitiesGradientContribution(
+                opac, vis, alphaGradientContribution, conic, delta, outConicGradientContribution,
+                outMean2dGradientContribution, outMean2dAbsGradientContribution,
+                outOpacityGradientContribution);
         }
 
-        accumulateColorStep(gaussianColor, fac, numChannels, accumColor);
+        accumulateFeaturesStep(gaussianFeature, fac, numChannels, accumFeature);
 
         return true;
     }
@@ -529,9 +507,9 @@ struct DeviceArgs {
 
         extern __shared__ int s[];
 
-        Gaussian<ScalarType> *sharedGaussians =
-            reinterpret_cast<Gaussian<ScalarType> *>(s);                 // [blockSize]
-        ScalarType *sharedGaussianColors =
+        Gaussian2D<ScalarType> *sharedGaussians =
+            reinterpret_cast<Gaussian2D<ScalarType> *>(s);               // [blockSize]
+        ScalarType *sharedGaussianFeatures =
             reinterpret_cast<ScalarType *>(&sharedGaussians[blockSize]); // [blockSize]
 
         // this is the T AFTER the last gaussian in this pixel
@@ -540,13 +518,12 @@ struct DeviceArgs {
 
         // Gradient of the loss with respect to the alpha output of the forward pass at this
         // pixel
-        const ScalarType dLossDRenderPixelAlpha = mDLossDRenderedAlphas[pixelOrdinalInImage];
+        const ScalarType dLossDRenderedAlpha = mDLossDRenderedAlphas[pixelOrdinalInImage];
 
         // ID of the last Gaussian to contribute to this pixel and the last gaussian id to
         // contribute to any pixel in this block
-        const int32_t lastGaussianIdInPixel =
-            pixelInImage ? mLastGaussianIdsPerPixel[pixelOrdinalInImage] : 0;
-        const int32_t lastGaussianIdInWarp = warpMax(lastGaussianIdInPixel, warp);
+        const int32_t lastGaussianId = pixelInImage ? mLastGaussianIds[pixelOrdinalInImage] : 0;
+        const int32_t lastGaussianIdInWarp = warpMax(lastGaussianId, warp);
 
         // Process Gaussians in batches of size blockSize (i.e. one Gaussian per thread in the
         // block), and batchEnd is the index of the last gaussian.
@@ -564,17 +541,17 @@ struct DeviceArgs {
             ScalarType accumTransmittance = finalTransmittance;
 
             // the contribution from gaussians behind the current one
-            ScalarType accumColor[NUM_SHARED_CHANNELS] = { ScalarType(0) };
+            ScalarType accumFeature[NUM_SHARED_CHANNELS] = { ScalarType(0) };
 
             // Gradient of the loss with respect to the color output of the forward pass at this
             // pixel
-            ScalarType dLossDRenderedPixelColor[NUM_SHARED_CHANNELS];
+            ScalarType dLossDRenderedFeature[NUM_SHARED_CHANNELS];
             for (auto k = 0; k < numChannels; ++k) {
-                dLossDRenderedPixelColor[k] =
-                    mDLossDRenderedColors[pixelOrdinalInImage * NUM_CHANNELS + channelStart + k];
+                dLossDRenderedFeature[k] =
+                    mDLossDRenderedFeatures[pixelOrdinalInImage * NUM_CHANNELS + channelStart + k];
             }
             for (auto k = numChannels; k < NUM_SHARED_CHANNELS; ++k) {
-                dLossDRenderedPixelColor[k] = ScalarType{ 0 };
+                dLossDRenderedFeature[k] = ScalarType{ 0 };
             }
 
             for (uint32_t b = 0; b < numBatches; ++b) {
@@ -591,10 +568,11 @@ struct DeviceArgs {
                 const int32_t idx      = batchEnd - threadOrdinal;
                 if (idx >= firstGaussianIdInBlock) {
                     const int32_t g = mTileGaussianIds[idx]; // Gaussian index in [C * N] or [nnz]
-                    Gaussian<ScalarType> *gaussian = &sharedGaussians[threadOrdinal];
+                    Gaussian2D<ScalarType> *gaussian = &sharedGaussians[threadOrdinal];
                     fetchGaussianIntoSharedMemory(g, gaussian);
-                    ScalarType *color = &sharedGaussianColors[threadOrdinal * NUM_SHARED_CHANNELS];
-                    fetchGaussianColorIntoSharedMemory(g, channelStart, numChannels, color);
+                    ScalarType *feature =
+                        &sharedGaussianFeatures[threadOrdinal * NUM_SHARED_CHANNELS];
+                    fetchGaussianFeatureIntoSharedMemory(g, channelStart, numChannels, feature);
                 }
 
                 // Sync threads so all gaussians for this batch are loaded in shared memory
@@ -607,28 +585,28 @@ struct DeviceArgs {
                 const int32_t batchSize = min(blockSize, batchEnd + 1 - firstGaussianIdInBlock);
                 for (uint32_t t = max(0, batchEnd - lastGaussianIdInWarp); t < batchSize; ++t) {
                     bool valid = pixelInImage;
-                    if (batchEnd - t > lastGaussianIdInPixel) {
+                    if (batchEnd - t > lastGaussianId) {
                         valid = false;
                     }
                     // How much each pixel contributes to the gradient of the parameters for
                     // this gaussian Initialize to 0 and only set if this pixel is valid
-                    ScalarType pixelRGBGradientContribution[NUM_SHARED_CHANNELS] = { ScalarType{
+                    ScalarType featureGradientContribution[NUM_SHARED_CHANNELS] = { ScalarType{
                         0 } };
-                    vec3t      pixelConicGradientContribution = { ScalarType{ 0 }, ScalarType{ 0 },
-                                                                  ScalarType{ 0 } };
-                    vec2t pixelMean2dGradientContribution    = { ScalarType{ 0 }, ScalarType{ 0 } };
-                    vec2t pixelMean2dAbsGradientContribution = { ScalarType{ 0 }, ScalarType{ 0 } };
-                    ScalarType pixelOpacityGradientContribution = ScalarType{ 0 };
+                    vec3t      conicGradientContribution     = { ScalarType{ 0 }, ScalarType{ 0 },
+                                                                 ScalarType{ 0 } };
+                    vec2t      mean2dGradientContribution    = { ScalarType{ 0 }, ScalarType{ 0 } };
+                    vec2t      mean2dAbsGradientContribution = { ScalarType{ 0 }, ScalarType{ 0 } };
+                    ScalarType opacityGradientContribution   = ScalarType{ 0 };
 
                     valid =
                         valid &&
                         calculateGradientContributions(
-                            sharedGaussians[t], &sharedGaussianColors[t * NUM_SHARED_CHANNELS],
-                            dLossDRenderedPixelColor, dLossDRenderPixelAlpha, px, py,
-                            finalTransmittance, numChannels, isLastChunk, accumTransmittance,
-                            accumColor, pixelRGBGradientContribution,
-                            pixelConicGradientContribution, pixelMean2dGradientContribution,
-                            pixelMean2dAbsGradientContribution, pixelOpacityGradientContribution);
+                            sharedGaussians[t], &sharedGaussianFeatures[t * NUM_SHARED_CHANNELS],
+                            dLossDRenderedFeature, dLossDRenderedAlpha, px, py, finalTransmittance,
+                            numChannels, isLastChunk, accumTransmittance, accumFeature,
+                            featureGradientContribution, conicGradientContribution,
+                            mean2dGradientContribution, mean2dAbsGradientContribution,
+                            opacityGradientContribution);
 
                     // if there are no active thread in this warp, skip this loop
                     if (!warp.any(valid)) {
@@ -638,32 +616,31 @@ struct DeviceArgs {
                     // Accumulate the gradient contribution to this Gaussian from every
                     // pixel in the block
                     if constexpr (IS_CHUNKED) {
-                        warpSumMut<decltype(warp), ScalarType>(pixelRGBGradientContribution,
+                        warpSumMut<decltype(warp), ScalarType>(featureGradientContribution,
                                                                numChannels, warp);
                     } else {
                         warpSumMut<NUM_SHARED_CHANNELS, decltype(warp), ScalarType>(
-                            pixelRGBGradientContribution, warp);
+                            featureGradientContribution, warp);
                     }
 
-                    warpSumMut<decltype(warp), ScalarType>(pixelConicGradientContribution, warp);
-                    warpSumMut<decltype(warp), ScalarType>(pixelMean2dGradientContribution, warp);
+                    warpSumMut<decltype(warp), ScalarType>(conicGradientContribution, warp);
+                    warpSumMut<decltype(warp), ScalarType>(mean2dGradientContribution, warp);
                     if (mOutDLossDMeans2dAbs != nullptr) {
-                        warpSumMut<decltype(warp), ScalarType>(pixelMean2dAbsGradientContribution,
-                                                               warp);
+                        warpSumMut<decltype(warp), ScalarType>(mean2dAbsGradientContribution, warp);
                     }
-                    warpSumMut<decltype(warp), ScalarType>(pixelOpacityGradientContribution, warp);
+                    warpSumMut<decltype(warp), ScalarType>(opacityGradientContribution, warp);
 
                     // The first thread in the block accumulates the gradient
                     // contribution from the whole block into the global gradient of
                     // this Gaussian
                     if (warp.thread_rank() == 0) {
-                        atomicAddRGBGradientContributions(sharedGaussians[t].id,
-                                                          pixelRGBGradientContribution,
-                                                          channelStart, numChannels);
+                        atomicAddFeatureGradientContributions(sharedGaussians[t].id,
+                                                              featureGradientContribution,
+                                                              channelStart, numChannels);
                         atomicAddMeans2dConicsAndOpacitiesGradientContributions(
-                            sharedGaussians[t].id, pixelConicGradientContribution,
-                            pixelMean2dGradientContribution, pixelMean2dAbsGradientContribution,
-                            pixelOpacityGradientContribution);
+                            sharedGaussians[t].id, conicGradientContribution,
+                            mean2dGradientContribution, mean2dAbsGradientContribution,
+                            opacityGradientContribution);
                     }
                 }
             }
@@ -737,8 +714,12 @@ rasterizeGaussiansBackward(
     constexpr uint32_t WARP_TILE_SIZE                = 32; // TODO (fwilliams): Tune this value
     const cg::thread_block_tile<WARP_TILE_SIZE> warp = cg::tiled_partition<WARP_TILE_SIZE>(block);
 
+// Suppress "expression has no effect warning". Compiler can't detect side effects of this method
+#pragma nv_diagnostic push
+#pragma nv_diag_suppress 174
     args.volumeRenderTileBackward<WARP_TILE_SIZE>(warp, i, j, firstGaussianIdInBlock,
                                                   lastGaussianIdInBlock, block.size());
+#pragma nv_diagnostic pop
 }
 
 template <typename ScalarType, size_t NUM_CHANNELS, size_t NUM_SHARED_CHANNELS, bool IS_PACKED>
@@ -746,7 +727,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 callRasterizeBackwardsWithTemplatedSharedChannels(
     const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
     const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
-    const torch::Tensor               &colors,      // [C, N, 3] or [nnz, 3]
+    const torch::Tensor               &features,    // [C, N, 3] or [nnz, 3]
     const torch::Tensor               &opacities,   // [C, N] or [nnz]
     const at::optional<torch::Tensor> &backgrounds, // [C, 3]
     const at::optional<torch::Tensor> &masks,       // [C, numTilesH, numTilesW]
@@ -755,20 +736,20 @@ callRasterizeBackwardsWithTemplatedSharedChannels(
     const torch::Tensor &tileOffsets,               // [C, numTilesH, numTilesW]
     const torch::Tensor &tileGaussianIds,           // [totalIntersections]
     const torch::Tensor &renderedAlphas,            // [C, imageHeight, imageWidth, 1]
-    const torch::Tensor &lastGaussianIdsPerPixel,   // [C, imageHeight, imageWidth]
-    const torch::Tensor &dLossDRenderedColors,      // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &lastGaussianIds,           // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedFeatures,    // [C, imageHeight, imageWidth, 3]
     const torch::Tensor &dLossDRenderedAlphas,      // [C, imageHeight, imageWidth, 1]
     bool absgrad, at::cuda::CUDAStream stream) {
     TORCH_CHECK(tileSize > 0, "Tile size must be greater than 0");
 
     DeviceArgs<ScalarType, NUM_CHANNELS, NUM_SHARED_CHANNELS, IS_PACKED> deviceArgs(
-        means2d, conics, colors, opacities, backgrounds, masks, imageWidth, imageHeight,
+        means2d, conics, features, opacities, backgrounds, masks, imageWidth, imageHeight,
         imageOriginW, imageOriginH, tileSize, tileOffsets, tileGaussianIds, renderedAlphas,
-        lastGaussianIdsPerPixel, dLossDRenderedColors, dLossDRenderedAlphas);
+        lastGaussianIds, dLossDRenderedFeatures, dLossDRenderedAlphas);
 
     torch::Tensor outDLossDMeans2d   = torch::zeros_like(means2d);
     torch::Tensor outDLossDConics    = torch::zeros_like(conics);
-    torch::Tensor outDLossDColors    = torch::zeros_like(colors);
+    torch::Tensor outDLossDFeatures  = torch::zeros_like(features);
     torch::Tensor outDLossDOpacities = torch::zeros_like(opacities);
     torch::Tensor outDLossDMeans2dAbs;
     if (absgrad) {
@@ -778,10 +759,10 @@ callRasterizeBackwardsWithTemplatedSharedChannels(
     // Just return empty tensors if there are no gaussians, cameras, or intersections
     if (means2d.numel() == 0 || tileGaussianIds.numel() == 0) {
         return std::make_tuple(outDLossDMeans2dAbs, outDLossDMeans2d, outDLossDConics,
-                               outDLossDColors, outDLossDOpacities);
+                               outDLossDFeatures, outDLossDOpacities);
     }
 
-    deviceArgs.setOutputArguments(outDLossDMeans2d, outDLossDConics, outDLossDColors,
+    deviceArgs.setOutputArguments(outDLossDMeans2d, outDLossDConics, outDLossDFeatures,
                                   outDLossDOpacities, outDLossDMeans2dAbs, absgrad);
 
     const size_t numChannels =
@@ -799,8 +780,8 @@ callRasterizeBackwardsWithTemplatedSharedChannels(
     rasterizeGaussiansBackward<ScalarType, NUM_CHANNELS, NUM_SHARED_CHANNELS, IS_PACKED>
         <<<gridDim, blockDim, sharedMemSize, stream>>>(deviceArgs);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
-    return std::make_tuple(outDLossDMeans2dAbs, outDLossDMeans2d, outDLossDConics, outDLossDColors,
-                           outDLossDOpacities);
+    return std::make_tuple(outDLossDMeans2dAbs, outDLossDMeans2d, outDLossDConics,
+                           outDLossDFeatures, outDLossDOpacities);
 }
 
 template <typename ScalarType, size_t NUM_CHANNELS, bool IS_PACKED>
@@ -808,7 +789,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Te
 callRasterizeBackwardsWithCorrectSharedChannels(
     const torch::Tensor               &means2d,     // [C, N, 2] or [nnz, 2]
     const torch::Tensor               &conics,      // [C, N, 3] or [nnz, 3]
-    const torch::Tensor               &colors,      // [C, N, 3] or [nnz, 3]
+    const torch::Tensor               &features,    // [C, N, 3] or [nnz, 3]
     const torch::Tensor               &opacities,   // [C, N] or [nnz]
     const at::optional<torch::Tensor> &backgrounds, // [C, 3]
     const at::optional<torch::Tensor> &masks,       // [C, numTilesH, numTilesW]
@@ -817,8 +798,8 @@ callRasterizeBackwardsWithCorrectSharedChannels(
     const torch::Tensor &tileOffsets,               // [C, numTilesH, numTilesW]
     const torch::Tensor &tileGaussianIds,           // [totalIntersections]
     const torch::Tensor &renderedAlphas,            // [C, imageHeight, imageWidth, 1]
-    const torch::Tensor &lastGaussianIdsPerPixel,   // [C, imageHeight, imageWidth]
-    const torch::Tensor &dLossDRenderedColors,      // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &lastGaussianIds,           // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedFeatures,    // [C, imageHeight, imageWidth, 3]
     const torch::Tensor &dLossDRenderedAlphas,      // [C, imageHeight, imageWidth, 1]
     const bool absgrad, const int64_t numSharedSharedChannelsOverride) {
     const at::cuda::OptionalCUDAGuard device_guard(device_of(means2d));
@@ -829,31 +810,31 @@ callRasterizeBackwardsWithCorrectSharedChannels(
         if (numSharedChannels == NUM_CHANNELS) {
             return callRasterizeBackwardsWithTemplatedSharedChannels<ScalarType, NUM_CHANNELS,
                                                                      NUM_CHANNELS, IS_PACKED>(
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,
                 at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad, stream);
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad, stream);
         } else if (numSharedChannels == 64) {
             return callRasterizeBackwardsWithTemplatedSharedChannels<ScalarType, NUM_CHANNELS, 64,
                                                                      IS_PACKED>(
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,
                 at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad, stream);
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad, stream);
         } else if (numSharedChannels == 32) {
             return callRasterizeBackwardsWithTemplatedSharedChannels<ScalarType, NUM_CHANNELS, 32,
                                                                      IS_PACKED>(
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,
                 at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad, stream);
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad, stream);
         } else if (numSharedChannels == 16) {
             return callRasterizeBackwardsWithTemplatedSharedChannels<ScalarType, NUM_CHANNELS, 16,
                                                                      IS_PACKED>(
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,
                 at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad, stream);
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad, stream);
         } else {
             if (numSharedSharedChannelsOverride > 0) {
                 AT_ERROR("Invalid numSharedChannelsOverride. Must be 64, 32, or 16.");
@@ -883,44 +864,47 @@ callRasterizeBackwardsWithCorrectSharedChannels(
         AT_ERROR("Failed to set maximum shared memory size");
     }
 }
+
+} // namespace
+
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeBackward<torch::kCUDA>(
-    const torch::Tensor &means2d,                 // [C, N, 2]
-    const torch::Tensor &conics,                  // [C, N, 3]
-    const torch::Tensor &colors,                  // [C, N, 3]
-    const torch::Tensor &opacities,               // [N]
+    const torch::Tensor &means2d,                // [C, N, 2]
+    const torch::Tensor &conics,                 // [C, N, 3]
+    const torch::Tensor &features,               // [C, N, 3]
+    const torch::Tensor &opacities,              // [N]
     const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
     const uint32_t imageOriginH, const uint32_t tileSize,
-    const torch::Tensor &tileOffsets,             // [C, numTilesH, numTilesW]
-    const torch::Tensor &tileGaussianIds,         // [totalIntersections]
-    const torch::Tensor &renderedAlphas,          // [C, imageHeight, imageWidth, 1]
-    const torch::Tensor &lastGaussianIdsPerPixel, // [C, imageHeight, imageWidth]
-    const torch::Tensor &dLossDRenderedColors,    // [C, imageHeight, imageWidth, 3]
-    const torch::Tensor &dLossDRenderedAlphas,    // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &tileOffsets,            // [C, numTilesH, numTilesW]
+    const torch::Tensor &tileGaussianIds,        // [totalIntersections]
+    const torch::Tensor &renderedAlphas,         // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastGaussianIds,        // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedFeatures, // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &dLossDRenderedAlphas,   // [C, imageHeight, imageWidth, 1]
     const bool absgrad, const int64_t numSharedSharedChannelsOverride) {
-    TORCH_CHECK(colors.is_cuda(), "Input colors must be a CUDA tensor");
+    TORCH_CHECK(features.is_cuda(), "Input features must be a CUDA tensor");
     TORCH_CHECK(means2d.is_cuda(), "Input means2d must be a CUDA tensor");
-    uint32_t   colorDim = colors.size(-1);
+    uint32_t   colorDim = features.size(-1);
     const bool isPacked = means2d.dim() == 2;
 
-#define __GS__CALL_BWD_(N)                                                                       \
-    case N: {                                                                                    \
-        if (isPacked) {                                                                          \
-            return callRasterizeBackwardsWithCorrectSharedChannels<float, N, true>(              \
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,                 \
-                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,      \
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel, \
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad,                             \
-                numSharedSharedChannelsOverride);                                                \
-        } else {                                                                                 \
-            return callRasterizeBackwardsWithCorrectSharedChannels<float, N, false>(             \
-                means2d, conics, colors, opacities, at::nullopt /*backgrounds*/,                 \
-                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH,      \
-                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel, \
-                dLossDRenderedColors, dLossDRenderedAlphas, absgrad,                             \
-                numSharedSharedChannelsOverride);                                                \
-        }                                                                                        \
+#define __GS__CALL_BWD_(N)                                                                  \
+    case N: {                                                                               \
+        if (isPacked) {                                                                     \
+            return callRasterizeBackwardsWithCorrectSharedChannels<float, N, true>(         \
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,          \
+                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH, \
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,    \
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad,                      \
+                numSharedSharedChannelsOverride);                                           \
+        } else {                                                                            \
+            return callRasterizeBackwardsWithCorrectSharedChannels<float, N, false>(        \
+                means2d, conics, features, opacities, at::nullopt /*backgrounds*/,          \
+                at::nullopt /*masks*/, imageWidth, imageHeight, imageOriginW, imageOriginH, \
+                tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIds,    \
+                dLossDRenderedFeatures, dLossDRenderedAlphas, absgrad,                      \
+                numSharedSharedChannelsOverride);                                           \
+        }                                                                                   \
     }
 
     switch (colorDim) {
@@ -952,18 +936,18 @@ dispatchGaussianRasterizeBackward<torch::kCUDA>(
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianRasterizeBackward<torch::kCPU>(
-    const torch::Tensor &means2d,                 // [C, N, 2]
-    const torch::Tensor &conics,                  // [C, N, 3]
-    const torch::Tensor &colors,                  // [C, N, 3]
-    const torch::Tensor &opacities,               // [N]
+    const torch::Tensor &means2d,                // [C, N, 2]
+    const torch::Tensor &conics,                 // [C, N, 3]
+    const torch::Tensor &features,               // [C, N, 3]
+    const torch::Tensor &opacities,              // [N]
     const uint32_t imageWidth, const uint32_t imageHeight, const uint32_t imageOriginW,
     const uint32_t imageOriginH, const uint32_t tileSize,
-    const torch::Tensor &tileOffsets,             // [C, numTilesH, numTilesW]
-    const torch::Tensor &tileGaussianIds,         // [totalIntersections]
-    const torch::Tensor &renderedAlphas,          // [C, imageHeight, imageWidth, 1]
-    const torch::Tensor &lastGaussianIdsPerPixel, // [C, imageHeight, imageWidth]
-    const torch::Tensor &dLossDRenderedColors,    // [C, imageHeight, imageWidth, 3]
-    const torch::Tensor &dLossDRenderedAlphas,    // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &tileOffsets,            // [C, numTilesH, numTilesW]
+    const torch::Tensor &tileGaussianIds,        // [totalIntersections]
+    const torch::Tensor &renderedAlphas,         // [C, imageHeight, imageWidth, 1]
+    const torch::Tensor &lastGaussianIds,        // [C, imageHeight, imageWidth]
+    const torch::Tensor &dLossDRenderedFeatures, // [C, imageHeight, imageWidth, 3]
+    const torch::Tensor &dLossDRenderedAlphas,   // [C, imageHeight, imageWidth, 1]
     const bool absgrad, const int64_t numSharedSharedChannelsOverride) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");
 }
