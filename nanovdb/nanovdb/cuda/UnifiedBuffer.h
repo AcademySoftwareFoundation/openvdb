@@ -40,17 +40,17 @@ public:
     UnifiedBuffer() : mPtr(nullptr), mSize(0), mCapacity(0){}
 
     /// @brief Constructor that specifies both the size and capacity
-    /// @param size size of the bufffer in bytes, indication what is actually used
-    /// @param capacity number of bytes in the vitual page table, i.e max size for growing
-    /// @note Capacity can be over-estimated to allow for future groth. Memory is not allocated
-    ///       with this constructor, only a page table. Allocation happend on use or when calling prefetch
+    /// @param size size of the buffer in bytes, indication what is actually used
+    /// @param capacity number of bytes in the virtual page table, i.e max size for growing
+    /// @note Capacity can be over-estimated to allow for future growth. Memory is not allocated
+    ///       with this constructor, only a page table. Allocation happens on usage or when calling prefetch
     UnifiedBuffer(size_t size, size_t capacity) : mPtr(nullptr), mSize(size), mCapacity(capacity)
     {
         assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
     }
 
-     /// @brief Simular to the constructor above except the size and capacity are equal, so no future growth is supported
+     /// @brief Similar to the constructor above except the size and capacity are equal, so no future growth is supported
     UnifiedBuffer(size_t size) : UnifiedBuffer(size, size){}
 
     /// @brief Constructor that specifies the size, capacity, and device (for prefetching)
@@ -60,6 +60,7 @@ public:
     /// @param stream
     UnifiedBuffer(uint64_t size, uint64_t capacity, int device, cudaStream_t stream = 0) : mPtr(nullptr), mSize(size), mCapacity(size)
     {
+        assert(mSize <= mCapacity);
         cudaCheck(cudaMallocManaged(&mPtr, mCapacity, cudaMemAttachGlobal));
         cudaCheck(cudaMemAdvise(mPtr, size, cudaMemAdviseSetPreferredLocation, device));
         cudaCheck(cudaMemPrefetchAsync(mPtr, size, device, stream));
@@ -76,11 +77,10 @@ public:
 
     /// @brief Move copy-constructor
     UnifiedBuffer(UnifiedBuffer&& other) noexcept
-        : mSize(other.mSize)
+        : mPtr(other.mPtr)
+        , mSize(other.mSize)
         , mCapacity(other.mCapacity)
     {
-        cudaCheck(cudaFree(mPtr));
-        mPtr = other.mPtr;
         other.mPtr = nullptr;
         other.mSize = other.mCapacity = 0;
     }
@@ -105,7 +105,7 @@ public:
     /// @brief Legacy factory method that mirrors DeviceBuffer. It creates a UnifiedBuffer from a size and a reference buffer.
     ///        If a reference buffer is provided and its non-empty, it is used to defined the capacity of the new buffer
     /// @param size Size on bytes of the new buffer
-    /// @param reference reference buffer optionally used to define the capcity
+    /// @param reference reference buffer optionally used to define the capacity
     /// @param host Ignored for now
     /// @param stream cuda stream
     /// @return An instance of a new UnifiedBuffer using move semantics
@@ -119,16 +119,16 @@ public:
     }
 
     /// @brief Factory method that created a buffer on the host of the specified size. If the
-    ///        reference buffer has a capacity it is used. Also the buffer is prefethed to the host
+    ///        reference buffer has a capacity it is used. Also the buffer is prefetched to the host
     /// @param size byte size of buffer initiated on the host
     /// @param reference optional reference buffer from which the capacity is derived
     static UnifiedBuffer create(size_t size, const UnifiedBuffer* reference){return create(size, reference, cudaCpuDeviceId, (cudaStream_t)0);}
 
     /// @brief Factory method that created a buffer on the host or device of the specified size. If the
-    ///        reference buffer has a capacity it is used. Also the buffer is prefethed to the host or (current) device
+    ///        reference buffer has a capacity it is used. Also the buffer is prefetched to the host or (current) device
     /// @param size byte size of buffer initiated on the device or host
     /// @param reference optional reference buffer from which the capacity is derived
-    /// @param host If true the buffer will be prefectched to the host, else to the current device
+    /// @param host If true the buffer will be prefetched to the host, else to the current device
     /// @param stream optional cuda stream
     static UnifiedBuffer create(size_t size, const UnifiedBuffer* reference, bool host, void* stream = nullptr)
     {
@@ -195,39 +195,39 @@ public:
     }
 
     /// @brief Apply a single advise to a memory block
-    /// @param byteOffset offset in bytes marking the begenning of the memory block to be advised
+    /// @param byteOffset offset in bytes marking the beginning of the memory block to be advised
     /// @param size size in bytes of the memory block to be advised.
     /// @param dev the device ID on which to apply the advice provided in adv, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param adv advice to be applied to the resized range
-    void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv)
+    void advise(ptrdiff_t byteOffset, size_t size, int dev, cudaMemoryAdvise adv) const
     {
         cudaCheck(cudaMemAdvise(util::PtrAdd(mPtr, byteOffset), size, adv, dev));
     }
 
     /// @brief Apply a list of advices to a memory block
-    /// @param byteOffset offset in bytes marking the begenning of the memory block to be advised
+    /// @param byteOffset offset in bytes marking the beginning of the memory block to be advised
     /// @param size size in bytes of the memory block to be advised.
     /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param list list of cuda advises
-    void advise(ptrdiff_t byteOffset, size_t size, int dev, std::initializer_list<cudaMemoryAdvise> list)
+    void advise(ptrdiff_t byteOffset, size_t size, int dev, std::initializer_list<cudaMemoryAdvise> list) const
     {
         void *ptr = util::PtrAdd(mPtr, byteOffset);
         for (auto a : list)  cudaCheck(cudaMemAdvise(ptr, size, a, dev));
     }
 
     /// @brief Prefetches data to the specified device, i.e. ensure the device has an up-to-date copy of the memory specified
-    /// @param byteOffset offset in bytes marking the begenning of the memory block to be prefetched
+    /// @param byteOffset offset in bytes marking the beginning of the memory block to be prefetched
     /// @param size size in bytes of the memory block to be prefetched. The default value of zero means copy all @c this->size() bytes.
     /// @param dev the device ID to prefetch to, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param stream  cuda stream
-    void prefetch(ptrdiff_t byteOffset = 0, size_t size = 0, int dev = cudaCpuDeviceId, cudaStream_t stream = cudaStreamPerThread)
+    void prefetch(ptrdiff_t byteOffset = 0, size_t size = 0, int dev = cudaCpuDeviceId, cudaStream_t stream = cudaStreamPerThread) const
     {
         cudaCheck(cudaMemPrefetchAsync(util::PtrAdd(mPtr, byteOffset), size ? size : mSize, dev, stream));
     }
 
     ///////////////////////////////////////////////////////////////////////
 
-    /// @brief Prefectches all data to the specified device
+    /// @brief Prefetches all data to the specified device
     /// @param device device ID, cudaCpuDeviceId = -1, 0, 1, ...
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
@@ -239,7 +239,7 @@ public:
     }
     void deviceUpload(int device, void* stream, bool sync) const{this->deviceUpload(device, cudaStream_t(stream));}
 
-    /// @brief Prefectches all data to the current device, as given by cudaGetDevice
+    /// @brief Prefetches all data to the current device, as given by cudaGetDevice
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
     /// @note Legacy method included for compatibility with DeviceBuffer
@@ -254,7 +254,6 @@ public:
     /// @brief Prefetches all data to the host
     /// @param stream cuda stream
     /// @param sync if false the memory copy is asynchronous
-
     void deviceDownload(cudaStream_t stream = 0, bool sync = false) const
     {
         cudaCheck(cudaMemPrefetchAsync(mPtr, mSize, cudaCpuDeviceId, stream));
@@ -271,11 +270,11 @@ public:
 
     ///////////////////////////////////////////////////////////////////////
 
-    /// @brief Retuns a raw pointer to the unified memory managed by this instance.
+    /// @brief Returns a raw pointer to the unified memory managed by this instance.
     /// @warning Note that the pointer can be NULL!
     void* data() const {return mPtr;}
 
-    /// @brief Returns an offset pointer of a specefic type from the allocated unified memory
+    /// @brief Returns an offset pointer of a specific type from the allocated unified memory
     /// @tparam T Type of the pointer returned
     /// @param count Numbers of elements of @c parameter type T to skip (or offset) the return pointer
     /// @warning assumes that this instance is not empty!

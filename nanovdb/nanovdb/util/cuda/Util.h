@@ -110,10 +110,11 @@ inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream){return cudaFreeAs
 #endif
 
 /// @brief Returns the device ID associated with the specified pointer
+/// @note  If @c ptr points to host memory (only) the return ID is either cudaInvalidDeviceId = -2 or cudaCpuDeviceId = -1
 inline int ptrToDevice(void *ptr)
 {
     cudaPointerAttributes ptrAtt;
-    cudaPointerGetAttributes(&ptrAtt, ptr);
+    cudaCheck(cudaPointerGetAttributes(&ptrAtt, ptr));
     return ptrAtt.device;
 }
 
@@ -142,7 +143,7 @@ inline void printDevInfo(int device, const char *preMsg = nullptr, std::FILE* fi
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, device);
     if (preMsg) fprintf(file, "%s ", preMsg);
-    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %lu GB of VRAM\n",
+    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %zu GB of VRAM\n",
             device, prop.name, prop.major, prop.minor, prop.totalGlobalMem >> 30);
 }
 
@@ -209,6 +210,17 @@ __global__ void lambdaKernel(const size_t numItems, Func func, Args... args)
     if (tid >= numItems) return;
     func(tid, args...);
 }// util::cuda::lambdaKernel
+
+/// @brief Cuda kernel that launches device lambda functions with a tid offset
+/// @param numItems Problem size
+/// @param offset Offset for thread id
+template<typename Func, typename... Args>
+__global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func func, Args... args)
+{
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numItems) return;
+    func(tid + offset, args...);
+}// util::cuda::offsetLambdaKernel
 
 #endif// __CUDACC__
 
