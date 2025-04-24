@@ -15,7 +15,7 @@ from fvdb.utils.examples import load_dragon_mesh, make_ray_grid, plot_ray_segmen
 def main():
     logging.basicConfig(level=logging.INFO)
     logging.addLevelName(logging.INFO, "\033[1;32m%s\033[1;0m" % logging.getLevelName(logging.INFO))
-    device = torch.device("cuda")
+    device = torch.device("cuda", torch.cuda.current_device())
     dtype = torch.float32
     vox_size = 0.04
     vox_origin = [0.0, 0.0, 0.0]

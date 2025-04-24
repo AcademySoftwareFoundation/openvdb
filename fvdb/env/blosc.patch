@@ -1,0 +1,23 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f726a0a..78dde8b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -72,7 +72,7 @@
+ #    DEV: static includes blosc.a and blosc.h
+ 
+ 
+-cmake_minimum_required(VERSION 2.8.12)
++cmake_minimum_required(VERSION 3.5)
+ if(NOT CMAKE_VERSION VERSION_LESS 3.3)
+     cmake_policy(SET CMP0063 NEW)
+ endif()
+diff --git a/internal-complibs/zlib-1.2.13/CMakeLists.txt b/internal-complibs/zlib-1.2.13/CMakeLists.txt
+index b412dc7..3efb674 100644
+--- a/internal-complibs/zlib-1.2.13/CMakeLists.txt
++++ b/internal-complibs/zlib-1.2.13/CMakeLists.txt
+@@ -1,4 +1,4 @@
+-cmake_minimum_required(VERSION 2.4.4)
++cmake_minimum_required(VERSION 3.5)
+ set(CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS ON)
+ 
+ project(zlib C)

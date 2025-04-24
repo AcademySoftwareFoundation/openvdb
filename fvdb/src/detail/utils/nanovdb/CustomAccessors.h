@@ -17,46 +17,54 @@ namespace fvdb {
 template <typename BuildType> struct ActiveOrUnmasked;
 template <> struct ActiveOrUnmasked<nanovdb::ValueOnIndex> {
     using BuildT = nanovdb::ValueOnIndex;
-    __hostdev__ static bool
+
+    using Type                 = bool;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return false;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &tile) {
-        return (bool)tile.state;
+        return tile.state > 0u;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &node, uint32_t n) {
         return node.mValueMask.isOn(n);
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &node, uint32_t n) {
         return node.mValueMask.isOn(n);
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mValueMask.isOn(n);
     }
 }; // ActiveOrUnmasked<BuildT>
 template <> struct ActiveOrUnmasked<nanovdb::ValueOnIndexMask> {
     using BuildT = nanovdb::ValueOnIndexMask;
-    __hostdev__ static bool
+
+    using Type                 = bool;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return false;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &) {
         return false;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &, uint32_t) {
         return false;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &, uint32_t) {
         return false;
     }
-    __hostdev__ static bool
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mMask.isOn(n);
     }
@@ -76,6 +84,8 @@ template <> struct ActiveOrUnmasked<nanovdb::ValueOnIndexMask> {
 
 /// @brief Set operation to set the mask of a ValueOnIndexMask node to the given value
 struct AtomicMaskedStateSetOnlyHost {
+    static constexpr int LEVEL = 0;
+
     using BuildT = nanovdb::ValueOnIndexMask;
     __hostdev__ static void
     set(nanovdb::NanoRoot<BuildT> &, bool) {}
@@ -93,6 +103,8 @@ struct AtomicMaskedStateSetOnlyHost {
 
 #if defined(__CUDACC__)
 struct AtomicMaskedStateSetOnlyDevice {
+    static constexpr int LEVEL = 0;
+
     using BuildT = nanovdb::ValueOnIndexMask;
     __device__ static void
     set(nanovdb::NanoRoot<BuildT> &, bool) {}
@@ -115,46 +127,54 @@ struct AtomicMaskedStateSetOnlyDevice {
 template <typename BuildType> struct TotalUnmaskedPerLeaf;
 template <> struct TotalUnmaskedPerLeaf<nanovdb::ValueOnIndexMask> {
     using BuildT = nanovdb::ValueOnIndexMask;
-    __hostdev__ static uint32_t
+
+    using Type                 = uint32_t;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mMask.countOn();
     }
 };
 template <> struct TotalUnmaskedPerLeaf<nanovdb::ValueOnIndex> {
     using BuildT = nanovdb::ValueOnIndex;
-    __hostdev__ static uint32_t
+
+    using Type                 = uint32_t;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mValueMask.countOn();
     }
@@ -167,46 +187,54 @@ template <> struct TotalUnmaskedPerLeaf<nanovdb::ValueOnIndex> {
 template <typename BuildType> struct UnmaskedPerLeaf;
 template <> struct UnmaskedPerLeaf<nanovdb::ValueOnIndexMask> {
     using BuildT = nanovdb::ValueOnIndexMask;
-    __hostdev__ static uint32_t
+
+    using Type                 = uint32_t;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mMask.countOn(n);
     }
 };
 template <> struct UnmaskedPerLeaf<nanovdb::ValueOnIndex> {
     using BuildT = nanovdb::ValueOnIndex;
-    __hostdev__ static uint32_t
+
+    using Type                 = uint32_t;
+    static constexpr int LEVEL = 0;
+
+    __hostdev__ static Type
     get(const nanovdb::NanoRoot<BuildT> &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const typename nanovdb::NanoRoot<BuildT>::Tile &) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoUpper<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLower<BuildT> &, uint32_t) {
         return 0;
     }
-    __hostdev__ static uint32_t
+    __hostdev__ static Type
     get(const nanovdb::NanoLeaf<BuildT> &leaf, uint32_t n) {
         return leaf.mValueMask.countOn(n);
     }

@@ -19,9 +19,9 @@ struct ReadIntoDense : public torch::autograd::Function<ReadIntoDense> {
     using Variable        = torch::autograd::Variable;
 
     static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 Variable                           sparseData,
-                                 const torch::optional<Vec3iBatch> &maybeMinCoord,
-                                 const torch::optional<Vec3i>      &maybeGridSize);
+                                 Variable                         sparseData,
+                                 const std::optional<Vec3iBatch> &maybeMinCoord,
+                                 const std::optional<Vec3i>      &maybeGridSize);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

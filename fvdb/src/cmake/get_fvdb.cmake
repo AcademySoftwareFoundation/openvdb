@@ -4,7 +4,9 @@
 # TODO: once FVDB is built using the CMake build system, we can remove the hard-coded path
 # to library and use a target name.
 
-set(FVDB_BUILD_DIR "${CMAKE_BINARY_DIR}/../../../build/lib.linux-x86_64-cpython-310/fvdb/")
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+
+set(FVDB_BUILD_DIR "${CMAKE_BINARY_DIR}/../../../build/lib.linux-x86_64-cpython-${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}/fvdb/")
 find_library(
     FVDB_LIBRARY
     NAMES fvdb

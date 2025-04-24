@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 import math
-from typing import List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence, Union
 
 import torch
 import torch.nn as nn
@@ -442,6 +442,84 @@ class BatchNorm(nn.BatchNorm1d):
         assert num_channels == self.num_features, "Input feature should have the same number of channels as BatchNorm"
         result_data = super().forward(input.data.jdata)
         return VDBTensor(input.grid, input.grid.jagged_like(result_data), input.kmap)
+
+
+@fvnn_module
+class SyncBatchNorm(nn.SyncBatchNorm):
+    r"""Applies distributed Batch Normalization over a VDBTensor.
+    See :class:`~torch.nn.SyncBatchNorm` for detailed information.
+
+    Only supports :class:`~torch.nn.DistributedDataParallel` (DDP) with single GPU per process. Use
+    :meth:`fvdb.nn.SyncBatchNorm.convert_sync_batchnorm()` to convert
+    :attr:`BatchNorm` layer to :class:`SyncBatchNorm` before wrapping
+    Network with DDP.
+    """
+
+    def forward(self, input: VDBTensor) -> VDBTensor:
+        """Layer forward pass.
+
+        Args:
+            input: input VDBTensor.
+
+        Returns:
+            Output VDBTensor with batch norm applied to the feature dimension, across all ranks.
+        """
+        num_channels = input.data.jdata.size(1)
+        assert num_channels == self.num_features, "Input feature should have the same number of channels as BatchNorm"
+        result_data = super().forward(input.data.jdata)
+        return VDBTensor(input.grid, input.grid.jagged_like(result_data), input.kmap)
+
+    @classmethod
+    def convert_sync_batchnorm(cls, module: nn.Module, process_group: Any = None) -> nn.Module:
+        r"""Helper function to convert
+        :attr:`fvdb.nn.BatchNorm` layer in the model to
+        :attr:`fvdb.nn.SyncBatchNorm` layer.
+
+        Args:
+            module: Module for which all :attr:`fvdb.nn.BatchNorm` layers will be converted to
+                :attr:`fvdb.nn.SyncBatchNorm` layers.
+            process_group: process group to scope synchronization, default is the whole world.
+
+        Returns:
+            The original module with the converted :attr:`fvbdb.nn.SyncBatchNorm` layers.
+
+        Example::
+
+            >>> # Network with fvdb.nn.SyncBatchNorm layer
+            >>> module = torch.nn.Sequential(
+            >>>            fvdb.nn.Linear(20, 100),
+            >>>            fvdb.nn.BatchNorm(100)
+            >>>          ).cuda()
+            >>> # creating process group (optional)
+            >>> # process_ids is a list of int identifying rank ids.
+            >>> process_group = torch.distributed.new_group(process_ids)
+            >>> sync_bn_module = fvdb.nn.SyncBatchNorm.convert_sync_batchnorm(module, process_group)
+
+        """
+        module_output = module
+        if isinstance(module, BatchNorm):
+            module_output = cls(
+                module.num_features,
+                module.eps,
+                module.momentum,
+                module.affine,
+                module.track_running_stats,
+                process_group,
+            )
+            if module.affine:
+                with torch.no_grad():
+                    module_output.weight = module.weight
+                    module_output.bias = module.bias
+            module_output.running_mean = module.running_mean
+            module_output.running_var = module.running_var
+            module_output.num_batches_tracked = module.num_batches_tracked
+            module_output.training = module.training
+            if hasattr(module, "qconfig"):
+                module_output.qconfig = module.qconfig
+        for name, child in module.named_children():
+            module_output.add_module(name, cls.convert_sync_batchnorm(child, process_group))
+        del module
+        return module_output
 
 
 # Non-linear Activations

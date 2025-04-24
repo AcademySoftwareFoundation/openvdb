@@ -23,7 +23,7 @@ dependencies:
   - pandas
   - pytest-benchmark
   - polyscope
-  - numpy<2
+  - numpy
   - pyrender
   - linkify-it-py
   ## 3dgs

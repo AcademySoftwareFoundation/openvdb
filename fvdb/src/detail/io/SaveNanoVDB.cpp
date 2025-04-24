@@ -130,7 +130,22 @@ fvdbToNanovdbGridWithValues(const GridBatch &gridBatch, const JaggedTensor &data
                           "Grid name " + name + " exceeds maximum character length of " +
                               std::to_string(nanovdb::GridData::MaxNameSize) + ".");
 
-        auto proxyGrid         = std::make_shared<ProxyGridT>(GridValueT(0), name);
+        auto proxyGrid = std::make_shared<ProxyGridT>(GridValueT(0), name);
+
+        const double   sx        = gridBatch.voxel_size_at(bi, torch::kFloat64)[0].item<double>();
+        const double   sy        = gridBatch.voxel_size_at(bi, torch::kFloat64)[1].item<double>();
+        const double   sz        = gridBatch.voxel_size_at(bi, torch::kFloat64)[2].item<double>();
+        const double   mat[3][3] = { { sx, 0.0, 0.0 },            // row 0
+                                     { 0.0, sy, 0.0 },            // row 1
+                                     { 0.0, 0.0, sz } };          // row 2
+        const double   invMat[3][3] = { { 1.0 / sx, 0.0, 0.0 },   // row 0
+                                        { 0.0, 1.0 / sy, 0.0 },   // row 1
+                                        { 0.0, 0.0, 1.0 / sz } }; // row 2
+        nanovdb::Vec3d trans        = { gridBatch.origin_at(bi, torch::kFloat64)[0].item<double>(),
+                                        gridBatch.origin_at(bi, torch::kFloat64)[1].item<double>(),
+                                        gridBatch.origin_at(bi, torch::kFloat64)[2].item<double>() };
+        proxyGrid.get()->mMap.set(mat, invMat, trans);
+
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
         const int     start     = ijkValues.joffsets()[bi].item<int>();
@@ -455,14 +470,12 @@ saveIndexGridWithBlindData(const std::string &path, const GridBatch &gridBatch,
 }
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
-toNVDB(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData,
-       const torch::optional<StringOrListOfStrings> maybeNames) {
+toNVDB(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
+       const std::vector<std::string> &names) {
     // Get optional names
-    std::vector<std::string> names;
-    if (maybeNames.has_value()) {
-        names = maybeNames.value().value();
+    if (!names.empty()) {
         TORCH_CHECK_VALUE(
-            names.size() == 0 || names.size() == (size_t)gridBatch.grid_count(),
+            names.size() == (size_t)gridBatch.grid_count(),
             "Invalid parameter for names, must be empty or a list of the same length as the batch size. Got " +
                 std::to_string(names.size()) + " names for batch size " +
                 std::to_string(gridBatch.grid_count()));
@@ -477,17 +490,15 @@ toNVDB(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData
 
 void
 saveNVDB(const std::string &path, const GridBatch &gridBatch,
-         const torch::optional<JaggedTensor>          maybeData,
-         const torch::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
+         const std::optional<JaggedTensor> maybeData, const std::vector<std::string> &names,
+         bool compressed, bool verbose) {
     // Which Codec to use for saving
     nanovdb::io::Codec codec = compressed ? nanovdb::io::Codec::BLOSC : nanovdb::io::Codec::NONE;
 
     // Get optional names
-    std::vector<std::string> names;
-    if (maybeNames.has_value()) {
-        names = maybeNames.value().value();
+    if (!names.empty()) {
         TORCH_CHECK_VALUE(
-            names.size() == 0 || names.size() == (size_t)gridBatch.grid_count(),
+            names.size() == (size_t)gridBatch.grid_count(),
             "Invalid parameter for names, must be empty or a list of the same length as the batch size. Got " +
                 std::to_string(names.size()) + " names for batch size " +
                 std::to_string(gridBatch.grid_count()));

@@ -22,7 +22,7 @@ buildEmptyGrid(torch::Device device, bool isMutable) {
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(device, true /* sync */);
+        ret.buffer().to(device);
         return ret;
     });
 }

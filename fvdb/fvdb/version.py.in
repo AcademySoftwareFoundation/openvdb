@@ -1,0 +1,2 @@
+# This file is auto-generated during the build process
+__version__ = "@SKBUILD_PROJECT_VERSION@"

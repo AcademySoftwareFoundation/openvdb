@@ -67,11 +67,12 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        names = None
+        name = ""
+        names = []
         if include_names:
             names = [f"grid-{i}" for i in range(batch_size)]
             if batch_size == 1 and np.random.rand() > 0.5:
-                names = names[0]
+                name = names[0]
 
         sizes = [np.random.randint(100, 200) for _ in range(batch_size)]
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(device)
@@ -81,12 +82,15 @@ class TestIO(unittest.TestCase):
         data = fvdb.JaggedTensor([(torch.rand(*sizes[i], device=device) * 256).to(dtype) for i in range(batch_size)])
 
         with tempfile.NamedTemporaryFile() as temp:
-            fvdb.save(temp.name, grid, data, names=names, compressed=compressed)
+            if name:
+                fvdb.save(temp.name, grid, data, name=name, compressed=compressed)
+            else:
+                fvdb.save(temp.name, grid, data, names=names, compressed=compressed)
             grid2, data2, names2 = fvdb.load(temp.name, device=device)
 
-            if isinstance(names, str):
-                names = [names] * batch_size
-            elif names is None:
+            if name:
+                names = [name] * batch_size
+            elif not names:
                 names = [""] * batch_size
 
             self.assertTrue(names == names2, f"{names}, {names2}")
@@ -130,7 +134,7 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        names = None
+        names = []
 
         sizes = [np.random.randint(10, 20) for _ in range(batch_size)]
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(device)
@@ -140,10 +144,7 @@ class TestIO(unittest.TestCase):
             fvdb.save(temp.name, grid, names=names, compressed=True)
             grid2, data2, names2 = fvdb.load(temp.name, device=device)
 
-            if isinstance(names, str):
-                names = [names] * batch_size
-            elif names is None:
-                names = [""] * batch_size
+            names = [""] * batch_size
 
             self.assertTrue(names == names2, f"{names}, {names2}")
 
@@ -305,20 +306,26 @@ class TestIO(unittest.TestCase):
         torch.manual_seed(0)
         np.random.seed(0)
 
-        pts = torch.tensor(
-            [
-                [1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
-            ],
-            device=device,
-        )
+        pts = fvdb.JaggedTensor([torch.rand((100, 3)) for _ in range(8)]).to(device)
+
         test_grid = fvdb.gridbatch_from_points(
-            pts, voxel_sizes=np.random.random() + 0.00001, origins=[np.random.randint(-100, 100) for _ in range(3)]
+            pts,
+            voxel_sizes=[np.random.random() + 0.00001 for _ in range(3)],
+            origins=[np.random.randint(-100, 100) for _ in range(3)],
         )
 
         with tempfile.NamedTemporaryFile() as temp:
+            # test saving index grids by themselves which will be written as a NanoVDB index grid
             fvdb.save(temp.name, test_grid)
             test_grid_from_file, _, _ = fvdb.load(temp.name, device=device)
+
+            self.assertTrue(torch.all(test_grid.voxel_sizes == test_grid_from_file.voxel_sizes))
+            self.assertTrue(torch.all(test_grid.origins == test_grid_from_file.origins))
+
+            # test saving index grids with data of a channel size which will be written as a NanoVDB data grid
+            data = test_grid.jagged_like(torch.rand(test_grid.total_voxels, 3, device=device))
+            fvdb.save(temp.name, test_grid, data)
+            test_grid_from_file, data_from_file, _ = fvdb.load(temp.name, device=device)
 
             self.assertTrue(torch.all(test_grid.voxel_sizes == test_grid_from_file.voxel_sizes))
             self.assertTrue(torch.all(test_grid.origins == test_grid_from_file.origins))

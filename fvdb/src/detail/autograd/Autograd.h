@@ -6,6 +6,7 @@
 
 #include "Attention.h"
 #include "AvgPoolGrid.h"
+#include "EvaluateSphericalHarmonics.h"
 #include "FillFromGrid.h"
 #include "GaussianRender.h"
 #include "JaggedReduce.h"

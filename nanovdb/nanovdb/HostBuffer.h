@@ -316,7 +316,6 @@ struct HostBuffer::Pool
                << mSize << " bytes of which\n\t" << (util::PtrDiff(alignedFree, mData) - mPadding)
                << " bytes are used by " << mRegister.size() << " other buffer(s). "
                << "Pool is " << (mManaged ? "internally" : "externally") << " managed.\n";
-            //std::cerr << ss.str();
             throw std::runtime_error(ss.str());
         }
         buffer->mSize = size;
@@ -389,7 +388,6 @@ struct HostBuffer::Pool
             }
 
             for (HostBuffer* buffer : mRegister) { // update registered buffers
-                //buffer->mData = paddedData + ptrdiff_t(buffer->mData - (mData + mPadding));
                 buffer->mData = util::PtrAdd(paddedData, util::PtrDiff(buffer->mData, util::PtrAdd(mData, mPadding)));
             }
             mFree = util::PtrAdd(paddedData, memUsage); // update the free pointer
@@ -414,12 +412,8 @@ private:
 
     static void* alloc(uint64_t size)
     {
-//#if (__cplusplus >= 201703L)
-//    return std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, size);//C++17 or newer
-//#else
     // make sure we alloc enough space to align the result
     return std::malloc(size + NANOVDB_DATA_ALIGNMENT);
-//#endif
     }
 
     static void* realloc(void* const origData,

@@ -22,6 +22,6 @@ dependencies:
   - sphinx_rtd_theme
   - myst-parser
   - linkify-it-py
-  - numpy<2
+  - numpy
   - tqdm
   - glm

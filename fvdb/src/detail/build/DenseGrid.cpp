@@ -16,7 +16,7 @@ namespace build {
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
-                  const nanovdb::Coord &ijkMin, torch::optional<torch::Tensor> mask) {
+                  const nanovdb::Coord &ijkMin, std::optional<torch::Tensor> mask) {
     torch::TensorAccessor<bool, 3> maskAccessor(nullptr, nullptr, nullptr);
     if (mask.has_value()) {
         maskAccessor = mask.value().accessor<bool, 3>();
@@ -47,10 +47,9 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
     nanovdb::GridHandle<TorchDeviceBuffer> ret =
         nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(*proxyGrid, 0u,
                                                                                 false, false);
-    ret.buffer().setDevice(torch::kCPU, true /* sync */);
+    ret.buffer().to(torch::kCPU);
 
-    TorchDeviceBuffer guide(0, nullptr);
-    guide.setDevice(torch::kCPU, true);
+    TorchDeviceBuffer guide(0, torch::kCPU);
 
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(batchSize);
@@ -69,7 +68,7 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildDenseGrid(torch::Device device, bool isMutable, const uint32_t batchSize,
                const nanovdb::Coord &size, const nanovdb::Coord &ijkMin,
-               const torch::optional<torch::Tensor> &mask) {
+               const std::optional<torch::Tensor> &mask) {
     TORCH_CHECK(size[0] > 0 && size[1] > 0 && size[2] > 0,
                 "Size must be greater than 0 in all dimensions");
     TORCH_CHECK((__uint128_t)size[0] * size[1] * size[2] <= std::numeric_limits<int64_t>::max(),

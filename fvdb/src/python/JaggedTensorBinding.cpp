@@ -196,9 +196,23 @@ bind_jagged_tensor(py::module &m) {
         .def("cpu", [](const fvdb::JaggedTensor& self) { return self.to(torch::kCPU); })
         .def("cuda", [](const fvdb::JaggedTensor& self) { return self.to(torch::kCUDA); })
 
-        .def("to", [](fvdb::JaggedTensor& self, fvdb::TorchDeviceOrString device) { return self.to(device.value(), self.scalar_type()); })
+        .def("to", [](fvdb::JaggedTensor& self, const torch::Device& device) { return self.to(device, self.scalar_type()); })
+        .def("to", [](fvdb::JaggedTensor& self, const std::string& device_string) {
+            torch::Device device(device_string);
+            if (device.is_cuda() && !device.has_index()) {
+                device.set_index(c10::cuda::current_device());
+            }
+            return self.to(device, self.scalar_type());
+        })
         .def("to", [](fvdb::JaggedTensor& self, torch::ScalarType dtype) { return self.to(self.device(), dtype); })
-        .def("to", [](const fvdb::JaggedTensor& self, fvdb::TorchDeviceOrString device) { return self.to(device.value()); }, py::arg("device"))
+        .def("to", [](const fvdb::JaggedTensor& self, const torch::Device& device) { return self.to(device); }, py::arg("device"))
+        .def("to", [](const fvdb::JaggedTensor& self, const std::string& device_string) {
+            torch::Device device(device_string);
+            if (device.is_cuda() && !device.has_index()) {
+                device.set_index(c10::cuda::current_device());
+            }
+            return self.to(device);
+        }, py::arg("device"))
 
         .def("type", [](const fvdb::JaggedTensor& self, torch::ScalarType dtype) { return self.to(dtype); })
         .def("type_as", [](const fvdb::JaggedTensor& self, const fvdb::JaggedTensor& jagged_tensor) { return self.to(jagged_tensor.dtype()); })

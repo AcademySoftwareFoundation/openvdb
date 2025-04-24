@@ -44,11 +44,7 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
     size_t size = 0u, *d_size;
     cudaCheck(util::cuda::mallocAsync((void**)&d_size, sizeof(size_t), stream));
     util::cuda::lambdaKernel<<<1, 1, 0, stream>>>(1, [=] __device__(size_t) {
-#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
-        *d_data = NodeManagerData{NANOVDB_MAGIC_NODE,   0u, (void*)d_grid, {0u,0u,0u}};
-#else
-        *d_data = NodeManagerData{NANOVDB_MAGIC_NUMB, 0u, (void*)d_grid, {0u,0u,0u}};
-#endif
+        *d_data = NodeManagerData((void*)d_grid);
         *d_size = sizeof(NodeManagerData);
         auto &tree = d_grid->tree();
         if (NodeManager<BuildT>::FIXED_SIZE && d_grid->isBreadthFirst()) {

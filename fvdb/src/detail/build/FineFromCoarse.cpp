@@ -58,7 +58,7 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
@@ -71,8 +71,8 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
 
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseBatchHdl,
-                            const torch::optional<JaggedTensor> &subdivMask,
-                            const nanovdb::Coord                 subdivisionFactor) {
+                            const std::optional<JaggedTensor> &subdivMask,
+                            const nanovdb::Coord               subdivisionFactor) {
     if (coarseBatchHdl.device().is_cuda()) {
         JaggedTensor coords = ops::dispatchFineIJKForCoarseGrid<torch::kCUDA>(
             coarseBatchHdl, subdivisionFactor, subdivMask);

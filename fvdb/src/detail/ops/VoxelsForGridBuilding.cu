@@ -327,9 +327,9 @@ fineIjkForCoarseGridVoxelCallback(int32_t bidx, int32_t lidx, int32_t vidx, int3
 
 template <>
 JaggedTensor
-dispatchFineIJKForCoarseGrid<torch::kCUDA>(const GridBatchImpl                 &batchHdl,
-                                           nanovdb::Coord                       upsamplingFactor,
-                                           const torch::optional<JaggedTensor> &maybeMask) {
+dispatchFineIJKForCoarseGrid<torch::kCUDA>(const GridBatchImpl               &batchHdl,
+                                           nanovdb::Coord                     upsamplingFactor,
+                                           const std::optional<JaggedTensor> &maybeMask) {
     TORCH_CHECK(batchHdl.device().is_cuda(), "GridBatchImpl must be on CUDA device");
     TORCH_CHECK(batchHdl.device().has_index(), "GridBatchImpl must have a valid index");
 

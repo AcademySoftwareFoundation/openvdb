@@ -1,32 +1,48 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 
-# find Python3 and site-packages path
+# find Python3
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-execute_process(
-  COMMAND "${Python3_EXECUTABLE}" -c "if True:
-    from distutils import sysconfig as sc
-    print(sc.get_python_lib(prefix='', plat_specific=True))"
-  OUTPUT_VARIABLE PYTHON_SITE
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-set (PYTHON_SITE "${CONDA_ENV_PATH}/${PYTHON_SITE}")
 
 # Check that PyTorch package uses the C++11 ABI
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}" -c "import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)"
+  COMMAND "${CMAKE_COMMAND}" -E env PYTHONPATH="${Python3_SITELIB}" "${Python3_EXECUTABLE}" -c "import torch; print(torch._C._GLIBCXX_USE_CXX11_ABI)"
   OUTPUT_VARIABLE TORCH_CXX11_ABI
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE TORCH_IMPORT_RESULT)
 
-if (NOT TORCH_CXX11_ABI)
-    message(FATAL_ERROR "PyTorch package does not use the C++11 ABI. "
-                        "Please install PyTorch with the C++11 ABI (e.g. conda-forge package).")
+if(NOT TORCH_IMPORT_RESULT EQUAL 0)
+  message(FATAL_ERROR "Failed to import PyTorch. Please ensure PyTorch is installed in the conda environment.")
 endif()
 
-# find torch, looking in site-packages
-set(Torch_DIR ${PYTHON_SITE}/torch/share/cmake/Torch)
+if(NOT TORCH_CXX11_ABI)
+  message(FATAL_ERROR "PyTorch package does not use the C++11 ABI. "
+    "Please install PyTorch with the C++11 ABI (e.g. conda-forge package).")
+endif()
+
+# find site-packages directory
+execute_process(
+  COMMAND "${CMAKE_COMMAND}" -E env PYTHONPATH="${Python3_SITELIB}" "${Python3_EXECUTABLE}" -c "import os; import torch; print(os.path.dirname(torch.__file__))"
+  OUTPUT_VARIABLE TORCH_PACKAGE_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
 # needed to correctly configure Torch with the conda-forge build
-set(CUDA_TOOLKIT_ROOT_DIR "${CONDA_ENV_PATH}/targets/x86_64-linux")
-find_package(Torch REQUIRED)
+if(DEFINED ENV{CONDA_PREFIX})
+  set(CUDA_TOOLKIT_ROOT_DIR "$ENV{CONDA_PREFIX}/targets/x86_64-linux")
+endif()
 
+find_package(Torch REQUIRED PATHS "${TORCH_PACKAGE_DIR}/share/cmake/Torch")
 
+# Without this we can't find TH/THC headers
+set(TORCH_SOURCE_INCLUDE_DIRS ${TORCH_PACKAGE_DIR}/include)
+
+if(NOT TORCH_PYTHON_LIBRARY)
+  message(STATUS "Looking for torch_python library...")
+  set(TORCH_PYTHON_LIBRARY "${TORCH_PACKAGE_DIR}/lib/libtorch_python.so")
+
+  if(NOT EXISTS "${TORCH_PYTHON_LIBRARY}")
+    message(FATAL_ERROR "Could not find libtorch_python.so at ${TORCH_PYTHON_LIBRARY}")
+  endif()
+endif()
+
+message(STATUS "TORCH_PYTHON_LIBRARY: ${TORCH_PYTHON_LIBRARY}")

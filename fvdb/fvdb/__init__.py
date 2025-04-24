@@ -9,7 +9,7 @@ if torch.cuda.is_available():
     torch.cuda.init()
 
 # isort: off
-from ._Cpp import JaggedTensor, GridBatch, SparseConvPackInfo, ConvPackBackend
+from ._Cpp import JaggedTensor, GridBatch, SparseConvPackInfo, ConvPackBackend, GaussianSplat3d
 from ._Cpp import (
     gridbatch_from_ijk,
     gridbatch_from_points,
@@ -26,11 +26,7 @@ from ._Cpp import (
     jzeros,
     jempty,
     volume_render,
-    gaussian_fully_fused_projection,
-    gaussian_render,
-    precompute_gaussian_render_state,
-    render_pixels_from_precomputed_gaussian_render_state,
-    gaussian_render_depth,
+    gaussian_render_jagged,
 )
 
 # The following import needs to come after the GridBatch and JaggedTensor imports
@@ -61,14 +57,16 @@ def jcat(things_to_cat, dim=None):
         raise ValueError("jcat() can only cat GridBatch, JaggedTensor, or VDBTensor")
 
 
-__version__ = "0.2.1"
-__version_info__ = (0, 2, 1)
+from .version import __version__
+
+__version_info__ = tuple(map(int, __version__.split(".")))
 
 __all__ = [
     "GridBatch",
     "JaggedTensor",
     "SparseConvPackInfo",
     "ConvPackBackend",
+    "GaussianSplat3d",
     "gridbatch_from_ijk",
     "gridbatch_from_points",
     "gridbatch_from_nearest_voxels_to_points",
@@ -85,9 +83,5 @@ __all__ = [
     "jzeros",
     "jempty",
     "volume_render",
-    "gaussian_fully_fused_projection",
-    "gaussian_render",
-    "precompute_gaussian_render_state",
-    "render_pixels_from_precomputed_gaussian_render_state",
-    "gaussian_render_depth",
+    "gaussian_render_jagged",
 ]

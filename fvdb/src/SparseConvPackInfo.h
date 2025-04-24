@@ -23,40 +23,40 @@ class SparseConvPackInfo : torch::CustomClassHolder {
     // S: Split count
 
     bool mGSUseME = false;
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mGSNeighborMap;   // [#IO, 2] (int32), GATHER_SCATTER, GATHER_SCATTER(me)
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mGSNeighborSizes; // [#IO, 2] (int32), GATHER_SCATTER, GATHER_SCATTER(me)
 
-    bool                           mIGEMMUseTF32 = false;
-    torch::optional<torch::Tensor> mIGEMMOutInMap;   // [#O-P, K] (int32), IGEMM, IGEMM(sorted)
-    torch::optional<torch::Tensor> mIGEMMReorderLoc; // [S, #O-P] (int32), IGEMM(sorted)
-    torch::optional<torch::Tensor> mIGEMMSortedMask; // [S, #O-P] (int32), IGEMM(sorted)
-    torch::optional<torch::Tensor> mIGEMMReducedSortedMask; // [S, #O-P//128] (int32), IGEMM(sorted)
-    torch::optional<torch::Tensor> mIGEMMReoderOutInMap;    // [#O-P, K] (int32), IGEMM(sorted)
+    bool                         mIGEMMUseTF32 = false;
+    std::optional<torch::Tensor> mIGEMMOutInMap;          // [#O-P, K] (int32), IGEMM, IGEMM(sorted)
+    std::optional<torch::Tensor> mIGEMMReorderLoc;        // [S, #O-P] (int32), IGEMM(sorted)
+    std::optional<torch::Tensor> mIGEMMSortedMask;        // [S, #O-P] (int32), IGEMM(sorted)
+    std::optional<torch::Tensor> mIGEMMReducedSortedMask; // [S, #O-P//128] (int32), IGEMM(sorted)
+    std::optional<torch::Tensor> mIGEMMReoderOutInMap;    // [#O-P, K] (int32), IGEMM(sorted)
 
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mIGEMMOutInMapBwd;        // [#I-P, K] (int32), IGEMM, IGEMM(sorted, training)
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mIGEMMReorderLocBwd;      // [S, #I-P] (int32), IGEMM, IGEMM(sorted, training)
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mIGEMMSortedMaskBwdW;     // [S, #I-P//x] (int32), IGEMM, IGEMM(sorted, training)
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mIGEMMSortedMaskBwdD;     // [S, #I-P//y] (int32), IGEMM, IGEMM(sorted, training)
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mIGEMMReorderOutInMapBwd; // [#I-P, K] (int32), IGEMM, IGEMM(sorted, training)
 
     bool mCUTLASSBenchmark = false;
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mCUTLASSHaloIndexBuffer;   // [#active_brick, 6, 4, 4] (int32), CUTLASS
-    torch::optional<torch::Tensor>
+    std::optional<torch::Tensor>
         mCUTLASSOutputIndexBuffer; // [#active_brick, 4, 2, 2] (int32), CUTLASS
 
-    torch::optional<torch::Tensor> mLGGSSpokeIndicesFlattenedOffset; // 1D array. (int32), LGGS
-    torch::optional<torch::Tensor>
-        mLGGSSpokeInputGlobalIndicesFlattenedData;                   // 1D array. (int32), LGGS
-    torch::optional<torch::Tensor>
-        mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData;    // 1D array. (int32), LGGS
+    std::optional<torch::Tensor> mLGGSSpokeIndicesFlattenedOffset; // 1D array. (int32), LGGS
+    std::optional<torch::Tensor>
+        mLGGSSpokeInputGlobalIndicesFlattenedData;                 // 1D array. (int32), LGGS
+    std::optional<torch::Tensor>
+        mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData;  // 1D array. (int32), LGGS
 
     Vec3iOrScalar mStride;
     Vec3iOrScalar mKernelSize;
@@ -66,68 +66,75 @@ class SparseConvPackInfo : torch::CustomClassHolder {
 
   public:
     SparseConvPackInfo
-    to(TorchDeviceOrString to_device) const {
-        torch::Device toDevice = to_device.value();
-
+    to(const torch::Device &device) const {
         SparseConvPackInfo copy = *this;
         if (copy.mGSNeighborMap) {
-            copy.mGSNeighborMap = copy.mGSNeighborMap.value().to(toDevice);
+            copy.mGSNeighborMap = copy.mGSNeighborMap.value().to(device);
         }
         if (copy.mGSNeighborSizes) {
-            copy.mGSNeighborSizes = copy.mGSNeighborSizes.value().to(toDevice);
+            copy.mGSNeighborSizes = copy.mGSNeighborSizes.value().to(device);
         }
         if (copy.mIGEMMOutInMap) {
-            copy.mIGEMMOutInMap = copy.mIGEMMOutInMap.value().to(toDevice);
+            copy.mIGEMMOutInMap = copy.mIGEMMOutInMap.value().to(device);
         }
         if (copy.mIGEMMReorderLoc) {
-            copy.mIGEMMReorderLoc = copy.mIGEMMReorderLoc.value().to(toDevice);
+            copy.mIGEMMReorderLoc = copy.mIGEMMReorderLoc.value().to(device);
         }
         if (copy.mIGEMMSortedMask) {
-            copy.mIGEMMSortedMask = copy.mIGEMMSortedMask.value().to(toDevice);
+            copy.mIGEMMSortedMask = copy.mIGEMMSortedMask.value().to(device);
         }
         if (copy.mIGEMMReducedSortedMask) {
-            copy.mIGEMMReducedSortedMask = copy.mIGEMMReducedSortedMask.value().to(toDevice);
+            copy.mIGEMMReducedSortedMask = copy.mIGEMMReducedSortedMask.value().to(device);
         }
         if (copy.mIGEMMReoderOutInMap) {
-            copy.mIGEMMReoderOutInMap = copy.mIGEMMReoderOutInMap.value().to(toDevice);
+            copy.mIGEMMReoderOutInMap = copy.mIGEMMReoderOutInMap.value().to(device);
         }
         if (copy.mIGEMMOutInMapBwd) {
-            copy.mIGEMMOutInMapBwd = copy.mIGEMMOutInMapBwd.value().to(toDevice);
+            copy.mIGEMMOutInMapBwd = copy.mIGEMMOutInMapBwd.value().to(device);
         }
         if (copy.mIGEMMReorderLocBwd) {
-            copy.mIGEMMReorderLocBwd = copy.mIGEMMReorderLocBwd.value().to(toDevice);
+            copy.mIGEMMReorderLocBwd = copy.mIGEMMReorderLocBwd.value().to(device);
         }
         if (copy.mIGEMMSortedMaskBwdW) {
-            copy.mIGEMMSortedMaskBwdW = copy.mIGEMMSortedMaskBwdW.value().to(toDevice);
+            copy.mIGEMMSortedMaskBwdW = copy.mIGEMMSortedMaskBwdW.value().to(device);
         }
         if (copy.mIGEMMSortedMaskBwdD) {
-            copy.mIGEMMSortedMaskBwdD = copy.mIGEMMSortedMaskBwdD.value().to(toDevice);
+            copy.mIGEMMSortedMaskBwdD = copy.mIGEMMSortedMaskBwdD.value().to(device);
         }
         if (copy.mIGEMMReorderOutInMapBwd) {
-            copy.mIGEMMReorderOutInMapBwd = copy.mIGEMMReorderOutInMapBwd.value().to(toDevice);
+            copy.mIGEMMReorderOutInMapBwd = copy.mIGEMMReorderOutInMapBwd.value().to(device);
         }
         if (copy.mCUTLASSHaloIndexBuffer) {
-            copy.mCUTLASSHaloIndexBuffer = copy.mCUTLASSHaloIndexBuffer.value().to(toDevice);
+            copy.mCUTLASSHaloIndexBuffer = copy.mCUTLASSHaloIndexBuffer.value().to(device);
         }
         if (copy.mCUTLASSOutputIndexBuffer) {
-            copy.mCUTLASSOutputIndexBuffer = copy.mCUTLASSOutputIndexBuffer.value().to(toDevice);
+            copy.mCUTLASSOutputIndexBuffer = copy.mCUTLASSOutputIndexBuffer.value().to(device);
         }
         if (copy.mLGGSSpokeIndicesFlattenedOffset) {
             copy.mLGGSSpokeIndicesFlattenedOffset =
-                copy.mLGGSSpokeIndicesFlattenedOffset.value().to(toDevice);
+                copy.mLGGSSpokeIndicesFlattenedOffset.value().to(device);
         }
         if (copy.mLGGSSpokeInputGlobalIndicesFlattenedData) {
             copy.mLGGSSpokeInputGlobalIndicesFlattenedData =
-                copy.mLGGSSpokeInputGlobalIndicesFlattenedData.value().to(toDevice);
+                copy.mLGGSSpokeInputGlobalIndicesFlattenedData.value().to(device);
         }
         if (copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
             copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData =
-                copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData.value().to(toDevice);
+                copy.mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData.value().to(device);
         }
-        copy.mSourceGrid = copy.mSourceGrid.to(to_device);
-        copy.mTargetGrid = copy.mTargetGrid.to(to_device);
+        copy.mSourceGrid = copy.mSourceGrid.to(device);
+        copy.mTargetGrid = copy.mTargetGrid.to(device);
 
         return copy;
+    }
+
+    SparseConvPackInfo
+    to(const std::string &device_string) const {
+        torch::Device device(device_string);
+        if (device.is_cuda() && !device.has_index()) {
+            device.set_index(c10::cuda::current_device());
+        }
+        return to(device);
     }
 
     SparseConvPackInfo
@@ -140,11 +147,11 @@ class SparseConvPackInfo : torch::CustomClassHolder {
         return to(torch::kCPU);
     }
 
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     neighborMap() const {
         return mGSNeighborMap;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     neighborSizes() const {
         return mGSNeighborSizes;
     }
@@ -153,23 +160,23 @@ class SparseConvPackInfo : torch::CustomClassHolder {
         return mGSUseME;
     }
 
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     outInMap() const {
         return mIGEMMOutInMap;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     reorderLoc() const {
         return mIGEMMReorderLoc;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     sortedMask() const {
         return mIGEMMSortedMask;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     reducedSortedMask() const {
         return mIGEMMReducedSortedMask;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     reoderOutInMap() const {
         return mIGEMMReoderOutInMap;
     }
@@ -178,32 +185,32 @@ class SparseConvPackInfo : torch::CustomClassHolder {
         return mIGEMMUseTF32;
     }
 
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     outInMapBwd() const {
         return mIGEMMOutInMapBwd;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     reorderLocBwd() const {
         return mIGEMMReorderLocBwd;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     sortedMaskBwdW() const {
         return mIGEMMSortedMaskBwdW;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     sortedMaskBwdD() const {
         return mIGEMMSortedMaskBwdD;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     reorderOutInMapBwd() const {
         return mIGEMMReorderOutInMapBwd;
     }
 
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     haloIndexBuffer() const {
         return mCUTLASSHaloIndexBuffer;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     outputIndexBuffer() const {
         return mCUTLASSOutputIndexBuffer;
     }
@@ -212,15 +219,15 @@ class SparseConvPackInfo : torch::CustomClassHolder {
         return mCUTLASSBenchmark;
     }
 
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     blockKernelRanges() const {
         return mLGGSSpokeIndicesFlattenedOffset;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     blockKernelInIdx() const {
         return mLGGSSpokeInputGlobalIndicesFlattenedData;
     }
-    const torch::optional<torch::Tensor>
+    const std::optional<torch::Tensor>
     blockKernelRelOutIdx() const {
         return mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData;
     }
@@ -244,7 +251,7 @@ class SparseConvPackInfo : torch::CustomClassHolder {
     }
 
     SparseConvPackInfo(Vec3iOrScalar kernelsize, Vec3iOrScalar stride, GridBatch src,
-                       torch::optional<GridBatch> maybeTarget);
+                       std::optional<GridBatch> maybeTarget);
 
     SparseConvPackInfo transposed() const;
 

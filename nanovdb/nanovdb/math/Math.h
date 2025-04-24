@@ -576,6 +576,676 @@ public:
     __hostdev__ inline Coord round() const { return *this; }
 }; // Coord class
 
+
+/// @brief Type alias for Coord so we have a consistent naming convention
+using Coord3 = Coord;
+
+
+template <typename T>
+class Vec2;
+
+/// @brief Signed (i, j) 32-bit integer coordinate class, similar to openvdb::math::Coord
+class Coord2
+{
+    int32_t mVec[2]; // private member data - three signed index coordinates
+public:
+    using ValueType = int32_t;
+    using IndexType = uint32_t;
+
+    /// @brief Initialize all coordinates to zero.
+    __hostdev__ Coord2()
+        : mVec{0, 0}
+    {
+    }
+
+    /// @brief Initializes all coordinates to the given signed integer.
+    __hostdev__ explicit Coord2(ValueType n)
+        : mVec{n, n}
+    {
+    }
+
+    /// @brief Initializes coordinate to the given signed integers.
+    __hostdev__ Coord2(ValueType i, ValueType j)
+        : mVec{i, j}
+    {
+    }
+
+    __hostdev__ Coord2(ValueType* ptr)
+        : mVec{ptr[0], ptr[1]}
+    {
+    }
+
+    __hostdev__ int32_t x() const { return mVec[0]; }
+    __hostdev__ int32_t y() const { return mVec[1]; }
+
+    __hostdev__ int32_t& x() { return mVec[0]; }
+    __hostdev__ int32_t& y() { return mVec[1]; }
+
+    __hostdev__ static Coord2 max() { return Coord2(int32_t((1u << 31) - 1)); }
+
+    __hostdev__ static Coord2 min() { return Coord2(-int32_t((1u << 31) - 1) - 1); }
+
+    __hostdev__ static size_t memUsage() { return sizeof(Coord2); }
+
+    /// @brief Return a const reference to the given Coord component.
+    /// @warning The argument is assumed to be 0 or 1,
+    __hostdev__ const ValueType& operator[](IndexType i) const { return mVec[i]; }
+
+    /// @brief Return a non-const reference to the given Coord component.
+    /// @warning The argument is assumed to be 0 or 1.
+    __hostdev__ ValueType& operator[](IndexType i) { return mVec[i]; }
+
+    /// @brief Assignment operator that works with openvdb::Coord
+    template<typename CoordT>
+    __hostdev__ Coord2& operator=(const CoordT& other)
+    {
+        static_assert(sizeof(Coord2) == sizeof(CoordT), "Mis-matched sizeof");
+        mVec[0] = other[0];
+        mVec[1] = other[1];
+        return *this;
+    }
+
+    /// @brief Return a new instance with coordinates masked by the given unsigned integer.
+    __hostdev__ Coord2 operator&(IndexType n) const { return Coord2(mVec[0] & n, mVec[1] & n); }
+
+    // @brief Return a new instance with coordinates left-shifted by the given unsigned integer.
+    __hostdev__ Coord2 operator<<(IndexType n) const { return Coord2(mVec[0] << n, mVec[1] << n); }
+
+    // @brief Return a new instance with coordinates right-shifted by the given unsigned integer.
+    __hostdev__ Coord2 operator>>(IndexType n) const { return Coord2(mVec[0] >> n, mVec[1] >> n); }
+
+    /// @brief Return true if this Coord is lexicographically less than the given Coord.
+    __hostdev__ bool operator<(const Coord2& rhs) const
+    {
+        return mVec[0] < rhs[0] ? true
+             : mVec[0] > rhs[0] ? false
+             : mVec[1] < rhs[1] ? true : false;
+    }
+
+    /// @brief Return true if this Coord is lexicographically less or equal to the given Coord.
+    __hostdev__ bool operator<=(const Coord2& rhs) const
+    {
+        return mVec[0] < rhs[0] ? true
+             : mVec[0] > rhs[0] ? false
+             : mVec[1] <= rhs[1] ? true : false;
+    }
+
+    // @brief Return true if this Coord is lexicographically greater than the given Coord.
+    __hostdev__ bool operator>(const Coord2& rhs) const
+    {
+        return mVec[0] > rhs[0] ? true
+             : mVec[0] < rhs[0] ? false
+             : mVec[1] > rhs[1] ? true : false;
+    }
+
+    // @brief Return true if this Coord is lexicographically greater or equal to the given Coord.
+    __hostdev__ bool operator>=(const Coord2& rhs) const
+    {
+        return mVec[0] > rhs[0] ? true
+             : mVec[0] < rhs[0] ? false
+             : mVec[1] >= rhs[1] ? true : false;
+    }
+
+    // @brief Return true if the Coord components are identical.
+    __hostdev__ bool   operator==(const Coord2& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1]; }
+    __hostdev__ bool   operator!=(const Coord2& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1]; }
+    __hostdev__ Coord2& operator&=(int n)
+    {
+        mVec[0] &= n;
+        mVec[1] &= n;
+        return *this;
+    }
+    __hostdev__ Coord2& operator<<=(uint32_t n)
+    {
+        mVec[0] <<= n;
+        mVec[1] <<= n;
+        return *this;
+    }
+    __hostdev__ Coord2& operator>>=(uint32_t n)
+    {
+        mVec[0] >>= n;
+        mVec[1] >>= n;
+        return *this;
+    }
+    __hostdev__ Coord2& operator+=(int n)
+    {
+        mVec[0] += n;
+        mVec[1] += n;
+        return *this;
+    }
+    __hostdev__ Coord2  operator+(const Coord2& rhs) const { return Coord2(mVec[0] + rhs[0], mVec[1] + rhs[1]); }
+    __hostdev__ Coord2  operator-(const Coord2& rhs) const { return Coord2(mVec[0] - rhs[0], mVec[1] - rhs[1]); }
+    __hostdev__ Coord2  operator-() const { return Coord2(-mVec[0], -mVec[1]); }
+    __hostdev__ Coord2& operator+=(const Coord2& rhs)
+    {
+        mVec[0] += rhs[0];
+        mVec[1] += rhs[1];
+        return *this;
+    }
+    __hostdev__ Coord2& operator-=(const Coord2& rhs)
+    {
+        mVec[0] -= rhs[0];
+        mVec[1] -= rhs[1];
+        return *this;
+    }
+
+    /// @brief Perform a component-wise minimum with the other Coord.
+    __hostdev__ Coord2& minComponent(const Coord2& other)
+    {
+        if (other[0] < mVec[0])
+            mVec[0] = other[0];
+        if (other[1] < mVec[1])
+            mVec[1] = other[1];
+        return *this;
+    }
+
+    /// @brief Perform a component-wise maximum with the other Coord.
+    __hostdev__ Coord2& maxComponent(const Coord2& other)
+    {
+        if (other[0] > mVec[0])
+            mVec[0] = other[0];
+        if (other[1] > mVec[1])
+            mVec[1] = other[1];
+        return *this;
+    }
+#if defined(__CUDACC__) // the following functions only run on the GPU!
+    __device__ inline Coord2& minComponentAtomic(const Coord2& other)
+    {
+        atomicMin(&mVec[0], other[0]);
+        atomicMin(&mVec[1], other[1]);
+        return *this;
+    }
+    __device__ inline Coord2& maxComponentAtomic(const Coord2& other)
+    {
+        atomicMax(&mVec[0], other[0]);
+        atomicMax(&mVec[1], other[1]);
+        return *this;
+    }
+#endif
+
+    __hostdev__ Coord2 offsetBy(ValueType dx, ValueType dy) const
+    {
+        return Coord2(mVec[0] + dx, mVec[1] + dy);
+    }
+
+    __hostdev__ Coord2 offsetBy(ValueType n) const { return this->offsetBy(n, n); }
+
+    /// Return true if any of the components of @a a are smaller than the
+    /// corresponding components of @a b.
+    __hostdev__ static inline bool lessThan(const Coord2& a, const Coord2& b)
+    {
+        return (a[0] < b[0] || a[1] < b[1]);
+    }
+
+    /// @brief Return the largest integer coordinates that are not greater
+    /// than @a xyz (node centered conversion).
+    template<typename Vec2T>
+    __hostdev__ static Coord2 Floor(const Vec2T& xy) { return Coord2(math::Floor(xy[0]), math::Floor(xy[1])); }
+
+    /// @brief Return a single precision floating-point vector of this coordinate
+    __hostdev__ inline Vec2<float> asVec2s() const;
+
+    /// @brief Return a double precision floating-point vector of this coordinate
+    __hostdev__ inline Vec2<double> asVec2d() const;
+
+    // returns a copy of itself, so it mimics the behaviour of Vec3<T>::round()
+    __hostdev__ inline Coord2 round() const { return *this; }
+}; // Coord2 class
+
+// ----------------------------> Vec2 <--------------------------------------
+
+/// @brief A simple vector class with three components, similar to openvdb::math::Vec3
+template<typename T>
+class Vec2
+{
+    T mVec[2];
+
+public:
+    static const int SIZE = 2;
+    static const int size = 2; // in openvdb::math::Tuple
+    using ValueType = T;
+    Vec2() = default;
+    __hostdev__ explicit Vec2(T x)
+        : mVec{x, x}
+    {
+    }
+    __hostdev__ Vec2(T x, T y)
+        : mVec{x, y}
+    {
+    }
+    template<template<class> class Vec2T, class T2>
+    __hostdev__ Vec2(const Vec2T<T2>& v)
+        : mVec{T(v[0]), T(v[1])}
+    {
+        static_assert(Vec2T<T2>::size == size, "expected Vec2T::size==2!");
+    }
+    template<typename T2>
+    __hostdev__ explicit Vec2(const Vec2<T2>& v)
+        : mVec{T(v[0]), T(v[1])}
+    {
+    }
+    __hostdev__ explicit Vec2(const Coord2& ijk)
+        : mVec{T(ijk[0]), T(ijk[1])}
+    {
+    }
+    __hostdev__ bool operator==(const Vec2& rhs) const { return mVec[0] == rhs[0] && mVec[1] == rhs[1]; }
+    __hostdev__ bool operator!=(const Vec2& rhs) const { return mVec[0] != rhs[0] || mVec[1] != rhs[1]; }
+    template<template<class> class Vec2T, class T2>
+    __hostdev__ Vec2& operator=(const Vec2T<T2>& rhs)
+    {
+        static_assert(Vec2T<T2>::size == size, "expected Vec2T::size==2!");
+        mVec[0] = rhs[0];
+        mVec[1] = rhs[1];
+        return *this;
+    }
+    __hostdev__ const T& operator[](int i) const { return mVec[i]; }
+    __hostdev__ T&       operator[](int i) { return mVec[i]; }
+    template<typename Vec2T>
+    __hostdev__ T dot(const Vec2T& v) const { return mVec[0] * v[0] + mVec[1] * v[1]; }
+    __hostdev__ T lengthSqr() const
+    {
+        return mVec[0] * mVec[0] + mVec[1] * mVec[1]; // 3 flops
+    }
+    __hostdev__ T     length() const { return Sqrt(this->lengthSqr()); }
+    __hostdev__ Vec2  operator-() const { return Vec2(-mVec[0], -mVec[1]); }
+    __hostdev__ Vec2  operator*(const Vec2& v) const { return Vec2(mVec[0] * v[0], mVec[1] * v[1]); }
+    __hostdev__ Vec2  operator/(const Vec2& v) const { return Vec2(mVec[0] / v[0], mVec[1] / v[1]); }
+    __hostdev__ Vec2  operator+(const Vec2& v) const { return Vec2(mVec[0] + v[0], mVec[1] + v[1]); }
+    __hostdev__ Vec2  operator-(const Vec2& v) const { return Vec2(mVec[0] - v[0], mVec[1] - v[1]); }
+    __hostdev__ Vec2  operator+(const Coord& ijk) const { return Vec2(mVec[0] + ijk[0], mVec[1] + ijk[1]); }
+    __hostdev__ Vec2  operator-(const Coord& ijk) const { return Vec2(mVec[0] - ijk[0], mVec[1] - ijk[1]); }
+    __hostdev__ Vec2  operator*(const T& s) const { return Vec2(s * mVec[0], s * mVec[1]); }
+    __hostdev__ Vec2  operator/(const T& s) const { return (T(1) / s) * (*this); }
+    __hostdev__ Vec2& operator+=(const Vec2& v)
+    {
+        mVec[0] += v[0];
+        mVec[1] += v[1];
+        return *this;
+    }
+    __hostdev__ Vec2& operator+=(const Coord& ijk)
+    {
+        mVec[0] += T(ijk[0]);
+        mVec[1] += T(ijk[1]);
+        return *this;
+    }
+    __hostdev__ Vec2& operator-=(const Vec2& v)
+    {
+        mVec[0] -= v[0];
+        mVec[1] -= v[1];
+        return *this;
+    }
+    __hostdev__ Vec2& operator-=(const Coord& ijk)
+    {
+        mVec[0] -= T(ijk[0]);
+        mVec[1] -= T(ijk[1]);
+        return *this;
+    }
+    __hostdev__ Vec2& operator*=(const T& s)
+    {
+        mVec[0] *= s;
+        mVec[1] *= s;
+        return *this;
+    }
+    __hostdev__ Vec2& operator/=(const T& s) { return (*this) *= T(1) / s; }
+    __hostdev__ Vec2& normalize() { return (*this) /= this->length(); }
+    /// @brief Perform a component-wise minimum with the other Coord.
+    __hostdev__ Vec2& minComponent(const Vec2& other)
+    {
+        if (other[0] < mVec[0])
+            mVec[0] = other[0];
+        if (other[1] < mVec[1])
+            mVec[1] = other[1];
+        return *this;
+    }
+
+    /// @brief Perform a component-wise maximum with the other Coord.
+    __hostdev__ Vec2& maxComponent(const Vec2& other)
+    {
+        if (other[0] > mVec[0])
+            mVec[0] = other[0];
+        if (other[1] > mVec[1])
+            mVec[1] = other[1];
+        return *this;
+    }
+    /// @brief Return the smallest vector component
+    __hostdev__ ValueType min() const
+    {
+        return mVec[0] < mVec[1] ? mVec[0] : mVec[1];
+    }
+    /// @brief Return the largest vector component
+    __hostdev__ ValueType max() const
+    {
+        return mVec[0] > mVec[1] ? mVec[0] : mVec[1];
+    }
+    /// @brief Round each component if this Vec<T> up to its integer value
+    /// @return Return an integer Coord
+    __hostdev__ Coord2 floor() const { return Coord2(Floor(mVec[0]), Floor(mVec[1])); }
+    /// @brief Round each component if this Vec<T> down to its integer value
+    /// @return Return an integer Coord
+    __hostdev__ Coord2 ceil() const { return Coord2(Ceil(mVec[0]), Ceil(mVec[1])); }
+    /// @brief Round each component if this Vec<T> to its closest integer value
+    /// @return Return an integer Coord
+    __hostdev__ Coord2 round() const
+    {
+        if constexpr(util::is_same<T, float>::value) {
+            return Coord2(Floor(mVec[0] + 0.5f), Floor(mVec[1] + 0.5f));
+        } else if constexpr(util::is_same<T, int>::value) {
+            return Coord2(mVec[0], mVec[1]);
+        } else {
+            return Coord2(Floor(mVec[0] + 0.5), Floor(mVec[1] + 0.5));
+        }
+    }
+
+    /// @brief return a non-const raw constant pointer to array of three vector components
+    __hostdev__ T* asPointer() { return mVec; }
+    /// @brief return a const raw constant pointer to array of three vector components
+    __hostdev__ const T* asPointer() const { return mVec; }
+}; // Vec2<T>
+
+template<typename T1, typename T2>
+__hostdev__ inline Vec2<T2> operator*(T1 scalar, const Vec2<T2>& vec)
+{
+    return Vec2<T2>(scalar * vec[0], scalar * vec[1]);
+}
+template<typename T1, typename T2>
+__hostdev__ inline Vec2<T2> operator/(T1 scalar, const Vec2<T2>& vec)
+{
+    return Vec2<T2>(scalar / vec[0], scalar / vec[1]);
+}
+
+/// @brief Return a single precision floating-point vector of this coordinate
+__hostdev__ inline Vec2<float> Coord2::asVec2s() const
+{
+    return Vec2<float>(float(mVec[0]), float(mVec[1]));
+}
+
+/// @brief Return a double precision floating-point vector of this coordinate
+__hostdev__ inline Vec2<double> Coord2::asVec2d() const
+{
+    return Vec2<double>(double(mVec[0]), double(mVec[1]));
+}
+
+
+// Forward declarations
+template<typename T> class Mat2;
+template<typename T> class Mat2x3;
+template<typename T> class Mat3x2;
+template<typename T> class Mat3;
+template<typename T> class Mat4;
+
+
+
+template <typename T>
+class Mat2 {
+    T mMat[2][2];
+public:
+    Mat2() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        @endverbatim */
+    __hostdev__ Mat2(T a, T b, T c, T d) {
+        mMat[0][0] = a; mMat[0][1] = b;
+        mMat[1][0] = c; mMat[1][1] = d;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat2<T> transpose() const {
+        return Mat2<T>(mMat[0][0], mMat[1][0], mMat[0][1], mMat[1][1]);
+    }
+
+    /// @brief returns inverse of this
+    __hostdev__ Mat2<T> inverse() const {
+        T det = mMat[0][0] * mMat[1][1] - mMat[0][1] * mMat[1][0];
+        if (det <= 0) {
+            return Mat2<T>();
+        }
+        T invDet   = 1.f / det;
+        return Mat2<T>(mMat[1][1] * invDet, -mMat[0][1] * invDet, -mMat[0][1] * invDet, mMat[0][0] * invDet);
+    }
+};
+
+template <typename T>
+class Mat2x3 {
+    T mMat[2][3];
+public:
+    Mat2x3() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        @endverbatim */
+    __hostdev__ Mat2x3(T a, T b, T c, T d, T e, T f) {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c;
+        mMat[1][0] = d; mMat[1][1] = e; mMat[1][2] = f;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat3x2<T> transpose() const {
+        return Mat3x2<T>(
+            mMat[0][0], mMat[1][0],  // First row
+            mMat[0][1], mMat[1][1],  // Second row
+            mMat[0][2], mMat[1][2]   // Third row
+        );
+    }
+};
+
+template <typename T>
+class Mat3x2 {
+    T mMat[3][2];
+public:
+    Mat3x2() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        e f
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3x2(Source *a)
+    {
+        for (int i = 0; i < 6; i++) {
+            mMat[i/2][i%2] = static_cast<T>(a[i]);
+        }
+    }
+
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b
+        c d
+        e f
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3x2(Source a, Source b, Source c, Source d, Source e, Source f)
+    {
+        mMat[0][0] = a; mMat[0][1] = b;
+        mMat[1][0] = c; mMat[1][1] = d;
+        mMat[2][0] = e; mMat[2][1] = f;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat2x3<T> transpose() const {
+        return Mat2x3<T>(mMat[0][0], mMat[1][0], mMat[2][0], // First row
+                   mMat[0][1], mMat[1][1], mMat[2][1]); // Second row
+    }
+
+};
+
+template <typename T>
+class Mat3 {
+    T mMat[3][3];
+public:
+    Mat3() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        g h i
+        @endverbatim */
+    template<typename Source>
+   __hostdev__ Mat3(Source *a)
+    {
+        for (int i = 0; i < 9; i++) {
+            mMat[i/3][i%3] = static_cast<T>(a[i]);
+        }
+    }
+
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c
+        d e f
+        g h i
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat3(Source a, Source b, Source c,
+         Source d, Source e, Source f,
+         Source g, Source h, Source i)
+    {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c;
+        mMat[1][0] = d; mMat[1][1] = e; mMat[1][2] = f;
+        mMat[2][0] = g; mMat[2][1] = h; mMat[2][2] = i;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief Multiply by @a v and return the resulting vector.
+    __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const {
+        return Vec3<T>(
+            mMat[0][0] * v[0] + mMat[0][1] * v[1] + mMat[0][2] * v[2],
+            mMat[1][0] * v[0] + mMat[1][1] * v[1] + mMat[1][2] * v[2],
+            mMat[2][0] * v[0] + mMat[2][1] * v[1] + mMat[2][2] * v[2]
+        );
+    }
+
+    /// @brief Multiply by 3x3 matrix @a m and return the resulting matrix.
+    __hostdev__ Mat3<T> operator*(const Mat3<T>& m) const {
+        return Mat3<T>(
+            mMat[0][0] * m[0][0] + mMat[0][1] * m[1][0] + mMat[0][2] * m[2][0],
+            mMat[0][0] * m[0][1] + mMat[0][1] * m[1][1] + mMat[0][2] * m[2][1],
+            mMat[0][0] * m[0][2] + mMat[0][1] * m[1][2] + mMat[0][2] * m[2][2],
+            mMat[1][0] * m[0][0] + mMat[1][1] * m[1][0] + mMat[1][2] * m[2][0],
+            mMat[1][0] * m[0][1] + mMat[1][1] * m[1][1] + mMat[1][2] * m[2][1],
+            mMat[1][0] * m[0][2] + mMat[1][1] * m[1][2] + mMat[1][2] * m[2][2],
+            mMat[2][0] * m[0][0] + mMat[2][1] * m[1][0] + mMat[2][2] * m[2][0],
+            mMat[2][0] * m[0][1] + mMat[2][1] * m[1][1] + mMat[2][2] * m[2][1],
+            mMat[2][0] * m[0][2] + mMat[2][1] * m[1][2] + mMat[2][2] * m[2][2]
+        );
+    }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat3 transpose() const {
+        return Mat3(mMat[0][0], mMat[1][0], mMat[2][0],
+                   mMat[0][1], mMat[1][1], mMat[2][1],
+                   mMat[0][2], mMat[1][2], mMat[2][2]);
+    }
+};
+
+template <typename T>
+class Mat4 {
+    T mMat[4][4];
+public:
+    Mat4() = default;
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a[ 0] a[1]  a[ 2] a[ 3]
+        a[ 4] a[5]  a[ 6] a[ 7]
+        a[ 8] a[9]  a[10] a[11]
+        a[12] a[13] a[14] a[15]
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat4(Source *a)
+    {
+        for (int i = 0; i < 16; i++) {
+            mMat[i/4][i%4] = static_cast<T>(a[i]);
+        }
+    }
+    /// @brief Constructor given array of elements, the ordering is in row major form:
+    /** @verbatim
+        a b c d
+        e f g h
+        i j k l
+        m n o p
+        @endverbatim */
+    template<typename Source>
+    __hostdev__ Mat4(Source a, Source b, Source c, Source d,
+         Source e, Source f, Source g, Source h,
+         Source i, Source j, Source k, Source l,
+         Source m, Source n, Source o, Source p)
+    {
+        mMat[0][0] = a; mMat[0][1] = b; mMat[0][2] = c; mMat[0][3] = d;
+        mMat[1][0] = e; mMat[1][1] = f; mMat[1][2] = g; mMat[1][3] = h;
+        mMat[2][0] = i; mMat[2][1] = j; mMat[2][2] = k; mMat[2][3] = l;
+        mMat[3][0] = m; mMat[3][1] = n; mMat[3][2] = o; mMat[3][3] = p;
+    }
+
+    __hostdev__ const T* operator[](int i) const { return mMat[i]; }
+    __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief returns transpose of this
+    __hostdev__ Mat4 transpose() const {
+        return Mat4(mMat[0][0], mMat[1][0], mMat[2][0], mMat[3][0],
+                   mMat[0][1], mMat[1][1], mMat[2][1], mMat[3][1],
+                   mMat[0][2], mMat[1][2], mMat[2][2], mMat[3][2],
+                   mMat[0][3], mMat[1][3], mMat[2][3], mMat[3][3]);
+    }
+};
+
+/// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
+template<typename T>
+__hostdev__ Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
+    return Mat2<T>(
+        // First row
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],    // [0][0]
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],    // [0][1]
+
+        // Second row
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],    // [1][0]
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1]     // [1][1]
+    );
+}
+
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const Mat3<T>& lhs, const Mat2x3<T>& rhs) {
+    return Mat2x3<T>(
+        // First row
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
+
+        // Second row
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
+    );
+}
+
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
+    return Mat2x3<T>(
+        // First row (3 elements)
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0] + lhs[0][2] * rhs[2][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1] + lhs[0][2] * rhs[2][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2] + lhs[0][2] * rhs[2][2],
+
+        // Second row (3 elements)
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0] + lhs[1][2] * rhs[2][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2] + lhs[1][2] * rhs[2][2]
+    );
+}
+
+
 // ----------------------------> Vec3 <--------------------------------------
 
 /// @brief A simple vector class with three components, similar to openvdb::math::Vec3

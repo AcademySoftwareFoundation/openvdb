@@ -1706,7 +1706,7 @@ createPointScatter(const NanoGrid<SrcBuildT>& srcGrid, // origin of grid in worl
         dstLeaf->mValueMask = srcLeaf.valueMask();
         for (uint32_t j = 0, m = 0; j < 512; ++j) {
             if (dstLeaf->mValueMask.isOn(j)) {
-                const Vec3f ijk = dstLeaf->offsetToGlobalCoord(j).asVec3s();// floating-point representatrion of index coorindates
+                const Vec3f ijk = dstLeaf->offsetToGlobalCoord(j).asVec3s();// floating-point representation of index coordinates
                 for (int n = 0; n < pointsPerVoxel; ++n) xyz.push_back(srcGrid.indexToWorld(randomPoint() + ijk));
                 m += pointsPerVoxel;
             }// active voxels

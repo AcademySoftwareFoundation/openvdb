@@ -21,7 +21,8 @@ struct GridBatch : torch::CustomClassHolder {
     // Set some speed limits so you don't shoot yourself in the foot
     constexpr static int64_t MAX_GRIDS_PER_BATCH = 1024;
 
-    explicit GridBatch(TorchDeviceOrString device, bool isMutable);
+    explicit GridBatch(const torch::Device &device, bool isMutable);
+    explicit GridBatch(const std::string &device_string, bool isMutable);
     explicit GridBatch();
 
     GridBatch(c10::intrusive_ptr<detail::GridBatchImpl> gridHdl) : mImpl(gridHdl) {}
@@ -349,7 +350,7 @@ struct GridBatch : torch::CustomClassHolder {
     ///         and coarseGrid is a GridBatch representing the downsampled grid batch
     std::pair<JaggedTensor, GridBatch>
     max_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOrScalar stride = 0,
-             torch::optional<GridBatch> coarse_grid = torch::nullopt) const;
+             std::optional<GridBatch> coarse_grid = std::nullopt) const;
 
     /// @brief Downsample this batch of grids using average pooling
     /// @param pool_factor How much to pool by (i,e, (2, 2, 2) means take max over 2x2x2 from start
@@ -366,7 +367,7 @@ struct GridBatch : torch::CustomClassHolder {
     ///         and coarseGrid is a GridBatch representing the downsampled grid batch
     std::pair<JaggedTensor, GridBatch>
     avg_pool(Vec3iOrScalar pool_factor, const JaggedTensor &data, Vec3iOrScalar stride = 0,
-             torch::optional<GridBatch> coarse_grid = torch::nullopt) const;
+             std::optional<GridBatch> coarse_grid = std::nullopt) const;
 
     /// @brief Subdivide this batch of grids using nearest neighbor interpolation
     /// @param subdiv_factor How much to upsample by (i,e, (2,2,2) means upsample by 2x2x2)
@@ -382,8 +383,8 @@ struct GridBatch : torch::CustomClassHolder {
     ///         fineGrid is a GridBatch representing the upsampled grid batch
     std::pair<JaggedTensor, GridBatch>
     subdivide(Vec3iOrScalar subdiv_factor, const JaggedTensor &data,
-              const torch::optional<JaggedTensor> mask      = torch::nullopt,
-              torch::optional<GridBatch>          fine_grid = torch::nullopt) const;
+              const std::optional<JaggedTensor> mask      = std::nullopt,
+              std::optional<GridBatch>          fine_grid = std::nullopt) const;
 
     /// @brief Read the values from a dense tensor of the voxels at the specified coordinates
     /// @param dense_data A dense tensor of shape [B, W, H, D, *]
@@ -405,9 +406,9 @@ struct GridBatch : torch::CustomClassHolder {
     ///                  Defaults to the total size of a grid containing the whole batch.
     /// @return A dense tensor of shape [B, W, H, D, *] containing the values at the specified
     /// coordinates (and zero elsewhere)
-    torch::Tensor write_to_dense(const JaggedTensor                &sparse_data,
-                                 const torch::optional<Vec3iBatch> &min_coord = torch::nullopt,
-                                 const torch::optional<Vec3i> &grid_size = torch::nullopt) const;
+    torch::Tensor write_to_dense(const JaggedTensor              &sparse_data,
+                                 const std::optional<Vec3iBatch> &min_coord = std::nullopt,
+                                 const std::optional<Vec3i>      &grid_size = std::nullopt) const;
 
     /// @brief Given a GridBatch and features associated with it,
     ///        return a JaggedTensor representing features for this batch of grids.
@@ -752,8 +753,8 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param mask An optional JaggedTensor of shape [B, -1] of boolean values indicating which
     /// voxels to subdivide
     /// @return A GridBatch representing the subdivided version of this batch.
-    GridBatch subdivided_grid(Vec3iOrScalar                       subdiv_factor,
-                              const torch::optional<JaggedTensor> mask = torch::nullopt) const;
+    GridBatch subdivided_grid(Vec3iOrScalar                     subdiv_factor,
+                              const std::optional<JaggedTensor> mask = std::nullopt) const;
 
     /// @brief Return a batch of grids representing the clipped version of this batch of grids.
     /// @param ijk_min Index space minimum bound of the clip region.
@@ -801,13 +802,27 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param to_device The device to return the grid batch on
     /// @return A GridBatch representing this grid batch on the specified device
     GridBatch
-    to(TorchDeviceOrString to_device) const {
-        torch::Device toDevice = to_device.value();
-        if (toDevice == device()) {
+    to(const torch::Device &to_device) const {
+        if (to_device == device()) {
             return GridBatch(impl());
         } else {
-            return GridBatch(impl()->clone(toDevice));
+            return GridBatch(impl()->clone(to_device));
         }
+    }
+
+    /// @brief Return a grid batch on the specified device. If the passed in device is the same as
+    /// this grid batch's
+    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
+    ///        returned on the specified device.
+    /// @param to_device The device to return the grid batch on
+    /// @return A GridBatch representing this grid batch on the specified device
+    GridBatch
+    to(const std::string &to_device_string) const {
+        torch::Device to_device(to_device_string);
+        if (to_device.is_cuda() && !to_device.has_index()) {
+            to_device.set_index(c10::cuda::current_device());
+        }
+        return to(to_device);
     }
 
     /// @brief Return a grid batch on the same device as the specified grid batch. If the passed in
@@ -986,10 +1001,10 @@ struct GridBatch : torch::CustomClassHolder {
     /// dense grid.
     ///             Note that the same mask will be re-used for all the grids in the batch.
     void set_from_dense_grid(const int64_t num_grids, const Vec3i &dense_dims,
-                             const Vec3i              &ijk_min     = torch::zeros(3, torch::kInt32),
-                             const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                             const Vec3dBatch         &origins     = torch::zeros(3),
-                             torch::optional<torch::Tensor> mask   = torch::nullopt);
+                             const Vec3i                 &ijk_min = torch::zeros(3, torch::kInt32),
+                             const Vec3dBatchOrScalar    &voxel_sizes = 1.0,
+                             const Vec3dBatch            &origins     = torch::zeros(3),
+                             std::optional<torch::Tensor> mask        = std::nullopt);
 
     /// @brief Serialize this grid batch to a torch tensor of bytes (dtype = int8)
     /// @return A serialized grid batch encoded as a torch::Tensor of type int8
@@ -1030,9 +1045,9 @@ struct GridBatch : torch::CustomClassHolder {
   private:
     void buildCoarseFromFineGrid(const GridBatch &fineGrid, nanovdb::Coord branchFactor);
 
-    void buildFineFromCoarseGrid(const GridBatch                     &coarseGrid,
-                                 const torch::optional<JaggedTensor> &subdivMask,
-                                 nanovdb::Coord                       subdivFactor);
+    void buildFineFromCoarseGrid(const GridBatch                   &coarseGrid,
+                                 const std::optional<JaggedTensor> &subdivMask,
+                                 nanovdb::Coord                     subdivFactor);
 
     void buildDualFromPrimalGrid(const GridBatch &primalGrid, bool excludeBorder = false);
 

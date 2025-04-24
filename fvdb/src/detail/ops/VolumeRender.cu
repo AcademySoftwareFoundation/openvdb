@@ -92,7 +92,7 @@ volumeRenderBwdCallback(const TensorAccessor<scalar_t, 1>     dLdOpacity,     //
                                dLdWs_times_ws.data() + sampleStartIdx + numRaySamples,
                                dLdWs_times_ws.data() + sampleStartIdx);
     } else {
-        thrust::inclusive_scan(dLdWs_times_ws.data() + sampleStartIdx,
+        thrust::inclusive_scan(thrust::seq, dLdWs_times_ws.data() + sampleStartIdx,
                                dLdWs_times_ws.data() + sampleStartIdx + numRaySamples,
                                dLdWs_times_ws.data() + sampleStartIdx);
     }

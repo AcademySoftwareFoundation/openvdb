@@ -149,7 +149,7 @@ dispatchCreateNanoGridFromIJK<torch::kCUDA>(const JaggedTensor &ijk, bool isMuta
         // function. We can't pass in a device directly but we can pass in a buffer which gets
         // passed to TorchDeviceBuffer::create. The guide buffer holds the device and effectively
         // passes it to the created buffer.
-        TorchDeviceBuffer guide(0, nullptr, false, ijk.device().index());
+        TorchDeviceBuffer guide(0, ijk.device());
 
         // FIXME: This is slow because we have to copy this data to the host and then build the
         // grids. Ideally we want to do this in a single invocation.
@@ -193,8 +193,8 @@ template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord origin,
                                               nanovdb::Coord size, bool isMutable,
-                                              torch::Device                         device,
-                                              const torch::optional<torch::Tensor> &maybeMask) {
+                                              torch::Device                       device,
+                                              const std::optional<torch::Tensor> &maybeMask) {
     TORCH_CHECK(device.is_cuda(), "device must be cuda");
     TORCH_CHECK(device.has_index(), "device must have index");
 
@@ -225,7 +225,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord
         // function. We can't pass in a device directly but we can pass in a buffer which gets
         // passed to TorchDeviceBuffer::create. The guide buffer holds the device and effectively
         // passes it to the created buffer.
-        TorchDeviceBuffer guide(0, nullptr, false, device.index());
+        TorchDeviceBuffer guide(0, device);
 
         TORCH_CHECK(ijkData.is_contiguous(), "ijkData must be contiguous");
 
