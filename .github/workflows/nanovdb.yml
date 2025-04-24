@@ -36,7 +36,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -103,6 +103,7 @@ jobs:
   #     shell: powershell
   #     run: .\ci\install_windows.ps1
   #   - name: build
+  #   # nvcc doesn't set _WIN32 when run in bash so we need to set it manually
   #     shell: bash
   #     run: >
   #       ./ci/build.sh -v
@@ -114,6 +115,7 @@ jobs:
   #       -DUSE_EXPLICIT_INSTANTIATION=OFF
   #       -DNANOVDB_USE_CUDA=ON
   #       -DCMAKE_CUDA_ARCHITECTURES="80"
+  #       -DCMAKE_CUDA_FLAGS="-D_WIN32"
   #       -DNANOVDB_USE_OPENVDB=ON
   #       -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
   #       -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
@@ -156,7 +158,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'NVIDIA-Omniverse' && 'linux-amd64-cpu32') || (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2024
     steps:
