@@ -1,0 +1,6 @@
+OpenVDB:
+  API Changes:
+    Mat3 and Mat4 functions have been marked [[nodiscard]] where it
+    may be confusing if they are operating in place or returning a
+    result, in particular tranpose, invert, adjoint, and
+    timesDiagonal.
