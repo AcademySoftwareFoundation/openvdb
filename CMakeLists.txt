@@ -99,6 +99,8 @@ option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 
 # Component dependency options
+# External dependency builds
+option(OPENVDB_BUILDS_DEPS "Build the dependencies from the submodules, rather than using find_package" ON )
 cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
@@ -567,6 +569,10 @@ will be disabled). If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the ins
 determine the ABI number. You may set this to force a given ABI number.]=] FORCE)
 
 ##########################################################################
+
+if(OPENVDB_BUILDS_DEPS)
+  add_subdirectory(ext)
+endif()
 
 if(OPENVDB_BUILD_CORE)
   add_subdirectory(openvdb/openvdb)
