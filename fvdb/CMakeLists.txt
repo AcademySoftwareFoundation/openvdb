@@ -31,7 +31,16 @@ set(FVDB_BINDINGS_CPP_FILES
     src/python/JaggedTensorBinding.cpp)
 
 # Build library
-pybind11_add_module(_Cpp MODULE ${FVDB_BINDINGS_CPP_FILES})
+Python3_add_library(_Cpp ${FVDB_BINDINGS_CPP_FILES})
+if (DEFINED TORCH_PYBIND11_INCLUDE_DIR)
+    target_link_libraries(_Cpp PUBLIC torch_pybind11_headers)
+else()
+    target_link_libraries(_Cpp PUBLIC pybind11::headers)
+endif()
+set_target_properties(_Cpp PROPERTIES
+                                INTERPROCEDURAL_OPTIMIZATION ON
+                                CXX_VISIBILITY_PRESET hidden
+                                VISIBILITY_INLINES_HIDDEN ON)
 
 target_link_options(_Cpp PRIVATE "-Wl,--no-as-needed")
 
