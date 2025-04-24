@@ -36,7 +36,7 @@ Quat<T> slerp(const Quat<T> &q1, const Quat<T> &q2, T t, T tolerance=0.00001)
         sineAngle = 0;
     } else {
         angle     = acos(qdot);
-        sineAngle = sin(angle);
+        sineAngle = sqrt(1.0 - qdot*qdot);
     }
 
     //
