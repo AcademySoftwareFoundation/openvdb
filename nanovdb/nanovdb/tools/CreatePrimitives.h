@@ -617,7 +617,7 @@ initSphere(double              radius, // radius of sphere in world units
     grid->setTransform(voxelSize, origin);
 
     // Define radius of sphere with narrow-band in voxel units
-    const ValueT r0 = radius / ValueT(voxelSize), rmax = r0 + ValueT(halfWidth);
+    const ValueT r0 = ValueT(radius / voxelSize), rmax = r0 + ValueT(halfWidth);
 
     // Radius below the Nyquist frequency
     if (r0 < ValueT(1.5f)) return grid;
@@ -689,7 +689,7 @@ initTorus(double              radius1, // major radius of torus in world units
     grid->setTransform(voxelSize, origin);
 
     // Define size of torus with narrow-band in voxel units
-    const ValueT r1 = radius1 / ValueT(voxelSize), r2 = radius2 / ValueT(voxelSize), rmax1 = r1 + r2 + ValueT(halfWidth), rmax2 = r2 + ValueT(halfWidth);
+    const ValueT r1 = ValueT(radius1 / voxelSize), r2 = ValueT(radius2 / voxelSize), rmax1 = r1 + r2 + ValueT(halfWidth), rmax2 = r2 + ValueT(halfWidth);
 
     // Radius below the Nyquist frequency
     if (r2 < ValueT(1.5)) return grid;
@@ -1706,7 +1706,7 @@ createPointScatter(const NanoGrid<SrcBuildT>& srcGrid, // origin of grid in worl
         dstLeaf->mValueMask = srcLeaf.valueMask();
         for (uint32_t j = 0, m = 0; j < 512; ++j) {
             if (dstLeaf->mValueMask.isOn(j)) {
-                const Vec3f ijk = dstLeaf->offsetToGlobalCoord(j).asVec3s();// floating-point representatrion of index coorindates
+                const Vec3f ijk = dstLeaf->offsetToGlobalCoord(j).asVec3s();// floating-point representation of index coordinates
                 for (int n = 0; n < pointsPerVoxel; ++n) xyz.push_back(srcGrid.indexToWorld(randomPoint() + ijk));
                 m += pointsPerVoxel;
             }// active voxels

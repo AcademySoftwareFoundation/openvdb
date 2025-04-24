@@ -35,6 +35,8 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "--fp8\tQuantize float grids to 8 bits\n"
               << "--fp16\tQuantize float grids to 16 bits\n"
               << "--fpN\tQuantize float grids to variable bit depth (use -a or -r to specify a tolerance)\n"
+              << "--index\tProduce an IndexGrid where all float values are encoded as side-car data\n"
+              << "--onIndex\tProduce an IndexGrid where active float values are encoded as side-car data\n"
               << "-g,--grid name\tConvert all grids matching the specified string name\n"
               << "-h,--help\tPrints this message\n"
               << "-r,--rel-error float\t Relative error tolerance used for variable bit depth quantization\n"
@@ -57,14 +59,14 @@ int main(int argc, char* argv[])
 {
     int exitStatus = EXIT_SUCCESS;
 
-    nanovdb::io::Codec       codec = nanovdb::io::Codec::NONE;// compression codec for the file
-    nanovdb::tools::StatsMode       sMode = nanovdb::tools::StatsMode::Default;
-    nanovdb::CheckMode    cMode = nanovdb::CheckMode::Default;
-    nanovdb::GridType        qMode = nanovdb::GridType::Unknown;//specify the quantization mode
-    bool                     verbose = false, overwrite = false, dither = false, absolute = true;
-    float                    tolerance = -1.0f;
-    std::string              gridName;
-    std::vector<std::string> fileNames;
+    nanovdb::io::Codec        codec = nanovdb::io::Codec::NONE;// compression codec for the file
+    nanovdb::tools::StatsMode sMode = nanovdb::tools::StatsMode::Default;
+    nanovdb::CheckMode        cMode = nanovdb::CheckMode::Default;
+    nanovdb::GridType         qMode = nanovdb::GridType::Unknown;//specify the quantization mode
+    bool                      verbose = false, overwrite = false, dither = false, absolute = true;
+    float                     tolerance = -1.0f;
+    std::string               gridName;
+    std::vector<std::string>  fileNames;
     auto toLowerCase = [](std::string &str) {
         std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){return std::tolower(c);});
     };
@@ -85,6 +87,10 @@ int main(int argc, char* argv[])
                 qMode = nanovdb::GridType::Fp16;
             } else if (arg == "--fpN") {
                 qMode = nanovdb::GridType::FpN;
+            } else if (arg == "--index") {
+                qMode = nanovdb::GridType::Index;
+            } else if (arg == "--onIndex") {
+                qMode = nanovdb::GridType::OnIndex;
             } else if (arg == "-h" || arg == "--help") {
                 usage(argv[0], EXIT_SUCCESS);
             } else if (arg == "-b" || arg == "--blosc") {
@@ -169,17 +175,22 @@ int main(int argc, char* argv[])
         std::cerr << "Expected at least one input file followed by exactly one output file\n" << std::endl;
         usage(argv[0]);
     }
-    const std::string outputFile = fileNames.back();
+    const std::string outputFile = fileNames.back();// last file is always the output file
     const std::string ext = outputFile.substr(outputFile.find_last_of(".") + 1);
     bool              toNanoVDB = false;
     if (ext == "nvdb") {
         toNanoVDB = true;
-    } else if (ext != "vdb") {
+    } else if (ext == "vdb") {
+        if (qMode != nanovdb::GridType::Unknown) {
+            std::cerr << "The options are incompatible an output of type OpenVDB" << std::endl;
+            usage(argv[0]);
+        }
+    } else {
         std::cerr << "Unrecognized file extension: \"" << ext << "\"\n" << std::endl;
         usage(argv[0]);
     }
 
-    fileNames.pop_back();
+    fileNames.pop_back();// remove the output file name
 
     if (!overwrite) {
         std::ifstream is(outputFile, std::ios::in | std::ios::binary);
@@ -203,9 +214,16 @@ int main(int argc, char* argv[])
 
     auto openToNano = [&](const openvdb::GridBase::Ptr& base)
     {
-        using SrcGridT = openvdb::FloatGrid;
-        if (auto floatGrid = openvdb::GridBase::grid<SrcGridT>(base)) {
-            nanovdb::tools::CreateNanoGrid<SrcGridT> s(*floatGrid);
+        const bool includeStats = false, includeTiles = false;
+        const int verb = verbose ? 1 : 0;
+        if (qMode == nanovdb::GridType::OnIndex) {
+            return nanovdb::tools::openToIndexVDB<nanovdb::ValueOnIndex>(base, 1u, includeStats, includeTiles, verb);
+        } else if (qMode == nanovdb::GridType::Index) {
+            return nanovdb::tools::openToIndexVDB<nanovdb::ValueIndex>(base, 1u, includeStats, includeTiles, verb);
+        }
+
+        if (auto floatGrid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
+            nanovdb::tools::CreateNanoGrid<openvdb::FloatGrid> s(*floatGrid);
             s.setStats(sMode);
             s.setChecksum(cMode);
             s.enableDithering(dither);
@@ -227,7 +245,7 @@ int main(int argc, char* argv[])
                 break;
             }// end of switch
         }
-        return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose ? 1 : 0);
+        return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verb);
     };
     try {
         if (toNanoVDB) { // OpenVDB -> NanoVDB
@@ -237,26 +255,21 @@ int main(int argc, char* argv[])
                     std::cerr << "Since the last file has extension .nvdb the remaining input files were expected to have extensions .vdb\n" << std::endl;
                     usage(argv[0]);
                 }
-                if (verbose)
-                    std::cout << "Opening OpenVDB file named \"" << inputFile << "\"" << std::endl;
+                if (verbose) std::cout << "Opening OpenVDB file named \"" << inputFile << "\"" << std::endl;
                 openvdb::io::File file(inputFile);
                 file.open(false); //disable delayed loading
                 if (gridName.empty()) {// convert all grid in the file
                     auto grids = file.getGrids();
                     std::vector<nanovdb::GridHandle<nanovdb::HostBuffer> > handles;
                     for (auto& grid : *grids) {
-                        if (verbose) {
-                            std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
-                        }
+                        if (verbose) std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                         handles.push_back(openToNano(grid));
                     } // loop over OpenVDB grids in file
                     auto handle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles);
                     nanovdb::io::writeGrid(os, handle, codec);
                 } else {// convert only grid with matching name
                     auto grid = file.readGrid(gridName);
-                    if (verbose) {
-                        std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
-                    }
+                    if (verbose) std::cout << "Converting OpenVDB grid named \"" << grid->getName() << "\" to NanoVDB" << std::endl;
                     auto handle = openToNano(grid);
                     nanovdb::io::writeGrid(os, handle, codec);
                 }
@@ -269,14 +282,12 @@ int main(int argc, char* argv[])
                     std::cerr << "Since the last file has extension .vdb the remaining input files were expected to have extensions .nvdb\n" << std::endl;
                     usage(argv[0]);
                 }
-                if (verbose)
-                    std::cout << "Opening NanoVDB file named \"" << inputFile << "\"" << std::endl;
+                if (verbose) std::cout << "Opening NanoVDB file named \"" << inputFile << "\"" << std::endl;
                 if (gridName.empty()) {
                     auto handles = nanovdb::io::readGrids(inputFile, verbose);
                     for (auto &h : handles) {
                         for (uint32_t i = 0; i < h.gridCount(); ++i) {
-                            if (verbose)
-                                std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
+                            if (verbose) std::cout << "Converting NanoVDB grid named \"" << h.gridMetaData(i)->shortGridName() << "\" to OpenVDB" << std::endl;
                             grids->push_back(nanovdb::tools::nanoToOpenVDB(h, 0, i));
                         }
                     }
@@ -286,8 +297,7 @@ int main(int argc, char* argv[])
                         std::cerr << "File did not contain a NanoVDB grid named \"" << gridName << "\"\n" << std::endl;
                         usage(argv[0]);
                     }
-                    if (verbose)
-                        std::cout << "Converting NanoVDB grid named \"" << handle.gridMetaData()->shortGridName() << "\" to OpenVDB" << std::endl;
+                    if (verbose) std::cout << "Converting NanoVDB grid named \"" << handle.gridMetaData()->shortGridName() << "\" to OpenVDB" << std::endl;
                     grids->push_back(nanovdb::tools::nanoToOpenVDB(handle));
                 }
             } // loop over input files

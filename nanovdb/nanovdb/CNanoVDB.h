@@ -5,6 +5,9 @@
 // Simple C-wrapper for the nanovdb structure
 // Meant for systems where you lack a C++ compiler.
 //
+
+/// @warning This header file will soon be deprecated in favor of PNanoVDB.h
+
 #ifndef __CNANOVDB__
 #define __CNANOVDB__
 

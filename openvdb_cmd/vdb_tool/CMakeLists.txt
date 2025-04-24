@@ -1,3 +1,5 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 cmake_minimum_required(VERSION 3.20)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
@@ -26,7 +28,7 @@ list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
 add_library(vdb_tool_common INTERFACE)
 
 # Optional components
-option(BUILD_TEST "Build unit tests" OFF)
+option(OPENVDB_BUILD_VDB_TOOL_UNITTESTS "Build unit tests" OFF)
 
 option(OPENVDB_TOOL_USE_NANO "Compile with NanoVDB support" OFF)
 option(OPENVDB_TOOL_NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
@@ -185,10 +187,11 @@ install(TARGETS vdb_tool RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
 
 
 # unit test
-if(BUILD_TEST)
+if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
   find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} CONFIG REQUIRED)
 
   add_executable(vdb_tool_test src/unittest.cpp)
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
   target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
+  add_test(vdb_tool_unit_test vdb_tool_test)
 endif()

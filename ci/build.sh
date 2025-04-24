@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 
 set -e
 
@@ -189,6 +191,7 @@ cmake \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_TOOL=ON \
+    -DOPENVDB_BUILD_VDB_TOOL_UNITTESTS=ON \
     -DOPENVDB_TOOL_USE_NANO=OFF \
     -DOPENVDB_BUILD_PYTHON_UNITTESTS=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \

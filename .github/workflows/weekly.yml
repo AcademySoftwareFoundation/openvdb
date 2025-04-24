@@ -61,7 +61,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
@@ -146,7 +146,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
       image: aswf/ci-openvdb:2024
@@ -203,7 +203,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-dev libgtest-dev libcppunit-dev
+            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev llvm-15-dev libgtest-dev libgmock-dev libcppunit-dev
             ./ci/install_nanobind.sh 2.0.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 15
@@ -284,7 +284,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -313,6 +313,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: clean
         if: matrix.config.components == 'core'
@@ -328,6 +329,7 @@ jobs:
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
           -DOPENVDB_CXX_STRICT=ON
+          -DOPENVDB_BUILD_VDB_TOOL=OFF
           \"
       - name: test
         run: cd build && ctest -V
@@ -476,6 +478,7 @@ jobs:
         -DMSVC_COMPRESS_PDB=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DNANOVDB_USE_CUDA=ON
+        -DCMAKE_CUDA_ARCHITECTURES="80"
         -DNANOVDB_USE_OPENVDB=ON
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
@@ -493,7 +496,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
       image: aswf/ci-base:2023
@@ -589,7 +592,7 @@ jobs:
         -strict
         -extended
     - name: upload_report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: abi_report

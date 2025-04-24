@@ -55,7 +55,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -76,6 +76,8 @@ jobs:
       - name: nanobind
         #if: contains(matrix.config.image, '2023') == false
         run: ./ci/install_nanobind.sh 2.0.0
+      - name: install_gtest
+        run: ./ci/install_gtest.sh 1.15.2
       - name: timestamp
         id: timestamp
         run: echo "timestamp=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
@@ -150,7 +152,7 @@ jobs:
     if: |
       github.event_name == 'workflow_dispatch' &&
       github.event.inputs.type == 'grammar'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-20.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
     container:
       image: aswf/ci-openvdb:2023-clang15
     steps:
@@ -158,7 +160,7 @@ jobs:
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: ax_grammar
         path: ./build/openvdb_ax/openvdb_ax/openvdb_ax/grammar

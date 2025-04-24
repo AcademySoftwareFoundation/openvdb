@@ -29,7 +29,7 @@ int main()
             using OpT = nanovdb::SetVoxel<float>;// defines type of random-access operation (set value)
             const nanovdb::Coord &ijk = d_coords[tid];
             d_grid->tree().set<OpT>(ijk, d_values[tid]);// normally one should use a ValueAccessor
-            printf("GPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", tid, ijk[0], ijk[1], ijk[2], d_grid->tree().getValue(ijk));
+            printf("GPU: voxel # %zu, grid(%4i,%4i,%4i) = %5.1f\n", tid, ijk[0], ijk[1], ijk[2], d_grid->tree().getValue(ijk));
         }); cudaCheckError();
 
         // Copy grid from GPU to CPU and print the voxel values for validation
@@ -37,7 +37,7 @@ int main()
         auto *grid = handle.grid<float>();
         for (size_t i=0; i<numVoxels; ++i) {
             const nanovdb::Coord &ijk = coords[i];
-            printf("CPU: voxel # %lu, grid(%4i,%4i,%4i) = %5.1f\n", i, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));
+            printf("CPU: voxel # %zu, grid(%4i,%4i,%4i) = %5.1f\n", i, ijk[0], ijk[1], ijk[2], grid->tree().getValue(ijk));
         }
 
         // free arrays allocated on the device

@@ -1,3 +1,5 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
 # find_package(doxygen REQUIRED dot  )
 if(WIN32)
   set(DOXYGEN_EXECUTABLE "C:/Program Files/doxygen/bin/doxygen.exe")

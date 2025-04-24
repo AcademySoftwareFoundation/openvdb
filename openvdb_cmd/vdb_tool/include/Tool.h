@@ -53,9 +53,9 @@
 
 #ifdef VDB_TOOL_USE_NANO
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/IO.h>
-#include <nanovdb/util/CreateNanoGrid.h>
-#include <nanovdb/util/NanoToOpenVDB.h>
+#include <nanovdb/io/IO.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/tools/NanoToOpenVDB.h>
 #endif
 
 #ifdef VDB_TOOL_USE_EXR
@@ -120,8 +120,8 @@ public:
 private:
 
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 6;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
+    static const int sMinor = 7;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;
@@ -369,14 +369,14 @@ void Tool::init()
 
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
-    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|off|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
-    {{"files", "", "{file|stdout}.{obj|ply|stl|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
+    {{"files", "", "{file|stdout}.{obj|ply|stl|off|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
@@ -925,8 +925,8 @@ std::string Tool::examples() const
 {
     const int w = 16;
     std::stringstream ss;
-    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
-    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj] -mesh2ls d=256 -write output.vdb config.txt\n";
+    ss << std::left << std::setw(w) << "Surface points:" << mCmdName << " -read points.[obj/ply/stl/off/pts] -points2ls d=256 r=2.0 w=3 -dilate r=2 -gauss i=1 w=1 -erode r=2 -ls2m a=0.25 -write output.[ply/obj/stl]\n";
+    ss << std::left << std::setw(w) << "Convert mesh:  " << mCmdName << " -read mesh.[ply/obj/off] -mesh2ls d=256 -write output.vdb config.txt\n";
     ss << std::left << std::setw(w) << "Config example:" << mCmdName << " -config config.txt\n";
     return ss.str();
 }
@@ -963,7 +963,7 @@ void Tool::read()
 {
   OPENVDB_ASSERT(mParser.getAction().name == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb", "nvdb"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,off,stl", "vdb", "nvdb"})) {
     case 1:
       this->readGeo(fileName);
       break;
@@ -1062,7 +1062,7 @@ void Tool::readNVDB(const std::string &fileName)
   const size_t count = mGrid.size();
   if (grids.size()) {
     for (const auto& gridHandle : grids) {
-      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::nanoToOpenVDB(gridHandle));
+      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::tools::nanoToOpenVDB(gridHandle));
     }
   } else if (mParser.verbose>0) {
     std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
@@ -1135,7 +1135,7 @@ void Tool::write()
 {
   OPENVDB_ASSERT(mParser.getAction().name == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,stl,abc", "vdb", "nvdb", "txt"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,stl,off,abc", "vdb", "nvdb", "txt"})) {
     case 1:
       this->writeGeo(fileName);
       break;
@@ -1262,26 +1262,26 @@ void Tool::writeNVDB(const std::string &fileName)
       throw std::invalid_argument("writeNVDB: unsupported bits \""+bits+"\"");
     }
 
-    nanovdb::StatsMode sMode = nanovdb::StatsMode::Default;
+    nanovdb::tools::StatsMode sMode = nanovdb::tools::StatsMode::Default;
     if (stats == "none") {
-      sMode = nanovdb::StatsMode::Disable;
+      sMode = nanovdb::tools::StatsMode::Disable;
     } else if (stats == "bbox") {
-      sMode = nanovdb::StatsMode::BBox;
+      sMode = nanovdb::tools::StatsMode::BBox;
     } else if (stats == "extrema") {
-      sMode = nanovdb::StatsMode::MinMax;
+      sMode = nanovdb::tools::StatsMode::MinMax;
     } else if (stats == "all") {
-      sMode = nanovdb::StatsMode::All;
+      sMode = nanovdb::tools::StatsMode::All;
     } else if (stats != "") {
       throw std::invalid_argument("writeNVDB: unsupported stats \""+stats+"\"");
     }
 
-    nanovdb::ChecksumMode cMode = nanovdb::ChecksumMode::Default;
+    nanovdb::CheckMode cMode = nanovdb::CheckMode::Default;
     if (checksum == "none") {
-      cMode = nanovdb::ChecksumMode::Disable;
+      cMode = nanovdb::CheckMode::Disable;
     } else if (checksum == "partial") {
-      cMode = nanovdb::ChecksumMode::Partial;
+      cMode = nanovdb::CheckMode::Partial;
     } else if (checksum == "full") {
-      cMode = nanovdb::ChecksumMode::Full;
+      cMode = nanovdb::CheckMode::Full;
     } else if (checksum != "") {
       throw std::invalid_argument("writeNVDB: unsupported checksum \""+checksum+"\"");
     }
@@ -1302,21 +1302,21 @@ void Tool::writeNVDB(const std::string &fileName)
         using SrcGridT = openvdb::FloatGrid;
         switch (qMode){
         case nanovdb::GridType::Fp4:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp4>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp8:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp8>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::Fp16:
-          return nanovdb::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
+          return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::Fp16>(*floatGrid, sMode, cMode, dither, verbose);
         case nanovdb::GridType::FpN:
           if (absolute) {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::AbsDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::AbsDiff(tolerance));
           } else {
-            return nanovdb::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::RelDiff(tolerance));
+            return nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::FpN>(*floatGrid, sMode, cMode, dither, verbose, nanovdb::tools::RelDiff(tolerance));
           }
         default: break;// 32 bit float grids are handled below
         }// end of switch
       }
-      return nanovdb::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
+      return nanovdb::tools::openToNanoVDB(base, sMode, cMode, verbose);// float and other grids
     };// openToNano
 
     if (fileName=="stdout.nvdb") {

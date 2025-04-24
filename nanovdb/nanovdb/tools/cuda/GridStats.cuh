@@ -32,7 +32,7 @@ void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode = StatsMode::Defau
 
 //================================================================================================
 
-/// @brief Allows for the construction of NanoVDB grids without any dependecy
+/// @brief Allows for the construction of NanoVDB grids without any dependency
 template<typename BuildT, typename StatsT = Stats<typename NanoGrid<BuildT>::ValueType>>
 class GridStats
 {
