@@ -9,8 +9,6 @@
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestCrement : public unittest_util::AXTestCase
@@ -18,20 +16,10 @@ class TestCrement : public unittest_util::AXTestCase
 public:
 
     std::string dir() const override { return GET_TEST_DIRECTORY(); }
-
-    CPPUNIT_TEST_SUITE(TestCrement);
-    CPPUNIT_TEST(crementScalar);
-    CPPUNIT_TEST(crementComponent);
-    CPPUNIT_TEST_SUITE_END();
-
-    void crementScalar();
-    void crementComponent();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestCrement);
 
-void
-TestCrement::crementScalar()
+TEST_F(TestCrement, crementScalar)
 {
     const std::string code = R"(
 _T1_@test1 = ++_T1_@test2;
@@ -159,8 +147,7 @@ _T1_@test8 = (++_T1_@test6, ++_T1_@test7, _T1_@test6++);
 }
 
 
-void
-TestCrement::crementComponent()
+TEST_F(TestCrement, crementComponent)
 {
     // Just tests the first two components of every container
     const std::string code = R"(

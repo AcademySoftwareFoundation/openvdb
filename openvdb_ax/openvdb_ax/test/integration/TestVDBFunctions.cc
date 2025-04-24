@@ -16,34 +16,13 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointGroup.h>
 
-#include <cppunit/extensions/HelperMacros.h>
 
 class TestVDBFunctions : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestVDBFunctions);
-    CPPUNIT_TEST(addremovefromgroup);
-    CPPUNIT_TEST(deletepoint);
-    CPPUNIT_TEST(getcoord);
-    CPPUNIT_TEST(getvoxelpws);
-    CPPUNIT_TEST(ingroupOrder);
-    CPPUNIT_TEST(ingroup);
-    CPPUNIT_TEST(testValidContext);
-    CPPUNIT_TEST_SUITE_END();
-
-    void addremovefromgroup();
-    void deletepoint();
-    void getcoord();
-    void getvoxelpws();
-    void ingroupOrder();
-    void ingroup();
-    void testValidContext();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestVDBFunctions);
 
-void
-TestVDBFunctions::addremovefromgroup()
+TEST_F(TestVDBFunctions, addremovefromgroup)
 {
     const std::vector<openvdb::math::Vec3s> positions = {
         {1, 1, 1},
@@ -89,65 +68,64 @@ TestVDBFunctions::addremovefromgroup()
 
     for (size_t i = 1; i <= 9; i++) {
         const std::string groupName = "newTestGroup" + std::to_string(i);
-        CPPUNIT_ASSERT_MESSAGE(groupName + " doesn't exist", desc.hasGroup(groupName));
+        ASSERT_TRUE(desc.hasGroup(groupName)) << (groupName + " doesn't exist");
     }
 
     openvdb::points::GroupHandle newTestGroupHandle = leafIter->groupHandle("newTestGroup9");
-    CPPUNIT_ASSERT(!newTestGroupHandle.get(0));
-    CPPUNIT_ASSERT(newTestGroupHandle.get(1));
-    CPPUNIT_ASSERT(!newTestGroupHandle.get(2));
-    CPPUNIT_ASSERT(newTestGroupHandle.get(3));
+    ASSERT_TRUE(!newTestGroupHandle.get(0));
+    ASSERT_TRUE(newTestGroupHandle.get(1));
+    ASSERT_TRUE(!newTestGroupHandle.get(2));
+    ASSERT_TRUE(newTestGroupHandle.get(3));
 
     // other new groups should be untouched
     for (size_t i = 1; i <= 8; i++) {
         openvdb::points::GroupHandle handle = leafIter->groupHandle("newTestGroup" + std::to_string(i));
-        CPPUNIT_ASSERT(handle.get(0));
-        CPPUNIT_ASSERT(handle.get(1));
-        CPPUNIT_ASSERT(handle.get(2));
-        CPPUNIT_ASSERT(handle.get(3));
+        ASSERT_TRUE(handle.get(0));
+        ASSERT_TRUE(handle.get(1));
+        ASSERT_TRUE(handle.get(2));
+        ASSERT_TRUE(handle.get(3));
     }
 
     openvdb::points::GroupHandle existingTestGroupHandle = leafIter->groupHandle("existingTestGroup");
-    CPPUNIT_ASSERT(existingTestGroupHandle.get(0));
-    CPPUNIT_ASSERT(!existingTestGroupHandle.get(1));
-    CPPUNIT_ASSERT(existingTestGroupHandle.get(2));
-    CPPUNIT_ASSERT(!existingTestGroupHandle.get(3));
+    ASSERT_TRUE(existingTestGroupHandle.get(0));
+    ASSERT_TRUE(!existingTestGroupHandle.get(1));
+    ASSERT_TRUE(existingTestGroupHandle.get(2));
+    ASSERT_TRUE(!existingTestGroupHandle.get(3));
 
     // membership of this group should now mirror exisingTestGroup
     openvdb::points::GroupHandle existingTestGroup2Handle = leafIter->groupHandle("existingTestGroup2");
-    CPPUNIT_ASSERT(existingTestGroup2Handle.get(0));
-    CPPUNIT_ASSERT(!existingTestGroup2Handle.get(1));
-    CPPUNIT_ASSERT(existingTestGroup2Handle.get(2));
-    CPPUNIT_ASSERT(!existingTestGroup2Handle.get(3));
+    ASSERT_TRUE(existingTestGroup2Handle.get(0));
+    ASSERT_TRUE(!existingTestGroup2Handle.get(1));
+    ASSERT_TRUE(existingTestGroup2Handle.get(2));
+    ASSERT_TRUE(!existingTestGroup2Handle.get(3));
 
     // check that "nonExistentGroup" was _not_ added to the tree, as it is removed from but not present
-    CPPUNIT_ASSERT(!desc.hasGroup("nonExistentGroup"));
+    ASSERT_TRUE(!desc.hasGroup("nonExistentGroup"));
 
     // now check 2 new attributes added to tree
     openvdb::points::AttributeHandle<int> testResultAttributeHandle1(*attributeSet.get("newTestAttribute1"));
     openvdb::points::AttributeHandle<int> testResultAttributeHandle2(*attributeSet.get("newTestAttribute2"));
     for (openvdb::Index i = 0;i < 4; i++) {
-        CPPUNIT_ASSERT(testResultAttributeHandle1.get(i));
+        ASSERT_TRUE(testResultAttributeHandle1.get(i));
     }
 
     // should match "existingTestGroup"
-    CPPUNIT_ASSERT(testResultAttributeHandle2.get(0));
-    CPPUNIT_ASSERT(!testResultAttributeHandle2.get(1));
-    CPPUNIT_ASSERT(testResultAttributeHandle2.get(2));
-    CPPUNIT_ASSERT(!testResultAttributeHandle2.get(3));
+    ASSERT_TRUE(testResultAttributeHandle2.get(0));
+    ASSERT_TRUE(!testResultAttributeHandle2.get(1));
+    ASSERT_TRUE(testResultAttributeHandle2.get(2));
+    ASSERT_TRUE(!testResultAttributeHandle2.get(3));
 
     // pre-existing attribute should still be present with the correct value
 
     for (; leafIter; ++leafIter) {
         openvdb::points::AttributeHandle<int>
             handle(leafIter->attributeArray("existingTestAttribute"));
-        CPPUNIT_ASSERT(handle.isUniform());
-        CPPUNIT_ASSERT_EQUAL(2, handle.get(0));
+        ASSERT_TRUE(handle.isUniform());
+        ASSERT_EQ(2, handle.get(0));
     }
 }
 
-void
-TestVDBFunctions::deletepoint()
+TEST_F(TestVDBFunctions, deletepoint)
 {
     // run first, should not modify grid as attribute doesn't exist
     // @todo - need to massively improve this test
@@ -166,8 +144,7 @@ TestVDBFunctions::deletepoint()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestVDBFunctions::getcoord()
+TEST_F(TestVDBFunctions, getcoord)
 {
     // create 3 test grids
     std::vector<openvdb::Int32Grid::Ptr> testGrids(3);
@@ -229,11 +206,10 @@ TestVDBFunctions::getcoord()
         if (!check) outMessage << stream.str() << std::endl;
     }
 
-    CPPUNIT_ASSERT_MESSAGE(outMessage.str(), check);
+    ASSERT_TRUE(check) << outMessage.str();
 }
 
-void
-TestVDBFunctions::getvoxelpws()
+TEST_F(TestVDBFunctions, getvoxelpws)
 {
     mHarness.testPoints(false);
     mHarness.testSparseVolumes(false); // disable as getvoxelpws will densify
@@ -244,8 +220,7 @@ TestVDBFunctions::getvoxelpws()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestVDBFunctions::ingroupOrder()
+TEST_F(TestVDBFunctions, ingroupOrder)
 {
     // Test that groups inserted in a different alphabetical order are inferred
     // correctly (a regression test for a previous issue)
@@ -259,11 +234,10 @@ TestVDBFunctions::ingroupOrder()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestVDBFunctions::ingroup()
+TEST_F(TestVDBFunctions, ingroup)
 {
     // test a tree with no groups
-    CPPUNIT_ASSERT(mHarness.mInputPointGrids.size() > 0);
+    ASSERT_TRUE(mHarness.mInputPointGrids.size() > 0);
     openvdb::points::PointDataGrid::Ptr pointDataGrid1 = mHarness.mInputPointGrids.back();
     openvdb::points::PointDataTree& pointTree = pointDataGrid1->tree();
 
@@ -274,7 +248,7 @@ TestVDBFunctions::ingroup()
     openvdb::ax::PointExecutable::Ptr executable =
         compiler.compile<openvdb::ax::PointExecutable>(code);
 
-    CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
+    ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
 
     // the snippet of code adds "groupTest" and groupTest2 attributes which should both have the values
     // "1" everywhere
@@ -283,8 +257,8 @@ TestVDBFunctions::ingroup()
         openvdb::points::AttributeHandle<int> handle1(leafIter->attributeArray("groupTest"));
         openvdb::points::AttributeHandle<int> handle2(leafIter->attributeArray("groupTest2"));
         for (auto iter = leafIter->beginIndexAll(); iter; ++iter) {
-            CPPUNIT_ASSERT_EQUAL(1, handle1.get(*iter));
-            CPPUNIT_ASSERT_EQUAL(1, handle2.get(*iter));
+            ASSERT_EQ(1, handle1.get(*iter));
+            ASSERT_EQ(1, handle2.get(*iter));
         }
     }
 
@@ -292,21 +266,21 @@ TestVDBFunctions::ingroup()
     auto leafIter = pointTree.cbeginLeaf();
     const openvdb::points::AttributeSet& attributeSet = leafIter->attributeSet();
     const openvdb::points::AttributeSet::Descriptor& descriptor1 = attributeSet.descriptor();
-    CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(0), descriptor1.groupMap().size());
+    ASSERT_EQ(static_cast<size_t>(0), descriptor1.groupMap().size());
 
     // now we add a single group and run the test again
     openvdb::points::appendGroup(pointTree, "testGroup");
     setGroup(pointTree, "testGroup", false);
 
     executable = compiler.compile<openvdb::ax::PointExecutable>(code);
-    CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
+    ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
 
     for (auto leafIter = pointTree.cbeginLeaf(); leafIter; ++leafIter) {
         openvdb::points::AttributeHandle<int> handle1(leafIter->attributeArray("groupTest"));
         openvdb::points::AttributeHandle<int> handle2(leafIter->attributeArray("groupTest2"));
         for (auto iter = leafIter->beginIndexAll(); iter; ++iter) {
-            CPPUNIT_ASSERT_EQUAL(1, handle1.get(*iter));
-            CPPUNIT_ASSERT_EQUAL(1, handle2.get(*iter));
+            ASSERT_EQ(1, handle1.get(*iter));
+            ASSERT_EQ(1, handle2.get(*iter));
         }
     }
 
@@ -343,29 +317,28 @@ TestVDBFunctions::ingroup()
     openvdb::points::setGroup(*pointDataTree2, pointIndexGrid->tree(), membershipTestGroup2, "testGroup2");
 
     executable = compiler.compile<openvdb::ax::PointExecutable>(code);
-    CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid2));
+    ASSERT_NO_THROW(executable->execute(*pointDataGrid2));
 
     auto leafIter2 = pointDataTree2->cbeginLeaf();
     const openvdb::points::AttributeSet& attributeSet2 = leafIter2->attributeSet();
     openvdb::points::AttributeHandle<int> testResultAttributeHandle(*attributeSet2.get("groupTest2"));
 
     // these should line up with the defined membership
-    CPPUNIT_ASSERT_EQUAL(testResultAttributeHandle.get(0), 1);
-    CPPUNIT_ASSERT_EQUAL(testResultAttributeHandle.get(1), 1);
-    CPPUNIT_ASSERT_EQUAL(testResultAttributeHandle.get(2), 2);
-    CPPUNIT_ASSERT_EQUAL(testResultAttributeHandle.get(3), 1);
+    ASSERT_EQ(testResultAttributeHandle.get(0), 1);
+    ASSERT_EQ(testResultAttributeHandle.get(1), 1);
+    ASSERT_EQ(testResultAttributeHandle.get(2), 2);
+    ASSERT_EQ(testResultAttributeHandle.get(3), 1);
 
     // check that no new groups have been created or deleted
     const openvdb::points::AttributeSet::Descriptor& descriptor2 = attributeSet2.descriptor();
-    CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(9), descriptor2.groupMap().size());
+    ASSERT_EQ(static_cast<size_t>(9), descriptor2.groupMap().size());
 
     for (size_t i = 0; i < 9; i++) {
-        CPPUNIT_ASSERT(descriptor2.hasGroup("testGroup" + std::to_string(i)));
+        ASSERT_TRUE(descriptor2.hasGroup("testGroup" + std::to_string(i)));
     }
 }
 
-void
-TestVDBFunctions::testValidContext()
+TEST_F(TestVDBFunctions, testValidContext)
 {
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
 #if LLVM_VERSION_MAJOR >= 15
@@ -414,9 +387,9 @@ TestVDBFunctions::testValidContext()
             if (func.second.isInternal()) continue;
 
             const openvdb::ax::codegen::FunctionGroup* const ptr = func.second.function();
-            CPPUNIT_ASSERT(ptr);
+            ASSERT_TRUE(ptr);
             const auto& signatures = ptr->list();
-            CPPUNIT_ASSERT(!signatures.empty());
+            ASSERT_TRUE(!signatures.empty());
 
             // Don't check C bindings
             const auto F = signatures.front();
@@ -424,9 +397,10 @@ TestVDBFunctions::testValidContext()
 
             const std::string code = generate(F, func.first);
 
-            CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
+            ASSERT_THROW(
                 compiler.compile<openvdb::ax::VolumeExecutable>(code),
-                openvdb::AXCompilerError);
+                openvdb::AXCompilerError
+            ) << ERROR_MSG("Expected Compiler Error", code);
         }
     }
 
@@ -441,9 +415,9 @@ TestVDBFunctions::testValidContext()
             if (func.second.isInternal()) continue;
 
             const openvdb::ax::codegen::FunctionGroup* const ptr = func.second.function();
-            CPPUNIT_ASSERT(ptr);
+            ASSERT_TRUE(ptr);
             const auto& signatures = ptr->list();
-            CPPUNIT_ASSERT(!signatures.empty());
+            ASSERT_TRUE(!signatures.empty());
 
             // Don't check C bindings
             const auto F = signatures.front();
@@ -451,9 +425,10 @@ TestVDBFunctions::testValidContext()
 
             const std::string code = generate(F, func.first);
 
-            CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
+            ASSERT_THROW(
                 compiler.compile<openvdb::ax::PointExecutable>(code),
-                openvdb::AXCompilerError);
+                openvdb::AXCompilerError
+            ) << ERROR_MSG("Expected Compiler Error", code);
         }
     }
 }

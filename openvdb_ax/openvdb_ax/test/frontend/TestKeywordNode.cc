@@ -8,7 +8,7 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -26,36 +26,29 @@ static const unittest_util::CodeTests tests =
 
 }
 
-class TestKeywordNode : public CppUnit::TestCase
+class TestKeywordNode : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestKeywordNode);
-    CPPUNIT_TEST(testSyntax);
-    CPPUNIT_TEST(testASTNode);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSyntax() { TEST_SYNTAX_PASSES(tests); }
-    void testASTNode();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestKeywordNode);
+TEST_F(TestKeywordNode, testSyntax)
+{
+    TEST_SYNTAX_PASSES(tests);
+}
 
-void TestKeywordNode::testASTNode()
+TEST_F(TestKeywordNode, testASTNode)
 {
     for (const auto& test : tests) {
         const std::string& code = test.first;
         const Node* expected = test.second.get();
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("No AST returned", code), static_cast<bool>(tree));
+        ASSERT_TRUE(static_cast<bool>(tree)) << ERROR_MSG("No AST returned", code);
 
         // get the first statement
         const Node* result = tree->child(0)->child(0);
-        CPPUNIT_ASSERT(result);
+        ASSERT_TRUE(result);
         const Keyword* resultAsKeyword = static_cast<const Keyword*>(result);
-        CPPUNIT_ASSERT(resultAsKeyword);
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid AST node", code),
-            Node::KeywordNode == result->nodetype());
+        ASSERT_TRUE(resultAsKeyword);
+        ASSERT_TRUE(Node::KeywordNode == result->nodetype()) << ERROR_MSG("Invalid AST node", code);
 
         std::vector<const Node*> resultList, expectedList;
         linearize(*result, resultList);
@@ -67,7 +60,7 @@ void TestKeywordNode::testASTNode()
             openvdb::ax::ast::print(*expected, true, os);
             os << "Result:\n";
             openvdb::ax::ast::print(*result, true, os);
-            CPPUNIT_FAIL(ERROR_MSG("Mismatching Trees for Return code", code) + os.str());
+            FAIL() << ERROR_MSG("Mismatching Trees for Return code", code) + os.str();
         }
     }
 }
