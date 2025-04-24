@@ -4,7 +4,21 @@ name: Houdini
 on:
   push:
     branches:
-      - "pull-request/[0-9]+"
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'nanovdb/**'
+      - 'openvdb_maya/**'
+      - 'fvdb/**'
+      - 'pendingchanges/**'
+      - '**.md'
+  pull_request:
+    branches:
+      - '**'
     paths-ignore:
       - 'CHANGES'
       - 'CODEOWNERS'
