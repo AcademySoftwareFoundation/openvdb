@@ -43,12 +43,16 @@ clip(const GridType& grid, const BBoxd& bbox, bool keepInterior = true);
 /// @param grid          the grid to be clipped
 /// @param frustum       a frustum map
 /// @param keepInterior  if true, discard voxels that lie outside the frustum;
-///     if false, discard voxels that lie inside the frustum
+///                      if false, discard voxels that lie inside the frustum
+/// @param padding       padding added to the frustum's X & Y extents in NDC space. Given as
+///                      (-X,-Y,+X,+Y); added to the left, bottom, right, top sides of frustum
 /// @warning Clipping a level set will likely produce a grid that is
 /// no longer a valid level set.
 template<typename GridType>
 typename GridType::Ptr
-clip(const GridType& grid, const math::NonlinearFrustumMap& frustum, bool keepInterior = true);
+clip(
+    const GridType& grid, const math::NonlinearFrustumMap& frustum,
+    bool keepInterior = true, const Vec4d& padding = Vec4d::zero());
 
 /// @brief Clip a grid against the active voxels of another grid
 /// and return a new grid containing the result.
@@ -401,14 +405,20 @@ clip(const SrcGridType& srcGrid, const Grid<ClipTreeType>& clipGrid, bool keepIn
 /// @private
 template<typename GridType>
 typename GridType::Ptr
-clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool keepInterior)
+clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap,
+     bool keepInterior, const Vec4d& padding)
 {
     using ValueT = typename GridType::ValueType;
     using TreeT = typename GridType::TreeType;
     using LeafT = typename TreeT::LeafNodeType;
 
     const auto& gridXform = inGrid.transform();
-    const auto frustumIndexBBox = frustumMap.getBBox();
+    BBoxd frustumIndexBBox = frustumMap.getBBox();
+    if (!padding.isZero()) {
+        const Vec2d extentsXY(frustumIndexBBox.extents().asPointer());
+        frustumIndexBBox.min() -= Vec3d(padding[0]*extentsXY.x(), padding[1]*extentsXY.y(), 0.0);
+        frustumIndexBBox.max() += Vec3d(padding[2]*extentsXY.x(), padding[3]*extentsXY.y(), 0.0);
+    }
 
     // Return true if index-space point (i,j,k) lies inside the frustum.
     auto frustumContainsCoord = [&](const Coord& ijk) -> bool {
@@ -582,7 +592,7 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr clip(const Grid<TreeT>&, const math::NonlinearFrustumMap&, bool)
+    Grid<TreeT>::Ptr clip(const Grid<TreeT>&, const math::NonlinearFrustumMap&, bool, const Vec4d&)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
