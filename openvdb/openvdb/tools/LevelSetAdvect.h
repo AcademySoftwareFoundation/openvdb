@@ -71,13 +71,12 @@ namespace tools {
 
 template<typename GridT,
          typename FieldT     = EnrightField<typename GridT::ValueType>,
-         typename InterruptT = util::NullInterrupter,
-         typename ComputeT   = typename ComputeTypeFor<typename GridT::ValueType>::type>
+         typename InterruptT = util::NullInterrupter>
 class LevelSetAdvection
 {
 public:
     using GridType = GridT;
-    using TrackerT = LevelSetTracker<GridT, InterruptT, ComputeT>;
+    using TrackerT = LevelSetTracker<GridT, InterruptT>;
     using LeafRange = typename TrackerT::LeafRange;
     using LeafType = typename TrackerT::LeafType;
     using BufferType = typename TrackerT::BufferType;
@@ -216,9 +215,9 @@ private:
 };//end of LevelSetAdvection
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 size_t
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect(ComputeType time0, ComputeType time1)
+LevelSetAdvection<GridT, FieldT, InterruptT>::advect(ComputeType time0, ComputeType time1)
 {
     switch (mSpatialScheme) {
     case math::FIRST_BIAS:
@@ -238,10 +237,10 @@ LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect(ComputeType time0
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme>
 size_t
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect1(ComputeType time0, ComputeType time1)
+LevelSetAdvection<GridT, FieldT, InterruptT>::advect1(ComputeType time0, ComputeType time1)
 {
     switch (mTemporalScheme) {
     case math::TVD_RK1:
@@ -257,10 +256,10 @@ LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect1(ComputeType time
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme, math::TemporalIntegrationScheme TemporalScheme>
 size_t
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect2(ComputeType time0, ComputeType time1)
+LevelSetAdvection<GridT, FieldT, InterruptT>::advect2(ComputeType time0, ComputeType time1)
 {
     const math::Transform& trans = mTracker.grid().transform();
     if (trans.mapType() == math::UniformScaleMap::mapType()) {
@@ -279,13 +278,13 @@ LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect2(ComputeType time
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme,
     typename MapT>
 size_t
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect3(ComputeType time0, ComputeType time1)
+LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ComputeType time0, ComputeType time1)
 {
     Advect<MapT, SpatialScheme, TemporalScheme> tmp(*this);
     return tmp.advect(time0, time1);
@@ -295,13 +294,13 @@ LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::advect3(ComputeType time
 ///////////////////////////////////////////////////////////////////////
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 Advect(LevelSetAdvection& parent)
     : mParent(parent)
@@ -314,13 +313,13 @@ Advect(LevelSetAdvection& parent)
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 Advect(const Advect& other)
     : mParent(other.mParent)
@@ -333,13 +332,13 @@ Advect(const Advect& other)
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 advect(ComputeType time0, ComputeType time1)
 {
@@ -421,13 +420,13 @@ advect(ComputeType time0, ComputeType time1)
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
-inline typename LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::ComputeType
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+inline typename LevelSetAdvection<GridT, FieldT, InterruptT>::ComputeType
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 sampleField(ComputeType time0, ComputeType time1)
 {
@@ -467,14 +466,14 @@ sampleField(ComputeType time0, ComputeType time1)
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 template<bool Aligned>
 inline void
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 sample(const LeafRange& range, ComputeType time0, ComputeType time1)
 {
@@ -496,13 +495,13 @@ sample(const LeafRange& range, ComputeType time0, ComputeType time1)
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 clearField()
 {
@@ -513,13 +512,13 @@ clearField()
 }
 
 
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 cook(const char* msg, size_t swapBuffer)
 {
@@ -538,14 +537,14 @@ cook(const char* msg, size_t swapBuffer)
 
 // Convex combination of Phi and a forward Euler advection steps:
 // Phi(result) = alpha * Phi(phi) + (1-alpha) * (Phi(0) - dt * V.Grad(0));
-template<typename GridT, typename FieldT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename FieldT, typename InterruptT>
 template<
     typename MapT,
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme>
 template <int Nominator, int Denominator>
 inline void
-LevelSetAdvection<GridT, FieldT, InterruptT, ComputeT>::
+LevelSetAdvection<GridT, FieldT, InterruptT>::
 Advect<MapT, SpatialScheme, TemporalScheme>::
 euler(const LeafRange& range, ComputeType dt, Index phiBuffer, Index resultBuffer)
 {
@@ -586,9 +585,9 @@ euler(const LeafRange& range, ComputeType dt, Index phiBuffer, Index resultBuffe
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<HalfGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<FloatGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<DoubleGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter, double>;
+OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<HalfGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<FloatGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<DoubleGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 

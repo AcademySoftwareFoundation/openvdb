@@ -84,16 +84,15 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 /// @note The leapfrog algorithm employed in this class is best
 /// suited for a single large sphere. For multiple small spheres consider
 /// using the faster algorithm in tools/ParticlesToLevelSet.h
-template<typename GridT, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetSphere
 {
 public:
     using TreeT  = typename GridT::TreeType;
     using ValueT = typename GridT::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
     using Vec3T  = typename math::Vec3<ComputeT>;
-    static_assert(openvdb::is_floating_point<ValueT>::value
-               && openvdb::is_floating_point<ComputeT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value,
         "level set grids must have scalar, floating-point value types");
 
     /// @brief Constructor
@@ -227,11 +226,10 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
     using Vec3T    = typename math::Vec3<ComputeT>;
     
     // GridType::ValueType is required to be a floating-point scalar.
-    static_assert(openvdb::is_floating_point<ValueT>::value
-               && openvdb::is_floating_point<ComputeT>::value,
+    static_assert(openvdb::is_floating_point<ValueT>::value,
         "level set grids must have scalar, floating-point value types");
 
-    LevelSetSphere<GridType, InterruptT, ComputeT> factory(ComputeT(radius), Vec3T(center), interrupt);
+    LevelSetSphere<GridType, InterruptT> factory(ComputeT(radius), Vec3T(center), interrupt);
     return factory.getLevelSet(ComputeT(voxelSize), ComputeT(halfWidth), threaded);
 }
 

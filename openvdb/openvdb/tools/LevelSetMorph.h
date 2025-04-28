@@ -44,19 +44,18 @@ namespace tools {
 /// the util::NullInterrupter is used, which implies that all interrupter
 /// calls are no-ops (i.e., they incur no computational overhead).
 template<typename GridT,
-         typename InterruptT = util::NullInterrupter,
-         typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+         typename InterruptT = util::NullInterrupter>
 class LevelSetMorphing
 {
 public:
     using GridType = GridT;
     using TreeType = typename GridT::TreeType;
-    using TrackerT = LevelSetTracker<GridT, InterruptT, ComputeT>;
+    using TrackerT = LevelSetTracker<GridT, InterruptT>;
     using LeafRange = typename TrackerT::LeafRange;
     using LeafType = typename TrackerT::LeafType;
     using BufferType = typename TrackerT::BufferType;
     using ValueType = typename TrackerT::ValueType;
-    using ComputeType = ComputeT;
+    using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
     /// Main constructor
     LevelSetMorphing(GridT& sourceGrid, const GridT& targetGrid, InterruptT* interrupt = nullptr)
@@ -240,9 +239,9 @@ private:
 
 };//end of LevelSetMorphing
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline size_t
-LevelSetMorphing<GridT, InterruptT, ComputeT>::advect(ComputeType time0, ComputeType time1)
+LevelSetMorphing<GridT, InterruptT>::advect(ComputeType time0, ComputeType time1)
 {
     switch (mSpatialScheme) {
     case math::FIRST_BIAS:
@@ -265,10 +264,10 @@ LevelSetMorphing<GridT, InterruptT, ComputeT>::advect(ComputeType time0, Compute
     return 0;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT, ComputeT>::advect1(ComputeType time0, ComputeType time1)
+LevelSetMorphing<GridT, InterruptT>::advect1(ComputeType time0, ComputeType time1)
 {
     switch (mTemporalScheme) {
     case math::TVD_RK1:
@@ -284,11 +283,11 @@ LevelSetMorphing<GridT, InterruptT, ComputeT>::advect1(ComputeType time0, Comput
     return 0;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT, ComputeT>::advect2(ComputeType time0, ComputeType time1)
+LevelSetMorphing<GridT, InterruptT>::advect2(ComputeType time0, ComputeType time1)
 {
     const math::Transform& trans = mTracker.grid().transform();
     if (trans.mapType() == math::UniformScaleMap::mapType()) {
@@ -306,12 +305,12 @@ LevelSetMorphing<GridT, InterruptT, ComputeT>::advect2(ComputeType time0, Comput
     return 0;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MapT>
 inline size_t
-LevelSetMorphing<GridT, InterruptT, ComputeT>::advect3(ComputeType time0, ComputeType time1)
+LevelSetMorphing<GridT, InterruptT>::advect3(ComputeType time0, ComputeType time1)
 {
     Morph<MapT, SpatialScheme, TemporalScheme> tmp(*this);
     return tmp.advect(time0, time1);
@@ -320,11 +319,11 @@ LevelSetMorphing<GridT, InterruptT, ComputeT>::advect3(ComputeType time0, Comput
 
 ///////////////////////////////////////////////////////////////////////
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(LevelSetMorphing<GridT, InterruptT>& parent)
     : mParent(&parent)
@@ -334,11 +333,11 @@ Morph(LevelSetMorphing<GridT, InterruptT>& parent)
 {
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(const Morph& other)
     : mParent(other.mParent)
@@ -349,11 +348,11 @@ Morph(const Morph& other)
 {
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 Morph(Morph& other, tbb::split)
     : mParent(other.mParent)
@@ -364,11 +363,11 @@ Morph(Morph& other, tbb::split)
 {
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline size_t
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 advect(ComputeType time0, ComputeType time1)
 {
@@ -448,11 +447,11 @@ advect(ComputeType time0, ComputeType time1)
     return countCFL;//number of CLF propagation steps
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template<typename MapT, math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
-inline typename LevelSetMorphing<GridT, InterruptT, ComputeT>::ComputeType
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+inline typename LevelSetMorphing<GridT, InterruptT>::ComputeType
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleSpeed(ComputeType time0, ComputeType time1, Index speedBuffer)
 {
@@ -478,11 +477,11 @@ sampleSpeed(ComputeType time0, ComputeType time1, Index speedBuffer)
     return math::Min(dt, ComputeType(CFL*dx/mMaxAbsS));
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
 {
@@ -528,11 +527,11 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
     }
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
 {
@@ -575,11 +574,11 @@ sampleAlignedSpeed(const LeafRange& range, Index speedBuffer)
     }
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template <typename MapT, math::BiasedGradientScheme SpatialScheme,
           math::TemporalIntegrationScheme TemporalScheme>
 inline void
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 cook(ThreadingMode mode, size_t swapBuffer)
 {
@@ -604,12 +603,12 @@ cook(ThreadingMode mode, size_t swapBuffer)
     mParent->mTracker.endInterrupter();
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 template<typename MapT, math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme>
 template <int Nominator, int Denominator>
 inline void
-LevelSetMorphing<GridT, InterruptT, ComputeT>::
+LevelSetMorphing<GridT, InterruptT>::
 Morph<MapT, SpatialScheme, TemporalScheme>::
 euler(const LeafRange& range, ComputeType dt,
       Index phiBuffer, Index resultBuffer, Index speedBuffer)
@@ -654,9 +653,9 @@ euler(const LeafRange& range, ComputeType dt,
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<HalfGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter, double>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<HalfGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 

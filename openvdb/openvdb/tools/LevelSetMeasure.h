@@ -39,7 +39,7 @@ namespace tools {
 ///                      world space units, else in voxel units.
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
-template<class GridType, typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template<class GridType>
 Real
 levelSetArea(const GridType& grid, bool useWorldSpace = true);
 
@@ -51,7 +51,7 @@ levelSetArea(const GridType& grid, bool useWorldSpace = true);
 ///                      world space units, else in voxel units.
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
-template<class GridType, typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template<class GridType>
 Real
 levelSetVolume(const GridType& grid, bool useWorldSpace = true);
 
@@ -61,7 +61,7 @@ levelSetVolume(const GridType& grid, bool useWorldSpace = true);
 ///                      closed level set surfaces
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
-template<class GridType, typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template<class GridType>
 int
 levelSetEulerCharacteristic(const GridType& grid);
 
@@ -72,7 +72,7 @@ levelSetEulerCharacteristic(const GridType& grid);
 /// @warning The genus is only well defined for a single connected surface
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
-template<class GridType, typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template<class GridType>
 int
 levelSetGenus(const GridType& grid);
 
@@ -99,17 +99,17 @@ private:
 /// catastrophic cancellation) and guarantee determinism during
 /// multi-threading this class is implemented using parallel_for, and
 /// delayed reduction of a sorted list.
-template<typename GridT, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetMeasure
 {
 public:
     using GridType = GridT;
     using TreeType = typename GridType::TreeType;
     using ManagerType = typename tree::LeafManager<const TreeType>;
+    
+    using ComputeType = typename ComputeTypeFor<typename GridType::ValueType>::type;
 
-    static_assert(openvdb::is_floating_point<typename GridT::ValueType>::value
-                  && openvdb::is_floating_point<ComputeT>::value,
+    static_assert(openvdb::is_floating_point<ComputeType>::value,
         "level set measure is supported only for scalar, floating-point grids");
 
     /// @brief Main constructor from a grid
@@ -250,9 +250,9 @@ private:
 }; // end of LevelSetMeasure class
 
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline
-LevelSetMeasure<GridT, InterruptT, ComputeT>::
+LevelSetMeasure<GridT, InterruptT>::
 LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
     : mInterrupter(interrupt)
     , mGrainSize(1)
@@ -260,9 +260,9 @@ LevelSetMeasure(const GridType& grid, InterruptT* interrupt)
     this->init(grid);
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT, ComputeT>::init(const GridType& grid)
+LevelSetMeasure<GridT, InterruptT>::init(const GridType& grid)
 {
     if (!grid.hasUniformVoxels()) {
          OPENVDB_THROW(RuntimeError,
@@ -284,9 +284,9 @@ LevelSetMeasure<GridT, InterruptT, ComputeT>::init(const GridType& grid)
     mUpdateArea = mUpdateCurvature = true;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline Real
-LevelSetMeasure<GridT, InterruptT, ComputeT>::area(bool useWorldUnits)
+LevelSetMeasure<GridT, InterruptT>::area(bool useWorldUnits)
 {
     if (mUpdateArea) {MeasureArea m(this);};
     double area = mArea;
@@ -294,9 +294,9 @@ LevelSetMeasure<GridT, InterruptT, ComputeT>::area(bool useWorldUnits)
     return area;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline Real
-LevelSetMeasure<GridT, InterruptT, ComputeT>::volume(bool useWorldUnits)
+LevelSetMeasure<GridT, InterruptT>::volume(bool useWorldUnits)
 {
     if (mUpdateArea) {MeasureArea m(this);};
     double volume = mVolume;
@@ -304,25 +304,25 @@ LevelSetMeasure<GridT, InterruptT, ComputeT>::volume(bool useWorldUnits)
     return volume;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline Real
-LevelSetMeasure<GridT, InterruptT, ComputeT>::totMeanCurvature(bool useWorldUnits)
+LevelSetMeasure<GridT, InterruptT>::totMeanCurvature(bool useWorldUnits)
 {
     if (mUpdateCurvature) {MeasureCurvatures m(this);};
     return mTotMeanCurvature * (useWorldUnits ? mDx : 1);
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline Real
-LevelSetMeasure<GridT, InterruptT, ComputeT>::totGaussianCurvature(bool)
+LevelSetMeasure<GridT, InterruptT>::totGaussianCurvature(bool)
 {
     if (mUpdateCurvature) {MeasureCurvatures m(this);};
     return mTotGausCurvature;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline int
-LevelSetMeasure<GridT, InterruptT, ComputeT>::eulerCharacteristic()
+LevelSetMeasure<GridT, InterruptT>::eulerCharacteristic()
 {
     const Real x = this->totGaussianCurvature(true) / (2.0*math::pi<Real>());
     return int(math::Round( x ));
@@ -330,9 +330,9 @@ LevelSetMeasure<GridT, InterruptT, ComputeT>::eulerCharacteristic()
 
 ///////////////////////// PRIVATE METHODS //////////////////////
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline bool
-LevelSetMeasure<GridT, InterruptT, ComputeT>::checkInterrupter()
+LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
         thread::cancelGroupExecution();
@@ -341,12 +341,12 @@ LevelSetMeasure<GridT, InterruptT, ComputeT>::checkInterrupter()
     return true;
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT, ComputeT>::
+LevelSetMeasure<GridT, InterruptT>::
 MeasureArea::operator()(const LeafRange& range) const
 {
-    using Vec3T = math::Vec3<ComputeT>;
+    using Vec3T = math::Vec3<ComputeType>;
     // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
     const Real invDx = 1.0/mParent->mDx;
@@ -371,17 +371,17 @@ MeasureArea::operator()(const LeafRange& range) const
     }
 }
 
-template<typename GridT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename InterruptT>
 inline void
-LevelSetMeasure<GridT, InterruptT, ComputeT>::
+LevelSetMeasure<GridT, InterruptT>::
 MeasureCurvatures::operator()(const LeafRange& range) const
 {
-    using Vec3T = math::Vec3<ComputeT>;
+    using Vec3T = math::Vec3<ComputeType>;
     // computations are performed in index space where dV = 1
     mParent->checkInterrupter();
     const Real dx = mParent->mDx, dx2=dx*dx, invDx = 1.0/dx;
     const DiracDelta<Real> DD(1.5);// dirac delta function is 3 voxel units wide
-    ComputeT mean, gauss;
+    ComputeType mean, gauss;
     const size_t leafCount = mParent->mLeafs->leafCount();
     for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
         Real sumM = 0, sumG = 0;//reduce risk of catastrophic cancellation
@@ -408,22 +408,20 @@ MeasureCurvatures::operator()(const LeafRange& range) const
 //{
 /// @cond OPENVDB_DOCS_INTERNAL
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value
-                     && openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT& grid, bool useWorldUnits)
 {
     using InterruptT = typename util::NullInterrupter;
     
-    LevelSetMeasure<GridT, InterruptT, ComputeT> m(grid);
+    LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.area(useWorldUnits);
 }
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value
-                     || !openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetArea(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -433,11 +431,11 @@ doLevelSetArea(const GridT&, bool)
 /// @endcond
 //}
 
-template<class GridT, typename ComputeT>
+template<class GridT>
 Real
 levelSetArea(const GridT& grid, bool useWorldUnits)
 {
-    return doLevelSetArea<GridT, ComputeT>(grid, useWorldUnits);
+    return doLevelSetArea<GridT>(grid, useWorldUnits);
 }
 
 ////////////////////////////////////////
@@ -445,22 +443,20 @@ levelSetArea(const GridT& grid, bool useWorldUnits)
 //{
 /// @cond OPENVDB_DOCS_INTERNAL
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value
-                     && openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 {
     using InterruptT = typename util::NullInterrupter;
     
-    LevelSetMeasure<GridT, InterruptT, ComputeT> m(grid);
+    LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.volume(useWorldUnits);
 }
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value
-                     || !openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetVolume(const GridT&, bool)
 {
     OPENVDB_THROW(TypeError,
@@ -470,11 +466,11 @@ doLevelSetVolume(const GridT&, bool)
 /// @endcond
 //}
 
-template<class GridT, typename ComputeT>
+template<class GridT>
 Real
 levelSetVolume(const GridT& grid, bool useWorldUnits)
 {
-    return doLevelSetVolume<GridT, ComputeT>(grid, useWorldUnits);
+    return doLevelSetVolume<GridT>(grid, useWorldUnits);
 }
 
 ////////////////////////////////////////
@@ -482,22 +478,20 @@ levelSetVolume(const GridT& grid, bool useWorldUnits)
 //{
 /// @cond OPENVDB_DOCS_INTERNAL
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value
-                     && openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetEulerCharacteristic(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
     
-    LevelSetMeasure<GridT, InterruptT, ComputeT> m(grid);
+    LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.eulerCharacteristic();
 }
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value
-                     || !openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetEulerCharacteristic(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -508,11 +502,11 @@ doLevelSetEulerCharacteristic(const GridT&)
 //}
 
 
-template<class GridT, typename ComputeT>
+template<class GridT>
 int
 levelSetEulerCharacteristic(const GridT& grid)
 {
-    return doLevelSetEulerCharacteristic<GridT, ComputeT>(grid);
+    return doLevelSetEulerCharacteristic<GridT>(grid);
 }
 
 ////////////////////////////////////////
@@ -520,22 +514,20 @@ levelSetEulerCharacteristic(const GridT& grid)
 //{
 /// @cond OPENVDB_DOCS_INTERNAL
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value
-                     && openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetGenus(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
     
-    LevelSetMeasure<GridT, InterruptT, ComputeT> m(grid);
+    LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.genus();
 }
 
-template<class GridT, typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value
-                     || !openvdb::is_floating_point<ComputeT>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
 doLevelSetGenus(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -545,11 +537,11 @@ doLevelSetGenus(const GridT&)
 /// @endcond
 //}
 
-template<class GridT, typename ComputeT>
+template<class GridT>
 int
 levelSetGenus(const GridT& grid)
 {
-    return doLevelSetGenus<GridT, ComputeT>(grid);
+    return doLevelSetGenus<GridT>(grid);
 }
 
 
@@ -584,9 +576,9 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<HalfGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<FloatGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<DoubleGrid, util::NullInterrupter, double>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<HalfGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<DoubleGrid, util::NullInterrupter>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
