@@ -37,9 +37,9 @@ class BaseStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type ValueType;
-    
+
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
 
@@ -253,7 +253,7 @@ class SevenPointStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 7;
@@ -309,7 +309,7 @@ class BoxStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 8;
@@ -481,7 +481,7 @@ class SecondOrderDenseStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
@@ -562,7 +562,7 @@ class ThirteenPointStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 13;
@@ -694,7 +694,7 @@ class FourthOrderDenseStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 61;
@@ -834,7 +834,7 @@ class NineteenPointStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
@@ -1051,7 +1051,7 @@ class SixthOrderDenseStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 127;
@@ -1247,7 +1247,7 @@ class GradStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 7;
@@ -1383,7 +1383,7 @@ class WenoStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
@@ -1535,7 +1535,7 @@ class CurvatureStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
      static const int SIZE = 19;
@@ -1786,7 +1786,7 @@ class DenseStencil
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    
+
     typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     DenseStencil(const GridType& grid, int halfWidth)

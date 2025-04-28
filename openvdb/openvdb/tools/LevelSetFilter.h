@@ -517,7 +517,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offsetImpl(
                          mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             for (VoxelIterT iter = leafIter->beginValueOn(); iter; ++iter) {
-                if (alpha(iter.getCoord(), a, b)) 
+                if (alpha(iter.getCoord(), a, b))
                     iter.setValue(ComputeType(*iter) + a*offset);
             }
         }
