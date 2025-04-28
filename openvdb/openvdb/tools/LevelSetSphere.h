@@ -224,7 +224,7 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
     using ValueT   = typename GridType::ValueType;
     using ComputeT = typename ComputeTypeFor<ValueT>::type;
     using Vec3T    = typename math::Vec3<ComputeT>;
-    
+
     // GridType::ValueType is required to be a floating-point scalar.
     static_assert(openvdb::is_floating_point<ValueT>::value,
         "level set grids must have scalar, floating-point value types");

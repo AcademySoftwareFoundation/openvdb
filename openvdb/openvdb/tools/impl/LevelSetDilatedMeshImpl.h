@@ -1211,7 +1211,7 @@ class DilatedMeshVoxelizer {
     using GridPtr = typename GridType::Ptr;
     using TreeT = typename GridType::TreeType;
     using LeafT = typename TreeT::LeafNodeType;
-    
+
     using ValueT = typename GridType::ValueType;
     using ComputeT = typename ComputeTypeFor<ValueT>::type;
 

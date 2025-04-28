@@ -106,7 +106,7 @@ public:
     using GridType = GridT;
     using TreeType = typename GridType::TreeType;
     using ManagerType = typename tree::LeafManager<const TreeType>;
-    
+
     using ComputeType = typename ComputeTypeFor<typename GridType::ValueType>::type;
 
     static_assert(openvdb::is_floating_point<ComputeType>::value,
@@ -414,7 +414,7 @@ typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::v
 doLevelSetArea(const GridT& grid, bool useWorldUnits)
 {
     using InterruptT = typename util::NullInterrupter;
-    
+
     LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.area(useWorldUnits);
 }
@@ -449,7 +449,7 @@ typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::v
 doLevelSetVolume(const GridT& grid, bool useWorldUnits)
 {
     using InterruptT = typename util::NullInterrupter;
-    
+
     LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.volume(useWorldUnits);
 }
@@ -484,7 +484,7 @@ typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::v
 doLevelSetEulerCharacteristic(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
-    
+
     LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.eulerCharacteristic();
 }
@@ -520,7 +520,7 @@ typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::v
 doLevelSetGenus(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
-    
+
     LevelSetMeasure<GridT, InterruptT> m(grid);
     return m.genus();
 }
