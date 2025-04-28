@@ -32,7 +32,7 @@
 ///
 ///     // Sample the tree at the given coordinates and return the result in val.
 ///     // Return true if the sampled value is active.
-///     template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+///     template<class TreeT>
 ///     bool sample(const TreeT& tree, const Vec3R& coord, typename TreeT::ValueType& val);
 /// };
 /// @endcode
@@ -76,14 +76,14 @@ struct Sampler
     /// and store the result in @a result.
     ///
     /// @return @c true if the sampled value is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Sample @a inTree at the floating-point index coordinate @a inCoord.
     ///
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
@@ -107,13 +107,13 @@ struct PointSampler
     /// @brief Sample @a inTree at the nearest neighbor to @a inCoord
     /// and store the result in @a result.
     /// @return @c true if the sampled value is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Sample @a inTree at the nearest neighbor to @a inCoord
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
@@ -130,13 +130,13 @@ struct BoxSampler
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord
     /// and store the result in @a result.
     /// @return @c true if any one of the sampled values is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord.
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
     /// @brief Import all eight values from @a inTree to support
@@ -173,13 +173,13 @@ struct QuadraticSampler
     /// @brief Triquadratically reconstruct @a inTree at @a inCoord
     /// and store the result in @a result.
     /// @return @c true if any one of the sampled values is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Triquadratically reconstruct @a inTree at to @a inCoord.
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
     template<class ValueT, size_t N>
@@ -207,13 +207,13 @@ struct StaggeredPointSampler
     /// @brief Sample @a inTree at the nearest neighbor to @a inCoord
     /// and store the result in @a result.
     /// @return true if the sampled value is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Sample @a inTree at the nearest neighbor to @a inCoord
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
@@ -230,13 +230,13 @@ struct StaggeredBoxSampler
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord
     /// and store the result in @a result.
     /// @return true if any one of the sampled value is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Trilinearly reconstruct @a inTree at @a inCoord.
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
@@ -253,13 +253,13 @@ struct StaggeredQuadraticSampler
     /// @brief Triquadratically reconstruct @a inTree at @a inCoord
     /// and store the result in @a result.
     /// @return true if any one of the sampled values is active.
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static bool sample(const TreeT& inTree, const Vec3R& inCoord,
                        typename TreeT::ValueType& result);
 
     /// @brief Triquadratically reconstruct @a inTree at to @a inCoord.
     /// @return the reconstructed value
-    template<class TreeT, typename ComputeT = typename ComputeTypeFor<typename TreeT::ValueType>::type>
+    template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
@@ -281,8 +281,7 @@ struct StaggeredQuadraticSampler
 /// template specialization below that employs a
 /// ValueAccessor. However, care must be taken when dealing with
 /// multi-threading (see warning below).
-template<typename GridOrTreeType, typename SamplerType,
-    typename ComputeT = typename ComputeTypeFor<typename GridOrTreeType::ValueType>::type>
+template<typename GridOrTreeType, typename SamplerType>
 class GridSampler
 {
 public:
@@ -333,7 +332,7 @@ public:
     ValueType isSample(const Vec3d& ispoint) const
     {
         ValueType result = zeroVal<ValueType>();
-        SamplerType::template sample<TreeType, ComputeT>(*mTree, ispoint, result);
+        SamplerType::sample(*mTree, ispoint, result);
         return result;
     }
 
@@ -342,7 +341,7 @@ public:
     ValueType wsSample(const Vec3d& wspoint) const
     {
         ValueType result = zeroVal<ValueType>();
-        SamplerType::template sample<TreeType, ComputeT>(*mTree, mTransform->worldToIndex(wspoint), result);
+        SamplerType::sample(*mTree, mTransform->worldToIndex(wspoint), result);
         return result;
     }
 
@@ -370,7 +369,6 @@ class GridSampler<tree::ValueAccessor<TreeT>, SamplerType>
 public:
     using Ptr = SharedPtr<GridSampler>;
     using ValueType = typename TreeT::ValueType;
-    using ComputeType = typename ComputeTypeFor<ValueType>::type;
     using TreeType = TreeT;
     using GridType = Grid<TreeType>;
     using AccessorType = typename tree::ValueAccessor<TreeT>;
@@ -413,7 +411,7 @@ public:
     ValueType isSample(const Vec3d& ispoint) const
     {
         ValueType result = zeroVal<ValueType>();
-        SamplerType::template sample<AccessorType, ComputeType>(*mAccessor, ispoint, result);
+        SamplerType::sample(*mAccessor, ispoint, result);
         return result;
     }
 
@@ -422,7 +420,7 @@ public:
     ValueType wsSample(const Vec3d& wspoint) const
     {
         ValueType result = zeroVal<ValueType>();
-        SamplerType::template sample<AccessorType, ComputeType>(*mAccessor, mTransform->worldToIndex(wspoint), result);
+        SamplerType::sample(*mAccessor, mTransform->worldToIndex(wspoint), result);
         return result;
     }
 
@@ -502,7 +500,6 @@ class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
 {
     public:
     using ValueType = typename TreeT::ValueType;
-    using ComputeType = typename ComputeTypeFor<ValueType>::type;
     using TreeType = TreeT;
     using GridType = Grid<TreeType>;
     using AccessorType = typename tree::ValueAccessor<TreeT>;
@@ -526,7 +523,7 @@ class DualGridSampler<tree::ValueAccessor<TreeT>, SamplerT>
     {
         if (mAligned) return mSourceAcc->getValue(ijk);
         const Vec3R world = mTargetXform->indexToWorld(ijk);
-        return SamplerT::template sample<AccessorType, ComputeType>(*mSourceAcc, mSourceXform->worldToIndex(world));
+        return SamplerT::sample(*mSourceAcc, mSourceXform->worldToIndex(world));
     }
     /// @brief Return true if the two grids are aligned.
     inline bool isAligned() const { return mAligned; }
@@ -611,7 +608,7 @@ roundVec3(const Vec3R& v)
 //////////////////////////////////////// PointSampler
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                      typename TreeT::ValueType& result)
@@ -619,7 +616,7 @@ PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     return inTree.probeValue(Coord(local_util::roundVec3(inCoord)), result);
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
@@ -743,12 +740,13 @@ BoxSampler::trilinearInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw)
 }
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                    typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
@@ -778,11 +776,12 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
 }
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord);
     const Vec3R uvw = inCoord - inIdx;
@@ -843,12 +842,13 @@ QuadraticSampler::triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R
     return _interpolate(vx, uvw.x());
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -872,11 +872,12 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     return active;
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
     const Vec3i inIdx = local_util::floorVec3(inCoord), inLoIdx = inIdx - Vec3i(1, 1, 1);
     const Vec3R uvw = inCoord - inIdx;
@@ -899,7 +900,7 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 //////////////////////////////////////// StaggeredPointSampler
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                               typename TreeT::ValueType& result)
@@ -920,7 +921,7 @@ StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     return active;
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
@@ -937,7 +938,7 @@ StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 //////////////////////////////////////// StaggeredBoxSampler
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
                             typename TreeT::ValueType& result)
@@ -948,9 +949,9 @@ StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     tempX = tempY = tempZ = zeroVal<ValueType>();
     bool active = false;
 
-    active = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.5, 0, 0), tempX) || active;
-    active = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0, 0.5, 0), tempY) || active;
-    active = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0, 0, 0.5), tempZ) || active;
+    active = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0, 0), tempX) || active;
+    active = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0, 0.5, 0), tempY) || active;
+    active = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0, 0, 0.5), tempZ) || active;
 
     result.x() = tempX.x();
     result.y() = tempY.y();
@@ -959,15 +960,15 @@ StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     return active;
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
 
-    const ValueT tempX = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
-    const ValueT tempY = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
-    const ValueT tempZ = BoxSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
+    const ValueT tempX = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
+    const ValueT tempY = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
+    const ValueT tempZ = BoxSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
 
     return ValueT(tempX.x(), tempY.y(), tempZ.z());
 }
@@ -976,7 +977,7 @@ StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 //////////////////////////////////////// StaggeredQuadraticSampler
 
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline bool
 StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     typename TreeT::ValueType& result)
@@ -986,9 +987,9 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     ValueType tempX, tempY, tempZ;
     bool active = false;
 
-    active = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.5, 0, 0), tempX) || active;
-    active = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0, 0.5, 0), tempY) || active;
-    active = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0, 0, 0.5), tempZ) || active;
+    active = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0, 0), tempX) || active;
+    active = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0, 0.5, 0), tempY) || active;
+    active = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0, 0, 0.5), tempZ) || active;
 
     result.x() = tempX.x();
     result.y() = tempY.y();
@@ -997,15 +998,15 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord,
     return active;
 }
 
-template<class TreeT, typename ComputeT>
+template<class TreeT>
 inline typename TreeT::ValueType
 StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     using ValueT = typename TreeT::ValueType;
 
-    const ValueT tempX = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
-    const ValueT tempY = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
-    const ValueT tempZ = QuadraticSampler::sample<TreeT, ComputeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
+    const ValueT tempX = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.5, 0.0, 0.0));
+    const ValueT tempY = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.5, 0.0));
+    const ValueT tempZ = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
 
     return ValueT(tempX.x(), tempY.y(), tempZ.z());
 }

@@ -167,8 +167,7 @@ private:
 /// op(Vec3s(0.0f, 1.0f, 2.0f), 5.0f);
 ///
 /// @endcode
-template <typename GridType, typename Derived, typename InterruptType = util::NullInterrupter,
-    typename ComputeType = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template <typename GridType, typename Derived, typename InterruptType = util::NullInterrupter>
 class ConvexVoxelizer
 {
     using GridPtr = typename GridType::Ptr;
@@ -184,7 +183,7 @@ class ConvexVoxelizer
 protected:
 
     using ValueT   = typename GridType::ValueType;
-    using ComputeT = ComputeType;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
     using Vec3T    = math::Vec3<ComputeT>;
     using Vec2T    = math::Vec2<ComputeT>;
 

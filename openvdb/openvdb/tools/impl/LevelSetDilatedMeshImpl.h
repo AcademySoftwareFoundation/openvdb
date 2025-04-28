@@ -45,37 +45,34 @@ namespace lvlset {
 /// Negative background tiles that fit inside the closed dilated triangle are also populated.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template <typename GridType, typename InterruptT = util::NullInterrupter>
 class OpenTriangularPrismVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
-          InterruptT,
-          ComputeT>
+          OpenTriangularPrismVoxelizer<GridType, InterruptT>,
+          InterruptT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        OpenTriangularPrismVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     using BaseT::mXYData;
     using BaseT::tileCeil;
 
-    using ValueT = typename BaseT::ValueT;
-    using Vec3T  = typename BaseT::Vec3T;
+    using ValueT   = typename BaseT::ValueT;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
+    using Vec3T    = typename BaseT::Vec3T;
 
 public:
 
     friend class ConvexVoxelizer<
         GridType,
-        OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        OpenTriangularPrismVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     /// @brief Constructor
@@ -354,38 +351,35 @@ private:
 /// The sector is defined by the intersection of two half spaces.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template <typename GridType, typename InterruptT = util::NullInterrupter>
 class OpenCapsuleWedgeVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
-          InterruptT,
-          ComputeT>
+          OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
+          InterruptT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     using BaseT::mXYData;
     using BaseT::tileCeil;
 
-    using ValueT = typename BaseT::ValueT;
-    using Vec3T  = typename BaseT::Vec3T;
-    using Vec2T  = typename BaseT::Vec2T;
+    using ValueT   = typename BaseT::ValueT;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
+    using Vec3T    = typename BaseT::Vec3T;
+    using Vec2T    = typename BaseT::Vec2T;
 
 public:
 
     friend class ConvexVoxelizer<
         GridType,
-        OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        OpenCapsuleWedgeVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     /// @brief Constructor
@@ -1223,8 +1217,8 @@ class DilatedMeshVoxelizer {
 
     using PartitionerT = tools::PointPartitioner<Index32, LeafT::LOG2DIM>;
 
-    using PrismVoxelizer = OpenTriangularPrismVoxelizer<GridType, InterruptT, ComputeT>;
-    using WedgeVoxelizer = OpenCapsuleWedgeVoxelizer<GridType, InterruptT, ComputeT>;
+    using PrismVoxelizer = OpenTriangularPrismVoxelizer<GridType, InterruptT>;
+    using WedgeVoxelizer = OpenCapsuleWedgeVoxelizer<GridType, InterruptT>;
 
     using MeshConnectivity = TriangleMeshEdgeConnectivity<ScalarType>;
 
@@ -1342,7 +1336,7 @@ private:
     inline void
     voxelizeCapsule(const Vec3T& p1, const Vec3T& p2, const Vec3T& p3)
     {
-        lvlset::CapsuleVoxelizer<GridType, InterruptT, ComputeT> voxelizer(mGrid, false);
+        lvlset::CapsuleVoxelizer<GridType, InterruptT> voxelizer(mGrid, false);
 
         ComputeT d1 = ComputeT((p2-p1).lengthSqr()),
                  d2 = ComputeT((p3-p2).lengthSqr()),

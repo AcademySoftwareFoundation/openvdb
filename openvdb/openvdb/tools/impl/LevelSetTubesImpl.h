@@ -44,38 +44,35 @@ namespace lvlset {
 /// representation of a capsule.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template <typename GridType, typename InterruptT = util::NullInterrupter>
 class CapsuleVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          CapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-          InterruptT,
-          ComputeT>
+          CapsuleVoxelizer<GridType, InterruptT>,
+          InterruptT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        CapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        CapsuleVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     using BaseT::mXYData;
     using BaseT::tileCeil;
 
-    using ValueT = typename BaseT::ValueT;
-    using Vec3T  = typename BaseT::Vec3T;
-    using Vec2T  = typename BaseT::Vec2T;
+    using ValueT   = typename BaseT::ValueT;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
+    using Vec3T    = typename BaseT::Vec3T;
+    using Vec2T    = typename BaseT::Vec2T;
 
 public:
 
     friend class ConvexVoxelizer<
         GridType,
-        CapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        CapsuleVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     /// @brief Constructor
@@ -470,38 +467,35 @@ private:
 /// representation of a tapered capsule.
 ///
 /// @note @c GridType::ValueType must be a floating-point scalar.
-template <typename GridType, typename InterruptT = util::NullInterrupter,
-    typename ComputeT = typename ComputeTypeFor<typename GridType::ValueType>::type>
+template <typename GridType, typename InterruptT = util::NullInterrupter>
 class TaperedCapsuleVoxelizer
     : public ConvexVoxelizer<
           GridType,
-          TaperedCapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-          InterruptT,
-          ComputeT>
+          TaperedCapsuleVoxelizer<GridType, InterruptT>,
+          InterruptT>
 {
     using GridPtr = typename GridType::Ptr;
 
     using BaseT = ConvexVoxelizer<
         GridType,
-        TaperedCapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        TaperedCapsuleVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     using BaseT::mXYData;
     using BaseT::tileCeil;
 
-    using ValueT = typename BaseT::ValueT;
-    using Vec3T  = typename BaseT::Vec3T;
-    using Vec2T  = typename BaseT::Vec2T;
+    using ValueT   = typename BaseT::ValueT;
+    using ComputeT = typename ComputeTypeFor<ValueT>::type;
+    using Vec3T    = typename BaseT::Vec3T;
+    using Vec2T    = typename BaseT::Vec2T;
 
 public:
 
     friend class ConvexVoxelizer<
         GridType,
-        TaperedCapsuleVoxelizer<GridType, InterruptT, ComputeT>,
-        InterruptT,
-        ComputeT
+        TaperedCapsuleVoxelizer<GridType, InterruptT>,
+        InterruptT
     >;
 
     /// @brief Constructor
@@ -1166,7 +1160,7 @@ private:
     inline void
     constantRadiusVoxelize(const tbb::blocked_range<size_t>& rng)
     {
-        CapsuleVoxelizer<GridType, InterruptT, ComputeT> voxelizer(mGrid, false);
+        CapsuleVoxelizer<GridType, InterruptT> voxelizer(mGrid, false);
 
         for (size_t i = rng.begin(); i < rng.end(); ++i) {
             for (auto it = mPtPartitioner->indices(i); it; ++it) {
@@ -1180,7 +1174,7 @@ private:
     inline void
     perSegmentRadiusVoxelize(const tbb::blocked_range<size_t>& rng)
     {
-        CapsuleVoxelizer<GridType, InterruptT, ComputeT> voxelizer(mGrid, false);
+        CapsuleVoxelizer<GridType, InterruptT> voxelizer(mGrid, false);
 
         for (size_t i = rng.begin(); i < rng.end(); ++i) {
             for (auto it = mPtPartitioner->indices(i); it; ++it) {
@@ -1194,9 +1188,9 @@ private:
     inline void
     perVertexRadiusVoxelize(const tbb::blocked_range<size_t>& rng)
     {
-        TaperedCapsuleVoxelizer<GridType, InterruptT, ComputeT> tc_voxelizer(mGrid, false);
+        TaperedCapsuleVoxelizer<GridType, InterruptT> tc_voxelizer(mGrid, false);
 
-        CapsuleVoxelizer<GridType, InterruptT, ComputeT> c_voxelizer(mGrid, false);
+        CapsuleVoxelizer<GridType, InterruptT> c_voxelizer(mGrid, false);
 
         for (size_t i = rng.begin(); i < rng.end(); ++i) {
             for (auto it = mPtPartitioner->indices(i); it; ++it) {
@@ -1417,7 +1411,7 @@ createLevelSetCapsule(const math::Vec3<ScalarType>& pt1, const math::Vec3<Scalar
     using ValueT   = typename GridType::ValueType;
     using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
-    using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT, ComputeT>;
+    using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT>;
 
     static_assert(openvdb::is_floating_point<ValueT>::value,
         "createLevelSetCapsule must return a scalar grid");
@@ -1457,8 +1451,8 @@ createLevelSetTaperedCapsule(const math::Vec3<ScalarType>& pt1, const math::Vec3
     using ValueT   = typename GridType::ValueType;
     using ComputeT = typename ComputeTypeFor<ValueT>::type;
 
-    using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT, ComputeT>;
-    using TaperedCapsuleVoxelizer = typename lvlset::TaperedCapsuleVoxelizer<GridType, InterruptT, ComputeT>;
+    using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT>;
+    using TaperedCapsuleVoxelizer = typename lvlset::TaperedCapsuleVoxelizer<GridType, InterruptT>;
 
     static_assert(openvdb::is_floating_point<ValueT>::value,
         "createLevelSetTaperedCapsule must return a scalar grid");

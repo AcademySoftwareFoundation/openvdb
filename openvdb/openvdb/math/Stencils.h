@@ -31,14 +31,15 @@ namespace math {
 
 ////////////////////////////////////////
 
-template<typename DerivedType, typename GridT, bool IsSafe,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
 public:
-    typedef GridT                                       GridType;
-    typedef typename GridT::TreeType                    TreeType;
-    typedef ValueT                                      ValueType;
+    typedef GridT                    GridType;
+    typedef typename GridT::TreeType TreeType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type ValueType;
+    
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
     typedef std::vector<ValueType>                      BufferType;
 
@@ -243,17 +244,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class SevenPointStencil
-    : public BaseStencil<SevenPointStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef SevenPointStencil<GridT, IsSafe, ValueT>  SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef SevenPointStencil<GridT, IsSafe>  SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 7;
 
@@ -276,7 +277,7 @@ private:
         BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// SevenPointStencil class
@@ -299,17 +300,17 @@ namespace { // anonymous namespace for stencil-layout map
     template<> struct BoxPt< 1, 1, 0> { enum { idx = 7 }; };
 }
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class BoxStencil
-    : public BaseStencil<BoxStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef BoxStencil<GridT, IsSafe, ValueT>         SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef BoxStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 8;
 
@@ -430,7 +431,7 @@ private:
         BaseType::template setValue< 1, 1, 0>(mAcc.getValue(ijk.offsetBy( 1, 1, 0)));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// BoxStencil class
@@ -471,17 +472,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class SecondOrderDenseStencil
-    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef SecondOrderDenseStencil<GridT, IsSafe, ValueT> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT>      BaseType;
+    typedef SecondOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe>      BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
 
@@ -518,7 +519,7 @@ private:
         mValues[DensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// SecondOrderDenseStencil class
@@ -552,17 +553,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class ThirteenPointStencil
-    : public BaseStencil<ThirteenPointStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<ThirteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef ThirteenPointStencil<GridT, IsSafe, ValueT> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT>   BaseType;
+    typedef ThirteenPointStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe>   BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 13;
 
@@ -591,7 +592,7 @@ private:
         mValues[ThirteenPt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// ThirteenPointStencil class
@@ -684,17 +685,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class FourthOrderDenseStencil
-    : public BaseStencil<FourthOrderDenseStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<FourthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef FourthOrderDenseStencil<GridT, IsSafe, ValueT> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT>      BaseType;
+    typedef FourthOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe>      BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 61;
 
@@ -782,7 +783,7 @@ private:
         mValues[FourthDensePt< 0, 2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-2));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// FourthOrderDenseStencil class
@@ -824,17 +825,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class NineteenPointStencil
-    : public BaseStencil<NineteenPointStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<NineteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef NineteenPointStencil<GridT, IsSafe, ValueT> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT>   BaseType;
+    typedef NineteenPointStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe>   BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
 
@@ -869,7 +870,7 @@ private:
         mValues[NineteenPt< 0, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -3));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// NineteenPointStencil class
@@ -1041,17 +1042,17 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class SixthOrderDenseStencil
-    : public BaseStencil<SixthOrderDenseStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<SixthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef SixthOrderDenseStencil<GridT, IsSafe, ValueT> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT>     BaseType;
+    typedef SixthOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe>     BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 127;
 
@@ -1210,7 +1211,7 @@ private:
         mValues[SixthDensePt< 0, 3,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-3));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
 };// SixthOrderDenseStencil class
@@ -1237,17 +1238,17 @@ namespace { // anonymous namespace for stencil-layout map
 ///
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class GradStencil
-    : public BaseStencil<GradStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef GradStencil<GridT, IsSafe, ValueT>        SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef GradStencil<GridT, IsSafe>        SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 7;
 
@@ -1359,7 +1360,7 @@ private:
         BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
     const ValueType mInv2Dx, mInvDx2;
@@ -1373,17 +1374,17 @@ private:
 ///
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class WenoStencil
-    : public BaseStencil<WenoStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef WenoStencil<GridT, IsSafe, ValueT>        SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef WenoStencil<GridT, IsSafe>        SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     static const int SIZE = 19;
 
@@ -1514,7 +1515,7 @@ private:
         mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  0,  3));
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
     const ValueType _mDx2, mInv2Dx, mInvDx2;
@@ -1525,17 +1526,17 @@ private:
 //////////////////////////////////////////////////////////////////////
 
 
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class CurvatureStencil
-    : public BaseStencil<CurvatureStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef CurvatureStencil<GridT, IsSafe, ValueT>   SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef CurvatureStencil<GridT, IsSafe>   SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
      static const int SIZE = 19;
 
@@ -1765,7 +1766,7 @@ private:
         return true;
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
     const ValueType mInv2Dx, mInvDx2;
@@ -1776,17 +1777,17 @@ private:
 
 
 /// @brief Dense stencil of a given width
-template<typename GridT, bool IsSafe = true,
-    typename ValueT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+template<typename GridT, bool IsSafe = true>
 class DenseStencil
-    : public BaseStencil<DenseStencil<GridT, IsSafe, ValueT>, GridT, IsSafe, ValueT>
+    : public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
-    typedef DenseStencil<GridT, IsSafe, ValueT>       SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe, ValueT> BaseType;
+    typedef DenseStencil<GridT, IsSafe>       SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
     typedef GridT                    GridType;
     typedef typename GridT::TreeType TreeType;
-    typedef ValueT                   ValueType;
+    
+    typedef typename ComputeTypeFor<typename GridT::ValueType>::type  ValueType;
 
     DenseStencil(const GridType& grid, int halfWidth)
         : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))
@@ -1828,7 +1829,7 @@ private:
         }
     }
 
-    template<typename, typename, bool, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
     const int mHalfWidth;

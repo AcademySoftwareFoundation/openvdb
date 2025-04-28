@@ -36,17 +36,16 @@ namespace tools {
 /// for unrestricted surface deformations
 template<typename GridT,
          typename MaskT = typename GridT::template ValueConverter<float>::Type,
-         typename InterruptT = util::NullInterrupter,
-         typename ComputeT = typename ComputeTypeFor<typename GridT::ValueType>::type>
+         typename InterruptT = util::NullInterrupter>
 class LevelSetFilter : public LevelSetTracker<GridT, InterruptT>
 {
 public:
-    using BaseType = LevelSetTracker<GridT, InterruptT, ComputeT>;
+    using BaseType = LevelSetTracker<GridT, InterruptT>;
     using GridType = GridT;
     using MaskType = MaskT;
     using TreeType = typename GridType::TreeType;
     using ValueType = typename TreeType::ValueType;
-    using ComputeType = ComputeT;
+    using ComputeType = typename ComputeTypeFor<ValueType>::type;
     using AlphaType = typename MaskType::ValueType;
     static_assert(openvdb::is_floating_point<AlphaType>::value,
         "LevelSetFilter requires a mask grid with floating-point values");
@@ -176,7 +175,7 @@ private:
         using BufferT = typename tree::LeafManager<TreeType>::BufferType;
         using LeafRange = typename tree::LeafManager<TreeType>::LeafRange;
         using LeafIterT = typename LeafRange::Iterator;
-        using AlphaMaskT = tools::AlphaMask<GridT, MaskT, tools::BoxSampler, ComputeType>;
+        using AlphaMaskT = tools::AlphaMask<GridT, MaskT, tools::BoxSampler>;
 
         Filter(LevelSetFilter* parent, const MaskType* mask) : mParent(parent), mMask(mask) {}
         Filter(const Filter&) = default;
@@ -248,9 +247,9 @@ private:
 
 ////////////////////////////////////////
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::median(int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::median(int width)
 {
     mParent->startInterrupter("Median-value flow of level set");
 
@@ -265,9 +264,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::median(int width)
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::mean(int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::mean(int width)
 {
     mParent->startInterrupter("Mean-value flow of level set");
 
@@ -276,9 +275,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::mean(int width)
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::gaussian(int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::gaussian(int width)
 {
     mParent->startInterrupter("Gaussian flow of level set");
 
@@ -287,9 +286,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::gaussian(int width)
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::box(int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::box(int width)
 {
     mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize()==0);
 
@@ -307,9 +306,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::box(int width)
     mParent->track();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::meanCurvature()
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvature()
 {
     mParent->startInterrupter("Mean-curvature flow of level set");
 
@@ -323,9 +322,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::meanCurvature()
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::fillet()
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::fillet()
 {
     mParent->startInterrupter("Filleting level set");
 
@@ -339,9 +338,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::fillet()
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::laplacian()
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacian()
 {
     mParent->startInterrupter("Laplacian flow of level set");
 
@@ -355,9 +354,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::laplacian()
     mParent->endInterrupter();
 }
 
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::offset(ComputeType value)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ComputeType value)
 {
     mParent->startInterrupter("Offsetting level set");
 
@@ -384,9 +383,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::offset(ComputeType v
 ///////////////////////// PRIVATE METHODS //////////////////////
 
 /// Performs parabolic mean-curvature diffusion
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::meanCurvatureImpl(const LeafRange& range)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRange& range)
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
@@ -422,9 +421,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::meanCurvatureImpl(co
 /// curvature, proportional to its magnitude. Leaves locations with non-negative
 /// principal curvatures untouched. This filter converges to the convex hull if
 /// iterated enough times.
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::filletImpl(const LeafRange& range)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::filletImpl(const LeafRange& range)
 {
     mParent->checkInterrupter();
 
@@ -471,9 +470,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::filletImpl(const Lea
 /// expensive! In other words if you're performing renormalization
 /// anyway (e.g. rebuilding the narrow-band) you should consider
 /// performing Laplacian diffusion over mean curvature flow!
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::laplacianImpl(const LeafRange& range)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange& range)
 {
     mParent->checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
@@ -506,9 +505,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::laplacianImpl(const 
 }
 
 /// Offsets the values by a constant
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::offsetImpl(
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offsetImpl(
     const LeafRange& range, ComputeType offset)
 {
     mParent->checkInterrupter();
@@ -532,9 +531,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::offsetImpl(
 }
 
 /// Performs simple but slow median-value diffusion
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::medianImpl(const LeafRange& range, int width)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::medianImpl(const LeafRange& range, int width)
 {
     mParent->checkInterrupter();
     typename math::DenseStencil<GridType> stencil(mParent->grid(), width);//creates local cache!
@@ -563,10 +562,10 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::medianImpl(const Lea
 }
 
 /// One dimensional convolution of a separable box filter
-template<typename GridT, typename MaskT, typename InterruptT, typename ComputeT>
+template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
 inline void
-LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::boxImpl(const LeafRange& range, Int32 w)
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range, Int32 w)
 {
     mParent->checkInterrupter();
     AvgT avg(mParent->grid(), w);
@@ -603,9 +602,9 @@ LevelSetFilter<GridT, MaskT, InterruptT, ComputeT>::Filter::boxImpl(const LeafRa
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-OPENVDB_INSTANTIATE_CLASS LevelSetFilter<HalfGrid, HalfGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetFilter<FloatGrid, FloatGrid, util::NullInterrupter, float>;
-OPENVDB_INSTANTIATE_CLASS LevelSetFilter<DoubleGrid, FloatGrid, util::NullInterrupter, double>;
+OPENVDB_INSTANTIATE_CLASS LevelSetFilter<HalfGrid, HalfGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetFilter<FloatGrid, FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetFilter<DoubleGrid, FloatGrid, util::NullInterrupter>;
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
