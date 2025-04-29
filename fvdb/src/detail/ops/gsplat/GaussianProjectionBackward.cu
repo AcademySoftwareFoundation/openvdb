@@ -33,7 +33,7 @@ computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
 
     T       accum = T(0);
     int32_t count = 0;
-    for (auto i = 0; i < C; i += N) {
+    for (auto i = 0; i < C * N; i += N) {
         const int32_t ri = radii[idx + i];
         if (ri <= 0) {
             continue;
@@ -46,7 +46,7 @@ computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
     }
     if constexpr (TRACK_MAX_RADII) {
         int32_t maxRad = 0;
-        for (auto i = 0; i < C; i += N) {
+        for (auto i = 0; i < C * N; i += N) {
             const int32_t ri = radii[idx + i];
             if (ri <= 0) {
                 continue;
@@ -259,9 +259,9 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     const torch::Tensor               &v_conics,                     // [C, N, 3]
     const at::optional<torch::Tensor> &v_compensations,              // [C, N] optional
     const bool viewmats_requires_grad, const bool ortho,
-    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum, // [C]
-    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,          // [C]
-    at::optional<torch::Tensor> outGradientStepCounts                // [C]
+    at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum, // [N]
+    at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,          // [N]
+    at::optional<torch::Tensor> outGradientStepCounts                // [N]
 ) {
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars = std::nullopt;
