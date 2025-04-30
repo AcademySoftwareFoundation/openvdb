@@ -10,35 +10,36 @@ namespace detail {
 namespace ops {
 
 __global__ void
-jIdxForJOffsets(TorchRAcc32<fvdb::JOffsetsType, 1> offsets,
-                TorchRAcc32<fvdb::JIdxType, 1>     outJIdx) {
+__launch_bounds__(1024)
+    jIdxForJOffsetsChild(fvdb::JOffsetsType start, fvdb::JOffsetsType end, fvdb::JIdxType i,
+                         TorchRAcc32<fvdb::JIdxType, 1> outJIdx) {
     const int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (idx >= outJIdx.size(0)) {
+    if (start + idx >= end) {
         return;
     }
 
-    fvdb::JIdxType left = 0, right = offsets.size(0) - 1;
+    outJIdx[start + idx] = i;
+}
 
-    while (left <= right) {
-        fvdb::JIdxType mid = left + (right - left) / 2;
+__global__ void
+__launch_bounds__(256) jIdxForJOffsetsParent(const TorchRAcc32<fvdb::JOffsetsType, 1> offsets,
+                                             TorchRAcc32<fvdb::JIdxType, 1>           outJIdx) {
+    const int32_t batchIdx = blockIdx.x * blockDim.x + threadIdx.x;
 
-        // Check if key is present at mid
-        if (idx >= offsets[mid] && idx < offsets[mid + 1]) {
-            outJIdx[idx] = mid;
-            return;
-        }
-
-        if (offsets[mid] < idx) {
-            // If key greater, ignore left half
-            left = mid + 1;
-        } else {
-            // If key is smaller, ignore right half
-            right = mid - 1;
-        }
+    if (batchIdx >= offsets.size(0) - 1) {
+        return;
     }
 
-    outJIdx[idx] = -1;
+    auto count = offsets[batchIdx + 1] - offsets[batchIdx];
+    if (!count) {
+        return;
+    }
+
+    constexpr int NUM_CHILD_THREADS = 1024;
+    const int     numChildBlocks    = GET_BLOCKS(count, NUM_CHILD_THREADS);
+    jIdxForJOffsetsChild<<<numChildBlocks, NUM_CHILD_THREADS>>>(
+        offsets[batchIdx], offsets[batchIdx + 1], static_cast<fvdb::JIdxType>(batchIdx), outJIdx);
 }
 
 template <>
@@ -47,17 +48,15 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
     TORCH_CHECK(numElements >= 0,
                 "Cannot call dispatchJIDxForOffsets with negative number of elements");
 
-    if (numElements == 0) {
-        return torch::zeros(
-            { 0 }, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
+    auto options = torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device());
+    torch::Tensor retJIdx = torch::empty({ numElements }, options);
+    if (!numElements) {
+        return retJIdx;
     }
-    torch::Tensor retJIdx =
-        torch::empty({ numElements },
-                     torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
 
-    const int NUM_THREADS = 1024;
-    const int NUM_BLOCKS  = GET_BLOCKS(numElements, NUM_THREADS);
-    jIdxForJOffsets<<<NUM_BLOCKS, NUM_THREADS>>>(
+    constexpr int NUM_PARENT_THREADS = 256;
+    const int     numParentBlocks    = GET_BLOCKS(joffsets.size(0) - 1, NUM_PARENT_THREADS);
+    jIdxForJOffsetsParent<<<numParentBlocks, NUM_PARENT_THREADS>>>(
         joffsets.packed_accessor32<fvdb::JOffsetsType, 1, torch::RestrictPtrTraits>(),
         retJIdx.packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -68,17 +67,19 @@ template <>
 torch::Tensor
 dispatchJIdxForJOffsets<torch::kCPU>(torch::Tensor joffsets, int64_t numElements) {
     TORCH_CHECK(numElements >= 0,
-                "Cannot call dispatchJIDxForOffsets with negaive number of elements");
-    if (numElements == 0) {
-        return torch::zeros(
-            { 0 }, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
+                "Cannot call dispatchJIDxForOffsets with negative number of elements");
+
+    auto options = torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device());
+    if (!numElements) {
+        return torch::empty({ numElements }, options);
     }
+
     std::vector<torch::Tensor> batchIdxs;
     batchIdxs.reserve(joffsets.size(0));
     for (int i = 0; i < joffsets.size(0) - 1; i += 1) {
         batchIdxs.push_back(torch::full(
             { joffsets[i + 1].item<fvdb::JOffsetsType>() - joffsets[i].item<fvdb::JOffsetsType>() },
-            i, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device())));
+            i, options));
     }
     return torch::cat(batchIdxs, 0);
 }
