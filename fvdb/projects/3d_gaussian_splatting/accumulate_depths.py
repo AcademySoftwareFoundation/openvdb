@@ -7,7 +7,7 @@ import torch
 import torch.utils.data
 import tqdm
 import tyro
-from datasets import ColmapDataset, ColmapParser
+from datasets import ColmapDataset
 from skimage import feature, morphology
 
 from fvdb import GaussianSplat3d
@@ -137,7 +137,7 @@ def accumulated_point_cloud(
 def main(
     checkpoint_path: str,
     data_path: str,
-    data_scale_factor: int = 4,
+    image_downsample_factor: int = 4,
     visualize_results: bool = False,
     device: str = "cuda",
 ):
@@ -150,7 +150,7 @@ def main(
     Args:
         checkpoint_path: Path to the GaussianSplat3d checkpoint.
         data_path: Path to the dataset.
-        data_scale_factor: Downsample factor for the depth images.
+        image_downsample_factor: Downsample factor for the depth images.
         visualize_results: Whether to visualize the results in Polyscope.
         device: Device to use
 
@@ -160,8 +160,7 @@ def main(
     checkpoint = torch.load(checkpoint_path, map_location=device)
     model = GaussianSplat3d.from_state_dict(checkpoint["splats"])
 
-    parser = ColmapParser(data_path, test_every=1, factor=data_scale_factor)
-    dataset = ColmapDataset(parser, split="test")
+    dataset = ColmapDataset(dataset_path=data_path, image_downsample_factor=image_downsample_factor, split="all")
 
     points, colors = accumulated_point_cloud(model, dataset, device=device)
     pcu.save_mesh_vc("accumulated_points.ply", points, colors)

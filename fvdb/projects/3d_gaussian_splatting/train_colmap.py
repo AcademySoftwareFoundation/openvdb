@@ -19,7 +19,7 @@ import tqdm
 import tyro
 import viser
 import yaml
-from datasets import ColmapDataset, ColmapParser
+from datasets import ColmapDataset
 from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
@@ -286,19 +286,26 @@ class Runner:
         self.writer = SummaryWriter(log_dir=self.tensorboard_dir) if not self.no_save else None
 
         # Load data: Training data should contain initial points and colors.
-        colmap_parser = ColmapParser(
-            data_dir=data_path,
-            factor=data_scale_factor,
-            normalization_type="ecef2enu" if normalize_ecef2enu else "pca",
+        normalization_type = "ecef2enu" if normalize_ecef2enu else "pca"
+        self.trainset = ColmapDataset(
+            dataset_path=data_path,
+            normalization_type=normalization_type,
+            image_downsample_factor=data_scale_factor,
             test_every=use_every_n_as_test,
+            split="train",
         )
-        self.trainset = ColmapDataset(colmap_parser, split="train")
-        self.valset = ColmapDataset(colmap_parser, split="val")
-        scene_scale = colmap_parser.scene_scale * 1.1
+        self.valset = ColmapDataset(
+            dataset_path=data_path,
+            normalization_type=normalization_type,
+            image_downsample_factor=data_scale_factor,
+            test_every=use_every_n_as_test,
+            split="test",
+        )
+        scene_scale = self.trainset.scene_scale * 1.1
         self.logger.info(f"Created dataset. Scene scale = {scene_scale}")
 
         # Initialize model
-        self.init_model(colmap_parser.points, colmap_parser.points_rgb)
+        self.init_model(self.trainset.points, self.trainset.points_rgb)
         self.logger.info(f"Model initialized with {self.model.num_gaussians} Gaussians")
 
         # Initialize optimizer
@@ -361,9 +368,8 @@ class Runner:
                 tic = time.time()
 
             minibatch = next(trainloader)
-            cam_to_world_mats = minibatch["camtoworld"].to(self.device)  # [B, 4, 4]
-            world_to_cam_mats = torch.linalg.inv(cam_to_world_mats).contiguous()  # [B, 4, 4]
-            intrinsics_mats = minibatch["K"].to(self.device)  # [B, 3, 3]
+            world_to_cam_mats = minibatch["worldtocam"].to(self.device)  # [B, 4, 4]
+            projection_mats = minibatch["K"].to(self.device)  # [B, 3, 3]
             image = minibatch["image"]  # [B, H, W, 3]
             mask = minibatch["mask"] if "mask" in minibatch else None
             image_height, image_width = image.shape[1:3]
@@ -373,7 +379,7 @@ class Runner:
             sh_degree_to_use = min(step // self.cfg.increase_sh_degree_every, self.cfg.sh_degree)
             projected_gaussians = self.model.project_gaussians_for_images(
                 world_to_cam_mats,
-                intrinsics_mats,
+                projection_mats,
                 image_width,
                 image_height,
                 self.cfg.near_plane,
@@ -505,9 +511,8 @@ class Runner:
         ellapsed_time = 0
         metrics = {"psnr": [], "ssim": [], "lpips": []}
         for i, data in enumerate(valloader):
-            cam_to_world_mats = data["camtoworld"].to(device)
-            world_to_cam_mats = torch.linalg.inv(cam_to_world_mats).contiguous()
-            intrinsics_mats = data["K"].to(device)
+            world_to_cam_mats = data["worldtocam"].to(device)
+            projection_mats = data["K"].to(device)
             pixels = data["image"].to(device) / 255.0
             mask_pixels = data["mask"] if "mask" in data else None
 
@@ -518,7 +523,7 @@ class Runner:
 
             colors, _ = self.model.render_images(
                 world_to_cam_mats,
-                intrinsics_mats,
+                projection_mats,
                 width,
                 height,
                 self.cfg.near_plane,

@@ -9,9 +9,9 @@ import torch
 import torch.utils.data
 import tqdm
 import tyro
-from datasets import ColmapDataset, ColmapParser
+from datasets import ColmapDataset
 
-from fvdb.nn.gaussian_splatting import GaussianSplat3D
+from fvdb import GaussianSplat3d
 
 
 def to_cam_open3d(image_width, image_height, K, world_view_transform):
@@ -34,8 +34,8 @@ def to_cam_open3d(image_width, image_height, K, world_view_transform):
 
 
 @torch.inference_mode()
-def mesh_gs(
-    model: GaussianSplat3D,
+def mesh_from_gaussian_splats(
+    model: GaussianSplat3d,
     dataset: ColmapDataset,
     voxel_size: float,
     sdf_trunc: float,
@@ -51,17 +51,12 @@ def mesh_gs(
 
     for data in tqdm.tqdm(dataloader):
         img = data["image"].to(device).squeeze()
-        K = data["K"].to(device).squeeze()
-        cam_to_world = data["camtoworld"].to(device).squeeze()
-        world_to_cam = torch.linalg.inv(cam_to_world).contiguous()
+        projection_mat = data["K"].to(device).squeeze()
+        world_to_cam_mat = data["worldtocam"].to(device).squeeze()
+        img_h, img_w = img.shape[0], img.shape[1]
 
-        rgbd, alphas, info = model(
-            image_w=img.shape[1],
-            image_h=img.shape[0],
-            extrinsics_mats=world_to_cam.unsqueeze(0),
-            intrinsics_mats=K.unsqueeze(0),
-            rasterize_mode="classic",
-            render_depth=True,
+        rgbd, alphas = model.render_images_and_depths(
+            world_to_cam_mat.unsqueeze(0), projection_mat.unsqueeze(0), img_w, img_h, near=0.01, far=1e10
         )
 
         rgb = rgbd[0, ..., 0:3]
@@ -83,7 +78,7 @@ def mesh_gs(
             convert_rgb_to_intensity=False,
             depth_scale=1.0,
         )
-        cam_o3d = to_cam_open3d(img.shape[1], img.shape[0], K, world_to_cam)
+        cam_o3d = to_cam_open3d(img.shape[1], img.shape[0], projection_mat, world_to_cam_mat)
         volume.integrate(rgbd, intrinsic=cam_o3d.intrinsic, extrinsic=cam_o3d.extrinsic)
 
     mesh = volume.extract_triangle_mesh()
@@ -97,18 +92,18 @@ def main(
     voxel_size: float = 0.5,  # TODO add logic to auto-tune these parameters
     sdf_trunc: float = 2.0,
     depth_trunc: float = 300.0,
-    data_scale_factor: int = 1,
+    image_downsample_factor: int = 1,
     device: str = "cuda",
 ):
     checkpoint = torch.load(checkpoint_path, map_location=device)
-    model = GaussianSplat3D(torch.rand([8, 3]), torch.rand([8, 3])).to(device)
-    model.load_state_dict(checkpoint["splats"])
+    model = GaussianSplat3d.from_state_dict(checkpoint["splats"])
 
-    parser = ColmapParser(data_path, test_every=1, factor=data_scale_factor)
-    dataset = ColmapDataset(parser, split="test")
+    dataset = ColmapDataset(dataset_path=data_path, image_downsample_factor=image_downsample_factor, split="all")
 
     print("extracting mesh")
-    mesh = mesh_gs(model, dataset, device=device, voxel_size=voxel_size, sdf_trunc=sdf_trunc, depth_trunc=depth_trunc)
+    mesh = mesh_from_gaussian_splats(
+        model, dataset, device=device, voxel_size=voxel_size, sdf_trunc=sdf_trunc, depth_trunc=depth_trunc
+    )
 
     print("saving mesh")
     o3d.io.write_triangle_mesh(os.path.join(results_path, "mesh.ply"), mesh)
