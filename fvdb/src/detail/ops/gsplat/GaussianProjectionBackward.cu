@@ -54,7 +54,7 @@ computeGradientState(const uint32_t C, const uint32_t N, const int32_t imageWidt
             }
             maxRad = nanovdb::math::Max(maxRad, ri);
         }
-        outMaxRadiiAccum[idx] = nanovdb::math::Max(outMaxRadiiAccum[idx], radii[idx]);
+        outMaxRadiiAccum[idx] = nanovdb::math::Max(outMaxRadiiAccum[idx], maxRad);
     }
     outDLossDMeans2dNormAccum[idx] += accum;
     outGradientStepCounts[idx] += count;
