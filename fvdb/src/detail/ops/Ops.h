@@ -680,12 +680,12 @@ dispatchGaussianRasterizeBackward(
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaussian sizes
-                                        const torch::Tensor &means,  // [M, 3]
-                                        const torch::Tensor &quats,  // [M, 4] optional
-                                        const torch::Tensor &scales, // [M, 3] optional
+                                        const torch::Tensor &means,  // [N, 3]
+                                        const torch::Tensor &quats,  // [N, 4] optional
+                                        const torch::Tensor &scales, // [N, 3] optional
                                         const torch::Tensor &cSizes, // [B] camera sizes
-                                        const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
-                                        const torch::Tensor &projectionMatrices, // [BC, 3, 3]
+                                        const torch::Tensor &worldToCamMatrices, // [C, 4, 4]
+                                        const torch::Tensor &projectionMatrices, // [C, 3, 3]
                                         const uint32_t imageWidth, const uint32_t imageHeight,
                                         const float eps2d, const float nearPlane,
                                         const float farPlane, const float minRadius2d,
@@ -715,7 +715,7 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaus
 /// @param[out] dLossDMeans2d Gradients with respect to projected 2D means [M, 2]
 /// @param[out] dLossDDepths Gradients with respect to depths [M]
 /// @param[out] dLossDConics Gradients with respect to conics [M, 3]
-/// @param[in] worldToCamRequiresGrad Whether viewmats requires gradient
+/// @param[in] worldToCamMatricesRequiresGrad Whether viewmats requires gradient
 /// @param[in] ortho Whether orthographic projection was used in forward pass
 ///
 /// @return std::tuple containing gradients of the loss function with respect to the input
@@ -729,20 +729,21 @@ dispatchGaussianProjectionJaggedForward(const torch::Tensor &gSizes, // [B] gaus
 template <c10::DeviceType>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedBackward(const torch::Tensor &gSizes, // [B] gaussian sizes
-                                         const torch::Tensor &means,  // [ggz, 3]
-                                         const torch::Tensor &quats,  // [ggz, 4] optional
-                                         const torch::Tensor &scales, // [ggz, 3] optional
+                                         const torch::Tensor &means,  // [N, 3]
+                                         const torch::Tensor &quats,  // [N, 4] optional
+                                         const torch::Tensor &scales, // [N, 3] optional
                                          const torch::Tensor &cSizes, // [B] camera sizes
-                                         const torch::Tensor &worldToCamMatrices, // [ccz, 4, 4]
-                                         const torch::Tensor &projectionMatrices, // [ccz, 3, 3]
+                                         const torch::Tensor &worldToCamMatrices, // [C, 4, 4]
+                                         const torch::Tensor &projectionMatrices, // [C, 3, 3]
                                          const uint32_t imageWidth, const uint32_t imageHeight,
                                          const float          eps2d,
-                                         const torch::Tensor &radii,              // [nnz]
-                                         const torch::Tensor &conics,             // [nnz, 3]
-                                         const torch::Tensor &dLossDMeans2d,      // [nnz, 2]
-                                         const torch::Tensor &dLossDDepths,       // [nnz]
-                                         const torch::Tensor &dLossDConics,       // [nnz, 3]
-                                         const bool worldToCamRequiresGrad, const bool ortho);
+                                         const torch::Tensor &radii,              // [N]
+                                         const torch::Tensor &conics,             // [N, 3]
+                                         const torch::Tensor &dLossDMeans2d,      // [N, 2]
+                                         const torch::Tensor &dLossDDepths,       // [N]
+                                         const torch::Tensor &dLossDConics,       // [N, 3]
+                                         const bool           worldToCamMatricesRequiresGrad,
+                                         const bool           ortho);
 
 /// @brief Create a mask identifying NaN or Inf values in Gaussian parameters
 ///

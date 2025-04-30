@@ -992,6 +992,26 @@ public:
 
     __hostdev__ const T* operator[](int i) const { return mMat[i]; }
     __hostdev__ T* operator[](int i) { return mMat[i]; }
+    __hostdev__ Mat2  operator-() const { return Mat2(-mMat[0][0], -mMat[0][1], -mMat[1][0], -mMat[1][1]); }
+
+    /// @brief Multiply by 2x2 matrix @a m and return the resulting matrix.
+    __hostdev__ Mat2<T> operator*(const Mat2<T>& m) const {
+        return Mat2<T>(
+            mMat[0][0] * m[0][0] + mMat[0][1] * m[1][0],
+            mMat[0][0] * m[0][1] + mMat[0][1] * m[1][1],
+            mMat[1][0] * m[0][0] + mMat[1][1] * m[1][0],
+            mMat[1][0] * m[0][1] + mMat[1][1] * m[1][1]
+        );
+    }
+
+    /// @brief Add each element of the given matrix to the corresponding element of this matrix.
+    __hostdev__ Mat2<T>& operator+=(const Mat2<T>& m) {
+        mMat[0][0] += m[0][0];
+        mMat[0][1] += m[0][1];
+        mMat[1][0] += m[1][0];
+        mMat[1][1] += m[1][1];
+        return *this;
+    }
 
     /// @brief returns transpose of this
     __hostdev__ Mat2<T> transpose() const {
@@ -1026,6 +1046,21 @@ public:
 
     __hostdev__ const T* operator[](int i) const { return mMat[i]; }
     __hostdev__ T* operator[](int i) { return mMat[i]; }
+
+    /// @brief Add two matrices and return the resulting matrix.
+    __hostdev__ Mat2x3<T> operator+(const Mat2x3<T>& m) const {
+        return Mat2x3<T>(
+            mMat[0][0] + m[0][0], mMat[0][1] + m[0][1], mMat[0][2] + m[0][2],
+            mMat[1][0] + m[1][0], mMat[1][1] + m[1][1], mMat[1][2] + m[1][2]
+        );
+    }
+
+    /// @brief Add a 2x3 matrix to this matrix.
+    __hostdev__ Mat2x3<T>& operator+=(const Mat2x3<T>& m) {
+        mMat[0][0] += m[0][0]; mMat[0][1] += m[0][1]; mMat[0][2] += m[0][2];
+        mMat[1][0] += m[1][0]; mMat[1][1] += m[1][1]; mMat[1][2] += m[1][2];
+        return *this;
+    }
 
     /// @brief returns transpose of this
     __hostdev__ Mat3x2<T> transpose() const {
@@ -1119,6 +1154,15 @@ public:
     __hostdev__ const T* operator[](int i) const { return mMat[i]; }
     __hostdev__ T* operator[](int i) { return mMat[i]; }
 
+    /// @brief Add two matrices and return the resulting matrix.
+    __hostdev__ Mat3<T> operator+(const Mat3<T>& m) const {
+        return Mat3<T>(
+            mMat[0][0] + m[0][0], mMat[0][1] + m[0][1], mMat[0][2] + m[0][2],
+            mMat[1][0] + m[1][0], mMat[1][1] + m[1][1], mMat[1][2] + m[1][2],
+            mMat[2][0] + m[2][0], mMat[2][1] + m[2][1], mMat[2][2] + m[2][2]
+        );
+    }
+
     /// @brief Multiply by @a v and return the resulting vector.
     __hostdev__ Vec3<T> operator*(const Vec3<T>& v) const {
         return Vec3<T>(
@@ -1141,6 +1185,14 @@ public:
             mMat[2][0] * m[0][1] + mMat[2][1] * m[1][1] + mMat[2][2] * m[2][1],
             mMat[2][0] * m[0][2] + mMat[2][1] * m[1][2] + mMat[2][2] * m[2][2]
         );
+    }
+
+    /// @brief Add each element of the given matrix to the corresponding element of this matrix.
+    __hostdev__ Mat3<T>& operator+=(const Mat3<T>& m) {
+        mMat[0][0] += m[0][0]; mMat[0][1] += m[0][1]; mMat[0][2] += m[0][2];
+        mMat[1][0] += m[1][0]; mMat[1][1] += m[1][1]; mMat[1][2] += m[1][2];
+        mMat[2][0] += m[2][0]; mMat[2][1] += m[2][1]; mMat[2][2] += m[2][2];
+        return *this;
     }
 
     /// @brief returns transpose of this
@@ -1201,6 +1253,12 @@ public:
     }
 };
 
+/// @brief Multiply a scalar by a 2x2 matrix, result is a 2x2 matrix
+template<typename T>
+__hostdev__ Mat2<T> operator*(const T& s, const Mat2<T>& m) {
+    return Mat2<T>(m[0][0] * s, m[0][1] * s, m[1][0] * s, m[1][1] * s);
+}
+
 /// @brief Multiply a 2x3 matrix by a 3x2 matrix, result is a 2x2 matrix
 template<typename T>
 __hostdev__ Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
@@ -1214,7 +1272,7 @@ __hostdev__ Mat2<T> operator*(const Mat2x3<T>& lhs, const Mat3x2<T>& rhs) {
         lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1] + lhs[1][2] * rhs[2][1]     // [1][1]
     );
 }
-
+/// @brief Multiply a 3x3 matrix by a 2x3 matrix, result is a 2x3 matrix
 template<typename T>
 __hostdev__ Mat2x3<T> operator*(const Mat3<T>& lhs, const Mat2x3<T>& rhs) {
     return Mat2x3<T>(
@@ -1229,7 +1287,7 @@ __hostdev__ Mat2x3<T> operator*(const Mat3<T>& lhs, const Mat2x3<T>& rhs) {
         lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
     );
 }
-
+/// @brief Multiply a 2x3 matrix by a 3x3 matrix, result is a 2x3 matrix
 template<typename T>
 __hostdev__ Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
     return Mat2x3<T>(
@@ -1244,8 +1302,50 @@ __hostdev__ Mat2x3<T> operator*(const Mat2x3<T>& lhs, const Mat3<T>& rhs) {
         lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2] + lhs[1][2] * rhs[2][2]
     );
 }
+/// @brief Multiply a 3x2 matrix by a 2x2 matrix, result is a 3x2 matrix
+template<typename T>
+__hostdev__ Mat3x2<T> operator*(const Mat3x2<T>& lhs, const Mat2<T>& rhs) {
+    return Mat3x2<T>(
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
+        lhs[2][0] * rhs[0][0] + lhs[2][1] * rhs[1][0],
+        lhs[2][0] * rhs[0][1] + lhs[2][1] * rhs[1][1]
+    );
+}
+/// @brief Multiply a 2x2 matrix by a 2x3 matrix, result is a 2x3 matrix
+template<typename T>
+__hostdev__ Mat2x3<T> operator*(const Mat2<T>& lhs, const Mat2x3<T>& rhs) {
+    return Mat2x3<T>(
+        // First row (3 elements)
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
 
+        // Second row (3 elements)
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2]
+    );
+}
+/// @brief Multiply a 3x2 matrix by a 2x3 matrix, result is a 3x3 matrix
+template<typename T>
+__hostdev__ Mat3<T> operator*(const Mat3x2<T>& lhs, const Mat2x3<T>& rhs) {
+    return Mat3<T>(
+        lhs[0][0] * rhs[0][0] + lhs[0][1] * rhs[1][0],
+        lhs[0][0] * rhs[0][1] + lhs[0][1] * rhs[1][1],
+        lhs[0][0] * rhs[0][2] + lhs[0][1] * rhs[1][2],
 
+        lhs[1][0] * rhs[0][0] + lhs[1][1] * rhs[1][0],
+        lhs[1][0] * rhs[0][1] + lhs[1][1] * rhs[1][1],
+        lhs[1][0] * rhs[0][2] + lhs[1][1] * rhs[1][2],
+
+        lhs[2][0] * rhs[0][0] + lhs[2][1] * rhs[1][0],
+        lhs[2][0] * rhs[0][1] + lhs[2][1] * rhs[1][1],
+        lhs[2][0] * rhs[0][2] + lhs[2][1] * rhs[1][2]
+    );
+}
 // ----------------------------> Vec3 <--------------------------------------
 
 /// @brief A simple vector class with three components, similar to openvdb::math::Vec3
@@ -1303,6 +1403,14 @@ public:
         return Vec3(mVec[1] * v[2] - mVec[2] * v[1],
                     mVec[2] * v[0] - mVec[0] * v[2],
                     mVec[0] * v[1] - mVec[1] * v[0]);
+    }
+    /// @brief Outer product of a 3x1 vector and a 1x3 vector, result is a 3x3 matrix
+    template<typename Vec3T>
+    __hostdev__ Mat3<ValueType> outer(const Vec3T& v) const
+    {
+        return Mat3<ValueType>(mVec[0] * v[0], mVec[0] * v[1], mVec[0] * v[2],
+                    mVec[1] * v[0], mVec[1] * v[1], mVec[1] * v[2],
+                    mVec[2] * v[0], mVec[2] * v[1], mVec[2] * v[2]);
     }
     __hostdev__ T lengthSqr() const
     {

@@ -1,7 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include "GaussianMacros.cuh"
 #include "GaussianUtils.cuh"
+#include "GaussianWarpUtils.cuh"
 #include <detail/ops/Ops.h>
 
 #include <nanovdb/math/Math.h>
@@ -20,9 +22,9 @@ namespace cg = cooperative_groups;
 
 template <typename T, bool TRACK_MAX_RADII>
 __global__ void
-computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
-                     const size_t imageHeight, const int32_t *__restrict__ radii,
-                     const T *__restrict__ dLossdMeans2d, T *__restrict__ outDLossdMeans2dNormAccum,
+computeGradientState(const uint32_t C, const uint32_t N, const int32_t imageWidth,
+                     const int32_t imageHeight, const int32_t *__restrict__ radii,
+                     const T *__restrict__ dLossDMeans2d, T *__restrict__ outDLossDMeans2dNormAccum,
                      int32_t *__restrict__ outMaxRadiiAccum,
                      int32_t *__restrict__ outGradientStepCounts) {
     const auto idx = cg::this_grid().thread_rank();
@@ -38,10 +40,9 @@ computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
         if (ri <= 0) {
             continue;
         }
-        const T dldm2x = dLossdMeans2d[(idx + i) * 2] * (T(imageWidth) / T(2) * T(C));
-        const T dldm2y = dLossdMeans2d[(idx + i) * 2 + 1] * (T(imageHeight) / T(2) * T(C));
+        const T dldm2x = dLossDMeans2d[(idx + i) * 2] * (T(imageWidth) / T(2) * T(C));
+        const T dldm2y = dLossDMeans2d[(idx + i) * 2 + 1] * (T(imageHeight) / T(2) * T(C));
         accum += nanovdb::math::Sqrt(dldm2x * dldm2x + dldm2y * dldm2y);
-        // maxRad = nanovdb::math::Max(maxRad, ri);
         count += 1;
     }
     if constexpr (TRACK_MAX_RADII) {
@@ -55,7 +56,7 @@ computeGradientState(const size_t C, const size_t N, const size_t imageWidth,
         }
         outMaxRadiiAccum[idx] = nanovdb::math::Max(outMaxRadiiAccum[idx], radii[idx]);
     }
-    outDLossdMeans2dNormAccum[idx] += accum;
+    outDLossDMeans2dNormAccum[idx] += accum;
     outGradientStepCounts[idx] += count;
 }
 
@@ -64,176 +65,180 @@ __global__ void
 projectionBackwardKernel(
     // fwd inputs
     const uint32_t C, const uint32_t N,
-    const T *__restrict__ means,    // [N, 3]
-    const T *__restrict__ covars,   // [N, 6] optional
-    const T *__restrict__ quats,    // [N, 4] optional
-    const T *__restrict__ scales,   // [N, 3] optional
-    const T *__restrict__ viewmats, // [C, 4, 4]
-    const T *__restrict__ Ks,       // [C, 3, 3]
-    const int32_t image_width, const int32_t image_height, const T eps2d,
+    const T *__restrict__ means,              // [N, 3]
+    const T *__restrict__ covars,             // [N, 6] optional
+    const T *__restrict__ quats,              // [N, 4] optional
+    const T *__restrict__ scales,             // [N, 3] optional
+    const T *__restrict__ worldToCamMatrices, // [C, 4, 4]
+    const T *__restrict__ projectionMatrices, // [C, 3, 3]
+    const int32_t imageWidth, const int32_t imageHeight, const T eps2d,
     // fwd outputs
     const int32_t *__restrict__ radii,   // [C, N]
     const T *__restrict__ conics,        // [C, N, 3]
     const T *__restrict__ compensations, // [C, N] optional
     // grad outputs
-    const T *__restrict__ v_means2d,       // [C, N, 2]
-    const T *__restrict__ v_depths,        // [C, N]
-    const T *__restrict__ v_conics,        // [C, N, 3]
-    const T *__restrict__ v_compensations, // [C, N] optional
+    const T *__restrict__ dLossDMeans2d,       // [C, N, 2]
+    const T *__restrict__ dLossDDepths,        // [C, N]
+    const T *__restrict__ dLossDConics,        // [C, N, 3]
+    const T *__restrict__ dLossDCompensations, // [C, N] optional
     // grad inputs
-    T *__restrict__ v_means,   // [N, 3]
-    T *__restrict__ v_covars,  // [N, 6] optional
-    T *__restrict__ v_quats,   // [N, 4] optional
-    T *__restrict__ v_scales,  // [N, 3] optional
-    T *__restrict__ v_viewmats // [C, 4, 4] optional
+    T *__restrict__ outDLossDMeans,             // [N, 3]
+    T *__restrict__ outDLossDCovars,            // [N, 6] optional
+    T *__restrict__ outDLossDQuats,             // [N, 4] optional
+    T *__restrict__ outDLossDScales,            // [N, 3] optional
+    T *__restrict__ outDLossDWorldToCamMatrices // [C, 4, 4] optional
 ) {
     // parallelize over C * N.
-    uint32_t idx = cg::this_grid().thread_rank();
+    const uint32_t idx = cg::this_grid().thread_rank();
     if (idx >= C * N || radii[idx] <= 0) {
         return;
     }
-    const uint32_t cid = idx / N; // camera id
-    const uint32_t gid = idx % N; // gaussian id
+    const uint32_t cId = idx / N; // camera id
+    const uint32_t gId = idx % N; // gaussian id
 
     // shift pointers to the current camera and gaussian
-    means += gid * 3;
-    viewmats += cid * 16;
-    Ks += cid * 9;
+    means += gId * 3;
+    worldToCamMatrices += cId * 16;
+    projectionMatrices += cId * 9;
 
     conics += idx * 3;
 
-    v_means2d += idx * 2;
-    v_depths += idx;
-    v_conics += idx * 3;
+    dLossDMeans2d += idx * 2;
+    dLossDDepths += idx;
+    dLossDConics += idx * 3;
 
     // vjp: compute the inverse of the 2d covariance
-    mat2<T> covar2d_inv   = mat2<T>(conics[0], conics[1], conics[1], conics[2]);
-    mat2<T> v_covar2d_inv = mat2<T>(v_conics[0], v_conics[1] * .5f, v_conics[1] * .5f, v_conics[2]);
-    mat2<T> v_covar2d(0.f);
-    inverse_vjp(covar2d_inv, v_covar2d_inv, v_covar2d);
+    const nanovdb::math::Mat2<T> covar2dInverse(conics[0], conics[1], conics[1], conics[2]);
+    const nanovdb::math::Mat2<T> dLossDCovar2dInverse(dLossDConics[0], dLossDConics[1] * .5f,
+                                                      dLossDConics[1] * .5f, dLossDConics[2]);
+    nanovdb::math::Mat2<T>       dLossDCovar2d =
+        inverseVectorJacobianProduct(covar2dInverse, dLossDCovar2dInverse);
 
-    if (v_compensations != nullptr) {
+    if (dLossDCompensations != nullptr) {
         // vjp: compensation term
-        const T compensation   = compensations[idx];
-        const T v_compensation = v_compensations[idx];
-        add_blur_vjp(eps2d, covar2d_inv, compensation, v_compensation, v_covar2d);
+        const T compensation       = compensations[idx];
+        const T dLossDCompensation = dLossDCompensations[idx];
+        dLossDCovar2d += generateBlurVectorJacobianProduct(eps2d, covar2dInverse, compensation,
+                                                           dLossDCompensation);
     }
 
     // transform Gaussian to camera space
-    mat3<T> R = mat3<T>(viewmats[0], viewmats[4],
-                        viewmats[8], // 1st column
-                        viewmats[1], viewmats[5],
-                        viewmats[9], // 2nd column
-                        viewmats[2], viewmats[6],
-                        viewmats[10] // 3rd column
-    );
-    vec3<T> t = vec3<T>(viewmats[3], viewmats[7], viewmats[11]);
-
-    mat3<T> covar;
-    vec4<T> quat;
-    vec3<T> scale;
+    const nanovdb::math::Mat3<T> R(
+        worldToCamMatrices[0], worldToCamMatrices[1], worldToCamMatrices[2],   // 1st row
+        worldToCamMatrices[4], worldToCamMatrices[5], worldToCamMatrices[6],   // 2nd row
+        worldToCamMatrices[8], worldToCamMatrices[9], worldToCamMatrices[10]); // 3rd row
+    const nanovdb::math::Vec3<T> t(worldToCamMatrices[3], worldToCamMatrices[7],
+                                   worldToCamMatrices[11]);
+    nanovdb::math::Mat3<T>       covar;
+    nanovdb::math::Vec4<T>       quat;
+    nanovdb::math::Vec3<T>       scale;
     if (covars != nullptr) {
-        covars += gid * 6;
-        covar = mat3<T>(covars[0], covars[1],
-                        covars[2], // 1st column
-                        covars[1], covars[3],
-                        covars[4], // 2nd column
-                        covars[2], covars[4],
-                        covars[5]  // 3rd column
+        covars += gId * 6;
+        covar = nanovdb::math::Mat3<T>(covars[0], covars[1], covars[2], // 1st row
+                                       covars[1], covars[3], covars[4], // 2nd row
+                                       covars[2], covars[4], covars[5]  // 3rd row
         );
     } else {
         // compute from quaternions and scales
-        quat  = glm::make_vec4(quats + gid * 4);
-        scale = glm::make_vec3(scales + gid * 3);
-        quat_scale_to_covar_preci<T>(quat, scale, &covar, nullptr);
+        quats += gId * 4;
+        scales += gId * 3;
+        quat  = nanovdb::math::Vec4<T>(quats[0], quats[1], quats[2], quats[3]);
+        scale = nanovdb::math::Vec3<T>(scales[0], scales[1], scales[2]);
+
+        covar = quaternionAndScaleToCovariance<T>(quat, scale);
     }
-    vec3<T> mean_c;
-    pos_world_to_cam(R, t, glm::make_vec3(means), mean_c);
-    mat3<T> covar_c;
-    covar_world_to_cam(R, covar, covar_c);
+
+    const nanovdb::math::Vec3<T> &meansCamSpace =
+        transformPointWorldToCam(R, t, nanovdb::math::Vec3<T>(means[0], means[1], means[2]));
+
+    const nanovdb::math::Mat3<T> &covarCamSpace = transformCovarianceWorldToCam(R, covar);
 
     // vjp: camera projection
-    T fx = Ks[0], cx = Ks[2], fy = Ks[4], cy = Ks[5];
-    auto [v_covar_c, v_mean_c] = [&]() {
+    const T fx = projectionMatrices[0], cx = projectionMatrices[2], fy = projectionMatrices[4],
+            cy                                     = projectionMatrices[5];
+    auto [dLossDCovarCamSpace, dLossDMeanCamSpace] = [&]() {
         if constexpr (Ortho) {
-            return ortho_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height,
-                                     v_covar2d, glm::make_vec2(v_means2d));
+            return projectGaussianOrthographicVectorJacobianProduct<T>(
+                meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth, imageHeight,
+                dLossDCovar2d, nanovdb::math::Vec2<T>(dLossDMeans2d[0], dLossDMeans2d[1]));
         } else {
-            return persp_proj_vjp<T>(mean_c, covar_c, fx, fy, cx, cy, image_width, image_height,
-                                     v_covar2d, glm::make_vec2(v_means2d));
+            return projectGaussianPerspectiveVectorJacobianProduct<T>(
+                meansCamSpace, covarCamSpace, fx, fy, cx, cy, imageWidth, imageHeight,
+                dLossDCovar2d, nanovdb::math::Vec2<T>(dLossDMeans2d[0], dLossDMeans2d[1]));
         }
     }();
 
-    // add contribution from v_depths
-    v_mean_c.z += v_depths[0];
+    // add contribution from dLossDDepths
+    dLossDMeanCamSpace[2] += dLossDDepths[0];
 
     // vjp: transform Gaussian covariance to camera space
-    vec3<T> v_mean(0.f);
-    mat3<T> v_covar(0.f);
-    mat3<T> v_R(0.f);
-    vec3<T> v_t(0.f);
-    pos_world_to_cam_vjp(R, t, glm::make_vec3(means), v_mean_c, v_R, v_t, v_mean);
-    covar_world_to_cam_vjp(R, covar, v_covar_c, v_R, v_covar);
+    auto [dLossDRotation, dLossDTranslation, dLossDPoint] =
+        transformPointWorldToCamVectorJacobianProduct(
+            R, t, nanovdb::math::Vec3<T>(means[0], means[1], means[2]), dLossDMeanCamSpace);
 
-    // #if __CUDA_ARCH__ >= 700
+    auto [dLossDRotationCov, dLossDCovar] =
+        transformCovarianceWorldToCamVectorJacobianProduct(R, covar, dLossDCovarCamSpace);
+
+    dLossDRotation += dLossDRotationCov;
+
     // write out results with warp-level reduction
     auto warp         = cg::tiled_partition<32>(cg::this_thread_block());
-    auto warp_group_g = cg::labeled_partition(warp, gid);
-    if (v_means != nullptr) {
-        warpSum(v_mean, warp_group_g);
+    auto warp_group_g = cg::labeled_partition(warp, gId);
+    if (outDLossDMeans != nullptr) {
+        warpSum(dLossDPoint, warp_group_g);
         if (warp_group_g.thread_rank() == 0) {
-            v_means += gid * 3;
+            outDLossDMeans += gId * 3;
             GSPLAT_PRAGMA_UNROLL
             for (uint32_t i = 0; i < 3; i++) {
-                gpuAtomicAdd(v_means + i, v_mean[i]);
+                gpuAtomicAdd(outDLossDMeans + i, dLossDPoint[i]);
             }
         }
     }
-    if (v_covars != nullptr) {
+    if (outDLossDCovars != nullptr) {
         // Output gradients w.r.t. the covariance matrix
-        warpSum(v_covar, warp_group_g);
+        warpSum(dLossDCovar, warp_group_g);
         if (warp_group_g.thread_rank() == 0) {
-            v_covars += gid * 6;
-            gpuAtomicAdd(v_covars, v_covar[0][0]);
-            gpuAtomicAdd(v_covars + 1, v_covar[0][1] + v_covar[1][0]);
-            gpuAtomicAdd(v_covars + 2, v_covar[0][2] + v_covar[2][0]);
-            gpuAtomicAdd(v_covars + 3, v_covar[1][1]);
-            gpuAtomicAdd(v_covars + 4, v_covar[1][2] + v_covar[2][1]);
-            gpuAtomicAdd(v_covars + 5, v_covar[2][2]);
+            outDLossDCovars += gId * 6;
+            gpuAtomicAdd(outDLossDCovars, dLossDCovar[0][0]);
+            gpuAtomicAdd(outDLossDCovars + 1, dLossDCovar[0][1] + dLossDCovar[1][0]);
+            gpuAtomicAdd(outDLossDCovars + 2, dLossDCovar[0][2] + dLossDCovar[2][0]);
+            gpuAtomicAdd(outDLossDCovars + 3, dLossDCovar[1][1]);
+            gpuAtomicAdd(outDLossDCovars + 4, dLossDCovar[1][2] + dLossDCovar[2][1]);
+            gpuAtomicAdd(outDLossDCovars + 5, dLossDCovar[2][2]);
         }
     } else {
         // Directly output gradients w.r.t. the quaternion and scale
-        mat3<T> rotmat = quat_to_rotmat<T>(quat);
-        vec4<T> v_quat(0.f);
-        vec3<T> v_scale(0.f);
-        quat_scale_to_covar_vjp<T>(quat, scale, rotmat, v_covar, v_quat, v_scale);
-        warpSum(v_quat, warp_group_g);
-        warpSum(v_scale, warp_group_g);
+        const nanovdb::math::Mat3<T> &rotmat = quaternionToRotationMatrix<T>(quat);
+
+        auto [dLossDQuat, dLossDScale] = quaternionAndScaleToCovarianceVectorJacobianProduct<T>(
+            quat, scale, rotmat, dLossDCovar);
+
+        warpSum(dLossDScale, warp_group_g);
         if (warp_group_g.thread_rank() == 0) {
-            v_quats += gid * 4;
-            v_scales += gid * 3;
-            gpuAtomicAdd(v_quats, v_quat[0]);
-            gpuAtomicAdd(v_quats + 1, v_quat[1]);
-            gpuAtomicAdd(v_quats + 2, v_quat[2]);
-            gpuAtomicAdd(v_quats + 3, v_quat[3]);
-            gpuAtomicAdd(v_scales, v_scale[0]);
-            gpuAtomicAdd(v_scales + 1, v_scale[1]);
-            gpuAtomicAdd(v_scales + 2, v_scale[2]);
+            outDLossDQuats += gId * 4;
+            outDLossDScales += gId * 3;
+            gpuAtomicAdd(outDLossDQuats, dLossDQuat[0]);
+            gpuAtomicAdd(outDLossDQuats + 1, dLossDQuat[1]);
+            gpuAtomicAdd(outDLossDQuats + 2, dLossDQuat[2]);
+            gpuAtomicAdd(outDLossDQuats + 3, dLossDQuat[3]);
+            gpuAtomicAdd(outDLossDScales, dLossDScale[0]);
+            gpuAtomicAdd(outDLossDScales + 1, dLossDScale[1]);
+            gpuAtomicAdd(outDLossDScales + 2, dLossDScale[2]);
         }
     }
-    if (v_viewmats != nullptr) {
-        auto warp_group_c = cg::labeled_partition(warp, cid);
-        warpSum(v_R, warp_group_c);
-        warpSum(v_t, warp_group_c);
+    if (outDLossDWorldToCamMatrices != nullptr) {
+        auto warp_group_c = cg::labeled_partition(warp, cId);
+        warpSum(dLossDRotation, warp_group_c);
+        warpSum(dLossDTranslation, warp_group_c);
         if (warp_group_c.thread_rank() == 0) {
-            v_viewmats += cid * 16;
+            outDLossDWorldToCamMatrices += cId * 16;
             GSPLAT_PRAGMA_UNROLL
             for (uint32_t i = 0; i < 3; i++) {     // rows
                 GSPLAT_PRAGMA_UNROLL
                 for (uint32_t j = 0; j < 3; j++) { // cols
-                    gpuAtomicAdd(v_viewmats + i * 4 + j, v_R[j][i]);
+                    gpuAtomicAdd(outDLossDWorldToCamMatrices + i * 4 + j, dLossDRotation[i][j]);
                 }
-                gpuAtomicAdd(v_viewmats + i * 4 + 3, v_t[i]);
+                gpuAtomicAdd(outDLossDWorldToCamMatrices + i * 4 + 3, dLossDTranslation[i]);
             }
         }
     }
@@ -243,22 +248,22 @@ template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionBackward<torch::kCUDA>(
     // fwd inputs
-    const torch::Tensor               &means,         // [N, 3]
-    const torch::Tensor               &quats,         // [N, 4]
-    const torch::Tensor               &scales,        // [N, 3]
-    const torch::Tensor               &viewmats,      // [C, 4, 4]
-    const torch::Tensor               &Ks,            // [C, 3, 3]
-    const at::optional<torch::Tensor> &compensations, // [N, 6] optional
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
+    const torch::Tensor               &means,              // [N, 3]
+    const torch::Tensor               &quats,              // [N, 4]
+    const torch::Tensor               &scales,             // [N, 3]
+    const torch::Tensor               &worldToCamMatrices, // [C, 4, 4]
+    const torch::Tensor               &projectionMatrices, // [C, 3, 3]
+    const at::optional<torch::Tensor> &compensations,      // [N, 6] optional
+    const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
     // fwd outputs
     const torch::Tensor &radii,  // [C, N]
     const torch::Tensor &conics, // [C, N, 3]
     // grad outputs
-    const torch::Tensor               &v_means2d,                    // [C, N, 2]
-    const torch::Tensor               &v_depths,                     // [C, N]
-    const torch::Tensor               &v_conics,                     // [C, N, 3]
-    const at::optional<torch::Tensor> &v_compensations,              // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho,
+    const torch::Tensor               &dLossDMeans2d,                // [C, N, 2]
+    const torch::Tensor               &dLossDDepths,                 // [C, N]
+    const torch::Tensor               &dLossDConics,                 // [C, N, 3]
+    const at::optional<torch::Tensor> &dLossDCompensations,          // [C, N] optional
+    const bool worldToCamMatricesRequiresGrad, const bool ortho,
     at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum, // [N]
     at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,          // [N]
     at::optional<torch::Tensor> outGradientStepCounts                // [N]
@@ -266,7 +271,7 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     // These are supported by the underlying kernel, but they are not exposed
     const at::optional<torch::Tensor> &covars = std::nullopt;
     // const at::optional<torch::Tensor> &compensations = std::nullopt;
-    // const at::optional<torch::Tensor> &v_compensations = std::nullopt;
+    // const at::optional<torch::Tensor> &dLossDCompensations = std::nullopt;
 
     GSPLAT_DEVICE_GUARD(means);
     GSPLAT_CHECK_INPUT(means);
@@ -276,36 +281,36 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
         GSPLAT_CHECK_INPUT(quats);
         GSPLAT_CHECK_INPUT(scales);
     }
-    GSPLAT_CHECK_INPUT(viewmats);
-    GSPLAT_CHECK_INPUT(Ks);
+    GSPLAT_CHECK_INPUT(worldToCamMatrices);
+    GSPLAT_CHECK_INPUT(projectionMatrices);
     GSPLAT_CHECK_INPUT(radii);
     GSPLAT_CHECK_INPUT(conics);
-    GSPLAT_CHECK_INPUT(v_means2d);
-    GSPLAT_CHECK_INPUT(v_depths);
-    GSPLAT_CHECK_INPUT(v_conics);
+    GSPLAT_CHECK_INPUT(dLossDMeans2d);
+    GSPLAT_CHECK_INPUT(dLossDDepths);
+    GSPLAT_CHECK_INPUT(dLossDConics);
     if (compensations.has_value()) {
         GSPLAT_CHECK_INPUT(compensations.value());
     }
-    if (v_compensations.has_value()) {
-        GSPLAT_CHECK_INPUT(v_compensations.value());
+    if (dLossDCompensations.has_value()) {
+        GSPLAT_CHECK_INPUT(dLossDCompensations.value());
         assert(compensations.has_value());
     }
 
-    uint32_t             N      = means.size(0);    // number of gaussians
-    uint32_t             C      = viewmats.size(0); // number of cameras
+    const uint32_t       N      = means.size(0);              // number of gaussians
+    const uint32_t       C      = worldToCamMatrices.size(0); // number of cameras
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
-    torch::Tensor v_means = torch::zeros_like(means);
-    torch::Tensor v_covars, v_quats, v_scales; // optional
+    torch::Tensor dLossDMeans = torch::zeros_like(means);
+    torch::Tensor dLossDCovars, dLossDQuats, dLossDScales; // optional
     if (covars.has_value()) {
-        v_covars = torch::zeros_like(covars.value());
+        dLossDCovars = torch::zeros_like(covars.value());
     } else {
-        v_quats  = torch::zeros_like(quats);
-        v_scales = torch::zeros_like(scales);
+        dLossDQuats  = torch::zeros_like(quats);
+        dLossDScales = torch::zeros_like(scales);
     }
-    torch::Tensor v_viewmats;
-    if (viewmats_requires_grad) {
-        v_viewmats = torch::zeros_like(viewmats);
+    torch::Tensor dLossDWorldToCamMatrices;
+    if (worldToCamMatricesRequiresGrad) {
+        dLossDWorldToCamMatrices = torch::zeros_like(worldToCamMatrices);
     }
     if (C && N) {
         if (ortho) {
@@ -315,18 +320,20 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : scales.data_ptr<float>(),
-                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
-                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    worldToCamMatrices.data_ptr<float>(), projectionMatrices.data_ptr<float>(),
+                    imageWidth, imageHeight, eps2d, radii.data_ptr<int32_t>(),
+                    conics.data_ptr<float>(),
                     compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
-                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
-                    v_conics.data_ptr<float>(),
-                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
-                                                : nullptr,
-                    v_means.data_ptr<float>(),
-                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
-                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
-                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+                    dLossDMeans2d.data_ptr<float>(), dLossDDepths.data_ptr<float>(),
+                    dLossDConics.data_ptr<float>(),
+                    dLossDCompensations.has_value() ? dLossDCompensations.value().data_ptr<float>()
+                                                    : nullptr,
+                    dLossDMeans.data_ptr<float>(),
+                    covars.has_value() ? dLossDCovars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : dLossDQuats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : dLossDScales.data_ptr<float>(),
+                    worldToCamMatricesRequiresGrad ? dLossDWorldToCamMatrices.data_ptr<float>()
+                                                   : nullptr);
         } else {
             projectionBackwardKernel<float, false>
                 <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
@@ -334,18 +341,20 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
                     covars.has_value() ? nullptr : quats.data_ptr<float>(),
                     covars.has_value() ? nullptr : scales.data_ptr<float>(),
-                    viewmats.data_ptr<float>(), Ks.data_ptr<float>(), image_width, image_height,
-                    eps2d, radii.data_ptr<int32_t>(), conics.data_ptr<float>(),
+                    worldToCamMatrices.data_ptr<float>(), projectionMatrices.data_ptr<float>(),
+                    imageWidth, imageHeight, eps2d, radii.data_ptr<int32_t>(),
+                    conics.data_ptr<float>(),
                     compensations.has_value() ? compensations.value().data_ptr<float>() : nullptr,
-                    v_means2d.data_ptr<float>(), v_depths.data_ptr<float>(),
-                    v_conics.data_ptr<float>(),
-                    v_compensations.has_value() ? v_compensations.value().data_ptr<float>()
-                                                : nullptr,
-                    v_means.data_ptr<float>(),
-                    covars.has_value() ? v_covars.data_ptr<float>() : nullptr,
-                    covars.has_value() ? nullptr : v_quats.data_ptr<float>(),
-                    covars.has_value() ? nullptr : v_scales.data_ptr<float>(),
-                    viewmats_requires_grad ? v_viewmats.data_ptr<float>() : nullptr);
+                    dLossDMeans2d.data_ptr<float>(), dLossDDepths.data_ptr<float>(),
+                    dLossDConics.data_ptr<float>(),
+                    dLossDCompensations.has_value() ? dLossDCompensations.value().data_ptr<float>()
+                                                    : nullptr,
+                    dLossDMeans.data_ptr<float>(),
+                    covars.has_value() ? dLossDCovars.data_ptr<float>() : nullptr,
+                    covars.has_value() ? nullptr : dLossDQuats.data_ptr<float>(),
+                    covars.has_value() ? nullptr : dLossDScales.data_ptr<float>(),
+                    worldToCamMatricesRequiresGrad ? dLossDWorldToCamMatrices.data_ptr<float>()
+                                                   : nullptr);
         }
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
@@ -360,43 +369,44 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                 computeGradientState<float, true>
                     <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
                        NUM_GRAD_STATE_THREADS, 0, stream>>>(
-                        C, N, image_width, image_height, radii.data_ptr<int32_t>(),
-                        v_means2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
+                        C, N, imageWidth, imageHeight, radii.data_ptr<int32_t>(),
+                        dLossDMeans2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
                         outNormalizedMaxRadiiAccumPtr, outGradientStepCountsPtr);
             } else {
                 computeGradientState<float, false>
                     <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
                        NUM_GRAD_STATE_THREADS, 0, stream>>>(
-                        C, N, image_width, image_height, radii.data_ptr<int32_t>(),
-                        v_means2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
+                        C, N, imageWidth, imageHeight, radii.data_ptr<int32_t>(),
+                        dLossDMeans2d.data_ptr<float>(), outNormalizeddLossdMeans2dNormAccumPtr,
                         nullptr, outGradientStepCountsPtr);
             }
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
     }
-    return std::make_tuple(v_means, v_covars, v_quats, v_scales, v_viewmats);
+    return std::make_tuple(dLossDMeans, dLossDCovars, dLossDQuats, dLossDScales,
+                           dLossDWorldToCamMatrices);
 }
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionBackward<torch::kCPU>(
     // fwd inputs
-    const torch::Tensor               &means,         // [N, 3]
-    const torch::Tensor               &quats,         // [N, 4]
-    const torch::Tensor               &scales,        // [N, 3]
-    const torch::Tensor               &viewmats,      // [C, 4, 4]
-    const torch::Tensor               &Ks,            // [C, 3, 3]
-    const at::optional<torch::Tensor> &compensations, // [N, 6] optional
-    const uint32_t image_width, const uint32_t image_height, const float eps2d,
+    const torch::Tensor               &means,              // [N, 3]
+    const torch::Tensor               &quats,              // [N, 4]
+    const torch::Tensor               &scales,             // [N, 3]
+    const torch::Tensor               &worldToCamMatrices, // [C, 4, 4]
+    const torch::Tensor               &projectionMatrices, // [C, 3, 3]
+    const at::optional<torch::Tensor> &compensations,      // [N, 6] optional
+    const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
     // fwd outputs
     const torch::Tensor &radii,  // [C, N]
     const torch::Tensor &conics, // [C, N, 3]
     // grad outputs
-    const torch::Tensor               &v_means2d,       // [C, N, 2]
-    const torch::Tensor               &v_depths,        // [C, N]
-    const torch::Tensor               &v_conics,        // [C, N, 3]
-    const at::optional<torch::Tensor> &v_compensations, // [C, N] optional
-    const bool viewmats_requires_grad, const bool ortho,
+    const torch::Tensor               &dLossDMeans2d,       // [C, N, 2]
+    const torch::Tensor               &dLossDDepths,        // [C, N]
+    const torch::Tensor               &dLossDConics,        // [C, N, 3]
+    const at::optional<torch::Tensor> &dLossDCompensations, // [C, N] optional
+    const bool worldToCamMatricesRequiresGrad, const bool ortho,
     at::optional<torch::Tensor> outNormalizeddLossdMeans2dNormAccum,
     at::optional<torch::Tensor> outNormalizedMaxRadiiAccum,
     at::optional<torch::Tensor> outGradientStepCounts) {

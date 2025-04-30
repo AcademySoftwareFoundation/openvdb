@@ -5,7 +5,7 @@
 CPMAddPackage(
   NAME fvdb_test_data
   GITHUB_REPOSITORY voxel-foundation/fvdb-test-data
-  GIT_TAG 9eca5724ea0f766dec7d4800ff75bf1e24e9f871
+  GIT_TAG 10f7c79b603461280ab78d7aa722935574a7163b
   DOWNLOAD_ONLY YES
 )
 
