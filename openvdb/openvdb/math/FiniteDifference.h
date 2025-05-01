@@ -303,6 +303,10 @@ inline ValueType
 WENO5(const ValueType& v1, const ValueType& v2, const ValueType& v3,
     const ValueType& v4, const ValueType& v5, float scale2 = 0.01f)
 {
+    using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+    const ComputeType f1 = v1, f2 = v2, f3 = v3, f4 = v4, f5 = v5;
+
     const double C = 13.0 / 12.0;
     // WENO is formulated for non-dimensional equations, here the optional scale2
     // is a reference value (squared) for the function being interpolated.  For
@@ -310,14 +314,14 @@ WENO5(const ValueType& v1, const ValueType& v2, const ValueType& v3,
     // leave scale2 = 1.
     const double eps = 1.0e-6 * static_cast<double>(scale2);
     // {\tilde \omega_k} = \gamma_k / ( \beta_k + \epsilon)^2 in Shu's ICASE report)
-    const double A1=0.1/math::Pow2(C*math::Pow2(v1-2*v2+v3)+0.25*math::Pow2(v1-4*v2+3.0*v3)+eps),
-                 A2=0.6/math::Pow2(C*math::Pow2(v2-2*v3+v4)+0.25*math::Pow2(v2-v4)+eps),
-                 A3=0.3/math::Pow2(C*math::Pow2(v3-2*v4+v5)+0.25*math::Pow2(3.0*v3-4*v4+v5)+eps);
+    const double A1=0.1/math::Pow2(C*math::Pow2(f1-2*f2+f3)+0.25*math::Pow2(f1-4*f2+3.0*f3)+eps),
+                 A2=0.6/math::Pow2(C*math::Pow2(f2-2*f3+f4)+0.25*math::Pow2(f2-f4)+eps),
+                 A3=0.3/math::Pow2(C*math::Pow2(f3-2*f4+f5)+0.25*math::Pow2(3.0*f3-4*f4+f5)+eps);
 
     return static_cast<ValueType>(static_cast<ValueType>(
-        A1*(2.0*v1 - 7.0*v2 + 11.0*v3) +
-        A2*(5.0*v3 -     v2 +  2.0*v4) +
-        A3*(2.0*v3 + 5.0*v4 -      v5))/(6.0*(A1+A2+A3)));
+        A1*(2.0*f1 - 7.0*f2 + 11.0*f3) +
+        A2*(5.0*f3 -     f2 +  2.0*f4) +
+        A3*(2.0*f3 + 5.0*f4 -      f5))/(6.0*(A1+A2+A3)));
 }
 
 
@@ -331,18 +335,23 @@ inline Real GodunovsNormSqrd(bool isOutside,
     using math::Min;
     using math::Pow2;
 
-    const Real zero(0);
-    Real dPLen2;
+    using ComputeType = typename ComputeTypeFor<Real>::type;
+
+    const ComputeType dpXm = dP_xm, dpYm = dP_ym, dpZm = dP_zm,
+                      dpXp = dP_xp, dpYp = dP_yp, dpZp = dP_zp;
+
+    const ComputeType zero(0);
+    ComputeType dPLen2;
     if (isOutside) { // outside
-        dPLen2  = Max(Pow2(Max(dP_xm, zero)), Pow2(Min(dP_xp,zero))); // (dP/dx)2
-        dPLen2 += Max(Pow2(Max(dP_ym, zero)), Pow2(Min(dP_yp,zero))); // (dP/dy)2
-        dPLen2 += Max(Pow2(Max(dP_zm, zero)), Pow2(Min(dP_zp,zero))); // (dP/dz)2
+        dPLen2  = Max(Pow2(Max(dpXm, zero)), Pow2(Min(dpXp, zero))); // (dP/dx)2
+        dPLen2 += Max(Pow2(Max(dpYm, zero)), Pow2(Min(dpYp, zero))); // (dP/dy)2
+        dPLen2 += Max(Pow2(Max(dpZm, zero)), Pow2(Min(dpZp, zero))); // (dP/dz)2
     } else { // inside
-        dPLen2  = Max(Pow2(Min(dP_xm, zero)), Pow2(Max(dP_xp,zero))); // (dP/dx)2
-        dPLen2 += Max(Pow2(Min(dP_ym, zero)), Pow2(Max(dP_yp,zero))); // (dP/dy)2
-        dPLen2 += Max(Pow2(Min(dP_zm, zero)), Pow2(Max(dP_zp,zero))); // (dP/dz)2
+        dPLen2  = Max(Pow2(Min(dpXm, zero)), Pow2(Max(dpXp, zero))); // (dP/dx)2
+        dPLen2 += Max(Pow2(Min(dpYm, zero)), Pow2(Max(dpYp, zero))); // (dP/dy)2
+        dPLen2 += Max(Pow2(Min(dpZm, zero)), Pow2(Max(dpZp, zero))); // (dP/dz)2
     }
-    return dPLen2; // |\nabla\phi|^2
+    return Real(dPLen2); // |\nabla\phi|^2
 }
 
 
@@ -554,36 +563,45 @@ struct D1<CD_4TH>
 {
 
     // the difference opperator
-    template <typename ValueType>
-    static ValueType difference( const ValueType& xp2, const ValueType& xp1,
-                                 const ValueType& xm1, const ValueType& xm2 ) {
-        return ValueType(2./3.)*(xp1 - xm1) + ValueType(1./12.)*(xm2 - xp2) ;
+    template <typename ValueType, typename ReturnType = ValueType>
+    static ReturnType difference( const ValueType& xp2, const ValueType& xp1,
+                                 const ValueType& xm1, const ValueType& xm2 )
+    {
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp1 = xp1, xcp2 = xp2, xcm1 = xm1, xcm2 = xm2;
+
+        return ReturnType(ComputeType(2./3.)*(xcp1 - xcm1) + ComputeType(1./12.)*(xcm2 - xcp2));
     }
 
 
     // random access version
-    template<typename Accessor>
-    static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference(
+        using ValueType = typename Accessor::ValueType;
+
+        return difference<ValueType, ReturnType>(
             grid.getValue(ijk.offsetBy( 2,0,0)), grid.getValue(ijk.offsetBy( 1,0,0)),
             grid.getValue(ijk.offsetBy(-1,0,0)), grid.getValue(ijk.offsetBy(-2,0,0)) );
     }
 
-    template<typename Accessor>
-    static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inY(const Accessor& grid, const Coord& ijk)
     {
+        using ValueType = typename Accessor::ValueType;
 
-        return difference(
+        return difference<ValueType, ReturnType>(
             grid.getValue(ijk.offsetBy( 0, 2, 0)), grid.getValue(ijk.offsetBy( 0, 1, 0)),
             grid.getValue(ijk.offsetBy( 0,-1, 0)), grid.getValue(ijk.offsetBy( 0,-2, 0)) );
     }
 
-    template<typename Accessor>
-    static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inZ(const Accessor& grid, const Coord& ijk)
     {
+        using ValueType = typename Accessor::ValueType;
 
-        return difference(
+        return difference<ValueType, ReturnType>(
             grid.getValue(ijk.offsetBy( 0, 0, 2)), grid.getValue(ijk.offsetBy( 0, 0, 1)),
             grid.getValue(ijk.offsetBy( 0, 0,-1)), grid.getValue(ijk.offsetBy( 0, 0,-2)) );
     }
@@ -622,38 +640,48 @@ template<>
 struct D1<CD_6TH>
 {
 
-    // the difference opperator
-    template <typename ValueType>
-    static ValueType difference( const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
+    // the difference operator
+    template <typename ValueType, typename ReturnType = ValueType>
+    static ReturnType difference( const ValueType& xp3, const ValueType& xp2, const ValueType& xp1,
                                  const ValueType& xm1, const ValueType& xm2, const ValueType& xm3 )
     {
-        return ValueType(3./4.)*(xp1 - xm1) - ValueType(0.15)*(xp2 - xm2)
-            + ValueType(1./60.)*(xp3-xm3);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp1 = xp1, xcp2 = xp2, xcp3 = xp3, xcm1 = xm1, xcm2 = xm2, xcm3 = xm3;
+
+        return ReturnType(ComputeType(3./4.)*(xcp1 - xcm1) - ComputeType(0.15)*(xcp2 - xcm2)
+            + ComputeType(1./60.)*(xcp3 - xcm3));
     }
 
 
     // random access version
-    template<typename Accessor>
-    static typename Accessor::ValueType inX(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inX(const Accessor& grid, const Coord& ijk)
     {
-        return difference(
+        using ValueType = typename Accessor::ValueType;
+
+        return difference<ValueType, ReturnType>(
             grid.getValue(ijk.offsetBy( 3,0,0)), grid.getValue(ijk.offsetBy( 2,0,0)),
             grid.getValue(ijk.offsetBy( 1,0,0)), grid.getValue(ijk.offsetBy(-1,0,0)),
             grid.getValue(ijk.offsetBy(-2,0,0)), grid.getValue(ijk.offsetBy(-3,0,0)));
     }
 
-    template<typename Accessor>
-    static typename Accessor::ValueType inY(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inY(const Accessor& grid, const Coord& ijk)
     {
+        using ValueType = typename Accessor::ValueType;
+
         return difference(
             grid.getValue(ijk.offsetBy( 0, 3, 0)), grid.getValue(ijk.offsetBy( 0, 2, 0)),
             grid.getValue(ijk.offsetBy( 0, 1, 0)), grid.getValue(ijk.offsetBy( 0,-1, 0)),
             grid.getValue(ijk.offsetBy( 0,-2, 0)), grid.getValue(ijk.offsetBy( 0,-3, 0)));
     }
 
-    template<typename Accessor>
-    static typename Accessor::ValueType inZ(const Accessor& grid, const Coord& ijk)
+    template<typename Accessor, typename ReturnType = typename Accessor::ValueType>
+    static ReturnType inZ(const Accessor& grid, const Coord& ijk)
     {
+        using ValueType = typename Accessor::ValueType;
+
         return difference(
             grid.getValue(ijk.offsetBy( 0, 0, 3)), grid.getValue(ijk.offsetBy( 0, 0, 2)),
             grid.getValue(ijk.offsetBy( 0, 0, 1)), grid.getValue(ijk.offsetBy( 0, 0,-1)),
@@ -756,7 +784,11 @@ struct D1<FD_2ND>
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0)
     {
-        return ValueType(2)*xp1 -(ValueType(0.5)*xp2 + ValueType(3./2.)*xp0);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2;
+
+        return ValueType(ComputeType(2)*xp1 -(ComputeType(0.5)*xp2 + ComputeType(3./2.)*xp0));
     }
 
 
@@ -826,7 +858,12 @@ struct D1<FD_3RD>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
         const ValueType& xp1, const ValueType& xp0)
     {
-        return static_cast<ValueType>(xp3/3.0 - 1.5*xp2 + 3.0*xp1 - 11.0*xp0/6.0);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2, xcp3 = xp3;
+
+        return ValueType(ComputeType(1.0/3.0)*xcp3 - ComputeType(1.5)*xcp2
+            + ComputeType(3)*xcp1 - ComputeType(11.0/6.0)*xcp0);
     }
 
 
@@ -1082,9 +1119,14 @@ struct D1<FD_WENO5>
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
-                                const ValueType& xm1, const ValueType& xm2) {
-        return WENO5<ValueType>(xp3, xp2, xp1, xp0, xm1)
-              - WENO5<ValueType>(xp2, xp1, xp0, xm1, xm2);
+                                const ValueType& xm1, const ValueType& xm2)
+    {
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2, xcp3 = xp3, xcm1 = xm1, xcm2 = xm2;
+
+        return ValueType(WENO5<ComputeType>(xcp3, xcp2, xcp1, xcp0, xcm1)
+              - WENO5<ComputeType>(xcp2, xcp1, xcp0, xcm1, xcm2));
     }
 
 
@@ -1182,8 +1224,13 @@ struct D1<FD_HJWENO5>
     template <typename ValueType>
     static ValueType difference(const ValueType& xp3, const ValueType& xp2,
                                 const ValueType& xp1, const ValueType& xp0,
-                                const ValueType& xm1, const ValueType& xm2) {
-        return WENO5<ValueType>(xp3 - xp2, xp2 - xp1, xp1 - xp0, xp0-xm1, xm1-xm2);
+                                const ValueType& xm1, const ValueType& xm2)
+    {
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2, xcp3 = xp3, xcm1 = xm1, xcm2 = xm2;
+
+        return ValueType(WENO5<ComputeType>(xcp3 - xcp2, xcp2 - xcp1, xcp1 - xcp0, xcp0-xcm1, xcm1-xcm2));
     }
 
     // random access version
@@ -1809,14 +1856,22 @@ struct D2<CD_SECOND>
     template <typename ValueType>
     static ValueType difference(const ValueType& xp1, const ValueType& xp0, const ValueType& xm1)
     {
-        return xp1 + xm1 - ValueType(2)*xp0;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcm1 = xm1;
+
+        return ValueType(xcp1 + xcm1 - ComputeType(2)*xcp0);
     }
 
     template <typename ValueType>
     static ValueType crossdifference(const ValueType& xpyp, const ValueType& xpym,
                                      const ValueType& xmyp, const ValueType& xmym)
     {
-        return ValueType(0.25)*(xpyp + xmym - xpym - xmyp);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcpyp = xpyp, xcpym = xpym, xcmyp = xmyp, xcmym = xmym;
+
+        return ValueType(ComputeType(0.25)*(xcpyp + xcmym - xcpym - xcmyp));
     }
 
     // random access version
@@ -1922,8 +1977,14 @@ struct D2<CD_FOURTH>
     // the difference opperator
     template <typename ValueType>
     static ValueType difference(const ValueType& xp2, const ValueType& xp1, const ValueType& xp0,
-                                const ValueType& xm1, const ValueType& xm2) {
-        return ValueType(-1./12.)*(xp2 + xm2) + ValueType(4./3.)*(xp1 + xm1) -ValueType(2.5)*xp0;
+                                const ValueType& xm1, const ValueType& xm2)
+    {
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2, xcm1 = xm1, xcm2 = xm2;
+
+        return ValueType(ComputeType(-1./12.)*(xcp2 + xcm2)
+            + ComputeType(4./3.)*(xcp1 + xcm1) - ComputeType(2.5)*xcp0);
     }
 
     template <typename ValueType>
@@ -1934,15 +1995,24 @@ struct D2<CD_FOURTH>
                                      const ValueType& xm2yp2, const ValueType& xm2yp1,
                                      const ValueType& xm2ym1, const ValueType& xm2ym2,
                                      const ValueType& xm1yp2, const ValueType& xm1yp1,
-                                     const ValueType& xm1ym1, const ValueType& xm1ym2 ) {
-        ValueType tmp1 =
-            ValueType(2./3.0)*(xp1yp1 - xm1yp1 - xp1ym1 + xm1ym1)-
-            ValueType(1./12.)*(xp2yp1 - xm2yp1 - xp2ym1 + xm2ym1);
-        ValueType tmp2 =
-            ValueType(2./3.0)*(xp1yp2 - xm1yp2 - xp1ym2 + xm1ym2)-
-            ValueType(1./12.)*(xp2yp2 - xm2yp2 - xp2ym2 + xm2ym2);
+                                     const ValueType& xm1ym1, const ValueType& xm1ym2 )
+    {
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
+        const ComputeType xcp2yp2 = xp2yp2, xcp2yp1 = xp2yp1, xcp2ym1 = xp2ym1, xcp2ym2 = xp2ym2,
+                          xcp1yp2 = xp1yp2, xcp1yp1 = xp1yp1, xcp1ym1 = xp1ym1, xcp1ym2 = xp1ym2,
+                          xcm2yp2 = xm2yp2, xcm2yp1 = xm2yp1, xcm2ym1 = xm2ym1, xcm2ym2 = xm2ym2,
+                          xcm1yp2 = xm1yp2, xcm1yp1 = xm1yp1, xcm1ym1 = xm1ym1, xcm1ym2 = xm1ym2;
+
+        const ComputeType tmp1 =
+            ComputeType(2./3.)*(xcp1yp1 - xcm1yp1 - xcp1ym1 + xcm1ym1)-
+            ComputeType(1./12.)*(xcp2yp1 - xcm2yp1 - xcp2ym1 + xcm2ym1);
+
+        const ComputeType tmp2 =
+            ComputeType(2./3.)*(xcp1yp2 - xcm1yp2 - xcp1ym2 + xcm1ym2)-
+            ComputeType(1./12.)*(xcp2yp2 - xcm2yp2 - xcp2ym2 + xcm2ym2);
+
+        return ValueType(ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2);
     }
 
 
@@ -1979,40 +2049,49 @@ struct D2<CD_FOURTH>
     template<typename Accessor>
     static typename Accessor::ValueType inXandY(const Accessor& grid, const Coord& ijk)
     {
-        using ValueType = typename Accessor::ValueType;
-        typename Accessor::ValueType tmp1 =
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-1, 0));
-        typename Accessor::ValueType tmp2 =
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-2, 0));
-        return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
+        using ValueType   = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType tmp1 =
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 1, 0)) -
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0,-1, 0));
+        ComputeType tmp2 =
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 2, 0)) -
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0,-2, 0));
+
+        return ValueType(ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inXandZ(const Accessor& grid, const Coord& ijk)
     {
-        using ValueType = typename Accessor::ValueType;
-        typename Accessor::ValueType tmp1 =
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 =
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-2));
-        return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
+        using ValueType   = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType tmp1 =
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-1));
+        ComputeType tmp2 =
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-2));
+
+        return ValueType(ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk)
     {
-        using ValueType = typename Accessor::ValueType;
-        typename Accessor::ValueType tmp1 =
-            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-1));
-        typename Accessor::ValueType tmp2 =
-            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-2));
-        return ValueType(2./3.)*tmp1 - ValueType(1./12.)*tmp2;
+        using ValueType   = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType tmp1 =
+            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-1));
+        ComputeType tmp2 =
+            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-2));
+
+        return ValueType(ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2);
     }
 
 
@@ -2095,8 +2174,13 @@ struct D2<CD_SIXTH>
                                 const ValueType& xp0,
                                 const ValueType& xm1, const ValueType& xm2, const ValueType& xm3)
     {
-        return  ValueType(1./90.)*(xp3 + xm3) - ValueType(3./20.)*(xp2 + xm2)
-              + ValueType(1.5)*(xp1 + xm1) - ValueType(49./18.)*xp0;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2, xcp3 = xp3,
+                          xcm1 = xm1, xcm2 = xm2, xcm3 = xm3;
+
+        return  ValueType(ComputeType(1./90.)*(xcp3 + xcm3) - ComputeType(3./20.)*(xcp2 + xcm2)
+            + ComputeType(1.5)*(xcp1 + xcm1) - ComputeType(49./18.)*xcp0);
     }
 
     template <typename ValueType>
@@ -2119,22 +2203,34 @@ struct D2<CD_SIXTH>
                                       const ValueType& xp3yp3,const ValueType& xm3yp3,
                                       const ValueType& xp3ym3,const ValueType& xm3ym3 )
     {
-        ValueType tmp1 =
-            ValueType(0.7500)*(xp1yp1 - xm1yp1 - xp1ym1 + xm1ym1) -
-            ValueType(0.1500)*(xp2yp1 - xm2yp1 - xp2ym1 + xm2ym1) +
-            ValueType(1./60.)*(xp3yp1 - xm3yp1 - xp3ym1 + xm3ym1);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType tmp2 =
-            ValueType(0.7500)*(xp1yp2 - xm1yp2 - xp1ym2 + xm1ym2) -
-            ValueType(0.1500)*(xp2yp2 - xm2yp2 - xp2ym2 + xm2ym2) +
-            ValueType(1./60.)*(xp3yp2 - xm3yp2 - xp3ym2 + xm3ym2);
+        const ComputeType xcp1yp1 = xp1yp1, xcm1yp1 = xm1yp1, xcp1ym1 = xp1ym1, xcm1ym1 = xm1ym1,
+                          xcp2yp1 = xp2yp1, xcm2yp1 = xm2yp1, xcp2ym1 = xp2ym1, xcm2ym1 = xm2ym1,
+                          xcp3yp1 = xp3yp1, xcm3yp1 = xm3yp1, xcp3ym1 = xp3ym1, xcm3ym1 = xm3ym1,
+                          xcp1yp2 = xp1yp2, xcm1yp2 = xm1yp2, xcp1ym2 = xp1ym2, xcm1ym2 = xm1ym2,
+                          xcp2yp2 = xp2yp2, xcm2yp2 = xm2yp2, xcp2ym2 = xp2ym2, xcm2ym2 = xm2ym2,
+                          xcp3yp2 = xp3yp2, xcm3yp2 = xm3yp2, xcp3ym2 = xp3ym2, xcm3ym2 = xm3ym2,
+                          xcp1yp3 = xp1yp3, xcm1yp3 = xm1yp3, xcp1ym3 = xp1ym3, xcm1ym3 = xm1ym3,
+                          xcp2yp3 = xp2yp3, xcm2yp3 = xm2yp3, xcp2ym3 = xp2ym3, xcm2ym3 = xm2ym3,
+                          xcp3yp3 = xp3yp3, xcm3yp3 = xm3yp3, xcp3ym3 = xp3ym3, xcm3ym3 = xm3ym3;
 
-        ValueType tmp3 =
-            ValueType(0.7500)*(xp1yp3 - xm1yp3 - xp1ym3 + xm1ym3) -
-            ValueType(0.1500)*(xp2yp3 - xm2yp3 - xp2ym3 + xm2ym3) +
-            ValueType(1./60.)*(xp3yp3 - xm3yp3 - xp3ym3 + xm3ym3);
+        ComputeType tmp1 =
+            ComputeType(0.7500)*(xcp1yp1 - xcm1yp1 - xcp1ym1 + xcm1ym1) -
+            ComputeType(0.1500)*(xcp2yp1 - xcm2yp1 - xcp2ym1 + xcm2ym1) +
+            ComputeType(1./60.)*(xcp3yp1 - xcm3yp1 - xcp3ym1 + xcm3ym1);
 
-        return ValueType(0.75)*tmp1 - ValueType(0.15)*tmp2 + ValueType(1./60)*tmp3;
+        ComputeType tmp2 =
+            ComputeType(0.7500)*(xcp1yp2 - xcm1yp2 - xcp1ym2 + xcm1ym2) -
+            ComputeType(0.1500)*(xcp2yp2 - xcm2yp2 - xcp2ym2 + xcm2ym2) +
+            ComputeType(1./60.)*(xcp3yp2 - xcm3yp2 - xcp3ym2 + xcm3ym2);
+
+        ComputeType tmp3 =
+            ComputeType(0.7500)*(xcp1yp3 - xcm1yp3 - xcp1ym3 + xcm1ym3) -
+            ComputeType(0.1500)*(xcp2yp3 - xcm2yp3 - xcp2ym3 + xcm2ym3) +
+            ComputeType(1./60.)*(xcp3yp3 - xcm3yp3 - xcp3ym3 + xcm3ym3);
+
+        return ValueType(ComputeType(0.75)*tmp1 - ComputeType(0.15)*tmp2 + ComputeType(1./60)*tmp3);
     }
 
     // random access version
@@ -2173,49 +2269,58 @@ struct D2<CD_SIXTH>
     template<typename Accessor>
     static typename Accessor::ValueType inXandY(const Accessor& grid, const Coord& ijk)
     {
-        using ValueT = typename Accessor::ValueType;
-        ValueT tmp1 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-1, 0));
-        ValueT tmp2 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-2, 0));
-        ValueT tmp3 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 3, 0)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0,-3, 0));
-        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
+        using ValueT   = typename Accessor::ValueType;
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        ComputeT tmp1 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 1, 0)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0,-1, 0));
+        ComputeT tmp2 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 2, 0)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0,-2, 0));
+        ComputeT tmp3 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 3, 0)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0,-3, 0));
+
+        return ValueT(ComputeT(0.75)*tmp1 - ComputeT(0.15)*tmp2 + ComputeT(1./60)*tmp3);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inXandZ(const Accessor& grid, const Coord& ijk)
     {
-        using ValueT = typename Accessor::ValueType;
-        ValueT tmp1 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-1));
-        ValueT tmp2 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-2));
-        ValueT tmp3 =
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0, 3)) -
-            D1<CD_6TH>::inX(grid, ijk.offsetBy(0, 0,-3));
-        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
+        using ValueT   = typename Accessor::ValueType;
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        ComputeT tmp1 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-1));
+        ComputeT tmp2 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-2));
+        ComputeT tmp3 =
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 3)) -
+            D1<CD_6TH>::inX<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-3));
+
+        return ValueT(ComputeT(0.75)*tmp1 - ComputeT(0.15)*tmp2 + ComputeT(1./60)*tmp3);
     }
 
     template<typename Accessor>
     static typename Accessor::ValueType inYandZ(const Accessor& grid, const Coord& ijk)
     {
-        using ValueT = typename Accessor::ValueType;
-        ValueT tmp1 =
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-1));
-        ValueT tmp2 =
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-2));
-        ValueT tmp3 =
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0, 3)) -
-            D1<CD_6TH>::inY(grid, ijk.offsetBy(0, 0,-3));
-        return ValueT(0.75*tmp1 - 0.15*tmp2 + 1./60*tmp3);
+        using ValueT   = typename Accessor::ValueType;
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        ComputeT tmp1 =
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-1));
+        ComputeT tmp2 =
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-2));
+        ComputeT tmp3 =
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0, 3)) -
+            D1<CD_6TH>::inY<ValueT, ComputeT>(grid, ijk.offsetBy(0, 0,-3));
+
+        return ValueT(ComputeT(0.75)*tmp1 - ComputeT(0.15)*tmp2 + ComputeT(1./60)*tmp3);
     }
 
 
