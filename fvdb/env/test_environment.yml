@@ -25,7 +25,6 @@ dependencies:
   - pytest-benchmark
   - numpy
   - linkify-it-py
-  - glm
   - polyscope
   - py-opencv=4.10[build=headless*]
   - imageio

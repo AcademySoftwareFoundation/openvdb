@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include "GaussianMacros.cuh"
 #include "GaussianUtils.cuh"
 #include <detail/ops/Ops.h>
 
@@ -14,34 +15,35 @@ namespace ops {
 
 template <typename T, bool Ortho>
 __global__ void
-jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
+jaggedProjectionForwardKernel(const uint32_t B, const int64_t N,
                               const int64_t *__restrict__ gSizes,       // [B]
                               const int64_t *__restrict__ cSizes,       // [B]
                               const int64_t *__restrict__ gIndex,       // [B] start indices
                               const int64_t *__restrict__ cIndex,       // [B] start indices
                               const int64_t *__restrict__ nIndex,       // [B] start indices
-                              const T *__restrict__ means,              // [M, 3]
-                              const T *__restrict__ covars,             // [M, 6] optional
-                              const T *__restrict__ quats,              // [M, 4] optional
-                              const T *__restrict__ scales,             // [M, 3] optional
-                              const T *__restrict__ worldToCamMatrices, // [BC, 4, 4]
-                              const T *__restrict__ projectionMatrices, // [BC, 3, 3]
-                              const int64_t imageWidth, const int64_t imageHeight, const T eps2d,
+                              const T *__restrict__ means,              // [N, 3]
+                              const T *__restrict__ covars,             // [N, 6] optional
+                              const T *__restrict__ quats,              // [N, 4] optional
+                              const T *__restrict__ scales,             // [N, 3] optional
+                              const T *__restrict__ worldToCamMatrices, // [C, 4, 4]
+                              const T *__restrict__ projectionMatrices, // [C, 3, 3]
+                              const int32_t imageWidth, const int32_t imageHeight, const T eps2d,
                               const T nearPlane, const T farPlane, const T radiusClip,
                               // outputs
-                              int32_t *__restrict__ radii,     // [M]
-                              T *__restrict__ means2d,         // [M, 2]
-                              T *__restrict__ depths,          // [M]
-                              T *__restrict__ conics,          // [M, 3]
-                              T *__restrict__ compensations) { // [M] optional
-    // parallelize over M.
+                              int32_t *__restrict__ radii,  // [N]
+                              T *__restrict__ means2d,      // [N, 2]
+                              T *__restrict__ depths,       // [N]
+                              T *__restrict__ conics,       // [N, 3]
+                              T *__restrict__ compensations // [N] optional
+) {
+    // parallelize over N.
     const auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= M) {
+    if (idx >= N) {
         return;
     }
 
     // TODO: too many global memory accesses.
-    const int64_t bId      = bin_search(nIndex, B, static_cast<int64_t>(idx)); // batch id
+    const int64_t bId      = binSearch(nIndex, B, static_cast<int64_t>(idx)); // batch id
     const int64_t idxLocal = idx - nIndex[bId];      // local elem idx within Ci * Ni
     const int64_t cidLocal = idxLocal / gSizes[bId]; // local camera id within Ci
     const int64_t gidLocal = idxLocal % gSizes[bId]; // local gaussian id within Ni
@@ -81,7 +83,7 @@ jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
         // compute from quaternions and scales
         quats += gId * 4;
         scales += gId * 3;
-        covar = quatAndScaleToCovariance<T>(
+        covar = quaternionAndScaleToCovariance<T>(
             nanovdb::math::Vec4<T>(quats[0], quats[1], quats[2], quats[3]),
             nanovdb::math::Vec3<T>(scales[0], scales[1], scales[2]));
     }
@@ -101,7 +103,7 @@ jaggedProjectionForwardKernel(const uint32_t B, const int64_t M,
     }();
 
     T       compensation;
-    const T det = add_blur(eps2d, covar2d, compensation);
+    const T det = addBlur(eps2d, covar2d, compensation);
     if (det <= 0.f) {
         radii[idx] = 0;
         return;
@@ -146,12 +148,12 @@ template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
     const torch::Tensor &gSizes,             // [B] gaussian sizes
-    const torch::Tensor &means,              // [M, 3]
-    const torch::Tensor &quats,              // [M, 4] optional
-    const torch::Tensor &scales,             // [M, 3] optional
+    const torch::Tensor &means,              // [N, 3]
+    const torch::Tensor &quats,              // [N, 4] optional
+    const torch::Tensor &scales,             // [N, 3] optional
     const torch::Tensor &cSizes,             // [B] camera sizes
-    const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
-    const torch::Tensor &projectionMatrices, // [BC, 3, 3]
+    const torch::Tensor &worldToCamMatrices, // [C, 4, 4]
+    const torch::Tensor &projectionMatrices, // [C, 3, 3]
     const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d, const float nearPlane,
     const float farPlane, const float minRadius2d, const bool ortho) {
     // These are supported by the underlying kernel, but they are not exposed
@@ -177,25 +179,25 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
     torch::Tensor  gIndex = torch::cumsum(gSizes, 0, torch::kInt64) - gSizes;
     torch::Tensor  nSize  = cSizes * gSizes;            // element size = Ci * Ni
     torch::Tensor  nIndex = torch::cumsum(nSize, 0, torch::kInt64);
-    const int64_t  M      = nIndex[-1].item<int64_t>(); // total number of elements
+    const int64_t  N      = nIndex[-1].item<int64_t>(); // total number of elements
     nIndex                = nIndex - nSize;
 
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
 
-    torch::Tensor radii   = torch::empty({ M }, means.options().dtype(torch::kInt32));
-    torch::Tensor means2d = torch::empty({ M, 2 }, means.options());
-    torch::Tensor depths  = torch::empty({ M }, means.options());
-    torch::Tensor conics  = torch::empty({ M, 3 }, means.options());
+    torch::Tensor radii   = torch::empty({ N }, means.options().dtype(torch::kInt32));
+    torch::Tensor means2d = torch::empty({ N, 2 }, means.options());
+    torch::Tensor depths  = torch::empty({ N }, means.options());
+    torch::Tensor conics  = torch::empty({ N, 3 }, means.options());
     torch::Tensor compensations;
     if (calc_compensations) {
         // we dont want NaN to appear in this tensor, so we zero intialize it
-        compensations = torch::zeros({ M }, means.options());
+        compensations = torch::zeros({ N }, means.options());
     }
-    if (M) {
+    if (N) {
         if (ortho) {
             jaggedProjectionForwardKernel<float, true>
-                <<<(M + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                    B, M, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
+                <<<(N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, N, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
                     gIndex.data_ptr<int64_t>(), cIndex.data_ptr<int64_t>(),
                     nIndex.data_ptr<int64_t>(), means.data_ptr<float>(),
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
@@ -208,8 +210,8 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
                     calc_compensations ? compensations.data_ptr<float>() : nullptr);
         } else {
             jaggedProjectionForwardKernel<float, false>
-                <<<(M + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
-                    B, M, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
+                <<<(N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                    B, N, gSizes.data_ptr<int64_t>(), cSizes.data_ptr<int64_t>(),
                     gIndex.data_ptr<int64_t>(), cIndex.data_ptr<int64_t>(),
                     nIndex.data_ptr<int64_t>(), means.data_ptr<float>(),
                     covars.has_value() ? covars.value().data_ptr<float>() : nullptr,
@@ -231,12 +233,12 @@ template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchGaussianProjectionJaggedForward<torch::kCPU>(
     const torch::Tensor &gSizes,             // [B] gaussian sizes
-    const torch::Tensor &means,              // [M, 3]
-    const torch::Tensor &quats,              // [M, 4] optional
-    const torch::Tensor &scales,             // [M, 3] optional
+    const torch::Tensor &means,              // [N, 3]
+    const torch::Tensor &quats,              // [N, 4] optional
+    const torch::Tensor &scales,             // [N, 3] optional
     const torch::Tensor &cSizes,             // [B] camera sizes
-    const torch::Tensor &worldToCamMatrices, // [BC, 4, 4]
-    const torch::Tensor &projectionMatrices, // [BC, 3, 3]
+    const torch::Tensor &worldToCamMatrices, // [C, 4, 4]
+    const torch::Tensor &projectionMatrices, // [C, 3, 3]
     const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d, const float nearPlane,
     const float farPlane, const float minRadius2d, const bool ortho) {
     TORCH_CHECK_NOT_IMPLEMENTED(false, "CPU implementation not available");

@@ -105,8 +105,9 @@ template <typename T, bool Ortho> struct ProjectionForward {
         //     );
         const auto quatAcc  = mQuatsAcc[gid];
         const auto scaleAcc = mScalesAcc[gid];
-        return quatAndScaleToCovariance<T>(Vec4(quatAcc[0], quatAcc[1], quatAcc[2], quatAcc[3]),
-                                           Vec3(scaleAcc[0], scaleAcc[1], scaleAcc[2]));
+        return quaternionAndScaleToCovariance<T>(
+            Vec4(quatAcc[0], quatAcc[1], quatAcc[2], quatAcc[3]),
+            Vec3(scaleAcc[0], scaleAcc[1], scaleAcc[2]));
     }
 
     inline __device__ void
@@ -148,7 +149,7 @@ template <typename T, bool Ortho> struct ProjectionForward {
         }();
 
         T       compensation;
-        const T det = add_blur(mEps2d, covar2d, compensation);
+        const T det = addBlur(mEps2d, covar2d, compensation);
         if (det <= 0.f) {
             mOutRadiiAcc[cid][gid] = 0;
             return;
@@ -228,7 +229,6 @@ projectionForwardKernel(ProjectionForward<T, Ortho> projectionForward) {
 
     // parallelize over C * N.
     const auto problemSize = projectionForward.C * projectionForward.N;
-    const auto idx         = blockIdx.x * blockDim.x + threadIdx.x;
     for (auto idx = blockIdx.x * blockDim.x + threadIdx.x; idx < problemSize;
          idx += blockDim.x * gridDim.x) {
         projectionForward.projectionForward(idx);

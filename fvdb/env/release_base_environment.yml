@@ -24,4 +24,3 @@ dependencies:
   - linkify-it-py
   - numpy
   - tqdm
-  - glm

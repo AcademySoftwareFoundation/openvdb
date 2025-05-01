@@ -74,28 +74,31 @@ function(check_pybind11_differences)
     endif()
 endfunction()
 
-find_package(pybind11)
-if (pybind11_FOUND)
-    message(STATUS "pybind11 found: ${pybind11_INCLUDE_DIRS}")
+detect_torch_pybind11_version()
+if (DEFINED TORCH_PYBIND11_INCLUDE_DIR)
+    add_library(torch_pybind11_headers INTERFACE)
+    target_include_directories(torch_pybind11_headers INTERFACE ${TORCH_PYBIND11_INCLUDE_DIR})
 else()
-    # Detect the version
-    detect_torch_pybind11_version()
+    find_package(pybind11)
+    if (pybind11_FOUND)
+        message(STATUS "pybind11 found: ${pybind11_INCLUDE_DIRS}")
+    else()
+        # Set variables needed by pybind11
+        set(PYBIND11_NEWPYTHON ON)
+        set(PYTHON_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
+        set(PYTHON_LIBRARIES ${Python3_LIBRARIES})
 
-    # Set variables needed by pybind11
-    set(PYBIND11_NEWPYTHON ON)
-    set(PYTHON_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
-    set(PYTHON_LIBRARIES ${Python3_LIBRARIES})
+        # Use CPM to fetch pybind11
+        CPMAddPackage(
+            NAME pybind11
+            GITHUB_REPOSITORY pybind/pybind11
+            VERSION ${PYBIND11_VERSION}
+            GIT_TAG v${PYBIND11_VERSION}
+            OPTIONS
+            "PYBIND11_INSTALL ON"
+            "PYBIND11_TEST OFF"
+        )
 
-    # Use CPM to fetch pybind11
-    CPMAddPackage(
-        NAME pybind11
-        GITHUB_REPOSITORY pybind/pybind11
-        VERSION ${PYBIND11_VERSION}
-        GIT_TAG v${PYBIND11_VERSION}
-        OPTIONS
-        "PYBIND11_INSTALL ON"
-        "PYBIND11_TEST OFF"
-    )
-
-    check_pybind11_differences()
+        check_pybind11_differences()
+    endif()
 endif()

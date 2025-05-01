@@ -10,7 +10,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cpm.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_nvtx.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_torch.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_tinyply.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_glm.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cutlass.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cudnn_frontend.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_blosc.cmake)
@@ -145,7 +144,8 @@ set_target_properties(
     CUDA_STANDARD 20
     CUDA_STANDARD_REQUIRED ON
     POSITION_INDEPENDENT_CODE ON
-    INTERFACE_POSITION_INDEPENDENT_CODE ON)
+    INTERFACE_POSITION_INDEPENDENT_CODE ON
+    CUDA_SEPARABLE_COMPILATION ON)
 
 message(STATUS "fvdb: TORCH_INCLUDE_DIRS: ${TORCH_INCLUDE_DIRS}")
 
@@ -184,7 +184,7 @@ target_compile_options(fvdb PRIVATE
     >)
 
 target_link_libraries(fvdb PRIVATE
-    ${TORCH_LIBRARIES} ${Python3_LIBRARIES} tinyply glm::glm cudnn_frontend cudnn cutlass blosc::blosc)
+    ${TORCH_LIBRARIES} ${Python3_LIBRARIES} tinyply cudnn_frontend cudnn cutlass blosc::blosc)
 
 # ## Install rules
 install(TARGETS fvdb

@@ -35,7 +35,7 @@ During the project's initial development stages, it is necessary to [run the bui
 ## Building *f*VDB from Source
 
 ### Environment Management
-ƒVDB is a Python library implemented as a C++ Pytorch extension.  Of course you can build ƒVDB in whatever environment suits you, but we provide two paths to constructing reliable environments for building and running ƒVDB:  using [docker](#setting-up-a-docker-container) and using [conda](#setting-up-a-conda-environment).
+ƒVDB is a Python library implemented as a C++ Pytorch extension.  Of course you can build ƒVDB in whatever environment suits you, but we provide three paths to constructing reliable environments for building and running ƒVDB:  using [docker](#setting-up-a-docker-container), [conda](#setting-up-a-conda-environment), or a Python virtual environment.
 
 `conda` tends to be more flexible since reconfiguring toolchains and modules to suit your larger project can be dynamic, but at the same time this can be a more brittle experience compared to using a virtualized `docker` container.  Using `conda` is generally recommended for development and testing, while using `docker` is recommended for CI/CD and deployment.
 
@@ -90,10 +90,26 @@ conda env create -f env/dev_environment.yml
 conda activate fvdb
 ```
 
-#### Other available environments
+##### Other available environments
 * `fvdb_build`: Use `env/build_environment.yml` for a minimum set of dependencies needed just to build/package *f*VDB (note this environment won't have all the runtime dependencies needed to `import fvdb`).
 * `fvdb_test`: Use `env/test_environment.yml` for a runtime environment which has only the packages required to run the unit tests after building ƒVDB. This is the environment used by the CI pipeline to run the tests after building ƒVDB in the `fvdb_build` environment.
 * `fvdb_learn`: Use `env/learn_environment.yml` for additional runtime requirements and packages needed to run the [notebooks](notebooks) or [examples](examples) and view their visualizations.
+
+#### Setting up a Python virtual environment
+
+After creating a Python virtual environment, proceed to install the exact version of PyTorch that corresponds to your CUDA version. Then, install the rest of the build requirements.
+
+```shell
+python -m venv fvdb
+source fvdb/bin/activate
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+pip install -r env/build_requirements.txt
+```
+
+When you're ready to build fVDB, run the following command after activating the Python virtual environment
+```shell
+TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" ./build.sh install
+```
 
 ### Building *f*VDB
 

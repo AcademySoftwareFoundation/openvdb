@@ -15,7 +15,7 @@ ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
                           const ProjectGaussians::Variable  &means,
                           const ProjectGaussians::Variable  &quats,
                           const ProjectGaussians::Variable  &scales,
-                          const ProjectGaussians::Variable  &camToWorldMatrices,
+                          const ProjectGaussians::Variable  &worldToCamMatrices,
                           const ProjectGaussians::Variable  &projectionMatrices,
                           const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d,
                           const float nearPlane, const float farPlane, const float minRadius2D,
@@ -24,12 +24,12 @@ ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
                           std::optional<Variable> outNormalizedMaxRadiiAccum,
                           std::optional<Variable> outGradientStepCount) {
     TORCH_CHECK(means.dim() == 2, "means must have shape (N, 3)");
-    TORCH_CHECK(camToWorldMatrices.dim() == 3, "camToWorldMatrices must have shape (C, 4, 4)");
+    TORCH_CHECK(worldToCamMatrices.dim() == 3, "worldToCamMatrices must have shape (C, 4, 4)");
     TORCH_CHECK(projectionMatrices.dim() == 3, "projectionMatrices must have shape (C, 3, 3)");
 
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionForward<DeviceTag>(
-            means, quats, scales, camToWorldMatrices, projectionMatrices, imageWidth, imageHeight,
+            means, quats, scales, worldToCamMatrices, projectionMatrices, imageWidth, imageHeight,
             eps2d, nearPlane, farPlane, minRadius2D, calcCompensations, ortho);
     });
     Variable radii     = std::get<0>(variables);
@@ -58,12 +58,12 @@ ProjectGaussians::forward(ProjectGaussians::AutogradContext *ctx,
 
     if (calcCompensations) {
         Variable compensations = std::get<4>(variables);
-        ctx->save_for_backward({ means, quats, scales, camToWorldMatrices, projectionMatrices,
+        ctx->save_for_backward({ means, quats, scales, worldToCamMatrices, projectionMatrices,
                                  radii, conics, compensations });
         return { radii, means2d, depths, conics, compensations };
     } else {
         ctx->save_for_backward(
-            { means, quats, scales, camToWorldMatrices, projectionMatrices, radii, conics });
+            { means, quats, scales, worldToCamMatrices, projectionMatrices, radii, conics });
         return { radii, means2d, depths, conics };
     }
 }
@@ -94,7 +94,7 @@ ProjectGaussians::backward(ProjectGaussians::AutogradContext *ctx,
     Variable     means              = saved.at(0);
     Variable     quats              = saved.at(1);
     Variable     scales             = saved.at(2);
-    Variable     camToWorldMatrices = saved.at(3);
+    Variable     worldToCamMatrices = saved.at(3);
     Variable     projectionMatrices = saved.at(4);
     Variable     radii              = saved.at(5);
     Variable     conics             = saved.at(6);
@@ -132,7 +132,7 @@ ProjectGaussians::backward(ProjectGaussians::AutogradContext *ctx,
     }();
     auto variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionBackward<DeviceTag>(
-            means, quats, scales, camToWorldMatrices, projectionMatrices, compensations, imageWidth,
+            means, quats, scales, worldToCamMatrices, projectionMatrices, compensations, imageWidth,
             imageHeight, eps2d, radii, conics, dLossDMeans2d, dLossDDepths, dLossDConics,
             dLossDCompensations, ctx->needs_input_grad(4), ortho, normalizeddLossdMeans2dNormAccum,
             normalizedMaxRadiiAccum, gradientStepCount);
@@ -142,9 +142,9 @@ ProjectGaussians::backward(ProjectGaussians::AutogradContext *ctx,
     // Variable dLossDCovars = std::get<1>(variables);
     Variable dLossDQuats       = std::get<2>(variables);
     Variable dLossDScales      = std::get<3>(variables);
-    Variable dLossDCamToWorlds = std::get<4>(variables);
+    Variable dLossDWorldToCams = std::get<4>(variables);
 
-    return { dLossDMeans, dLossDQuats, dLossDScales, dLossDCamToWorlds, Variable(), Variable(),
+    return { dLossDMeans, dLossDQuats, dLossDScales, dLossDWorldToCams, Variable(), Variable(),
              Variable(),  Variable(),  Variable(),   Variable(),        Variable(), Variable(),
              Variable(),  Variable(),  Variable(),   Variable() };
 }
@@ -248,13 +248,13 @@ ProjectGaussiansJagged::forward(
     const ProjectGaussiansJagged::Variable  &quats,              // [ggz, 4] optional
     const ProjectGaussiansJagged::Variable  &scales,             // [ggz, 3] optional
     const ProjectGaussiansJagged::Variable  &cSizes,             // [B] camera sizes
-    const ProjectGaussiansJagged::Variable  &camToWorldMatrices, // [ccz, 4, 4]
+    const ProjectGaussiansJagged::Variable  &worldToCamMatrices, // [ccz, 4, 4]
     const ProjectGaussiansJagged::Variable  &projectionMatrices, // [ccz, 3, 3]
     const uint32_t imageWidth, const uint32_t imageHeight, const float eps2d, const float nearPlane,
     const float farPlane, const float minRadius2D, const bool ortho) {
     auto     variables = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionJaggedForward<DeviceTag>(
-            gSizes, means, quats, scales, cSizes, camToWorldMatrices, projectionMatrices,
+            gSizes, means, quats, scales, cSizes, worldToCamMatrices, projectionMatrices,
             imageWidth, imageHeight, eps2d, nearPlane, farPlane, minRadius2D, ortho);
     });
     Variable radii     = std::get<0>(variables);
@@ -262,7 +262,7 @@ ProjectGaussiansJagged::forward(
     Variable depths    = std::get<2>(variables);
     Variable conics    = std::get<3>(variables);
 
-    ctx->save_for_backward({ gSizes, means, quats, scales, cSizes, camToWorldMatrices,
+    ctx->save_for_backward({ gSizes, means, quats, scales, cSizes, worldToCamMatrices,
                              projectionMatrices, radii, conics });
     ctx->saved_data["imageWidth"]  = (int64_t)imageWidth;
     ctx->saved_data["imageHeight"] = (int64_t)imageHeight;
@@ -296,7 +296,7 @@ ProjectGaussiansJagged::backward(ProjectGaussiansJagged::AutogradContext *ctx,
     Variable     quats              = saved.at(2);
     Variable     scales             = saved.at(3);
     Variable     cSizes             = saved.at(4);
-    Variable     camToWorldMatrices = saved.at(5);
+    Variable     worldToCamMatrices = saved.at(5);
     Variable     projectionMatrices = saved.at(6);
     Variable     radii              = saved.at(7);
     Variable     conics             = saved.at(8);
@@ -308,7 +308,7 @@ ProjectGaussiansJagged::backward(ProjectGaussiansJagged::AutogradContext *ctx,
 
     auto     variables   = FVDB_DISPATCH_KERNEL_DEVICE(means.device(), [&]() {
         return ops::dispatchGaussianProjectionJaggedBackward<DeviceTag>(
-            gSizes, means, quats, scales, cSizes, camToWorldMatrices, projectionMatrices,
+            gSizes, means, quats, scales, cSizes, worldToCamMatrices, projectionMatrices,
             imageWidth, imageHeight, eps2d, radii, conics, dLossDMeans2d, dLossDDepths,
             dLossDConics, ctx->needs_input_grad(6), ortho);
     });
@@ -316,10 +316,10 @@ ProjectGaussiansJagged::backward(ProjectGaussiansJagged::AutogradContext *ctx,
     // Variable dLossDCovars = std::get<1>(variables);
     Variable dLossDQuats       = std::get<2>(variables);
     Variable dLossDScales      = std::get<3>(variables);
-    Variable dLossDCamToWorlds = std::get<4>(variables);
+    Variable dLossDWorldToCams = std::get<4>(variables);
 
     return { Variable(),        dLossDMeans, dLossDQuats, dLossDScales, Variable(),
-             dLossDCamToWorlds, Variable(),  Variable(),  Variable(),   Variable(),
+             dLossDWorldToCams, Variable(),  Variable(),  Variable(),   Variable(),
              Variable(),        Variable(),  Variable(),  Variable() };
 }
 

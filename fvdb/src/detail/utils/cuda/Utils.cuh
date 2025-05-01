@@ -53,7 +53,7 @@ using JaggedAcc = fvdb::JaggedAccessor<ScalarType, DIMS>;
 /// @param N The number of elements to parallelize over
 /// @param maxThreadsPerBlock The maximum number of threads per block
 /// @return The number of blocks for a CUDA kernel launch
-static int
+static int __hostdev__
 GET_BLOCKS(const int64_t N, const int64_t maxThreadsPerBlock) {
     if (N <= 0) {
         return 0;
