@@ -829,7 +829,7 @@ struct D1<FD_2ND>
 
         const ComputeType xcp0 = xp0, xcp1 = xp1, xcp2 = xp2;
 
-        return ComputeType(2)*xp1 -(ComputeType(0.5)*xp2 + ComputeType(3./2.)*xp0);
+        return ComputeType(2)*xcp1 - (ComputeType(0.5)*xcp2 + ComputeType(3./2.)*xcp0);
     }
 
 
