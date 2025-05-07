@@ -480,7 +480,7 @@ levelSetVolume(const GridT& grid, bool useWorldUnits)
 
 template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
@@ -491,7 +491,7 @@ doLevelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetEulerCharacteristic(const GridT&)
 {
     OPENVDB_THROW(TypeError,
@@ -516,7 +516,7 @@ levelSetEulerCharacteristic(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetGenus(const GridT& grid)
 {
     using InterruptT = typename util::NullInterrupter;
@@ -527,7 +527,7 @@ doLevelSetGenus(const GridT& grid)
 
 template<class GridT>
 inline
-typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, Real>::type
+typename std::enable_if<!openvdb::is_floating_point<typename GridT::ValueType>::value, int>::type
 doLevelSetGenus(const GridT&)
 {
     OPENVDB_THROW(TypeError,
