@@ -1393,7 +1393,7 @@ createLevelSetCapsule(const math::Vec3<ScalarType>& pt1, const math::Vec3<Scalar
 
     using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT>;
 
-    static_assert(openvdb::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ComputeT>::value,
         "createLevelSetCapsule must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
@@ -1434,7 +1434,7 @@ createLevelSetTaperedCapsule(const math::Vec3<ScalarType>& pt1, const math::Vec3
     using CapsuleVoxelizer = typename lvlset::CapsuleVoxelizer<GridType, InterruptT>;
     using TaperedCapsuleVoxelizer = typename lvlset::TaperedCapsuleVoxelizer<GridType, InterruptT>;
 
-    static_assert(openvdb::is_floating_point<ValueT>::value,
+    static_assert(openvdb::is_floating_point<ComputeT>::value,
         "createLevelSetTaperedCapsule must return a scalar grid");
 
     if (voxelSize <= 0) OPENVDB_THROW(ValueError, "voxel size must be positive");
