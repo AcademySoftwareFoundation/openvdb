@@ -212,7 +212,7 @@ struct ISGradientBiased
     {
         using ValueType = typename Accessor::ValueType;
         using ComputeType = typename ComputeTypeFor<ValueType>::type;
-        using Vec3Type = Vec3<ValueType>;
+        using Vec3Type = Vec3<ComputeType>;
 
         return Vec3Type(V[0]<0 ? D1<FD>::inX(grid,ijk) : D1<BD>::inX(grid,ijk),
                         V[1]<0 ? D1<FD>::inY(grid,ijk) : D1<BD>::inY(grid,ijk),
@@ -1110,9 +1110,6 @@ struct Divergence<TranslationMap, DiffScheme>
     static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const TranslationMap&, const Accessor& grid, const Coord& ijk)
     {
-        using ValueType = typename Accessor::ValueType::value_type;
-        using ComputeType = typename ComputeTypeFor<ValueType>::type;
-
         return ISDivergence<DiffScheme>::result(grid, ijk);
     }
 
@@ -1121,9 +1118,6 @@ struct Divergence<TranslationMap, DiffScheme>
     static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const TranslationMap&, const StencilT& stencil)
     {
-        using ValueType = typename StencilT::ValueType::value_type;
-        using ComputeType = typename ComputeTypeFor<ValueType>::type;
-
         return ISDivergence<DiffScheme>::result(stencil);
     }
 };
