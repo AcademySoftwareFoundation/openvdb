@@ -6,6 +6,8 @@
 #ifndef OPENVDB_MATH_OPERATORS_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_OPERATORS_HAS_BEEN_INCLUDED
 
+#include <openvdb/Types.h>
+
 #include "FiniteDifference.h"
 #include "Stencils.h"
 #include "Maps.h"
@@ -83,7 +85,8 @@ namespace internal {
 template<typename T>
 struct ReturnValue {
     using ValueType = typename T::ValueType;
-    using Vec3Type = math::Vec3<ValueType>;
+    using ComputeType = typename ComputeTypeFor<ValueType>::type;
+    using Vec3Type = math::Vec3<ComputeType>;
 };
 
 } // namespace internal
@@ -99,22 +102,26 @@ template<DScheme DiffScheme>
 struct ISGradient
 {
     // random access version
-    template<typename Accessor> static Vec3<typename Accessor::ValueType>
+    template<typename Accessor>
+    static Vec3<typename ComputeTypeFor<typename Accessor::ValueType>::type>
     result(const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
         return Vec3Type( D1<DiffScheme>::inX(grid, ijk),
                          D1<DiffScheme>::inY(grid, ijk),
                          D1<DiffScheme>::inZ(grid, ijk) );
     }
 
     // stencil access version
-    template<typename StencilT> static Vec3<typename StencilT::ValueType>
+    template<typename StencilT>
+    static Vec3<typename ComputeTypeFor<typename StencilT::ValueType>::type>
     result(const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
         return Vec3Type( D1<DiffScheme>::inX(stencil),
                          D1<DiffScheme>::inY(stencil),
                          D1<DiffScheme>::inZ(stencil) );
@@ -200,10 +207,11 @@ struct ISGradientBiased
 
     // random access version
     template<typename Accessor>
-    static Vec3<typename Accessor::ValueType>
+    static Vec3<typename ComputeTypeFor<typename Accessor::ValueType>::type>
     result(const Accessor& grid, const Coord& ijk, const Vec3Bias& V)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
         using Vec3Type = Vec3<ValueType>;
 
         return Vec3Type(V[0]<0 ? D1<FD>::inX(grid,ijk) : D1<BD>::inX(grid,ijk),
@@ -213,11 +221,12 @@ struct ISGradientBiased
 
     // stencil access version
     template<typename StencilT>
-    static Vec3<typename StencilT::ValueType>
+    static Vec3<typename ComputeTypeFor<typename StencilT::ValueType>::type>
     result(const StencilT& stencil, const Vec3Bias& V)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
 
         return Vec3Type(V[0]<0 ? D1<FD>::inX(stencil) : D1<BD>::inX(stencil),
                         V[1]<0 ? D1<FD>::inY(stencil) : D1<BD>::inY(stencil),
@@ -235,11 +244,12 @@ struct ISGradientNormSqrd
 
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3Type up   = ISGradient<FD>::result(grid, ijk);
         Vec3Type down = ISGradient<BD>::result(grid, ijk);
@@ -248,11 +258,12 @@ struct ISGradientNormSqrd
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3Type up   = ISGradient<FD>::result(stencil);
         Vec3Type down = ISGradient<BD>::result(stencil);
@@ -266,7 +277,8 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk)
     {
         struct GetValue
         {
@@ -307,7 +319,8 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& s)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& s)
     {
         using F4Val = simd::Float4::value_type;
 
@@ -341,6 +354,23 @@ struct ISGradientNormSqrd<HJWENO5_BIAS>
 //@}
 
 
+template<typename Accessor>
+struct GetGridComputeTypeValue
+{
+    using ValueType = typename Accessor::ValueType;
+    using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+    GetGridComputeTypeValue(const Accessor& acc): mAcc(acc) {}
+
+    inline ComputeType
+    operator()(const Coord& ijk) const
+    {
+        return static_cast<ComputeType>(mAcc.getValue(ijk));
+    }
+
+    const Accessor& mAcc;
+};
+
 //@{
 /// @brief Laplacian defined in index space, using various center-difference stencils
 template<DDScheme DiffScheme>
@@ -348,11 +378,13 @@ struct ISLaplacian
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk);
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk);
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& stencil);
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& stencil);
 };
 
 
@@ -361,21 +393,25 @@ struct ISLaplacian<CD_SECOND>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk)
     {
-        return  grid.getValue(ijk.offsetBy(1,0,0)) + grid.getValue(ijk.offsetBy(-1, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,1,0)) + grid.getValue(ijk.offsetBy(0, -1, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,1)) + grid.getValue(ijk.offsetBy(0,  0,-1))
-                                                   - 6*grid.getValue(ijk);
+        const GetGridComputeTypeValue valueAt(grid);
+
+        return  valueAt(ijk.offsetBy(1,0,0)) + valueAt(ijk.offsetBy(-1, 0, 0)) +
+                valueAt(ijk.offsetBy(0,1,0)) + valueAt(ijk.offsetBy(0, -1, 0)) +
+                valueAt(ijk.offsetBy(0,0,1)) + valueAt(ijk.offsetBy(0,  0,-1))
+                                             - 6*valueAt(ijk);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& stencil)
     {
-        return  stencil.template getValue< 1, 0, 0>() + stencil.template getValue<-1, 0, 0>() +
-                stencil.template getValue< 0, 1, 0>() + stencil.template getValue< 0,-1, 0>() +
-                stencil.template getValue< 0, 0, 1>() + stencil.template getValue< 0, 0,-1>()
+        return stencil.template getValue< 1, 0, 0>() + stencil.template getValue<-1, 0, 0>() +
+               stencil.template getValue< 0, 1, 0>() + stencil.template getValue< 0,-1, 0>() +
+               stencil.template getValue< 0, 0, 1>() + stencil.template getValue< 0, 0,-1>()
                                                    - 6*stencil.template getValue< 0, 0, 0>();
     }
 };
@@ -385,36 +421,44 @@ struct ISLaplacian<CD_FOURTH>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk)
     {
-        using ValueT = typename Accessor::ValueType;
-        return static_cast<ValueT>(
-            (-1./12.)*(
-                grid.getValue(ijk.offsetBy(2,0,0)) + grid.getValue(ijk.offsetBy(-2, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,2,0)) + grid.getValue(ijk.offsetBy( 0,-2, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,2)) + grid.getValue(ijk.offsetBy( 0, 0,-2)) )
-            + (4./3.)*(
-                grid.getValue(ijk.offsetBy(1,0,0)) + grid.getValue(ijk.offsetBy(-1, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,1,0)) + grid.getValue(ijk.offsetBy( 0,-1, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,1)) + grid.getValue(ijk.offsetBy( 0, 0,-1)) )
-            - 7.5*grid.getValue(ijk));
+        using ValueT   = typename Accessor::ValueType;
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        const GetGridComputeTypeValue valueAt(grid);
+
+        return
+            ComputeT(-1./12.)*(
+                valueAt(ijk.offsetBy(2,0,0)) + valueAt(ijk.offsetBy(-2, 0, 0)) +
+                valueAt(ijk.offsetBy(0,2,0)) + valueAt(ijk.offsetBy( 0,-2, 0)) +
+                valueAt(ijk.offsetBy(0,0,2)) + valueAt(ijk.offsetBy( 0, 0,-2)) )
+            + ComputeT(4./3.)*(
+                valueAt(ijk.offsetBy(1,0,0)) + valueAt(ijk.offsetBy(-1, 0, 0)) +
+                valueAt(ijk.offsetBy(0,1,0)) + valueAt(ijk.offsetBy( 0,-1, 0)) +
+                valueAt(ijk.offsetBy(0,0,1)) + valueAt(ijk.offsetBy( 0, 0,-1)) )
+            - ComputeT(7.5)*valueAt(ijk);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& stencil)
     {
         using ValueT = typename StencilT::ValueType;
-        return static_cast<ValueT>(
-            (-1./12.)*(
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        return
+            ComputeT(-1./12.)*(
                 stencil.template getValue< 2, 0, 0>() + stencil.template getValue<-2, 0, 0>() +
                 stencil.template getValue< 0, 2, 0>() + stencil.template getValue< 0,-2, 0>() +
                 stencil.template getValue< 0, 0, 2>() + stencil.template getValue< 0, 0,-2>() )
-            + (4./3.)*(
+            + ComputeT(4./3.)*(
                 stencil.template getValue< 1, 0, 0>() + stencil.template getValue<-1, 0, 0>() +
                 stencil.template getValue< 0, 1, 0>() + stencil.template getValue< 0,-1, 0>() +
                 stencil.template getValue< 0, 0, 1>() + stencil.template getValue< 0, 0,-1>() )
-            - 7.5*stencil.template getValue< 0, 0, 0>());
+            - ComputeT(7.5)*stencil.template getValue< 0, 0, 0>();
     }
 };
 
@@ -423,44 +467,52 @@ struct ISLaplacian<CD_SIXTH>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk)
     {
-        using ValueT = typename Accessor::ValueType;
-        return static_cast<ValueT>(
-            (1./90.)*(
-                grid.getValue(ijk.offsetBy(3,0,0)) + grid.getValue(ijk.offsetBy(-3, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,3,0)) + grid.getValue(ijk.offsetBy( 0,-3, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,3)) + grid.getValue(ijk.offsetBy( 0, 0,-3)) )
-            - (3./20.)*(
-                grid.getValue(ijk.offsetBy(2,0,0)) + grid.getValue(ijk.offsetBy(-2, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,2,0)) + grid.getValue(ijk.offsetBy( 0,-2, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,2)) + grid.getValue(ijk.offsetBy( 0, 0,-2)) )
-            + 1.5 *(
-                grid.getValue(ijk.offsetBy(1,0,0)) + grid.getValue(ijk.offsetBy(-1, 0, 0)) +
-                grid.getValue(ijk.offsetBy(0,1,0)) + grid.getValue(ijk.offsetBy( 0,-1, 0)) +
-                grid.getValue(ijk.offsetBy(0,0,1)) + grid.getValue(ijk.offsetBy( 0, 0,-1)) )
-            - (3*49/18.)*grid.getValue(ijk));
+        using ValueT   = typename Accessor::ValueType;
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        const GetGridComputeTypeValue valueAt(grid);
+
+        return
+            ComputeT(1./90.)*(
+                valueAt(ijk.offsetBy(3,0,0)) + valueAt(ijk.offsetBy(-3, 0, 0)) +
+                valueAt(ijk.offsetBy(0,3,0)) + valueAt(ijk.offsetBy( 0,-3, 0)) +
+                valueAt(ijk.offsetBy(0,0,3)) + valueAt(ijk.offsetBy( 0, 0,-3)) )
+            - ComputeT(3./20.)*(
+                valueAt(ijk.offsetBy(2,0,0)) + valueAt(ijk.offsetBy(-2, 0, 0)) +
+                valueAt(ijk.offsetBy(0,2,0)) + valueAt(ijk.offsetBy( 0,-2, 0)) +
+                valueAt(ijk.offsetBy(0,0,2)) + valueAt(ijk.offsetBy( 0, 0,-2)) )
+            + ComputeT(1.5) *(
+                valueAt(ijk.offsetBy(1,0,0)) + valueAt(ijk.offsetBy(-1, 0, 0)) +
+                valueAt(ijk.offsetBy(0,1,0)) + valueAt(ijk.offsetBy( 0,-1, 0)) +
+                valueAt(ijk.offsetBy(0,0,1)) + valueAt(ijk.offsetBy( 0, 0,-1)) )
+            - ComputeT(3*49/18.)*valueAt(ijk);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& stencil)
     {
         using ValueT = typename StencilT::ValueType;
-        return static_cast<ValueT>(
-            (1./90.)*(
+        using ComputeT = typename ComputeTypeFor<ValueT>::type;
+
+        return
+            ComputeT(1./90.)*(
                 stencil.template getValue< 3, 0, 0>() + stencil.template getValue<-3, 0, 0>() +
                 stencil.template getValue< 0, 3, 0>() + stencil.template getValue< 0,-3, 0>() +
                 stencil.template getValue< 0, 0, 3>() + stencil.template getValue< 0, 0,-3>() )
-            - (3./20.)*(
+            - ComputeT(3./20.)*(
                 stencil.template getValue< 2, 0, 0>() + stencil.template getValue<-2, 0, 0>() +
                 stencil.template getValue< 0, 2, 0>() + stencil.template getValue< 0,-2, 0>() +
                 stencil.template getValue< 0, 0, 2>() + stencil.template getValue< 0, 0,-2>() )
-            + 1.5 *(
+            + ComputeT(1.5) *(
                 stencil.template getValue< 1, 0, 0>() + stencil.template getValue<-1, 0, 0>() +
                 stencil.template getValue< 0, 1, 0>() + stencil.template getValue< 0,-1, 0>() +
                 stencil.template getValue< 0, 0, 1>() + stencil.template getValue< 0, 0,-1>() )
-            - (3*49/18.)*stencil.template getValue< 0, 0, 0>());
+            - ComputeT(3*49/18.)*stencil.template getValue< 0, 0, 0>();
     }
 };
 //@}
@@ -472,7 +524,8 @@ template<DScheme DiffScheme>
 struct ISDivergence
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const Accessor& grid, const Coord& ijk)
     {
         return D1Vec<DiffScheme>::inX(grid, ijk, 0) +
@@ -481,7 +534,8 @@ struct ISDivergence
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const StencilT& stencil)
     {
         return D1Vec<DiffScheme>::inX(stencil, 0) +
@@ -499,9 +553,11 @@ struct ISCurl
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const Accessor& grid, const Coord& ijk)
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
+
         return Vec3Type( D1Vec<DiffScheme>::inY(grid, ijk, 2) - //dw/dy - dv/dz
                          D1Vec<DiffScheme>::inZ(grid, ijk, 1),
                          D1Vec<DiffScheme>::inZ(grid, ijk, 0) - //du/dz - dw/dx
@@ -512,9 +568,11 @@ struct ISCurl
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const StencilT& stencil)
     {
-        using Vec3Type = typename StencilT::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
+
         return Vec3Type( D1Vec<DiffScheme>::inY(stencil, 2) - //dw/dy - dv/dz
                          D1Vec<DiffScheme>::inZ(stencil, 1),
                          D1Vec<DiffScheme>::inZ(stencil, 0) - //du/dz - dw/dx
@@ -537,36 +595,57 @@ struct ISMeanCurvature
     /// in &nabla; &middot; (&nabla;&Phi; / |&nabla;&Phi;|) and @a beta is |&nabla;&Phi;|.
     template<typename Accessor>
     static bool result(const Accessor& grid, const Coord& ijk,
-                       typename Accessor::ValueType& alpha,
-                       typename Accessor::ValueType& beta)
+        typename ComputeTypeFor<typename Accessor::ValueType>::type& alpha,
+        typename ComputeTypeFor<typename Accessor::ValueType>::type& beta)
     {
-        using ValueType = typename Accessor::ValueType;
+        using ValueType   = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        const ValueType Dx = D1<DiffScheme1>::inX(grid, ijk);
-        const ValueType Dy = D1<DiffScheme1>::inY(grid, ijk);
-        const ValueType Dz = D1<DiffScheme1>::inZ(grid, ijk);
+        const ComputeType Dx = D1<DiffScheme1>::inX(grid, ijk);
+        const ComputeType Dy = D1<DiffScheme1>::inY(grid, ijk);
+        const ComputeType Dz = D1<DiffScheme1>::inZ(grid, ijk);
 
-        const ValueType Dx2 = Dx*Dx;
-        const ValueType Dy2 = Dy*Dy;
-        const ValueType Dz2 = Dz*Dz;
-        const ValueType normGrad = Dx2 + Dy2 + Dz2;
-        if (normGrad <= math::Tolerance<ValueType>::value()) {
-            alpha = beta = 0;
+        const ComputeType Dx2 = Dx*Dx;
+        const ComputeType Dy2 = Dy*Dy;
+        const ComputeType Dz2 = Dz*Dz;
+        const ComputeType normGrad = Dx2 + Dy2 + Dz2;
+        if (normGrad <= math::Tolerance<ComputeType>::value()) {
+            alpha = beta = ComputeType(0);
             return false;
         }
 
-        const ValueType Dxx = D2<DiffScheme2>::inX(grid, ijk);
-        const ValueType Dyy = D2<DiffScheme2>::inY(grid, ijk);
-        const ValueType Dzz = D2<DiffScheme2>::inZ(grid, ijk);
+        const ComputeType Dxx = D2<DiffScheme2>::inX(grid, ijk);
+        const ComputeType Dyy = D2<DiffScheme2>::inY(grid, ijk);
+        const ComputeType Dzz = D2<DiffScheme2>::inZ(grid, ijk);
 
-        const ValueType Dxy = D2<DiffScheme2>::inXandY(grid, ijk);
-        const ValueType Dyz = D2<DiffScheme2>::inYandZ(grid, ijk);
-        const ValueType Dxz = D2<DiffScheme2>::inXandZ(grid, ijk);
+        const ComputeType Dxy = D2<DiffScheme2>::inXandY(grid, ijk);
+        const ComputeType Dyz = D2<DiffScheme2>::inYandZ(grid, ijk);
+        const ComputeType Dxz = D2<DiffScheme2>::inXandZ(grid, ijk);
 
         // for return
         alpha = (Dx2*(Dyy+Dzz)+Dy2*(Dxx+Dzz)+Dz2*(Dxx+Dyy)-2*(Dx*(Dy*Dxy+Dz*Dxz)+Dy*Dz*Dyz));
-        beta  = ValueType(std::sqrt(double(normGrad))); // * 1/dx
+        beta  = ComputeType(std::sqrt(double(normGrad))); // * 1/dx
         return true;
+    }
+
+    template<typename Accessor>
+    static typename std::enable_if_t<!std::is_same_v<typename Accessor::ValueType,
+                typename ComputeTypeFor<typename Accessor::ValueType>::type>, bool>
+    result(const Accessor& grid, const Coord& ijk,
+           typename Accessor::ValueType& alpha,
+           typename Accessor::ValueType& beta)
+    {
+        using ValueType   = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType alpha_c, beta_c;
+
+        const bool res = result(grid, ijk, alpha_c, beta_c);
+
+        alpha = static_cast<ValueType>(alpha_c);
+        beta  = static_cast<ValueType>(beta_c);
+
+        return res;
     }
 
     /// @brief Stencil access version
@@ -579,31 +658,53 @@ struct ISMeanCurvature
                        typename StencilT::ValueType& beta)
     {
         using ValueType = typename StencilT::ValueType;
-        const ValueType Dx = D1<DiffScheme1>::inX(stencil);
-        const ValueType Dy = D1<DiffScheme1>::inY(stencil);
-        const ValueType Dz = D1<DiffScheme1>::inZ(stencil);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        const ValueType Dx2 = Dx*Dx;
-        const ValueType Dy2 = Dy*Dy;
-        const ValueType Dz2 = Dz*Dz;
-        const ValueType normGrad = Dx2 + Dy2 + Dz2;
-        if (normGrad <= math::Tolerance<ValueType>::value()) {
-            alpha = beta = 0;
+        const ComputeType Dx = D1<DiffScheme1>::inX(stencil);
+        const ComputeType Dy = D1<DiffScheme1>::inY(stencil);
+        const ComputeType Dz = D1<DiffScheme1>::inZ(stencil);
+
+        const ComputeType Dx2 = Dx*Dx;
+        const ComputeType Dy2 = Dy*Dy;
+        const ComputeType Dz2 = Dz*Dz;
+        const ComputeType normGrad = Dx2 + Dy2 + Dz2;
+        if (normGrad <= math::Tolerance<ComputeType>::value()) {
+            alpha = beta = ComputeType(0);
             return false;
         }
 
-        const ValueType Dxx = D2<DiffScheme2>::inX(stencil);
-        const ValueType Dyy = D2<DiffScheme2>::inY(stencil);
-        const ValueType Dzz = D2<DiffScheme2>::inZ(stencil);
+        const ComputeType Dxx = D2<DiffScheme2>::inX(stencil);
+        const ComputeType Dyy = D2<DiffScheme2>::inY(stencil);
+        const ComputeType Dzz = D2<DiffScheme2>::inZ(stencil);
 
-        const ValueType Dxy = D2<DiffScheme2>::inXandY(stencil);
-        const ValueType Dyz = D2<DiffScheme2>::inYandZ(stencil);
-        const ValueType Dxz = D2<DiffScheme2>::inXandZ(stencil);
+        const ComputeType Dxy = D2<DiffScheme2>::inXandY(stencil);
+        const ComputeType Dyz = D2<DiffScheme2>::inYandZ(stencil);
+        const ComputeType Dxz = D2<DiffScheme2>::inXandZ(stencil);
 
         // for return
         alpha = (Dx2*(Dyy+Dzz)+Dy2*(Dxx+Dzz)+Dz2*(Dxx+Dyy)-2*(Dx*(Dy*Dxy+Dz*Dxz)+Dy*Dz*Dyz));
-        beta = ValueType(std::sqrt(double(normGrad))); // * 1/dx
+        beta = ComputeType(std::sqrt(double(normGrad))); // * 1/dx
         return true;
+    }
+
+    template<typename StencilT>
+    static typename std::enable_if_t<!std::is_same_v<typename StencilT::ValueType,
+                typename ComputeTypeFor<typename StencilT::ValueType>::type>, bool>
+    result(const StencilT& stencil,
+           typename StencilT::ValueType& alpha,
+           typename StencilT::ValueType& beta)
+    {
+        using ValueType   = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType alpha_c, beta_c;
+
+        const bool res = result(stencil, alpha_c, beta_c);
+
+        alpha = static_cast<ValueType>(alpha_c);
+        beta  = static_cast<ValueType>(beta_c);
+
+        return res;
     }
 };
 
@@ -674,11 +775,12 @@ struct Gradient<UniformScaleMap, CD_2ND>
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename internal::ReturnValue<Accessor>::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-        return  iGradient * inv2dx;
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        return iGradient * inv2dx;
     }
 
     // stencil access version
@@ -687,11 +789,12 @@ struct Gradient<UniformScaleMap, CD_2ND>
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename internal::ReturnValue<StencilT>::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-        return  iGradient * inv2dx;
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        return iGradient * inv2dx;
     }
 };
 
@@ -706,11 +809,12 @@ struct Gradient<UniformScaleTranslateMap, CD_2ND>
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename internal::ReturnValue<Accessor>::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
         using Vec3Type = typename internal::ReturnValue<Accessor>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(grid, ijk) );
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-        return  iGradient * inv2dx;
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        return iGradient * inv2dx;
     }
 
     // stencil access version
@@ -719,11 +823,12 @@ struct Gradient<UniformScaleTranslateMap, CD_2ND>
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename internal::ReturnValue<StencilT>::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
         using Vec3Type = typename internal::ReturnValue<StencilT>::Vec3Type;
 
         Vec3Type iGradient( ISGradient<CD_2NDT>::result(stencil) );
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-        return  iGradient * inv2dx;
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        return iGradient * inv2dx;
     }
 };
 
@@ -824,24 +929,28 @@ template<typename MapType, BiasedGradientScheme GradScheme>
 struct GradientBiased
 {
     // random access version
-    template<typename Accessor> static math::Vec3<typename Accessor::ValueType>
+    template<typename Accessor>
+    static math::Vec3<typename ComputeTypeFor<typename Accessor::ValueType>::type>
     result(const MapType& map, const Accessor& grid, const Coord& ijk,
            const Vec3<typename Accessor::ValueType>& V)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3d iGradient( ISGradientBiased<GradScheme, Vec3Type>::result(grid, ijk, V) );
         return Vec3Type(map.applyIJT(iGradient, ijk.asVec3d()));
     }
 
     // stencil access version
-    template<typename StencilT> static math::Vec3<typename StencilT::ValueType>
+    template<typename StencilT>
+    static math::Vec3<typename ComputeTypeFor<typename StencilT::ValueType>::type>
     result(const MapType& map, const StencilT& stencil,
            const Vec3<typename StencilT::ValueType>& V)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3d iGradient( ISGradientBiased<GradScheme, Vec3Type>::result(stencil, V) );
         return Vec3Type(map.applyIJT(iGradient, stencil.getCenterCoord().asVec3d()));
@@ -862,11 +971,12 @@ struct GradientNormSqrd
 
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, grid, ijk);
         Vec3Type down = Gradient<MapType, BD>::result(map, grid, ijk);
@@ -875,11 +985,12 @@ struct GradientNormSqrd
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const MapType& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = math::Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = math::Vec3<ComputeType>;
 
         Vec3Type up   = Gradient<MapType, FD>::result(map, stencil);
         Vec3Type down = Gradient<MapType, BD>::result(map, stencil);
@@ -893,23 +1004,25 @@ struct GradientNormSqrd<UniformScaleMap, GradScheme>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return invdxdx * ISGradientNormSqrd<GradScheme>::result(grid, ijk);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return invdxdx * ISGradientNormSqrd<GradScheme>::result(stencil);
     }
 };
@@ -920,23 +1033,25 @@ struct GradientNormSqrd<UniformScaleTranslateMap, GradScheme>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return invdxdx * ISGradientNormSqrd<GradScheme>::result(grid, ijk);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return invdxdx * ISGradientNormSqrd<GradScheme>::result(stencil);
     }
 };
@@ -949,33 +1064,37 @@ template<typename MapType, DScheme DiffScheme>
 struct Divergence
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div(0);
         for (int i=0; i < 3; i++) {
             Vec3d vec( D1Vec<DiffScheme>::inX(grid, ijk, i),
                        D1Vec<DiffScheme>::inY(grid, ijk, i),
                        D1Vec<DiffScheme>::inZ(grid, ijk, i) );
-            div += ValueType(map.applyIJT(vec, ijk.asVec3d())[i]);
+            div += ComputeType(map.applyIJT(vec, ijk.asVec3d())[i]);
         }
         return div;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const MapType& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div(0);
         for (int i=0; i < 3; i++) {
             Vec3d vec( D1Vec<DiffScheme>::inX(stencil, i),
                        D1Vec<DiffScheme>::inY(stencil, i),
                        D1Vec<DiffScheme>::inZ(stencil, i) );
-            div += ValueType(map.applyIJT(vec, stencil.getCenterCoord().asVec3d())[i]);
+            div += ComputeType(map.applyIJT(vec, stencil.getCenterCoord().asVec3d())[i]);
         }
         return div;
     }
@@ -987,25 +1106,25 @@ template<DScheme DiffScheme>
 struct Divergence<TranslationMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const TranslationMap&, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div =ISDivergence<DiffScheme>::result(grid, ijk);
-        return div;
+        return ISDivergence<DiffScheme>::result(grid, ijk);
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const TranslationMap&, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div =ISDivergence<DiffScheme>::result(stencil);
-        return div;
+        return ISDivergence<DiffScheme>::result(stencil);
     }
 };
 
@@ -1015,28 +1134,30 @@ template<DScheme DiffScheme>
 struct Divergence<UniformScaleMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<DiffScheme>::result(grid, ijk);
+        ComputeType invdx = ComputeType(map.getInvScale()[0]);
 
-        div =ISDivergence<DiffScheme>::result(grid, ijk);
-        ValueType invdx = ValueType(map.getInvScale()[0]);
         return div * invdx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<DiffScheme>::result(stencil);
+        ComputeType invdx = ComputeType(map.getInvScale()[0]);
 
-        div =ISDivergence<DiffScheme>::result(stencil);
-        ValueType invdx = ValueType(map.getInvScale()[0]);
         return div * invdx;
     }
 };
@@ -1047,28 +1168,30 @@ template<DScheme DiffScheme>
 struct Divergence<UniformScaleTranslateMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<DiffScheme>::result(grid, ijk);
+        ComputeType invdx = ComputeType(map.getInvScale()[0]);
 
-        div =ISDivergence<DiffScheme>::result(grid, ijk);
-        ValueType invdx = ValueType(map.getInvScale()[0]);
         return div * invdx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<DiffScheme>::result(stencil);
+        ComputeType invdx = ComputeType(map.getInvScale()[0]);
 
-        div =ISDivergence<DiffScheme>::result(stencil);
-        ValueType invdx = ValueType(map.getInvScale()[0]);
         return div * invdx;
     }
 };
@@ -1079,26 +1202,30 @@ template<>
 struct Divergence<UniformScaleMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div =ISDivergence<CD_2NDT>::result(grid, ijk);
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        ComputeType div = ISDivergence<CD_2NDT>::result(grid, ijk);
+        ComputeType inv2dx = ComputeType(map.getInvTwiceScale()[0]);
+
         return div * inv2dx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div =ISDivergence<CD_2NDT>::result(stencil);
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+        ComputeType div = ISDivergence<CD_2NDT>::result(stencil);
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+
         return div * inv2dx;
     }
 };
@@ -1109,28 +1236,30 @@ template<>
 struct Divergence<UniformScaleTranslateMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<CD_2NDT>::result(grid, ijk);
+        ComputeType inv2dx = ComputeType(map.getInvTwiceScale()[0]);
 
-        div =ISDivergence<CD_2NDT>::result(grid, ijk);
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
         return div * inv2dx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
+        ComputeType div = ISDivergence<CD_2NDT>::result(stencil);
+        ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
 
-        div =ISDivergence<CD_2NDT>::result(stencil);
-        ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
         return div * inv2dx;
     }
 };
@@ -1141,29 +1270,34 @@ template<DScheme DiffScheme>
 struct Divergence<ScaleMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const ScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<DiffScheme>::inX(grid, ijk, 0) * (map.getInvScale()[0]) +
             D1Vec<DiffScheme>::inY(grid, ijk, 1) * (map.getInvScale()[1]) +
             D1Vec<DiffScheme>::inZ(grid, ijk, 2) * (map.getInvScale()[2]));
+
         return div;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const ScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div = ValueType(
+        ComputeType div = ComputeType(
               D1Vec<DiffScheme>::inX(stencil, 0) * (map.getInvScale()[0]) +
               D1Vec<DiffScheme>::inY(stencil, 1) * (map.getInvScale()[1]) +
               D1Vec<DiffScheme>::inZ(stencil, 2) * (map.getInvScale()[2]) );
+
         return div;
     }
 };
@@ -1174,29 +1308,34 @@ template<DScheme DiffScheme>
 struct Divergence<ScaleTranslateMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const ScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<DiffScheme>::inX(grid, ijk, 0) * (map.getInvScale()[0]) +
             D1Vec<DiffScheme>::inY(grid, ijk, 1) * (map.getInvScale()[1]) +
             D1Vec<DiffScheme>::inZ(grid, ijk, 2) * (map.getInvScale()[2]));
+
         return div;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const ScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div(0);
-        div = ValueType(
+        ComputeType div = ComputeType(
               D1Vec<DiffScheme>::inX(stencil, 0) * (map.getInvScale()[0]) +
               D1Vec<DiffScheme>::inY(stencil, 1) * (map.getInvScale()[1]) +
               D1Vec<DiffScheme>::inZ(stencil, 2) * (map.getInvScale()[2]) );
+
         return div;
     }
 };
@@ -1207,28 +1346,34 @@ template<>
 struct Divergence<ScaleMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const ScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<CD_2NDT>::inX(grid, ijk, 0) * (map.getInvTwiceScale()[0]) +
             D1Vec<CD_2NDT>::inY(grid, ijk, 1) * (map.getInvTwiceScale()[1]) +
             D1Vec<CD_2NDT>::inZ(grid, ijk, 2) * (map.getInvTwiceScale()[2]) );
+
         return div;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const ScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<CD_2NDT>::inX(stencil, 0) * (map.getInvTwiceScale()[0]) +
             D1Vec<CD_2NDT>::inY(stencil, 1) * (map.getInvTwiceScale()[1]) +
             D1Vec<CD_2NDT>::inZ(stencil, 2) * (map.getInvTwiceScale()[2]) );
+
         return div;
     }
 };
@@ -1239,28 +1384,34 @@ template<>
 struct Divergence<ScaleTranslateMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType::value_type
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType::value_type>::type
     result(const ScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<CD_2NDT>::inX(grid, ijk, 0) * (map.getInvTwiceScale()[0]) +
             D1Vec<CD_2NDT>::inY(grid, ijk, 1) * (map.getInvTwiceScale()[1]) +
             D1Vec<CD_2NDT>::inZ(grid, ijk, 2) * (map.getInvTwiceScale()[2]) );
+
         return div;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType::value_type
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType::value_type>::type
     result(const ScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType::value_type;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType div = ValueType(
+        ComputeType div = ComputeType(
             D1Vec<CD_2NDT>::inX(stencil, 0) * (map.getInvTwiceScale()[0]) +
             D1Vec<CD_2NDT>::inY(stencil, 1) * (map.getInvTwiceScale()[1]) +
             D1Vec<CD_2NDT>::inZ(stencil, 2) * (map.getInvTwiceScale()[2]) );
+
         return div;
     }
 };
@@ -1274,10 +1425,11 @@ template<typename MapType, DScheme DiffScheme>
 struct Curl
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
         Vec3Type mat[3];
         for (int i = 0; i < 3; i++) {
             Vec3d vec(
@@ -1293,10 +1445,11 @@ struct Curl
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const MapType& map, const StencilT& stencil)
     {
-        using Vec3Type = typename StencilT::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
         Vec3Type mat[3];
         for (int i = 0; i < 3; i++) {
             Vec3d vec(
@@ -1317,21 +1470,25 @@ template<DScheme DiffScheme>
 struct Curl<UniformScaleMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
+
         return ISCurl<DiffScheme>::result(grid, ijk) * ValueType(map.getInvScale()[0]);
     }
 
     // Stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
-         using Vec3Type = typename StencilT::ValueType;
-         using ValueType = typename Vec3Type::value_type;
-         return ISCurl<DiffScheme>::result(stencil) * ValueType(map.getInvScale()[0]);
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
+        using ValueType = typename Vec3Type::value_type;
+
+        return ISCurl<DiffScheme>::result(stencil) * ValueType(map.getInvScale()[0]);
      }
 };
 
@@ -1340,20 +1497,22 @@ template<DScheme DiffScheme>
 struct Curl<UniformScaleTranslateMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<DiffScheme>::result(grid, ijk) * ValueType(map.getInvScale()[0]);
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
-        using Vec3Type = typename StencilT::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<DiffScheme>::result(stencil) * ValueType(map.getInvScale()[0]);
@@ -1365,20 +1524,22 @@ template<>
 struct Curl<UniformScaleMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<CD_2NDT>::result(grid, ijk) * ValueType(map.getInvTwiceScale()[0]);
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
-        using Vec3Type = typename StencilT::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<CD_2NDT>::result(stencil) * ValueType(map.getInvTwiceScale()[0]);
@@ -1390,20 +1551,22 @@ template<>
 struct Curl<UniformScaleTranslateMap, CD_2ND>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
-        using Vec3Type = typename Accessor::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename Accessor::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<CD_2NDT>::result(grid, ijk) * ValueType(map.getInvTwiceScale()[0]);
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
-        using Vec3Type = typename StencilT::ValueType;
+        using Vec3Type = typename ComputeTypeFor<typename StencilT::ValueType>::type;
         using ValueType = typename Vec3Type::value_type;
 
         return ISCurl<CD_2NDT>::result(stencil) * ValueType(map.getInvTwiceScale()[0]);
@@ -1420,18 +1583,21 @@ struct Laplacian
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const MapType& map,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const MapType& map,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        // all the second derivatives in index space
-        ValueType iddx  = D2<DiffScheme>::inX(grid, ijk);
-        ValueType iddy  = D2<DiffScheme>::inY(grid, ijk);
-        ValueType iddz  = D2<DiffScheme>::inZ(grid, ijk);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType iddxy = D2<DiffScheme>::inXandY(grid, ijk);
-        ValueType iddyz = D2<DiffScheme>::inYandZ(grid, ijk);
-        ValueType iddxz = D2<DiffScheme>::inXandZ(grid, ijk);
+        // all the second derivatives in index space
+        ComputeType iddx  = D2<DiffScheme>::inX(grid, ijk);
+        ComputeType iddy  = D2<DiffScheme>::inY(grid, ijk);
+        ComputeType iddz  = D2<DiffScheme>::inZ(grid, ijk);
+
+        ComputeType iddxy = D2<DiffScheme>::inXandY(grid, ijk);
+        ComputeType iddyz = D2<DiffScheme>::inYandZ(grid, ijk);
+        ComputeType iddxz = D2<DiffScheme>::inXandZ(grid, ijk);
 
         // second derivatives in index space
         Mat3d  d2_is(iddx,  iddxy, iddxz,
@@ -1451,22 +1617,25 @@ struct Laplacian
         }
 
         // the trace of the second derivative (range space) matrix is laplacian
-        return ValueType(d2_rs(0,0) + d2_rs(1,1) + d2_rs(2,2));
+        return ComputeType(d2_rs(0,0) + d2_rs(1,1) + d2_rs(2,2));
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const MapType& map, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const MapType& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        // all the second derivatives in index space
-        ValueType iddx  = D2<DiffScheme>::inX(stencil);
-        ValueType iddy  = D2<DiffScheme>::inY(stencil);
-        ValueType iddz  = D2<DiffScheme>::inZ(stencil);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType iddxy = D2<DiffScheme>::inXandY(stencil);
-        ValueType iddyz = D2<DiffScheme>::inYandZ(stencil);
-        ValueType iddxz = D2<DiffScheme>::inXandZ(stencil);
+        // all the second derivatives in index space
+        ComputeType iddx  = D2<DiffScheme>::inX(stencil);
+        ComputeType iddy  = D2<DiffScheme>::inY(stencil);
+        ComputeType iddz  = D2<DiffScheme>::inZ(stencil);
+
+        ComputeType iddxy = D2<DiffScheme>::inXandY(stencil);
+        ComputeType iddyz = D2<DiffScheme>::inYandZ(stencil);
+        ComputeType iddxz = D2<DiffScheme>::inXandZ(stencil);
 
         // second derivatives in index space
         Mat3d  d2_is(iddx,  iddxy, iddxz,
@@ -1486,7 +1655,7 @@ struct Laplacian
         }
 
         // the trace of the second derivative (range space) matrix is laplacian
-        return ValueType(d2_rs(0,0) + d2_rs(1,1) + d2_rs(2,2));
+        return ComputeType(d2_rs(0,0) + d2_rs(1,1) + d2_rs(2,2));
     }
 };
 
@@ -1496,7 +1665,8 @@ struct Laplacian<TranslationMap, DiffScheme>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const TranslationMap&,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const TranslationMap&,
         const Accessor& grid, const Coord& ijk)
     {
         return ISLaplacian<DiffScheme>::result(grid, ijk);
@@ -1504,7 +1674,8 @@ struct Laplacian<TranslationMap, DiffScheme>
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const TranslationMap&, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const TranslationMap&, const StencilT& stencil)
     {
         return ISLaplacian<DiffScheme>::result(stencil);
     }
@@ -1517,7 +1688,8 @@ struct Laplacian<UnitaryMap, DiffScheme>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const UnitaryMap&,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const UnitaryMap&,
         const Accessor& grid, const Coord& ijk)
     {
         return ISLaplacian<DiffScheme>::result(grid, ijk);
@@ -1525,7 +1697,8 @@ struct Laplacian<UnitaryMap, DiffScheme>
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const UnitaryMap&, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const UnitaryMap&, const StencilT& stencil)
     {
         return ISLaplacian<DiffScheme>::result(stencil);
     }
@@ -1536,20 +1709,26 @@ template<DDScheme DiffScheme>
 struct Laplacian<UniformScaleMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return ISLaplacian<DiffScheme>::result(grid, ijk) * invdxdx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return ISLaplacian<DiffScheme>::result(stencil) * invdxdx;
     }
 };
@@ -1559,20 +1738,26 @@ template<DDScheme DiffScheme>
 struct Laplacian<UniformScaleTranslateMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return ISLaplacian<DiffScheme>::result(grid, ijk) * invdxdx;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
+        ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
         return ISLaplacian<DiffScheme>::result(stencil) * invdxdx;
     }
 };
@@ -1582,37 +1767,41 @@ template<DDScheme DiffScheme>
 struct Laplacian<ScaleMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const ScaleMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
         // compute the second derivatives in index space
-        ValueType iddx = D2<DiffScheme>::inX(grid, ijk);
-        ValueType iddy = D2<DiffScheme>::inY(grid, ijk);
-        ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
+        ComputeType iddx = D2<DiffScheme>::inX(grid, ijk);
+        ComputeType iddy = D2<DiffScheme>::inY(grid, ijk);
+        ComputeType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
+        const ComputeType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const ScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
         // compute the second derivatives in index space
-        ValueType iddx = D2<DiffScheme>::inX(stencil);
-        ValueType iddy = D2<DiffScheme>::inY(stencil);
-        ValueType iddz = D2<DiffScheme>::inZ(stencil);
+        ComputeType iddx = D2<DiffScheme>::inX(stencil);
+        ComputeType iddy = D2<DiffScheme>::inY(stencil);
+        ComputeType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
+        const ComputeType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
@@ -1623,35 +1812,41 @@ template<DDScheme DiffScheme>
 struct Laplacian<ScaleTranslateMap, DiffScheme>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const ScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         // compute the second derivatives in index space
-        ValueType iddx = D2<DiffScheme>::inX(grid, ijk);
-        ValueType iddy = D2<DiffScheme>::inY(grid, ijk);
-        ValueType iddz = D2<DiffScheme>::inZ(grid, ijk);
+        ComputeType iddx = D2<DiffScheme>::inX(grid, ijk);
+        ComputeType iddy = D2<DiffScheme>::inY(grid, ijk);
+        ComputeType iddz = D2<DiffScheme>::inZ(grid, ijk);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
+        const ComputeType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const ScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         // compute the second derivatives in index space
-        ValueType iddx = D2<DiffScheme>::inX(stencil);
-        ValueType iddy = D2<DiffScheme>::inY(stencil);
-        ValueType iddz = D2<DiffScheme>::inZ(stencil);
+        ComputeType iddx = D2<DiffScheme>::inX(stencil);
+        ComputeType iddy = D2<DiffScheme>::inY(stencil);
+        ComputeType iddz = D2<DiffScheme>::inZ(stencil);
         const Vec3d& invScaleSqr = map.getInvScaleSqr();
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
         // scale them by the appropriate 1/dx^2, 1/dy^2, 1/dz^2 and sum
-        const ValueType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
+        const ComputeType value = iddx * invScaleSqr[0] + iddy * invScaleSqr[1] + iddz * invScaleSqr[2];
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
@@ -1665,14 +1860,16 @@ template<typename MapType, DScheme DiffScheme>
 struct CPT
 {
     // random access version
-    template<typename Accessor> static math::Vec3<typename Accessor::ValueType>
+    template<typename Accessor>
+    static math::Vec3<typename ComputeTypeFor<typename Accessor::ValueType>::type>
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
 
         // current distance
-        ValueType d = grid.getValue(ijk);
+        ComputeType d = grid.getValue(ijk);
         // compute gradient in physical space where it is a unit normal
         // since the grid holds a distance level set.
         Vec3d vectorFromSurface(d*Gradient<MapType,DiffScheme>::result(map, grid, ijk));
@@ -1687,14 +1884,16 @@ struct CPT
     }
 
     // stencil access version
-    template<typename StencilT> static math::Vec3<typename StencilT::ValueType>
+    template<typename StencilT>
+    static math::Vec3<typename ComputeTypeFor<typename StencilT::ValueType>::type>
     result(const MapType& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
 
         // current distance
-        ValueType d = stencil.template getValue<0, 0, 0>();
+        ComputeType d = stencil.template getValue<0, 0, 0>();
         // compute gradient in physical space where it is a unit normal
         // since the grid holds a distance level set.
         Vec3d vectorFromSurface(d*Gradient<MapType, DiffScheme>::result(map, stencil));
@@ -1718,13 +1917,16 @@ template<typename MapType, DScheme DiffScheme>
 struct CPT_RANGE
 {
     // random access version
-    template<typename Accessor> static Vec3<typename Accessor::ValueType>
+    template<typename Accessor>
+    static math::Vec3<typename ComputeTypeFor<typename Accessor::ValueType>::type>
     result(const MapType& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
+
         // current distance
-        ValueType d = grid.getValue(ijk);
+        ComputeType d = grid.getValue(ijk);
         // compute gradient in physical space where it is a unit normal
         // since the grid holds a distance level set.
         Vec3Type vectorFromSurface =
@@ -1735,13 +1937,16 @@ struct CPT_RANGE
     }
 
     // stencil access version
-    template<typename StencilT> static Vec3<typename StencilT::ValueType>
+    template<typename StencilT>
+    static math::Vec3<typename ComputeTypeFor<typename StencilT::ValueType>::type>
     result(const MapType& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
-        using Vec3Type = Vec3<ValueType>;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+        using Vec3Type = Vec3<ComputeType>;
+
         // current distance
-        ValueType d = stencil.template getValue<0, 0, 0>();
+        ComputeType d = stencil.template getValue<0, 0, 0>();
         // compute gradient in physical space where it is a unit normal
         // since the grid holds a distance level set.
         Vec3Type vectorFromSurface =
@@ -1769,74 +1974,81 @@ struct MeanCurvature
                         double& alpha, double& beta)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-         // compute the gradient in index and world space
-         Vec3d d1_is(static_cast<double>(D1<DiffScheme1>::inX(grid, ijk)),
-                     static_cast<double>(D1<DiffScheme1>::inY(grid, ijk)),
-                     static_cast<double>(D1<DiffScheme1>::inZ(grid, ijk))), d1_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
-             d1_ws = map.applyIJT(d1_is);
-         } else {
-             d1_ws = map.applyIJT(d1_is, ijk.asVec3d());
-         }
-         const double Dx2 = d1_ws(0)*d1_ws(0);
-         const double Dy2 = d1_ws(1)*d1_ws(1);
-         const double Dz2 = d1_ws(2)*d1_ws(2);
-         const double normGrad = Dx2 + Dy2 + Dz2;
-         if (normGrad <= math::Tolerance<double>::value()) {
-             alpha = beta = 0;
-             return false;
-         }
+        // compute the gradient in index and world space
+        Vec3d d1_is(static_cast<double>(D1<DiffScheme1>::inX(grid, ijk)),
+                    static_cast<double>(D1<DiffScheme1>::inY(grid, ijk)),
+                    static_cast<double>(D1<DiffScheme1>::inZ(grid, ijk))), d1_ws;
+        if (is_linear<MapType>::value) {//resolved at compiletime
+            d1_ws = map.applyIJT(d1_is);
+        } else {
+            d1_ws = map.applyIJT(d1_is, ijk.asVec3d());
+        }
+        const double Dx2 = d1_ws(0)*d1_ws(0);
+        const double Dy2 = d1_ws(1)*d1_ws(1);
+        const double Dz2 = d1_ws(2)*d1_ws(2);
+        const double normGrad = Dx2 + Dy2 + Dz2;
+        if (normGrad <= math::Tolerance<double>::value()) {
+            alpha = beta = double(0);
+            return false;
+        }
 
-         // all the second derivatives in index space
-         ValueType iddx  = D2<DiffScheme2>::inX(grid, ijk);
-         ValueType iddy  = D2<DiffScheme2>::inY(grid, ijk);
-         ValueType iddz  = D2<DiffScheme2>::inZ(grid, ijk);
+        // all the second derivatives in index space
+        ComputeType iddx  = D2<DiffScheme2>::inX(grid, ijk);
+        ComputeType iddy  = D2<DiffScheme2>::inY(grid, ijk);
+        ComputeType iddz  = D2<DiffScheme2>::inZ(grid, ijk);
 
-         ValueType iddxy = D2<DiffScheme2>::inXandY(grid, ijk);
-         ValueType iddyz = D2<DiffScheme2>::inYandZ(grid, ijk);
-         ValueType iddxz = D2<DiffScheme2>::inXandZ(grid, ijk);
+        ComputeType iddxy = D2<DiffScheme2>::inXandY(grid, ijk);
+        ComputeType iddyz = D2<DiffScheme2>::inYandZ(grid, ijk);
+        ComputeType iddxz = D2<DiffScheme2>::inXandZ(grid, ijk);
 
-         // second derivatives in index space
-         Mat3d  d2_is(iddx,  iddxy, iddxz,
-                      iddxy, iddy,  iddyz,
-                      iddxz, iddyz, iddz);
+        // second derivatives in index space
+        Mat3d  d2_is(iddx,  iddxy, iddxz,
+                     iddxy, iddy,  iddyz,
+                     iddxz, iddyz, iddz);
 
-         // convert second derivatives to world space
-         Mat3d d2_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
-             d2_ws = map.applyIJC(d2_is);
-         } else {
-             d2_ws = map.applyIJC(d2_is, d1_is, ijk.asVec3d());
-         }
+        // convert second derivatives to world space
+        Mat3d d2_ws;
+        if (is_linear<MapType>::value) {//resolved at compiletime
+            d2_ws = map.applyIJC(d2_is);
+        } else {
+            d2_ws = map.applyIJC(d2_is, d1_is, ijk.asVec3d());
+        }
 
-         // assemble the nominator and denominator for mean curvature
-         alpha = (Dx2*(d2_ws(1,1)+d2_ws(2,2))+Dy2*(d2_ws(0,0)+d2_ws(2,2))
-                  +Dz2*(d2_ws(0,0)+d2_ws(1,1))
-                  -2*(d1_ws(0)*(d1_ws(1)*d2_ws(0,1)+d1_ws(2)*d2_ws(0,2))
-                      +d1_ws(1)*d1_ws(2)*d2_ws(1,2)));
-         beta = std::sqrt(normGrad); // * 1/dx
-         return true;
+        // assemble the nominator and denominator for mean curvature
+        alpha = (Dx2*(d2_ws(1,1)+d2_ws(2,2))+Dy2*(d2_ws(0,0)+d2_ws(2,2))
+                 +Dz2*(d2_ws(0,0)+d2_ws(1,1))
+                 -2*(d1_ws(0)*(d1_ws(1)*d2_ws(0,1)+d1_ws(2)*d2_ws(0,2))
+                     +d1_ws(1)*d1_ws(2)*d2_ws(1,2)));
+        beta = std::sqrt(normGrad); // * 1/dx
+        return true;
     }
 
     template<typename Accessor>
-    static typename Accessor::ValueType result(const MapType& map,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const MapType& map,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         double alpha, beta;
         return compute(map, grid, ijk, alpha, beta) ?
-               ValueType(alpha/(2. *math::Pow3(beta))) : 0;
+               ComputeType(alpha/(2. *math::Pow3(beta))) : ComputeType(0);
     }
 
     template<typename Accessor>
-    static typename Accessor::ValueType normGrad(const MapType& map,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    normGrad(const MapType& map,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         double alpha, beta;
         return compute(map, grid, ijk, alpha, beta) ?
-               ValueType(alpha/(2. *math::Pow2(beta))) : 0;
+               ComputeType(alpha/(2. *math::Pow2(beta))) : ComputeType(0);
     }
 
     /// @brief Stencil access version
@@ -1848,73 +2060,79 @@ struct MeanCurvature
                         double& alpha, double& beta)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-         // compute the gradient in index and world space
-         Vec3d d1_is(D1<DiffScheme1>::inX(stencil),
-                     D1<DiffScheme1>::inY(stencil),
-                     D1<DiffScheme1>::inZ(stencil) ), d1_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
-             d1_ws = map.applyIJT(d1_is);
-         } else {
-             d1_ws = map.applyIJT(d1_is, stencil.getCenterCoord().asVec3d());
-         }
-         const double Dx2 = d1_ws(0)*d1_ws(0);
-         const double Dy2 = d1_ws(1)*d1_ws(1);
-         const double Dz2 = d1_ws(2)*d1_ws(2);
-         const double normGrad = Dx2 + Dy2 + Dz2;
-         if (normGrad <= math::Tolerance<double>::value()) {
-             alpha = beta = 0;
-             return false;
-         }
+        // compute the gradient in index and world space
+        Vec3d d1_is(D1<DiffScheme1>::inX(stencil),
+                    D1<DiffScheme1>::inY(stencil),
+                    D1<DiffScheme1>::inZ(stencil) ), d1_ws;
+        if (is_linear<MapType>::value) {//resolved at compiletime
+            d1_ws = map.applyIJT(d1_is);
+        } else {
+            d1_ws = map.applyIJT(d1_is, stencil.getCenterCoord().asVec3d());
+        }
+        const double Dx2 = d1_ws(0)*d1_ws(0);
+        const double Dy2 = d1_ws(1)*d1_ws(1);
+        const double Dz2 = d1_ws(2)*d1_ws(2);
+        const double normGrad = Dx2 + Dy2 + Dz2;
+        if (normGrad <= math::Tolerance<double>::value()) {
+            alpha = beta = double(0);
+            return false;
+        }
 
-         // all the second derivatives in index space
-         ValueType iddx  = D2<DiffScheme2>::inX(stencil);
-         ValueType iddy  = D2<DiffScheme2>::inY(stencil);
-         ValueType iddz  = D2<DiffScheme2>::inZ(stencil);
+        // all the second derivatives in index space
+        ComputeType iddx  = D2<DiffScheme2>::inX(stencil);
+        ComputeType iddy  = D2<DiffScheme2>::inY(stencil);
+        ComputeType iddz  = D2<DiffScheme2>::inZ(stencil);
 
-         ValueType iddxy = D2<DiffScheme2>::inXandY(stencil);
-         ValueType iddyz = D2<DiffScheme2>::inYandZ(stencil);
-         ValueType iddxz = D2<DiffScheme2>::inXandZ(stencil);
+        ComputeType iddxy = D2<DiffScheme2>::inXandY(stencil);
+        ComputeType iddyz = D2<DiffScheme2>::inYandZ(stencil);
+        ComputeType iddxz = D2<DiffScheme2>::inXandZ(stencil);
 
-         // second derivatives in index space
-         Mat3d  d2_is(iddx,  iddxy, iddxz,
-                      iddxy, iddy,  iddyz,
-                      iddxz, iddyz, iddz);
+        // second derivatives in index space
+        Mat3d  d2_is(iddx,  iddxy, iddxz,
+                     iddxy, iddy,  iddyz,
+                     iddxz, iddyz, iddz);
 
-         // convert second derivatives to world space
-         Mat3d d2_ws;
-         if (is_linear<MapType>::value) {//resolved at compiletime
-             d2_ws = map.applyIJC(d2_is);
-         } else {
-             d2_ws = map.applyIJC(d2_is, d1_is, stencil.getCenterCoord().asVec3d());
-         }
+        // convert second derivatives to world space
+        Mat3d d2_ws;
+        if (is_linear<MapType>::value) {//resolved at compiletime
+            d2_ws = map.applyIJC(d2_is);
+        } else {
+            d2_ws = map.applyIJC(d2_is, d1_is, stencil.getCenterCoord().asVec3d());
+        }
 
-         // for return
-         alpha = (Dx2*(d2_ws(1,1)+d2_ws(2,2))+Dy2*(d2_ws(0,0)+d2_ws(2,2))
-                  +Dz2*(d2_ws(0,0)+d2_ws(1,1))
-                  -2*(d1_ws(0)*(d1_ws(1)*d2_ws(0,1)+d1_ws(2)*d2_ws(0,2))
-                      +d1_ws(1)*d1_ws(2)*d2_ws(1,2)));
-         beta  = std::sqrt(normGrad); // * 1/dx
-         return true;
+        // for return
+        alpha = (Dx2*(d2_ws(1,1)+d2_ws(2,2))+Dy2*(d2_ws(0,0)+d2_ws(2,2))
+                 +Dz2*(d2_ws(0,0)+d2_ws(1,1))
+                 -2*(d1_ws(0)*(d1_ws(1)*d2_ws(0,1)+d1_ws(2)*d2_ws(0,2))
+                     +d1_ws(1)*d1_ws(2)*d2_ws(1,2)));
+        beta  = std::sqrt(normGrad); // * 1/dx
+        return true;
     }
 
     template<typename StencilT>
-    static typename StencilT::ValueType
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const MapType& map, const StencilT stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         double alpha, beta;
         return compute(map, stencil, alpha, beta) ?
-               ValueType(alpha/(2*math::Pow3(beta))) : 0;
+               ComputeType(alpha/(2*math::Pow3(beta))) : ComputeType(0);
     }
 
     template<typename StencilT>
-    static typename StencilT::ValueType normGrad(const MapType& map, const StencilT stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    normGrad(const MapType& map, const StencilT stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
+
         double alpha, beta;
         return compute(map, stencil, alpha, beta) ?
-               ValueType(alpha/(2*math::Pow2(beta))) : 0;
+               ComputeType(alpha/(2*math::Pow2(beta))) : ComputeType(0);
     }
 };
 
@@ -1924,46 +2142,54 @@ struct MeanCurvature<TranslationMap, DiffScheme2, DiffScheme1>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const TranslationMap&,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const TranslationMap&,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         return ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta) ?
-               ValueType(alpha /(2*math::Pow3(beta))) : 0;
+               ComputeType(alpha /(2*math::Pow3(beta))) : ComputeType(0);
     }
 
     template<typename Accessor>
-    static typename Accessor::ValueType normGrad(const TranslationMap&,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    normGrad(const TranslationMap&,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         return ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta) ?
-               ValueType(alpha/(2*math::Pow2(beta))) : 0;
+               ComputeType(alpha/(2*math::Pow2(beta))) : ComputeType(0);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const TranslationMap&, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const TranslationMap&, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         return ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta) ?
-               ValueType(alpha /(2*math::Pow3(beta))) : 0;
+               ComputeType(alpha /(2*math::Pow3(beta))) : ComputeType(0);
     }
 
     template<typename StencilT>
-    static typename StencilT::ValueType normGrad(const TranslationMap&, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    normGrad(const TranslationMap&, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         return ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta) ?
-               ValueType(alpha/(2*math::Pow2(beta))) : 0;
+               ComputeType(alpha/(2*math::Pow2(beta))) : ComputeType(0);
     }
 };
 
@@ -1973,58 +2199,66 @@ struct MeanCurvature<UniformScaleMap, DiffScheme2, DiffScheme1>
 {
     // random access version
     template<typename Accessor>
-    static typename Accessor::ValueType result(const UniformScaleMap& map,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    result(const UniformScaleMap& map,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta)) {
-            ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-            return ValueType(alpha*inv2dx/math::Pow3(beta));
+            ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+            return ComputeType(alpha*inv2dx/math::Pow3(beta));
         }
-        return 0;
+        return ComputeType(0);
     }
 
     template<typename Accessor>
-    static typename Accessor::ValueType normGrad(const UniformScaleMap& map,
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
+    normGrad(const UniformScaleMap& map,
         const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta)) {
-            ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
-            return ValueType(alpha*invdxdx/(2*math::Pow2(beta)));
+            ComputeType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+            return ComputeType(alpha*invdxdx/(2*math::Pow2(beta)));
         }
-        return 0;
+        return ComputeType(0);
     }
 
     // stencil access version
     template<typename StencilT>
-    static typename StencilT::ValueType result(const UniformScaleMap& map, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    result(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta)) {
-            ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-            return ValueType(alpha*inv2dx/math::Pow3(beta));
+            ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+            return ComputeType(alpha*inv2dx/math::Pow3(beta));
         }
-        return 0;
+        return ComputeType(0);
     }
 
     template<typename StencilT>
-    static typename StencilT::ValueType normGrad(const UniformScaleMap& map, const StencilT& stencil)
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
+    normGrad(const UniformScaleMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta)) {
-            ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
-            return ValueType(alpha*invdxdx/(2*math::Pow2(beta)));
+            ComputeType invdxdx = ComputeType(map.getInvScaleSqr()[0]);
+            return ComputeType(alpha*invdxdx/(2*math::Pow2(beta)));
         }
-        return 0;
+        return ComputeType(0);
     }
 };
 
@@ -2033,57 +2267,65 @@ template<DDScheme DiffScheme2, DScheme DiffScheme1>
 struct MeanCurvature<UniformScaleTranslateMap, DiffScheme2, DiffScheme1>
 {
     // random access version
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     result(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta)) {
-            ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-            return ValueType(alpha*inv2dx/math::Pow3(beta));
+            ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+            return ComputeType(alpha*inv2dx/math::Pow3(beta));
         }
-        return 0;
+        return ComputeType(0);
     }
 
-    template<typename Accessor> static typename Accessor::ValueType
+    template<typename Accessor>
+    static typename ComputeTypeFor<typename Accessor::ValueType>::type
     normGrad(const UniformScaleTranslateMap& map, const Accessor& grid, const Coord& ijk)
     {
         using ValueType = typename Accessor::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(grid, ijk, alpha, beta)) {
-            ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
-            return ValueType(alpha*invdxdx/(2*math::Pow2(beta)));
+            ComputeType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+            return ComputeType(alpha*invdxdx/(2*math::Pow2(beta)));
         }
-        return 0;
+        return ComputeType(0);
     }
 
     // stencil access version
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     result(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta)) {
-            ValueType inv2dx = ValueType(map.getInvTwiceScale()[0]);
-            return ValueType(alpha*inv2dx/math::Pow3(beta));
+            ComputeType inv2dx = ValueType(map.getInvTwiceScale()[0]);
+            return ComputeType(alpha*inv2dx/math::Pow3(beta));
         }
-        return 0;
+        return ComputeType(0);
     }
 
-    template<typename StencilT> static typename StencilT::ValueType
+    template<typename StencilT>
+    static typename ComputeTypeFor<typename StencilT::ValueType>::type
     normGrad(const UniformScaleTranslateMap& map, const StencilT& stencil)
     {
         using ValueType = typename StencilT::ValueType;
+        using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
-        ValueType alpha, beta;
+        ComputeType alpha, beta;
         if (ISMeanCurvature<DiffScheme2, DiffScheme1>::result(stencil, alpha, beta)) {
-            ValueType invdxdx = ValueType(map.getInvScaleSqr()[0]);
-            return ValueType(alpha*invdxdx/(2*math::Pow2(beta)));
+            ComputeType invdxdx = ValueType(map.getInvScaleSqr()[0]);
+            return ComputeType(alpha*invdxdx/(2*math::Pow2(beta)));
         }
-        return 0;
+        return ComputeType(0);
     }
 };
 
