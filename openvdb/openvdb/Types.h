@@ -505,6 +505,25 @@ struct ComputeTypeFor<Half>
     using type = float;
 };
 
+// Specialization for Vec<half> -> Vec<float>
+template <>
+struct ComputeTypeFor<Vec2H>
+{
+    using type = Vec2s;
+};
+
+template <>
+struct ComputeTypeFor<Vec3H>
+{
+    using type = Vec3s;
+};
+
+template <>
+struct ComputeTypeFor<Vec4H>
+{
+    using type = Vec4s;
+};
+
 
 ////////////////////////////////////////
 
