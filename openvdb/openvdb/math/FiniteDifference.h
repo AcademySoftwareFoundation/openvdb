@@ -2203,11 +2203,11 @@ struct D2<CD_FOURTH>
         using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
         ComputeType tmp1 =
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 1, 0)) -
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0,-1, 0));
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 1, 0)) -
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-1, 0));
         ComputeType tmp2 =
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 2, 0)) -
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0,-2, 0));
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 2, 0)) -
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0,-2, 0));
 
         return ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2;
     }
@@ -2220,11 +2220,11 @@ struct D2<CD_FOURTH>
         using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
         ComputeType tmp1 =
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-1));
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-1));
         ComputeType tmp2 =
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_4TH>::inX<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-2));
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_4TH>::inX(grid, ijk.offsetBy(0, 0,-2));
 
         return ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2;
     }
@@ -2237,11 +2237,11 @@ struct D2<CD_FOURTH>
         using ComputeType = typename ComputeTypeFor<ValueType>::type;
 
         ComputeType tmp1 =
-            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 1)) -
-            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-1));
+            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 1)) -
+            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-1));
         ComputeType tmp2 =
-            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0, 2)) -
-            D1<CD_4TH>::inY<ValueType, ComputeType>(grid, ijk.offsetBy(0, 0,-2));
+            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0, 2)) -
+            D1<CD_4TH>::inY(grid, ijk.offsetBy(0, 0,-2));
 
         return ComputeType(2./3.)*tmp1 - ComputeType(1./12.)*tmp2;
     }
