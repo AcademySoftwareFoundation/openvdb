@@ -272,22 +272,19 @@ JaggedTensor dispatchIJKForMesh(const JaggedTensor &meshVertices, const JaggedTe
                                 const std::vector<VoxelCoordTransform> &transforms);
 
 template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForGrid(const GridBatchImpl &batchHdl, const nanovdb::Coord &bmin,
-                                      const nanovdb::Coord &bmax);
+JaggedTensor dispatchPaddedIJKForGrid(const GridBatchImpl      &batchHdl,
+                                      const nanovdb::CoordBBox &bbox);
 
 template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForGridWithoutBorder(const GridBatchImpl  &batchHdl,
-                                                   const nanovdb::Coord &bmin,
-                                                   const nanovdb::Coord &bmax);
+JaggedTensor dispatchPaddedIJKForGridWithoutBorder(const GridBatchImpl      &batchHdl,
+                                                   const nanovdb::CoordBBox &bbox);
 
 template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForPoints(const JaggedTensor &points, const nanovdb::Coord &bmin,
-                                        const nanovdb::Coord                   &bmax,
+JaggedTensor dispatchPaddedIJKForPoints(const JaggedTensor &points, const nanovdb::CoordBBox &bbox,
                                         const std::vector<VoxelCoordTransform> &transforms);
 
 template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForCoords(const JaggedTensor &coords, const nanovdb::Coord &bmin,
-                                        const nanovdb::Coord &bmax);
+JaggedTensor dispatchPaddedIJKForCoords(const JaggedTensor &coords, const nanovdb::CoordBBox &bbox);
 
 template <c10::DeviceType>
 JaggedTensor

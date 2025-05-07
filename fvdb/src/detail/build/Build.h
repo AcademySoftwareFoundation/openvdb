@@ -76,18 +76,17 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromGrid(bool             
                                                                bool excludeBorder);
 
 /// @brief Build a NanoVDB grid from a set of points and pad each voxel ijk which contains a point
-/// from ijk - bmin to ijk + bmax
+/// from ijk - bbox.min() to ijk + bbox.max()
 /// @param device The device on which the grid will be allocated
 /// @param isMutable Whether the grid should be mutable or not
 /// @param points The points to be encoded in the grid (JaggedTensor of shape = (B, -1, 3))
 /// @param tx Transform from world to voxel coordinates
-/// @param bmin The minimum padding (i.e. we pad ijk from ijk - bmin to ijk + bmax)
-/// @param bmax The maximum padding (i.e. we pad ijk from ijk - bmin to ijk + bmax)
+/// @param bbox Padding (i.e. we pad ijk from ijk - bbox.min() to ijk + bbox.max())
 /// @return A handle to the nanovdb grid (the device will match points)
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromPoints(bool isMutable, const JaggedTensor &points,
-                          const std::vector<VoxelCoordTransform> &tx, const nanovdb::Coord &bmin,
-                          const nanovdb::Coord &bmax);
+                          const std::vector<VoxelCoordTransform> &tx,
+                          const nanovdb::CoordBBox               &bbox);
 
 /// @brief Build a NanoVDB grid from a set of points where the 8 nearest voxels to each point are
 /// added to the grid
@@ -100,19 +99,17 @@ nanovdb::GridHandle<TorchDeviceBuffer>
 buildNearestNeighborGridFromPoints(bool isMutable, const JaggedTensor &points,
                                    const std::vector<VoxelCoordTransform> &tx);
 
-/// @brief Build a NanoVDB grid from a set of ijk coordinates pad each voxel from ijk - bmin to ijk
-/// + bmax
+/// @brief Build a NanoVDB grid from a set of ijk coordinates pad each voxel from ijk - bbox.min()
+/// to ijk + bbox.max()
 /// @param device The device on which the grid will be allocated
 /// @param isMutable Whether the grid should be mutable or not
 /// @param coords The ijk coordinates to be encoded in the grid (JaggedTensor of shape = (B, -1, 3))
 /// @param tx Transform from world to voxel coordinates
-/// @param bmin The minimum padding (i.e. we pad ijk from ijk - bmin to ijk + bmax)
-/// @param bmax The maximum padding (i.e. we pad ijk from ijk - bmin to ijk + bmax)
+/// @param bbox Padding (i.e. we pad ijk from ijk - bbox.min() to ijk + bbox.max())
 /// @return A handle to the nanovdb grid (the device will match coords)
-nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromCoords(bool                  isMutable,
-                                                                 const JaggedTensor   &coords,
-                                                                 const nanovdb::Coord &bmin,
-                                                                 const nanovdb::Coord &bmax);
+nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromCoords(bool                isMutable,
+                                                                 const JaggedTensor &coords,
+                                                                 const nanovdb::CoordBBox &bbox);
 
 /// @brief Build a NanoVDB grid by voxelizing a mesh (i.e. each voxel in the ouput grid intersects
 /// the mesh)

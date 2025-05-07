@@ -580,8 +580,7 @@ GridBatch::set_from_points(const JaggedTensor &points, const Vec3i &pad_min, con
                       " grids in a batch. ", "You passed in ", points.num_outer_lists(),
                       " points sets.");
 
-    const nanovdb::Coord padMin = pad_min.value();
-    const nanovdb::Coord padMax = pad_max.value();
+    const nanovdb::CoordBBox padding(pad_min.value(), pad_max.value());
 
     const int64_t numGrids = points.joffsets().size(0) - 1;
     TORCH_CHECK(
@@ -601,7 +600,7 @@ GridBatch::set_from_points(const JaggedTensor &points, const Vec3i &pad_min, con
     }
 
     mImpl = c10::make_intrusive<detail::GridBatchImpl>(
-        detail::build::buildPaddedGridFromPoints(is_mutable(), points, transforms, padMin, padMax),
+        detail::build::buildPaddedGridFromPoints(is_mutable(), points, transforms, padding),
         voxSizesVec, voxOriginsVec);
 }
 
@@ -674,8 +673,7 @@ GridBatch::set_from_ijk(const JaggedTensor &coords, const Vec3i &pad_min, const 
                       " grids in a batch. ", "You passed in ", coords.num_outer_lists(),
                       " coordinate sets.");
 
-    const nanovdb::Coord &padMin = pad_min.value();
-    const nanovdb::Coord &padMax = pad_max.value();
+    const nanovdb::CoordBBox padding(pad_min.value(), pad_max.value());
 
     const int64_t numGrids = coords.joffsets().size(0) - 1;
     TORCH_CHECK(numGrids == coords.num_outer_lists(),
@@ -687,7 +685,7 @@ GridBatch::set_from_ijk(const JaggedTensor &coords, const Vec3i &pad_min, const 
         origins.value(numGrids, false /* onlyPositive */, "voxel_origins");
 
     mImpl = c10::make_intrusive<detail::GridBatchImpl>(
-        detail::build::buildPaddedGridFromCoords(is_mutable(), coords, padMin, padMax), voxSizesVec,
+        detail::build::buildPaddedGridFromCoords(is_mutable(), coords, padding), voxSizesVec,
         voxOriginsVec);
 }
 

@@ -17,8 +17,7 @@ namespace build {
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::Coord &bmin,
-                             const nanovdb::Coord &bmax) {
+buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::CoordBBox &bbox) {
     return AT_DISPATCH_INTEGRAL_TYPES(
         jaggedCoords.scalar_type(), "buildPaddedGridFromCoords", [&]() {
             using ScalarT = scalar_t;
@@ -47,9 +46,9 @@ buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::Co
                     nanovdb::Coord ijk0(coordsAcc[ci][0], coordsAcc[ci][1], coordsAcc[ci][2]);
 
                     // Splat the normal to the 8 neighboring voxels
-                    for (int di = bmin[0]; di <= bmax[0]; di += 1) {
-                        for (int dj = bmin[1]; dj <= bmax[1]; dj += 1) {
-                            for (int dk = bmin[2]; dk <= bmax[2]; dk += 1) {
+                    for (int di = bbox.min()[0]; di <= bbox.max()[0]; di += 1) {
+                        for (int dj = bbox.min()[1]; dj <= bbox.max()[1]; dj += 1) {
+                            for (int dk = bbox.min()[2]; dk <= bbox.max()[2]; dk += 1) {
                                 const nanovdb::Coord ijk = ijk0 + nanovdb::Coord(di, dj, dk);
                                 proxyGridAccessor.setValue(ijk, 11);
                             }
@@ -73,16 +72,14 @@ buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::Co
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromCoords(bool isMutable, const JaggedTensor &coords, const nanovdb::Coord &bmin,
-                          const nanovdb::Coord &bmax) {
+buildPaddedGridFromCoords(bool isMutable, const JaggedTensor &coords,
+                          const nanovdb::CoordBBox &bbox) {
     if (coords.device().is_cuda()) {
-        JaggedTensor buildCoords =
-            ops::dispatchPaddedIJKForCoords<torch::kCUDA>(coords, bmin, bmax);
+        JaggedTensor buildCoords = ops::dispatchPaddedIJKForCoords<torch::kCUDA>(coords, bbox);
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(buildCoords, isMutable);
     } else {
-        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildPaddedGridFromCoordsCPU<GridType>(coords, bmin, bmax);
-        });
+        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(
+            isMutable, [&]() { return buildPaddedGridFromCoordsCPU<GridType>(coords, bbox); });
     }
 }
 } // namespace build

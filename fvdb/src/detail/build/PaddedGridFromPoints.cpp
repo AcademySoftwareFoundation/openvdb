@@ -17,7 +17,7 @@ template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagged,
                              const std::vector<VoxelCoordTransform> &txs,
-                             const nanovdb::Coord &bmin, const nanovdb::Coord &bmax) {
+                             const nanovdb::CoordBBox               &bbox) {
     return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
         pointsJagged.scalar_type(), "buildPaddedGridFromPoints", [&]() {
             using ScalarT = scalar_t;
@@ -51,9 +51,9 @@ buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagge
                                               .round();
 
                     // Splat the normal to the 8 neighboring voxels
-                    for (int di = bmin[0]; di <= bmax[0]; di += 1) {
-                        for (int dj = bmin[1]; dj <= bmax[1]; dj += 1) {
-                            for (int dk = bmin[2]; dk <= bmax[2]; dk += 1) {
+                    for (int di = bbox.min()[0]; di <= bbox.max()[0]; di += 1) {
+                        for (int dj = bbox.min()[1]; dj <= bbox.max()[1]; dj += 1) {
+                            for (int dk = bbox.min()[2]; dk <= bbox.max()[2]; dk += 1) {
                                 const nanovdb::Coord ijk = ijk0 + nanovdb::Coord(di, dj, dk);
                                 proxyGridAccessor.setValue(ijk, 1.0f);
                             }
@@ -78,17 +78,15 @@ buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagge
 
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromPoints(bool isMutable, const JaggedTensor &points,
-                          const std::vector<VoxelCoordTransform> &txs, const nanovdb::Coord &bmin,
-                          const nanovdb::Coord &bmax) {
+                          const std::vector<VoxelCoordTransform> &txs,
+                          const nanovdb::CoordBBox               &bbox) {
     if (points.device().is_cuda()) {
-        JaggedTensor coords =
-            ops::dispatchPaddedIJKForPoints<torch::kCUDA>(points, bmin, bmax, txs);
+        JaggedTensor coords = ops::dispatchPaddedIJKForPoints<torch::kCUDA>(points, bbox, txs);
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
 
     } else {
-        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildPaddedGridFromPointsCPU<GridType>(points, txs, bmin, bmax);
-        });
+        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(
+            isMutable, [&]() { return buildPaddedGridFromPointsCPU<GridType>(points, txs, bbox); });
     }
 }
 
