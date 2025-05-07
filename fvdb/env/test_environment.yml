@@ -3,32 +3,33 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python=3.11
-  - pytorch-gpu=2.4.1[build=cuda120*]
-  - tensorboard
-  - cuda-version=12.0
-  - pip>=23.3.1
-  - git
-  - gitpython
   - ca-certificates
   - certifi
-  - openssl
-  - parameterized
+  - cuda-version=12.0
+  - git
+  - gitpython
+  - imageio
   - ipython
-  - matplotlib
-  - tqdm
-  - sphinx>=7.0.0
-  - sphinx_rtd_theme
-  - myst-parser
-  - pandas
-  - rich
-  - pytest-benchmark
-  - numpy
+  - libpng
   - linkify-it-py
+  - matplotlib
+  - myst-parser
+  - numpy
+  - openssl
+  - pandas
+  - parameterized
+  - pip>=23.3.1
   - polyscope
   - py-opencv=4.10[build=headless*]
-  - imageio
+  - pytest-benchmark
+  - python=3.11
+  - pytorch-gpu=2.4.1[build=cuda120*]
+  - rich
   - scikit-learn
+  - sphinx_rtd_theme
+  - sphinx>=7.0.0
+  - tensorboard
+  - tqdm
   - zlib
   - pip:
     - gsplat

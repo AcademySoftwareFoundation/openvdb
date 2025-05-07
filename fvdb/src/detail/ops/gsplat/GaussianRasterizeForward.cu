@@ -224,7 +224,7 @@ template <typename ScalarType, uint32_t NUM_CHANNELS, bool IS_PACKED> struct Dev
         //       of just ignore small impact gaussians ¯\_(ツ)_/¯.
         ScalarType accumTransmittance = 1.0f;
         // index of most recent gaussian to write to this thread's pixel
-        uint32_t curIdx = 0;
+        int32_t curIdx = -1;
 
         // collect and process batches of gaussians
         // each thread loads one gaussian at a time before rasterizing its
@@ -258,6 +258,8 @@ template <typename ScalarType, uint32_t NUM_CHANNELS, bool IS_PACKED> struct Dev
                 const ScalarType sigma = gaussian.sigma(delta);
                 const ScalarType alpha = min(0.999f, gaussian.opacity * __expf(-sigma));
 
+                // TODO: are we quantizing the alpha too early? They could add up to significant
+                // opacity.
                 if (sigma < 0.f || alpha < 1.f / 255.f) {
                     continue;
                 }
@@ -304,7 +306,7 @@ template <typename ScalarType, uint32_t NUM_CHANNELS, bool IS_PACKED> struct Dev
                                       : (pixOut[k] + accumTransmittance * mBackgrounds[k]);
             }
             // index in bin of last gaussian in this pixel
-            *mOutLastGaussianIds = static_cast<int32_t>(curIdx);
+            *mOutLastGaussianIds = curIdx;
         }
     }
 };

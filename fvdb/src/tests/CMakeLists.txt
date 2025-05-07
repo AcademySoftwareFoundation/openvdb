@@ -8,7 +8,39 @@ enable_testing()
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_google_test.cmake)
 include(GoogleTest)
 
+# Find libpng
+find_package(PNG REQUIRED)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_test_data.cmake)
+
+# --- Define Test Utilities Library ---
+add_library(fvdb_test_utils STATIC
+  utils/ImageUtils.cpp
+)
+
+set_target_properties(fvdb_test_utils
+  PROPERTIES
+  CXX_STANDARD 17
+  CXX_STANDARD_REQUIRED ON
+)
+
+# Include PRIVATE for compiling the library, PUBLIC for consumers (test executables)
+# Add src dir PRIVATE to find <tests/utils/ImageUtils.h> from ImageUtils.cpp
+target_include_directories(fvdb_test_utils
+  PRIVATE
+    ${CMAKE_SOURCE_DIR}/src # To find <tests/utils/ImageUtils.h>
+    ${PNG_INCLUDE_DIRS}     # Include directory for png.h
+  # PUBLIC includes could be added if ImageUtils.h included e.g., Torch headers
+  # PUBLIC
+    # ${TORCH_INCLUDE_DIRS}
+)
+
+# Link dependencies PRIVATE as they are implementation details
+target_link_libraries(fvdb_test_utils PRIVATE
+  PNG::PNG
+  ${TORCH_LIBRARIES} # Link utils against Torch
+)
+# --- End Test Utilities Library Definition ---
 
 # output directory
 set(TEST_BINARY_DIRECTORY "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/gtests>")
@@ -30,8 +62,11 @@ function(ConfigureTest CMAKE_TEST_NAME)
   )
 
   # Include directories needed to COMPILE the test object library
+  # Test sources need to find <tests/utils/ImageUtils.h> etc.
   target_include_directories(${CMAKE_TEST_NAME}_obj PRIVATE
+    ${CMAKE_SOURCE_DIR}/src # Include src for finding <tests/utils/...>
     $<TARGET_PROPERTY:fvdb,INTERFACE_INCLUDE_DIRECTORIES> # Get includes exposed by fvdb
+    # $<TARGET_PROPERTY:fvdb_test_utils,INTERFACE_INCLUDE_DIRECTORIES> # No longer needed with PRIVATE includes
     $<TARGET_PROPERTY:GTest::gtest,INTERFACE_INCLUDE_DIRECTORIES> # Get includes exposed by GTest::gtest
     $<TARGET_PROPERTY:GTest::gtest_main,INTERFACE_INCLUDE_DIRECTORIES> # Get includes exposed by GTest::gtest_main
   )
@@ -55,7 +90,9 @@ function(ConfigureTest CMAKE_TEST_NAME)
   # Link the FINAL executable against necessary libraries
   target_link_libraries(
     ${CMAKE_TEST_NAME}
-    fvdb ${TORCH_LIBRARIES}
+    fvdb
+    fvdb_test_utils # Link test executable against test utils library
+    # Dependencies like Torch and PNG are now linked transitively via fvdb_test_utils
     GTest::gtest
     GTest::gtest_main
     $<TARGET_NAME_IF_EXISTS:conda_env>
@@ -87,6 +124,7 @@ ConfigureTest(GaussianComputeSparseInfoTest "GaussianComputeSparseInfoTest.cpp")
 ConfigureTest(GaussianTileIntersectionTest "GaussianTileIntersectionTest.cpp")
 ConfigureTest(GaussianComputeNanInfMaskTest "GaussianComputeNanInfMaskTest.cpp")
 ConfigureTest(GaussianRasterizeBackwardTest "GaussianRasterizeBackwardTest.cpp")
+# Removed utils/ImageUtils.cpp from this call
 ConfigureTest(GaussianRasterizeForwardTest "GaussianRasterizeForwardTest.cpp")
 ConfigureTest(GaussianSphericalHarmonicsForwardTest "GaussianSphericalHarmonicsForwardTest.cpp")
 ConfigureTest(GaussianSphericalHarmonicsBackwardTest "GaussianSphericalHarmonicsBackwardTest.cpp")
