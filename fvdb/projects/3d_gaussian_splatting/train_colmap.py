@@ -1,6 +1,7 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 #
+import csv
 import itertools
 import json
 import logging
@@ -24,6 +25,7 @@ from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
+from utils import gaussian_means_outside_bbox
 from viz import CameraState, Viewer
 
 from fvdb import GaussianSplat3d
@@ -184,26 +186,31 @@ class Runner:
             self.checkpoint_dir = None
             self.tensorboard_dir = None
             return
-        os.makedirs("results", exist_ok=True)
-        results_name = f"run_{time.strftime('%Y-%m-%d-%H-%M-%S')}" if self.results_path is None else self.results_path
-        tenative_results_dir = os.path.join("results", results_name)
-        # If for some reason you have multiple runs at the same second, add a number to the directory
-        num_retries = 0
-        while os.path.exists(tenative_results_dir) and num_retries < 10:
+
+        if self.results_path is None:
+            os.makedirs("results", exist_ok=True)
             results_name = f"run_{time.strftime('%Y-%m-%d-%H-%M-%S')}"
-            tenative_results_dir = os.path.join("results", f"{results_name}_{num_retries}")
-            num_retries += 1
+            tenative_results_dir = os.path.join("results", results_name)
+            # If for some reason you have multiple runs at the same second, add a number to the directory
+            num_retries = 0
+            while os.path.exists(tenative_results_dir) and num_retries < 10:
+                results_name = f"run_{time.strftime('%Y-%m-%d-%H-%M-%S')}"
+                tenative_results_dir = os.path.join("results", f"{results_name}_{num_retries}")
+                num_retries += 1
+        else:
+            tenative_results_dir = os.path.normpath(self.results_path)
 
         self.output_dir = tenative_results_dir
-        os.makedirs(self.output_dir)
-        self.render_dir = os.path.join(tenative_results_dir, "render")
-        os.makedirs(self.render_dir)
-        self.stats_dir = os.path.join(tenative_results_dir, "stats")
-        os.makedirs(self.stats_dir)
-        self.checkpoint_dir = os.path.join(tenative_results_dir, "checkpoints")
-        os.makedirs(self.checkpoint_dir)
-        self.tensorboard_dir = os.path.join(tenative_results_dir, "tb")
-        os.makedirs(self.tensorboard_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        self.render_dir = os.path.join(self.output_dir, "render")
+        os.makedirs(self.render_dir, exist_ok=True)
+        self.stats_dir = os.path.join(self.output_dir, "stats")
+        os.makedirs(self.stats_dir, exist_ok=True)
+        self.checkpoint_dir = os.path.join(self.output_dir, "checkpoints")
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.tensorboard_dir = os.path.join(self.output_dir, "tb")
+        os.makedirs(self.tensorboard_dir, exist_ok=True)
 
         # Dump config to file
         with open(f"{self.output_dir}/cfg.yml", "w") as f:
@@ -262,6 +269,9 @@ class Runner:
         no_save_renders: bool = False,
         normalize_ecef2enu: bool = False,
         use_masks: bool = False,
+        point_ids_split_path: Optional[str] = None,
+        image_ids_split_path: Optional[str] = None,
+        split_masks_path: Optional[str] = None,
     ) -> None:
         random.seed(cfg.seed)
         np.random.seed(cfg.seed)
@@ -287,12 +297,27 @@ class Runner:
 
         # Load data: Training data should contain initial points and colors.
         normalization_type = "ecef2enu" if normalize_ecef2enu else "pca"
+
+        image_ids = None
+        if image_ids_split_path is not None:
+            image_ids = []
+            with open(image_ids_split_path, "r") as fp:
+                reader = csv.reader(fp)
+                hdr = next(reader)
+                if hdr[0] != "imageId":
+                    raise ValueError("header of image split file should be: imageId")
+                else:
+                    for row in reader:
+                        image_ids.append(int(row[0]))
+
         self.trainset = ColmapDataset(
             dataset_path=data_path,
             normalization_type=normalization_type,
             image_downsample_factor=data_scale_factor,
             test_every=use_every_n_as_test,
             split="train",
+            image_indices=image_ids,
+            mask_path=split_masks_path,
         )
         self.valset = ColmapDataset(
             dataset_path=data_path,
@@ -300,12 +325,45 @@ class Runner:
             image_downsample_factor=data_scale_factor,
             test_every=use_every_n_as_test,
             split="test",
+            image_indices=image_ids,
+            mask_path=split_masks_path,
         )
-        scene_scale = self.trainset.scene_scale * 1.1
+
+        # Initialize model
+        if point_ids_split_path is not None:
+            point_ids = []
+            with open(point_ids_split_path, "r") as fp:
+                reader = csv.reader(fp)
+                hdr = next(reader)
+                if hdr[0] != "pointId":
+                    raise ValueError("header of point split file should be: pointId")
+                else:
+                    for row in reader:
+                        point_ids.append(int(row[0]))
+            point_ids = np.array(point_ids)
+            points = self.trainset.points[point_ids, :]
+            points_rgb = self.trainset.points_rgb[point_ids, :]
+
+            # Calculate the point bounds from split and save for trimming later
+            self.clip_bounds = np.concatenate((np.min(points, axis=0), np.max(points, axis=0)))
+            self.clip_bounds = torch.from_numpy(self.clip_bounds).float().to(self.device)
+
+            ## TODO doesn't work well typically when from SFM due to outliers, user should percentile clean
+            # Calculate scene bound from points provided by user
+            scene_center = np.mean(points, axis=0)
+            dists = np.linalg.norm(points - scene_center, axis=1)
+            scene_scale = np.max(dists) * 1.1
+
+        else:
+            points = self.trainset.points
+            points_rgb = self.trainset.points_rgb
+            self.clip_bounds = None
+            scene_scale = self.trainset.colmap_scene.scene_scale * 1.1
+
         self.logger.info(f"Created dataset. Scene scale = {scene_scale}")
 
         # Initialize model
-        self.init_model(self.trainset.points, self.trainset.points_rgb)
+        self.init_model(points, points_rgb)
         self.logger.info(f"Model initialized with {self.model.num_gaussians} Gaussians")
 
         # Initialize optimizer
@@ -357,7 +415,7 @@ class Runner:
 
         # Training loop.
         cnt = 0
-        mask_debug_path = "mask_images/"
+
         self.train_start_time = time.time()
         pbar = tqdm.tqdm(range(start_step, self.cfg.max_steps))
         for step in pbar:
@@ -458,7 +516,7 @@ class Runner:
                     self.writer.add_image("train/render", canvas, step)
                 self.writer.flush()
 
-            # save checkpoint before updating the model
+            # save checkpoint before updating the model; clip if provided cliping bounds
             if step in [i - 1 for i in self.cfg.save_steps] or step == self.cfg.max_steps - 1:
                 self.save_checkpoint(step)
 
@@ -480,6 +538,14 @@ class Runner:
                     f"Step {step}: Refinement: {num_dup} duplicated, {num_split} split, {num_prune} pruned. "
                     f"Num Gaussians: {self.model.num_gaussians} (before: {num_gaussians_before})"
                 )
+                if self.clip_bounds is not None:
+                    ng_prior = self.model.num_gaussians
+                    bad_mask = gaussian_means_outside_bbox(self.clip_bounds, self.model)
+                    self.optimizer.remove_gaussians(bad_mask)
+                    ng_post = self.model.num_gaussians
+                    nclip = ng_prior - ng_post
+                    self.logger.info(f"Clipped {nclip} Gaussians using clip bounds")
+
             # Reset the opacity parameters every so often
             if step % self.cfg.reset_opacities_every == 0:
                 self.optimizer.reset_opacities()
@@ -640,6 +706,9 @@ def train(
     no_save_renders: bool = False,
     normalize_ecef2enu: bool = False,
     use_masks: bool = False,
+    point_ids_split_path: Optional[str] = None,
+    image_ids_split_path: Optional[str] = None,
+    split_masks_path: Optional[str] = None,
 ):
     logging.basicConfig(level=logging.INFO)
     runner = Runner(
@@ -656,6 +725,9 @@ def train(
         no_save_renders,
         normalize_ecef2enu,
         use_masks,
+        point_ids_split_path,
+        image_ids_split_path,
+        split_masks_path,
     )
     runner.train()
     if not disable_viewer:

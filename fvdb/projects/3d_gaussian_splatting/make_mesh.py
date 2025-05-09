@@ -72,8 +72,8 @@ def mesh_from_gaussian_splats(
         # imageio.imwrite('depth.tif', img.astype(np.uint16))
 
         rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
-            o3d.geometry.Image(np.asarray(rgb.cpu().numpy() * 255, order="C", dtype=np.uint8)),
-            o3d.geometry.Image(np.asarray(depth.cpu().numpy().squeeze(), order="C")),
+            o3d.geometry.Image(np.asarray(rgb * 255, order="C", dtype=np.uint8)),
+            o3d.geometry.Image(np.asarray(depth, order="C")),
             depth_trunc=depth_trunc,
             convert_rgb_to_intensity=False,
             depth_scale=1.0,

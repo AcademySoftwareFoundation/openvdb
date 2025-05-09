@@ -11,7 +11,7 @@ import tqdm
 import tyro
 from torch.utils.data import DataLoader, Dataset
 
-from fvdb.nn.gaussian_splatting import GaussianSplat3D
+from gaussian_splat_model import GaussianSplat3D
 
 
 class SegmentationDataset(Dataset):

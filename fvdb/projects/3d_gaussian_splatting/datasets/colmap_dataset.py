@@ -7,9 +7,9 @@ from typing import Any, Dict, List, Optional
 import cv2
 import imageio.v2 as imageio
 import numpy as np
+import pyproj
 import torch
 import torch.utils.data
-from pyproj import Transformer
 
 from ._colmap_utils import Camera, SceneManager
 
@@ -101,6 +101,7 @@ class ColmapImageMetadata:
         camera_metadata: ColmapCameraMetadata,
         camera_id: int,
         image_path: str,
+        image_name: str,
         mask_path: str,
         point_indices: np.ndarray,
     ):
@@ -108,6 +109,7 @@ class ColmapImageMetadata:
         self.cam_to_world_mat = cam_to_world_mat
         self.camera_id = camera_id
         self.image_path = image_path
+        self.image_name = image_name
         self.mask_path = mask_path
         self.point_indices = point_indices
         self.camera_metadata = camera_metadata
@@ -140,7 +142,13 @@ class ColmapScene:
     heuristics.
     """
 
-    def __init__(self, dataset_path: str, image_downsample_factor: int = 1, normalization_type: str = "pca"):
+    def __init__(
+        self,
+        dataset_path: str,
+        image_downsample_factor: int = 1,
+        normalization_type: str = "pca",
+        mask_path: Optional[str] = None,
+    ):
         self.dataset_path = dataset_path
         self.image_downsample_factor = image_downsample_factor
         self.normalization_type = normalization_type
@@ -158,9 +166,10 @@ class ColmapScene:
         if not os.path.exists(colmap_dir):
             raise FileNotFoundError(f"COLMAP directory {colmap_dir} does not exist.")
 
-        mask_path = os.path.join(dataset_path, "image_masks")
-        if not os.path.exists(mask_path):
-            mask_path = None
+        if mask_path is None:
+            mask_path = os.path.join(dataset_path, "image_masks")
+            if not os.path.exists(mask_path):
+                mask_path = None
 
         scene_manager = SceneManager(colmap_dir)
         scene_manager.load_cameras()
@@ -386,7 +395,7 @@ class ColmapScene:
             normalization_transform = ColmapScene._pca_normalization_transform(points)
         elif normalization_type == "ecef2enu":
             centroid = np.median(points, axis=0)
-            tform_ecef2lonlat = Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
+            tform_ecef2lonlat = pyproj.Transformer.from_crs("EPSG:4978", "EPSG:4326", always_xy=True)
             pt_lonlat = tform_ecef2lonlat.transform(centroid[0], centroid[1], centroid[2])
 
             normalization_transform = ColmapScene._geo_ecef2enu_normalization_transform(
@@ -433,11 +442,13 @@ class ColmapScene:
             image_filenames.append(im.name)
 
             if mask_path is not None:
-                image_mask_path = os.path.join(mask_path, os.path.basename(im.name))
+                image_mask_path = os.path.join(mask_path, im.name)
                 if os.path.exists(image_mask_path):
                     mask_paths.append(image_mask_path)
+                elif os.path.exists(image_mask_path + ".png"):
+                    mask_paths.append(image_mask_path + ".png")
                 else:
-                    raise FileNotFoundError("missing mask: " + image_mask_path)
+                    mask_paths.append("")
             else:
                 mask_paths.append("")
 
@@ -479,18 +490,24 @@ class ColmapScene:
         image_paths = [os.path.join(rescaled_images_path, full_scale_to_rescaled[f]) for f in image_filenames]
 
         # Compute the set of 3D points visible in each image
-        image_id_to_name = {v: k for k, v in scene_manager.name_to_image_id.items()}
-        point_indices = dict()  # Map from image names to point indices
-        image_id_to_name = {v: k for k, v in scene_manager.name_to_image_id.items()}
+
         # For each point, get the images that see it
-        for point_id, data in scene_manager.point3D_id_to_images.items():
-            # For each image that sees this point, add the index of the point
-            # to a list of points corresponding to that image
-            for image_id, _ in data:
-                image_name = image_id_to_name[image_id]
-                point_idx = scene_manager.point3D_id_to_point3D_idx[point_id]
-                point_indices.setdefault(image_name, []).append(point_idx)
-        point_indices = {k: np.array(v).astype(np.int32) for k, v in point_indices.items()}
+        cached_visible_points_path = os.path.join(data_path, "visible_points_per_image.pt")
+        if os.path.exists(cached_visible_points_path):
+            point_indices = torch.load(cached_visible_points_path)
+        else:
+            image_id_to_name = {v: k for k, v in scene_manager.name_to_image_id.items()}
+            point_indices = dict()  # Map from image names to point indices
+            image_id_to_name = {v: k for k, v in scene_manager.name_to_image_id.items()}
+            for point_id, data in scene_manager.point3D_id_to_images.items():
+                # For each image that sees this point, add the index of the point
+                # to a list of points corresponding to that image
+                for image_id, _ in data:
+                    image_name = image_id_to_name[image_id]
+                    point_idx = scene_manager.point3D_id_to_point3D_idx[point_id]
+                    point_indices.setdefault(image_name, []).append(point_idx)
+            point_indices = {k: np.array(v).astype(np.int32) for k, v in point_indices.items()}
+            torch.save(point_indices, cached_visible_points_path)
 
         loaded_images = [
             ColmapImageMetadata(
@@ -499,6 +516,7 @@ class ColmapScene:
                 camera_id=camera_ids[i],
                 camera_metadata=loaded_cameras[camera_ids[i]],
                 image_path=image_paths[i],
+                image_name=image_filenames[i],
                 mask_path=mask_paths[i],
                 point_indices=point_indices[image_filenames[i]].copy(),
             )
@@ -581,6 +599,39 @@ class ColmapDataset(torch.utils.data.Dataset):
         """
         return f"COLMAP_SCENE_{self.dataset_path}_{self.image_downsample_factor}_{self.normalization_type}"
 
+    @staticmethod
+    def filter_points_percentile(points, percentile=[98, 98, 98, 98, 98, 98]):
+        """
+        Remove all points with locations falling outside the provided percentile ranges
+        Args:
+            points: array of 3D points to split up [npoints, 3]
+            percentile: drop all spats with locations outside the percentiles (minx, maxx, miny, maxy, minz, maxz)
+
+        Returns:
+            filtered point indicies
+        """
+        lower_boundx = np.percentile(points[:, 0], 100.0 - percentile[0])
+        upper_boundx = np.percentile(points[:, 0], percentile[1])
+
+        lower_boundy = np.percentile(points[:, 1], 100.0 - percentile[2])
+        upper_boundy = np.percentile(points[:, 1], percentile[3])
+
+        lower_boundz = np.percentile(points[:, 2], 100.0 - percentile[4])
+        upper_boundz = np.percentile(points[:, 2], percentile[5])
+
+        good_map = np.logical_and.reduce(
+            [
+                points[:, 0] > lower_boundx,
+                points[:, 0] < upper_boundx,
+                points[:, 1] > lower_boundy,
+                points[:, 1] < upper_boundy,
+                points[:, 2] > lower_boundz,
+                points[:, 2] < upper_boundz,
+            ]
+        )
+
+        return np.argwhere(good_map).squeeze()
+
     def __init__(
         self,
         dataset_path: str,
@@ -588,8 +639,11 @@ class ColmapDataset(torch.utils.data.Dataset):
         image_downsample_factor: int = 1,
         test_every: int = 100,
         split: str = "train",
+        image_indices: Optional[List] = None,
         patch_size: Optional[int] = None,
         load_depths: bool = False,
+        percentile_filter_points: Optional[List] = None,
+        mask_path: Optional[str] = None,
     ):
         self.dataset_path = dataset_path
         self.image_downsample_factor = image_downsample_factor
@@ -603,6 +657,7 @@ class ColmapDataset(torch.utils.data.Dataset):
                 dataset_path=dataset_path,
                 normalization_type=normalization_type,
                 image_downsample_factor=image_downsample_factor,
+                mask_path=mask_path,
             )
 
         self.colmap_scene = ColmapDataset.__colmap_scene_cache[scene_id]
@@ -611,7 +666,7 @@ class ColmapDataset(torch.utils.data.Dataset):
         self.patch_size = patch_size
         self.load_depths = load_depths
 
-        indices = np.arange(self.colmap_scene.num_images)
+        indices = np.arange(self.colmap_scene.num_images) if image_indices is None else np.array(image_indices)
         if self.split == "train":
             self.indices = indices[indices % self.test_every != 0]
         elif self.split == "test":
@@ -621,13 +676,40 @@ class ColmapDataset(torch.utils.data.Dataset):
         else:
             raise ValueError(f"Split must be one of 'train', 'test', or 'all'. Got {self.split}.")
 
+        self._good_point_inds = None
+
+        if percentile_filter_points is not None:
+            if len(percentile_filter_points) != 6:
+                raise ValueError("percentile filter points must have 6 values.")
+            self._good_point_inds = self.filter_points_percentile(self.colmap_scene.points, percentile_filter_points)
+
     @property
     def scene_scale(self) -> float:
         return self.colmap_scene.scene_scale
 
     @property
     def points(self) -> np.ndarray:
-        return self.colmap_scene.points
+        if self._good_point_inds is not None:
+            return self.colmap_scene.points[self._good_point_inds]
+        else:
+            return self.colmap_scene.points
+
+    @property
+    def point_indices(self) -> np.ndarray:
+        if self._good_point_inds is not None:
+            return np.array(list(self._good_point_inds))
+        else:
+            return np.arange(self.colmap_scene.points.shape[0])
+
+    @property
+    def visible_point_indices(self) -> np.ndarray:
+        visible_points = set()
+        for idx in self.indices:
+            image_meta: ColmapImageMetadata = self.colmap_scene.images[idx]
+            visible_points.update(image_meta.point_indices.tolist())
+        if self._good_point_inds is not None:
+            visible_points = visible_points.intersection(set(self._good_point_inds.tolist()))
+        return np.array(list(visible_points))
 
     @property
     def points_rgb(self) -> np.ndarray:
@@ -667,8 +749,9 @@ class ColmapDataset(torch.utils.data.Dataset):
 
         # If you passed in masks, we'll set set these in the data dictionary
         if image_meta.mask_path != "":
-            mask = imageio.imread(image_meta.mask_path)[..., :3]
+            mask = imageio.imread(image_meta.mask_path)
             mask = mask < 127
+
             data["mask_path"] = image_meta.mask_path
             data["mask"] = mask
 

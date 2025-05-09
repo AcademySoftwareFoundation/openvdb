@@ -9,7 +9,7 @@ from datasets import ColmapDataset, ColmapParser
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 from sam2.build_sam import build_sam2
 
-from fvdb.nn.gaussian_splatting import GaussianSplat3D
+from gaussian_splat_model import GaussianSplat3D
 
 
 @torch.inference_mode()

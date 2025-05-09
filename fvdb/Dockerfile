@@ -14,3 +14,6 @@ ENV CONDA_OVERRIDE_CUDA=12.0
 # copy env/dev_environment.yml to /tmp/
 COPY fvdb/env/dev_environment.yml /tmp/
 RUN  conda env create -f /tmp/dev_environment.yml
+
+RUN conda init
+RUN echo "conda activate fvdb" >> ~/.bashrc

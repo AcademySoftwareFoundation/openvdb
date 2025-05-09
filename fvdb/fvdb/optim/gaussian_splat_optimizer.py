@@ -3,7 +3,7 @@
 #
 import math
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Tuple, Union, Optional
 
 import torch
 import torch.nn.functional as F
@@ -260,14 +260,14 @@ class GaussianSplatOptimizer:
 
         # First duplicate the Gaussians
         if n_dupli > 0:
-            self._duplicate_params(mask=is_dupli, dup_factor=dup_factor)
+            self.duplicate_gaussians(mask=is_dupli, dup_factor=dup_factor)
 
         # Track new Gaussians added by duplication so we we don't split them
         is_split = torch.cat([is_split] + [torch.zeros(n_dupli, dtype=torch.bool, device=device)] * dup_factor)
 
         # Now split the Gaussians
         if n_split > 0:
-            self._split_params(mask=is_split, revised_opacity=self.revised_opacity, split_factor=split_factor)
+            self.subdivide_gaussians(mask=is_split, split_factor=split_factor)
         return n_dupli, n_split
 
     @torch.no_grad()
@@ -287,18 +287,16 @@ class GaussianSplatOptimizer:
 
         n_prune = is_prune.sum().item()
         if n_prune > 0:
-            self._remove_params(mask=is_prune)
+            self.remove_gaussians(mask=is_prune)
 
         return int(n_prune)
 
     @torch.no_grad()
-    def _split_params(self, mask: torch.Tensor, revised_opacity: bool = False, split_factor: int = 2):
+    def subdivide_gaussians(self, mask: torch.Tensor, split_factor: int = 2):
         """Split the Gaussian with the given mask.
 
         Args:
             mask: A boolean mask with shape [num_means,] indicating which Gaussians to split.
-            revised_opacity: Whether to use revised opacity formulation
-                             from https://arxiv.org/abs/2404.06109. Default: False.
             split_factor: The number of splits for each Gaussian. Default: 4.
         """
 
@@ -353,7 +351,7 @@ class GaussianSplatOptimizer:
                 # TODO: Adjust scale factor for splitting
                 p_split = torch.log(scales / 1.6).repeat(split_factor, 1)  # [2N, 3]
                 p_rest = p[rest]
-            elif name == "opacities" and revised_opacity:
+            elif name == "opacities" and self.revised_opacity:
                 new_opacities = 1.0 - torch.sqrt(1.0 - torch.sigmoid(p[sel]))
                 p_split = torch.logit(new_opacities).repeat(repeats)  # [2N]
                 p_rest = p[rest]
@@ -383,7 +381,7 @@ class GaussianSplatOptimizer:
         self._update_param_with_optimizer(param_fn, optimizer_fn)
 
     @torch.no_grad()
-    def _duplicate_params(self, mask: torch.Tensor, dup_factor: int = 1):
+    def duplicate_gaussians(self, mask: torch.Tensor, dup_factor: int = 1):
         """Duplicate the Gaussian with the given mask.
 
         Args:
@@ -416,7 +414,7 @@ class GaussianSplatOptimizer:
         self._update_param_with_optimizer(param_fn, optimizer_fn)
 
     @torch.no_grad()
-    def _remove_params(self, mask: torch.Tensor):
+    def remove_gaussians(self, mask: torch.Tensor):
         """Remove the Gaussian with the given mask.
 
         Args:
