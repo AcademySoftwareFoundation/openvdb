@@ -92,6 +92,29 @@
 #define OPENVDB_UNLIKELY(x) (x)
 #endif
 
+/// Macros for assume builtins. Note that we currently don't simply apply these
+/// in place of asserts (when asserts are disabled) - they should be only be
+/// applied with an assert once profiled
+#ifdef __has_cpp_attribute
+  #if __has_cpp_attribute(assume) >= 202207L
+    #define OPENVDB_ASSUME(...) [[assume(__VA_ARGS__)]]
+  #endif
+#endif
+#ifndef OPENVDB_ASSUME
+  #if defined(__clang__)
+    #define OPENVDB_ASSUME(...)  __builtin_assume(__VA_ARGS__);
+  #elif defined(_MSC_VER)
+    #define OPENVDB_ASSUME(...) __assume(__VA_ARGS__);
+  #elif defined(__GNUC__)
+    #if __GNUC__ >= 13
+      #define OPENVDB_ASSUME(...) __attribute__((__assume__(__VA_ARGS__)))
+    #endif
+  #endif
+#endif
+#ifndef OPENVDB_ASSUME
+  #define OPENVDB_ASSUME(...)
+#endif
+
 /// Force inline function macros. These macros do not necessary guarantee that
 /// the decorated function will be inlined, but provide the strongest vendor
 /// annotations to that end.
