@@ -308,6 +308,86 @@ TEST_F(TestLevelSetRayIntersector, tests)
     }
 }
 
+TEST_F(TestLevelSetRayIntersector, testMissedIntersections)
+{
+    using namespace openvdb;
+    typedef math::Ray<double>  RayT;
+    typedef RayT::Vec3Type     Vec3T;
+
+    // Create a level set sphere
+    const float r = 10.0f;
+    const Vec3f c(0.0f, 0.0f, 0.0f);
+    const float s = 1.0f, w = 3.0f;
+    FloatGrid::Ptr ls = tools::createLevelSetSphere<FloatGrid>(r, c, s, w);
+    tools::LevelSetRayIntersector<FloatGrid> lsri(*ls);
+
+    // Create a ray that misses the sphere, but intersects the bounding box
+    const Vec3T dir(-2.0, -2.0, 3.0); // Ray crossing the sphere
+    const Vec3T eye(12.0, 12.0, 12.0); // Starting point
+    const RayT ray(eye, dir);
+
+    // Initial values
+    Vec3T world(1.0, 2.0, 3.0);
+    Vec3T normal(4.0, 5.0, 6.0);
+    Real time = 42.0;
+
+    // These tests all have zero intersections and it is expected
+    // that the variables being passed in are not altered as a result.
+
+    // Test with time
+    EXPECT_FALSE(lsri.intersectsIS(ray, time));
+    EXPECT_EQ(42.0, time);
+
+    // Test with world position
+    EXPECT_FALSE(lsri.intersectsIS(ray, world));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+
+    // Test with world position and time
+    EXPECT_FALSE(lsri.intersectsIS(ray, world, time));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+    EXPECT_EQ(42.0, time);
+
+    // Test with time
+    EXPECT_FALSE(lsri.intersectsWS(ray, time));
+    EXPECT_EQ(42.0, time);
+
+    // Test with world position
+    EXPECT_FALSE(lsri.intersectsWS(ray, world));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+
+    // Test with world position and time
+    EXPECT_FALSE(lsri.intersectsWS(ray, world, time));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+    EXPECT_EQ(42.0, time);
+
+    // Test with world position and normal
+    EXPECT_FALSE(lsri.intersectsWS(ray, world, normal));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+    EXPECT_EQ(4.0, normal[0]);
+    EXPECT_EQ(5.0, normal[1]);
+    EXPECT_EQ(6.0, normal[2]);
+
+    // Test with world position, normal and time
+    EXPECT_FALSE(lsri.intersectsWS(ray, world, normal, time));
+    EXPECT_EQ(1.0, world[0]);
+    EXPECT_EQ(2.0, world[1]);
+    EXPECT_EQ(3.0, world[2]);
+    EXPECT_EQ(4.0, normal[0]);
+    EXPECT_EQ(5.0, normal[1]);
+    EXPECT_EQ(6.0, normal[2]);
+    EXPECT_EQ(42.0, time);
+}
+
 #ifdef STATS_TEST
 TEST_F(TestLevelSetRayIntersector, stats)
 {
