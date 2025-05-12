@@ -44,14 +44,14 @@ __launch_bounds__(256) computeNanInfMaskKernel(fvdb::TorchRAcc64<T, 2>    means,
         }
 
         for (auto i = 0; i < sh0.size(2); i += 1) {
-            if (std::isnan(sh0[0][x][i]) || std::isinf(sh0[0][x][i])) {
+            if (std::isnan(sh0[x][0][i]) || std::isinf(sh0[x][0][i])) {
                 valid = false;
             }
         }
 
-        for (auto i = 0; i < shN.size(0); i += 1) {
+        for (auto i = 0; i < shN.size(1); i += 1) {
             for (auto j = 0; j < shN.size(2); j += 1) {
-                if (std::isnan(shN[i][x][j]) || std::isinf(shN[i][x][j])) {
+                if (std::isnan(shN[x][i][j]) || std::isinf(shN[x][i][j])) {
                     valid = false;
                 }
             }
@@ -75,18 +75,18 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
                       "All inputs must have the same number of gaussians");
     TORCH_CHECK_VALUE(means.rsize(0) == logitOpacities.rsize(0),
                       "All inputs must have the same number of gaussians");
-    TORCH_CHECK_VALUE(means.rsize(0) == sh0.rsize(1),
+    TORCH_CHECK_VALUE(means.rsize(0) == sh0.rsize(0),
                       "All inputs must have the same number of gaussians");
-    TORCH_CHECK_VALUE(means.rsize(0) == shN.rsize(1),
+    TORCH_CHECK_VALUE(means.rsize(0) == shN.rsize(0),
                       "All inputs must have the same number of gaussians");
 
-    TORCH_CHECK_VALUE(means.rsize(1) == 3, "Means must have 3 components");
-    TORCH_CHECK_VALUE(quats.rsize(1) == 4, "Quaternions must have 4 components");
-    TORCH_CHECK_VALUE(logScales.rsize(1) == 3, "logScales must have 3 components");
+    TORCH_CHECK_VALUE(means.rsize(1) == 3, "Means must have 3 components (shape [N, 3])");
+    TORCH_CHECK_VALUE(quats.rsize(1) == 4, "Quaternions must have 4 components (shape [N, 4])");
+    TORCH_CHECK_VALUE(logScales.rsize(1) == 3, "logScales must have 3 components (shape [N, 3])");
     TORCH_CHECK_VALUE(logitOpacities.rdim() == 1,
-                      "logit_opacities must have 1 component (rshape [N,])");
-    TORCH_CHECK_VALUE(sh0.rdim() == 3, "sh0 coefficients must have rshape [K, N, D]");
-    TORCH_CHECK_VALUE(shN.rdim() == 3, "shN coefficients must have rshape [K, N, D]");
+                      "logit_opacities must have 1 component (shape [N,])");
+    TORCH_CHECK_VALUE(sh0.rdim() == 3, "sh0 coefficients must have shape [N, 1, D]");
+    TORCH_CHECK_VALUE(shN.rdim() == 3, "shN coefficients must have shape [N, K-1, D]");
 
     if (means.rsize(0) == 0) {
         return means.jagged_like(

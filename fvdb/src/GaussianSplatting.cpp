@@ -21,9 +21,9 @@ torch::Tensor
 GaussianSplat3d::evalSphericalHarmonicsImpl(const int64_t        shDegreeToUse,
                                             const torch::Tensor &worldToCameraMatrices,
                                             const torch::Tensor &perGaussianProjectedRadii) const {
-    const auto K              = mShN.size(0) + 1;              // number of SH bases
+    const auto K              = mShN.size(1) + 1;              // number of SH bases
     const auto C              = worldToCameraMatrices.size(0); // number of cameras
-    const auto actualShDegree = shDegreeToUse < 0 ? (int64_t(std::sqrt(K)) - 1) : shDegreeToUse;
+    const auto actualShDegree = shDegreeToUse < 0 ? (std::sqrt(K) - 1) : shDegreeToUse;
     if (actualShDegree == 0) {
         return detail::autograd::EvaluateSphericalHarmonics::apply(
             actualShDegree, C, torch::nullopt, mSh0, torch::nullopt, perGaussianProjectedRadii)[0];
@@ -59,11 +59,11 @@ GaussianSplat3d::checkState(const torch::Tensor &means, const torch::Tensor &qua
                       "scales must have shape (N, 3)");
     TORCH_CHECK_VALUE(logitOpacities.sizes() == torch::IntArrayRef({ N }),
                       "opacities must have shape (N)");
-    TORCH_CHECK_VALUE(sh0.size(0) == 1, "sh0 must have shape (1, N, D)");
-    TORCH_CHECK_VALUE(sh0.size(1) == N, "sh0 must have shape (1, N, D)");
-    TORCH_CHECK_VALUE(sh0.dim() == 3, "sh0 must have shape (1, N, D)");
-    TORCH_CHECK_VALUE(shN.size(1) == N, "shN must have shape (K-1, N, D)");
-    TORCH_CHECK_VALUE(shN.dim() == 3, "shN must have shape (K-1, N, D)");
+    TORCH_CHECK_VALUE(sh0.size(0) == N, "sh0 must have shape (N, 1, D)");
+    TORCH_CHECK_VALUE(sh0.size(1) == 1, "sh0 must have shape (N, 1, D)");
+    TORCH_CHECK_VALUE(sh0.dim() == 3, "sh0 must have shape (N, 1, D)");
+    TORCH_CHECK_VALUE(shN.size(0) == N, "shN must have shape (N, K-1, D)");
+    TORCH_CHECK_VALUE(shN.dim() == 3, "shN must have shape (N, K-1, D)");
 
     TORCH_CHECK_VALUE(means.device() == quats.device(), "All tensors must be on the same device");
     TORCH_CHECK_VALUE(means.device() == logScales.device(),
@@ -279,7 +279,7 @@ GaussianSplat3d::projectGaussiansImpl(const torch::Tensor  &worldToCameraMatrice
     const bool ortho = settings.projectionType == fvdb::detail::ops::ProjectionType::ORTHOGRAPHIC;
     const int  C     = worldToCameraMatrices.size(0); // number of cameras
     const int  N     = mMeans.size(0);                // number of gaussians
-    const int  K     = mShN.size(0) + 1;              // number of SH bases
+    const int  K     = mShN.size(1) + 1;              // number of SH bases
     const int  D     = mSh0.size(-1);                 // Dimension of output
 
     TORCH_CHECK(worldToCameraMatrices.sizes() == torch::IntArrayRef({ C, 4, 4 }),
@@ -507,12 +507,12 @@ GaussianSplat3d::savePly(const std::string &filename) const {
 
     // [N, D]
     const torch::Tensor shCoeffs0CPU =
-        mSh0.index({ 0, validMask.jdata(), torch::indexing::Ellipsis }).cpu().contiguous();
+        mSh0.index({ validMask.jdata(), 0, torch::indexing::Ellipsis }).cpu().contiguous();
     // [N, K-1, D]
     const torch::Tensor shCoeffsNCPU =
-        mShN.index({ torch::indexing::Slice(), validMask.jdata(), torch::indexing::Ellipsis })
+        mShN.index({ validMask.jdata(), torch::indexing::Slice(), torch::indexing::Ellipsis })
             .cpu()
-            .permute({ 1, 0, 2 })
+            .contiguous()
             .reshape({ mMeans.size(0), -1 });
 
     plyf.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, meansCPU.size(0),
@@ -724,7 +724,7 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
         const torch::Tensor sh_coeffs_batched =
             sh_coeffs.jdata()
                 .permute({ 1, 0, 2 })
-                .index({ Slice(), gaussian_ids, Slice() });   // [K, M, 3]
+                .index({ Slice(), gaussian_ids, Slice() });   // [K, nnz, 3]
 
         const int K              = sh_coeffs_batched.size(0); // number of SH bases
         const int actualShDegree = sh_degree_to_use < 0 ? (std::sqrt(K) - 1) : sh_degree_to_use;
@@ -733,21 +733,22 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
 
         if (actualShDegree == 0) {
             const auto sh0 =
-                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0); // [1, M, 3]
+                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0); // [1, nnz, 3]
             renderQuantities = detail::autograd::EvaluateSphericalHarmonics::apply(
-                actualShDegree, 1, torch::nullopt, sh0, torch::nullopt, radii.unsqueeze(0))[0];
+                actualShDegree, 1, torch::nullopt, sh0.permute({ 1, 0, 2 }), torch::nullopt,
+                radii.unsqueeze(0))[0];
         } else {
             const auto sh0 =
-                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0);  // [1, M, 3]
+                sh_coeffs_batched.index({ 0, Slice(), Slice() }).unsqueeze(0);  // [1, nnz, 3]
             const auto shN =
-                sh_coeffs_batched.index({ Slice(1, None), Slice(), Slice() });  // [K-1, M, 3]
-            const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [BC, 4, 4]
+                sh_coeffs_batched.index({ Slice(1, None), Slice(), Slice() });  // [K-1, nnz, 3]
+            const torch::Tensor camtoworlds = torch::inverse(viewmats.jdata()); // [ccz, 4, 4]
             const torch::Tensor dirs        = means.jdata().index({ gaussian_ids, Slice() }) -
                                        camtoworlds.index({ camera_ids, Slice(None, 3), 3 });
-            renderQuantities =
-                detail::autograd::EvaluateSphericalHarmonics::apply(
-                    actualShDegree, 1, dirs.unsqueeze(0), sh0, shN, radii.unsqueeze(0))[0]
-                    .squeeze(0);
+            renderQuantities = detail::autograd::EvaluateSphericalHarmonics::apply(
+                                   actualShDegree, 1, dirs.unsqueeze(0), sh0.permute({ 1, 0, 2 }),
+                                   shN.permute({ 1, 0, 2 }), radii.unsqueeze(0))[0]
+                                   .squeeze(0);
         }
 
         if (render_depth_channel) {

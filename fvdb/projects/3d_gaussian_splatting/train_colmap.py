@@ -245,9 +245,9 @@ class Runner:
         )  # [N,]
 
         rgbs = torch.from_numpy(colors / 255.0).to(device=self.device, dtype=torch.float32)  # [N, 3]
-        sh_0 = _rgb_to_sh(rgbs).unsqueeze(0)  # [1, N, 3]
+        sh_0 = _rgb_to_sh(rgbs).unsqueeze(1)  # [N, 1, 3]
 
-        sh_n = torch.zeros(((self.cfg.sh_degree + 1) ** 2 - 1, num_gaussians, 3), device=self.device)  # [K, N, 3]
+        sh_n = torch.zeros((num_gaussians, (self.cfg.sh_degree + 1) ** 2 - 1, 3), device=self.device)  # [N, K-1, 3]
 
         self.model = GaussianSplat3d(means, quats, log_scales, logit_opacities, sh_0, sh_n, True)
 

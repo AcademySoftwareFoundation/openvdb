@@ -367,7 +367,7 @@ torch::Tensor dispatchSphericalHarmonicsForward(const int64_t        shDegreeToU
                                                 const int64_t        numCameras,
                                                 const torch::Tensor &viewDirs,  // [C, N, 3]
                                                 const torch::Tensor &sh0Coeffs, // [1, N, D]
-                                                const torch::Tensor &shNCoeffs, // [K-1, N, D]
+                                                const torch::Tensor &shNCoeffs, // [N, K-1, D]
                                                 const torch::Tensor &radii      // [C, N]
 );
 
@@ -399,7 +399,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchSphericalHarmonicsBackward(const int64_t shDegreeToUse, const int64_t numCameras,
                                    const int64_t        numGaussians,
                                    const torch::Tensor &viewDirs,  // [N, 3]
-                                   const torch::Tensor &shNCoeffs, // [K-1, N, D]
+                                   const torch::Tensor &shNCoeffs, // [N, K-1, D]
                                    const torch::Tensor &dLossDColors,
                                    const torch::Tensor &radii,     // [N]
                                    const bool           computeDLossDViewDirs);

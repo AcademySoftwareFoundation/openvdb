@@ -60,10 +60,10 @@ class TestGaussianRender(unittest.TestCase):
         self.height = data["height"].item()
 
         self.sh_degree = 3
-        sh_coeffs = torch.zeros(((self.sh_degree + 1) ** 2, means.shape[0], 3), device=self.device)
-        sh_coeffs[0, :, :] = rgb_to_sh(colors)
-        sh_0 = sh_coeffs[0, :, :].unsqueeze(0).clone()
-        sh_n = sh_coeffs[1:, :, :].clone()
+        sh_coeffs = torch.zeros((means.shape[0], (self.sh_degree + 1) ** 2, 3), device=self.device)
+        sh_coeffs[:, 0, :] = rgb_to_sh(colors)
+        sh_0 = sh_coeffs[:, 0, :].unsqueeze(1).clone()
+        sh_n = sh_coeffs[:, 1:, :].clone()
 
         self.gs3d = GaussianSplat3d(
             means=means,
@@ -144,12 +144,12 @@ class TestGaussianRender(unittest.TestCase):
         self.assertTrue(torch.allclose(opacities_loaded, self.gs3d.logit_opacities))
 
         sh0_loaded = (
-            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1)).to(self.device).unsqueeze(0)
+            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1)).to(self.device).unsqueeze(1)
         )
         self.assertTrue(torch.allclose(sh0_loaded, self.gs3d.sh0))
         print(sorted(attribs.keys()))
         shN_loaded = torch.from_numpy(np.stack([attribs[f"f_rest_{i}"] for i in range(45)], axis=1)).to(self.device)
-        shN_loaded = shN_loaded.view(self.gs3d.num_gaussians, 15, 3).permute(1, 0, 2)
+        shN_loaded = shN_loaded.view(self.gs3d.num_gaussians, 15, 3)
         self.assertTrue(torch.allclose(shN_loaded, self.gs3d.shN))
 
     def test_gaussian_render(self):
@@ -177,7 +177,7 @@ class TestGaussianRender(unittest.TestCase):
         jt_scales = JaggedTensor([self.gs3d.scales, self.gs3d.scales]).to(self.device)
         jt_opacities = JaggedTensor([self.gs3d.opacities, self.gs3d.opacities]).to(self.device)
 
-        sh_coeffs = torch.cat([self.gs3d.sh0, self.gs3d.shN], dim=0).permute(1, 0, 2)  # [N, K, 3]
+        sh_coeffs = torch.cat([self.gs3d.sh0, self.gs3d.shN], dim=1)  # [N, K, 3]
         jt_sh_coeffs = JaggedTensor([sh_coeffs, sh_coeffs]).to(self.device)
 
         # The first scene renders to 2 views and the second scene renders to a single view

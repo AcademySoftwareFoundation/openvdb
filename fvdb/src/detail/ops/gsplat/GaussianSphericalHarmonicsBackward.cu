@@ -36,14 +36,15 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
                   const int64_t                     gi,     // gaussian index
                   const int64_t                     c,      // render channel
                   const typename Vec3Type<T>::type &dir,    // [3]
-                  const fvdb::TorchRAcc64<T, 3>     coeffsN,
-                  const T                          *dLossDRenderQuantities, // [D]
-                  fvdb::TorchRAcc64<T, 3> dLossDSh0Coeffs, fvdb::TorchRAcc64<T, 3> dLossDShNCoeffs,
-                  typename Vec3Type<T>::type *dLossDViewDir                 // [3] optional
+                  const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> coeffsN,
+                  const T *dLossDRenderQuantities,          // [D]
+                  torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> dLossDSh0Coeffs,
+                  torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> dLossDShNCoeffs,
+                  typename Vec3Type<T>::type *dLossDViewDir // [3] optional
 ) {
     T dLossDRenderQuantitiesLocal = dLossDRenderQuantities[c];
 
-    dLossDSh0Coeffs[0][gi][c] = T(0.2820947917738781) * dLossDRenderQuantitiesLocal;
+    dLossDSh0Coeffs[gi][0][c] = T(0.2820947917738781) * dLossDRenderQuantitiesLocal;
 
     if (degree < 1) {
         return;
@@ -54,14 +55,14 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
     const T z     = dir.z * inorm;
     T       vX = 0.f, vY = 0.f, vZ = 0.f;
 
-    dLossDShNCoeffs[0][gi][c] = T(-0.48860251190292) * y * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[1][gi][c] = T(0.48860251190292) * z * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[2][gi][c] = T(-0.48860251190292) * x * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][0][c] = T(-0.48860251190292) * y * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][1][c] = T(0.48860251190292) * z * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][2][c] = T(-0.48860251190292) * x * dLossDRenderQuantitiesLocal;
 
     if (dLossDViewDir != nullptr) {
-        vX += T(-0.48860251190292) * coeffsN[2][gi][c] * dLossDRenderQuantitiesLocal;
-        vY += T(-0.48860251190292) * coeffsN[0][gi][c] * dLossDRenderQuantitiesLocal;
-        vZ += T(0.48860251190292) * coeffsN[1][gi][c] * dLossDRenderQuantitiesLocal;
+        vX += T(-0.48860251190292) * coeffsN[gi][2][c] * dLossDRenderQuantitiesLocal;
+        vY += T(-0.48860251190292) * coeffsN[gi][0][c] * dLossDRenderQuantitiesLocal;
+        vZ += T(0.48860251190292) * coeffsN[gi][1][c] * dLossDRenderQuantitiesLocal;
     }
     if (degree < 2) {
         if (dLossDViewDir != nullptr) {
@@ -79,11 +80,11 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
     const T pSH5              = fTmp0B * y;
     const T pSH8              = T(0.5462742152960395) * fC1;
     const T pSH4              = T(0.5462742152960395) * fS1;
-    dLossDShNCoeffs[3][gi][c] = pSH4 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[4][gi][c] = pSH5 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[5][gi][c] = pSH6 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[6][gi][c] = pSH7 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[7][gi][c] = pSH8 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][3][c] = pSH4 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][4][c] = pSH5 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][5][c] = pSH6 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][6][c] = pSH7 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][7][c] = pSH8 * dLossDRenderQuantitiesLocal;
 
     T fTmp0B_z, fC1_x, fC1_y, fS1_x, fS1_y, pSH6_z, pSH7_x, pSH7_z, pSH5_y, pSH5_z, pSH8_x, pSH8_y,
         pSH4_x, pSH4_y;
@@ -105,13 +106,13 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
 
         vX +=
             dLossDRenderQuantitiesLocal *
-            (pSH4_x * coeffsN[3][gi][c] + pSH8_x * coeffsN[7][gi][c] + pSH7_x * coeffsN[6][gi][c]);
+            (pSH4_x * coeffsN[gi][3][c] + pSH8_x * coeffsN[gi][7][c] + pSH7_x * coeffsN[gi][6][c]);
         vY +=
             dLossDRenderQuantitiesLocal *
-            (pSH4_y * coeffsN[3][gi][c] + pSH8_y * coeffsN[7][gi][c] + pSH5_y * coeffsN[4][gi][c]);
+            (pSH4_y * coeffsN[gi][3][c] + pSH8_y * coeffsN[gi][7][c] + pSH5_y * coeffsN[gi][4][c]);
         vZ +=
             dLossDRenderQuantitiesLocal *
-            (pSH6_z * coeffsN[5][gi][c] + pSH7_z * coeffsN[6][gi][c] + pSH5_z * coeffsN[4][gi][c]);
+            (pSH6_z * coeffsN[gi][5][c] + pSH7_z * coeffsN[gi][6][c] + pSH5_z * coeffsN[gi][4][c]);
     }
 
     if (degree < 3) {
@@ -133,13 +134,13 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
     const T pSH15  = T(-0.5900435899266435) * fC2;
     const T pSH9   = T(-0.5900435899266435) * fS2;
 
-    dLossDShNCoeffs[8][gi][c]  = pSH9 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[9][gi][c]  = pSH10 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[10][gi][c] = pSH11 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[11][gi][c] = pSH12 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[12][gi][c] = pSH13 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[13][gi][c] = pSH14 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[14][gi][c] = pSH15 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][8][c]  = pSH9 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][9][c]  = pSH10 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][10][c] = pSH11 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][11][c] = pSH12 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][12][c] = pSH13 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][13][c] = pSH14 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][14][c] = pSH15 * dLossDRenderQuantitiesLocal;
 
     T fTmp0C_z, fTmp1B_z, fC2_x, fC2_y, fS2_x, fS2_y, pSH12_z, pSH13_x, pSH13_z, pSH11_y, pSH11_z,
         pSH14_x, pSH14_y, pSH14_z, pSH10_x, pSH10_y, pSH10_z, pSH15_x, pSH15_y, pSH9_x, pSH9_y;
@@ -166,13 +167,13 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
         pSH9_x   = T(-0.5900435899266435) * fS2_x;
         pSH9_y   = T(-0.5900435899266435) * fS2_y;
 
-        const T cSH9  = coeffsN[8][gi][c];
-        const T cSH10 = coeffsN[9][gi][c];
-        const T cSH11 = coeffsN[10][gi][c];
-        const T cSH12 = coeffsN[11][gi][c];
-        const T cSH13 = coeffsN[12][gi][c];
-        const T cSH14 = coeffsN[13][gi][c];
-        const T cSH15 = coeffsN[14][gi][c];
+        const T cSH9  = coeffsN[gi][8][c];
+        const T cSH10 = coeffsN[gi][9][c];
+        const T cSH11 = coeffsN[gi][10][c];
+        const T cSH12 = coeffsN[gi][11][c];
+        const T cSH13 = coeffsN[gi][12][c];
+        const T cSH14 = coeffsN[gi][13][c];
+        const T cSH15 = coeffsN[gi][14][c];
 
         vX += dLossDRenderQuantitiesLocal * (pSH9_x * cSH9 + pSH15_x * cSH15 + pSH10_x * cSH10 +
                                              pSH14_x * cSH14 + pSH13_x * cSH13);
@@ -206,15 +207,15 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
     const T pSH24  = T(0.6258357354491763) * fC3;
     const T pSH16  = T(0.6258357354491763) * fS3;
 
-    dLossDShNCoeffs[15][gi][c] = pSH16 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[16][gi][c] = pSH17 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[17][gi][c] = pSH18 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[18][gi][c] = pSH19 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[19][gi][c] = pSH20 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[20][gi][c] = pSH21 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[21][gi][c] = pSH22 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[22][gi][c] = pSH23 * dLossDRenderQuantitiesLocal;
-    dLossDShNCoeffs[23][gi][c] = pSH24 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][15][c] = pSH16 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][16][c] = pSH17 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][17][c] = pSH18 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][18][c] = pSH19 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][19][c] = pSH20 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][20][c] = pSH21 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][21][c] = pSH22 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][22][c] = pSH23 * dLossDRenderQuantitiesLocal;
+    dLossDShNCoeffs[gi][23][c] = pSH24 * dLossDRenderQuantitiesLocal;
 
     T fTmp0D_z, fTmp1C_z, fTmp2B_z, fC3_x, fC3_y, fS3_x, fS3_y, pSH20_z, pSH21_x, pSH21_z, pSH19_y,
         pSH19_z, pSH22_x, pSH22_y, pSH22_z, pSH18_x, pSH18_y, pSH18_z, pSH23_x, pSH23_y, pSH23_z,
@@ -249,15 +250,15 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
         pSH16_x  = T(0.6258357354491763) * fS3_x;
         pSH16_y  = T(0.6258357354491763) * fS3_y;
 
-        const T cSH16 = coeffsN[15][gi][c];
-        const T cSH17 = coeffsN[16][gi][c];
-        const T cSH18 = coeffsN[17][gi][c];
-        const T cSH19 = coeffsN[18][gi][c];
-        const T cSH20 = coeffsN[19][gi][c];
-        const T cSH21 = coeffsN[20][gi][c];
-        const T cSH22 = coeffsN[21][gi][c];
-        const T cSH23 = coeffsN[22][gi][c];
-        const T cSH24 = coeffsN[23][gi][c];
+        const T cSH16 = coeffsN[gi][15][c];
+        const T cSH17 = coeffsN[gi][16][c];
+        const T cSH18 = coeffsN[gi][17][c];
+        const T cSH19 = coeffsN[gi][18][c];
+        const T cSH20 = coeffsN[gi][19][c];
+        const T cSH21 = coeffsN[gi][20][c];
+        const T cSH22 = coeffsN[gi][21][c];
+        const T cSH23 = coeffsN[gi][22][c];
+        const T cSH24 = coeffsN[gi][23][c];
 
         vX += dLossDRenderQuantitiesLocal *
               (pSH16_x * cSH16 + pSH24_x * cSH24 + pSH17_x * cSH17 + pSH23_x * cSH23 +
@@ -276,63 +277,73 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
 
 template <typename T>
 __global__ void
-computeShBackward(const int64_t C, const int64_t N, const int64_t K, const int64_t D,
-                  const int64_t shDegreeToUse, const fvdb::TorchRAcc64<T, 3> viewDirs, // [C, N, 3]
-                  const fvdb::TorchRAcc64<T, 3>                  shNCoeffs,      // [K-1, N, D]
-                  const std::optional<fvdb::TorchRAcc64<int, 2>> radii,          // [C, N]
-                  const fvdb::TorchRAcc64<T, 3>          dLossDRenderQuantities, // [C, N, D]
-                  fvdb::TorchRAcc64<T, 3>                outDLossDSh0Coeffs,     // [1, N, D]
-                  fvdb::TorchRAcc64<T, 3>                outDLossDShNCoeffs,     // [K-1, N, D]
-                  std::optional<fvdb::TorchRAcc64<T, 3>> outDLossDViewDirs       // [C, N, 3]
+computeShBackward(
+    const int64_t C, const int64_t N, const int64_t K, const int64_t D, const int64_t shDegreeToUse,
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> viewDirs,     // [C, N, 3]
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> shNCoeffs,    // [K-1, N, D]
+    const int *__restrict__ radii,                                                    // [C, N]
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits>
+        dLossDRenderQuantities,                                                       // [C, N, D]
+    torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> outDLossDSh0Coeffs, // [N, 1, D]
+    torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> outDLossDShNCoeffs, // [N, K-1, D]
+    T *__restrict__ outDLossDViewDirs // [C, N, 3] optiondl
 ) {
-    for (auto idx = blockIdx.x * blockDim.x + threadIdx.x; idx < C * N * D;
-         idx += blockDim.x + gridDim.x) {
-        const auto eid = idx / D; // cidx * N + gidx
-        const auto cid = eid / N; // camera index
-        const auto gid = eid % N; // gaussian index
-        const auto c   = idx % D; // render channel
-        if (!(radii.has_value() && radii.value()[cid][gid] <= 0)) {
-            using vec3t                         = typename Vec3Type<T>::type;
-            const bool  hasViewDirs             = viewDirs.size(0) > 0;
-            const vec3t viewDir                 = hasViewDirs
-                                                      ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
-                                                      : vec3t{ T(0), T(0), T(0) };
-            const T    *dLossDRenderQuantityPtr = dLossDRenderQuantities[cid][gid].data();
+    // parallelize over C * N * D
+    const auto idx = blockIdx.x * blockDim.x + threadIdx.x; // cidx * N * D + gidx * D + c
+    if (idx >= C * N * D) {
+        return;
+    }
 
-            vec3t  dLossDViewDir{ T(0), T(0), T(0) };
-            vec3t *outDLossDViewDirPtr = outDLossDViewDirs.has_value() ? nullptr : &dLossDViewDir;
+    const auto eid = idx / D; // cidx * N + gidx
+    const auto cid = eid / N; // camera index
+    const auto gid = eid % N; // gaussian index
+    const auto c   = idx % D; // render channel
+    if (radii != nullptr && radii[eid] <= 0) {
+        return;
+    }
 
-            evalShFunctionVJP(shDegreeToUse, cid, gid, c, viewDir, shNCoeffs,
-                              dLossDRenderQuantityPtr, outDLossDSh0Coeffs, outDLossDShNCoeffs,
-                              outDLossDViewDirPtr);
-            if (outDLossDViewDirs.has_value()) {
-                auto dLossDViewDirAcc = outDLossDViewDirs.value()[cid][gid];
-                gpuAtomicAdd(&dLossDViewDirAcc[0], dLossDViewDir.x);
-                gpuAtomicAdd(&dLossDViewDirAcc[1], dLossDViewDir.y);
-                gpuAtomicAdd(&dLossDViewDirAcc[2], dLossDViewDir.z);
-            }
-        }
+    using vec3t             = typename Vec3Type<T>::type;
+    const bool  hasViewDirs = viewDirs.size(0) > 0;
+    const vec3t viewDir     = hasViewDirs ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
+                                          : vec3t{ T(0), T(0), T(0) };
+    const T    *dLossDRenderQuantityPtr = dLossDRenderQuantities[cid][gid].data();
+
+    vec3t  dLossDViewDir{ T(0), T(0), T(0) };
+    vec3t *outDLossDViewDirPtr = outDLossDViewDirs == nullptr ? nullptr : &dLossDViewDir;
+
+    evalShFunctionVJP(shDegreeToUse, cid, gid, c, viewDir, shNCoeffs, dLossDRenderQuantityPtr,
+                      outDLossDSh0Coeffs, outDLossDShNCoeffs, outDLossDViewDirPtr);
+    if (outDLossDViewDirs != nullptr) {
+        gpuAtomicAdd(outDLossDViewDirs + eid * 3, dLossDViewDir.x);
+        gpuAtomicAdd(outDLossDViewDirs + eid * 3 + 1, dLossDViewDir.y);
+        gpuAtomicAdd(outDLossDViewDirs + eid * 3 + 2, dLossDViewDir.z);
     }
 }
 
 template <typename T>
 __global__ void
-computeShDiffuseOnlyBackward(const int64_t C, const int64_t N, const int64_t D,
-                             const fvdb::TorchRAcc64<T, 3> dLossDRenderQuantities, // [C, N, D]
-                             const std::optional<fvdb::TorchRAcc64<int, 2>> radii, // [C, N]
-                             fvdb::TorchRAcc64<T, 3> outDLossDSh0Coeffs            // [1, N, D]
+computeShDiffuseOnlyBackward(
+    const int64_t C, const int64_t N, const int64_t D,
+    const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits>
+        dLossDRenderQuantities,                                                      // [C, N, D]
+    const int *__restrict__ radii,                                                   // [C, N]
+    torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> outDLossDSh0Coeffs // [N, 1, D]
 ) {
-    for (auto idx = blockIdx.x * blockDim.x + threadIdx.x; idx < C * N * D;
-         idx += blockDim.x + gridDim.x) {
-        const auto eid = idx / D; // cidx * N + gidx
-        const auto cid = eid / N; // camera index
-        const auto gid = eid % N; // gaussian index
-        const auto c   = idx % D; // render channel
-        if (!(radii.has_value() && radii.value()[cid][gid] <= 0)) {
-            outDLossDSh0Coeffs[0][gid][c] =
-                T(0.2820947917738781) * dLossDRenderQuantities[cid][gid][c];
-        }
+    // parallelize over C * N * D
+    const auto idx = blockIdx.x * blockDim.x + threadIdx.x; // cidx * N * D + gidx * D + c
+    if (idx >= C * N * D) {
+        return;
     }
+
+    const auto eid = idx / D; // cidx * N + gidx
+    const auto cid = eid / N; // camera index
+    const auto gid = eid % N; // gaussian index
+    const auto c   = idx % D; // render channel
+    if (radii != nullptr && radii[eid] <= 0) {
+        return;
+    }
+
+    outDLossDSh0Coeffs[gid][0][c] = T(0.2820947917738781) * dLossDRenderQuantities[cid][gid][c];
 }
 
 template <>
@@ -340,7 +351,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     const int64_t shDegreeToUse, const int64_t numCameras, const int64_t numGaussians,
     const torch::Tensor &viewDirs,               // [C, N, 3]
-    const torch::Tensor &shNCoeffs,              // [K, N, D]
+    const torch::Tensor &shNCoeffs,              // [N, K-1, D]
     const torch::Tensor &dLossDRenderQuantities, // [C, N, D]
     const torch::Tensor &radii,                  // [C, N]
     const bool           computeDLossDViewDirs) {
@@ -353,22 +364,23 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     if (hasShNCoeffs) {
         TORCH_CHECK_VALUE(hasViewirs, "viewDirs must be defined if shNCoeffs is defined");
         TORCH_CHECK_VALUE(shNCoeffs.is_cuda(), "shNCoeffs must be a CUDA tensor");
-        TORCH_CHECK_VALUE(shNCoeffs.dim() == 3, "shNCoeffs must have shape [K, N, D]");
-        TORCH_CHECK_VALUE(shNCoeffs.size(1) == numGaussians,
-                          "shCoeffs must have shape [K, N, D] and radii must have shape [C, N]");
+        TORCH_CHECK_VALUE(shNCoeffs.dim() == 3, "shNCoeffs must have shape [N, K-1, D]");
+        TORCH_CHECK_VALUE(shNCoeffs.size(0) == numGaussians,
+                          "shNCoeffs must have shape [N, K-1, D]");
     } else {
         TORCH_CHECK_VALUE(shDegreeToUse == 0, "shDegreeToUse must be 0 if no shNCoeffs");
     }
     if (hasRadii) {
-        TORCH_CHECK_VALUE(radii.dim() == 2, "radii must have shape [C, N]");
-        TORCH_CHECK_VALUE(numGaussians == radii.size(1), "radii must have shape [C, N]");
+        TORCH_CHECK_VALUE(radii.dim() == 2, "radii must have two dimensions with shape [C, N]");
+        TORCH_CHECK_VALUE(numGaussians == radii.size(1),
+                          "radii must have shape [C, N] but got shape = ", radii.sizes());
         TORCH_CHECK_VALUE(radii.size(0) == numCameras,
                           "radii must have shape [C, N] and C must match numCameras");
         TORCH_CHECK_VALUE(radii.is_cuda(), "radii must be a CUDA tensor");
         TORCH_CHECK_VALUE(radii.is_contiguous(), "radii must be a contiguous");
     }
 
-    const int64_t K           = hasShNCoeffs ? shNCoeffs.size(0) + 1 : 1;
+    const int64_t K           = hasShNCoeffs ? shNCoeffs.size(1) + 1 : 1;
     const int64_t N           = dLossDRenderQuantities.size(1);
     const int64_t C           = numCameras;
     const int64_t D           = dLossDRenderQuantities.size(2);
@@ -380,8 +392,8 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     if (hasShNCoeffs && K > 1 && shDegreeToUse > 0) {
         TORCH_CHECK_VALUE(viewDirs.dim() == 3, "viewDirs must have shape [C, N, 3]");
         TORCH_CHECK_VALUE(
-            shNCoeffs.size(1) == viewDirs.size(1),
-            "shCoeffs must have shape [K, N, D] and viewDirs must have shape [C, N, 3]");
+            shNCoeffs.size(0) == viewDirs.size(1),
+            "shNCoeffs must have shape [N, K-1, D] and viewDirs must have shape [C, N, 3]");
         TORCH_CHECK_VALUE(viewDirs.is_cuda(), "dirs must be a CUDA tensor");
         TORCH_CHECK_VALUE(viewDirs.size(-1) == 3, "dirs must have last dimension 3");
     }
@@ -391,22 +403,15 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
 
     using scalar_t = float;
 
-    std::optional<fvdb::TorchRAcc64<int, 2>> radiiOpt = std::nullopt;
-    if (hasRadii) {
-        radiiOpt = radii.packed_accessor64<int, 2, torch::RestrictPtrTraits>();
-    }
+    const int *radiiPtr = hasRadii ? radii.data_ptr<int>() : nullptr;
 
     const auto tensorOptions = dLossDRenderQuantities.options();
     if (hasShNCoeffs && K > 1) {
         torch::Tensor dLossDShNCoeffs = torch::zeros_like(shNCoeffs);
-        torch::Tensor dLossDSh0Coeffs = torch::zeros({ 1, N, D }, tensorOptions);
-        torch::Tensor dLossDViewDirs =
-            computeDLossDViewDirs ? torch::zeros_like(viewDirs) : torch::Tensor();
-
-        std::optional<fvdb::TorchRAcc64<scalar_t, 3>> dLossDViewDirsOpt = std::nullopt;
+        torch::Tensor dLossDSh0Coeffs = torch::zeros({ N, 1, D }, tensorOptions);
+        torch::Tensor dLossDViewDirs;
         if (computeDLossDViewDirs) {
-            dLossDViewDirsOpt =
-                dLossDViewDirs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>();
+            dLossDViewDirs = torch::zeros_like(viewDirs);
         }
         if (N == 0) {
             return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
@@ -414,17 +419,17 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
 
         computeShBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
             C, N, K, D, shDegreeToUse,
-            viewDirs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
-            shNCoeffs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(), radiiOpt,
-            dLossDRenderQuantities.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
-            dLossDSh0Coeffs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
-            dLossDShNCoeffs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
-            dLossDViewDirsOpt);
+            viewDirs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            shNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(), radiiPtr,
+            dLossDRenderQuantities.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            dLossDSh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            dLossDShNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            computeDLossDViewDirs ? dLossDViewDirs.data_ptr<scalar_t>() : nullptr);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
         return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
     } else {
-        torch::Tensor dLossDSh0Coeffs = torch::zeros({ 1, N, D }, tensorOptions);
+        torch::Tensor dLossDSh0Coeffs = torch::zeros({ N, 1, D }, tensorOptions);
         torch::Tensor dLossDShNCoeffs;
         torch::Tensor dLossDViewDirs;
         if (N == 0) {
@@ -433,8 +438,8 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
 
         computeShDiffuseOnlyBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
             C, N, D,
-            dLossDRenderQuantities.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
-            radiiOpt, dLossDSh0Coeffs.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>());
+            dLossDRenderQuantities.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radiiPtr, dLossDSh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
     }
