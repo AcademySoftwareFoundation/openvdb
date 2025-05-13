@@ -3,32 +3,14 @@
 
 #include "TestHarness.h"
 
-#include <cppunit/extensions/HelperMacros.h>
-
 using namespace openvdb::points;
 
 class TestLoop : public unittest_util::AXTestCase
 {
-public:
-    CPPUNIT_TEST_SUITE(TestLoop);
-    CPPUNIT_TEST(testLoopForLoop);
-    CPPUNIT_TEST(testLoopWhileLoop);
-    CPPUNIT_TEST(testLoopDoWhileLoop);
-    CPPUNIT_TEST(testLoopOverflow);
-    CPPUNIT_TEST(testLoopErrors);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testLoopForLoop();
-    void testLoopWhileLoop();
-    void testLoopDoWhileLoop();
-    void testLoopOverflow();
-    void testLoopErrors();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLoop);
 
-void
-TestLoop::testLoopForLoop()
+TEST_F(TestLoop, testLoopForLoop)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test1",  openvdb::Vec3f(1.0,2.0,3.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test2",  openvdb::Vec3f(1.0,2.0,3.0));
@@ -46,8 +28,7 @@ TestLoop::testLoopForLoop()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestLoop::testLoopWhileLoop()
+TEST_F(TestLoop, testLoopWhileLoop)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test9",  openvdb::Vec3f(1.0,2.0,3.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test16", openvdb::Vec3f(0.0,0.0,0.0));
@@ -58,8 +39,7 @@ TestLoop::testLoopWhileLoop()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestLoop::testLoopDoWhileLoop()
+TEST_F(TestLoop, testLoopDoWhileLoop)
 {
     mHarness.addAttribute<openvdb::Vec3f>("loop_test12", openvdb::Vec3f(1.0,2.0,3.0));
     mHarness.addAttribute<openvdb::Vec3f>("loop_test17", openvdb::Vec3f(1.0,0.0,0.0));
@@ -70,8 +50,7 @@ TestLoop::testLoopDoWhileLoop()
     AXTESTS_STANDARD_ASSERT();
 }
 
-void
-TestLoop::testLoopOverflow()
+TEST_F(TestLoop, testLoopOverflow)
 {
     // Disable all optimizations to force the loop to not remove the interior
     // allocation. The loop should generate its allocas in the function prologue
@@ -82,10 +61,9 @@ TestLoop::testLoopOverflow()
     mHarness.executeCode("test/snippets/loop/loopOverflow");
 }
 
-void
-TestLoop::testLoopErrors()
+TEST_F(TestLoop, testLoopErrors)
 {
     const bool success = mHarness.executeCode("test/snippets/loop/loopErrors");
-    CPPUNIT_ASSERT(!success);
+    ASSERT_TRUE(!success);
 }
 
