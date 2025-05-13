@@ -513,7 +513,7 @@ GaussianSplat3d::savePly(const std::string &filename) const {
         mShN.index({ torch::indexing::Slice(), validMask.jdata(), torch::indexing::Ellipsis })
             .cpu()
             .permute({ 1, 0, 2 })
-            .reshape({ mMeans.size(0), -1 });
+            .reshape({ meansCPU.size(0), -1 });
 
     plyf.add_properties_to_element("vertex", { "x", "y", "z" }, Type::FLOAT32, meansCPU.size(0),
                                    detail::tensorBytePointer(meansCPU), Type::INVALID, 0);
