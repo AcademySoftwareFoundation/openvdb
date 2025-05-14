@@ -240,17 +240,21 @@ public:
     /// @brief Creates a handle to a grid with the specified build type from a list of points in index or world space
     /// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
     /// @tparam PtrT Template type to a raw or fancy-pointer of point coordinates in world or index space.
+    /// @tparam BufferT Template type of buffer used for memory allocation on the device. Must support Unified Memory.
     /// @param points device pointer to an array of points or voxels
     /// @param pointCount number of input points or voxels
+    /// @param buffer Optional buffer to guide the allocation
     /// @return returns a handle with a grid of type NanoGrid<BuildT> in unified memory
-    template<typename PtrT>
-    GridHandle<nanovdb::cuda::UnifiedBuffer> getHandle(const PtrT points, size_t pointCount);
+    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    GridHandle<BufferT> getHandle(const PtrT points,
+                                  size_t pointCount,
+                                  const BufferT &buffer = BufferT());
 
     template <typename PtrT>
     void countNodes(const PtrT coords, size_t coordCount);
 
-    template <typename PtrT>
-    nanovdb::cuda::UnifiedBuffer getBuffer(const PtrT, size_t pointCount);
+    template <typename PtrT, typename BufferT = nanovdb::cuda::UnifiedBuffer>
+    BufferT getBuffer(const PtrT, size_t pointCount, const BufferT &buffer);
 
     template <typename PtrT>
     void processGridTreeRoot(const PtrT points, size_t pointCount);
@@ -346,13 +350,13 @@ DistributedPointsToGrid<BuildT>::~DistributedPointsToGrid()
 }
 
 template<typename BuildT>
-template<typename PtrT>
-inline GridHandle<nanovdb::cuda::UnifiedBuffer>
-DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount)
+template<typename PtrT, typename BufferT>
+inline GridHandle<BufferT>
+DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount, const BufferT &pool)
 {
     this->countNodes(points, pointCount);
 
-    auto buffer = this->getBuffer(points, pointCount);
+    auto buffer = this->getBuffer<PtrT, BufferT>(points, pointCount, pool);
 
     this->processGridTreeRoot(points, pointCount);
 
@@ -370,7 +374,7 @@ DistributedPointsToGrid<BuildT>::getHandle(const PtrT points, size_t pointCount)
         cudaCheck(cudaStreamSynchronize(stream));
     }
 
-    return GridHandle<nanovdb::cuda::UnifiedBuffer>(std::move(buffer));
+    return GridHandle<BufferT>(std::move(buffer));
 }// DistributedPointsToGrid<BuildT>::getHandle
 
 template <typename BuildT>
@@ -839,8 +843,8 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 } // DistributedPointsToGrid<BuildT>::countNodes
 
 template <typename BuildT>
-template <typename PtrT>
-inline nanovdb::cuda::UnifiedBuffer DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t pointCount)
+template <typename PtrT, typename BufferT>
+inline BufferT DistributedPointsToGrid<BuildT>::getBuffer(const PtrT, size_t pointCount, const BufferT &pool)
 {
     auto sizeofPoint = [&]()->size_t{
         switch (mPointType){
@@ -879,7 +883,7 @@ inline nanovdb::cuda::UnifiedBuffer DistributedPointsToGrid<BuildT>::getBuffer(c
     mData->blind = mData->meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
     mData->size  = mData->blind + pointCount*sizeofPoint();// end of buffer
 
-    auto buffer = nanovdb::cuda::UnifiedBuffer::create(mData->size);
+    auto buffer = BufferT::create(mData->size, &pool);
     mData->d_bufferPtr = buffer.deviceData();
     if (!mData->d_bufferPtr)
         throw std::runtime_error("Failed to allocate grid buffer in Unified Memory");

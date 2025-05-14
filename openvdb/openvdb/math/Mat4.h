@@ -469,7 +469,7 @@ public:
     }
 
     /// @return transpose of this
-    Mat4 transpose() const
+    [[nodiscard]] Mat4 transpose() const
     {
         return Mat4<T>(
                        MyBase::mm[ 0], MyBase::mm[ 4], MyBase::mm[ 8], MyBase::mm[12],
@@ -482,7 +482,7 @@ public:
 
     /// @return inverse of this
     /// @throw ArithmeticError if singular
-    Mat4 inverse(T tolerance = 0) const
+    [[nodiscard]] Mat4 inverse(T tolerance = 0) const
     {
         //
         // inv [ A  | b ]  =  [ E  | f ]    A: 3x3, b: 3x1, c': 1x3 d: 1x1
