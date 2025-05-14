@@ -5,7 +5,9 @@ channels:
 dependencies:
   - ca-certificates
   - certifi
+  - clang=18
   - clang-format=18
+  - clang-tools=18
   - cmake
   - cuda-command-line-tools
   - cuda-compiler
@@ -19,6 +21,7 @@ dependencies:
   - gxx_linux-64=11
   - ipython
   - jupyterlab
+  - libclang=18
   - libcublas-dev
   - libcurand-dev
   - libcusolver-dev

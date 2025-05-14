@@ -145,6 +145,9 @@ sphinx-build -E -a docs/ build/sphinx
 open build/sphinx/index.html
 ```
 
+### Setting up Intellisense with clangd in Visual Studio Code
+
+Please see the guide [`Clangd for Intellisense in fVDB`](docs/markdown/clangd.md)
 
 
 ## Usage Examples
