@@ -510,23 +510,25 @@ dispatchPaddedIJKForPoints<torch::kCUDA>(const JaggedTensor                     
     torch::Tensor outIJKBIdx = torch::empty({ jaggedPoints.jdata().size(0) * totalPadAmount },
                                             optsBIdx); // TODO: Don't populate for single batch
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(jaggedPoints.scalar_type(), "paddedIJKForPoints", [&] {
-        RAIIRawDeviceBuffer<VoxelCoordTransform> transformsDVec(transforms.size(),
-                                                                jaggedPoints.device());
-        transformsDVec.setData((VoxelCoordTransform *)transforms.data(), true /* blocking */);
-        const VoxelCoordTransform *transformDevPtr = transformsDVec.devicePtr;
+    AT_DISPATCH_V2(
+        jaggedPoints.scalar_type(), "paddedIJKForPoints", AT_WRAP([&] {
+            RAIIRawDeviceBuffer<VoxelCoordTransform> transformsDVec(transforms.size(),
+                                                                    jaggedPoints.device());
+            transformsDVec.setData((VoxelCoordTransform *)transforms.data(), true /* blocking */);
+            const VoxelCoordTransform *transformDevPtr = transformsDVec.devicePtr;
 
-        auto outIJKAcc = outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
-        auto outIJKBIdxAcc =
-            outIJKBIdx.packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
+            auto outIJKAcc = outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
+            auto outIJKBIdxAcc =
+                outIJKBIdx.packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
 
-        auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                 JaggedRAcc32<scalar_t, 2> pacc) {
-            paddedIJKForPointsCallback(bidx, eidx, pacc, transformDevPtr, bbox, outIJKAcc,
-                                       outIJKBIdxAcc);
-        };
-        forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, jaggedPoints, cb);
-    });
+            auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                     JaggedRAcc32<scalar_t, 2> pacc) {
+                paddedIJKForPointsCallback(bidx, eidx, pacc, transformDevPtr, bbox, outIJKAcc,
+                                           outIJKBIdxAcc);
+            };
+            forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, jaggedPoints, cb);
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     return JaggedTensor::from_data_offsets_and_list_ids(
         outIJK, jaggedPoints.joffsets() * totalPadAmount, jaggedPoints.jlidx());
 }
@@ -550,18 +552,20 @@ dispatchPaddedIJKForCoords<torch::kCUDA>(const JaggedTensor       &jaggedCoords,
     torch::Tensor outIJKBIdx = torch::empty({ jaggedCoords.jdata().size(0) * totalPadAmount },
                                             optsBIdx); // TODO: Don't populate for single batch
 
-    AT_DISPATCH_INTEGRAL_TYPES(jaggedCoords.scalar_type(), "paddedIJKForCoords", [&] {
-        auto outIJKAcc = outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
-        auto outIJKBIdxAcc =
-            outIJKBIdx.packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
+    AT_DISPATCH_V2(
+        jaggedCoords.scalar_type(), "paddedIJKForCoords", AT_WRAP([&] {
+            auto outIJKAcc = outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
+            auto outIJKBIdxAcc =
+                outIJKBIdx.packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
 
-        auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                 JaggedRAcc32<scalar_t, 2> cacc) {
-            paddedIJKForCoordsCallback(bidx, eidx, cacc, bbox, outIJKAcc, outIJKBIdxAcc);
-        };
+            auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                     JaggedRAcc32<scalar_t, 2> cacc) {
+                paddedIJKForCoordsCallback(bidx, eidx, cacc, bbox, outIJKAcc, outIJKBIdxAcc);
+            };
 
-        forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, jaggedCoords, cb);
-    });
+            forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, jaggedCoords, cb);
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 
     return JaggedTensor::from_data_offsets_and_list_ids(
         outIJK, jaggedCoords.joffsets() * totalPadAmount, jaggedCoords.jlidx());
@@ -582,8 +586,8 @@ dispatchNearestNeighborIJKForPoints<torch::kCUDA>(
     torch::Tensor outIJKBIdx = torch::empty({ jaggedPoints.jdata().size(0) * 8 },
                                             optsBIdx); // TODO: Don't populate for single batch
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        jaggedPoints.scalar_type(), "nearestNeighborIJKForPoints", [&] {
+    AT_DISPATCH_V2(
+        jaggedPoints.scalar_type(), "nearestNeighborIJKForPoints", AT_WRAP([&] {
             RAIIRawDeviceBuffer<VoxelCoordTransform> transformsDVec(transforms.size(),
                                                                     jaggedPoints.device());
             transformsDVec.setData((VoxelCoordTransform *)transforms.data(), true /* blocking */);
@@ -600,7 +604,8 @@ dispatchNearestNeighborIJKForPoints<torch::kCUDA>(
             };
 
             forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, jaggedPoints, cb);
-        });
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 
     return JaggedTensor::from_data_offsets_and_list_ids(outIJK, jaggedPoints.joffsets() * 8,
                                                         jaggedPoints.jlidx());

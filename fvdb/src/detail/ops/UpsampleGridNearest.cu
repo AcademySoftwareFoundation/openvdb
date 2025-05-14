@@ -124,9 +124,8 @@ UpsampleGridNearest(const GridBatchImpl &coarseBatchAccessor,
                 "out_fine_data must be contiguous. This should never happen");
 
     FVDB_DISPATCH_GRID_TYPES(coarseBatchAccessor, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, coarseData.scalar_type(),
-            "UpsampleGridNearest", [&]() {
+        AT_DISPATCH_V2(
+            coarseData.scalar_type(), "UpsampleGridNearest", AT_WRAP([&]() {
                 auto coarseBatchAcc = gridBatchAccessor<DeviceTag, GridType>(coarseBatchAccessor);
                 auto coarseDataAcc =
                     tensorAccessor<DeviceTag, scalar_t, 2, int64_t>(coarseDataReshape);
@@ -154,7 +153,8 @@ UpsampleGridNearest(const GridBatchImpl &coarseBatchAccessor,
                     };
                     forEachVoxelCPU<GridType>(outFineData.size(1), fineBatchAccessor, callback);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 
     return outFineData;
@@ -174,9 +174,8 @@ UpsampleGridNearestBackward(const GridBatchImpl &fineBatchAccessor,
     torch::Tensor outGradInReshape  = torch::zeros_like(coarseDataReshape);
 
     FVDB_DISPATCH_GRID_TYPES(coarseBatchAccessor, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, gradOut.scalar_type(),
-            "UpsampleGridNearestBackward", [&]() {
+        AT_DISPATCH_V2(
+            gradOut.scalar_type(), "UpsampleGridNearestBackward", AT_WRAP([&]() {
                 auto coarseBatchAcc = gridBatchAccessor<DeviceTag, GridType>(coarseBatchAccessor);
                 auto gradOutAcc = tensorAccessor<DeviceTag, scalar_t, 2, int64_t>(gradOutReshape);
                 auto outCoarseDataAcc =
@@ -206,7 +205,8 @@ UpsampleGridNearestBackward(const GridBatchImpl &fineBatchAccessor,
                     forEachVoxelCPU<GridType>(outGradInReshape.size(1), fineBatchAccessor,
                                               callback);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
     torch::Tensor outGradIn =
         outGradInReshape.reshape(spliceShape({ coarseData.size(0) }, gradOut));

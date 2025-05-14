@@ -263,8 +263,8 @@ dispatchVolumeRender<torch::kCUDA>(
     const int64_t NUM_THREADS = 1024;
     const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        sigmas.scalar_type(), "volumeRender", ([&] {
+    AT_DISPATCH_V2(
+        sigmas.scalar_type(), "volumeRender", AT_WRAP([&] {
             volumeRender<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
                 sigmas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 rgbs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -279,7 +279,8 @@ dispatchVolumeRender<torch::kCUDA>(
                 outRgb.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
                 outWs.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>());
             C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }));
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 
     // return {total_samples, opacity, depth, depthSq, rgb, ws};
 }
@@ -328,8 +329,8 @@ dispatchVolumeRenderBackward<torch::kCUDA>(const torch::Tensor dLdOpacity,
     const int64_t NUM_THREADS = 1024;
     const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        sigmas.scalar_type(), "volumeRenderBackward", ([&] {
+    AT_DISPATCH_V2(
+        sigmas.scalar_type(), "volumeRenderBackward", AT_WRAP([&] {
             volumeRenderBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
                 dLdOpacity.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 dLdDepth.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
@@ -349,7 +350,8 @@ dispatchVolumeRenderBackward<torch::kCUDA>(const torch::Tensor dLdOpacity,
                 outDLdSigmas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 outDLdRbgs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>());
             C10_CUDA_KERNEL_LAUNCH_CHECK();
-        }));
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 
     // return {dL_dsigmas, dLdRgbs};
 }
@@ -362,16 +364,16 @@ dispatchVolumeRender<torch::kCPU>(const torch::Tensor sigmas, const torch::Tenso
                                   torch::Tensor &outOpacity, torch::Tensor &outDepth,
                                   torch::Tensor &outRgb, torch::Tensor &outWs,
                                   torch::Tensor &outTotalSamples) {
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        sigmas.scalar_type(), "volumeRender", ([&] {
-            volumeRenderCPU<scalar_t>(
-                sigmas.accessor<scalar_t, 1>(), rgbs.accessor<scalar_t, 2>(),
-                deltas.accessor<scalar_t, 1>(), ts.accessor<scalar_t, 1>(),
-                jOffsets.accessor<JOffsetsType, 1>(), tsmtThreshold,
-                outTotalSamples.accessor<int64_t, 1>(), outOpacity.accessor<scalar_t, 1>(),
-                outDepth.accessor<scalar_t, 1>(), outRgb.accessor<scalar_t, 2>(),
-                outWs.accessor<scalar_t, 1>());
-        }));
+    AT_DISPATCH_V2(sigmas.scalar_type(), "volumeRender", AT_WRAP([&] {
+                       volumeRenderCPU<scalar_t>(
+                           sigmas.accessor<scalar_t, 1>(), rgbs.accessor<scalar_t, 2>(),
+                           deltas.accessor<scalar_t, 1>(), ts.accessor<scalar_t, 1>(),
+                           jOffsets.accessor<JOffsetsType, 1>(), tsmtThreshold,
+                           outTotalSamples.accessor<int64_t, 1>(),
+                           outOpacity.accessor<scalar_t, 1>(), outDepth.accessor<scalar_t, 1>(),
+                           outRgb.accessor<scalar_t, 2>(), outWs.accessor<scalar_t, 1>());
+                   }),
+                   AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 template <>
@@ -387,18 +389,19 @@ dispatchVolumeRenderBackward<torch::kCPU>(const torch::Tensor dLdOpacity,
                                           torch::Tensor &outDLdRbgs) {
     torch::Tensor dLdWs_times_ws = (dLdWs * ws); // auxiliary input
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        sigmas.scalar_type(), "volumeRenderBackward", ([&] {
-            volumeRenderBackwardCPU<scalar_t>(
-                dLdOpacity.accessor<scalar_t, 1>(), dLdDepth.accessor<scalar_t, 1>(),
-                dLdRgb.accessor<scalar_t, 2>(), dLdWs.accessor<scalar_t, 1>(),
-                dLdWs_times_ws.accessor<scalar_t, 1>(), sigmas.accessor<scalar_t, 1>(),
-                rgbs.accessor<scalar_t, 2>(), deltas.accessor<scalar_t, 1>(),
-                ts.accessor<scalar_t, 1>(), jOffsets.accessor<JOffsetsType, 1>(),
-                opacity.accessor<scalar_t, 1>(), depth.accessor<scalar_t, 1>(),
-                rgb.accessor<scalar_t, 2>(), tsmtThreshold, outDLdSigmas.accessor<scalar_t, 1>(),
-                outDLdRbgs.accessor<scalar_t, 2>());
-        }));
+    AT_DISPATCH_V2(sigmas.scalar_type(), "volumeRenderBackward", AT_WRAP([&] {
+                       volumeRenderBackwardCPU<scalar_t>(
+                           dLdOpacity.accessor<scalar_t, 1>(), dLdDepth.accessor<scalar_t, 1>(),
+                           dLdRgb.accessor<scalar_t, 2>(), dLdWs.accessor<scalar_t, 1>(),
+                           dLdWs_times_ws.accessor<scalar_t, 1>(), sigmas.accessor<scalar_t, 1>(),
+                           rgbs.accessor<scalar_t, 2>(), deltas.accessor<scalar_t, 1>(),
+                           ts.accessor<scalar_t, 1>(), jOffsets.accessor<JOffsetsType, 1>(),
+                           opacity.accessor<scalar_t, 1>(), depth.accessor<scalar_t, 1>(),
+                           rgb.accessor<scalar_t, 2>(), tsmtThreshold,
+                           outDLdSigmas.accessor<scalar_t, 1>(),
+                           outDLdRbgs.accessor<scalar_t, 2>());
+                   }),
+                   AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 } // namespace ops

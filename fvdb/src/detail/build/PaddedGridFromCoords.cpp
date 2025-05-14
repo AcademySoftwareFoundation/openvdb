@@ -18,8 +18,8 @@ namespace build {
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::CoordBBox &bbox) {
-    return AT_DISPATCH_INTEGRAL_TYPES(
-        jaggedCoords.scalar_type(), "buildPaddedGridFromCoords", [&]() {
+    return AT_DISPATCH_V2(
+        jaggedCoords.scalar_type(), "buildPaddedGridFromCoords", AT_WRAP([&]() {
             using ScalarT = scalar_t;
             jaggedCoords.check_valid();
 
@@ -68,7 +68,8 @@ buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::Co
             } else {
                 return nanovdb::mergeGrids(batchHandles);
             }
-        });
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>

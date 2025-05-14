@@ -18,8 +18,8 @@ nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagged,
                              const std::vector<VoxelCoordTransform> &txs,
                              const nanovdb::CoordBBox               &bbox) {
-    return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        pointsJagged.scalar_type(), "buildPaddedGridFromPoints", [&]() {
+    return AT_DISPATCH_V2(
+        pointsJagged.scalar_type(), "buildPaddedGridFromPoints", AT_WRAP([&]() {
             using ScalarT = scalar_t;
             static_assert(is_floating_point_or_half<ScalarT>::value,
                           "Invalid type for points, must be floating point");
@@ -73,7 +73,8 @@ buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagge
             } else {
                 return nanovdb::mergeGrids(batchHandles);
             }
-        });
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>

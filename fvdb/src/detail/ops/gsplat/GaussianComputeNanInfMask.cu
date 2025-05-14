@@ -103,8 +103,8 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
     const size_t NUM_THREADS = 256;
     const size_t NUM_BLOCKS  = (N + NUM_THREADS - 1) / NUM_THREADS;
 
-    AT_DISPATCH_FLOATING_TYPES(
-        means.scalar_type(), "computeNanInfMaskKernel", ([&] {
+    AT_DISPATCH_V2(
+        means.scalar_type(), "computeNanInfMaskKernel", AT_WRAP([&] {
             computeNanInfMaskKernel<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
                 means.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                 quats.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -113,7 +113,8 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
                 sh0.jdata().packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
                 shN.jdata().packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>(),
                 outValid.packed_accessor64<bool, 1, torch::RestrictPtrTraits>());
-        }));
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES));
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return means.jagged_like(outValid);

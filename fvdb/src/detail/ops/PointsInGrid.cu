@@ -47,25 +47,27 @@ PointsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points, bool ign
     torch::Tensor outMask = torch::empty({ points.rsize(0) }, opts);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(points.scalar_type(), "PointsInGrid", [&]() {
-            auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-            auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> ptsA) {
-                    pointsInGridCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, ptsA, outMaskAccessor, batchAcc, ignoreDisabledVoxels);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, points, cb);
-            } else {
-                auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                              JaggedAcc<scalar_t, 2> ptsA) {
-                    pointsInGridCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                        bidx, eidx, ptsA, outMaskAccessor, batchAcc, ignoreDisabledVoxels);
-                };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
-            }
-        });
+        AT_DISPATCH_V2(
+            points.scalar_type(), "PointsInGrid", AT_WRAP([&]() {
+                auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                             JaggedRAcc32<scalar_t, 2> ptsA) {
+                        pointsInGridCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
+                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, ignoreDisabledVoxels);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, points, cb);
+                } else {
+                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                                  JaggedAcc<scalar_t, 2> ptsA) {
+                        pointsInGridCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, ignoreDisabledVoxels);
+                    };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
+                }
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
 
     return points.jagged_like(outMask);

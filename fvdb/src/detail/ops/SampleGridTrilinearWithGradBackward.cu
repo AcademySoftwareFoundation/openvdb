@@ -69,8 +69,8 @@ SampleGridTrilinearWithGradBackward(const GridBatchImpl &batchHdl, const JaggedT
     auto          outShape = spliceShape({ outGrad.size(0) }, data, 1); // [B*M, *]
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            points.scalar_type(), "SampleGridTrilinearWithGradBackward", ([&] {
+        AT_DISPATCH_V2(
+            points.scalar_type(), "SampleGridTrilinearWithGradBackward", AT_WRAP([&] {
                 auto batchAcc           = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
                 auto gradOutFeaturesAcc = tensorAccessor<DeviceTag, scalar_t, 2>(gradOutFeatures);
                 auto gradOutGradFeaturesAcc =
@@ -96,7 +96,8 @@ SampleGridTrilinearWithGradBackward(const GridBatchImpl &batchHdl, const JaggedT
                     };
                     forEachJaggedElementChannelCPU<scalar_t, 2>(outGrad.size(1), points, cb);
                 }
-            }));
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
     return outGrad.reshape(outShape);
 }

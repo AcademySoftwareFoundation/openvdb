@@ -312,8 +312,8 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
     TORCH_CHECK(rayDirections.ldim() == 1, "Invalid list dimension for ray directions.");
 
     return FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() -> JaggedTensor {
-        return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            rayOrigins.scalar_type(), "UniformRaySamples", [&]() -> JaggedTensor {
+        return AT_DISPATCH_V2(
+            rayOrigins.scalar_type(), "UniformRaySamples", AT_WRAP([&]() -> JaggedTensor {
                 int64_t numThreads = 256 + 128;
                 if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
                     numThreads = 256;
@@ -408,7 +408,8 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 }
                 return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
                     outRayTimes, outJOffsets, outJIdx, outJLidx, batchHdl.batchSize());
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
 }
 

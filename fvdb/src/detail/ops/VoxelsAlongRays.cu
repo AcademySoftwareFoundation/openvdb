@@ -186,8 +186,9 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
     TORCH_CHECK_VALUE(rayDirections.ldim() == 1, "Invalid list dimension for ray directions.");
 
     return FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() -> std::vector<JaggedTensor> {
-        return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            rayOrigins.scalar_type(), "VoxelsAlongRays", [&]() -> std::vector<JaggedTensor> {
+        return AT_DISPATCH_V2(
+            rayOrigins.scalar_type(), "VoxelsAlongRays",
+            AT_WRAP([&]() -> std::vector<JaggedTensor> {
                 int64_t numThreads = 384;
                 if constexpr (nanovdb::util::is_same<scalar_t, double>::value ||
                               nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value) {
@@ -308,7 +309,8 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 const JaggedTensor retTimes = retVox.jagged_like(outTimes);
 
                 return { retVox, retTimes };
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
 }
 

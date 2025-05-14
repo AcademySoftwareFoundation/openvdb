@@ -188,66 +188,72 @@ dispatchIJKForMesh<torch::kCUDA>(const JaggedTensor &meshVertices, const JaggedT
     const torch::TensorOptions optsJIdx =
         torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(meshFaces.device());
 
-    return AT_DISPATCH_INTEGRAL_TYPES(meshFaces.scalar_type(), "ijkForMesh", [&]() {
-        using scalar_i = scalar_t;
-        return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            meshVertices.scalar_type(), "countVoxelsPerTriToCheckVertices", [&]() {
-                using scalar_f = scalar_t;
+    return AT_DISPATCH_V2(
+        meshFaces.scalar_type(), "ijkForMesh", AT_WRAP([&]() {
+            using scalar_i = scalar_t;
+            return AT_DISPATCH_V2(
+                meshVertices.scalar_type(), "countVoxelsPerTriToCheckVertices", AT_WRAP([&]() {
+                    using scalar_f = scalar_t;
 
-                // First count the total number of samples to generate in each triangle
-                torch::Tensor samplesPerTri =
-                    torch::empty({ meshFaces.jdata().size(0) + 1 }, optsI32);
-                auto samplesPerTriAcc =
-                    samplesPerTri.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>();
-                auto verticesAcc =
-                    meshVertices.packed_accessor32<scalar_f, 2, torch::RestrictPtrTraits>();
-                auto facesAcc =
-                    meshFaces.packed_accessor32<scalar_i, 2, torch::RestrictPtrTraits>();
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                         JaggedRAcc32<scalar_i, 2> acc) {
-                    countVoxelsPerTriToCheck<scalar_f, scalar_i>(
-                        bidx, eidx, transformDevPtr, verticesAcc, facesAcc, samplesPerTriAcc);
-                };
-                forEachJaggedElementChannelCUDA<scalar_i, 2>(1024, 1, meshFaces, cb);
+                    // First count the total number of samples to generate in each triangle
+                    torch::Tensor samplesPerTri =
+                        torch::empty({ meshFaces.jdata().size(0) + 1 }, optsI32);
+                    auto samplesPerTriAcc =
+                        samplesPerTri.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>();
+                    auto verticesAcc =
+                        meshVertices.packed_accessor32<scalar_f, 2, torch::RestrictPtrTraits>();
+                    auto facesAcc =
+                        meshFaces.packed_accessor32<scalar_i, 2, torch::RestrictPtrTraits>();
+                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                             JaggedRAcc32<scalar_i, 2> acc) {
+                        countVoxelsPerTriToCheck<scalar_f, scalar_i>(
+                            bidx, eidx, transformDevPtr, verticesAcc, facesAcc, samplesPerTriAcc);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_i, 2>(1024, 1, meshFaces, cb);
 
-                // Compute the cumulative sum of the number of samples per triangle so each thread
-                // can figure out which triangle it's in
-                torch::Tensor samplesPerTriCumSum = samplesPerTri.cumsum(0);
-                auto          samplesPerTriCumSumAcc =
-                    samplesPerTriCumSum.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>();
-                const int64_t totalSurfaceSamples = samplesPerTriCumSum[-1].item<int64_t>();
+                    // Compute the cumulative sum of the number of samples per triangle so each
+                    // thread can figure out which triangle it's in
+                    torch::Tensor samplesPerTriCumSum = samplesPerTri.cumsum(0);
+                    auto          samplesPerTriCumSumAcc =
+                        samplesPerTriCumSum
+                            .packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>();
+                    const int64_t totalSurfaceSamples = samplesPerTriCumSum[-1].item<int64_t>();
 
-                // Now write out the surface samples
-                const int64_t threadsPerBlock = 1024;
-                const int64_t numBlocks       = GET_BLOCKS(totalSurfaceSamples, threadsPerBlock);
-                torch::Tensor outIJK          = torch::empty({ totalSurfaceSamples, 3 }, optsI32);
-                torch::Tensor outJidx         = torch::empty({ totalSurfaceSamples }, optsJIdx);
+                    // Now write out the surface samples
+                    const int64_t threadsPerBlock = 1024;
+                    const int64_t numBlocks = GET_BLOCKS(totalSurfaceSamples, threadsPerBlock);
+                    torch::Tensor outIJK    = torch::empty({ totalSurfaceSamples, 3 }, optsI32);
+                    torch::Tensor outJidx   = torch::empty({ totalSurfaceSamples }, optsJIdx);
 
-                if (outIJK.numel() >= 1 << 31) {
-                    auto outIJKAcc =
-                        outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
-                    auto outJidxKAcc =
-                        outJidx.packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
-                    generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc64>
-                        <<<numBlocks, threadsPerBlock>>>(transformDevPtr, verticesAcc, facesAcc,
-                                                         samplesPerTriCumSumAcc, outIJKAcc,
-                                                         outJidxKAcc);
-                } else {
-                    auto outIJKAcc =
-                        outIJK.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
-                    auto outJidxKAcc =
-                        outJidx.packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
-                    generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc32>
-                        <<<numBlocks, threadsPerBlock>>>(transformDevPtr, verticesAcc, facesAcc,
-                                                         samplesPerTriCumSumAcc, outIJKAcc,
-                                                         outJidxKAcc);
-                }
-                C10_CUDA_KERNEL_LAUNCH_CHECK();
+                    if (outIJK.numel() >= 1 << 31) {
+                        auto outIJKAcc =
+                            outIJK.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
+                        auto outJidxKAcc =
+                            outJidx
+                                .packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
+                        generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc64>
+                            <<<numBlocks, threadsPerBlock>>>(transformDevPtr, verticesAcc, facesAcc,
+                                                             samplesPerTriCumSumAcc, outIJKAcc,
+                                                             outJidxKAcc);
+                    } else {
+                        auto outIJKAcc =
+                            outIJK.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
+                        auto outJidxKAcc =
+                            outJidx
+                                .packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
+                        generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc32>
+                            <<<numBlocks, threadsPerBlock>>>(transformDevPtr, verticesAcc, facesAcc,
+                                                             samplesPerTriCumSumAcc, outIJKAcc,
+                                                             outJidxKAcc);
+                    }
+                    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-                return fvdb::JaggedTensor::from_data_indices_and_list_ids(
-                    outIJK, outJidx, meshFaces.jlidx(), meshFaces.num_tensors());
-            });
-    });
+                    return fvdb::JaggedTensor::from_data_indices_and_list_ids(
+                        outIJK, outJidx, meshFaces.jlidx(), meshFaces.num_tensors());
+                }),
+                AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 }
 
 } // namespace ops

@@ -70,8 +70,8 @@ SampleGridBezierWithGradBackward(const GridBatchImpl &batchHdl, const JaggedTens
     auto          outShape = spliceShape({ outGrad.size(0) }, data, 1); // [B*M, *]
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            points.scalar_type(), "SampleGridBezierWithGradBackward", ([&] {
+        AT_DISPATCH_V2(
+            points.scalar_type(), "SampleGridBezierWithGradBackward", AT_WRAP([&] {
                 auto batchAcc           = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
                 auto gradOutFeaturesAcc = tensorAccessor<DeviceTag, scalar_t, 2>(gradOutFeatures);
                 auto gradOutGradFeaturesAcc =
@@ -97,7 +97,8 @@ SampleGridBezierWithGradBackward(const GridBatchImpl &batchHdl, const JaggedTens
                     };
                     forEachJaggedElementChannelCPU<scalar_t, 2>(outGrad.size(1), points, cb);
                 }
-            }));
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
     return outGrad.reshape(outShape);
 }

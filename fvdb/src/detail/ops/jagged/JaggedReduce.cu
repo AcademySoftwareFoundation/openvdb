@@ -109,48 +109,51 @@ JaggedReduce(const torch::Tensor &jdataRaw, const torch::Tensor &jidx,
 
     auto joffsetsAccessor = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(joffsets);
 
-    AT_DISPATCH_ALL_TYPES_AND(at::ScalarType::Half, jdata.scalar_type(), "JaggedReduce", [&]() {
-        out.fill_(Reducer<scalar_t, REDUCE>::init());
-        auto outAccessor = tensorAccessor<DeviceTag, scalar_t, 2>(out);
+    AT_DISPATCH_V2(
+        jdata.scalar_type(), "JaggedReduce", AT_WRAP([&]() {
+            out.fill_(Reducer<scalar_t, REDUCE>::init());
+            auto outAccessor = tensorAccessor<DeviceTag, scalar_t, 2>(out);
 
-        if constexpr (DeviceTag == torch::kCUDA) {
-            auto cb = [=] __device__(int32_t ridx, int32_t cidx, TorchRAcc32<scalar_t, 2> dataAcc) {
-                jaggedReduceDeviceCallback<scalar_t, TorchRAcc32, REDUCE>(
-                    ridx, cidx, dataAcc, jidxAccessor, outAccessor);
-            };
-            forEachTensorElementChannelCUDA<scalar_t, 2>(256, jdata.size(1), jdata, cb);
-        } else {
-            auto cb = [=](int32_t ridx, int32_t cidx, TorchAcc<scalar_t, 2> dataAcc) {
-                jaggedReduceHostCallback<scalar_t, TorchAcc, REDUCE>(ridx, cidx, dataAcc,
-                                                                     jidxAccessor, outAccessor);
-            };
-            forEachTensorElementChannelCPU<scalar_t, 2>(jdata.size(1), jdata, cb);
-        }
-
-        // Fill empty slots with 0 instead of Inf/-Inf, and compute arguments.
-        if constexpr (isMinMax) {
-            out.masked_fill_(out == Reducer<scalar_t, REDUCE>::init(), (scalar_t)0);
-            argOut->fill_(-1);
-
-            auto argOutAccessor = tensorAccessor<DeviceTag, int64_t, 2>(argOut.value());
             if constexpr (DeviceTag == torch::kCUDA) {
                 auto cb = [=] __device__(int32_t ridx, int32_t cidx,
                                          TorchRAcc32<scalar_t, 2> dataAcc) {
-                    jaggedArgReduceCallback<scalar_t, TorchRAcc32, DeviceTag>(
-                        ridx, cidx, dataAcc, jidxAccessor, joffsetsAccessor, outAccessor,
-                        argOutAccessor);
+                    jaggedReduceDeviceCallback<scalar_t, TorchRAcc32, REDUCE>(
+                        ridx, cidx, dataAcc, jidxAccessor, outAccessor);
                 };
                 forEachTensorElementChannelCUDA<scalar_t, 2>(256, jdata.size(1), jdata, cb);
             } else {
                 auto cb = [=](int32_t ridx, int32_t cidx, TorchAcc<scalar_t, 2> dataAcc) {
-                    jaggedArgReduceCallback<scalar_t, TorchAcc, DeviceTag>(
-                        ridx, cidx, dataAcc, jidxAccessor, joffsetsAccessor, outAccessor,
-                        argOutAccessor);
+                    jaggedReduceHostCallback<scalar_t, TorchAcc, REDUCE>(ridx, cidx, dataAcc,
+                                                                         jidxAccessor, outAccessor);
                 };
                 forEachTensorElementChannelCPU<scalar_t, 2>(jdata.size(1), jdata, cb);
             }
-        }
-    });
+
+            // Fill empty slots with 0 instead of Inf/-Inf, and compute arguments.
+            if constexpr (isMinMax) {
+                out.masked_fill_(out == Reducer<scalar_t, REDUCE>::init(), (scalar_t)0);
+                argOut->fill_(-1);
+
+                auto argOutAccessor = tensorAccessor<DeviceTag, int64_t, 2>(argOut.value());
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t ridx, int32_t cidx,
+                                             TorchRAcc32<scalar_t, 2> dataAcc) {
+                        jaggedArgReduceCallback<scalar_t, TorchRAcc32, DeviceTag>(
+                            ridx, cidx, dataAcc, jidxAccessor, joffsetsAccessor, outAccessor,
+                            argOutAccessor);
+                    };
+                    forEachTensorElementChannelCUDA<scalar_t, 2>(256, jdata.size(1), jdata, cb);
+                } else {
+                    auto cb = [=](int32_t ridx, int32_t cidx, TorchAcc<scalar_t, 2> dataAcc) {
+                        jaggedArgReduceCallback<scalar_t, TorchAcc, DeviceTag>(
+                            ridx, cidx, dataAcc, jidxAccessor, joffsetsAccessor, outAccessor,
+                            argOutAccessor);
+                    };
+                    forEachTensorElementChannelCPU<scalar_t, 2>(jdata.size(1), jdata, cb);
+                }
+            }
+        }),
+        AT_ALL_TYPES, c10::kHalf);
 
     torch::Tensor                rOut    = out.reshape(spliceShape({ out.size(0) }, jdataRaw));
     std::optional<torch::Tensor> rArgOut = std::nullopt;
