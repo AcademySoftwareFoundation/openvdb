@@ -13,6 +13,7 @@ find_package(Python3 COMPONENTS Development Interpreter)
 message(STATUS "CMAKE_BUILD_PARALLEL_LEVEL: ${CMAKE_BUILD_PARALLEL_LEVEL}")
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/get_cpm.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/get_nvtx.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/get_torch.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/get_pybind11.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/src/cmake/configure_torch_pybind11.cmake)
