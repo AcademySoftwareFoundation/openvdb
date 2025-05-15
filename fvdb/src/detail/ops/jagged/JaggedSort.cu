@@ -104,24 +104,25 @@ JaggedArgsort(const JaggedTensor &jt) {
     auto idxAccessor   = tensorAccessor<DeviceTag, int64_t, 1>(idx);
     auto stackAccessor = tensorAccessor<DeviceTag, int64_t, 1>(stack);
 
-    AT_DISPATCH_ALL_TYPES_AND2(
-        at::ScalarType::Half, at::ScalarType::BFloat16, data.scalar_type(), "JaggedArgsort", [&]() {
-            auto dataAcc = tensorAccessor<DeviceTag, scalar_t, 1>(data);
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t ridx, int32_t cidx,
-                                         TorchRAcc32<int64_t, 2> offsetAcc) {
-                    qsortCallback<scalar_t, TorchRAcc32>(ridx, offsetAcc, dataAcc, idxAccessor,
-                                                         stackAccessor);
-                };
-                forEachTensorElementChannelCUDA<int64_t, 2>(256, 1, offsets, cb);
-            } else {
-                auto cb = [=](int32_t ridx, int32_t cidx, TorchAcc<int64_t, 2> offsetAcc) {
-                    qsortCallback<scalar_t, TorchAcc>(ridx, offsetAcc, dataAcc, idxAccessor,
-                                                      stackAccessor);
-                };
-                forEachTensorElementChannelCPU<int64_t, 2>(1, offsets, cb);
-            }
-        });
+    AT_DISPATCH_V2(data.scalar_type(), "JaggedArgsort", AT_WRAP([&]() {
+                       auto dataAcc = tensorAccessor<DeviceTag, scalar_t, 1>(data);
+                       if constexpr (DeviceTag == torch::kCUDA) {
+                           auto cb = [=] __device__(int32_t ridx, int32_t cidx,
+                                                    TorchRAcc32<int64_t, 2> offsetAcc) {
+                               qsortCallback<scalar_t, TorchRAcc32>(ridx, offsetAcc, dataAcc,
+                                                                    idxAccessor, stackAccessor);
+                           };
+                           forEachTensorElementChannelCUDA<int64_t, 2>(256, 1, offsets, cb);
+                       } else {
+                           auto cb = [=](int32_t ridx, int32_t cidx,
+                                         TorchAcc<int64_t, 2> offsetAcc) {
+                               qsortCallback<scalar_t, TorchAcc>(ridx, offsetAcc, dataAcc,
+                                                                 idxAccessor, stackAccessor);
+                           };
+                           forEachTensorElementChannelCPU<int64_t, 2>(1, offsets, cb);
+                       }
+                   }),
+                   AT_ALL_TYPES, c10::kHalf, c10::kBFloat16);
 
     return idx;
 }

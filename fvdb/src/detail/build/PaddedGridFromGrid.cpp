@@ -118,10 +118,10 @@ buildPaddedGridFromGrid(bool isMutable, const GridBatchImpl &baseBatchHdl, int b
         JaggedTensor coords;
         if (excludeBorder) {
             coords = ops::dispatchPaddedIJKForGridWithoutBorder<torch::kCUDA>(
-                baseBatchHdl, nanovdb::Coord(bmin), nanovdb::Coord(bmax));
+                baseBatchHdl, nanovdb::CoordBBox(nanovdb::Coord(bmin), nanovdb::Coord(bmax)));
         } else {
-            coords = ops::dispatchPaddedIJKForGrid<torch::kCUDA>(baseBatchHdl, nanovdb::Coord(bmin),
-                                                                 nanovdb::Coord(bmax));
+            coords = ops::dispatchPaddedIJKForGrid<torch::kCUDA>(
+                baseBatchHdl, nanovdb::CoordBBox(nanovdb::Coord(bmin), nanovdb::Coord(bmax)));
         }
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
     } else {

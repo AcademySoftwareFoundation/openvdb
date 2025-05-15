@@ -95,10 +95,11 @@ buildGridFromMesh(bool isMutable, const JaggedTensor meshVertices, const JaggedT
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
     } else {
         return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return AT_DISPATCH_FLOATING_TYPES(
-                meshVertices.scalar_type(), "buildGridFromMeshCPU", [&]() {
+            return AT_DISPATCH_V2(
+                meshVertices.scalar_type(), "buildGridFromMeshCPU", AT_WRAP([&]() {
                     return buildGridFromMeshCPU<GridType, scalar_t>(meshVertices, meshFaces, tx);
-                });
+                }),
+                AT_EXPAND(AT_FLOATING_TYPES));
         });
     }
 }

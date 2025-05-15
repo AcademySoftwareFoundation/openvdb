@@ -1,6 +1,12 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 
+# Include guard to prevent multiple inclusion
+if(DEFINED _GET_TORCH_CMAKE_INCLUDED)
+  return()
+endif()
+set(_GET_TORCH_CMAKE_INCLUDED TRUE)
+
 # find Python3
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
@@ -38,10 +44,33 @@ set(TORCH_SOURCE_INCLUDE_DIRS ${TORCH_PACKAGE_DIR}/include)
 
 if(NOT TORCH_PYTHON_LIBRARY)
   message(STATUS "Looking for torch_python library...")
-  set(TORCH_PYTHON_LIBRARY "${TORCH_PACKAGE_DIR}/lib/libtorch_python.so")
 
-  if(NOT EXISTS "${TORCH_PYTHON_LIBRARY}")
-    message(FATAL_ERROR "Could not find libtorch_python.so at ${TORCH_PYTHON_LIBRARY}")
+  # Create a list of candidate paths
+  set(TORCH_PYTHON_LIBRARY_CANDIDATES "${TORCH_PACKAGE_DIR}/lib/libtorch_python.so")
+
+  if(DEFINED ENV{CONDA_PREFIX})
+    list(APPEND TORCH_PYTHON_LIBRARY_CANDIDATES "$ENV{CONDA_PREFIX}/lib/libtorch_python.so")
+  endif()
+
+  # Iterate through candidates until found
+  set(TORCH_PYTHON_LIBRARY_FOUND FALSE)
+
+  foreach(CANDIDATE ${TORCH_PYTHON_LIBRARY_CANDIDATES})
+    if(EXISTS "${CANDIDATE}")
+      set(TORCH_PYTHON_LIBRARY "${CANDIDATE}")
+      message(STATUS "Found libtorch_python.so at: ${TORCH_PYTHON_LIBRARY}")
+      set(TORCH_PYTHON_LIBRARY_FOUND TRUE)
+      break()
+    endif()
+  endforeach()
+
+  # If not found, report error
+  if(NOT TORCH_PYTHON_LIBRARY_FOUND)
+    if(DEFINED ENV{CONDA_PREFIX})
+      message(FATAL_ERROR "Could not find libtorch_python.so in any of the search locations.")
+    else()
+      message(FATAL_ERROR "Could not find libtorch_python.so. CONDA_PREFIX was not defined, so only site-packages location was checked.")
+    endif()
   endif()
 endif()
 

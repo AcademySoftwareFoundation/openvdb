@@ -2,24 +2,26 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
+
 import sys
 import time
 from typing import Tuple
 
 import numpy as np
 import torch
-import torch.utils.data
+from utils import filter_splat_means, prune_large
 from viz import CameraState, Viewer
 
 from fvdb import GaussianSplat3d
-from fvdb.nn.gaussian_splatting import GaussianSplat3D
 
 np.set_printoptions(suppress=True)
 import viser
 
 checkpoint_path = sys.argv[1]
 checkpoint = torch.load(checkpoint_path, map_location="cuda")
-model = GaussianSplat3d.from_state_dict(checkpoint["splats"])
+splats = prune_large(checkpoint["splats"])
+splats = filter_splat_means(splats, [0.95, 0.95, 0.95, 0.95, 0.89, 0.999])
+model = GaussianSplat3d.from_state_dict(splats)
 
 
 @torch.no_grad()

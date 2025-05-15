@@ -145,9 +145,8 @@ DownsampleGridMaxPool(const GridBatchImpl &fineBatchHdl, const GridBatchImpl &co
     torch::Tensor outCoarseDataReshape = featureCoalescedView(outCoarseData);
 
     FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, fineData.scalar_type(),
-            "DownsampleGridMaxPool", [&]() {
+        AT_DISPATCH_V2(
+            fineData.scalar_type(), "DownsampleGridMaxPool", AT_WRAP([&]() {
                 auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
                 auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
                 auto outCoarseDataAcc =
@@ -175,7 +174,8 @@ DownsampleGridMaxPool(const GridBatchImpl &fineBatchHdl, const GridBatchImpl &co
                     forEachVoxelCPU<GridType>(outCoarseData.size(1), coarseBatchHdl,
                                               maxPoolPerVoxel);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 
     return outCoarseData;
@@ -201,9 +201,8 @@ DownsampleGridMaxPoolBackward(const GridBatchImpl &coarseBatchHdl,
     torch::Tensor outGradInReshape     = torch::zeros_like(fineDataReshape); // [#fin
 
     FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, fineData.scalar_type(),
-            "DownsampleGridMaxPoolBackward", [&]() {
+        AT_DISPATCH_V2(
+            fineData.scalar_type(), "DownsampleGridMaxPoolBackward", AT_WRAP([&]() {
                 auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
                 auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
                 auto coarseGradOutAcc =
@@ -232,7 +231,8 @@ DownsampleGridMaxPoolBackward(const GridBatchImpl &coarseBatchHdl,
                     };
                     forEachVoxelCPU<GridType>(fineData.size(1), coarseBatchHdl, cb);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
     return outGradInReshape.reshape(spliceShape({ fineData.size(0) }, coarseGradOut));
 }

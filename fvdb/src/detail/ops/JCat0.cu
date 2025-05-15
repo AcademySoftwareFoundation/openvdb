@@ -143,25 +143,28 @@ dispatchJCat0<torch::kCUDA>(const std::vector<JaggedTensor> &vec) {
         torch::zeros({ maxElements }, torch::TensorOptions().dtype(idxType).device(torch::kCUDA));
     for (size_t jti = 0; jti < vec.size(); ++jti) {
         const JaggedTensor &jt = vec[jti];
-        AT_DISPATCH_INTEGRAL_TYPES(selectIndices.scalar_type(), "computeIndexPutArg", [&] {
-            const int64_t numElements                  = jt.jdata().size(0);
-            const int64_t numThreadsComputeIndexPutArg = 1024;
-            const int64_t numBlocksComputeIndexPutArg =
-                GET_BLOCKS(numElements, numThreadsComputeIndexPutArg);
-            computeIndexPutArg<<<numBlocksComputeIndexPutArg, numThreadsComputeIndexPutArg>>>(
-                jti, thrust::raw_pointer_cast(offsets_d.data()), offsets_d.size(),
-                jt.jdata().size(0),
-                jt.jidx().packed_accessor32<JIdxType, 1, torch::RestrictPtrTraits>(),
-                jt.joffsets().packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
-                outJOffsets.packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
-                selectIndices.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
-                outJIdx.packed_accessor32<JIdxType, 1, torch::RestrictPtrTraits>());
-            C10_CUDA_KERNEL_LAUNCH_CHECK();
+        AT_DISPATCH_V2(
+            selectIndices.scalar_type(), "computeIndexPutArg", AT_WRAP([&] {
+                const int64_t numElements                  = jt.jdata().size(0);
+                const int64_t numThreadsComputeIndexPutArg = 1024;
+                const int64_t numBlocksComputeIndexPutArg =
+                    GET_BLOCKS(numElements, numThreadsComputeIndexPutArg);
+                computeIndexPutArg<<<numBlocksComputeIndexPutArg, numThreadsComputeIndexPutArg>>>(
+                    jti, thrust::raw_pointer_cast(offsets_d.data()), offsets_d.size(),
+                    jt.jdata().size(0),
+                    jt.jidx().packed_accessor32<JIdxType, 1, torch::RestrictPtrTraits>(),
+                    jt.joffsets().packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
+                    outJOffsets.packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>(),
+                    selectIndices.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
+                    outJIdx.packed_accessor32<JIdxType, 1, torch::RestrictPtrTraits>());
+                C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-            torch::Tensor selIdxI = selectIndices.index({ torch::indexing::Slice(0, numElements) });
+                torch::Tensor selIdxI =
+                    selectIndices.index({ torch::indexing::Slice(0, numElements) });
 
-            outJData.index_put_({ selIdxI, torch::indexing::Ellipsis }, jt.jdata());
-        });
+                outJData.index_put_({ selIdxI, torch::indexing::Ellipsis }, jt.jdata());
+            }),
+            AT_EXPAND(AT_INTEGRAL_TYPES));
     }
 
     return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(

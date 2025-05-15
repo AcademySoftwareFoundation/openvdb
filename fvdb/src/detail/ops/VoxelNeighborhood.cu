@@ -63,26 +63,28 @@ VoxelNeighborhood(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, nanovd
         torch::empty({ ijk.rsize(0), extentPerAxis[0], extentPerAxis[1], extentPerAxis[2] }, opts);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_INTEGRAL_TYPES(ijk.scalar_type(), "VoxelNeighborhood", [&]() {
-            auto batchAcc    = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-            auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 4>(outIndex);
+        AT_DISPATCH_V2(
+            ijk.scalar_type(), "VoxelNeighborhood", AT_WRAP([&]() {
+                auto batchAcc    = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 4>(outIndex);
 
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> ptsA) {
-                    voxelNeighborhoodCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, ijk, cb);
-            } else {
-                auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                              JaggedAcc<scalar_t, 2> ptsA) {
-                    voxelNeighborhoodCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                        bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
-                };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-            }
-        });
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                             JaggedRAcc32<scalar_t, 2> ptsA) {
+                        voxelNeighborhoodCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
+                            bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, ijk, cb);
+                } else {
+                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                                  JaggedAcc<scalar_t, 2> ptsA) {
+                        voxelNeighborhoodCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
+                    };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+                }
+            }),
+            AT_EXPAND(AT_INTEGRAL_TYPES));
     });
 
     return ijk.jagged_like(outIndex);

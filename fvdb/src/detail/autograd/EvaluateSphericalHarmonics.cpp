@@ -16,8 +16,8 @@ EvaluateSphericalHarmonics::forward(
     const size_t numCameras,
     const std::optional<EvaluateSphericalHarmonics::Variable>
                                                 viewDirections,           // [C, N, 3] (optional)
-    const EvaluateSphericalHarmonics::Variable &sh0Coeffs,                // [1, N, D]
-    const std::optional<EvaluateSphericalHarmonics::Variable> &shNCoeffs, // [K-1, N, D]
+    const EvaluateSphericalHarmonics::Variable &sh0Coeffs,                // [N, 1, D]
+    const std::optional<EvaluateSphericalHarmonics::Variable> &shNCoeffs, // [N, K-1, D]
     const EvaluateSphericalHarmonics::Variable                &radii      // [C, N]
 ) {
     const Variable viewDirectionsValue = viewDirections.value_or(torch::Tensor());
@@ -29,7 +29,7 @@ EvaluateSphericalHarmonics::forward(
     ctx->save_for_backward({ viewDirectionsValue, shNCoeffsValue, radii });
     ctx->saved_data["shDegreeToUse"] = static_cast<int64_t>(shDegreeToUse);
     ctx->saved_data["numCameras"]    = static_cast<int64_t>(numCameras);
-    ctx->saved_data["numGaussians"]  = static_cast<int64_t>(sh0Coeffs.size(1));
+    ctx->saved_data["numGaussians"]  = static_cast<int64_t>(sh0Coeffs.size(0));
     return { renderQuantities };
 }
 

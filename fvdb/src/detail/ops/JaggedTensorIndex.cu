@@ -184,8 +184,8 @@ jaggedTensorIndexJaggedTensorImpl(const JaggedTensor &jt, const JaggedTensor &jt
             torch::Tensor selidxAdd =
                 torch::empty({ jtIndices.jdata().size(0) }, jtIndices.jdata().options());
 
-            AT_DISPATCH_INTEGRAL_TYPES(
-                jtIndices.scalar_type(), "calculateIndexShiftForEachElement", [&] {
+            AT_DISPATCH_V2(
+                jtIndices.scalar_type(), "calculateIndexShiftForEachElement", AT_WRAP([&] {
                     const int64_t MAX_BLOCKS = 4194302; // floor((2^32 - 1) / 1024)
                     const int64_t numBlocks  = GET_BLOCKS(jtIndices.jdata().size(0), 1024);
                     TORCH_INTERNAL_ASSERT(numBlocks < MAX_BLOCKS, "Too many blocks");
@@ -195,7 +195,8 @@ jaggedTensorIndexJaggedTensorImpl(const JaggedTensor &jt, const JaggedTensor &jt
                         jtIndices.jidx().packed_accessor64<JIdxType, 1, torch::RestrictPtrTraits>(),
                         selidxAdd.packed_accessor64<scalar_t, 1, torch::RestrictPtrTraits>());
                     C10_CUDA_KERNEL_LAUNCH_CHECK();
-                });
+                }),
+                AT_EXPAND(AT_INTEGRAL_TYPES));
             for (int i = 1; i < jtIndices.jdata().dim(); i += 1) {
                 selidxAdd = selidxAdd.unsqueeze(-1);
             }

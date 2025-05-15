@@ -44,25 +44,27 @@ IjkToIndex(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool cumulati
     torch::Tensor outIndex = torch::empty({ ijk.rsize(0) }, opts);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_INTEGRAL_TYPES(ijk.scalar_type(), "IjkToIndex", [&]() {
-            auto batchAcc    = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-            auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 1>(outIndex);
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(fvdb::JIdxType bidx, int64_t eidx, int64_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> ijkAcc) {
-                    ijkToIndexCallback<GridType, scalar_t, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, batchAcc, ijkAcc, outIndexAcc, cumulative);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, ijk, cb);
-            } else {
-                auto cb = [=](fvdb::JIdxType bidx, int64_t eidx, int64_t cidx,
-                              JaggedAcc<scalar_t, 2> ijkAcc) {
-                    ijkToIndexCallback<GridType, scalar_t, JaggedAcc, TorchAcc>(
-                        bidx, eidx, batchAcc, ijkAcc, outIndexAcc, cumulative);
-                };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-            }
-        });
+        AT_DISPATCH_V2(
+            ijk.scalar_type(), "IjkToIndex", AT_WRAP([&]() {
+                auto batchAcc    = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 1>(outIndex);
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(fvdb::JIdxType bidx, int64_t eidx, int64_t cidx,
+                                             JaggedRAcc32<scalar_t, 2> ijkAcc) {
+                        ijkToIndexCallback<GridType, scalar_t, JaggedRAcc32, TorchRAcc32>(
+                            bidx, eidx, batchAcc, ijkAcc, outIndexAcc, cumulative);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, ijk, cb);
+                } else {
+                    auto cb = [=](fvdb::JIdxType bidx, int64_t eidx, int64_t cidx,
+                                  JaggedAcc<scalar_t, 2> ijkAcc) {
+                        ijkToIndexCallback<GridType, scalar_t, JaggedAcc, TorchAcc>(
+                            bidx, eidx, batchAcc, ijkAcc, outIndexAcc, cumulative);
+                    };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+                }
+            }),
+            AT_EXPAND(AT_INTEGRAL_TYPES));
     });
 
     return ijk.jagged_like(outIndex);

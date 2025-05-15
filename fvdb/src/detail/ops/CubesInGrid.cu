@@ -80,32 +80,34 @@ CubesInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
     torch::Tensor outMask = torch::empty({ cubeCenters.rsize(0) }, opts);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(cubeCenters.scalar_type(), "CubesInGrid", [&]() {
-            using opmath_t = at::opmath_type<scalar_t>;
+        AT_DISPATCH_V2(
+            cubeCenters.scalar_type(), "CubesInGrid", AT_WRAP([&]() {
+                using opmath_t = at::opmath_type<scalar_t>;
 
-            auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-            auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
-            nanovdb::math::Vec3<opmath_t> dstart(padMin);
-            nanovdb::math::Vec3<opmath_t> dend(padMax);
+                auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
+                nanovdb::math::Vec3<opmath_t> dstart(padMin);
+                nanovdb::math::Vec3<opmath_t> dend(padMax);
 
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> ptsA) {
-                    cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
-                        ignoreDisabledVoxels);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, cubeCenters, cb);
-            } else {
-                auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                              JaggedAcc<scalar_t, 2> ptsA) {
-                    cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedAcc, TorchAcc>(
-                        bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
-                        ignoreDisabledVoxels);
-                };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, cubeCenters, cb);
-            }
-        });
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                             JaggedRAcc32<scalar_t, 2> ptsA) {
+                        cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedRAcc32, TorchRAcc32>(
+                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
+                            ignoreDisabledVoxels);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, cubeCenters, cb);
+                } else {
+                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                                  JaggedAcc<scalar_t, 2> ptsA) {
+                        cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
+                            ignoreDisabledVoxels);
+                    };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, cubeCenters, cb);
+                }
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
 
     return cubeCenters.jagged_like(outMask);

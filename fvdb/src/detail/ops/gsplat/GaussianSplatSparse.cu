@@ -4,7 +4,7 @@
 #include <detail/ops/Ops.h>
 #include <detail/utils/cuda/Utils.cuh>
 
-#include <ATen/Dispatch.h>
+#include <ATen/Dispatch_v2.h>
 
 #include <cub/cub.cuh>
 #include <thrust/sort.h>

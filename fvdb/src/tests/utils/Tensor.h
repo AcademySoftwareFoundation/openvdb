@@ -49,7 +49,7 @@ checkTensor(const torch::Tensor &tensor, const std::vector<int64_t> &shape,
 /// @param device The device to create the tensor on (default: torch::kCUDA)
 /// @return A torch::TensorOptions object with the given scalar type and device
 template <typename T>
-inline constexpr torch::TensorOptions
+inline torch::TensorOptions
 tensorOpts(torch::Device device = torch::kCUDA) {
     return torch::TensorOptions().device(device).dtype(torch::CppTypeToScalarType<T>::value);
 }

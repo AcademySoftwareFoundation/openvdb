@@ -25,7 +25,6 @@ from .modules import (
 from .vdbtensor import VDBTensor, vdbtensor_from_dense
 
 __all__ = [
-    "GaussianSplat3D",
     "VDBTensor",
     "vdbtensor_from_dense",
     "MaxPool",

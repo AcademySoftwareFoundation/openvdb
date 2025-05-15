@@ -17,8 +17,8 @@ template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &jaggedPoints,
                                       const std::vector<VoxelCoordTransform> &txs) {
-    return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        jaggedPoints.scalar_type(), "buildNearestNeighborGridFromPoints", [&]() {
+    return AT_DISPATCH_V2(
+        jaggedPoints.scalar_type(), "buildNearestNeighborGridFromPoints", AT_WRAP([&]() {
             using ScalarT    = scalar_t;
             using MathT      = typename at::opmath_type<ScalarT>;
             using Vec3T      = typename nanovdb::math::Vec3<MathT>;
@@ -80,7 +80,8 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &ja
             } else {
                 return nanovdb::mergeGrids(batchHandles);
             }
-        });
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>

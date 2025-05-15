@@ -48,8 +48,31 @@ setup_parallel_build_jobs() {
 # Ensure that the build is done with the conda environment
 # Get any additional command line arguments after $1
 shift
-ADDITIONAL_ARGS="$@"
-export PIP_ARGS="-v --no-build-isolation $ADDITIONAL_ARGS"
+
+CONFIG_SETTINGS=""
+PASS_THROUGH_ARGS=""
+
+while (( "$#" )); do
+  if [[ "$BUILD_TYPE" == "install" ]]; then
+    if [[ "$1" == "gtests" ]]; then
+      echo "Detected 'gtests' flag for install build. Enabling FVDB_BUILD_TESTS."
+      CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_TESTS=ON"
+    elif [[ "$1" == "benchmarks" ]]; then
+      echo "Detected 'benchmarks' flag for install build. Enabling FVDB_BUILD_BENCHMARKS."
+      CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_BENCHMARKS=ON"
+    else
+      # Append other arguments, handling potential spaces safely
+      PASS_THROUGH_ARGS+=" $(printf "%q" "$1")"
+    fi
+  else
+    # Append other arguments, handling potential spaces safely
+    PASS_THROUGH_ARGS+=" $(printf "%q" "$1")"
+  fi
+  shift
+done
+
+# Construct PIP_ARGS with potential CMake args and other pass-through args
+export PIP_ARGS="-v --no-build-isolation$CONFIG_SETTINGS$PASS_THROUGH_ARGS"
 
 if [ "$BUILD_TYPE" != "ctest" ]; then
     setup_parallel_build_jobs
@@ -62,7 +85,7 @@ if [ "$BUILD_TYPE" == "wheel" ]; then
     pip wheel . --wheel-dir dist/ $PIP_ARGS
 elif [ "$BUILD_TYPE" == "install" ]; then
     echo "Build and install package"
-    echo "pip install  --force-reinstall $PIP_ARGS ."
+    echo "pip install --force-reinstall $PIP_ARGS ."
     pip install --force-reinstall $PIP_ARGS .
 # TODO: Fix editable install
 # else

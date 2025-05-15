@@ -89,9 +89,8 @@ dispatchReadIntoDense<torch::kCUDA>(const GridBatchImpl &batchHdl, const torch::
                                     const torch::Tensor &denseOrigins,
                                     torch::Tensor &outDenseTensor, bool ignoreMasked) {
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, outDenseTensor.scalar_type(),
-            "readIntoDense", [&]() {
+        AT_DISPATCH_V2(
+            outDenseTensor.scalar_type(), "readIntoDense", AT_WRAP([&]() {
                 auto outDenseAcc =
                     outDenseTensor.packed_accessor64<scalar_t, 5, torch::RestrictPtrTraits>();
                 auto denseOriginsAcc =
@@ -106,7 +105,8 @@ dispatchReadIntoDense<torch::kCUDA>(const GridBatchImpl &batchHdl, const torch::
                                                                    outDenseAcc, ignoreMasked);
                 };
                 forEachVoxelCUDA<GridType>(1024, inGridData.size(1), batchHdl, callback);
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 }
 
@@ -118,14 +118,13 @@ dispatchReadIntoDense<torch::kCPU>(const GridBatchImpl &gridHdl, const torch::Te
     bool isContiguous = inGridData.is_contiguous() && outDenseTensor.is_contiguous();
 
     FVDB_DISPATCH_GRID_TYPES(gridHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(at::ScalarType::Half, at::ScalarType::BFloat16,
-                                        outDenseTensor.scalar_type(), "readIntoDense", [&]() {
-                                            readIntoDenseCPU(gridHdl.hostAccessor<GridType>(),
-                                                             inGridData.accessor<scalar_t, 2>(),
-                                                             denseOrigins.accessor<int32_t, 2>(),
-                                                             outDenseTensor.accessor<scalar_t, 5>(),
-                                                             ignoreMasked, isContiguous);
-                                        });
+        AT_DISPATCH_V2(outDenseTensor.scalar_type(), "readIntoDense", AT_WRAP([&]() {
+                           readIntoDenseCPU(
+                               gridHdl.hostAccessor<GridType>(), inGridData.accessor<scalar_t, 2>(),
+                               denseOrigins.accessor<int32_t, 2>(),
+                               outDenseTensor.accessor<scalar_t, 5>(), ignoreMasked, isContiguous);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 }
 

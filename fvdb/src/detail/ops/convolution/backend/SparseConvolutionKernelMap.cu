@@ -185,30 +185,30 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor 
 
         // gather n_active_feats dense features from N sparse input features with c
         // feature dimensions
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(),
-            "convolution_forward_cuda", ([&] {
-                gatherKernel<scalar_t>
-                    <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                        n_active_feats, n_in_feats, n_in_channels, in_feat.data_ptr<scalar_t>(),
-                        in_buffer_activated.data_ptr<scalar_t>(),
-                        neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            }));
+        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+                           gatherKernel<scalar_t>
+                               <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
+                                   n_active_feats, n_in_feats, n_in_channels,
+                                   in_feat.data_ptr<scalar_t>(),
+                                   in_buffer_activated.data_ptr<scalar_t>(),
+                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         // gemm: (i, c) X (c, o) = (i, o)
         torch::mm_out(out_buffer_activated, in_buffer_activated, kernel[i]);
 
         // scatter n_active_feats dense features into n_out_feats output features of
         // dimension n_out_channels
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(),
-            "convolution_forward_cuda", ([&] {
-                scatterKernel<scalar_t>
-                    <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
-                        n_active_feats, n_out_feats, n_out_channels,
-                        out_buffer_activated.data_ptr<scalar_t>(), out_feat.data_ptr<scalar_t>(),
-                        neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            }));
+        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+                           scatterKernel<scalar_t>
+                               <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
+                                   n_active_feats, n_out_feats, n_out_channels,
+                                   out_buffer_activated.data_ptr<scalar_t>(),
+                                   out_feat.data_ptr<scalar_t>(),
+                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         cur_offset += 2 * n_active_feats;
     }
@@ -303,26 +303,25 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Ten
         }
 
         // gather
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(),
-            "convolution_forward_cuda", ([&] {
-                gatherKernel<scalar_t>
-                    <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
-                        n_active_feats, n_out_feats, n_out_channels,
-                        grad_out_feat.data_ptr<scalar_t>(),
-                        out_grad_buffer_activated.data_ptr<scalar_t>(),
-                        neighbor_map.data_ptr<int>() + cur_offset, !transpose);
-            }));
+        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+                           gatherKernel<scalar_t>
+                               <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
+                                   n_active_feats, n_out_feats, n_out_channels,
+                                   grad_out_feat.data_ptr<scalar_t>(),
+                                   out_grad_buffer_activated.data_ptr<scalar_t>(),
+                                   neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(),
-            "convolution_forward_cuda", ([&] {
-                gatherKernel<scalar_t>
-                    <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                        n_active_feats, n_in_feats, n_in_channels, in_feat.data_ptr<scalar_t>(),
-                        in_buffer_activated.data_ptr<scalar_t>(),
-                        neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            }));
+        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+                           gatherKernel<scalar_t>
+                               <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
+                                   n_active_feats, n_in_feats, n_in_channels,
+                                   in_feat.data_ptr<scalar_t>(),
+                                   in_buffer_activated.data_ptr<scalar_t>(),
+                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         // gemm
         torch::mm_out(in_grad_buffer_activated, out_grad_buffer_activated,
@@ -331,16 +330,15 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Ten
                       out_grad_buffer_activated);
 
         // scatter
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(),
-            "convolution_forward_cuda", ([&] {
-                scatterKernel<scalar_t>
-                    <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                        n_active_feats, n_in_feats, n_in_channels,
-                        in_grad_buffer_activated.data_ptr<scalar_t>(),
-                        grad_in_feat.data_ptr<scalar_t>(),
-                        neighbor_map.data_ptr<int>() + cur_offset, !transpose);
-            }));
+        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+                           scatterKernel<scalar_t>
+                               <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
+                                   n_active_feats, n_in_feats, n_in_channels,
+                                   in_grad_buffer_activated.data_ptr<scalar_t>(),
+                                   grad_in_feat.data_ptr<scalar_t>(),
+                                   neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         cur_offset += 2 * n_active_feats;
     }
@@ -400,25 +398,25 @@ dispatchSparseConvolutionKernelMap<torch::kCPU>(torch::Tensor in_feat, torch::Te
             in_buffer.data_ptr(), { neighbor_offset.data_ptr<int>()[i], in_feat.size(1) }, options);
 
         // gather
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, in_feat.scalar_type(), "gatherCpu",
-            [&]() {
-                gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
-                          in_feat.data_ptr<scalar_t>(), in_buffer_activated.data_ptr<scalar_t>(),
-                          neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            });
+        AT_DISPATCH_V2(in_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
+                           gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
+                                     in_feat.data_ptr<scalar_t>(),
+                                     in_buffer_activated.data_ptr<scalar_t>(),
+                                     neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         // matmul
         torch::mm_out(out_buffer_activated, in_buffer_activated, kernel[i]);
 
         // scatter
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, out_feat.scalar_type(), "scatterCpu",
-            [&]() {
-                scatterCpu(neighbor_offset.data_ptr<int>()[i], out_nrows, kernel.size(2),
-                           out_buffer_activated.data_ptr<scalar_t>(), out_feat.data_ptr<scalar_t>(),
-                           neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            });
+        AT_DISPATCH_V2(out_feat.scalar_type(), "scatterCpu", AT_WRAP([&]() {
+                           scatterCpu(neighbor_offset.data_ptr<int>()[i], out_nrows, kernel.size(2),
+                                      out_buffer_activated.data_ptr<scalar_t>(),
+                                      out_feat.data_ptr<scalar_t>(),
+                                      neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
         cur_offset += 2 * neighbor_offset.data_ptr<int>()[i];
     }
 }
@@ -467,21 +465,20 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCPU>(at::Tensor in_feat, at::Tens
             in_buffer.data_ptr(), { neighbor_offset.data_ptr<int>()[i], in_feat.size(1) }, options);
 
         // gather
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, grad_out_feat.scalar_type(),
-            "gatherCpu", [&]() {
-                gatherCpu(out_grad_buffer_activated.size(0), grad_out_feat.size(0), kernel.size(2),
-                          grad_out_feat.data_ptr<scalar_t>(),
-                          out_grad_buffer_activated.data_ptr<scalar_t>(),
-                          neighbor_map.data_ptr<int>() + cur_offset, !transpose);
-            });
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, grad_out_feat.scalar_type(),
-            "gatherCpu", [&]() {
-                gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
-                          in_feat.data_ptr<scalar_t>(), in_buffer_activated.data_ptr<scalar_t>(),
-                          neighbor_map.data_ptr<int>() + cur_offset, transpose);
-            });
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
+                           gatherCpu(out_grad_buffer_activated.size(0), grad_out_feat.size(0),
+                                     kernel.size(2), grad_out_feat.data_ptr<scalar_t>(),
+                                     out_grad_buffer_activated.data_ptr<scalar_t>(),
+                                     neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
+                           gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
+                                     in_feat.data_ptr<scalar_t>(),
+                                     in_buffer_activated.data_ptr<scalar_t>(),
+                                     neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         // matmul
         torch::mm_out(in_grad_buffer_activated, out_grad_buffer_activated,
@@ -490,14 +487,13 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCPU>(at::Tensor in_feat, at::Tens
                       out_grad_buffer_activated);
 
         // scatter
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, grad_out_feat.scalar_type(),
-            "scatterCpu", [&]() {
-                scatterCpu(neighbor_offset.data_ptr<int>()[i], in_feat.size(0), kernel.size(1),
-                           in_grad_buffer_activated.data_ptr<scalar_t>(),
-                           grad_in_feat.data_ptr<scalar_t>(),
-                           neighbor_map.data_ptr<int>() + cur_offset, !transpose);
-            });
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "scatterCpu", AT_WRAP([&]() {
+                           scatterCpu(neighbor_offset.data_ptr<int>()[i], in_feat.size(0),
+                                      kernel.size(1), in_grad_buffer_activated.data_ptr<scalar_t>(),
+                                      grad_in_feat.data_ptr<scalar_t>(),
+                                      neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
 
         cur_offset += 2 * neighbor_offset.data_ptr<int>()[i];
     }

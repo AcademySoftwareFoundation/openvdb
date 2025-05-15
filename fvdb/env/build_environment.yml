@@ -19,6 +19,7 @@ dependencies:
   - libcublas-dev
   - libcusolver-dev
   - libcusparse-dev
+  - libpng
   - linkify-it-py
   - make
   - myst-parser
