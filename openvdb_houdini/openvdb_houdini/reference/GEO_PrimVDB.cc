@@ -2985,7 +2985,6 @@ vdbJSON()
         GA_PrimitiveJSON* json = new geo_PrimVDBJSON;
         if (nullptr != theJSON.compare_swap(nullptr, json)) {
             delete json;
-            json = nullptr;
         }
     }
     return theJSON;
