@@ -266,88 +266,41 @@ countEnabledPerLeafShiftByOneLeafCallback(
     outUnmaskedPerLeafAcc[gridAccessor.leafOffset(batchIdx) + leafIdx + 1] = numUnmasked;
 }
 
-/// @brief Helper class to extract the correct TensorAccessor type for a given device
-/// @tparam DeviceTag The device tag (torch::kCUDA or torch::kCPU)
-/// @tparam T The scalar type of the tensor
-/// @tparam N The number of dimensions of the tensor
-template <c10::DeviceType DeviceTag, typename T, int N, typename IndexType = int32_t>
-struct TensorAccessorExtractor {
-    using AccType = torch::TensorAccessor<T, N>;
-    AccType
-    get(const torch::Tensor &tensor) {
-        return tensor.accessor<T, N>();
-    }
-};
-template <typename T, int N, typename IndexType>
-struct TensorAccessorExtractor<torch::kCUDA, T, N, IndexType> {
-    using AccType = torch::GenericPackedTensorAccessor<T, N, torch::RestrictPtrTraits, IndexType>;
-    AccType
-    get(const torch::Tensor &tensor) {
-        return tensor.generic_packed_accessor<T, N, torch::RestrictPtrTraits, IndexType>();
-    }
-};
-
-/// @brief Helper class to extract the correct GridBatchImpl::Accessor type for a given device
-/// @tparam DeviceTag The device tag (torch::kCUDA or torch::kCPU)
-/// @tparam T The GridType of the grid (either nanovdb::ValueOnIndex or nanovdb::ValueOnIndexMask)
-template <c10::DeviceType DeviceTag, typename T> struct GridBatchAccessorExtractor {
-    using AccType = fvdb::detail::GridBatchImpl::Accessor<T>;
-    AccType
-    get(const fvdb::detail::GridBatchImpl &batchHdl) {
-        return batchHdl.hostAccessor<T>();
-    }
-};
-template <typename T> struct GridBatchAccessorExtractor<torch::kCUDA, T> {
-    using AccType = fvdb::detail::GridBatchImpl::Accessor<T>;
-    AccType
-    get(const fvdb::detail::GridBatchImpl &batchHdl) {
-        return batchHdl.deviceAccessor<T>();
-    }
-};
-
-/// @brief Helper class to extract the correct JaggedAccessor type for a given device
-/// @tparam DeviceTag The device tag (torch::kCUDA or torch::kCPU)
-/// @tparam T The scalar type of the jagged tensor
-/// @tparam N The number of dimensions of the jagged data tensor
-template <c10::DeviceType DeviceTag, typename T, int N> struct JaggedAccessorExtractor {
-    using AccType = fvdb::JaggedAcc<T, N>;
-    AccType
-    get(const fvdb::JaggedTensor &tensor) {
-        return tensor.accessor<T, N>();
-    }
-};
-template <typename T, int N> struct JaggedAccessorExtractor<torch::kCUDA, T, N> {
-    using AccType = fvdb::JaggedRAcc32<T, N>;
-    AccType
-    get(const fvdb::JaggedTensor &tensor) {
-        return tensor.packed_accessor32<T, N, torch::RestrictPtrTraits>();
-    }
-};
-
 } // namespace _private
 
 /// @brief Get an accessor for the given tensor with scalar type T and N dimensions
 /// @tparam DeviceTag The device tag to use for the accessor (either torch::kCUDA or torch::kCPU)
 /// @tparam T The scalar type of the tensor
 /// @tparam N The number of dimensions of the tensor
-/// @tparam IndexType The type of index to use for packed tensors on the GPU (default is int32_t)
+/// @tparam IndexT The type of index to use for packed tensors on the GPU (default is int32_t)
 /// @param tensor The tensor to get an accessor for
 /// @return A tensor accessor (either torch::TensorAccessor or torch::PackedTensorAccessor32)
-template <c10::DeviceType DeviceTag, typename T, size_t N, typename IndexType = int32_t>
-typename _private::TensorAccessorExtractor<DeviceTag, T, N, IndexType>::AccType
+template <c10::DeviceType DeviceTag, typename T, size_t N, typename IndexT = int32_t>
+typename std::conditional<
+    DeviceTag == torch::kCUDA,
+    torch::GenericPackedTensorAccessor<T, N, torch::RestrictPtrTraits, IndexT>,
+    torch::TensorAccessor<T, N>>::type
 tensorAccessor(const torch::Tensor &tensor) {
-    return _private::TensorAccessorExtractor<DeviceTag, T, N, IndexType>().get(tensor);
+    if constexpr (DeviceTag == torch::kCUDA) {
+        return tensor.generic_packed_accessor<T, N, torch::RestrictPtrTraits, IndexT>();
+    } else {
+        return tensor.accessor<T, N>();
+    }
 }
 
 /// @brief Get an accessor for the given batched grid handle with scalar type T
 /// @tparam DeviceTag The device tag to use for the accessor (either torch::kCUDA or torch::kCPU)
-/// @tparam GridType The type of grid (either nanovdb::ValueOnIndex or nanovdb::ValueOnIndexMask)
+/// @tparam GridT The type of grid (either nanovdb::ValueOnIndex or nanovdb::ValueOnIndexMask)
 /// @param batchHdl The batched grid handle to get an accessor for
 /// @return A fvdb::detail::GridBatchImpl::Accessor of the given type on the appropriate device
-template <c10::DeviceType DeviceTag, typename GridType>
-typename _private::GridBatchAccessorExtractor<DeviceTag, GridType>::AccType
+template <c10::DeviceType DeviceTag, typename GridT>
+typename fvdb::detail::GridBatchImpl::Accessor<GridT>
 gridBatchAccessor(const fvdb::detail::GridBatchImpl &batchHdl) {
-    return _private::GridBatchAccessorExtractor<DeviceTag, GridType>().get(batchHdl);
+    if constexpr (DeviceTag == torch::kCUDA) {
+        return batchHdl.deviceAccessor<GridT>();
+    } else {
+        return batchHdl.hostAccessor<GridT>();
+    }
 }
 
 /// @brief Get an accessor for the given jagged tensor with scalar type T and N dimensions
@@ -357,9 +310,14 @@ gridBatchAccessor(const fvdb::detail::GridBatchImpl &batchHdl) {
 /// @param jaggedTensor The JaggedTensor to get an accessor for
 /// @return A JaggedTensor accessor (either JaggedAccessor or PackedJaggedAccessor32)
 template <c10::DeviceType DeviceTag, typename T, size_t N>
-typename _private::JaggedAccessorExtractor<DeviceTag, T, N>::AccType
+typename std::conditional<DeviceTag == torch::kCUDA, fvdb::JaggedRAcc32<T, N>,
+                          fvdb::JaggedAcc<T, N>>::type
 jaggedAccessor(const fvdb::JaggedTensor &jaggedTensor) {
-    return _private::JaggedAccessorExtractor<DeviceTag, T, N>().get(jaggedTensor);
+    if constexpr (DeviceTag == torch::kCUDA) {
+        return jaggedTensor.packed_accessor32<T, N, torch::RestrictPtrTraits>();
+    } else {
+        return jaggedTensor.accessor<T, N>();
+    }
 }
 
 /// @brief Run the given function on each leaf in the grid batch in parallel on the GPU.
