@@ -10,6 +10,8 @@
 #include <torch/custom_class.h>
 #include <torch/extension.h>
 
+#include <optional>
+
 namespace fvdb {
 
 struct JaggedTensorIndex;
@@ -287,35 +289,31 @@ class JaggedTensor : public torch::CustomClassHolder {
     }
 
     /// @brief Get the number of elements in each tensor indexed by this JaggedTensor. Assumes the
-    /// JaggedTensor has ldim() == 1
-    ///        i.e. it represents a list of tensors
+    /// JaggedTensor has ldim() == 1 i.e. it represents a list of tensors
     /// @return The number of elements in each tensor indexed by this JaggedTensor
     std::vector<int64_t> lsizes1() const;
 
     /// @brief Get the number of elements in each tensor indexed by this JaggedTensor. Assumes
-    /// JaggedTensor has ldim() == 2
-    ///        i.e. it represents a list of lists of tensors
+    /// JaggedTensor has ldim() == 2 i.e. it represents a list of lists of tensors
     /// @return The number of elements in each tensor indexed by this JaggedTensor such that
-    /// lsizes2()[i][j] is the number of elements
-    ///         in the j-th tensor in i-th list
+    /// lsizes2()[i][j] is the number of elements in the j-th tensor in i-th list
     std::vector<std::vector<int64_t>> lsizes2() const;
 
     /// @brief Get the number of nested lists encoded by this JaggedTensor. An ldim of one means
-    /// this JaggedTensor encodes a list
-    //         of tensors, an ldim of 2 means this JaggedTensor encodes a list of lists of tensors,
-    //         etc.
+    /// this JaggedTensor encodes a list of tensors, an ldim of 2 means this JaggedTensor
+    //  encodes a list of lists of tensors, etc.
     /// @return The number of nested lists encoded by this JaggedTensor
     int64_t ldim() const;
 
     /// @brief Get the size of each element indexed by this JaggedTensor. i.e. if the JaggedTensor
-    /// represents a list of tensors
-    ///        where each tensor has shape [N, A, B, C], then esizes() will return [A, B, C]
+    /// represents a list of tensors where each tensor has shape [N_i, A, B, C], then esizes() will
+    //  return [A, B, C]
     /// @return The size of each element indexed by this JaggedTensor
     std::vector<int64_t> esizes() const;
 
     /// @brief Get the number of dimensions of each element indexed by this JaggedTensor. i.e. if
-    /// the JaggedTensor represents a list of tensors
-    ///        where each tensor has shape [N, A, B, C], then edim() will return 3
+    /// the JaggedTensor represents a list of tensors where each tensor has shape [N_i, A, B, C],
+    // then edim() will return 3
     /// @return The number of dimensions of each element indexed by this JaggedTensor
     int64_t edim() const;
 
@@ -409,6 +407,18 @@ class JaggedTensor : public torch::CustomClassHolder {
     /// @param keepdim Whether to keep the max dimension
     /// @return Maximum value of size (batch_size, *) and argmax of size (batch_size, *)
     std::vector<JaggedTensor> jmax(int64_t dim = 0, bool keepdim = false) const;
+
+    /// @brief Squeeze each tensor in the JaggedTensor. i.e. if this JaggedTensor represents a list
+    ///        of tensors with shape [N_i, 1, B, C] then jsqueeze() will return a JaggedTensor with
+    ///        where each tensor has shape [N_i, B, C].
+    ///        i.e. if this JaggedTensor is a list of tensors [t1, t2, t3], then:
+    ///        jsqueeze(dim) will return a JaggedTensor
+    ///        [t1.squeeze(dim), t2.squeeze(dim), t3.squeeze(dim)]
+    /// @param dim The dimension to squeeze. None to squeeze all dimensions of size 1
+    /// @return A JaggedTensor with the squeezed tensors
+    /// @note This function creates a view over the original JaggedTensor so modifying the
+    ///       returned JaggedTensor will modify the original tensor.
+    JaggedTensor jsqueeze(std::optional<int64_t> dim = std::nullopt) const;
 
     // Operators on raw data
     inline int64_t

@@ -86,6 +86,182 @@ class TestJaggedTensor(unittest.TestCase):
             assert False, "jagged tensor ldim should be 1 or 2"
 
     @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_noop(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor(tensor_list)
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_noop_list_of_lists(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor([tensor_list, tensor_list])
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_empty_list(self, device, dtype):
+        tensor_list = [torch.rand(0, 1, 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor(tensor_list)
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_empty_list_of_lists(self, device, dtype):
+        tensor_list = [torch.rand(0, 1, 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor([tensor_list, tensor_list])
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_simple(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor(tensor_list)
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_simple_list_of_lists(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(7)]
+        jt = fvdb.JaggedTensor([tensor_list, tensor_list])
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_empty_tensors(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+
+        jt = fvdb.JaggedTensor(tensor_list)
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
+    def test_jsqueeze_empty_tensors_list_of_lists(self, device, dtype):
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list += [torch.empty(0, 1, 3, device=device, dtype=dtype) for _ in range(4)]
+        tensor_list = [torch.rand(100 + np.random.randint(10), 1, 3, device=device, dtype=dtype) for _ in range(3)]
+
+        jt = fvdb.JaggedTensor([tensor_list, tensor_list])
+
+        jt_squeezed = jt.jsqueeze()
+
+        self.assertEqual(jt_squeezed.lshape, jt.lshape)
+        self.assertNotEqual(jt_squeezed.jdata.shape, jt.jdata.shape)
+        self.assertTrue(torch.equal(jt_squeezed.jdata.unsqueeze(1), jt.jdata))
+        self.assertTrue(torch.equal(jt_squeezed.jdata, jt.jdata.squeeze()))
+        self.assertTrue(torch.equal(jt_squeezed.joffsets, jt.joffsets))
+        self.assertTrue(torch.equal(jt_squeezed.jidx, jt.jidx))
+        self.assertEqual(jt_squeezed.joffsets.shape, jt.joffsets.shape)
+        self.assertEqual(jt_squeezed.jidx.shape, jt.jidx.shape)
+        self.assertEqual(jt_squeezed.device, jt.device)
+        self.assertEqual(jt_squeezed.dtype, jt.dtype)
+        self.assertEqual(jt_squeezed.ldim, jt.ldim)
+        self.assertNotEqual(jt_squeezed.eshape, jt.eshape)
+
+    @parameterized.expand(all_device_dtype_combos)
     def test_jcat_along_dim_0_with_one_tensor(self, device, dtype):
         batch_size = 1
 

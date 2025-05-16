@@ -9,6 +9,8 @@
 #include <detail/ops/jagged/JaggedOps.h>
 #include <detail/utils/Utils.h>
 
+#include <optional>
+
 namespace fvdb {
 
 void
@@ -727,6 +729,15 @@ JaggedTensor::jmin(int64_t dim, bool keepdim) const {
         torch::Tensor minIndices = std::get<1>(minTuple);
         return { jagged_like(minVals), jagged_like(minIndices) };
     }
+}
+
+JaggedTensor
+JaggedTensor::jsqueeze(std::optional<int64_t> dim) const {
+    torch::Tensor jdataSqueezed = dim.has_value() ? mData.squeeze(dim.value()) : mData.squeeze();
+    if (jdataSqueezed.dim() == 0) {
+        jdataSqueezed = jdataSqueezed.unsqueeze(0);
+    }
+    return jagged_like(jdataSqueezed);
 }
 
 std::vector<JaggedTensor>
