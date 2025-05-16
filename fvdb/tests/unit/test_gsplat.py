@@ -54,17 +54,13 @@ class TestGaussianRender(unittest.TestCase):
         scales = torch.from_numpy(data["scales"]).float().to(self.device)
         opacities = torch.from_numpy(data["opacities"]).float().to(self.device)
         colors = torch.from_numpy(data["colors"]).float().to(self.device)
-        self.cam_to_world_mats = (
-            torch.from_numpy(data["viewmats"]).float().to(self.device)
-        )
+        self.cam_to_world_mats = torch.from_numpy(data["viewmats"]).float().to(self.device)
         self.projection_mats = torch.from_numpy(data["Ks"]).float().to(self.device)
         self.width = data["width"].item()
         self.height = data["height"].item()
 
         self.sh_degree = 3
-        sh_coeffs = torch.zeros(
-            (means.shape[0], (self.sh_degree + 1) ** 2, 3), device=self.device
-        )
+        sh_coeffs = torch.zeros((means.shape[0], (self.sh_degree + 1) ** 2, 3), device=self.device)
         sh_coeffs[:, 0, :] = rgb_to_sh(colors)
         sh_0 = sh_coeffs[:, 0, :].unsqueeze(1).clone()
         sh_n = sh_coeffs[:, 1:, :].clone()
@@ -80,9 +76,7 @@ class TestGaussianRender(unittest.TestCase):
         )
 
         nan_mean = means.clone()
-        nan_mean[0] = torch.tensor(
-            [float("nan"), float("nan"), float("nan")], device=self.device
-        )
+        nan_mean[0] = torch.tensor([float("nan"), float("nan"), float("nan")], device=self.device)
         self.nan_gs3d = GaussianSplat3d(
             means=nan_mean,
             quats=quats,
@@ -118,34 +112,22 @@ class TestGaussianRender(unittest.TestCase):
             torch.save(conics, "regression_conics.pt")
 
         # Regression test
-        test_radii = torch.load(
-            self.data_path / "regression_radii.pt", weights_only=True
-        )
-        test_means2d = torch.load(
-            self.data_path / "regression_means2d.pt", weights_only=True
-        )
-        test_depths = torch.load(
-            self.data_path / "regression_depths.pt", weights_only=True
-        )
-        test_conics = torch.load(
-            self.data_path / "regression_conics.pt", weights_only=True
-        )
+        test_radii = torch.load(self.data_path / "regression_radii.pt", weights_only=True)
+        test_means2d = torch.load(self.data_path / "regression_means2d.pt", weights_only=True)
+        test_depths = torch.load(self.data_path / "regression_depths.pt", weights_only=True)
+        test_conics = torch.load(self.data_path / "regression_conics.pt", weights_only=True)
 
         torch.testing.assert_close(radii, test_radii)
         torch.testing.assert_close(means2d[radii > 0], test_means2d[radii > 0])
         torch.testing.assert_close(depths[radii > 0], test_depths[radii > 0])
-        torch.testing.assert_close(
-            conics[radii > 0], test_conics[radii > 0], atol=1e-5, rtol=1e-4
-        )
+        torch.testing.assert_close(conics[radii > 0], test_conics[radii > 0], atol=1e-5, rtol=1e-4)
 
     def _tensors_to_pixel(self, colors, alphas):
         canvas = (
             torch.cat(
                 [
                     colors.reshape(self.num_cameras * self.height, self.width, 3),
-                    alphas.reshape(
-                        self.num_cameras * self.height, self.width, 1
-                    ).expand(-1, -1, 3),
+                    alphas.reshape(self.num_cameras * self.height, self.width, 1).expand(-1, -1, 3),
                 ],
                 dim=1,
             )
@@ -181,9 +163,7 @@ class TestGaussianRender(unittest.TestCase):
         self.assertTrue(torch.allclose(means_loaded, gs3d_without_nan.means))
 
         scales_loaded = torch.from_numpy(
-            np.stack(
-                [attribs["scale_0"], attribs["scale_1"], attribs["scale_2"]], axis=-1
-            )
+            np.stack([attribs["scale_0"], attribs["scale_1"], attribs["scale_2"]], axis=-1)
         ).to(self.device)
         self.assertTrue(torch.allclose(scales_loaded, gs3d_without_nan.log_scales))
 
@@ -201,19 +181,13 @@ class TestGaussianRender(unittest.TestCase):
         self.assertTrue(torch.allclose(quats_loaded, gs3d_without_nan.quats))
 
         opacities_loaded = torch.from_numpy(attribs["opacity"]).to(self.device)
-        self.assertTrue(
-            torch.allclose(opacities_loaded, gs3d_without_nan.logit_opacities)
-        )
+        self.assertTrue(torch.allclose(opacities_loaded, gs3d_without_nan.logit_opacities))
 
         sh0_loaded = (
-            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1))
-            .to(self.device)
-            .unsqueeze(1)
+            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1)).to(self.device).unsqueeze(1)
         )
         self.assertTrue(torch.allclose(sh0_loaded, gs3d_without_nan.sh0))
-        shN_loaded = torch.from_numpy(
-            np.stack([attribs[f"f_rest_{i}"] for i in range(45)], axis=1)
-        ).to(self.device)
+        shN_loaded = torch.from_numpy(np.stack([attribs[f"f_rest_{i}"] for i in range(45)], axis=1)).to(self.device)
         shN_loaded = shN_loaded.view(gs3d_without_nan.num_gaussians, 15, 3)
         self.assertTrue(torch.allclose(shN_loaded, gs3d_without_nan.shN))
 
@@ -228,9 +202,7 @@ class TestGaussianRender(unittest.TestCase):
         self.assertTrue(torch.allclose(means_loaded, self.gs3d.means))
 
         scales_loaded = torch.from_numpy(
-            np.stack(
-                [attribs["scale_0"], attribs["scale_1"], attribs["scale_2"]], axis=-1
-            )
+            np.stack([attribs["scale_0"], attribs["scale_1"], attribs["scale_2"]], axis=-1)
         ).to(self.device)
         self.assertTrue(torch.allclose(scales_loaded, self.gs3d.log_scales))
 
@@ -251,15 +223,11 @@ class TestGaussianRender(unittest.TestCase):
         self.assertTrue(torch.allclose(opacities_loaded, self.gs3d.logit_opacities))
 
         sh0_loaded = (
-            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1))
-            .to(self.device)
-            .unsqueeze(1)
+            torch.from_numpy(np.stack([attribs[f"f_dc_{i}"] for i in range(3)], axis=1)).to(self.device).unsqueeze(1)
         )
         self.assertTrue(torch.allclose(sh0_loaded, self.gs3d.sh0))
         print(sorted(attribs.keys()))
-        shN_loaded = torch.from_numpy(
-            np.stack([attribs[f"f_rest_{i}"] for i in range(45)], axis=1)
-        ).to(self.device)
+        shN_loaded = torch.from_numpy(np.stack([attribs[f"f_rest_{i}"] for i in range(45)], axis=1)).to(self.device)
         shN_loaded = shN_loaded.view(self.gs3d.num_gaussians, 15, 3)
         self.assertTrue(torch.allclose(shN_loaded, self.gs3d.shN))
 
@@ -274,9 +242,7 @@ class TestGaussianRender(unittest.TestCase):
         )
 
         pixels = self._tensors_to_pixel(render_colors, render_alphas)
-        differ, cmp = compare_images(
-            pixels, str(self.data_path / "regression_gaussian_render_result.png")
-        )
+        differ, cmp = compare_images(pixels, str(self.data_path / "regression_gaussian_render_result.png"))
 
         if self.save_image_data:
             imageio.imsave(self.data_path / "output_gaussian_render.png", pixels)
@@ -294,20 +260,14 @@ class TestGaussianRender(unittest.TestCase):
         jt_means = JaggedTensor([self.gs3d.means, self.gs3d.means]).to(self.device)
         jt_quats = JaggedTensor([self.gs3d.quats, self.gs3d.quats]).to(self.device)
         jt_scales = JaggedTensor([self.gs3d.scales, self.gs3d.scales]).to(self.device)
-        jt_opacities = JaggedTensor([self.gs3d.opacities, self.gs3d.opacities]).to(
-            self.device
-        )
+        jt_opacities = JaggedTensor([self.gs3d.opacities, self.gs3d.opacities]).to(self.device)
 
         sh_coeffs = torch.cat([self.gs3d.sh0, self.gs3d.shN], dim=1)  # [N, K, 3]
         jt_sh_coeffs = JaggedTensor([sh_coeffs, sh_coeffs]).to(self.device)
 
         # The first scene renders to 2 views and the second scene renders to a single view
-        jt_viewmats = JaggedTensor(
-            [self.cam_to_world_mats[:2], self.cam_to_world_mats[2:]]
-        ).to(self.device)
-        jt_Ks = JaggedTensor([self.projection_mats[:2], self.projection_mats[2:]]).to(
-            self.device
-        )
+        jt_viewmats = JaggedTensor([self.cam_to_world_mats[:2], self.cam_to_world_mats[2:]]).to(self.device)
+        jt_Ks = JaggedTensor([self.projection_mats[:2], self.projection_mats[2:]]).to(self.device)
 
         # g_sizes = means.joffsets[1:] - means.joffsets[:-1]
         # c_sizes = Ks.joffsets[1:] - Ks.joffsets[:-1]
@@ -346,9 +306,7 @@ class TestGaussianRender(unittest.TestCase):
         torch.cuda.synchronize()
 
         pixels = self._tensors_to_pixel(render_colors, render_alphas)
-        differ, cmp = compare_images(
-            pixels, str(self.data_path / "regression_gaussian_render_jagged_result.png")
-        )
+        differ, cmp = compare_images(pixels, str(self.data_path / "regression_gaussian_render_jagged_result.png"))
 
         if self.save_image_data:
             imageio.imsave(self.data_path / "output_gaussian_render_jagged.png", pixels)
