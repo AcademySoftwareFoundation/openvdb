@@ -72,11 +72,17 @@ namespace _private {
 
 template <typename GridType, typename Func, typename... Args>
 __global__ void
-forEachLeafCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid, int32_t channelsPerLeaf,
-                      Func func, Args... args) {
+forEachLeafCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid,
+                      const bool returnIfOutOfRange, const int32_t channelsPerLeaf, Func func,
+                      Args... args) {
     const uint64_t leafChannelIdx = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     if (leafChannelIdx >= static_cast<uint64_t>(grid.totalLeaves()) * channelsPerLeaf) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(-1, -1, -1, grid, args...);
+            return;
+        }
     }
 
     const int64_t cumLeafIdx = static_cast<int64_t>(leafChannelIdx / channelsPerLeaf);
@@ -91,12 +97,18 @@ forEachLeafCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid, int3
 template <typename GridType, typename Func, typename... Args>
 __global__ void
 forEachLeafSingleGridCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> batchAccessor,
-                                int32_t channelsPerLeaf, int32_t bidx, Func func, Args... args) {
+                                const bool returnIfOutOfRange, const int32_t channelsPerLeaf,
+                                const int32_t bidx, Func func, Args... args) {
     const typename nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
 
     const uint64_t leafChannelIdx = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     if (leafChannelIdx >= static_cast<uint64_t>(gpuGrid->tree().nodeCount(0)) * channelsPerLeaf) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(gpuGrid, -1, -1, args...);
+            return;
+        }
     }
 
     const int64_t leafIdx    = static_cast<int64_t>(leafChannelIdx / channelsPerLeaf);
@@ -140,12 +152,17 @@ voxelMetaIndexCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> gridAcc
 template <typename GridType, typename Func, typename... Args>
 __global__ void
 forEachVoxelWithMetaCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid,
-                               TorchRAcc32<int64_t, 2> metaIndex, int64_t channelsPerVoxel,
-                               Func func, Args... args) {
+                               TorchRAcc32<int64_t, 2> metaIndex, const bool returnIfOutOfRange,
+                               const int64_t channelsPerVoxel, Func func, Args... args) {
     const int64_t vcIdx = ((int64_t)blockIdx.x * (int64_t)blockDim.x) + threadIdx.x;
 
     if (vcIdx >= grid.totalVoxels() * channelsPerVoxel) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(-1, -1, -1, -1, grid, args...);
+            return;
+        }
     }
 
     const int64_t voxelIdx   = vcIdx / channelsPerVoxel;
@@ -161,14 +178,20 @@ forEachVoxelWithMetaCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> g
 template <typename GridType, typename Func, typename... Args>
 __global__ void
 forEachVoxelCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid,
-                       int64_t channelsPerVoxel, Func func, Args... args) {
+                       const bool returnIfOutOfRange, const int64_t channelsPerVoxel, Func func,
+                       Args... args) {
     constexpr uint64_t VOXELS_PER_LEAF =
         nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType::NUM_VALUES;
     const uint64_t lvcIdx = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     const uint64_t voxelsChannelsPerLeaf = VOXELS_PER_LEAF * channelsPerVoxel;
 
     if (lvcIdx >= static_cast<uint64_t>(grid.totalLeaves()) * voxelsChannelsPerLeaf) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(-1, -1, -1, -1, grid, args...);
+            return;
+        }
     }
 
     const int64_t cumLeafIdx = static_cast<int64_t>(lvcIdx / voxelsChannelsPerLeaf);
@@ -187,11 +210,18 @@ template <int32_t NDIMS, typename ScalarT, typename Func, typename... Args>
 __global__ void
 __launch_bounds__(1024)
     forEachJaggedElementChannelCUDAKernel(JaggedRAcc32<ScalarT, NDIMS> jaggedAcc,
-                                          int64_t channelsPerElement, Func func, Args... args) {
+                                          const bool                   returnIfOutOfRange,
+                                          const int64_t channelsPerElement, Func func,
+                                          Args... args) {
     const uint64_t idx         = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     const int64_t  numElements = jaggedAcc.elementCount();
     if (idx >= static_cast<uint64_t>(numElements) * channelsPerElement) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(-1, -1, -1, jaggedAcc, args...);
+            return;
+        }
     }
     const int64_t        elementIdx = static_cast<int64_t>(idx / channelsPerElement);
     const fvdb::JIdxType batchIdx   = jaggedAcc.batchIdx(elementIdx);
@@ -203,11 +233,17 @@ __launch_bounds__(1024)
 template <int32_t NDIMS, typename ScalarT, typename Func, typename... Args>
 __global__ void
 forEachTensorElementChannelCUDAKernel(TorchRAcc32<ScalarT, NDIMS> tensorAcc,
-                                      int64_t channelsPerElement, Func func, Args... args) {
+                                      const bool                  returnIfOutOfRange,
+                                      const int64_t channelsPerElement, Func func, Args... args) {
     const uint64_t idx         = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     const int64_t  numElements = tensorAcc.size(0);
     if (idx >= static_cast<uint64_t>(numElements) * channelsPerElement) {
-        return;
+        if (returnIfOutOfRange) {
+            return;
+        } else {
+            func(-1, -1, tensorAcc, args...);
+            return;
+        }
     }
     const int64_t elementIdx = static_cast<int64_t>(idx / channelsPerElement);
     const int64_t channelIdx = static_cast<int64_t>(idx % channelsPerElement);
@@ -341,6 +377,8 @@ jaggedAccessor(const fvdb::JaggedTensor &jaggedTensor) {
 ///         Args...)
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
 /// @param numThreads The number of threads per block to use
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchHdl A batch of index grids
@@ -348,7 +386,8 @@ jaggedAccessor(const fvdb::JaggedTensor &jaggedTensor) {
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 void
-forEachLeafCUDA(int64_t numThreads, int64_t numChannels,
+forEachLeafCUDA(const at::cuda::CUDAStream &stream, const size_t sharedMemBytes,
+                const bool returnIfOutOfRange, const int64_t numThreads, const int64_t numChannels,
                 const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
     TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
     TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
@@ -356,11 +395,30 @@ forEachLeafCUDA(int64_t numThreads, int64_t numChannels,
     const int64_t        numBlocks = GET_BLOCKS(batchHdl.totalLeaves() * numChannels, numThreads);
     TORCH_INTERNAL_ASSERT(numBlocks < (int64_t)(4294967295), "Too many blocks");
     if (numBlocks > 0) {
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(_private::forEachLeafCUDAKernel<GridType, Func, Args...>,
+                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                     sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachLeafCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
         auto batchAccessor = batchHdl.deviceAccessor<GridType>();
-        _private::forEachLeafCUDAKernel<<<numBlocks, numThreads>>>(batchAccessor, numChannels, func,
-                                                                   args...);
+        _private::forEachLeafCUDAKernel<<<numBlocks, numThreads, sharedMemBytes, stream>>>(
+            batchAccessor, returnIfOutOfRange, numChannels, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+}
+template <typename GridType, typename Func, typename... Args>
+void
+forEachLeafCUDA(const int64_t numThreads, const int64_t numChannels,
+                const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
+    TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
+    TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(batchHdl.device().index());
+    return forEachLeafCUDA<GridType, Func, Args...>(stream, 0, true, numThreads, numChannels,
+                                                    batchHdl, func, args...);
 }
 
 /// @brief Run the given function on each leaf in the specified grid (at index batchIdx) in the
@@ -375,6 +433,11 @@ forEachLeafCUDA(int64_t numThreads, int64_t numChannels,
 /// @tparam Func The type of the callback function to run on each leaf.
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
+/// @param returnIfOutOfRange Whether to skip the callback if the element is out of range. If false,
+///                           the callback will be run with -1 for the batchIdx, leafIdx, and
+///                           channelIdx
 /// @param numThreads The number of threads per block to use
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchIdx The index of the grid in the batch to run the callback on
@@ -383,7 +446,9 @@ forEachLeafCUDA(int64_t numThreads, int64_t numChannels,
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 void
-forEachLeafInOneGridCUDA(int64_t numThreads, int64_t numChannels, int64_t batchIdx,
+forEachLeafInOneGridCUDA(const at::cuda::CUDAStream &stream, const size_t sharedMemBytes,
+                         const bool returnIfOutOfRange, const int64_t numThreads,
+                         const int64_t numChannels, const int64_t batchIdx,
                          const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
     TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
     TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
@@ -392,11 +457,32 @@ forEachLeafInOneGridCUDA(int64_t numThreads, int64_t numChannels, int64_t batchI
     const int64_t numBlocks = GET_BLOCKS(batchHdl.numLeaves(batchIdx) * numChannels, numThreads);
     TORCH_INTERNAL_ASSERT(numBlocks < (int64_t)(4294967295), "Too many blocks");
     if (numBlocks > 0) {
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(
+                    _private::forEachLeafSingleGridCUDAKernel<GridType, Func, Args...>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachLeafSingleGridCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
         auto batchAccessor = batchHdl.deviceAccessor<GridType>();
-        _private::forEachLeafSingleGridCUDAKernel<<<numBlocks, numThreads>>>(
-            batchAccessor, numChannels, batchIdx, func, args...);
+        _private::
+            forEachLeafSingleGridCUDAKernel<<<numBlocks, numThreads, sharedMemBytes, stream>>>(
+                batchAccessor, returnIfOutOfRange, numChannels, batchIdx, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+}
+template <typename GridType, typename Func, typename... Args>
+void
+forEachLeafInOneGridCUDA(const int64_t numThreads, const int64_t numChannels,
+                         const int64_t batchIdx, const fvdb::detail::GridBatchImpl &batchHdl,
+                         Func func, Args... args) {
+    TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
+    TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(batchHdl.device().index());
+    return forEachLeafInOneGridCUDA<GridType, Func, Args...>(
+        stream, 0, true, numThreads, numChannels, batchIdx, batchHdl, func, args...);
 }
 
 /// @brief Run the given function on each voxel in the grid batch in parallel on the GPU.
@@ -419,6 +505,11 @@ forEachLeafInOneGridCUDA(int64_t numThreads, int64_t numChannels, int64_t batchI
 ///         fvdb::detail::GridBatchImpl::Accessor<GridType>, Args...)
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
+/// @param returnIfOutOfRange Whether to skip the callback if the element is out of range. If false,
+///                           the callback will be run with -1 for the batchIdx, leafIdx, voxelIdx,
+///                           and channelIdx
 /// @param numThreads The number of threads per block to use
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchHdl A batch of index grids
@@ -426,7 +517,8 @@ forEachLeafInOneGridCUDA(int64_t numThreads, int64_t numChannels, int64_t batchI
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 void
-forEachVoxelCUDA(int64_t numThreads, int64_t numChannels,
+forEachVoxelCUDA(const at::cuda::CUDAStream &stream, const size_t sharedMemBytes,
+                 const bool returnIfOutOfRange, const int64_t numThreads, const int64_t numChannels,
                  const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
     TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
     TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
@@ -447,14 +539,24 @@ forEachVoxelCUDA(int64_t numThreads, int64_t numChannels,
         auto metaIndexAcc = metaIndex.packed_accessor32<int64_t, 2, torch::RestrictPtrTraits>();
 
         const int64_t numMetaBlocks = GET_BLOCKS(numLeaves * VOXELS_PER_LEAF, 128);
-        _private::voxelMetaIndexCUDAKernel<<<numMetaBlocks, 128>>>(batchAccessor, metaIndexAcc);
+        _private::voxelMetaIndexCUDAKernel<<<numMetaBlocks, 128, 0, stream>>>(batchAccessor,
+                                                                              metaIndexAcc);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(
+                    _private::forEachVoxelWithMetaCUDAKernel<GridType, Func, Args...>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachVoxelWithMetaCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
         const int64_t numBlocks = GET_BLOCKS(numVoxels * numChannels, numThreads);
         TORCH_INTERNAL_ASSERT(numBlocks < (int64_t)(4294967295),
                               "Too many blocks in forEachVoxelCUDA");
-        _private::forEachVoxelWithMetaCUDAKernel<<<numBlocks, numThreads>>>(
-            batchAccessor, metaIndexAcc, numChannels, func, args...);
+        _private::forEachVoxelWithMetaCUDAKernel<<<numBlocks, numThreads, sharedMemBytes, stream>>>(
+            batchAccessor, metaIndexAcc, returnIfOutOfRange, numChannels, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     } else {
@@ -462,10 +564,29 @@ forEachVoxelCUDA(int64_t numThreads, int64_t numChannels,
         TORCH_INTERNAL_ASSERT(numBlocks < (int64_t)(4294967295),
                               "Too many blocks in forEachVoxelCUDA");
 
-        _private::forEachVoxelCUDAKernel<<<numBlocks, numThreads>>>(batchAccessor, numChannels,
-                                                                    func, args...);
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(_private::forEachVoxelCUDAKernel<GridType, Func, Args...>,
+                                     cudaFuncAttributeMaxDynamicSharedMemorySize,
+                                     sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachVoxelCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
+        _private::forEachVoxelCUDAKernel<<<numBlocks, numThreads, sharedMemBytes, stream>>>(
+            batchAccessor, returnIfOutOfRange, numChannels, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+}
+template <typename GridType, typename Func, typename... Args>
+void
+forEachVoxelCUDA(const int64_t numThreads, const int64_t numChannels,
+                 const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
+    TORCH_CHECK(batchHdl.device().is_cuda(), "Grid batch must be on a CUDA device");
+    TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(batchHdl.device().index());
+    return forEachVoxelCUDA<GridType, Func, Args...>(stream, 0, true, numThreads, numChannels,
+                                                     batchHdl, func, args...);
 }
 
 /// @brief Run the given function on each leaf in the grid batch on the CPU.
@@ -483,6 +604,8 @@ forEachVoxelCUDA(int64_t numThreads, int64_t numChannels,
 ///         Args...)
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchHdl A batch of index grids
 /// @param func The callback function to run on each leaf
@@ -519,6 +642,8 @@ forEachLeafCPU(int64_t channelsPerLeaf, const fvdb::detail::GridBatchImpl &batch
 /// @tparam Func The type of the callback function to run on each leaf.
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
 /// @param numThreads The number of threads per block to use
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchIdx The index of the grid in the batch to run the callback on
@@ -565,6 +690,8 @@ forEachLeafInOneGridCPU(int64_t numChannels, int64_t batchIdx,
 ///         fvdb::detail::GridBatchImpl::Accessor<GridType>, Args...)
 /// @tparam Args... The types of any extra arguments to pass to the callback function
 ///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
 /// @param numChannels The number of channels per item in each leaf being parallelized over
 /// @param batchHdl A batch of index grids
 /// @param func The callback function to run on each leaf
@@ -606,6 +733,12 @@ forEachVoxelCPU(int64_t numChannels, const fvdb::detail::GridBatchImpl &batchHdl
 /// @tparam Func The type of the callback function
 /// @tparam ...Args The types of any extra arguments to pass to the callback function
 /// @tparam NDIMS The number of data dimensions in the jagged tensor
+///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
+/// @param returnIfOutOfRange Whether to skip the callback if the element is out of range. If false,
+///                           the callback will be called with -1 for the batchIdx, elementIdx, and
+///                           channelIdx
 /// @param numThreads The number of threads to use per block
 /// @param numChannels The number of channels per item in each jagged element being parallelized
 /// over
@@ -614,20 +747,41 @@ forEachVoxelCPU(int64_t numChannels, const fvdb::detail::GridBatchImpl &batchHdl
 /// @param ...args Any extra arguments to pass to the callback function
 template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
 void
-forEachJaggedElementChannelCUDA(int64_t numThreads, int64_t numChannels,
-                                const JaggedTensor &jaggedTensor, Func func, Args... args) {
+forEachJaggedElementChannelCUDA(const at::cuda::CUDAStream &stream, const size_t sharedMemBytes,
+                                const bool returnIfOutOfRange, const int64_t numThreads,
+                                const int64_t numChannels, const JaggedTensor &jaggedTensor,
+                                Func func, Args... args) {
     TORCH_CHECK(jaggedTensor.device().is_cuda(), "JaggedTensor must be on a CUDA device");
     TORCH_CHECK(jaggedTensor.device().has_index(), "JaggedTensor device must have an index");
     c10::cuda::CUDAGuard deviceGuard(jaggedTensor.device());
     const int64_t        numElements = jaggedTensor.element_count();
     const int64_t        numBlocks   = GET_BLOCKS(numElements * numChannels, numThreads);
     if (numBlocks > 0) {
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(
+                    _private::forEachJaggedElementChannelCUDAKernel<NDIMS, ScalarT, Func, Args...>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachJaggedElementChannelCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
         _private::forEachJaggedElementChannelCUDAKernel<NDIMS, ScalarT, Func, Args...>
-            <<<numBlocks, numThreads>>>(
+            <<<numBlocks, numThreads, sharedMemBytes, stream>>>(
                 jaggedTensor.packed_accessor32<ScalarT, NDIMS, torch::RestrictPtrTraits>(),
-                numChannels, func, args...);
+                returnIfOutOfRange, numChannels, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+}
+template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
+void
+forEachJaggedElementChannelCUDA(const int64_t numThreads, const int64_t numChannels,
+                                const JaggedTensor &jaggedTensor, Func func, Args... args) {
+    TORCH_CHECK(jaggedTensor.device().is_cuda(), "JaggedTensor must be on a CUDA device");
+    TORCH_CHECK(jaggedTensor.device().has_index(), "JaggedTensor device must have an index");
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(jaggedTensor.device().index());
+    return forEachJaggedElementChannelCUDA<ScalarT, NDIMS, Func, Args...>(
+        stream, 0, true, numThreads, numChannels, jaggedTensor, func, args...);
 }
 
 /// @brief Run the given function on each element in the tensor (first dimension) on the GPU
@@ -642,6 +796,11 @@ forEachJaggedElementChannelCUDA(int64_t numThreads, int64_t numChannels,
 /// @tparam Func The type of the callback function
 /// @tparam ...Args The types of any extra arguments to pass to the callback function
 /// @tparam NDIMS The number of data dimensions in the tensor
+///
+/// @param stream Which cuda stream to run the kernel on
+/// @param sharedMemBytes The amount of shared memory to use for the kernel. If 0, no shared memory
+/// @param returnIfOutOfRange Whether to skip the callback if the element is out of range. If false,
+///                           the callback will be called with -1 for the elementIdx and channelIdx
 /// @param numThreads The number of threads to use per block
 /// @param numChannels The number of channels per item in each tensor element being parallelized
 /// over
@@ -650,20 +809,41 @@ forEachJaggedElementChannelCUDA(int64_t numThreads, int64_t numChannels,
 /// @param ...args Any extra arguments to pass to the callback function
 template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
 void
-forEachTensorElementChannelCUDA(int64_t numThreads, int64_t numChannels,
-                                const torch::Tensor &tensor, Func func, Args... args) {
+forEachTensorElementChannelCUDA(const at::cuda::CUDAStream &stream, const size_t sharedMemBytes,
+                                const bool returnIfOutOfRange, const int64_t numThreads,
+                                const int64_t numChannels, const torch::Tensor &tensor, Func func,
+                                Args... args) {
     TORCH_CHECK(tensor.device().is_cuda(), "Tensor must be on a CUDA device");
     TORCH_CHECK(tensor.device().has_index(), "Tensor device must have an index");
     c10::cuda::CUDAGuard deviceGuard(tensor.device());
     const int64_t        numElements = tensor.size(0);
     const int64_t        numBlocks   = GET_BLOCKS(numElements * numChannels, numThreads);
     if (numBlocks > 0) {
+        if (sharedMemBytes > 0) {
+            if (cudaFuncSetAttribute(
+                    _private::forEachTensorElementChannelCUDAKernel<NDIMS, ScalarT, Func, Args...>,
+                    cudaFuncAttributeMaxDynamicSharedMemorySize, sharedMemBytes) != cudaSuccess) {
+                AT_ERROR(
+                    "Failed to set maximum shared memory size for forEachTensorElementChannelCUDAKernel (requested ",
+                    sharedMemBytes, " bytes), try lowering sharedMemBytes.");
+            }
+        }
         _private::forEachTensorElementChannelCUDAKernel<NDIMS, ScalarT, Func, Args...>
-            <<<numBlocks, numThreads>>>(
-                tensor.packed_accessor32<ScalarT, NDIMS, torch::RestrictPtrTraits>(), numChannels,
-                func, args...);
+            <<<numBlocks, numThreads, sharedMemBytes, stream>>>(
+                tensor.packed_accessor32<ScalarT, NDIMS, torch::RestrictPtrTraits>(),
+                returnIfOutOfRange, numChannels, func, args...);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
+}
+template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
+void
+forEachTensorElementChannelCUDA(const int64_t numThreads, const int64_t numChannels,
+                                const torch::Tensor &tensor, Func func, Args... args) {
+    TORCH_CHECK(tensor.device().is_cuda(), "Tensor must be on a CUDA device");
+    TORCH_CHECK(tensor.device().has_index(), "Tensor device must have an index");
+    at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(tensor.device().index());
+    return forEachTensorElementChannelCUDA<ScalarT, NDIMS, Func, Args...>(
+        stream, 0, true, numThreads, numChannels, tensor, func, args...);
 }
 
 /// @brief Run the given function on each element in the jagged tensor on the CPU
