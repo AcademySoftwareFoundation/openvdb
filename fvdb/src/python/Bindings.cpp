@@ -17,8 +17,8 @@ void bind_gaussian_splat3d(py::module &m);
 #define __FVDB__BUILDER_INNER(FUNC_NAME, FUNC_STR, LSHAPE_TYPE)                               \
     m.def(                                                                                    \
         FUNC_STR,                                                                             \
-        [](const LSHAPE_TYPE &lshape, c10::optional<const std::vector<int64_t>> &rshape,      \
-           c10::optional<torch::ScalarType> dtype, c10::optional<torch::Device> device,       \
+        [](const LSHAPE_TYPE &lshape, std::optional<const std::vector<int64_t>> &rshape,      \
+           std::optional<torch::ScalarType> dtype, std::optional<torch::Device> device,       \
            bool requires_grad, bool pin_memory) {                                             \
             const torch::Device        device_ = device.value_or(torch::kCPU);                \
             const torch::ScalarType    dtype_  = dtype.value_or(torch::kFloat32);             \
@@ -30,13 +30,13 @@ void bind_gaussian_splat3d(py::module &m);
             const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>());     \
             return fvdb::FUNC_NAME(lshape, rshape_, opts);                                    \
         },                                                                                    \
-        py::arg("lshape"), py::arg("rshape") = c10::nullopt, py::arg("dtype") = c10::nullopt, \
-        py::arg("device") = c10::nullopt, py::arg("requires_grad") = false,                   \
+        py::arg("lshape"), py::arg("rshape") = std::nullopt, py::arg("dtype") = std::nullopt, \
+        py::arg("device") = std::nullopt, py::arg("requires_grad") = false,                   \
         py::arg("pin_memory") = false);                                                       \
     m.def(                                                                                    \
         FUNC_STR,                                                                             \
-        [](const LSHAPE_TYPE &lshape, c10::optional<const std::vector<int64_t>> &rshape,      \
-           c10::optional<torch::ScalarType> dtype, c10::optional<std::string> device,         \
+        [](const LSHAPE_TYPE &lshape, std::optional<const std::vector<int64_t>> &rshape,      \
+           std::optional<torch::ScalarType> dtype, std::optional<std::string> device,         \
            bool requires_grad, bool pin_memory) {                                             \
             torch::Device device_(device.value_or("cpu"));                                    \
             if (device_.is_cuda() && !device_.has_index()) {                                  \
@@ -51,8 +51,8 @@ void bind_gaussian_splat3d(py::module &m);
             const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>());     \
             return fvdb::FUNC_NAME(lshape, rshape_, opts);                                    \
         },                                                                                    \
-        py::arg("lshape"), py::arg("rshape") = c10::nullopt, py::arg("dtype") = c10::nullopt, \
-        py::arg("device") = c10::nullopt, py::arg("requires_grad") = false,                   \
+        py::arg("lshape"), py::arg("rshape") = std::nullopt, py::arg("dtype") = std::nullopt, \
+        py::arg("device") = std::nullopt, py::arg("requires_grad") = false,                   \
         py::arg("pin_memory") = false);
 
 #define __FVDB__BUILDER(FUNC_NAME, FUNC_STR)                         \
@@ -195,9 +195,9 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
     /*
               py::overload_cast<const std::vector<int64_t>&,
-                                c10::optional<const std::vector<int64_t>>&,
-                                c10::optional<torch::ScalarType>,
-                                c10::optional<torch::Device>,
+                                std::optional<const std::vector<int64_t>>&,
+                                std::optional<torch::ScalarType>,
+                                std::optional<torch::Device>,
                                 bool, bool>(
     */
     bind_jt_build_functions(m);

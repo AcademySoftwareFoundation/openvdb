@@ -169,17 +169,17 @@ class JaggedTensor : public torch::CustomClassHolder {
     ///            [[torch.cat([a_11, b_11], dim=dim), torch.cat([a_12, b_12], dim=dim)],
     ///             [torch.cat([a_21, b_21], dim=dim)],
     ///             [torch.cat([a_31, b_31], dim=dim), torch.cat([a_32, b_32], dim=dim)]]
-    ///        2. If dim is c10::nullopt:
+    ///        2. If dim is std::nullopt:
     ///            e.g. if [jt_a, jt_b] are two JaggedTensors of the form
     ///            jt_a = [[a_11, a_12], [a_21], [a_31, a_32]] and jt_b = [[b_11], [b_21, b_22]],
     ///            then JaggedTensor::jcat({jt_a, jt_b}) will return a JaggedTensor of the form
     ///            [[a_11, a_12], [a_21], [a_31, a_32], [b_11], [b_21, b_22]]
     /// @param vec A vector of JaggedTensors to concatenate
-    /// @param dim The dimension along which to concatenate each JaggedTensor or c10::nullopt to
+    /// @param dim The dimension along which to concatenate each JaggedTensor or std::nullopt to
     /// concatenate
     ///            the JaggedTensors as lists
     /// @return A JaggedTensor containing the concatenated data
-    static JaggedTensor jcat(const std::vector<JaggedTensor> &vec, c10::optional<int64_t> dim);
+    static JaggedTensor jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dim);
 
     /// @brief Create an empty JaggedTensor
     JaggedTensor() {
@@ -552,52 +552,19 @@ class JaggedTensor : public torch::CustomClassHolder {
             mListIdx.contiguous(), mNumOuterLists);
     }
 
-    inline JaggedTensor
-    to(at::TensorOptions options = {}, bool non_blocking = false, bool copy = false,
-       c10::optional<at::MemoryFormat> memory_format = c10::nullopt) const {
-        JaggedTensor ret = *this;
-        ret.mData        = ret.mData.to(options, non_blocking, copy, memory_format);
-        ret.mBatchIdx    = ret.mBatchIdx.to(ret.mData.device(), non_blocking, copy, memory_format);
-        ret.mOffsets     = ret.mOffsets.to(ret.mData.device(), non_blocking, copy, memory_format);
-        ret.mListIdx     = ret.mListIdx.to(ret.mData.device(), non_blocking, copy, memory_format);
-        return ret;
-    }
+    JaggedTensor to(at::TensorOptions options = {}, bool non_blocking = false, bool copy = false,
+                    std::optional<at::MemoryFormat> memory_format = std::nullopt) const;
 
-    inline JaggedTensor
-    to(c10::optional<torch::ScalarType> dtype, c10::optional<at::Layout> layout,
-       c10::optional<at::Device> device, c10::optional<bool> pin_memory, bool non_blocking,
-       bool copy, c10::optional<at::MemoryFormat> memory_format) {
-        JaggedTensor ret = *this;
-        ret.mData =
-            ret.mData.to(dtype, layout, device, pin_memory, non_blocking, copy, memory_format);
-        ret.mBatchIdx = ret.mBatchIdx.to(JIdxScalarType, layout, device, pin_memory, non_blocking,
-                                         copy, memory_format);
-        ret.mOffsets = ret.mOffsets.to(JOffsetsScalarType, layout, device, pin_memory, non_blocking,
-                                       copy, memory_format);
-        ret.mListIdx = ret.mListIdx.to(JLIdxScalarType, layout, device, pin_memory, non_blocking,
-                                       copy, memory_format);
-        return ret;
-    }
-    inline JaggedTensor
-    to(torch::Device device, torch::ScalarType dtype, bool non_blocking = false, bool copy = false,
-       c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
-        JaggedTensor ret = *this;
-        ret.mData        = ret.mData.to(device, dtype, non_blocking, copy, memory_format);
-        ret.mBatchIdx    = ret.mBatchIdx.to(device, non_blocking, copy, memory_format);
-        ret.mOffsets     = ret.mOffsets.to(device, non_blocking, copy, memory_format);
-        ret.mListIdx     = ret.mListIdx.to(device, non_blocking, copy, memory_format);
-        return ret;
-    }
-    inline JaggedTensor
-    to(torch::ScalarType dtype, bool non_blocking = false, bool copy = false,
-       c10::optional<at::MemoryFormat> memory_format = c10::nullopt) {
-        JaggedTensor ret = *this;
-        ret.mData        = ret.mData.to(dtype, non_blocking, copy, memory_format);
-        ret.mBatchIdx    = ret.mBatchIdx.to(JIdxScalarType, non_blocking, copy, memory_format);
-        ret.mOffsets     = ret.mOffsets.to(JOffsetsScalarType, non_blocking, copy, memory_format);
-        ret.mListIdx     = ret.mListIdx.to(JLIdxScalarType, non_blocking, copy, memory_format);
-        return ret;
-    }
+    JaggedTensor to(std::optional<torch::ScalarType> dtype, std::optional<at::Layout> layout,
+                    std::optional<at::Device> device, std::optional<bool> pin_memory,
+                    bool non_blocking, bool copy, std::optional<at::MemoryFormat> memory_format);
+
+    JaggedTensor to(torch::Device device, torch::ScalarType dtype, bool non_blocking = false,
+                    bool                            copy          = false,
+                    std::optional<at::MemoryFormat> memory_format = std::nullopt);
+
+    JaggedTensor to(torch::ScalarType dtype, bool non_blocking = false, bool copy = false,
+                    std::optional<at::MemoryFormat> memory_format = std::nullopt);
 
     torch::TensorOptions
     options() const {
@@ -735,7 +702,7 @@ class JaggedTensor : public torch::CustomClassHolder {
 };
 
 struct JaggedTensorIndex {
-    JaggedTensorIndex(c10::nullopt_t) : mType(JaggedTensorIndexType::None) {}
+    JaggedTensorIndex(std::nullopt_t) : mType(JaggedTensorIndexType::None) {}
     JaggedTensorIndex(int64_t integer) : mType(JaggedTensorIndexType::Integer), mInteger(integer) {}
     JaggedTensorIndex(torch::indexing::EllipsisIndexType)
         : mType(JaggedTensorIndexType::Ellipsis) {}

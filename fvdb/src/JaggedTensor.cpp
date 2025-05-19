@@ -779,7 +779,7 @@ JaggedTensor::jmax(int64_t dim, bool keepdim) const {
 }
 
 JaggedTensor
-JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, c10::optional<int64_t> dimension) {
+JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dimension) {
     // Null dimension is just list concatenation
     if (!dimension.has_value()) {
         TORCH_CHECK_VALUE(vec.size() > 0, "Empty jagged tensor list");
@@ -843,6 +843,52 @@ JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, c10::optional<int64_t> 
                 vec[0].mNumOuterLists);
         }
     }
+}
+
+JaggedTensor
+JaggedTensor::to(at::TensorOptions options, bool non_blocking, bool copy,
+                 std::optional<at::MemoryFormat> memory_format) const {
+    JaggedTensor ret = *this;
+    ret.mData        = ret.mData.to(options, non_blocking, copy, memory_format);
+    ret.mBatchIdx    = ret.mBatchIdx.to(ret.mData.device(), non_blocking, copy, memory_format);
+    ret.mOffsets     = ret.mOffsets.to(ret.mData.device(), non_blocking, copy, memory_format);
+    ret.mListIdx     = ret.mListIdx.to(ret.mData.device(), non_blocking, copy, memory_format);
+    return ret;
+}
+
+JaggedTensor
+JaggedTensor::to(std::optional<torch::ScalarType> dtype, std::optional<at::Layout> layout,
+                 std::optional<at::Device> device, std::optional<bool> pin_memory,
+                 bool non_blocking, bool copy, std::optional<at::MemoryFormat> memory_format) {
+    JaggedTensor ret = *this;
+    ret.mData = ret.mData.to(dtype, layout, device, pin_memory, non_blocking, copy, memory_format);
+    ret.mBatchIdx = ret.mBatchIdx.to(JIdxScalarType, layout, device, pin_memory, non_blocking, copy,
+                                     memory_format);
+    ret.mOffsets  = ret.mOffsets.to(JOffsetsScalarType, layout, device, pin_memory, non_blocking,
+                                    copy, memory_format);
+    ret.mListIdx  = ret.mListIdx.to(JLIdxScalarType, layout, device, pin_memory, non_blocking, copy,
+                                    memory_format);
+    return ret;
+}
+JaggedTensor
+JaggedTensor::to(torch::Device device, torch::ScalarType dtype, bool non_blocking, bool copy,
+                 std::optional<at::MemoryFormat> memory_format) {
+    JaggedTensor ret = *this;
+    ret.mData        = ret.mData.to(device, dtype, non_blocking, copy, memory_format);
+    ret.mBatchIdx    = ret.mBatchIdx.to(device, non_blocking, copy, memory_format);
+    ret.mOffsets     = ret.mOffsets.to(device, non_blocking, copy, memory_format);
+    ret.mListIdx     = ret.mListIdx.to(device, non_blocking, copy, memory_format);
+    return ret;
+}
+JaggedTensor
+JaggedTensor::to(torch::ScalarType dtype, bool non_blocking, bool copy,
+                 std::optional<at::MemoryFormat> memory_format) {
+    JaggedTensor ret = *this;
+    ret.mData        = ret.mData.to(dtype, non_blocking, copy, memory_format);
+    ret.mBatchIdx    = ret.mBatchIdx.to(JIdxScalarType, non_blocking, copy, memory_format);
+    ret.mOffsets     = ret.mOffsets.to(JOffsetsScalarType, non_blocking, copy, memory_format);
+    ret.mListIdx     = ret.mListIdx.to(JLIdxScalarType, non_blocking, copy, memory_format);
+    return ret;
 }
 
 JaggedTensor
