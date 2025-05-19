@@ -192,6 +192,9 @@ coordTensorToBatch(const torch::Tensor &coordOrBatch, int64_t batchSize) {
 /// @return The string representation of the scalar type
 inline const std::string
 TorchScalarTypeToStr(torch::ScalarType stype) {
+// An equivalent function is exposed in PyTorch starting from version 2.6
+#if (!defined(TORCH_VERSION_MAJOR) || (TORCH_VERSION_MAJOR < 2) || \
+     (TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR < 6))
     switch (stype) {
     case torch::kInt8:
         return "int8";
@@ -242,6 +245,9 @@ TorchScalarTypeToStr(torch::ScalarType stype) {
         // Byte, Char, Short, Int, Long, Half, Float, Double, ComplexHalf, ComplexFloat,
         // ComplexDouble, Bool, QInt8, QUInt8, QInt32, BFloat16, QUInt4x2, QUInt2x4
     }
+#else
+    return c10::getDtypeNames(stype).first;
+#endif
 }
 
 /// @brief Convert a string representation of a scalar type into a torch::ScalarType (or throw an
@@ -250,6 +256,9 @@ TorchScalarTypeToStr(torch::ScalarType stype) {
 /// @return The torch::ScalarType corresponding to the string
 inline torch::ScalarType
 StringToTorchScalarType(std::string dtypeStr) {
+// An equivalent function is exposed in PyTorch starting from version 2.6
+#if (!defined(TORCH_VERSION_MAJOR) || (TORCH_VERSION_MAJOR < 2) || \
+     (TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR < 6))
     if (dtypeStr == "int8") {
         return torch::kInt8;
     } else if (dtypeStr == "uint8") {
@@ -297,6 +306,9 @@ StringToTorchScalarType(std::string dtypeStr) {
     }
 
     TORCH_CHECK(false, "Invalid dtype string " + dtypeStr);
+#else
+    return c10::getStringToDtypeMap().at(dtypeStr);
+#endif
 }
 
 struct RAIIDeviceGuard {
