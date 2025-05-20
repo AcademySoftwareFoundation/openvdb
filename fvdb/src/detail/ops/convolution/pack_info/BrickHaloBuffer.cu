@@ -3,7 +3,7 @@
 //
 #include "PackInfoOps.h"
 #include <Types.h>
-#include <detail/utils/cuda/Utils.cuh>
+#include <detail/utils/AccessorHelpers.h>
 
 #include <ATen/OpMathType.h>
 #include <c10/cuda/CUDAException.h>

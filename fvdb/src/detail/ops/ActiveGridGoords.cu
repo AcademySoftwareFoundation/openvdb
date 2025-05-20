@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include <detail/utils/cuda/Utils.cuh>
+#include <detail/ops/CountEnabledPerLeaf.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
@@ -109,7 +109,7 @@ GetActiveGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords
     }
 }
 
-/// @brief Get the number of active (or enabled for mutable grids) ijk coordiantes in a batch of
+/// @brief Get the number of active (or enabled for mutable grids) ijk coordinates in a batch of
 /// grids
 /// @tparam DeviceTag Which device to run on
 /// @param gridBatch The batch of grids to get the active coordinates for

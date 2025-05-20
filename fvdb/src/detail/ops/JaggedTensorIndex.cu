@@ -1,6 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include <Config.h>
+#include <detail/utils/AccessorHelpers.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/Utils.cuh>
 

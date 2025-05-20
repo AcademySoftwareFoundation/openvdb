@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
-#include <detail/utils/cuda/Utils.cuh>
+#include <detail/utils/AccessorHelpers.h>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>

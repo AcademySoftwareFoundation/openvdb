@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Ops.h"
+#include <detail/utils/AccessorHelpers.h>
+#include <detail/utils/cuda/ForEachCUDA.cuh>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <detail/utils/cuda/Utils.cuh>
 

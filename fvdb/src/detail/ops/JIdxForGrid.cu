@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include <detail/utils/cuda/Utils.cuh>
+#include <detail/ops/CountEnabledPerLeaf.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>

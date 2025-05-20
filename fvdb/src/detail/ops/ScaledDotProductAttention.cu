@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include <detail/utils/AccessorHelpers.h>
 #include <detail/utils/BezierInterpolationIterator.h>
-#include <detail/utils/cuda/Utils.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>

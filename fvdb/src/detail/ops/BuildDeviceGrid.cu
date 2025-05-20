@@ -3,6 +3,7 @@
 //
 #include <detail/GridBatchImpl.h>
 #include <detail/build/Build.h>
+#include <detail/utils/AccessorHelpers.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <detail/utils/cuda/Utils.cuh>
