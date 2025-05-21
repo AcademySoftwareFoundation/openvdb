@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_UTILS_ACCESSORHELPERS_H
-#define FVDB_DETAIL_UTILS_ACCESSORHELPERS_H
+#ifndef FVDB_DETAIL_UTILS_ACCESSORHELPERS_CUH
+#define FVDB_DETAIL_UTILS_ACCESSORHELPERS_CUH
 
 #include <JaggedTensor.h>
 #include <detail/GridBatchImpl.h>
@@ -96,4 +96,4 @@ jaggedAccessor(const fvdb::JaggedTensor &jaggedTensor) {
 
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_UTILS_ACCESSORHELPERS_H
+#endif // FVDB_DETAIL_UTILS_ACCESSORHELPERS_CUH

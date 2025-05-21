@@ -3,7 +3,7 @@
 //
 #include "GaussianVectorTypes.cuh"
 #include <detail/ops/Ops.h>
-#include <detail/utils/AccessorHelpers.h>
+#include <detail/utils/AccessorHelpers.cuh>
 
 #include <ATen/cuda/Atomic.cuh>
 

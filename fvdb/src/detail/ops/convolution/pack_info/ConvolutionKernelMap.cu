@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "PackInfoOps.h"
-#include <detail/utils/AccessorHelpers.h>
+#include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
 #include <detail/utils/nanovdb/CustomAccessors.h>
 

@@ -5,7 +5,7 @@
 #define FVDB_DETAIL_OPS_COUNTENABLEDPERLEAF_CUH
 
 #include <detail/GridBatchImpl.h>
-#include <detail/utils/AccessorHelpers.h>
+#include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/ForEachCPU.h>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
 

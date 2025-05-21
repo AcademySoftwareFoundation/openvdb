@@ -3,7 +3,7 @@
 //
 #include "GaussianUtils.cuh"
 #include <detail/ops/Ops.h>
-#include <detail/utils/AccessorHelpers.h>
+#include <detail/utils/AccessorHelpers.cuh>
 
 #include <optional>
 
