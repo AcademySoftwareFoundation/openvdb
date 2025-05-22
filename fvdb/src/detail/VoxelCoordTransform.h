@@ -36,7 +36,7 @@ struct VoxelCoordTransform {
     /// @return The gradient dT/dxyz of the transformation applied to xyz
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyGrad(const nanovdb::math::Vec3<ScalarT> &xyz) const {
+    applyGrad(const nanovdb::math::Vec3<ScalarT> &xyz) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return mTransform.scale<ScalarT>();
     }
@@ -50,7 +50,7 @@ struct VoxelCoordTransform {
     /// @return The gradient dT/d(x, y, z) of the transformation applied to (x, y, z)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyGrad(ScalarT x, ScalarT y, ScalarT z) const {
+    applyGrad(ScalarT x, ScalarT y, ScalarT z) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return mTransform.scale<ScalarT>();
     }
@@ -62,7 +62,7 @@ struct VoxelCoordTransform {
     /// @return The gradient dT^-1/dijk of the inverse transformation applied to ijk
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyInvGrad(const nanovdb::math::Vec3<ScalarT> &ijk) const {
+    applyInvGrad(const nanovdb::math::Vec3<ScalarT> &ijk) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return nanovdb::math::Vec3<ScalarT>(1.0, 1.0, 1.0) / mTransform.scale<ScalarT>();
     }
@@ -76,7 +76,7 @@ struct VoxelCoordTransform {
     /// @return The gradient dT^-1/d(i, j, k) of the inverse transformation applied to (i, j, k)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyInvGrad(ScalarT i, ScalarT j, ScalarT k) const {
+    applyInvGrad(ScalarT i, ScalarT j, ScalarT k) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return nanovdb::math::Vec3<ScalarT>(1.0, 1.0, 1.0) / mTransform.scale<ScalarT>();
     }
@@ -87,7 +87,7 @@ struct VoxelCoordTransform {
     /// @return The transformed point T(xyz)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                apply(const nanovdb::math::Vec3<ScalarT> &xyz) const {
+    apply(const nanovdb::math::Vec3<ScalarT> &xyz) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return xyz * mTransform.scale<ScalarT>() + mTransform.translate<ScalarT>();
     }
@@ -100,7 +100,7 @@ struct VoxelCoordTransform {
     /// @return The transformed point T(x, y, z)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                apply(ScalarT x, ScalarT y, ScalarT z) const {
+    apply(ScalarT x, ScalarT y, ScalarT z) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> xyz(x, y, z);
         return xyz * mTransform.scale<ScalarT>() + mTransform.translate<ScalarT>();
@@ -114,7 +114,7 @@ struct VoxelCoordTransform {
     /// @return The transformed point T(xyz)
     template <typename ScalarT, typename InVec3T>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                apply(const InVec3T &xyz) const {
+    apply(const InVec3T &xyz) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> pt(xyz[0], xyz[1], xyz[2]);
         return pt * mTransform.scale<ScalarT>() + mTransform.translate<ScalarT>();
@@ -126,7 +126,7 @@ struct VoxelCoordTransform {
     /// @return The transformed coordinate T^-1(ijk)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyInv(const nanovdb::math::Vec3<ScalarT> &ijk) const {
+    applyInv(const nanovdb::math::Vec3<ScalarT> &ijk) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         return (ijk - mTransform.translate<ScalarT>()) / mTransform.scale<ScalarT>();
     }
@@ -139,7 +139,7 @@ struct VoxelCoordTransform {
     /// @return The transformed coordinate T^-1(i, j, k)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyInv(ScalarT i, ScalarT j, ScalarT k) const {
+    applyInv(ScalarT i, ScalarT j, ScalarT k) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> ijk(i, j, k);
         return (ijk - mTransform.translate<ScalarT>()) / mTransform.scale<ScalarT>();
@@ -153,7 +153,7 @@ struct VoxelCoordTransform {
     /// @return The transformed coordinate T^-1(ijk)
     template <typename ScalarT, typename InVec3T>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                applyInv(const InVec3T &ijk) const {
+    applyInv(const InVec3T &ijk) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> coord(ijk[0], ijk[1], ijk[2]);
         return (coord - mTransform.translate<ScalarT>()) / mTransform.scale<ScalarT>();
@@ -165,7 +165,7 @@ struct VoxelCoordTransform {
     /// @return The transformed ray T(ray)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Ray<ScalarT>
-                applyToRay(nanovdb::math::Ray<ScalarT> ray) const {
+    applyToRay(nanovdb::math::Ray<ScalarT> ray) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> oVox = apply<ScalarT>(ray.eye());
         const nanovdb::math::Vec3<ScalarT> dVox = ray.dir() * mTransform.scale<ScalarT>();
@@ -185,8 +185,13 @@ struct VoxelCoordTransform {
     /// @return The transformed ray T(ray)
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Ray<ScalarT>
-    applyToRay(ScalarT rayOx, ScalarT rayOy, ScalarT rayOz, ScalarT rayDx, ScalarT rayDy,
-               ScalarT rayDz, ScalarT t0 = static_cast<ScalarT>(0),
+    applyToRay(ScalarT rayOx,
+               ScalarT rayOy,
+               ScalarT rayOz,
+               ScalarT rayDx,
+               ScalarT rayDy,
+               ScalarT rayDz,
+               ScalarT t0 = static_cast<ScalarT>(0),
                ScalarT t1 = std::numeric_limits<ScalarT>::infinity()) const {
         static_assert(is_floating_point_or_half<ScalarT>::value);
         const nanovdb::math::Vec3<ScalarT> oVox = apply<ScalarT>(rayOx, rayOy, rayOz);
@@ -200,7 +205,7 @@ struct VoxelCoordTransform {
     /// @return The scale component of this transformation
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                scale() const {
+    scale() const {
         return mTransform.scale<ScalarT>();
     }
 
@@ -209,7 +214,7 @@ struct VoxelCoordTransform {
     /// @return The translation component of this transformation
     template <typename ScalarT>
     __hostdev__ nanovdb::math::Vec3<ScalarT>
-                translate() const {
+    translate() const {
         return mTransform.translate<ScalarT>();
     }
 
@@ -297,10 +302,10 @@ primalVoxelTransformForSizeAndOrigin(const nanovdb::Vec3d &voxSize,
                                      const nanovdb::Vec3d &voxOrigin) {
     // TORCH_CHECK_VALUE(voxSize[0] > 0.0 && voxSize[1] > 0.0 && voxSize[2] > 0.0, "voxel_size must
     // be positive");
-    const nanovdb::Vec3d &w    = voxSize;
-    const nanovdb::Vec3d &tx   = voxOrigin;
-    const nanovdb::Vec3d  invW = nanovdb::Vec3d(1.0, 1.0, 1.0) / w;
-    const nanovdb::Vec3d  half(0.5, 0.5, 0.5);
+    const nanovdb::Vec3d &w   = voxSize;
+    const nanovdb::Vec3d &tx  = voxOrigin;
+    const nanovdb::Vec3d invW = nanovdb::Vec3d(1.0, 1.0, 1.0) / w;
+    const nanovdb::Vec3d half(0.5, 0.5, 0.5);
 
     return VoxelCoordTransform(invW, -tx / w);
 }
@@ -312,14 +317,16 @@ primalVoxelTransformForSizeAndOrigin(const nanovdb::Vec3d &voxSize,
 /// @param outPrimal Output primal transform
 /// @param outDual Output dual transform
 inline __hostdev__ void
-voxelTransformForSizeAndOrigin(const nanovdb::Vec3d &voxSize, const nanovdb::Vec3d &voxOrigin,
-                               VoxelCoordTransform &outPrimal, VoxelCoordTransform &outDual) {
+voxelTransformForSizeAndOrigin(const nanovdb::Vec3d &voxSize,
+                               const nanovdb::Vec3d &voxOrigin,
+                               VoxelCoordTransform &outPrimal,
+                               VoxelCoordTransform &outDual) {
     // TORCH_CHECK_VALUE(voxSize[0] > 0.0 && voxSize[1] > 0.0 && voxSize[2] > 0.0, "voxel_size must
     // be positive");
-    const nanovdb::Vec3d &w    = voxSize;
-    const nanovdb::Vec3d &tx   = voxOrigin;
-    const nanovdb::Vec3d  invW = nanovdb::Vec3d(1.0, 1.0, 1.0) / w;
-    const nanovdb::Vec3d  half(0.5, 0.5, 0.5);
+    const nanovdb::Vec3d &w   = voxSize;
+    const nanovdb::Vec3d &tx  = voxOrigin;
+    const nanovdb::Vec3d invW = nanovdb::Vec3d(1.0, 1.0, 1.0) / w;
+    const nanovdb::Vec3d half(0.5, 0.5, 0.5);
 
     outPrimal = VoxelCoordTransform(invW, -tx / w);
     outDual   = VoxelCoordTransform(invW, -tx / w + half);

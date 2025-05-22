@@ -18,8 +18,10 @@ struct SplatIntoGridTrilinear : public torch::autograd::Function<SplatIntoGridTr
     using Variable        = torch::autograd::Variable;
     using JaggedVariable  = JaggedTensor;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 JaggedTensor points, Variable pointData);
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 JaggedTensor points,
+                                 Variable pointData);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
@@ -30,8 +32,10 @@ struct SplatIntoGridBezier : public torch::autograd::Function<SplatIntoGridBezie
     using Variable        = torch::autograd::Variable;
     using JaggedVariable  = JaggedTensor;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 JaggedVariable points, Variable pointData);
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 JaggedVariable points,
+                                 Variable pointData);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

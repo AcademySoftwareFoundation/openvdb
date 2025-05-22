@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "IO.h"
+
 #include <Types.h>
 #include <detail/GridBatchImpl.h>
 #include <detail/utils/Utils.h>
@@ -28,17 +29,17 @@ template <typename GridType>
 const nanovdb::NanoGrid<GridType> *
 getGrid(const nanovdb::GridHandle<nanovdb::HostBuffer> &handle, uint32_t gridId, uint32_t bi) {
     const nanovdb::NanoGrid<GridType> *grid = handle.grid<GridType>(gridId);
-    char                               gridTypeStr[nanovdb::strlen<nanovdb::GridType>()];
+    char gridTypeStr[nanovdb::strlen<nanovdb::GridType>()];
     nanovdb::toStr(gridTypeStr, handle.gridType(gridId));
     char expectedGridTypeStr[nanovdb::strlen<nanovdb::GridType>()];
     nanovdb::toStr(expectedGridTypeStr, nanovdb::toGridType<GridType>());
     TORCH_CHECK(gridId < handle.gridCount(),
                 "Failed to load grid " + std::to_string(gridId) + " from handle at batch index " +
                     std::to_string(bi) + std::string(". Grid index out of bounds."));
-    TORCH_CHECK(grid != nullptr, "Failed to load grid " + std::to_string(gridId) +
-                                     " from handle at batch index " + std::to_string(bi) +
-                                     std::string(". Grid has type ") + gridTypeStr +
-                                     std::string(", but expected ") + expectedGridTypeStr + ".");
+    TORCH_CHECK(grid != nullptr,
+                "Failed to load grid " + std::to_string(gridId) + " from handle at batch index " +
+                    std::to_string(bi) + std::string(". Grid has type ") + gridTypeStr +
+                    std::string(", but expected ") + expectedGridTypeStr + ".");
     return grid;
 }
 
@@ -122,8 +123,8 @@ isFvdbBlindData(const nanovdb::GridBlindMetaData &blindMetadata) {
     }
 
     // Get the dtype of the blind data tensor
-    const std::string  blindDtypeName = std::string(blindMetadata.mName + 10);
-    const torch::Dtype blindDtype     = StringToTorchScalarType(blindDtypeName);
+    const std::string blindDtypeName = std::string(blindMetadata.mName + 10);
+    const torch::Dtype blindDtype    = StringToTorchScalarType(blindDtypeName);
     return std::make_tuple(true, std::optional<torch::Dtype>(blindDtype));
 }
 
@@ -188,7 +189,10 @@ copyIndexGridToHandle(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
 /// @return A tuple containing the index grid, the name of the grid, the tensor of data, the voxel
 /// size, and the voxel origin
 template <class SourceGridType, class TargetGridType>
-std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>, std::string, torch::Tensor, nanovdb::Vec3d,
+std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>,
+           std::string,
+           torch::Tensor,
+           nanovdb::Vec3d,
            nanovdb::Vec3d>
 nanovdbTensorGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
     static_assert(
@@ -212,7 +216,7 @@ nanovdbTensorGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid)
         copyIndexGridToHandle<SourceGridType, TargetGridType>(sourceGrid);
 
     // Check if this grid has FVDB blind data attached to it
-    bool         foundFVDB = false;
+    bool foundFVDB = false;
     torch::Dtype blindDtype;
     for (unsigned i = 0; i < sourceGrid->blindDataCount(); i += 1) {
         const nanovdb::GridBlindMetaData &blindMetadata = sourceGrid->blindMetaData(i);
@@ -239,7 +243,9 @@ nanovdbTensorGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid)
     // If there is no FVDB blind data, this is just an index grid, so just return an empty data
     // tensor
     if (!foundFVDB) {
-        return std::make_tuple(std::move(retHandle), sourceGrid->gridName(), torch::empty({ 0 }),
+        return std::make_tuple(std::move(retHandle),
+                               sourceGrid->gridName(),
+                               torch::empty({0}),
                                sourceGrid->data()->mVoxelSize,
                                sourceGrid->data()->mMap.applyMap(nanovdb::Vec3d(0.0)));
     }
@@ -262,7 +268,7 @@ nanovdbTensorGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid)
         torch::from_blob(const_cast<uint8_t *>(readHead), blindDataShape, blindDtype).clone();
 
     // Load the name and the transform
-    const std::string    name      = sourceGrid->gridName();
+    const std::string name         = sourceGrid->gridName();
     const nanovdb::Vec3d voxSize   = sourceGrid->mVoxelSize;
     const nanovdb::Vec3d voxOrigin = sourceGrid->mMap.applyMap(nanovdb::Vec3d(0.0));
     return std::make_tuple(std::move(retHandle), name, retData, voxSize, voxOrigin);
@@ -279,15 +285,18 @@ nanovdbTensorGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid)
 /// @return A tuple containing the index grid, the name of the grid, the empty tensor of data, the
 /// voxel size, and the voxel origin
 template <class SourceGridType, class TargetGridType>
-std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>, std::string, torch::Tensor, nanovdb::Vec3d,
+std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>,
+           std::string,
+           torch::Tensor,
+           nanovdb::Vec3d,
            nanovdb::Vec3d>
 nanovdbIndexGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
     nanovdb::GridHandle<TorchDeviceBuffer> retHandle =
         copyIndexGridToHandle<SourceGridType, TargetGridType>(sourceGrid);
-    const std::string    name      = sourceGrid->gridName();
+    const std::string name         = sourceGrid->gridName();
     const nanovdb::Vec3d voxSize   = sourceGrid->data()->mVoxelSize;
     const nanovdb::Vec3d voxOrigin = sourceGrid->data()->mMap.applyMap(nanovdb::Vec3d(0.0));
-    return std::make_tuple(std::move(retHandle), name, torch::empty({ 0 }), voxSize, voxOrigin);
+    return std::make_tuple(std::move(retHandle), name, torch::empty({0}), voxSize, voxOrigin);
 }
 
 /// @brief Load a nanovdb grid with scalar or vector data stored in the leaves into a ValueOnIndex
@@ -303,7 +312,10 @@ nanovdbIndexGridToFVDBGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) 
 /// @return A tuple containing the index grid, the name of the grid, the tensor of data, the voxel
 /// size, and the voxel origin
 template <class SourceGridType, class ScalarType, class TargetGridType, int DataDim>
-std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>, std::string, torch::Tensor, nanovdb::Vec3d,
+std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>,
+           std::string,
+           torch::Tensor,
+           nanovdb::Vec3d,
            nanovdb::Vec3d>
 nanovdbGridToFvdbGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
     static_assert(nanovdb::util::is_same<TargetGridType, nanovdb::ValueOnIndex>::value,
@@ -337,12 +349,12 @@ nanovdbGridToFvdbGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
                 "Internal error: outGrid is not an index grid.");
 
     // Load data at the voxels into a tensor
-    int64_t              numVox  = outGrid->activeVoxelCount();
-    int64_t              dim     = DataDim;
-    torch::TensorOptions opts    = torch::TensorOptions().device(torch::kCPU).dtype<ScalarType>();
-    torch::Tensor        outData = torch::empty({ numVox, dim }, opts);
-    auto                 outDataAcc         = outData.accessor<ScalarType, 2>();
-    auto                 sourceGridAccessor = sourceGrid->getAccessor();
+    int64_t numVox            = outGrid->activeVoxelCount();
+    int64_t dim               = DataDim;
+    torch::TensorOptions opts = torch::TensorOptions().device(torch::kCPU).dtype<ScalarType>();
+    torch::Tensor outData     = torch::empty({numVox, dim}, opts);
+    auto outDataAcc           = outData.accessor<ScalarType, 2>();
+    auto sourceGridAccessor   = sourceGrid->getAccessor();
     for (auto it = ActiveVoxelIterator<TargetGridType, -1>(outGrid->tree()); it.isValid(); it++) {
         valueSetter(outDataAcc, it->second, sourceGridAccessor.getValue(it->first));
     }
@@ -395,7 +407,7 @@ nanovdbGridToFvdbGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
     }
 
     // Load the name and the transform
-    const std::string    name      = sourceGrid->gridName();
+    const std::string name         = sourceGrid->gridName();
     const nanovdb::Vec3d voxSize   = sourceGrid->data()->mVoxelSize;
     const nanovdb::Vec3d voxOrigin = sourceGrid->data()->mMap.applyMap(nanovdb::Vec3d(0.0));
 
@@ -423,7 +435,10 @@ nanovdbGridToFvdbGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
 /// @param bi The batch index of the grid in the handle to read (this is only used for logging)
 /// @return A tuple containing the loaded index grid, the name of the grid, the tensor of data, the
 /// voxel size, and the voxel origin
-std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>, std::string, torch::Tensor, nanovdb::Vec3d,
+std::tuple<nanovdb::GridHandle<TorchDeviceBuffer>,
+           std::string,
+           torch::Tensor,
+           nanovdb::Vec3d,
            nanovdb::Vec3d>
 loadOneGrid(const nanovdb::GridHandle<nanovdb::HostBuffer> &handle, uint32_t gridId, uint32_t bi) {
     if (handle.gridMetaData()->gridClass() == nanovdb::GridClass::TensorGrid) {
@@ -532,20 +547,20 @@ loadOneGrid(const nanovdb::GridHandle<nanovdb::HostBuffer> &handle, uint32_t gri
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 fromNVDB(nanovdb::GridHandle<nanovdb::HostBuffer> &handle,
-         const std::optional<torch::Device>        maybeDevice) {
-    return fromNVDB({ handle }, maybeDevice);
+         const std::optional<torch::Device> maybeDevice) {
+    return fromNVDB({handle}, maybeDevice);
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
-         const std::optional<torch::Device>                           maybeDevice) {
+         const std::optional<torch::Device> maybeDevice) {
     // Load the grids, data, names, voxel origins, and sizes
-    std::vector<torch::Tensor>                          data;
+    std::vector<torch::Tensor> data;
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> grids;
-    std::vector<nanovdb::Vec3d>                         voxSizes, voxOrigins;
-    std::vector<std::string>                            names;
-    uint32_t                                            bi           = 0;
-    nanovdb::GridType                                   lastGridType = nanovdb::GridType::Unknown;
+    std::vector<nanovdb::Vec3d> voxSizes, voxOrigins;
+    std::vector<std::string> names;
+    uint32_t bi                    = 0;
+    nanovdb::GridType lastGridType = nanovdb::GridType::Unknown;
     for (size_t handleId = 0; handleId < handles.size(); handleId += 1) {
         for (size_t gridId = 0; gridId < handles[handleId].gridCount(); gridId += 1) {
             auto gridData = loadOneGrid(handles[handleId], gridId, bi);
@@ -575,9 +590,11 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
 
     // Merge all the loaded grids into a single handle
     TORCH_CHECK_VALUE(grids.size() <= fvdb::GridBatch::MAX_GRIDS_PER_BATCH,
-                      "Cannot load more than ", fvdb::GridBatch::MAX_GRIDS_PER_BATCH, " grids.");
+                      "Cannot load more than ",
+                      fvdb::GridBatch::MAX_GRIDS_PER_BATCH,
+                      " grids.");
     nanovdb::GridHandle<TorchDeviceBuffer> resCpu = nanovdb::mergeGrids(grids);
-    c10::intrusive_ptr<GridBatchImpl>      ret =
+    c10::intrusive_ptr<GridBatchImpl> ret =
         c10::make_intrusive<GridBatchImpl>(std::move(resCpu), voxSizes, voxOrigins);
 
     // Merge loaded data Tensors into a JaggedTensor
@@ -596,8 +613,10 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-loadNVDB(const std::string &path, const NanoVDBFileGridIdentifier &gridIdentifier,
-         const torch::Device &device, bool verbose) {
+loadNVDB(const std::string &path,
+         const NanoVDBFileGridIdentifier &gridIdentifier,
+         const torch::Device &device,
+         bool verbose) {
     // Load a std::vector of grid handles each containing a one grid to load
     // If the user specified specific indices or names of grid to load, use that as a filter
     std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> sourceHandles;
@@ -616,8 +635,8 @@ loadNVDB(const std::string &path, const NanoVDBFileGridIdentifier &gridIdentifie
                 sourceHandles.emplace_back(
                     nanovdb::io::readGrid<nanovdb::HostBuffer>(path, name, verbose));
             } catch (std::runtime_error &e) {
-                TORCH_CHECK_INDEX(false, "Grid with name '", name, "' not found in file '", path,
-                                  "'.");
+                TORCH_CHECK_INDEX(
+                    false, "Grid with name '", name, "' not found in file '", path, "'.");
             }
         }
     } else {

@@ -19,14 +19,18 @@ namespace ops {
 
 static torch::Tensor
 exclusivePrefixSum(torch::Tensor input) {
-    return torch::cat({ torch::zeros(1, input.options()), input.cumsum(0) });
+    return torch::cat({torch::zeros(1, input.options()), input.cumsum(0)});
 }
 
 template <>
 torch::Tensor
-dispatchScaledDotProductAttention<torch::kCUDA>(
-    const torch::Tensor &query, const torch::Tensor &key, const torch::Tensor &value,
-    const torch::Tensor &qLengths, const torch::Tensor &kvLengths, bool training, float scale) {
+dispatchScaledDotProductAttention<torch::kCUDA>(const torch::Tensor &query,
+                                                const torch::Tensor &key,
+                                                const torch::Tensor &value,
+                                                const torch::Tensor &qLengths,
+                                                const torch::Tensor &kvLengths,
+                                                bool training,
+                                                float scale) {
 #if (defined(__CUDACC_VER_MAJOR__) && __CUDACC_VER_MAJOR__ >= 12)
     // TODO: Cache built execution graph and plans!
     // Get dimensions: query (B*Sq, H, D), key (B*Skv, H, D), value (B*Skv, H, T)
@@ -58,45 +62,47 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
 
     // Create input tensor nodes (cudnn_frontend::graph::Tensor_attributes)
     // (although storage is BSHD, MHA needs dimension to be BHSD)
-    auto qNode       = graph->tensor(fe::graph::Tensor_attributes()
-                                         .set_name("Q")
-                                         .set_dim({ num_batch, num_heads, num_sq, num_qk_feat })
-                                         .set_stride({ num_sq * num_heads * num_qk_feat, num_qk_feat,
-                                                       num_heads * num_qk_feat, 1 }));
-    auto kNode       = graph->tensor(fe::graph::Tensor_attributes()
-                                         .set_name("K")
-                                         .set_dim({ num_batch, num_heads, num_skv, num_qk_feat })
-                                         .set_stride({ num_skv * num_heads * num_qk_feat, num_qk_feat,
-                                                       num_heads * num_qk_feat, 1 }));
-    auto vNode       = graph->tensor(fe::graph::Tensor_attributes()
-                                         .set_name("V")
-                                         .set_dim({ num_batch, num_heads, num_skv, num_v_feat })
-                                         .set_stride({ num_skv * num_heads * num_v_feat, num_v_feat,
-                                                       num_heads * num_v_feat, 1 }));
+    auto qNode = graph->tensor(
+        fe::graph::Tensor_attributes()
+            .set_name("Q")
+            .set_dim({num_batch, num_heads, num_sq, num_qk_feat})
+            .set_stride(
+                {num_sq * num_heads * num_qk_feat, num_qk_feat, num_heads * num_qk_feat, 1}));
+    auto kNode = graph->tensor(
+        fe::graph::Tensor_attributes()
+            .set_name("K")
+            .set_dim({num_batch, num_heads, num_skv, num_qk_feat})
+            .set_stride(
+                {num_skv * num_heads * num_qk_feat, num_qk_feat, num_heads * num_qk_feat, 1}));
+    auto vNode = graph->tensor(
+        fe::graph::Tensor_attributes()
+            .set_name("V")
+            .set_dim({num_batch, num_heads, num_skv, num_v_feat})
+            .set_stride({num_skv * num_heads * num_v_feat, num_v_feat, num_heads * num_v_feat, 1}));
     auto qLenNode    = graph->tensor(fe::graph::Tensor_attributes()
-                                         .set_name("seq_len_q")
-                                         .set_dim({ num_batch, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
-                                         .set_data_type(fe::DataType_t::INT32));
+                                      .set_name("seq_len_q")
+                                      .set_dim({num_batch, 1, 1, 1})
+                                      .set_stride({1, 1, 1, 1})
+                                      .set_data_type(fe::DataType_t::INT32));
     auto kvLenNode   = graph->tensor(fe::graph::Tensor_attributes()
-                                         .set_name("seq_len_kv")
-                                         .set_dim({ num_batch, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
-                                         .set_data_type(fe::DataType_t::INT32));
+                                       .set_name("seq_len_kv")
+                                       .set_dim({num_batch, 1, 1, 1})
+                                       .set_stride({1, 1, 1, 1})
+                                       .set_data_type(fe::DataType_t::INT32));
     auto qOffsetNode = graph->tensor(fe::graph::Tensor_attributes()
                                          .set_name("offset_q")
-                                         .set_dim({ num_batch + 1, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
+                                         .set_dim({num_batch + 1, 1, 1, 1})
+                                         .set_stride({1, 1, 1, 1})
                                          .set_data_type(fe::DataType_t::INT32));
     auto kOffsetNode = graph->tensor(fe::graph::Tensor_attributes()
                                          .set_name("offset_k")
-                                         .set_dim({ num_batch + 1, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
+                                         .set_dim({num_batch + 1, 1, 1, 1})
+                                         .set_stride({1, 1, 1, 1})
                                          .set_data_type(fe::DataType_t::INT32));
     auto vOffsetNode = graph->tensor(fe::graph::Tensor_attributes()
                                          .set_name("offset_v")
-                                         .set_dim({ num_batch + 1, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
+                                         .set_dim({num_batch + 1, 1, 1, 1})
+                                         .set_stride({1, 1, 1, 1})
                                          .set_data_type(fe::DataType_t::INT32));
     qNode->set_ragged_offset(qOffsetNode);
     kNode->set_ragged_offset(kOffsetNode);
@@ -112,12 +118,12 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
     // Create SPDA and output node
     auto [O, stats] = graph->sdpa(qNode, kNode, vNode, sdpa_options);
     O->set_output(true)
-        .set_dim({ num_batch, num_heads, num_sq, num_v_feat })
-        .set_stride({ num_sq * num_heads * num_v_feat, num_v_feat, num_heads * num_v_feat, 1 });
+        .set_dim({num_batch, num_heads, num_sq, num_v_feat})
+        .set_stride({num_sq * num_heads * num_v_feat, num_v_feat, num_heads * num_v_feat, 1});
     auto oOffsetNode = graph->tensor(fe::graph::Tensor_attributes()
                                          .set_name("offset_o")
-                                         .set_dim({ num_batch + 1, 1, 1, 1 })
-                                         .set_stride({ 1, 1, 1, 1 })
+                                         .set_dim({num_batch + 1, 1, 1, 1})
+                                         .set_stride({1, 1, 1, 1})
                                          .set_data_type(fe::DataType_t::INT32));
     O->set_ragged_offset(oOffsetNode);
 
@@ -134,7 +140,7 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
     // cudnnHandle_t handle = at::native::getCudnnHandle();
     // We use our own linked cudnn 9.0
     cudnnHandle_t handle;
-    auto          create_status = cudnnCreate(&handle);
+    auto create_status = cudnnCreate(&handle);
     TORCH_CHECK(create_status == CUDNN_STATUS_SUCCESS,
                 std::string("CUDNN handle creation failed: ") + std::to_string(create_status));
 
@@ -144,18 +150,18 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
     TORCH_CHECK(build_status.is_good(),
                 std::string("Graph build failed: ") + build_status.get_message());
 
-    auto plans = graph->create_execution_plans({ fe::HeurMode_t::A });
+    auto plans = graph->create_execution_plans({fe::HeurMode_t::A});
     TORCH_CHECK(graph->check_support(handle).is_good(), "Graph support check failed");
     TORCH_CHECK(graph->build_plans(handle).is_good(), "Graph plan build failed");
 
     // Build output tensor
     torch::Tensor output =
-        torch::empty({ num_batch, num_heads, num_sq, num_v_feat },
+        torch::empty({num_batch, num_heads, num_sq, num_v_feat},
                      torch::TensorOptions().dtype(query.dtype()).device(query.device()));
     torch::Tensor statsTensor;
     if (training) {
         statsTensor =
-            torch::empty({ num_batch, num_heads, num_sq, 1 },
+            torch::empty({num_batch, num_heads, num_sq, 1},
                          torch::TensorOptions().dtype(torch::kFloat32).device(query.device()));
     }
 
@@ -168,12 +174,16 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
     torch::Tensor offsetV = exclusivePrefixSum(seqLenKV * num_heads * num_v_feat).to(torch::kInt32);
     torch::Tensor offsetO = exclusivePrefixSum(seqLenQ * num_heads * num_v_feat).to(torch::kInt32);
     std::unordered_map<std::shared_ptr<fe::graph::Tensor_attributes>, void *> variant_pack = {
-        { qNode, (char *)query.data_ptr() },         { kNode, (char *)key.data_ptr() },
-        { vNode, (char *)value.data_ptr() },         { qLenNode, (char *)seqLenQ.data_ptr() },
-        { kvLenNode, (char *)seqLenKV.data_ptr() },  { qOffsetNode, (char *)offsetQ.data_ptr() },
-        { kOffsetNode, (char *)offsetK.data_ptr() }, { vOffsetNode, (char *)offsetV.data_ptr() },
-        { oOffsetNode, (char *)offsetO.data_ptr() }, { O, (char *)output.data_ptr() }
-    };
+        {qNode, (char *)query.data_ptr()},
+        {kNode, (char *)key.data_ptr()},
+        {vNode, (char *)value.data_ptr()},
+        {qLenNode, (char *)seqLenQ.data_ptr()},
+        {kvLenNode, (char *)seqLenKV.data_ptr()},
+        {qOffsetNode, (char *)offsetQ.data_ptr()},
+        {kOffsetNode, (char *)offsetK.data_ptr()},
+        {vOffsetNode, (char *)offsetV.data_ptr()},
+        {oOffsetNode, (char *)offsetO.data_ptr()},
+        {O, (char *)output.data_ptr()}};
     if (training) {
         variant_pack[stats] = (char *)statsTensor.data_ptr();
     }
@@ -196,10 +206,12 @@ dispatchScaledDotProductAttention<torch::kCUDA>(
 
 template <>
 torch::Tensor
-dispatchScaledDotProductAttention<torch::kCPU>(const torch::Tensor &query, const torch::Tensor &key,
+dispatchScaledDotProductAttention<torch::kCPU>(const torch::Tensor &query,
+                                               const torch::Tensor &key,
                                                const torch::Tensor &value,
                                                const torch::Tensor &qLengths,
-                                               const torch::Tensor &kvLengths, bool training,
+                                               const torch::Tensor &kvLengths,
+                                               bool training,
                                                float scale) {
     TORCH_CHECK(false, "CPU implementation not available");
 }

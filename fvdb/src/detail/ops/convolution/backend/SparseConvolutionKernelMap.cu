@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/ops/Ops.h>
 
 #include <ATen/cuda/CUDAContext.h>
@@ -17,8 +18,13 @@ namespace ops {
 
 template <typename scalar_t>
 __global__ void
-gatherKernel(const int n_k, const int n_in, const int c, const scalar_t *in_feat,
-             scalar_t *out_feat, const int *kmap, const bool transpose) {
+gatherKernel(const int n_k,
+             const int n_in,
+             const int c,
+             const scalar_t *in_feat,
+             scalar_t *out_feat,
+             const int *kmap,
+             const bool transpose) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int i     = index / c;
     int j     = index % c;
@@ -32,8 +38,13 @@ gatherKernel(const int n_k, const int n_in, const int c, const scalar_t *in_feat
 
 template <typename scalar_t>
 __global__ void
-scatterKernel(const int n_in, const int n_out, const int c, const scalar_t *in_feat,
-              scalar_t *out_feat, const int *kmap, const bool transpose) {
+scatterKernel(const int n_in,
+              const int n_out,
+              const int c,
+              const scalar_t *in_feat,
+              scalar_t *out_feat,
+              const int *kmap,
+              const bool transpose) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int i     = index / c;
     int j     = index % c;
@@ -47,8 +58,13 @@ scatterKernel(const int n_in, const int n_out, const int c, const scalar_t *in_f
 
 template <typename scalar_t>
 static void
-scatterCpu(const int n_in, const int n_out, const int c, const scalar_t *in_feat,
-           scalar_t *out_feat, const int *kmap, const bool transpose) {
+scatterCpu(const int n_in,
+           const int n_out,
+           const int c,
+           const scalar_t *in_feat,
+           scalar_t *out_feat,
+           const int *kmap,
+           const bool transpose) {
     for (int i = 0; i < n_in; i++) {
         int out_pos = kmap[2 * i + 1 - transpose];
         if (out_pos < 0) {
@@ -63,8 +79,13 @@ scatterCpu(const int n_in, const int n_out, const int c, const scalar_t *in_feat
 
 template <typename scalar_t>
 static void
-gatherCpu(const int n_k, const int n_in, const int c, const scalar_t *in_feat, scalar_t *out_feat,
-          const int *kmap, const bool transpose) {
+gatherCpu(const int n_k,
+          const int n_in,
+          const int c,
+          const scalar_t *in_feat,
+          scalar_t *out_feat,
+          const int *kmap,
+          const bool transpose) {
     for (int i = 0; i < n_k; i++) {
         int in_pos = kmap[2 * i + transpose];
         if (in_pos < 0) {
@@ -93,21 +114,30 @@ gatherCpu(const int n_k, const int n_in, const int c, const scalar_t *in_feat, s
 //                      holding w[0,0].
 template <>
 void
-dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor out_feat,
-                                                 at::Tensor kernel, at::Tensor neighbor_map,
-                                                 at::Tensor neighbor_offset, const bool transpose,
+dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat,
+                                                 at::Tensor out_feat,
+                                                 at::Tensor kernel,
+                                                 at::Tensor neighbor_map,
+                                                 at::Tensor neighbor_offset,
+                                                 const bool transpose,
                                                  const bool middleAcceleration) {
     TORCH_CHECK(in_feat.device().is_cuda(), "in_feat must be a CUDA tensor");
     TORCH_CHECK(in_feat.device().has_index(), "in_feat must have a device index");
     TORCH_CHECK(in_feat.device() == out_feat.device(),
-                "All tensors must be on the same device, got in_feat.device() = ", in_feat.device(),
-                ", out_feat.device() = ", out_feat.device());
+                "All tensors must be on the same device, got in_feat.device() = ",
+                in_feat.device(),
+                ", out_feat.device() = ",
+                out_feat.device());
     TORCH_CHECK(in_feat.device() == kernel.device(),
-                "All tensors must be on the same device, got in_feat.device() = ", in_feat.device(),
-                ", kernel.device() = ", kernel.device());
+                "All tensors must be on the same device, got in_feat.device() = ",
+                in_feat.device(),
+                ", kernel.device() = ",
+                kernel.device());
     TORCH_CHECK(in_feat.device() == neighbor_map.device(),
-                "All tensors must be on the same device, got in_feat.device() = ", in_feat.device(),
-                ", neighbor_map.device() = ", neighbor_map.device());
+                "All tensors must be on the same device, got in_feat.device() = ",
+                in_feat.device(),
+                ", neighbor_map.device() = ",
+                neighbor_map.device());
     TORCH_CHECK(neighbor_offset.device().is_cpu(),
                 "neighborhood_offset must be on the CPU because torch_sparse conv is wack");
 
@@ -128,16 +158,17 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor 
 
     // memory optimization
     bool precompute_mid = false;
-    int  mid_kernel     = kernel_volume / 2;
-    int  in_buffer_size = 1;
+    int mid_kernel      = kernel_volume / 2;
+    int in_buffer_size  = 1;
     // we can precompute features for w[0,0] which avoids gather/scatter
     if (kernel_volume % 2 == 1 && n_in_feats == n_out_feats && middleAcceleration) {
         precompute_mid = true;
         in_buffer_size = *std::max_element(neighbor_offset.data_ptr<int>(),
                                            neighbor_offset.data_ptr<int>() + mid_kernel);
-        in_buffer_size = std::max(
-            in_buffer_size, *std::max_element(neighbor_offset.data_ptr<int>() + mid_kernel + 1,
-                                              neighbor_offset.data_ptr<int>() + kernel_volume));
+        in_buffer_size =
+            std::max(in_buffer_size,
+                     *std::max_element(neighbor_offset.data_ptr<int>() + mid_kernel + 1,
+                                       neighbor_offset.data_ptr<int>() + kernel_volume));
         in_buffer_size = std::max(in_buffer_size, 1);
 
         // (N, c) X (c, o) = (N, o)
@@ -148,9 +179,9 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor 
     }
 
     auto options    = torch::TensorOptions().dtype(in_feat.dtype()).device(in_feat.device());
-    auto in_buffer  = torch::zeros({ in_buffer_size, n_in_channels }, options);
-    auto out_buffer = torch::zeros({ in_buffer_size, n_out_channels }, options);
-    int  cur_offset = 0;
+    auto in_buffer  = torch::zeros({in_buffer_size, n_in_channels}, options);
+    auto out_buffer = torch::zeros({in_buffer_size, n_out_channels}, options);
+    int cur_offset  = 0;
     // gather/gemm/scatter on each weight
     for (int i = 0; i < kernel_volume; i++) {
         int n_active_feats = neighbor_offset.data_ptr<int>()[i];
@@ -172,43 +203,57 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor 
         at::Tensor out_buffer_activated;
         at::Tensor in_buffer_activated;
         if (is_half) {
-            out_buffer_activated = torch::from_blob(out_buffer.data_ptr<at::Half>(),
-                                                    { n_active_feats, n_out_channels }, options);
-            in_buffer_activated  = torch::from_blob(in_buffer.data_ptr<at::Half>(),
-                                                    { n_active_feats, n_in_channels }, options);
+            out_buffer_activated = torch::from_blob(
+                out_buffer.data_ptr<at::Half>(), {n_active_feats, n_out_channels}, options);
+            in_buffer_activated = torch::from_blob(
+                in_buffer.data_ptr<at::Half>(), {n_active_feats, n_in_channels}, options);
         } else {
-            out_buffer_activated = torch::from_blob(out_buffer.data_ptr(),
-                                                    { n_active_feats, n_out_channels }, options);
+            out_buffer_activated =
+                torch::from_blob(out_buffer.data_ptr(), {n_active_feats, n_out_channels}, options);
             in_buffer_activated =
-                torch::from_blob(in_buffer.data_ptr(), { n_active_feats, n_in_channels }, options);
+                torch::from_blob(in_buffer.data_ptr(), {n_active_feats, n_in_channels}, options);
         }
 
         // gather n_active_feats dense features from N sparse input features with c
         // feature dimensions
-        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "convolution_forward_cuda",
+                       AT_WRAP([&] {
                            gatherKernel<scalar_t>
                                <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                                   n_active_feats, n_in_feats, n_in_channels,
+                                   n_active_feats,
+                                   n_in_feats,
+                                   n_in_channels,
                                    in_feat.data_ptr<scalar_t>(),
                                    in_buffer_activated.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                   neighbor_map.data_ptr<int>() + cur_offset,
+                                   transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         // gemm: (i, c) X (c, o) = (i, o)
         torch::mm_out(out_buffer_activated, in_buffer_activated, kernel[i]);
 
         // scatter n_active_feats dense features into n_out_feats output features of
         // dimension n_out_channels
-        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "convolution_forward_cuda",
+                       AT_WRAP([&] {
                            scatterKernel<scalar_t>
                                <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
-                                   n_active_feats, n_out_feats, n_out_channels,
+                                   n_active_feats,
+                                   n_out_feats,
+                                   n_out_channels,
                                    out_buffer_activated.data_ptr<scalar_t>(),
                                    out_feat.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                   neighbor_map.data_ptr<int>() + cur_offset,
+                                   transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         cur_offset += 2 * n_active_feats;
     }
@@ -216,8 +261,10 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat, at::Tensor 
 
 template <>
 void
-dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Tensor grad_in_feat,
-                                                     at::Tensor grad_out_feat, at::Tensor kernel,
+dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat,
+                                                     at::Tensor grad_in_feat,
+                                                     at::Tensor grad_out_feat,
+                                                     at::Tensor kernel,
                                                      at::Tensor grad_kernel,
                                                      at::Tensor neighbor_map,
                                                      at::Tensor neighbor_offset,
@@ -242,28 +289,28 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Ten
     grad_kernel.resize_as_(kernel);
     grad_kernel.zero_();
 
-    bool is_half        = in_feat.scalar_type() == at::ScalarType::Half;
-    bool is_bfloat16    = in_feat.scalar_type() == at::ScalarType::BFloat16;
-    int  n_in_feats     = in_feat.size(0);
-    int  n_in_channels  = in_feat.size(1);
-    int  n_out_feats    = grad_out_feat.size(0);
-    int  n_out_channels = kernel.size(-1);
+    bool is_half       = in_feat.scalar_type() == at::ScalarType::Half;
+    bool is_bfloat16   = in_feat.scalar_type() == at::ScalarType::BFloat16;
+    int n_in_feats     = in_feat.size(0);
+    int n_in_channels  = in_feat.size(1);
+    int n_out_feats    = grad_out_feat.size(0);
+    int n_out_channels = kernel.size(-1);
 
-    int  kernel_volume = kernel.size(0);
-    bool flag          = false;
-    int  in_buffer_size;
+    int kernel_volume = kernel.size(0);
+    bool flag         = false;
+    int in_buffer_size;
     in_buffer_size = *std::max_element(neighbor_offset.data_ptr<int>(),
                                        neighbor_offset.data_ptr<int>() + kernel_volume);
 
     auto options         = torch::TensorOptions().dtype(in_feat.dtype()).device(in_feat.device());
-    auto in_buffer       = torch::zeros({ in_buffer_size, in_feat.size(1) }, options);
-    auto in_grad_buffer  = torch::zeros({ in_buffer_size, in_feat.size(1) }, options);
-    auto out_grad_buffer = torch::zeros({ in_buffer_size, kernel.size(2) }, options);
+    auto in_buffer       = torch::zeros({in_buffer_size, in_feat.size(1)}, options);
+    auto in_grad_buffer  = torch::zeros({in_buffer_size, in_feat.size(1)}, options);
+    auto out_grad_buffer = torch::zeros({in_buffer_size, kernel.size(2)}, options);
 
     int cur_offset = 0;
     for (int i = 0; i < kernel_volume; i++) {
         auto kernel_grad_buffer = grad_kernel[i];
-        int  n_active_feats     = neighbor_offset.data_ptr<int>()[i];
+        int n_active_feats      = neighbor_offset.data_ptr<int>()[i];
         if (flag && (i == kernel_volume / 2)) {
             cur_offset += 2 * n_active_feats;
             continue;
@@ -279,66 +326,88 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Ten
         at::Tensor in_buffer_activated;
         if (is_half) {
             out_grad_buffer_activated = torch::from_blob(
-                out_grad_buffer.data_ptr<at::Half>(), { n_active_feats, kernel.size(2) }, options);
+                out_grad_buffer.data_ptr<at::Half>(), {n_active_feats, kernel.size(2)}, options);
             in_grad_buffer_activated = torch::from_blob(
-                in_grad_buffer.data_ptr<at::Half>(), { n_active_feats, in_feat.size(1) }, options);
-            in_buffer_activated = torch::from_blob(in_buffer.data_ptr<at::Half>(),
-                                                   { n_active_feats, in_feat.size(1) }, options);
+                in_grad_buffer.data_ptr<at::Half>(), {n_active_feats, in_feat.size(1)}, options);
+            in_buffer_activated = torch::from_blob(
+                in_buffer.data_ptr<at::Half>(), {n_active_feats, in_feat.size(1)}, options);
         } else if (is_bfloat16) {
-            out_grad_buffer_activated =
-                torch::from_blob(out_grad_buffer.data_ptr<at::BFloat16>(),
-                                 { n_active_feats, kernel.size(2) }, options);
-            in_grad_buffer_activated =
-                torch::from_blob(in_grad_buffer.data_ptr<at::BFloat16>(),
-                                 { n_active_feats, in_feat.size(1) }, options);
-            in_buffer_activated = torch::from_blob(in_buffer.data_ptr<at::BFloat16>(),
-                                                   { n_active_feats, in_feat.size(1) }, options);
+            out_grad_buffer_activated = torch::from_blob(out_grad_buffer.data_ptr<at::BFloat16>(),
+                                                         {n_active_feats, kernel.size(2)},
+                                                         options);
+            in_grad_buffer_activated  = torch::from_blob(in_grad_buffer.data_ptr<at::BFloat16>(),
+                                                         {n_active_feats, in_feat.size(1)},
+                                                        options);
+            in_buffer_activated       = torch::from_blob(
+                in_buffer.data_ptr<at::BFloat16>(), {n_active_feats, in_feat.size(1)}, options);
         } else {
             out_grad_buffer_activated = torch::from_blob(
-                out_grad_buffer.data_ptr(), { n_active_feats, kernel.size(2) }, options);
+                out_grad_buffer.data_ptr(), {n_active_feats, kernel.size(2)}, options);
             in_grad_buffer_activated = torch::from_blob(
-                in_grad_buffer.data_ptr(), { n_active_feats, in_feat.size(1) }, options);
-            in_buffer_activated = torch::from_blob(in_buffer.data_ptr(),
-                                                   { n_active_feats, in_feat.size(1) }, options);
+                in_grad_buffer.data_ptr(), {n_active_feats, in_feat.size(1)}, options);
+            in_buffer_activated =
+                torch::from_blob(in_buffer.data_ptr(), {n_active_feats, in_feat.size(1)}, options);
         }
 
         // gather
-        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "convolution_forward_cuda",
+                       AT_WRAP([&] {
                            gatherKernel<scalar_t>
                                <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
-                                   n_active_feats, n_out_feats, n_out_channels,
+                                   n_active_feats,
+                                   n_out_feats,
+                                   n_out_channels,
                                    grad_out_feat.data_ptr<scalar_t>(),
                                    out_grad_buffer_activated.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                                   neighbor_map.data_ptr<int>() + cur_offset,
+                                   !transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
-        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "convolution_forward_cuda",
+                       AT_WRAP([&] {
                            gatherKernel<scalar_t>
                                <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                                   n_active_feats, n_in_feats, n_in_channels,
+                                   n_active_feats,
+                                   n_in_feats,
+                                   n_in_channels,
                                    in_feat.data_ptr<scalar_t>(),
                                    in_buffer_activated.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                   neighbor_map.data_ptr<int>() + cur_offset,
+                                   transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         // gemm
-        torch::mm_out(in_grad_buffer_activated, out_grad_buffer_activated,
-                      torch::transpose(kernel[i], 0, 1));
-        torch::mm_out(kernel_grad_buffer, torch::transpose(in_buffer_activated, 0, 1),
+        torch::mm_out(
+            in_grad_buffer_activated, out_grad_buffer_activated, torch::transpose(kernel[i], 0, 1));
+        torch::mm_out(kernel_grad_buffer,
+                      torch::transpose(in_buffer_activated, 0, 1),
                       out_grad_buffer_activated);
 
         // scatter
-        AT_DISPATCH_V2(in_feat.scalar_type(), "convolution_forward_cuda", AT_WRAP([&] {
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "convolution_forward_cuda",
+                       AT_WRAP([&] {
                            scatterKernel<scalar_t>
                                <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                                   n_active_feats, n_in_feats, n_in_channels,
+                                   n_active_feats,
+                                   n_in_feats,
+                                   n_in_channels,
                                    in_grad_buffer_activated.data_ptr<scalar_t>(),
                                    grad_in_feat.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                                   neighbor_map.data_ptr<int>() + cur_offset,
+                                   !transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         cur_offset += 2 * n_active_feats;
     }
@@ -346,21 +415,24 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCUDA>(at::Tensor in_feat, at::Ten
 
 template <>
 void
-dispatchSparseConvolutionKernelMap<torch::kCPU>(torch::Tensor in_feat, torch::Tensor out_feat,
-                                                torch::Tensor kernel, torch::Tensor neighbor_map,
-                                                torch::Tensor neighbor_offset, bool transpose,
+dispatchSparseConvolutionKernelMap<torch::kCPU>(torch::Tensor in_feat,
+                                                torch::Tensor out_feat,
+                                                torch::Tensor kernel,
+                                                torch::Tensor neighbor_map,
+                                                torch::Tensor neighbor_offset,
+                                                bool transpose,
                                                 bool middleAcceleration) {
     if (in_feat.size(1) != kernel.size(1)) {
         throw std::invalid_argument("Input feature size and kernel size mismatch");
     }
 
     int out_nrows = out_feat.size(0);
-    out_feat.resize_({ out_nrows, kernel.size(2) });
+    out_feat.resize_({out_nrows, kernel.size(2)});
     out_feat.zero_();
 
-    int  kernel_volume  = kernel.size(0);
-    int  in_buffer_size = 1;
-    bool flag           = false;
+    int kernel_volume  = kernel.size(0);
+    int in_buffer_size = 1;
+    bool flag          = false;
     // memory optimization
     if (kernel_volume % 2 && out_nrows == in_feat.size(0) && middleAcceleration) {
         flag           = true;
@@ -379,9 +451,9 @@ dispatchSparseConvolutionKernelMap<torch::kCPU>(torch::Tensor in_feat, torch::Te
     }
 
     auto options    = torch::TensorOptions().dtype(in_feat.dtype()).device(in_feat.device());
-    auto in_buffer  = torch::zeros({ in_buffer_size, in_feat.size(1) }, options);
-    auto out_buffer = torch::zeros({ in_buffer_size, kernel.size(2) }, options);
-    int  cur_offset = 0;
+    auto in_buffer  = torch::zeros({in_buffer_size, in_feat.size(1)}, options);
+    auto out_buffer = torch::zeros({in_buffer_size, kernel.size(2)}, options);
+    int cur_offset  = 0;
     for (int i = 0; i < kernel_volume; i++) {
         if (flag && (i == kernel_volume / 2)) {
             cur_offset += 2 * neighbor_offset.data_ptr<int>()[i];
@@ -393,55 +465,73 @@ dispatchSparseConvolutionKernelMap<torch::kCPU>(torch::Tensor in_feat, torch::Te
         }
 
         auto out_buffer_activated = torch::from_blob(
-            out_buffer.data_ptr(), { neighbor_offset.data_ptr<int>()[i], kernel.size(2) }, options);
+            out_buffer.data_ptr(), {neighbor_offset.data_ptr<int>()[i], kernel.size(2)}, options);
         auto in_buffer_activated = torch::from_blob(
-            in_buffer.data_ptr(), { neighbor_offset.data_ptr<int>()[i], in_feat.size(1) }, options);
+            in_buffer.data_ptr(), {neighbor_offset.data_ptr<int>()[i], in_feat.size(1)}, options);
 
         // gather
-        AT_DISPATCH_V2(in_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
-                           gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
+        AT_DISPATCH_V2(in_feat.scalar_type(),
+                       "gatherCpu",
+                       AT_WRAP([&]() {
+                           gatherCpu(in_buffer_activated.size(0),
+                                     in_feat.size(0),
+                                     kernel.size(1),
                                      in_feat.data_ptr<scalar_t>(),
                                      in_buffer_activated.data_ptr<scalar_t>(),
-                                     neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                     neighbor_map.data_ptr<int>() + cur_offset,
+                                     transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         // matmul
         torch::mm_out(out_buffer_activated, in_buffer_activated, kernel[i]);
 
         // scatter
-        AT_DISPATCH_V2(out_feat.scalar_type(), "scatterCpu", AT_WRAP([&]() {
-                           scatterCpu(neighbor_offset.data_ptr<int>()[i], out_nrows, kernel.size(2),
+        AT_DISPATCH_V2(out_feat.scalar_type(),
+                       "scatterCpu",
+                       AT_WRAP([&]() {
+                           scatterCpu(neighbor_offset.data_ptr<int>()[i],
+                                      out_nrows,
+                                      kernel.size(2),
                                       out_buffer_activated.data_ptr<scalar_t>(),
                                       out_feat.data_ptr<scalar_t>(),
-                                      neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                      neighbor_map.data_ptr<int>() + cur_offset,
+                                      transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
         cur_offset += 2 * neighbor_offset.data_ptr<int>()[i];
     }
 }
 
 template <>
 void
-dispatchSparseConvolutionKernelMapGrad<torch::kCPU>(at::Tensor in_feat, at::Tensor grad_in_feat,
-                                                    at::Tensor grad_out_feat, at::Tensor kernel,
-                                                    at::Tensor grad_kernel, at::Tensor neighbor_map,
-                                                    at::Tensor neighbor_offset, bool transpose) {
+dispatchSparseConvolutionKernelMapGrad<torch::kCPU>(at::Tensor in_feat,
+                                                    at::Tensor grad_in_feat,
+                                                    at::Tensor grad_out_feat,
+                                                    at::Tensor kernel,
+                                                    at::Tensor grad_kernel,
+                                                    at::Tensor neighbor_map,
+                                                    at::Tensor neighbor_offset,
+                                                    bool transpose) {
     grad_in_feat.resize_as_(in_feat);
     grad_in_feat.zero_();
     grad_kernel.resize_as_(kernel);
     grad_kernel.zero_();
 
-    int  kernel_volume = kernel.size(0);
-    bool flag          = false;
-    int  in_buffer_size;
+    int kernel_volume = kernel.size(0);
+    bool flag         = false;
+    int in_buffer_size;
     in_buffer_size = *std::max_element(neighbor_offset.data_ptr<int>(),
                                        neighbor_offset.data_ptr<int>() + kernel_volume);
 
     auto options         = torch::TensorOptions().dtype(in_feat.dtype()).device(in_feat.device());
-    auto in_buffer       = torch::zeros({ in_buffer_size, in_feat.size(1) }, options);
-    auto in_grad_buffer  = torch::zeros({ in_buffer_size, in_feat.size(1) }, options);
-    auto out_grad_buffer = torch::zeros({ in_buffer_size, kernel.size(2) }, options);
+    auto in_buffer       = torch::zeros({in_buffer_size, in_feat.size(1)}, options);
+    auto in_grad_buffer  = torch::zeros({in_buffer_size, in_feat.size(1)}, options);
+    auto out_grad_buffer = torch::zeros({in_buffer_size, kernel.size(2)}, options);
 
     int cur_offset = 0;
     for (int i = 0; i < kernel_volume; i++) {
@@ -457,43 +547,67 @@ dispatchSparseConvolutionKernelMapGrad<torch::kCPU>(at::Tensor in_feat, at::Tens
 
         auto out_grad_buffer_activated =
             torch::from_blob(out_grad_buffer.data_ptr(),
-                             { neighbor_offset.data_ptr<int>()[i], kernel.size(2) }, options);
+                             {neighbor_offset.data_ptr<int>()[i], kernel.size(2)},
+                             options);
         auto in_grad_buffer_activated =
             torch::from_blob(in_grad_buffer.data_ptr(),
-                             { neighbor_offset.data_ptr<int>()[i], in_feat.size(1) }, options);
+                             {neighbor_offset.data_ptr<int>()[i], in_feat.size(1)},
+                             options);
         auto in_buffer_activated = torch::from_blob(
-            in_buffer.data_ptr(), { neighbor_offset.data_ptr<int>()[i], in_feat.size(1) }, options);
+            in_buffer.data_ptr(), {neighbor_offset.data_ptr<int>()[i], in_feat.size(1)}, options);
 
         // gather
-        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
-                           gatherCpu(out_grad_buffer_activated.size(0), grad_out_feat.size(0),
-                                     kernel.size(2), grad_out_feat.data_ptr<scalar_t>(),
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(),
+                       "gatherCpu",
+                       AT_WRAP([&]() {
+                           gatherCpu(out_grad_buffer_activated.size(0),
+                                     grad_out_feat.size(0),
+                                     kernel.size(2),
+                                     grad_out_feat.data_ptr<scalar_t>(),
                                      out_grad_buffer_activated.data_ptr<scalar_t>(),
-                                     neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                                     neighbor_map.data_ptr<int>() + cur_offset,
+                                     !transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
-        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "gatherCpu", AT_WRAP([&]() {
-                           gatherCpu(in_buffer_activated.size(0), in_feat.size(0), kernel.size(1),
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(),
+                       "gatherCpu",
+                       AT_WRAP([&]() {
+                           gatherCpu(in_buffer_activated.size(0),
+                                     in_feat.size(0),
+                                     kernel.size(1),
                                      in_feat.data_ptr<scalar_t>(),
                                      in_buffer_activated.data_ptr<scalar_t>(),
-                                     neighbor_map.data_ptr<int>() + cur_offset, transpose);
+                                     neighbor_map.data_ptr<int>() + cur_offset,
+                                     transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         // matmul
-        torch::mm_out(in_grad_buffer_activated, out_grad_buffer_activated,
-                      torch::transpose(kernel[i], 0, 1));
-        torch::mm_out(kernel_grad_buffer, torch::transpose(in_buffer_activated, 0, 1),
+        torch::mm_out(
+            in_grad_buffer_activated, out_grad_buffer_activated, torch::transpose(kernel[i], 0, 1));
+        torch::mm_out(kernel_grad_buffer,
+                      torch::transpose(in_buffer_activated, 0, 1),
                       out_grad_buffer_activated);
 
         // scatter
-        AT_DISPATCH_V2(grad_out_feat.scalar_type(), "scatterCpu", AT_WRAP([&]() {
-                           scatterCpu(neighbor_offset.data_ptr<int>()[i], in_feat.size(0),
-                                      kernel.size(1), in_grad_buffer_activated.data_ptr<scalar_t>(),
+        AT_DISPATCH_V2(grad_out_feat.scalar_type(),
+                       "scatterCpu",
+                       AT_WRAP([&]() {
+                           scatterCpu(neighbor_offset.data_ptr<int>()[i],
+                                      in_feat.size(0),
+                                      kernel.size(1),
+                                      in_grad_buffer_activated.data_ptr<scalar_t>(),
                                       grad_in_feat.data_ptr<scalar_t>(),
-                                      neighbor_map.data_ptr<int>() + cur_offset, !transpose);
+                                      neighbor_map.data_ptr<int>() + cur_offset,
+                                      !transpose);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf,
+                       c10::kBFloat16);
 
         cur_offset += 2 * neighbor_offset.data_ptr<int>()[i];
     }

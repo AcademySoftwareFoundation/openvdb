@@ -18,8 +18,11 @@ struct SampleGridTrilinear : public torch::autograd::Function<SampleGridTrilinea
     using Variable        = torch::autograd::Variable;
     using JaggedVariable  = JaggedTensor;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 JaggedTensor points, Variable data, bool returnGrad = false);
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 JaggedTensor points,
+                                 Variable data,
+                                 bool returnGrad = false);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
@@ -30,8 +33,11 @@ struct SampleGridBezier : public torch::autograd::Function<SampleGridBezier> {
     using Variable        = torch::autograd::Variable;
     using JaggedVariable  = JaggedTensor;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 JaggedTensor points, Variable data, bool returnGrad = false);
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 JaggedTensor points,
+                                 Variable data,
+                                 bool returnGrad = false);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

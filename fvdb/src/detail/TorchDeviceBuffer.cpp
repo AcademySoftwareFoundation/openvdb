@@ -33,23 +33,24 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
     auto buffer = fvdb::detail::TorchDeviceBuffer::create(mBuffer.size(), &guide);
 
     if (iAmHost && guideIsHost) {
-        std::memcpy(buffer.data(), mBuffer.data(),
+        std::memcpy(buffer.data(),
+                    mBuffer.data(),
                     mBuffer.size()); // deep copy of buffer in CPU RAM
         return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmHost && guideIsDevice) {
-        const at::cuda::CUDAGuard device_guard{ guide.device() };
-        cudaCheck(cudaMemcpy(buffer.deviceData(), mBuffer.data(), mBuffer.size(),
-                             cudaMemcpyHostToDevice));
+        const at::cuda::CUDAGuard device_guard{guide.device()};
+        cudaCheck(cudaMemcpy(
+            buffer.deviceData(), mBuffer.data(), mBuffer.size(), cudaMemcpyHostToDevice));
         return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmDevice && guideIsHost) {
-        const at::cuda::CUDAGuard device_guard{ mBuffer.device() };
-        cudaCheck(cudaMemcpy(buffer.data(), mBuffer.deviceData(), mBuffer.size(),
-                             cudaMemcpyDeviceToHost));
+        const at::cuda::CUDAGuard device_guard{mBuffer.device()};
+        cudaCheck(cudaMemcpy(
+            buffer.data(), mBuffer.deviceData(), mBuffer.size(), cudaMemcpyDeviceToHost));
         return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else if (iAmDevice && guideIsDevice) {
-        const at::cuda::CUDAGuard device_guard{ guide.device() };
-        cudaCheck(cudaMemcpy(buffer.deviceData(), mBuffer.deviceData(), mBuffer.size(),
-                             cudaMemcpyDeviceToDevice));
+        const at::cuda::CUDAGuard device_guard{guide.device()};
+        cudaCheck(cudaMemcpy(
+            buffer.deviceData(), mBuffer.deviceData(), mBuffer.size(), cudaMemcpyDeviceToDevice));
         return GridHandle<fvdb::detail::TorchDeviceBuffer>(std::move(buffer));
     } else {
         TORCH_CHECK(false, "All host/device combos exhausted. This should never happen.");
@@ -61,7 +62,7 @@ GridHandle<fvdb::detail::TorchDeviceBuffer>::copy(
 namespace fvdb {
 namespace detail {
 
-TorchDeviceBuffer::TorchDeviceBuffer(uint64_t             size /* = 0*/,
+TorchDeviceBuffer::TorchDeviceBuffer(uint64_t size /* = 0*/,
                                      const torch::Device &device /* = torch::kCPU*/)
     : mSize(size), mData(nullptr), mDevice(device) {
     if (!mSize) {

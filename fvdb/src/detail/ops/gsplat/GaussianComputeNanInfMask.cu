@@ -10,12 +10,12 @@ namespace ops {
 
 template <typename T>
 __global__ void
-__launch_bounds__(256) computeNanInfMaskKernel(fvdb::TorchRAcc64<T, 2>    means,          // [N, 3]
-                                               fvdb::TorchRAcc64<T, 2>    quats,          // [N, 4]
-                                               fvdb::TorchRAcc64<T, 2>    logScales,      // [N, 3]
-                                               fvdb::TorchRAcc64<T, 1>    logitOpacities, // [N,]
-                                               fvdb::TorchRAcc64<T, 3>    sh0,     // [1, N, D]
-                                               fvdb::TorchRAcc64<T, 3>    shN,     // [K-1, N, D]
+__launch_bounds__(256) computeNanInfMaskKernel(fvdb::TorchRAcc64<T, 2> means,          // [N, 3]
+                                               fvdb::TorchRAcc64<T, 2> quats,          // [N, 4]
+                                               fvdb::TorchRAcc64<T, 2> logScales,      // [N, 3]
+                                               fvdb::TorchRAcc64<T, 1> logitOpacities, // [N,]
+                                               fvdb::TorchRAcc64<T, 3> sh0,            // [1, N, D]
+                                               fvdb::TorchRAcc64<T, 3> shN,        // [K-1, N, D]
                                                fvdb::TorchRAcc64<bool, 1> outValid // [N,]
 ) {
     for (int x = blockIdx.x * blockDim.x + threadIdx.x; x < means.size(0);
@@ -90,7 +90,7 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
 
     if (means.rsize(0) == 0) {
         return means.jagged_like(
-            torch::empty({ 0 }, torch::TensorOptions().dtype(torch::kBool).device(means.device())));
+            torch::empty({0}, torch::TensorOptions().dtype(torch::kBool).device(means.device())));
     }
     const at::cuda::OptionalCUDAGuard device_guard(device_of(means.jdata()));
     at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(means.device().index());
@@ -98,13 +98,15 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
     const auto N = means.rsize(0);
 
     auto outValid =
-        torch::empty({ N }, torch::TensorOptions().dtype(torch::kBool).device(means.device()));
+        torch::empty({N}, torch::TensorOptions().dtype(torch::kBool).device(means.device()));
 
     const size_t NUM_THREADS = 256;
     const size_t NUM_BLOCKS  = (N + NUM_THREADS - 1) / NUM_THREADS;
 
     AT_DISPATCH_V2(
-        means.scalar_type(), "computeNanInfMaskKernel", AT_WRAP([&] {
+        means.scalar_type(),
+        "computeNanInfMaskKernel",
+        AT_WRAP([&] {
             computeNanInfMaskKernel<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
                 means.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                 quats.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),

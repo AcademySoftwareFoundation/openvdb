@@ -1,9 +1,18 @@
 ---
 Language: Cpp
+Standard: c++20
 
 # Indentation
+TabWidth: 4
 IndentWidth: 4
 UseTab: Never
+IndentPPDirectives: None
+IndentWrappedFunctionNames: false
+NamespaceIndentation: None
+
+# Empty lines
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
 
 # Line length
 ColumnLimit: 100
@@ -12,11 +21,28 @@ ColumnLimit: 100
 DeriveLineEnding: false
 LineEnding: LF
 
+# Breaking and Penalties
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Attach
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializersBeforeComma: false
+BreakInheritanceList: BeforeColon
+BreakStringLiterals: false
+
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+
 # Spacing and padding
 SpaceAfterCStyleCast: false
 SpaceAfterTemplateKeyword: true
 SpaceAfterLogicalNot: false
 SpaceAfterControlStatementKeyword: true
+SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
 SpaceBeforeRangeBasedForLoopColon: false
 SpaceInEmptyParentheses: false
@@ -31,8 +57,6 @@ SpaceBeforeInheritanceColon: true
 SpaceBeforeSquareBrackets: false
 SpacesInSquareBrackets: false
 SpaceBeforeCaseColon: false
-BreakBeforeBinaryOperators: None
-SpaceBeforeAssignmentOperators: true
 
 # Brace placement
 BraceWrapping:
@@ -49,6 +73,7 @@ BraceWrapping:
   SplitEmptyFunction: false
   SplitEmptyRecord: false
   SplitEmptyNamespace: false
+Cpp11BracedListStyle: true
 
 # Function definitions
 # BreakAfterReturnType: AllDefinitions
@@ -56,55 +81,50 @@ AlwaysBreakAfterDefinitionReturnType: All
 
 # Alignment
 AlignConsecutiveAssignments: true
-AlignConsecutiveDeclarations: true
+AlignConsecutiveBitFields: true
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
 AlignOperands: true
 AlignTrailingComments:
   Kind: Always
   OverEmptyLines: 2
 
-# Miscellaneous
+# Single line allowances
+BinPackParameters: false
+BinPackArguments: false
+AllowAllArgumentsOnNextLine: true
+AllowAllConstructorInitializersOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: true
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: true
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: false
+AllowShortLambdasOnASingleLine: true
 AllowShortLoopsOnASingleLine: false
-AllowAllParametersOfDeclarationOnNextLine: true
-BreakBeforeBraces: Attach
-BreakBeforeTernaryOperators: true
-BreakConstructorInitializersBeforeComma: false
-BreakInheritanceList: BeforeColon
-BreakStringLiterals: false
-Cpp11BracedListStyle: false
+
+# Sorting
 IncludeBlocks: Regroup
 IncludeIsMainRegex: "$"
 IncludeCategories:
   - Regex:           '^"' # quoted includes
     Priority:        1
-  - Regex:           '^<(detail/|Types.h|JaggedTensor.h|GridBatch.h|SparseConvPackInfo.h|Config.h|FVDB.h|GaussianSplatting.h)' # fvdb includes
-    Priority:        1
-  - Regex:           '^<nanovdb/' # nanovdb includes
+  - Regex:           '^<(detail/|tests/|Types.h|JaggedTensor.h|GridBatch.h|SparseConvPackInfo.h|Config.h|FVDB.h|GaussianSplatting.h)' # fvdb includes
     Priority:        2
-  - Regex:           '^<(torch|c10|THC|ATen)/' # torch includes
+  - Regex:           '^<nanovdb/' # nanovdb includes
     Priority:        3
-  - Regex:           '^<(cooperative_groups|cuco|cuda.h|cuda_|device_types|math_constants|nvtx3|cute)' # CUDA includes
+  - Regex:           '^<(torch|c10|THC|ATen)/' # torch includes
     Priority:        4
-  - Regex:           '^<.*\..*' # other system includes (e.g. with a '.')
+  - Regex:           '^<(thrust|cub|cuda)/' # CCCL includes
     Priority:        5
-  - Regex:           '^<[^.]+' # STL includes (no '.')
+  - Regex:           '^<(cooperative_groups|cuco|cuda.h|cuda_|device_types|math_constants|nvtx3|cute)' # CUDA includes
     Priority:        6
+  - Regex:           '^<.*\..*' # other system includes (e.g. with a '.')
+    Priority:        7
+  - Regex:           '^<[^.]+' # STL includes (no '.')
+    Priority:        8
 IncludeIsMainSourceRegex: "$"
-IndentPPDirectives: None
-IndentWrappedFunctionNames: false
-KeepEmptyLinesAtTheStartOfBlocks: false
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
-PenaltyBreakAssignment: 2
-PenaltyBreakBeforeFirstCallParameter: 19
-PenaltyBreakComment: 300
-PenaltyBreakFirstLessLess: 120
-PenaltyBreakString: 1000
-PenaltyExcessCharacter: 1000000
-PenaltyReturnTypeOnItsOwnLine: 60
 SortIncludes: true
 SortUsingDeclarations: true
-TabWidth: 4
-Standard: c++20
+

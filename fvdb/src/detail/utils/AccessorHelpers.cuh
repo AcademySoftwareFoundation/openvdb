@@ -85,7 +85,8 @@ gridBatchAccessor(const fvdb::detail::GridBatchImpl &batchHdl) {
 /// @return A JaggedTensor accessor (either JaggedAccessor or PackedJaggedAccessor32)
 template <c10::DeviceType DeviceTag, typename T, size_t N>
 typename std::conditional<DeviceTag == torch::kCUDA || DeviceTag == torch::kPrivateUse1,
-                          fvdb::JaggedRAcc32<T, N>, fvdb::JaggedAcc<T, N>>::type
+                          fvdb::JaggedRAcc32<T, N>,
+                          fvdb::JaggedAcc<T, N>>::type
 jaggedAccessor(const fvdb::JaggedTensor &jaggedTensor) {
     if constexpr (DeviceTag == torch::kCUDA || DeviceTag == torch::kPrivateUse1) {
         return jaggedTensor.packed_accessor32<T, N, torch::RestrictPtrTraits>();

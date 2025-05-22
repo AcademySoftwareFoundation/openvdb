@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/ops/Ops.h>
 
 #include <torch/extension.h>
@@ -27,7 +28,11 @@ template <> struct global_load<16> {
                      "  @p ld.global.v4.u32 {%0, %1, %2, %3}, [%4];\n"
                      "}\n"
                      : "=r"(data.x), "=r"(data.y), "=r"(data.z), "=r"(data.w)
-                     : "l"(ptr), "r"((int)(pred_guard & 1)), "r"(data.x), "r"(data.y), "r"(data.z),
+                     : "l"(ptr),
+                       "r"((int)(pred_guard & 1)),
+                       "r"(data.x),
+                       "r"(data.y),
+                       "r"(data.z),
                        "r"(data.w));
     }
 };
@@ -46,8 +51,10 @@ template <> struct global_load<8> {
                          "  @p ld.global.v2.u32 {%0, %1}, [%2];\n"
                          "}\n"
                          : "=r"(data.x), "=r"(data.y)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data.x), "r"(data.y));
+                         : "l"(ptr_ldg + ldg_idx),
+                           "r"((int)(pred_guard & (1 << ldg_idx))),
+                           "r"(data.x),
+                           "r"(data.y));
         }
     }
 };
@@ -58,15 +65,15 @@ template <> struct global_load<4> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 4; ldg_idx++) {
             unsigned &data = *(reinterpret_cast<unsigned *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b32 %0, %3;\n"
-                         "  @p ld.global.u32 %0, [%1];\n"
-                         "}\n"
-                         : "=r"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b32 %0, %3;\n"
+                "  @p ld.global.u32 %0, [%1];\n"
+                "}\n"
+                : "=r"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "r"(data));
         }
     }
 };
@@ -77,15 +84,15 @@ template <> struct global_load<2> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 8; ldg_idx++) {
             uint16_t &data = *(reinterpret_cast<uint16_t *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b16 %0, %3;\n"
-                         "  @p ld.global.u16 %0, [%1];\n"
-                         "}\n"
-                         : "=h"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "h"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b16 %0, %3;\n"
+                "  @p ld.global.u16 %0, [%1];\n"
+                "}\n"
+                : "=h"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "h"(data));
         }
     }
 };
@@ -109,20 +116,28 @@ __pack_half2(const half x, const half y) {
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_bf16bf16f32_sort
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, __nv_bfloat16 *__restrict__ A, __nv_bfloat16 *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    __nv_bfloat16 *__restrict__ C) {
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+__launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   int split_mask_len,
+                                                                   int reduced_mask_len,
+                                                                   int reorder_loc_len,
+                                                                   __nv_bfloat16 *__restrict__ A,
+                                                                   __nv_bfloat16 *__restrict__ B,
+                                                                   int *__restrict__ reduced_mask,
+                                                                   int *__restrict__ out_in_map,
+                                                                   int *__restrict__ reorder_loc,
+                                                                   __nv_bfloat16 *__restrict__ C) {
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float                    C_warp[32];
+    float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[640];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[8];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -130,16 +145,16 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = (N + 15) / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = (N + 15) / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 16) / K_tile_padded +
                           ((threadIdx.x * 8) % 16) / K_tile_padded;
-    int           *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int           *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     __nv_bfloat16 *A_ptr =
         A + ((threadIdx.y * 256 % 16) % K_tile_padded) + ((threadIdx.x * 8 % 16) % K_tile_padded);
     __nv_bfloat16 *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -150,8 +165,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(
                            (blockIdx_y % j_factors1) * 16 + threadIdx.y / 2 * 16 +
                            (threadIdx.x % 4) * 2;
 
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -194,8 +209,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(
                     B_pred_guard |= (1 << i);
             }
 
-            int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
-            __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * 16 % K_tile_padded);
+            int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
+            __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * 16 % K_tile_padded);
             __nv_bfloat16 *B_ptr_local;
             if constexpr (K_ld_check)
                 B_ptr_local = B_ptr + (i2_0_0 * K_tile / K_tile_padded * K_original +
@@ -425,19 +440,28 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_f16f16f32_sort
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, half *__restrict__ A, half *__restrict__ B, int *__restrict__ reduced_mask,
-    int *__restrict__ out_in_map, int *__restrict__ reorder_loc, half *__restrict__ C) {
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+__launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 int split_mask_len,
+                                                                 int reduced_mask_len,
+                                                                 int reorder_loc_len,
+                                                                 half *__restrict__ A,
+                                                                 half *__restrict__ B,
+                                                                 int *__restrict__ reduced_mask,
+                                                                 int *__restrict__ out_in_map,
+                                                                 int *__restrict__ reorder_loc,
+                                                                 half *__restrict__ C) {
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float           C_warp[32];
+    float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[640];
-    half            A_shared_warp[32];
-    half            B_shared_warp[8];
+    half A_shared_warp[32];
+    half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -445,16 +469,16 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = (N + 15) / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = (N + 15) / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 16) / K_tile_padded +
                           ((threadIdx.x * 8) % 16) / K_tile_padded;
-    int  *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int  *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     half *A_ptr =
         A + ((threadIdx.y * 256 % 16) % K_tile_padded) + ((threadIdx.x * 8 % 16) % K_tile_padded);
     half *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -464,8 +488,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(
     half *C_ptr = C + M * N * blockIdx_z + (blockIdx_x % 1) * j_factors1 * 16 +
                   (blockIdx_y % j_factors1) * 16 + threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
 
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -508,8 +532,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(
                     B_pred_guard |= (1 << i);
             }
 
-            int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
-            half *A_ptr_local          = A_ptr + (i2_0_0 * 16 % K_tile_padded);
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
+            half *A_ptr_local         = A_ptr + (i2_0_0 * 16 % K_tile_padded);
             half *B_ptr_local;
             if constexpr (K_ld_check)
                 B_ptr_local = B_ptr + (i2_0_0 * K_tile / K_tile_padded * K_original +
@@ -738,17 +762,25 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_bf16bf16f32_sort
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, __nv_bfloat16 *__restrict__ A, __nv_bfloat16 *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    __nv_bfloat16 *__restrict__ C) {
-    int                      K_implicit = K_original * kernel_volume;
-    float                    C_warp[32];
+__launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   int split_mask_len,
+                                                                   int reduced_mask_len,
+                                                                   int reorder_loc_len,
+                                                                   __nv_bfloat16 *__restrict__ A,
+                                                                   __nv_bfloat16 *__restrict__ B,
+                                                                   int *__restrict__ reduced_mask,
+                                                                   int *__restrict__ out_in_map,
+                                                                   int *__restrict__ reorder_loc,
+                                                                   __nv_bfloat16 *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[1280];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[8];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -756,16 +788,16 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int           *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int           *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     __nv_bfloat16 *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     __nv_bfloat16 *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -793,9 +825,9 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            __nv_bfloat16 *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * 32 % K_original);
+            __nv_bfloat16 *B_ptr_local = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
@@ -1007,16 +1039,25 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_f16f16f32_sort
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, half *__restrict__ A, half *__restrict__ B, int *__restrict__ reduced_mask,
-    int *__restrict__ out_in_map, int *__restrict__ reorder_loc, half *__restrict__ C) {
-    int             K_implicit = K_original * kernel_volume;
-    float           C_warp[32];
+__launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 int split_mask_len,
+                                                                 int reduced_mask_len,
+                                                                 int reorder_loc_len,
+                                                                 half *__restrict__ A,
+                                                                 half *__restrict__ B,
+                                                                 int *__restrict__ reduced_mask,
+                                                                 int *__restrict__ out_in_map,
+                                                                 int *__restrict__ reorder_loc,
+                                                                 half *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[1280];
-    half            A_shared_warp[32];
-    half            B_shared_warp[8];
+    half A_shared_warp[32];
+    half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -1024,16 +1065,16 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int  *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int  *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     half *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     half *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -1061,9 +1102,9 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            half *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            half *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            half *A_ptr_local         = A_ptr + (i2_0_0 * 32 % K_original);
+            half *B_ptr_local         = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
@@ -1275,17 +1316,25 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_bf16bf16f32_sort
 __global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, __nv_bfloat16 *__restrict__ A, __nv_bfloat16 *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    __nv_bfloat16 *__restrict__ C) {
-    int                      K_implicit = K_original * kernel_volume;
-    float                    C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_mask_len,
+                                                                    int reduced_mask_len,
+                                                                    int reorder_loc_len,
+                                                                    __nv_bfloat16 *__restrict__ A,
+                                                                    __nv_bfloat16 *__restrict__ B,
+                                                                    int *__restrict__ reduced_mask,
+                                                                    int *__restrict__ out_in_map,
+                                                                    int *__restrict__ reorder_loc,
+                                                                    __nv_bfloat16 *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[2304];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[16];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1295,16 +1344,16 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 4;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 4;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int           *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int           *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     __nv_bfloat16 *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     __nv_bfloat16 *B_ptr = B + (blockIdx_y % j_factors1) * 64 + threadIdx.y * 256 / 64 * N +
@@ -1332,9 +1381,9 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            __nv_bfloat16 *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * 32 % K_original);
+            __nv_bfloat16 *B_ptr_local = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1592,16 +1641,25 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_f16f16f32_sort
 __global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, half *__restrict__ A, half *__restrict__ B, int *__restrict__ reduced_mask,
-    int *__restrict__ out_in_map, int *__restrict__ reorder_loc, half *__restrict__ C) {
-    int             K_implicit = K_original * kernel_volume;
-    float           C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_mask_len,
+                                                                  int reduced_mask_len,
+                                                                  int reorder_loc_len,
+                                                                  half *__restrict__ A,
+                                                                  half *__restrict__ B,
+                                                                  int *__restrict__ reduced_mask,
+                                                                  int *__restrict__ out_in_map,
+                                                                  int *__restrict__ reorder_loc,
+                                                                  half *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[2304];
-    half            A_shared_warp[32];
-    half            B_shared_warp[16];
+    half A_shared_warp[32];
+    half B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1611,16 +1669,16 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 4;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 4;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int  *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int  *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     half *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     half *B_ptr = B + (blockIdx_y % j_factors1) * 64 + threadIdx.y * 256 / 64 * N +
@@ -1648,9 +1706,9 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            half *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            half *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            half *A_ptr_local         = A_ptr + (i2_0_0 * 32 % K_original);
+            half *B_ptr_local         = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1909,20 +1967,28 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_tf32tf32f32_sort
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+__launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   int split_mask_len,
+                                                                   int reduced_mask_len,
+                                                                   int reorder_loc_len,
+                                                                   float *__restrict__ A,
+                                                                   float *__restrict__ B,
+                                                                   int *__restrict__ reduced_mask,
+                                                                   int *__restrict__ out_in_map,
+                                                                   int *__restrict__ reorder_loc,
+                                                                   float *__restrict__ C) {
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float            C_warp[32];
+    float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[640];
-    float            A_shared_warp[32];
-    float            B_shared_warp[8];
+    float A_shared_warp[32];
+    float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -1930,16 +1996,16 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = (N + 15) / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = (N + 15) / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 16 + threadIdx.x / 2;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 16) / K_tile_padded +
                           ((threadIdx.x * 8) % 16) / K_tile_padded;
-    int   *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int   *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     float *A_ptr =
         A + ((threadIdx.y * 256 % 16) % K_tile_padded) + ((threadIdx.x * 8 % 16) % K_tile_padded);
     float *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -1949,8 +2015,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
     float *C_ptr = C + M * N * blockIdx_z + (blockIdx_x % 1) * j_factors1 * 16 +
                    (blockIdx_y % j_factors1) * 16 + threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
 
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -1993,8 +2059,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
                     B_pred_guard |= (1 << i);
             }
 
-            int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
-            float *A_ptr_local          = A_ptr + (i2_0_0 * 16 % K_tile_padded);
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_tile_padded;
+            float *A_ptr_local        = A_ptr + (i2_0_0 * 16 % K_tile_padded);
             float *B_ptr_local;
             if constexpr (K_ld_check)
                 B_ptr_local = B_ptr + (i2_0_0 * K_tile / K_tile_padded * K_original +
@@ -2009,7 +2075,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
                                                       (ax0_ax1_fused_0 * 512 % 16) / K_tile_padded];
 
                 if (input_idx != -1) {
-                    uint4 A_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                    uint4 A_loaded[2] = {make_uint4(0, 0, 0, 0)};
                     global_load<K_ld_factor>(A_loaded[0],
                                              A_ptr_local + input_idx * K_original +
                                                  ((ax0_ax1_fused_0 * 512 % 16) % K_tile_padded),
@@ -2033,10 +2099,10 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
             }
 
             if (threadIdx.y == 0) {
-                uint4 B_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                uint4 B_loaded[2] = {make_uint4(0, 0, 0, 0)};
                 global_load<N_ld_factor>(B_loaded[0], B_ptr_local, B_pred_guard);
-                global_load<N_ld_factor>(B_loaded[1], B_ptr_local + 4,
-                                         B_pred_guard >> (4 * 4 / N_ld_factor));
+                global_load<N_ld_factor>(
+                    B_loaded[1], B_ptr_local + 4, B_pred_guard >> (4 * 4 / N_ld_factor));
                 *(ulonglong4 *)(B_shared +
                                 (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1) * 40)) +
                                  ((((int)threadIdx.x) & 1) * 8))) =
@@ -2172,17 +2238,25 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_tf32tf32f32_sort
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
-    int              K_implicit = K_original * kernel_volume;
-    float            C_warp[32];
+__launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   int split_mask_len,
+                                                                   int reduced_mask_len,
+                                                                   int reorder_loc_len,
+                                                                   float *__restrict__ A,
+                                                                   float *__restrict__ B,
+                                                                   int *__restrict__ reduced_mask,
+                                                                   int *__restrict__ out_in_map,
+                                                                   int *__restrict__ reorder_loc,
+                                                                   float *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[1280];
-    float            A_shared_warp[32];
-    float            B_shared_warp[8];
+    float A_shared_warp[32];
+    float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -2190,16 +2264,16 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 1;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 1;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int   *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int   *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     float *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     float *B_ptr = B + (blockIdx_y % j_factors1) * 16 + threadIdx.y * 256 / 16 * N +
@@ -2227,9 +2301,9 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            float *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            float *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            float *A_ptr_local        = A_ptr + (i2_0_0 * 32 % K_original);
+            float *B_ptr_local        = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
@@ -2388,17 +2462,25 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_tf32tf32f32_sort
 __global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
-    int              K_implicit = K_original * kernel_volume;
-    float            C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(int M,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_mask_len,
+                                                                    int reduced_mask_len,
+                                                                    int reorder_loc_len,
+                                                                    float *__restrict__ A,
+                                                                    float *__restrict__ B,
+                                                                    int *__restrict__ reduced_mask,
+                                                                    int *__restrict__ out_in_map,
+                                                                    int *__restrict__ reorder_loc,
+                                                                    float *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[2304];
-    float            A_shared_warp[32];
-    float            B_shared_warp[16];
+    float A_shared_warp[32];
+    float B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -2408,16 +2490,16 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1        = N / 16 / 4;
-    int  blockIdx_x        = 0;
-    int  blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
-    int  blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
-    int  out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
-    int *out_in_map_ptr    = out_in_map + out_in_map_offset * kernel_volume +
+    int j_factors1        = N / 16 / 4;
+    int blockIdx_x        = 0;
+    int blockIdx_y        = blockIdx.x % ((M + 128 - 1) / 128 * j_factors1);
+    int blockIdx_z        = blockIdx.x / ((M + 128 - 1) / 128 * j_factors1);
+    int out_in_map_offset = blockIdx_y / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4;
+    int *out_in_map_ptr   = out_in_map + out_in_map_offset * kernel_volume +
                           ((threadIdx.y * 256) % 32) / K_original +
                           ((threadIdx.x * 8) % 32) / K_original;
-    int   *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
-    int   *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
+    int *reduced_mask_ptr = reduced_mask + blockIdx_z * reduced_mask_len;
+    int *reorder_loc_ptr  = reorder_loc + blockIdx_z * reorder_loc_len;
     float *A_ptr =
         A + ((threadIdx.y * 256 % 32) % K_original) + ((threadIdx.x * 8 % 32) % K_original);
     float *B_ptr = B + (blockIdx_y % j_factors1) * 64 + threadIdx.y * 256 / 64 * N +
@@ -2445,9 +2527,9 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
         if (bit_flag) {
-            int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-            float *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-            float *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+            int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+            float *A_ptr_local        = A_ptr + (i2_0_0 * 32 % K_original);
+            float *B_ptr_local        = B_ptr + i2_0_0 * 32 * N;
 
             __syncthreads();
             for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -2638,21 +2720,29 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(
 // conv_forward_cuda_m128n16k16_f32f32f32_sort
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 int split_mask_len,
+                                                                 int reduced_mask_len,
+                                                                 int reorder_loc_len,
+                                                                 float *__restrict__ A,
+                                                                 float *__restrict__ B,
+                                                                 int *__restrict__ reduced_mask,
+                                                                 int *__restrict__ out_in_map,
+                                                                 int *__restrict__ reorder_loc,
+                                                                 float *__restrict__ C) {
     int j_factors1 = (N - 1) / 16 + 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float            C_local[32];
+    float C_local[32];
     __shared__ float A_shared[2048];
     __shared__ float B_shared[256];
 
@@ -2688,16 +2778,16 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
     // float * C_ptr = C
     // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
     // + blockIdx_n * 16 + (threadIdx_x % 4);
-    int    location_offset  = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
-    int    C_n_offset       = blockIdx_n * 16 + (threadIdx_x % 4);
-    float *C_block          = C + blockIdx_z * M * N;
-    int    channel_offset_A = ((threadIdx_x * 4) % 16);
+    int location_offset  = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
+    int C_n_offset       = blockIdx_n * 16 + (threadIdx_x % 4);
+    float *C_block       = C + blockIdx_z * M * N;
+    int channel_offset_A = ((threadIdx_x * 4) % 16);
 
     // const int K_ld_factor = (8 * !(K_original % 8)) + (4 * !(K_original % 4)) + (2 * !(K_original
     // % 2)) + 1;
     // TODO: A_ld_start related to k_0
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
@@ -2709,9 +2799,9 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
 
 #pragma unroll
     for (int k_0 = block_k_iter_start; k_0 < block_k_iter_end; ++k_0) {
-        int  kernel_offset = k_0 / (K_tile_padded / K_tile);
-        int  bitmask_shift = kernel_offset - blockIdx_z * split_mask_len;
-        bool bit_flag      = (bool)(reduced_mask_block[blockIdx_m] & (1 << bitmask_shift));
+        int kernel_offset = k_0 / (K_tile_padded / K_tile);
+        int bitmask_shift = kernel_offset - blockIdx_z * split_mask_len;
+        bool bit_flag     = (bool)(reduced_mask_block[blockIdx_m] & (1 << bitmask_shift));
         if (bit_flag) {
             if constexpr (K_ld_check) {
                 A_ld_start =
@@ -2734,8 +2824,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
                     B_pred_guard |= (1 << i);
             }
 
-            int   *out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
-            float *A_ptr_local          = A + (k_0 * 16 % K_tile_padded) + channel_offset_A;
+            int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
+            float *A_ptr_local        = A + (k_0 * 16 % K_tile_padded) + channel_offset_A;
 
             // float *B_ptr_local = B_ptr + i2_0_0 * K_tile * N;
             float *B_ptr_local;
@@ -2755,8 +2845,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
                     // elements loaded in each loop
                     //     *(float4*)(A + (input_idx * K_original) + channel_offset);
                     uint4 A_loaded = make_uint4(0, 0, 0, 0);
-                    global_load<K_ld_factor>(A_loaded, A_ptr_local + (input_idx * K_original),
-                                             A_pred_guard);
+                    global_load<K_ld_factor>(
+                        A_loaded, A_ptr_local + (input_idx * K_original), A_pred_guard);
                     *(uint4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = A_loaded;
                 } else {
                     // *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_float4(0.0, 0.0,
@@ -2771,8 +2861,8 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
                 // ax0_ax1_fused_0_1 * elements loaded in each loop
                 //       *(float4*)(B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N);
                 uint4 B_loaded = make_uint4(0, 0, 0, 0);
-                global_load<N_ld_factor>(B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N,
-                                         B_pred_guard);
+                global_load<N_ld_factor>(
+                    B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N, B_pred_guard);
                 *(uint4 *)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) = B_loaded;
             }
 
@@ -2810,17 +2900,25 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(
 
 // conv_forward_cuda_m128n16k32_f32f32f32_sort
 __global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode1_f32f32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting2_mode1_f32f32f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 int split_mask_len,
+                                                                 int reduced_mask_len,
+                                                                 int reorder_loc_len,
+                                                                 float *__restrict__ A,
+                                                                 float *__restrict__ B,
+                                                                 int *__restrict__ reduced_mask,
+                                                                 int *__restrict__ out_in_map,
+                                                                 int *__restrict__ reorder_loc,
+                                                                 float *__restrict__ C) {
     int j_factors1 = (N - 1) / 16 + 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 
-    float            C_local[32];
+    float C_local[32];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[512];
 
@@ -2855,17 +2953,17 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f32f32f32(
     // float * C_ptr = C
     // // + (blockIdx_m * 128 + (threadIdx_x / 4)) * N
     // + blockIdx_n * 16 + (threadIdx_x % 4);
-    int    location_offset = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
-    int    C_n_offset      = blockIdx_n * 16 + (threadIdx_x % 4);
-    float *C_block         = C + blockIdx_z * M * N;
+    int location_offset = blockIdx_m * 128 + (threadIdx_x / 4); // C_m_offset
+    int C_n_offset      = blockIdx_n * 16 + (threadIdx_x % 4);
+    float *C_block      = C + blockIdx_z * M * N;
 
     int channel_offset_A = ((threadIdx_x * 4) % 32); // mod K_tile=32
 
 #pragma unroll
     for (int k_0 = block_k_iter_start; k_0 < block_k_iter_end; ++k_0) {
-        int  channel_offset   = k_0 % (K_original / 32) * 32 + channel_offset_A;
-        int  kernel_offset    = k_0 / (K_original / 32);
-        int  bitmask_shift    = kernel_offset - blockIdx_z * split_mask_len;
+        int channel_offset    = k_0 % (K_original / 32) * 32 + channel_offset_A;
+        int kernel_offset     = k_0 / (K_original / 32);
+        int bitmask_shift     = kernel_offset - blockIdx_z * split_mask_len;
         int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
         bool bit_flag = (bool)(reduced_mask_block[blockIdx_m] & (1 << bitmask_shift));
@@ -2922,17 +3020,25 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f32f32f32(
 
 // conv_forward_cuda_m128n64k32_f32f32f32_sort
 __global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode1_f32f32f32(
-    int M, int K_original, int N, int kernel_volume, int split_mask_len, int reduced_mask_len,
-    int reorder_loc_len, float *__restrict__ A, float *__restrict__ B,
-    int *__restrict__ reduced_mask, int *__restrict__ out_in_map, int *__restrict__ reorder_loc,
-    float *__restrict__ C) {
+__launch_bounds__(128) conv_forward_cuda_setting3_mode1_f32f32f32(int M,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_mask_len,
+                                                                  int reduced_mask_len,
+                                                                  int reorder_loc_len,
+                                                                  float *__restrict__ A,
+                                                                  float *__restrict__ B,
+                                                                  int *__restrict__ reduced_mask,
+                                                                  int *__restrict__ out_in_map,
+                                                                  int *__restrict__ reorder_loc,
+                                                                  float *__restrict__ C) {
     int j_factors1 = (N - 1) / 64 + 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 
-    float            C_local[64];
+    float C_local[64];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[2048];
 
@@ -2967,17 +3073,17 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f32f32f32(
     // float * C_ptr = C
     // // + (blockIdx_m * 128 + (threadIdx_x / 16)) * N
     // + blockIdx_n * 64 + (threadIdx_x % 16);
-    int    location_offset = blockIdx_m * 128 + (threadIdx_x / 16); // C_m_offset
-    int    C_n_offset      = blockIdx_n * 64 + (threadIdx_x % 16);
-    float *C_block         = C + blockIdx_z * M * N;
+    int location_offset = blockIdx_m * 128 + (threadIdx_x / 16); // C_m_offset
+    int C_n_offset      = blockIdx_n * 64 + (threadIdx_x % 16);
+    float *C_block      = C + blockIdx_z * M * N;
 
     int channel_offset_A = ((threadIdx_x * 4) % 32); // mod K_tile=32
 
 #pragma unroll
     for (int k_0 = block_k_iter_start; k_0 < block_k_iter_end; ++k_0) {
-        int  channel_offset   = k_0 % (K_original / 32) * 32 + channel_offset_A;
-        int  kernel_offset    = k_0 / (K_original / 32);
-        int  bitmask_shift    = kernel_offset - blockIdx_z * split_mask_len;
+        int channel_offset    = k_0 % (K_original / 32) * 32 + channel_offset_A;
+        int kernel_offset     = k_0 / (K_original / 32);
+        int bitmask_shift     = kernel_offset - blockIdx_z * split_mask_len;
         int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
         bool bit_flag = (bool)(reduced_mask_block[blockIdx_m] & (1 << bitmask_shift));
@@ -3034,26 +3140,31 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f32f32f32(
 
 template <>
 torch::Tensor
-dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
-    torch::Tensor _in_feats, torch::Tensor _kernel, torch::Tensor _out_in_map,
-    torch::Tensor _reduced_mask, torch::Tensor _reorder_loc, int num_out_feats,
-    int num_out_channels, bool allow_tf32, bool allow_fp16) {
-    bool is_tf           = allow_tf32;
-    int  num_in_feats    = _in_feats.size(0);
-    int  num_in_channels = _in_feats.size(1);
-    int  kernel_volume   = _out_in_map.size(1);
+dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(torch::Tensor _in_feats,
+                                                          torch::Tensor _kernel,
+                                                          torch::Tensor _out_in_map,
+                                                          torch::Tensor _reduced_mask,
+                                                          torch::Tensor _reorder_loc,
+                                                          int num_out_feats,
+                                                          int num_out_channels,
+                                                          bool allow_tf32,
+                                                          bool allow_fp16) {
+    bool is_tf          = allow_tf32;
+    int num_in_feats    = _in_feats.size(0);
+    int num_in_channels = _in_feats.size(1);
+    int kernel_volume   = _out_in_map.size(1);
 
     int split_mask_num   = _reduced_mask.size(0);
     int split_mask_len   = (kernel_volume + split_mask_num - 1) / split_mask_num;
     int reduced_mask_len = _reduced_mask.size(1);
     int reorder_loc_len  = _reorder_loc.size(1);
 
-    auto       options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
+    auto options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
     at::Tensor _out_feats;
     if (split_mask_num != 1)
-        _out_feats = torch::empty({ split_mask_num, num_out_feats, num_out_channels }, options);
+        _out_feats = torch::empty({split_mask_num, num_out_feats, num_out_channels}, options);
     else
-        _out_feats = torch::empty({ num_out_feats, num_out_channels }, options);
+        _out_feats = torch::empty({num_out_feats, num_out_channels}, options);
     auto reduced_mask = _reduced_mask.data_ptr<int>();
     auto out_in_map   = _out_in_map.data_ptr<int>();
     auto reorder_loc  = _reorder_loc.data_ptr<int>();
@@ -3066,28 +3177,48 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
         auto out_feats = reinterpret_cast<__nv_bfloat16 *>(_out_feats.data_ptr<at::BFloat16>());
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode1_bf16bf16f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode1_bf16bf16f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -3098,162 +3229,387 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_bf16bf16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             }
         }
@@ -3269,28 +3625,48 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
         auto out_feats = reinterpret_cast<half *>(_out_feats.data_ptr<at::Half>());
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode1_f16f16f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode1_f16f16f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -3301,162 +3677,387 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f16f16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f16f16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f16f16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f16f16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f16f16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             }
         }
@@ -3468,28 +4069,48 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
         auto out_feats = _out_feats.data_ptr<float>();
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode1_tf32tf32f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode1_tf32tf32f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                _reduced_mask.size(1), _reorder_loc.size(1), in_feats, kernel, reduced_mask,
-                out_in_map, reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                _reduced_mask.size(1),
+                _reorder_loc.size(1),
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks(1 * (num_out_feats + 127) / 128 * j_factors1 * split_mask_num);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -3500,106 +4121,250 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_tf32tf32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, _reduced_mask.size(1), _reorder_loc.size(1), in_feats,
-                            kernel, reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            _reduced_mask.size(1),
+                                                            _reorder_loc.size(1),
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             }
         }
@@ -3611,26 +4376,46 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
         auto out_feats = _out_feats.data_ptr<float>();
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = num_out_channels / 64; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = num_out_channels / 64; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N * split_mask_num);
             dim3 threads_per_block(128);
             conv_forward_cuda_setting3_mode1_f32f32f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                reduced_mask_len, reorder_loc_len, in_feats, kernel, reduced_mask, out_in_map,
-                reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                reduced_mask_len,
+                reorder_loc_len,
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = num_out_channels / 16; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = num_out_channels / 16; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N * split_mask_num);
             dim3 threads_per_block(64);
             conv_forward_cuda_setting2_mode1_f32f32f32<<<num_blocks, threads_per_block>>>(
-                num_out_feats, num_in_channels, num_out_channels, kernel_volume, split_mask_len,
-                reduced_mask_len, reorder_loc_len, in_feats, kernel, reduced_mask, out_in_map,
-                reorder_loc, out_feats);
+                num_out_feats,
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_mask_len,
+                reduced_mask_len,
+                reorder_loc_len,
+                in_feats,
+                kernel,
+                reduced_mask,
+                out_in_map,
+                reorder_loc,
+                out_feats);
         } else {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = (num_out_channels + 15) / 16; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = (num_out_channels + 15) / 16; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N * split_mask_num);
             dim3 threads_per_block(64);
             // conv_forward_cuda_setting1_mode1_tf32tf32f32<<<num_blocks, threads_per_block>>>(
@@ -3641,106 +4426,250 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f32f32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f32f32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode1_f32f32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode1_f32f32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            num_out_feats, num_in_channels, num_out_channels, kernel_volume,
-                            split_mask_len, reduced_mask_len, reorder_loc_len, in_feats, kernel,
-                            reduced_mask, out_in_map, reorder_loc, out_feats);
+                        <<<num_blocks, threads_per_block>>>(num_out_feats,
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_mask_len,
+                                                            reduced_mask_len,
+                                                            reorder_loc_len,
+                                                            in_feats,
+                                                            kernel,
+                                                            reduced_mask,
+                                                            out_in_map,
+                                                            reorder_loc,
+                                                            out_feats);
                 }
             }
         }
@@ -3753,10 +4682,15 @@ dispatchSparseConvolutionImplicitGEMMSorted<torch::kCUDA>(
 
 template <>
 torch::Tensor
-dispatchSparseConvolutionImplicitGEMMSorted<torch::kCPU>(
-    torch::Tensor _in_feats, torch::Tensor _kernel, torch::Tensor _out_in_map,
-    torch::Tensor _reduced_mask, torch::Tensor _reorder_loc, int num_out_feats,
-    int num_out_channels, bool allow_tf32, bool allow_fp16) {
+dispatchSparseConvolutionImplicitGEMMSorted<torch::kCPU>(torch::Tensor _in_feats,
+                                                         torch::Tensor _kernel,
+                                                         torch::Tensor _out_in_map,
+                                                         torch::Tensor _reduced_mask,
+                                                         torch::Tensor _reorder_loc,
+                                                         int num_out_feats,
+                                                         int num_out_channels,
+                                                         bool allow_tf32,
+                                                         bool allow_fp16) {
     TORCH_CHECK(false, "No support for CPU-based ImplicitGEMM!");
 }
 

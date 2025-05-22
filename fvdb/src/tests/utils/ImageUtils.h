@@ -14,8 +14,8 @@ namespace fvdb::test {
 /// @param colors Tensor of shape [H, W, 3] representing RGB image data
 /// @param alphas Tensor of shape [H, W, 1] representing alpha values
 /// @param filename The filename to write the image to
-void writePNG(const torch::Tensor &colors, const torch::Tensor &alphas,
-              const std::string &filename);
+void
+writePNG(const torch::Tensor &colors, const torch::Tensor &alphas, const std::string &filename);
 
 } // namespace fvdb::test
 

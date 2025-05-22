@@ -19,7 +19,8 @@ namespace ops {
 template <template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
 countEnabledPerLeafOneGridCallback(const nanovdb::NanoGrid<nanovdb::ValueOnIndexMask> *gpuGrid,
-                                   int32_t li, int32_t ci,
+                                   int32_t li,
+                                   int32_t ci,
                                    TensorAccessor<int64_t, 1> outUnmaskedPerLeaf) {
     using LeafNodeT       = typename nanovdb::NanoTree<nanovdb::ValueOnIndexMask>::LeafNodeType;
     const LeafNodeT &leaf = gpuGrid->tree().template getFirstNode<0>()[li];
@@ -35,11 +36,12 @@ countEnabledPerLeafOneGridCallback(const nanovdb::NanoGrid<nanovdb::ValueOnIndex
 /// @return
 template <template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
-countUnmaskedPerLeafCallback(int32_t batchIdx, int32_t leafIdx,
+countUnmaskedPerLeafCallback(int32_t batchIdx,
+                             int32_t leafIdx,
                              GridBatchImpl::Accessor<nanovdb::ValueOnIndexMask> batchAccessor,
                              TensorAccessor<int64_t, 1> outUnmaskedPerLeaf) {
-    using GridType                                                 = nanovdb::ValueOnIndexMask;
-    const nanovdb::NanoGrid<GridType>                        *grid = batchAccessor.grid(batchIdx);
+    using GridType                          = nanovdb::ValueOnIndexMask;
+    const nanovdb::NanoGrid<GridType> *grid = batchAccessor.grid(batchIdx);
     const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const int64_t numUnmasked = (int64_t)leaf.template get<TotalUnmaskedPerLeaf<GridType>>(1111);
@@ -49,7 +51,7 @@ countUnmaskedPerLeafCallback(int32_t batchIdx, int32_t leafIdx,
 template <c10::DeviceType DeviceTag>
 int64_t
 CountEnabledVoxels(const GridBatchImpl &batchHdl, int batchIdx) {
-    auto          opts = torch::TensorOptions().dtype(torch::kInt64).device(batchHdl.device());
+    auto opts = torch::TensorOptions().dtype(torch::kInt64).device(batchHdl.device());
     torch::Tensor unmaskedPerLeaf;
     // auto batchAccessor = batchHdl.deviceAccessor<nanovdb::ValueOnIndexMask>();
 
@@ -59,21 +61,25 @@ CountEnabledVoxels(const GridBatchImpl &batchHdl, int batchIdx) {
         }
         // Count the number of unmasked voxels in each leaf node, then cumsum and return the last
         // item to get the total
-        unmaskedPerLeaf         = torch::empty({ batchHdl.totalLeaves() }, opts);
+        unmaskedPerLeaf         = torch::empty({batchHdl.totalLeaves()}, opts);
         auto unmaskedPerLeafAcc = tensorAccessor<DeviceTag, int64_t, 1>(unmaskedPerLeaf);
         if constexpr (DeviceTag == torch::kCUDA) {
             auto callback =
-                [=] __device__(int32_t batchIdx, int32_t leafIdx, int32_t,
+                [=] __device__(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t,
                                GridBatchImpl::Accessor<nanovdb::ValueOnIndexMask> batchAcc) {
-                    countUnmaskedPerLeafCallback<TorchRAcc32>(batchIdx, leafIdx, batchAcc,
-                                                              unmaskedPerLeafAcc);
+                    countUnmaskedPerLeafCallback<TorchRAcc32>(
+                        batchIdx, leafIdx, batchAcc, unmaskedPerLeafAcc);
                 };
             forEachLeafCUDA<nanovdb::ValueOnIndexMask>(1024, 1, batchHdl, callback);
         } else {
-            auto callback = [=](int32_t batchIdx, int32_t leafIdx, int32_t,
+            auto callback = [=](int32_t batchIdx,
+                                int32_t leafIdx,
+                                int32_t,
                                 GridBatchImpl::Accessor<nanovdb::ValueOnIndexMask> batchAcc) {
-                countUnmaskedPerLeafCallback<TorchAcc>(batchIdx, leafIdx, batchAcc,
-                                                       unmaskedPerLeafAcc);
+                countUnmaskedPerLeafCallback<TorchAcc>(
+                    batchIdx, leafIdx, batchAcc, unmaskedPerLeafAcc);
             };
             forEachLeafCPU<nanovdb::ValueOnIndexMask>(1, batchHdl, callback);
         }
@@ -82,21 +88,23 @@ CountEnabledVoxels(const GridBatchImpl &batchHdl, int batchIdx) {
             return 0;
         }
         // Count the number of unmasked voxels in each leaf node for a single batch item
-        unmaskedPerLeaf         = torch::empty({ batchHdl.numLeaves(batchIdx) }, opts);
+        unmaskedPerLeaf         = torch::empty({batchHdl.numLeaves(batchIdx)}, opts);
         auto unmaskedPerLeafAcc = tensorAccessor<DeviceTag, int64_t, 1>(unmaskedPerLeaf);
         if constexpr (DeviceTag == torch::kCUDA) {
             auto callback = [=] __device__(const nanovdb::NanoGrid<nanovdb::ValueOnIndexMask> *grid,
-                                           int32_t leafIdx, int32_t cIdx) {
-                countEnabledPerLeafOneGridCallback<TorchRAcc32>(grid, leafIdx, cIdx,
-                                                                unmaskedPerLeafAcc);
+                                           int32_t leafIdx,
+                                           int32_t cIdx) {
+                countEnabledPerLeafOneGridCallback<TorchRAcc32>(
+                    grid, leafIdx, cIdx, unmaskedPerLeafAcc);
             };
-            forEachLeafInOneGridCUDA<nanovdb::ValueOnIndexMask>(1024, 1, batchIdx, batchHdl,
-                                                                callback);
+            forEachLeafInOneGridCUDA<nanovdb::ValueOnIndexMask>(
+                1024, 1, batchIdx, batchHdl, callback);
         } else {
             auto callback = [=](const nanovdb::NanoGrid<nanovdb::ValueOnIndexMask> *grid,
-                                int32_t leafIdx, int32_t cIdx) {
-                countEnabledPerLeafOneGridCallback<TorchAcc>(grid, leafIdx, cIdx,
-                                                             unmaskedPerLeafAcc);
+                                int32_t leafIdx,
+                                int32_t cIdx) {
+                countEnabledPerLeafOneGridCallback<TorchAcc>(
+                    grid, leafIdx, cIdx, unmaskedPerLeafAcc);
             };
             forEachLeafInOneGridCPU<nanovdb::ValueOnIndexMask>(1, batchIdx, batchHdl, callback);
         }

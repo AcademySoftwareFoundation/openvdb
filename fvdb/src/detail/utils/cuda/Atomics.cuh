@@ -11,10 +11,10 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             uint32_t *address_as_ui = (uint32_t *)(address - ((size_t)address & 3));               \
-            uint32_t  old           = *address_as_ui;                                              \
-            uint32_t  shift         = ((size_t)address & 3) * 8;                                   \
-            uint32_t  sum;                                                                         \
-            uint32_t  assumed;                                                                     \
+            uint32_t old            = *address_as_ui;                                              \
+            uint32_t shift          = ((size_t)address & 3) * 8;                                   \
+            uint32_t sum;                                                                          \
+            uint32_t assumed;                                                                      \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
@@ -29,10 +29,10 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             uint32_t *address_as_ui = (uint32_t *)((char *)address - ((size_t)address & 2));       \
-            uint32_t  old           = *address_as_ui;                                              \
-            uint32_t  sum;                                                                         \
-            uint32_t  newval;                                                                      \
-            uint32_t  assumed;                                                                     \
+            uint32_t old            = *address_as_ui;                                              \
+            uint32_t sum;                                                                          \
+            uint32_t newval;                                                                       \
+            uint32_t assumed;                                                                      \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
@@ -48,8 +48,8 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             uint32_t *address_as_ui = (uint32_t *)address;                                         \
-            uint32_t  old           = *address_as_ui;                                              \
-            uint32_t  assumed;                                                                     \
+            uint32_t old            = *address_as_ui;                                              \
+            uint32_t assumed;                                                                      \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
@@ -62,8 +62,8 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             unsigned long long *address_as_ull = (unsigned long long *)address;                    \
-            unsigned long long  old            = *address_as_ull;                                  \
-            unsigned long long  assumed;                                                           \
+            unsigned long long old             = *address_as_ull;                                  \
+            unsigned long long assumed;                                                            \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
@@ -118,13 +118,13 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             int *address_as_i = (int *)address;                                                    \
-            int  old          = *address_as_i;                                                     \
-            int  assumed;                                                                          \
+            int old           = *address_as_i;                                                     \
+            int assumed;                                                                           \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
-                old     = atomicCAS(address_as_i, assumed,                                         \
-                                    __float_as_int(OP(val, __int_as_float(assumed))));             \
+                old     = atomicCAS(                                                               \
+                    address_as_i, assumed, __float_as_int(OP(val, __int_as_float(assumed))));  \
             } while (assumed != old);                                                              \
         }                                                                                          \
     };                                                                                             \
@@ -133,13 +133,14 @@
         inline __device__ void                                                                     \
         operator()(scalar *address, scalar val) {                                                  \
             unsigned long long int *address_as_ull = (unsigned long long int *)address;            \
-            unsigned long long int  old            = *address_as_ull;                              \
-            unsigned long long int  assumed;                                                       \
+            unsigned long long int old             = *address_as_ull;                              \
+            unsigned long long int assumed;                                                        \
                                                                                                    \
             do {                                                                                   \
                 assumed = old;                                                                     \
-                old     = atomicCAS(address_as_ull, assumed,                                       \
-                                    __double_as_longlong(OP(val, __longlong_as_double(assumed)))); \
+                old     = atomicCAS(address_as_ull,                                                \
+                                assumed,                                                       \
+                                __double_as_longlong(OP(val, __longlong_as_double(assumed)))); \
             } while (assumed != old);                                                              \
         }                                                                                          \
     };

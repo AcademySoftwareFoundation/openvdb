@@ -25,8 +25,10 @@ struct FillFromGrid : public torch::autograd::Function<FillFromGrid> {
     using Variable        = torch::autograd::Variable;
 
     static variable_list
-    forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> fromGrid,
-            c10::intrusive_ptr<GridBatchImpl> toGrid, Variable fromFeatures,
+    forward(AutogradContext *ctx,
+            c10::intrusive_ptr<GridBatchImpl> fromGrid,
+            c10::intrusive_ptr<GridBatchImpl> toGrid,
+            Variable fromFeatures,
             const int default_value = 0.0) {
         TORCH_CHECK_VALUE(fromFeatures.size(0) == fromGrid->totalVoxels(),
                           "fromFeatures must conform to fromGrid");
@@ -34,9 +36,10 @@ struct FillFromGrid : public torch::autograd::Function<FillFromGrid> {
                           "fromGrid and toGrid must have the same batch size");
 
         torch::Tensor fromFeaturesReshape = featureCoalescedView(fromFeatures);
-        torch::Tensor ret = torch::full({ toGrid->totalVoxels(), fromFeaturesReshape.size(1) },
-                                        default_value, fromFeaturesReshape.options());
-        auto outShape     = spliceShape({ toGrid->totalVoxels() }, fromFeatures, 1); // [B*M, *]
+        torch::Tensor ret = torch::full({toGrid->totalVoxels(), fromFeaturesReshape.size(1)},
+                                        default_value,
+                                        fromFeaturesReshape.options());
+        auto outShape     = spliceShape({toGrid->totalVoxels()}, fromFeatures, 1); // [B*M, *]
 
         // Dispatch to kernel.
         FVDB_DISPATCH_KERNEL_DEVICE(fromGrid->device(), [&]() {
@@ -46,7 +49,7 @@ struct FillFromGrid : public torch::autograd::Function<FillFromGrid> {
         ctx->saved_data["from_grid"] = fromGrid;
         ctx->saved_data["to_grid"]   = toGrid;
 
-        return variable_list({ ret.reshape(outShape) });
+        return variable_list({ret.reshape(outShape)});
     }
 
     static variable_list
@@ -56,22 +59,21 @@ struct FillFromGrid : public torch::autograd::Function<FillFromGrid> {
 
         auto fromGrid = ctx->saved_data["from_grid"].toCustomClass<GridBatchImpl>();
         auto toGrid   = ctx->saved_data["to_grid"].toCustomClass<GridBatchImpl>();
-        auto outShape = spliceShape({ fromGrid->totalVoxels() }, gradFeatures, 1); // [B*M, *]
+        auto outShape = spliceShape({fromGrid->totalVoxels()}, gradFeatures, 1); // [B*M, *]
 
         // The default grad_input is always 0.0, since gradient will only propagate for overlapped
         // voxels.
-        torch::Tensor gradInput =
-            torch::zeros({ fromGrid->totalVoxels(), gradFeaturesReshape.size(1) },
-                         gradFeaturesReshape.options());
+        torch::Tensor gradInput = torch::zeros(
+            {fromGrid->totalVoxels(), gradFeaturesReshape.size(1)}, gradFeaturesReshape.options());
 
         // Dispatch same kernel but with to and from switched.
         FVDB_DISPATCH_KERNEL_DEVICE(fromGrid->device(), [&]() {
-            ops::dispatchFillFromGrid<DeviceTag>(*toGrid, *fromGrid, gradFeaturesReshape,
-                                                 gradInput);
+            ops::dispatchFillFromGrid<DeviceTag>(
+                *toGrid, *fromGrid, gradFeaturesReshape, gradInput);
         });
 
         return variable_list(
-            { torch::Tensor(), torch::Tensor(), gradInput.reshape(outShape), torch::Tensor() });
+            {torch::Tensor(), torch::Tensor(), gradInput.reshape(outShape), torch::Tensor()});
     }
 };
 

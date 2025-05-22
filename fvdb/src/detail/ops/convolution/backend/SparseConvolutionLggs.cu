@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 
 #include <c10/cuda/CUDAException.h>
@@ -38,16 +39,20 @@ struct ConvolutionFunctorV1 {
     using SmemCopyAtom   = Copy_Atom<DefaultCopy, tfloat32_t>;
 
     void __device__
-    operator()(float *deviceInputTensor, float *deviceOutputTensor, float *deviceStencil,
-               int numVoxels, int32_t *deviceSpokeIndicesFlattenedOffset,
+    operator()(float *deviceInputTensor,
+               float *deviceOutputTensor,
+               float *deviceStencil,
+               int numVoxels,
+               int32_t *deviceSpokeIndicesFlattenedOffset,
                int32_t *deviceSpokeInputGlobalIndicesFlattenedData,
-               int32_t *deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData, char *smem_buf) {
-        int            b                 = blockIdx.x;
-        int            tid               = threadIdx.x;
-        SharedStorage &storage           = *reinterpret_cast<SharedStorage *>(smem_buf);
-        auto          &inputMatrix       = storage.inputMatrix;
-        auto          &outputMatrixSpoke = storage.outputMatrixSpoke;
-        auto          &outputMatrixBlock = storage.outputMatrixBlock;
+               int32_t *deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData,
+               char *smem_buf) {
+        int b                   = blockIdx.x;
+        int tid                 = threadIdx.x;
+        SharedStorage &storage  = *reinterpret_cast<SharedStorage *>(smem_buf);
+        auto &inputMatrix       = storage.inputMatrix;
+        auto &outputMatrixSpoke = storage.outputMatrixSpoke;
+        auto &outputMatrixBlock = storage.outputMatrixBlock;
 
         Tensor deviceSpokeIndicesFlattenedOffsetTensor =
             make_tensor(make_gmem_ptr(deviceSpokeIndicesFlattenedOffset),
@@ -60,7 +65,7 @@ struct ConvolutionFunctorV1 {
             Shape<Shape<_3, _3, _3>, Int<Di>, Int<Do>>{}, tuple<tuple<_2, _3, _4>, _0, _1>{}));
         Tensor stencil_tensor = make_tensor(make_gmem_ptr(deviceStencil), StencilLayout{});
 
-        InputMatrixType  inputTensor  = reinterpret_cast<InputMatrixType>(*deviceInputTensor);
+        InputMatrixType inputTensor   = reinterpret_cast<InputMatrixType>(*deviceInputTensor);
         OutputMatrixType outputTensor = reinterpret_cast<OutputMatrixType>(*deviceOutputTensor);
 
         for (int e = 0; e < maxIndicesPerBlock; e++) {
@@ -72,7 +77,7 @@ struct ConvolutionFunctorV1 {
 // for every spoke
 #pragma nounroll
         for (int k_tile_iter = 0; k_tile_iter < size<0>(stencil_tensor); ++k_tile_iter) {
-            auto       stencil_slice = stencil_tensor(k_tile_iter, _, _);
+            auto stencil_slice = stencil_tensor(k_tile_iter, _, _);
             const auto spokeGlobalIndicesBegin =
                 localDeviceSpokeIndicesFlattenedOffsetTensor(k_tile_iter);
             const auto spokeIndicesCount =
@@ -99,7 +104,7 @@ struct ConvolutionFunctorV1 {
                 if (e < spokeIndicesCount) {
                     auto inputIndex = spokeInputGlobalIndices[e];
                     if (inputIndex < 0) { // Won't happen if not locally densified
-                        sA_128b(e, tid_k) = float4{ 0, 0, 0, 0 };
+                        sA_128b(e, tid_k) = float4{0, 0, 0, 0};
                         continue;
                     }
                     Tensor input_tensor_slice = make_tensor(
@@ -107,7 +112,7 @@ struct ConvolutionFunctorV1 {
                         make_layout(make_shape(_32{})));
                     sA_128b(e, tid_k) = input_tensor_slice(tid_k);
                 } else {
-                    sA_128b(e, tid_k) = float4{ 0, 0, 0, 0 };
+                    sA_128b(e, tid_k) = float4{0, 0, 0, 0};
                 }
             }
             __syncthreads();
@@ -126,7 +131,7 @@ struct ConvolutionFunctorV1 {
                                         make_layout(make_shape(_M{}, _N{}), GenRowMajor{}));
 
                 TiledMma tiled_mma;
-                Tensor   accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
+                Tensor accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
 
                 auto thr_mma = tiled_mma.get_thread_slice(threadIdx.x);
 
@@ -158,7 +163,7 @@ struct ConvolutionFunctorV1 {
                                         make_layout(make_shape(_M{}, _N{}), GenRowMajor{}));
 
                 TiledMma tiled_mma;
-                Tensor   accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
+                Tensor accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
 
                 auto thr_mma = tiled_mma.get_thread_slice(threadIdx.x);
 
@@ -190,7 +195,7 @@ struct ConvolutionFunctorV1 {
                                         make_layout(make_shape(_M{}, _N{}), GenRowMajor{}));
 
                 TiledMma tiled_mma;
-                Tensor   accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
+                Tensor accum = partition_fragment_C(tiled_mma, Shape<_M, _N>{});
 
                 auto thr_mma = tiled_mma.get_thread_slice(threadIdx.x);
 
@@ -234,20 +239,30 @@ struct ConvolutionFunctorV1 {
 template <class Operator>
 __global__
 __launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor) void kernel_entrypoint(
-    float *deviceInputTensor, float *deviceOutputTensor, float *deviceStencil, int numVoxels,
-    int32_t *deviceSpokeIndicesFlattenedOffset, int32_t *deviceSpokeInputGlobalIndicesFlattenedData,
+    float *deviceInputTensor,
+    float *deviceOutputTensor,
+    float *deviceStencil,
+    int numVoxels,
+    int32_t *deviceSpokeIndicesFlattenedOffset,
+    int32_t *deviceSpokeInputGlobalIndicesFlattenedData,
     int32_t *deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
     extern __shared__ char smem_buf[];
-    Operator               op;
-    op(deviceInputTensor, deviceOutputTensor, deviceStencil, numVoxels,
-       deviceSpokeIndicesFlattenedOffset, deviceSpokeInputGlobalIndicesFlattenedData,
-       deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData, smem_buf);
+    Operator op;
+    op(deviceInputTensor,
+       deviceOutputTensor,
+       deviceStencil,
+       numVoxels,
+       deviceSpokeIndicesFlattenedOffset,
+       deviceSpokeInputGlobalIndicesFlattenedData,
+       deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData,
+       smem_buf);
 }
 
 template <>
 torch::Tensor
 dispatchSparseConvolutionLggs<torch::kCUDA>(
-    const torch::Tensor &inFeatures, const torch::Tensor &kernel,
+    const torch::Tensor &inFeatures,
+    const torch::Tensor &kernel,
     const torch::Tensor &spokeIndicesFlattenedOffset,
     const torch::Tensor &spokeInputGlobalIndicesFlattenedData,
     const torch::Tensor &spokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
@@ -257,16 +272,19 @@ dispatchSparseConvolutionLggs<torch::kCUDA>(
     const int inC = kernel.size(1), outC = kernel.size(2);
     TORCH_CHECK(inC == 128 && outC == 128, "ConvolutionFunctorV1 only supports 128x128 kernels");
 
-    torch::Tensor outFeatures = torch::empty({ inFeatures.size(0), outC }, inFeatures.options());
+    torch::Tensor outFeatures = torch::empty({inFeatures.size(0), outC}, inFeatures.options());
 
     constexpr size_t smem_size = sizeof(typename Op::SharedStorage);
-    cudaFuncSetAttribute(kernel_entrypoint<Op>, cudaFuncAttributeMaxDynamicSharedMemorySize,
-                         smem_size);
+    cudaFuncSetAttribute(
+        kernel_entrypoint<Op>, cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
 
     int blockCount = (spokeIndicesFlattenedOffset.size(0) - 1) / 27;
     kernel_entrypoint<Op><<<size_t(blockCount), Op::MaxThreadsPerBlock, smem_size>>>(
-        inFeatures.data_ptr<float>(), outFeatures.data_ptr<float>(), kernel.data_ptr<float>(),
-        inFeatures.size(0), spokeIndicesFlattenedOffset.data_ptr<int>(),
+        inFeatures.data_ptr<float>(),
+        outFeatures.data_ptr<float>(),
+        kernel.data_ptr<float>(),
+        inFeatures.size(0),
+        spokeIndicesFlattenedOffset.data_ptr<int>(),
         spokeInputGlobalIndicesFlattenedData.data_ptr<int>(),
         spokeOutputLocalOffsetsRelativeToBlockFlattenedData.data_ptr<int>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -277,7 +295,8 @@ dispatchSparseConvolutionLggs<torch::kCUDA>(
 template <>
 torch::Tensor
 dispatchSparseConvolutionLggs<torch::kCPU>(
-    const torch::Tensor &inFeatures, const torch::Tensor &kernel,
+    const torch::Tensor &inFeatures,
+    const torch::Tensor &kernel,
     const torch::Tensor &spokeIndicesFlattenedOffset,
     const torch::Tensor &spokeInputGlobalIndicesFlattenedData,
     const torch::Tensor &spokeOutputLocalOffsetsRelativeToBlockFlattenedData) {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "GaussianVectorTypes.cuh"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/AccessorHelpers.cuh>
 
@@ -19,8 +20,8 @@ namespace {
 // direction and write it out, so pull this into a function.
 template <typename T>
 __device__ inline void
-writeDLossDViewDir(T x, T y, T z, T vX, T vY, T vZ, T inorm,
-                   typename Vec3Type<T>::type *dLossDViewDir) {
+writeDLossDViewDir(
+    T x, T y, T z, T vX, T vY, T vZ, T inorm, typename Vec3Type<T>::type *dLossDViewDir) {
     using vec3t                     = typename Vec3Type<T>::type;
     const T dLossDViewDirDotViewDir = x * vX + y * vY + z * vZ;
 
@@ -31,10 +32,10 @@ writeDLossDViewDir(T x, T y, T z, T vX, T vY, T vZ, T inorm,
 
 template <typename T>
 inline __device__ void
-evalShFunctionVJP(const int64_t                     degree, // degree of SH to be evaluated
-                  const int64_t                     ci,     // camera index
-                  const int64_t                     gi,     // gaussian index
-                  const int64_t                     c,      // render channel
+evalShFunctionVJP(const int64_t degree,                     // degree of SH to be evaluated
+                  const int64_t ci,                         // camera index
+                  const int64_t gi,                         // gaussian index
+                  const int64_t c,                          // render channel
                   const typename Vec3Type<T>::type &dir,    // [3]
                   const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> coeffsN,
                   const T *dLossDRenderQuantities,          // [D]
@@ -53,7 +54,7 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
     const T x     = dir.x * inorm;
     const T y     = dir.y * inorm;
     const T z     = dir.z * inorm;
-    T       vX = 0.f, vY = 0.f, vZ = 0.f;
+    T vX = 0.f, vY = 0.f, vZ = 0.f;
 
     dLossDShNCoeffs[gi][0][c] = T(-0.48860251190292) * y * dLossDRenderQuantitiesLocal;
     dLossDShNCoeffs[gi][1][c] = T(0.48860251190292) * z * dLossDRenderQuantitiesLocal;
@@ -278,7 +279,11 @@ evalShFunctionVJP(const int64_t                     degree, // degree of SH to b
 template <typename T>
 __global__ void
 computeShBackward(
-    const int64_t C, const int64_t N, const int64_t K, const int64_t D, const int64_t shDegreeToUse,
+    const int64_t C,
+    const int64_t N,
+    const int64_t K,
+    const int64_t D,
+    const int64_t shDegreeToUse,
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> viewDirs,     // [C, N, 3]
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> shNCoeffs,    // [K-1, N, D]
     const int *__restrict__ radii,                                                    // [C, N]
@@ -302,17 +307,25 @@ computeShBackward(
         return;
     }
 
-    using vec3t             = typename Vec3Type<T>::type;
-    const bool  hasViewDirs = viewDirs.size(0) > 0;
-    const vec3t viewDir     = hasViewDirs ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
-                                          : vec3t{ T(0), T(0), T(0) };
-    const T    *dLossDRenderQuantityPtr = dLossDRenderQuantities[cid][gid].data();
+    using vec3t            = typename Vec3Type<T>::type;
+    const bool hasViewDirs = viewDirs.size(0) > 0;
+    const vec3t viewDir    = hasViewDirs ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
+                                         : vec3t{T(0), T(0), T(0)};
+    const T *dLossDRenderQuantityPtr = dLossDRenderQuantities[cid][gid].data();
 
-    vec3t  dLossDViewDir{ T(0), T(0), T(0) };
+    vec3t dLossDViewDir{T(0), T(0), T(0)};
     vec3t *outDLossDViewDirPtr = outDLossDViewDirs == nullptr ? nullptr : &dLossDViewDir;
 
-    evalShFunctionVJP(shDegreeToUse, cid, gid, c, viewDir, shNCoeffs, dLossDRenderQuantityPtr,
-                      outDLossDSh0Coeffs, outDLossDShNCoeffs, outDLossDViewDirPtr);
+    evalShFunctionVJP(shDegreeToUse,
+                      cid,
+                      gid,
+                      c,
+                      viewDir,
+                      shNCoeffs,
+                      dLossDRenderQuantityPtr,
+                      outDLossDSh0Coeffs,
+                      outDLossDShNCoeffs,
+                      outDLossDViewDirPtr);
     if (outDLossDViewDirs != nullptr) {
         gpuAtomicAdd(outDLossDViewDirs + eid * 3, dLossDViewDir.x);
         gpuAtomicAdd(outDLossDViewDirs + eid * 3 + 1, dLossDViewDir.y);
@@ -323,7 +336,9 @@ computeShBackward(
 template <typename T>
 __global__ void
 computeShDiffuseOnlyBackward(
-    const int64_t C, const int64_t N, const int64_t D,
+    const int64_t C,
+    const int64_t N,
+    const int64_t D,
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits>
         dLossDRenderQuantities,                                                      // [C, N, D]
     const int *__restrict__ radii,                                                   // [C, N]
@@ -349,12 +364,14 @@ computeShDiffuseOnlyBackward(
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
 dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-    const int64_t shDegreeToUse, const int64_t numCameras, const int64_t numGaussians,
+    const int64_t shDegreeToUse,
+    const int64_t numCameras,
+    const int64_t numGaussians,
     const torch::Tensor &viewDirs,               // [C, N, 3]
     const torch::Tensor &shNCoeffs,              // [N, K-1, D]
     const torch::Tensor &dLossDRenderQuantities, // [C, N, D]
     const torch::Tensor &radii,                  // [C, N]
-    const bool           computeDLossDViewDirs) {
+    const bool computeDLossDViewDirs) {
     const at::cuda::OptionalCUDAGuard device_guard(at::device_of(dLossDRenderQuantities));
 
     const bool hasShNCoeffs = shNCoeffs.defined();
@@ -373,7 +390,8 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     if (hasRadii) {
         TORCH_CHECK_VALUE(radii.dim() == 2, "radii must have two dimensions with shape [C, N]");
         TORCH_CHECK_VALUE(numGaussians == radii.size(1),
-                          "radii must have shape [C, N] but got shape = ", radii.sizes());
+                          "radii must have shape [C, N] but got shape = ",
+                          radii.sizes());
         TORCH_CHECK_VALUE(radii.size(0) == numCameras,
                           "radii must have shape [C, N] and C must match numCameras");
         TORCH_CHECK_VALUE(radii.is_cuda(), "radii must be a CUDA tensor");
@@ -408,7 +426,7 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     const auto tensorOptions = dLossDRenderQuantities.options();
     if (hasShNCoeffs && K > 1) {
         torch::Tensor dLossDShNCoeffs = torch::zeros_like(shNCoeffs);
-        torch::Tensor dLossDSh0Coeffs = torch::zeros({ N, 1, D }, tensorOptions);
+        torch::Tensor dLossDSh0Coeffs = torch::zeros({N, 1, D}, tensorOptions);
         torch::Tensor dLossDViewDirs;
         if (computeDLossDViewDirs) {
             dLossDViewDirs = torch::zeros_like(viewDirs);
@@ -418,9 +436,14 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
         }
 
         computeShBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
-            C, N, K, D, shDegreeToUse,
+            C,
+            N,
+            K,
+            D,
+            shDegreeToUse,
             viewDirs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            shNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(), radiiPtr,
+            shNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radiiPtr,
             dLossDRenderQuantities.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
             dLossDSh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
             dLossDShNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
@@ -429,7 +452,7 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
 
         return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
     } else {
-        torch::Tensor dLossDSh0Coeffs = torch::zeros({ N, 1, D }, tensorOptions);
+        torch::Tensor dLossDSh0Coeffs = torch::zeros({N, 1, D}, tensorOptions);
         torch::Tensor dLossDShNCoeffs;
         torch::Tensor dLossDViewDirs;
         if (N == 0) {
@@ -437,9 +460,12 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
         }
 
         computeShDiffuseOnlyBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
-            C, N, D,
+            C,
+            N,
+            D,
             dLossDRenderQuantities.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            radiiPtr, dLossDSh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>());
+            radiiPtr,
+            dLossDSh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
         return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
     }
@@ -447,14 +473,14 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
 
 template <>
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor>
-dispatchSphericalHarmonicsBackward<torch::kCPU>(const int64_t        shDegreeToUse,
-                                                const int64_t        numCameras,
-                                                const int64_t        numGaussians,
+dispatchSphericalHarmonicsBackward<torch::kCPU>(const int64_t shDegreeToUse,
+                                                const int64_t numCameras,
+                                                const int64_t numGaussians,
                                                 const torch::Tensor &dirs,     // [N, 3]
                                                 const torch::Tensor &shCoeffs, // [N, K, 3]
                                                 const torch::Tensor &dLossDRenderQuantities,
                                                 const torch::Tensor &radii,    // [N]
-                                                const bool           computeDLossDViewDirs) {
+                                                const bool computeDLossDViewDirs) {
     TORCH_CHECK(false, "CPU implementation not available");
 }
 

@@ -29,10 +29,11 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildEmptyGrid(torch::Device device, bool
 /// @param mask An optional mask tensor that can be used to mask out some of the voxels (shape =
 /// size)
 /// @return A handle to the nanovdb grid
-nanovdb::GridHandle<TorchDeviceBuffer> buildDenseGrid(torch::Device device, bool isMutable,
-                                                      const uint32_t                      batchSize,
-                                                      const nanovdb::Coord               &size,
-                                                      const nanovdb::Coord               &ijkMin,
+nanovdb::GridHandle<TorchDeviceBuffer> buildDenseGrid(torch::Device device,
+                                                      bool isMutable,
+                                                      const uint32_t batchSize,
+                                                      const nanovdb::Coord &size,
+                                                      const nanovdb::Coord &ijkMin,
                                                       const std::optional<torch::Tensor> &mask);
 
 /// @brief Build a NanoVDB grid representing the coarse grid of a given fine grid
@@ -41,9 +42,8 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildDenseGrid(torch::Device device, bool
 /// @param branchingFactor The coarsening factor from the fine grid to the coarse grid (i.e. N = [2,
 /// 2, 2] for a 2x2x2 coarsening)
 /// @return A handle to the nanovdb grid (the device will match fineGridHdl)
-nanovdb::GridHandle<TorchDeviceBuffer>
-buildCoarseGridFromFineGrid(bool isMutable, const GridBatchImpl &fineGridHdl,
-                            const nanovdb::Coord branchingFactor);
+nanovdb::GridHandle<TorchDeviceBuffer> buildCoarseGridFromFineGrid(
+    bool isMutable, const GridBatchImpl &fineGridHdl, const nanovdb::Coord branchingFactor);
 
 /// @brief Build a NanoVDB grid representing the fine grid of a given coarse grid
 /// @param isMutable Whether the grid should be mutable or not
@@ -54,12 +54,13 @@ buildCoarseGridFromFineGrid(bool isMutable, const GridBatchImpl &fineGridHdl,
 /// 2, 2) for a 2x2x2 refinement)
 /// @return A handle to the nanovdb grid (the device will match coarseGridHdl)
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseGridHdl,
+buildFineGridFromCoarseGrid(bool isMutable,
+                            const GridBatchImpl &coarseGridHdl,
                             const std::optional<JaggedTensor> &subdivMask,
-                            const nanovdb::Coord               subdivisionFactor);
+                            const nanovdb::Coord subdivisionFactor);
 
-nanovdb::GridHandle<TorchDeviceBuffer> buildConvGridFromGrid(bool                  isMutable,
-                                                             const GridBatchImpl  &baseGridHdl,
+nanovdb::GridHandle<TorchDeviceBuffer> buildConvGridFromGrid(bool isMutable,
+                                                             const GridBatchImpl &baseGridHdl,
                                                              const nanovdb::Coord &kernelSize,
                                                              const nanovdb::Coord &stride);
 
@@ -70,10 +71,8 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildConvGridFromGrid(bool               
 /// @param bmax The padding in the positive direction
 /// @param excludeBorder Whether to exclude the border voxels from padding
 /// @return A handle to the padded nanovdb grid (the device will match baseGridHdl)
-nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromGrid(bool                 isMutable,
-                                                               const GridBatchImpl &baseGridHdl,
-                                                               int bmin, int bmax,
-                                                               bool excludeBorder);
+nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromGrid(
+    bool isMutable, const GridBatchImpl &baseGridHdl, int bmin, int bmax, bool excludeBorder);
 
 /// @brief Build a NanoVDB grid from a set of points and pad each voxel ijk which contains a point
 /// from ijk - bbox.min() to ijk + bbox.max()
@@ -84,9 +83,10 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromGrid(bool             
 /// @param bbox Padding (i.e. we pad ijk from ijk - bbox.min() to ijk + bbox.max())
 /// @return A handle to the nanovdb grid (the device will match points)
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromPoints(bool isMutable, const JaggedTensor &points,
+buildPaddedGridFromPoints(bool isMutable,
+                          const JaggedTensor &points,
                           const std::vector<VoxelCoordTransform> &tx,
-                          const nanovdb::CoordBBox               &bbox);
+                          const nanovdb::CoordBBox &bbox);
 
 /// @brief Build a NanoVDB grid from a set of points where the 8 nearest voxels to each point are
 /// added to the grid
@@ -95,9 +95,8 @@ buildPaddedGridFromPoints(bool isMutable, const JaggedTensor &points,
 /// @param points The points to be encoded in the grid (JaggedTensor of shape = (B, -1, 3))
 /// @param tx Transform from world to voxel coordinates
 /// @return A handle to the nanovdb grid (the device will match points)
-nanovdb::GridHandle<TorchDeviceBuffer>
-buildNearestNeighborGridFromPoints(bool isMutable, const JaggedTensor &points,
-                                   const std::vector<VoxelCoordTransform> &tx);
+nanovdb::GridHandle<TorchDeviceBuffer> buildNearestNeighborGridFromPoints(
+    bool isMutable, const JaggedTensor &points, const std::vector<VoxelCoordTransform> &tx);
 
 /// @brief Build a NanoVDB grid from a set of ijk coordinates pad each voxel from ijk - bbox.min()
 /// to ijk + bbox.max()
@@ -107,7 +106,7 @@ buildNearestNeighborGridFromPoints(bool isMutable, const JaggedTensor &points,
 /// @param tx Transform from world to voxel coordinates
 /// @param bbox Padding (i.e. we pad ijk from ijk - bbox.min() to ijk + bbox.max())
 /// @return A handle to the nanovdb grid (the device will match coords)
-nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromCoords(bool                isMutable,
+nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromCoords(bool isMutable,
                                                                  const JaggedTensor &coords,
                                                                  const nanovdb::CoordBBox &bbox);
 
@@ -120,7 +119,9 @@ nanovdb::GridHandle<TorchDeviceBuffer> buildPaddedGridFromCoords(bool           
 /// to voxelize
 /// @return A handle to the nanovdb grid (the device will match meshVertices and meshFaces)
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildGridFromMesh(bool isMutable, const JaggedTensor meshVertices, const JaggedTensor meshFaces,
+buildGridFromMesh(bool isMutable,
+                  const JaggedTensor meshVertices,
+                  const JaggedTensor meshFaces,
                   const std::vector<VoxelCoordTransform> &tx);
 
 } // namespace build

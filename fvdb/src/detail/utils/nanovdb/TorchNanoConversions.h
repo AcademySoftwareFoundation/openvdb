@@ -19,7 +19,8 @@ tensorToVec3d(const torch::Tensor &inVec3Tensor) {
     TORCH_CHECK(vec3Tensor.numel() == 3, "tensor must be a vec3");
     TORCH_CHECK(vec3Tensor.size(0) == 3, "tensor must be a vec3");
 
-    return nanovdb::Vec3d(vec3Tensor[0].item().toDouble(), vec3Tensor[1].item().toDouble(),
+    return nanovdb::Vec3d(vec3Tensor[0].item().toDouble(),
+                          vec3Tensor[1].item().toDouble(),
                           vec3Tensor[2].item().toDouble());
 }
 
@@ -35,7 +36,8 @@ tensorToCoord(const torch::Tensor &inVec3Tensor) {
     TORCH_CHECK(at::isIntegralType(vec3Tensor.scalar_type(), false /*includeBool*/),
                 "tensor must have an integer type");
 
-    return nanovdb::Coord(vec3Tensor[0].item().toLong(), vec3Tensor[1].item().toLong(),
+    return nanovdb::Coord(vec3Tensor[0].item().toLong(),
+                          vec3Tensor[1].item().toLong(),
                           vec3Tensor[2].item().toLong());
 }
 
@@ -51,8 +53,10 @@ tensorToCoord4(const torch::Tensor &inVec3Tensor) {
     TORCH_CHECK(at::isIntegralType(vec3Tensor.scalar_type(), false /*includeBool*/),
                 "tensor must have an integer type");
 
-    return nanovdb::Vec4i(vec3Tensor[0].item().toLong(), vec3Tensor[1].item().toLong(),
-                          vec3Tensor[2].item().toLong(), vec3Tensor[3].item().toLong());
+    return nanovdb::Vec4i(vec3Tensor[0].item().toLong(),
+                          vec3Tensor[1].item().toLong(),
+                          vec3Tensor[2].item().toLong(),
+                          vec3Tensor[3].item().toLong());
 }
 
 /// @brief Convert a nanovdb::coord into a (cpu) torch tensor with exactly 3 long elements
@@ -60,9 +64,9 @@ tensorToCoord4(const torch::Tensor &inVec3Tensor) {
 /// @return A torch tensor with exactly 3 long elements
 inline torch::Tensor
 coordToTensor(const nanovdb::Coord &inCoord) {
-    auto          opts = torch::TensorOptions().dtype(torch::kLong);
-    torch::Tensor ret  = torch::empty(3, opts);
-    auto          acc  = ret.accessor<int64_t, 1>();
+    auto opts         = torch::TensorOptions().dtype(torch::kLong);
+    torch::Tensor ret = torch::empty(3, opts);
+    auto acc          = ret.accessor<int64_t, 1>();
     for (int i = 0; i < 3; i += 1) {
         acc[i] = inCoord[i];
     }
@@ -77,13 +81,17 @@ coordToTensor(const nanovdb::Coord &inCoord) {
 /// @param allowNegative If true, then negative values are allowed in the tensor
 /// @return A vector of nanovdb::Vec3d of length B
 inline std::vector<nanovdb::Vec3d>
-tensorToVec3dBatch(int64_t batchSize, const torch::Tensor &vec3ToConvert, bool allowNegative = true,
-                   std::string name = "tensor") {
-    torch::Tensor               vec3In = vec3ToConvert.squeeze();
+tensorToVec3dBatch(int64_t batchSize,
+                   const torch::Tensor &vec3ToConvert,
+                   bool allowNegative = true,
+                   std::string name   = "tensor") {
+    torch::Tensor vec3In = vec3ToConvert.squeeze();
     std::vector<nanovdb::Vec3d> returnVec;
     returnVec.reserve(batchSize);
     if (vec3In.dim() == 1) {
-        TORCH_CHECK_VALUE(vec3In.size(0) == 3, "Expected ", name,
+        TORCH_CHECK_VALUE(vec3In.size(0) == 3,
+                          "Expected ",
+                          name,
                           " to have shape [3,] or [B, 3] but got shape = [" +
                               std::to_string(vec3In.size(0)) + ",]");
         const nanovdb::Vec3d voxS = fvdb::tensorToVec3d(vec3In);
@@ -96,11 +104,15 @@ tensorToVec3dBatch(int64_t batchSize, const torch::Tensor &vec3ToConvert, bool a
             returnVec.push_back(voxS);
         }
     } else if (vec3In.dim() == 2) {
-        TORCH_CHECK(vec3In.size(0) == batchSize, "Expected ", name,
+        TORCH_CHECK(vec3In.size(0) == batchSize,
+                    "Expected ",
+                    name,
                     " to have shape [3,] or [B, 3] but got shape = [" +
                         std::to_string(vec3In.size(0)) + ", " + std::to_string(vec3In.size(1)) +
                         "]");
-        TORCH_CHECK(vec3In.size(0) == batchSize, "Expected ", name,
+        TORCH_CHECK(vec3In.size(0) == batchSize,
+                    "Expected ",
+                    name,
                     " to have shape [3,] or [B, 3] but got shape = [" +
                         std::to_string(vec3In.size(0)) + ", " + std::to_string(vec3In.size(1)) +
                         "]");

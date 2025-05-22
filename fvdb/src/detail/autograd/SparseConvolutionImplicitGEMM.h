@@ -20,8 +20,11 @@ struct SparseConvolutionImplicitGEMM
     using Variable        = torch::autograd::Variable;
 
     static variable_list
-    forward(AutogradContext *ctx, Variable inFeatures, Variable kernels,
-            SparseConvPackInfo packInfo, bool transposed) {
+    forward(AutogradContext *ctx,
+            Variable inFeatures,
+            Variable kernels,
+            SparseConvPackInfo packInfo,
+            bool transposed) {
         if (transposed) {
             packInfo = packInfo.transposed();
         }
@@ -29,10 +32,10 @@ struct SparseConvolutionImplicitGEMM
         TORCH_CHECK(packInfo.outInMap().has_value(),
                     "Out In Map must be built for IGEMM sparse convolution");
         torch::Tensor outInMap = packInfo.outInMap().value();
-        bool          useTF32  = packInfo.useTF32();
+        bool useTF32           = packInfo.useTF32();
 
-        const std::vector<int> sizes = { (int)packInfo.sourceGrid().total_voxels(),
-                                         (int)packInfo.targetGrid().total_voxels() };
+        const std::vector<int> sizes = {(int)packInfo.sourceGrid().total_voxels(),
+                                        (int)packInfo.targetGrid().total_voxels()};
         TORCH_CHECK(packInfo.sourceGrid().is_mutable() == packInfo.targetGrid().is_mutable(),
                     "Source and target grids must both be mutable or immutable");
 
@@ -46,11 +49,12 @@ struct SparseConvolutionImplicitGEMM
                 std::to_string(inFeatures.dim()) + " dimensions");
         TORCH_CHECK_TYPE(kernels.is_floating_point(), "kernels must have a floating point type");
         for (int i = 0; i < kernels.dim(); i += 1) {
-            TORCH_CHECK_VALUE(kernels.size(i) != 0, "kernels tensor has zero dimension (dim = " +
-                                                        std::to_string(i) + ")");
+            TORCH_CHECK_VALUE(kernels.size(i) != 0,
+                              "kernels tensor has zero dimension (dim = " + std::to_string(i) +
+                                  ")");
         }
 
-        auto          opt    = torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
+        auto opt             = torch::TensorOptions().dtype(torch::kInt32).device(torch::kCPU);
         torch::Tensor kWidth = torch::empty(
             {
                 3,
@@ -74,7 +78,7 @@ struct SparseConvolutionImplicitGEMM
             kWidth[0] = kernels.size(2);
             kWidth[1] = kernels.size(3);
             kWidth[2] = kernels.size(4);
-            kernels   = kernels.permute({ 4, 3, 2, 1, 0 }).reshape({ -1, inC, outC }).contiguous();
+            kernels   = kernels.permute({4, 3, 2, 1, 0}).reshape({-1, inC, outC}).contiguous();
         } else {
             TORCH_CHECK_VALUE(inFeatures.size(0) == sizes[1],
                               "The number of input features must match the number of voxels");
@@ -92,7 +96,7 @@ struct SparseConvolutionImplicitGEMM
             kWidth[0] = kernels.size(2);
             kWidth[1] = kernels.size(3);
             kWidth[2] = kernels.size(4);
-            kernels   = kernels.permute({ 4, 3, 2, 0, 1 }).reshape({ -1, inC, outC }).contiguous();
+            kernels   = kernels.permute({4, 3, 2, 0, 1}).reshape({-1, inC, outC}).contiguous();
         }
 
         torch::Tensor output;
@@ -104,9 +108,15 @@ struct SparseConvolutionImplicitGEMM
             if (packInfo.reoderOutInMap().has_value() && canSort) {
                 output = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
                     return ops::dispatchSparseConvolutionImplicitGEMMSorted<DeviceTag>(
-                        inFeatures, kernels, packInfo.reoderOutInMap().value(),
-                        packInfo.reducedSortedMask().value(), packInfo.reorderLoc().value(),
-                        outFeats, outC, useTF32, true);
+                        inFeatures,
+                        kernels,
+                        packInfo.reoderOutInMap().value(),
+                        packInfo.reducedSortedMask().value(),
+                        packInfo.reorderLoc().value(),
+                        outFeats,
+                        outC,
+                        useTF32,
+                        true);
                 });
             } else {
                 output = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
@@ -116,21 +126,24 @@ struct SparseConvolutionImplicitGEMM
             }
         } else {
             auto opt = torch::TensorOptions().dtype(inFeatures.dtype()).device(inFeatures.device());
-            output   = torch::empty({ 0, kernels.size(-1) }, opt);
+            output   = torch::empty({0, kernels.size(-1)}, opt);
         }
 
         // Save for backward (for training mode)
         if (packInfo.outInMapBwd().has_value()) {
-            ctx->save_for_backward(
-                { inFeatures, kernels, packInfo.outInMapBwd().value(),
-                  packInfo.reorderOutInMapBwd().value(), packInfo.sortedMaskBwdW().value(),
-                  packInfo.sortedMaskBwdD().value(), packInfo.reorderLocBwd().value() });
+            ctx->save_for_backward({inFeatures,
+                                    kernels,
+                                    packInfo.outInMapBwd().value(),
+                                    packInfo.reorderOutInMapBwd().value(),
+                                    packInfo.sortedMaskBwdW().value(),
+                                    packInfo.sortedMaskBwdD().value(),
+                                    packInfo.reorderLocBwd().value()});
         }
         ctx->saved_data["use_tf32"]     = useTF32;
         ctx->saved_data["kernel_width"] = kWidth;
         ctx->saved_data["transposed"]   = transposed;
 
-        return { output };
+        return {output};
     }
 
     static variable_list
@@ -140,18 +153,18 @@ struct SparseConvolutionImplicitGEMM
             saved.size() > 0,
             "No backward context computed during forward. Please pass in training=True when calling kmap.build_implicit_gemm()");
 
-        Variable      inFeatures         = saved.at(0);
-        Variable      kernels            = saved.at(1);
-        Variable      outInMapBwd        = saved.at(2);
-        Variable      reorderOutInMapBwd = saved.at(3);
-        Variable      sortedMaskBwdW     = saved.at(4);
-        Variable      sortedMaskBwdD     = saved.at(5);
-        Variable      reorderLocBwd      = saved.at(6);
-        bool          useTF32            = ctx->saved_data["use_tf32"].toBool();
-        torch::Tensor kWidth             = ctx->saved_data["kernel_width"].toTensor();
-        bool          transposed         = ctx->saved_data["transposed"].toBool();
+        Variable inFeatures         = saved.at(0);
+        Variable kernels            = saved.at(1);
+        Variable outInMapBwd        = saved.at(2);
+        Variable reorderOutInMapBwd = saved.at(3);
+        Variable sortedMaskBwdW     = saved.at(4);
+        Variable sortedMaskBwdD     = saved.at(5);
+        Variable reorderLocBwd      = saved.at(6);
+        bool useTF32                = ctx->saved_data["use_tf32"].toBool();
+        torch::Tensor kWidth        = ctx->saved_data["kernel_width"].toTensor();
+        bool transposed             = ctx->saved_data["transposed"].toBool();
 
-        Variable      gradOut = grad_output.at(0);
+        Variable gradOut = grad_output.at(0);
         torch::Tensor gradInput, gradWeight;
 
         // Dispatching following torchsparse++
@@ -162,19 +175,37 @@ struct SparseConvolutionImplicitGEMM
         if (kernelVolume < 32) {
             gradInput  = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
                 return ops::dispatchSparseConvolutionImplicitGEMMSorted<DeviceTag>(
-                    gradOut, kernels.transpose(2, 1).contiguous(), reorderOutInMapBwd,
-                    sortedMaskBwdD, reorderLocBwd, inFeatures.size(0), inC, useTF32, true);
+                    gradOut,
+                    kernels.transpose(2, 1).contiguous(),
+                    reorderOutInMapBwd,
+                    sortedMaskBwdD,
+                    reorderLocBwd,
+                    inFeatures.size(0),
+                    inC,
+                    useTF32,
+                    true);
             });
             gradWeight = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
                 return ops::dispatchSparseConvolutionImplicitGEMMGradSorted<DeviceTag>(
-                    gradOut, inFeatures, reorderOutInMapBwd, sortedMaskBwdW, reorderLocBwd, 32,
-                    useTF32, true);
+                    gradOut,
+                    inFeatures,
+                    reorderOutInMapBwd,
+                    sortedMaskBwdW,
+                    reorderLocBwd,
+                    32,
+                    useTF32,
+                    true);
             });
         } else {
             gradInput  = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
                 return ops::dispatchSparseConvolutionImplicitGEMM<DeviceTag>(
-                    gradOut, kernels.transpose(2, 1).contiguous(), outInMapBwd, inFeatures.size(0),
-                    inC, useTF32, true);
+                    gradOut,
+                    kernels.transpose(2, 1).contiguous(),
+                    outInMapBwd,
+                    inFeatures.size(0),
+                    inC,
+                    useTF32,
+                    true);
             });
             gradWeight = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
                 return ops::dispatchSparseConvolutionImplicitGEMMGrad<DeviceTag>(
@@ -184,18 +215,28 @@ struct SparseConvolutionImplicitGEMM
 
         if (!transposed) {
             gradWeight = gradWeight
-                             .reshape({ kWidth[2].item<int32_t>(), kWidth[1].item<int32_t>(),
-                                        kWidth[0].item<int32_t>(), outC, inC })
-                             .permute({ 3, 4, 2, 1, 0 });
+                             .reshape({kWidth[2].item<int32_t>(),
+                                       kWidth[1].item<int32_t>(),
+                                       kWidth[0].item<int32_t>(),
+                                       outC,
+                                       inC})
+                             .permute({3, 4, 2, 1, 0});
         } else {
             gradWeight = gradWeight
-                             .reshape({ kWidth[2].item<int32_t>(), kWidth[1].item<int32_t>(),
-                                        kWidth[0].item<int32_t>(), outC, inC })
-                             .permute({ 4, 3, 2, 1, 0 });
+                             .reshape({kWidth[2].item<int32_t>(),
+                                       kWidth[1].item<int32_t>(),
+                                       kWidth[0].item<int32_t>(),
+                                       outC,
+                                       inC})
+                             .permute({4, 3, 2, 1, 0});
         }
 
-        return { gradInput,       gradWeight,      torch::Tensor(),
-                 torch::Tensor(), torch::Tensor(), torch::Tensor() };
+        return {gradInput,
+                gradWeight,
+                torch::Tensor(),
+                torch::Tensor(),
+                torch::Tensor(),
+                torch::Tensor()};
     }
 };
 

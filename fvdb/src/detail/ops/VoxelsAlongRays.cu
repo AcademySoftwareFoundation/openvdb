@@ -13,27 +13,34 @@ namespace detail {
 namespace ops {
 
 // Called for each ray
-template <bool returnIjk, typename ScalarType, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <bool returnIjk,
+          typename ScalarType,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ void
-voxelsAlongRaysCallback(int32_t bidx, int32_t rayIdx,
-                        const JaggedAccessor<ScalarType, 2>         rayOrigins,    // [B*M, 3]
-                        const JaggedAccessor<ScalarType, 2>         rayDirections, // [B*M, 3]
-                        const TensorAccessor<fvdb::JOffsetsType, 1> outJOffsets,   // [B*M, 2]
-                        TensorAccessor<fvdb::JIdxType, 1>           outJIdx,       // [B*M*S]
-                        TensorAccessor<fvdb::JLIdxType, 2>          outJLIdx,      // [B*M, 2]
-                        TensorAccessor<int32_t, 2>                  outVoxels,     // [B*M*S, 3]
-                        TensorAccessor<ScalarType, 2>               outTimes,      // [B*M*S, 2]
-                        GridBatchImpl::Accessor<GridType> batchAccessor, int64_t maxVox,
-                        ScalarType eps, bool cumulative) {
-    const nanovdb::NanoGrid<GridType> *gpuGrid   = batchAccessor.grid(bidx);
-    const VoxelCoordTransform         &transform = batchAccessor.dualTransform(bidx);
-    const nanovdb::CoordBBox           dualBbox  = batchAccessor.dualBbox(bidx);
-    auto                               primalAcc = gpuGrid->getAccessor();
+voxelsAlongRaysCallback(int32_t bidx,
+                        int32_t rayIdx,
+                        const JaggedAccessor<ScalarType, 2> rayOrigins,          // [B*M, 3]
+                        const JaggedAccessor<ScalarType, 2> rayDirections,       // [B*M, 3]
+                        const TensorAccessor<fvdb::JOffsetsType, 1> outJOffsets, // [B*M, 2]
+                        TensorAccessor<fvdb::JIdxType, 1> outJIdx,               // [B*M*S]
+                        TensorAccessor<fvdb::JLIdxType, 2> outJLIdx,             // [B*M, 2]
+                        TensorAccessor<int32_t, 2> outVoxels,                    // [B*M*S, 3]
+                        TensorAccessor<ScalarType, 2> outTimes,                  // [B*M*S, 2]
+                        GridBatchImpl::Accessor<GridType> batchAccessor,
+                        int64_t maxVox,
+                        ScalarType eps,
+                        bool cumulative) {
+    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform       = batchAccessor.dualTransform(bidx);
+    const nanovdb::CoordBBox dualBbox          = batchAccessor.dualBbox(bidx);
+    auto primalAcc                             = gpuGrid->getAccessor();
 
-    const auto                    &rayO = rayOrigins.data()[rayIdx];
-    const auto                    &rayD = rayDirections.data()[rayIdx];
+    const auto &rayO = rayOrigins.data()[rayIdx];
+    const auto &rayD = rayDirections.data()[rayIdx];
     nanovdb::math::Ray<ScalarType> rayVox =
         transform.applyToRay(rayO[0], rayO[1], rayO[2], rayD[0], rayD[1], rayD[2]);
 
@@ -47,13 +54,14 @@ voxelsAlongRaysCallback(int32_t bidx, int32_t rayIdx,
         return;
     }
 
-    fvdb::JOffsetsType       numVox   = 0;
+    fvdb::JOffsetsType numVox         = 0;
     const fvdb::JOffsetsType startIdx = outJOffsets[rayIdx];
     for (auto it = HDDAVoxelIterator<decltype(primalAcc), ScalarType>(rayVox, primalAcc);
-         it.isValid(); ++it) {
-        const ScalarType      t0 = it->second.t0, t1 = it->second.t1;
-        const ScalarType      deltaT = t1 - t0;
-        const nanovdb::Coord &ijk    = it->first;
+         it.isValid();
+         ++it) {
+        const ScalarType t0 = it->second.t0, t1 = it->second.t1;
+        const ScalarType deltaT   = t1 - t0;
+        const nanovdb::Coord &ijk = it->first;
 
         int32_t ijkIdx = -1;
         if constexpr (!returnIjk) {
@@ -104,23 +112,28 @@ voxelsAlongRaysCallback(int32_t bidx, int32_t rayIdx,
     // assert(numVox == outJOffsets[rayIdx][1] - outJOffsets[rayIdx][0]);
 }
 
-template <typename ScalarType, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarType,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ void
-countVoxelsAlongRaysCallback(int32_t bidx, int32_t eidx,
+countVoxelsAlongRaysCallback(int32_t bidx,
+                             int32_t eidx,
                              const JaggedAccessor<ScalarType, 2> rayOrigins,
                              const JaggedAccessor<ScalarType, 2> rayDirections,
-                             TensorAccessor<int32_t, 1>          outCounts,
-                             BatchGridAccessor<GridType> batchAccessor, int64_t maxVox,
+                             TensorAccessor<int32_t, 1> outCounts,
+                             BatchGridAccessor<GridType> batchAccessor,
+                             int64_t maxVox,
                              ScalarType eps) {
-    const nanovdb::NanoGrid<GridType> *gpuGrid   = batchAccessor.grid(bidx);
-    const VoxelCoordTransform         &transform = batchAccessor.dualTransform(bidx);
-    const nanovdb::CoordBBox           dualBbox  = batchAccessor.dualBbox(bidx);
-    auto                               primalAcc = gpuGrid->getAccessor();
+    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform       = batchAccessor.dualTransform(bidx);
+    const nanovdb::CoordBBox dualBbox          = batchAccessor.dualBbox(bidx);
+    auto primalAcc                             = gpuGrid->getAccessor();
 
-    const auto                    &rayO = rayOrigins.data()[eidx];
-    const auto                    &rayD = rayDirections.data()[eidx];
+    const auto &rayO = rayOrigins.data()[eidx];
+    const auto &rayD = rayDirections.data()[eidx];
     nanovdb::math::Ray<ScalarType> rayVox =
         transform.applyToRay(rayO[0], rayO[1], rayO[2], rayD[0], rayD[1], rayD[2]);
 
@@ -128,13 +141,14 @@ countVoxelsAlongRaysCallback(int32_t bidx, int32_t eidx,
         outCounts[eidx + 1] = 0;
         return;
     }
-    int32_t        numVox = 0;
+    int32_t numVox = 0;
     nanovdb::Coord lastIjk;
     for (auto it = HDDAVoxelIterator<decltype(primalAcc), ScalarType>(rayVox, primalAcc);
-         it.isValid(); ++it) {
-        const ScalarType      t0 = it->second.t0, t1 = it->second.t1;
-        const ScalarType      deltaT = t1 - t0;
-        const nanovdb::Coord &ijk    = it->first;
+         it.isValid();
+         ++it) {
+        const ScalarType t0 = it->second.t0, t1 = it->second.t1;
+        const ScalarType deltaT   = t1 - t0;
+        const nanovdb::Coord &ijk = it->first;
         if (deltaT < eps) {
             continue;
         }
@@ -153,8 +167,12 @@ countVoxelsAlongRaysCallback(int32_t bidx, int32_t eidx,
 
 template <c10::DeviceType DeviceTag>
 std::vector<JaggedTensor>
-VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
-                const JaggedTensor &rayDirections, int64_t maxVox, float eps, bool returnIjk,
+VoxelsAlongRays(const GridBatchImpl &batchHdl,
+                const JaggedTensor &rayOrigins,
+                const JaggedTensor &rayDirections,
+                int64_t maxVox,
+                float eps,
+                bool returnIjk,
                 bool cumulative) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(rayOrigins);
@@ -189,7 +207,8 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
 
     return FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() -> std::vector<JaggedTensor> {
         return AT_DISPATCH_V2(
-            rayOrigins.scalar_type(), "VoxelsAlongRays",
+            rayOrigins.scalar_type(),
+            "VoxelsAlongRays",
             AT_WRAP([&]() -> std::vector<JaggedTensor> {
                 int64_t numThreads = 384;
                 if constexpr (nanovdb::util::is_same<scalar_t, double>::value ||
@@ -209,20 +228,23 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                     torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(rayOrigins.device());
 
                 // Count number of voxels along each ray
-                torch::Tensor rayCounts =
-                    torch::zeros({ rayOrigins.rsize(0) + 1 }, optsI32); // [B*M]
-                auto outCountsAcc     = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
-                auto batchAcc         = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto rayDirectionsAcc = jaggedAccessor<DeviceTag, scalar_t, 2>(rayDirections);
+                torch::Tensor rayCounts = torch::zeros({rayOrigins.rsize(0) + 1}, optsI32); // [B*M]
+                auto outCountsAcc       = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
+                auto batchAcc           = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto rayDirectionsAcc   = jaggedAccessor<DeviceTag, scalar_t, 2>(rayDirections);
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb1 = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb1 = [=] __device__(int32_t bidx,
+                                              int32_t eidx,
+                                              int32_t cidx,
                                               JaggedRAcc32<scalar_t, 2> rOA) {
                         countVoxelsAlongRaysCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
                             bidx, eidx, rOA, rayDirectionsAcc, outCountsAcc, batchAcc, maxVox, eps);
                     };
                     forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cb1);
                 } else {
-                    auto cb1 = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb1 = [=](int32_t bidx,
+                                   int32_t eidx,
+                                   int32_t cidx,
                                    JaggedAcc<scalar_t, 2> rOA) {
                         countVoxelsAlongRaysCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
                             bidx, eidx, rOA, rayDirectionsAcc, outCountsAcc, batchAcc, maxVox, eps);
@@ -238,14 +260,14 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
 
                 // Allocate output JaggedTensor indexing data
                 torch::Tensor outJLidx =
-                    torch::empty({ outJOffsets.size(0) - 1, 2 }, optsJLIdx); // [total_rays, 2]
+                    torch::empty({outJOffsets.size(0) - 1, 2}, optsJLIdx); // [total_rays, 2]
                 torch::Tensor outJIdx =
-                    torch::zeros({ totalIsects }, optsJIdx); // [total_intersections]
+                    torch::zeros({totalIsects}, optsJIdx);                 // [total_intersections]
 
                 // Allocate output jdata tensors
                 torch::Tensor outVoxels =
-                    torch::zeros({ totalIsects, returnIjk ? 3 : 1 }, optsI32);    // [B*M*S, 3]
-                torch::Tensor outTimes = torch::zeros({ totalIsects, 2 }, optsF); // [B*M*S, 2]
+                    torch::zeros({totalIsects, returnIjk ? 3 : 1}, optsI32);    // [B*M*S, 3]
+                torch::Tensor outTimes = torch::zeros({totalIsects, 2}, optsF); // [B*M*S, 2]
 
                 // Compute output voxels and times
                 auto outJOffsetsAcc = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(outJOffsets);
@@ -256,43 +278,95 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 auto outTimesAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(outTimes);
 
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cbIjk = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cbIjk = [=] __device__(int32_t bidx,
+                                                int32_t eidx,
+                                                int32_t cidx,
                                                 JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<true, scalar_t, GridType, JaggedRAcc32,
-                                                TorchRAcc32>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, outJOffsetsAcc, outJIdxAcc,
-                            outJLIdxAcc, outVoxelsAcc, outTimesAcc, batchAcc, maxVox, eps,
-                            cumulative);
+                        voxelsAlongRaysCallback<true,
+                                                scalar_t,
+                                                GridType,
+                                                JaggedRAcc32,
+                                                TorchRAcc32>(bidx,
+                                                             eidx,
+                                                             rayOriginsAcc,
+                                                             rayDirectionsAcc,
+                                                             outJOffsetsAcc,
+                                                             outJIdxAcc,
+                                                             outJLIdxAcc,
+                                                             outVoxelsAcc,
+                                                             outTimesAcc,
+                                                             batchAcc,
+                                                             maxVox,
+                                                             eps,
+                                                             cumulative);
                     };
-                    auto cbIdx = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cbIdx = [=] __device__(int32_t bidx,
+                                                int32_t eidx,
+                                                int32_t cidx,
                                                 JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<false, scalar_t, GridType, JaggedRAcc32,
-                                                TorchRAcc32>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, outJOffsetsAcc, outJIdxAcc,
-                            outJLIdxAcc, outVoxelsAcc, outTimesAcc, batchAcc, maxVox, eps,
-                            cumulative);
+                        voxelsAlongRaysCallback<false,
+                                                scalar_t,
+                                                GridType,
+                                                JaggedRAcc32,
+                                                TorchRAcc32>(bidx,
+                                                             eidx,
+                                                             rayOriginsAcc,
+                                                             rayDirectionsAcc,
+                                                             outJOffsetsAcc,
+                                                             outJIdxAcc,
+                                                             outJLIdxAcc,
+                                                             outVoxelsAcc,
+                                                             outTimesAcc,
+                                                             batchAcc,
+                                                             maxVox,
+                                                             eps,
+                                                             cumulative);
                     };
 
                     if (returnIjk) {
-                        forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins,
-                                                                     cbIjk);
+                        forEachJaggedElementChannelCUDA<scalar_t, 2>(
+                            numThreads, 1, rayOrigins, cbIjk);
                     } else {
-                        forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins,
-                                                                     cbIdx);
+                        forEachJaggedElementChannelCUDA<scalar_t, 2>(
+                            numThreads, 1, rayOrigins, cbIdx);
                     }
                 } else {
-                    auto cbIjk = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cbIjk = [=](int32_t bidx,
+                                     int32_t eidx,
+                                     int32_t cidx,
                                      JaggedAcc<scalar_t, 2> rayOriginsAcc) {
                         voxelsAlongRaysCallback<true, scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, outJOffsetsAcc, outJIdxAcc,
-                            outJLIdxAcc, outVoxelsAcc, outTimesAcc, batchAcc, maxVox, eps,
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            outJOffsetsAcc,
+                            outJIdxAcc,
+                            outJLIdxAcc,
+                            outVoxelsAcc,
+                            outTimesAcc,
+                            batchAcc,
+                            maxVox,
+                            eps,
                             cumulative);
                     };
-                    auto cbIdx = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cbIdx = [=](int32_t bidx,
+                                     int32_t eidx,
+                                     int32_t cidx,
                                      JaggedAcc<scalar_t, 2> rayOriginsAcc) {
                         voxelsAlongRaysCallback<false, scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, outJOffsetsAcc, outJIdxAcc,
-                            outJLIdxAcc, outVoxelsAcc, outTimesAcc, batchAcc, maxVox, eps,
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            outJOffsetsAcc,
+                            outJIdxAcc,
+                            outJLIdxAcc,
+                            outVoxelsAcc,
+                            outTimesAcc,
+                            batchAcc,
+                            maxVox,
+                            eps,
                             cumulative);
                     };
                     if (returnIjk) {
@@ -310,28 +384,37 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                     outVoxels, outJOffsets, outJIdx, outJLidx, batchHdl.batchSize());
                 const JaggedTensor retTimes = retVox.jagged_like(outTimes);
 
-                return { retVox, retTimes };
+                return {retVox, retTimes};
             }),
-            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     });
 }
 
 template <>
 std::vector<JaggedTensor>
-dispatchVoxelsAlongRays<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
-                                      const JaggedTensor &rayDirections, int64_t maxVox, float eps,
-                                      bool returnIjk, bool cumulative) {
-    return VoxelsAlongRays<torch::kCUDA>(batchHdl, rayOrigins, rayDirections, maxVox, eps,
-                                         returnIjk, cumulative);
+dispatchVoxelsAlongRays<torch::kCUDA>(const GridBatchImpl &batchHdl,
+                                      const JaggedTensor &rayOrigins,
+                                      const JaggedTensor &rayDirections,
+                                      int64_t maxVox,
+                                      float eps,
+                                      bool returnIjk,
+                                      bool cumulative) {
+    return VoxelsAlongRays<torch::kCUDA>(
+        batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk, cumulative);
 }
 
 template <>
 std::vector<JaggedTensor>
-dispatchVoxelsAlongRays<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
-                                     const JaggedTensor &rayDirections, int64_t maxVox, float eps,
-                                     bool returnIjk, bool cumulative) {
-    return VoxelsAlongRays<torch::kCPU>(batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk,
-                                        cumulative);
+dispatchVoxelsAlongRays<torch::kCPU>(const GridBatchImpl &batchHdl,
+                                     const JaggedTensor &rayOrigins,
+                                     const JaggedTensor &rayDirections,
+                                     int64_t maxVox,
+                                     float eps,
+                                     bool returnIjk,
+                                     bool cumulative) {
+    return VoxelsAlongRays<torch::kCPU>(
+        batchHdl, rayOrigins, rayDirections, maxVox, eps, returnIjk, cumulative);
 }
 
 } // namespace ops

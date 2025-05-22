@@ -15,15 +15,18 @@ namespace ops {
 /// @brief Per-voxel callback for getting the enabled state of every voxel in a batch of grids
 template <typename GridType, template <typename T, int32_t D> typename TorchAccessor>
 __hostdev__ inline void
-enabledMaskCallback(int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx,
+enabledMaskCallback(int32_t batchIdx,
+                    int32_t leafIdx,
+                    int32_t voxelIdx,
                     GridBatchImpl::Accessor<GridType> gridAccessor,
-                    TorchAccessor<bool, 1> outEnabledMask, bool returnDisabled) {
-    const nanovdb::NanoGrid<GridType>                        *grid = gridAccessor.grid(batchIdx);
+                    TorchAccessor<bool, 1> outEnabledMask,
+                    bool returnDisabled) {
+    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
     const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
 
     const int64_t baseOffset = gridAccessor.voxelOffset(batchIdx);
-    const bool    enabled    = leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx);
+    const bool enabled       = leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx);
     if (leaf.isActive(voxelIdx)) {
         const int64_t outIdx = baseOffset + (int64_t)leaf.getValue(voxelIdx) - 1;
         if (returnDisabled) {
@@ -47,22 +50,28 @@ EnabledMask(const GridBatchImpl &batchHdl, bool returnDisabled) {
         batchHdl.checkNonEmptyGrid();
 
         torch::Tensor outMask =
-            torch::empty({ batchHdl.totalVoxels() },
+            torch::empty({batchHdl.totalVoxels()},
                          torch::TensorOptions().device(batchHdl.device()).dtype(torch::kBool));
         auto outMaskAcc = tensorAccessor<DeviceTag, bool, 1>(outMask);
 
         if constexpr (DeviceTag == torch::kCUDA) {
-            auto cb = [=] __device__(int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+            auto cb = [=] __device__(int32_t batchIdx,
+                                     int32_t leafIdx,
+                                     int32_t voxelIdx,
+                                     int32_t,
                                      GridBatchImpl::Accessor<GridType> gridAccessor) {
                 enabledMaskCallback<GridType, TorchRAcc32>(
                     batchIdx, leafIdx, voxelIdx, gridAccessor, outMaskAcc, returnDisabled);
             };
             forEachVoxelCUDA<GridType>(1024, 1, batchHdl, cb);
         } else {
-            auto cb = [=](int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+            auto cb = [=](int32_t batchIdx,
+                          int32_t leafIdx,
+                          int32_t voxelIdx,
+                          int32_t,
                           GridBatchImpl::Accessor<GridType> gridAccessor) {
-                enabledMaskCallback<GridType, TorchAcc>(batchIdx, leafIdx, voxelIdx, gridAccessor,
-                                                        outMaskAcc, returnDisabled);
+                enabledMaskCallback<GridType, TorchAcc>(
+                    batchIdx, leafIdx, voxelIdx, gridAccessor, outMaskAcc, returnDisabled);
             };
             forEachVoxelCPU<GridType>(1, batchHdl, cb);
         }

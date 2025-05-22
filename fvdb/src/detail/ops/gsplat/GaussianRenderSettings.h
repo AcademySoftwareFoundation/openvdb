@@ -18,18 +18,18 @@ struct RenderSettings {
         RGBD  = 2,
     };
 
-    std::uint32_t  imageWidth;
-    std::uint32_t  imageHeight;
-    ProjectionType projectionType  = ProjectionType::PERSPECTIVE;
-    RenderMode     renderMode      = RenderMode::RGB;
-    float          nearPlane       = 0.01;
-    float          farPlane        = 1e10;
-    std::uint32_t  tileSize        = 16;
-    float          radiusClip      = 0.0;
-    float          eps2d           = 0.3;
-    bool           antialias       = false;
-    int            shDegreeToUse   = -1;
-    int            numDepthSamples = -1;
+    std::uint32_t imageWidth;
+    std::uint32_t imageHeight;
+    ProjectionType projectionType = ProjectionType::PERSPECTIVE;
+    RenderMode renderMode         = RenderMode::RGB;
+    float nearPlane               = 0.01;
+    float farPlane                = 1e10;
+    std::uint32_t tileSize        = 16;
+    float radiusClip              = 0.0;
+    float eps2d                   = 0.3;
+    bool antialias                = false;
+    int shDegreeToUse             = -1;
+    int numDepthSamples           = -1;
 };
 } // namespace ops
 } // namespace detail

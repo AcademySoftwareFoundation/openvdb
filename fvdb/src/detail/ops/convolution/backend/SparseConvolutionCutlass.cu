@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 
 #include <THC/THCAtomics.cuh>
@@ -12,7 +13,7 @@
 #include <cute/atom/mma_atom.hpp>
 #include <cute/tensor.hpp>
 
-#include <algorithm>
+#include <string>
 
 namespace example {
 
@@ -96,7 +97,7 @@ template <class Func, class Stride> struct CustomStride {
         return Layout<Shape, CustomStride>(shape, stride);
     }
 
-    Func   func_;
+    Func func_;
     Stride stride_;
 };
 
@@ -104,11 +105,11 @@ template <class Stride, class Func>
 CUTLASS_HOST_DEVICE auto
 make_custom_stride_layout(Stride const &stride, Func &&func) {
     // Use a dummy shape and replace the first non-unit stride with a custom gather stride
-    auto          idx = find_if(stride, [](auto x) { return not is_constant<1, decltype(x)>{}; });
-    constexpr int I   = decltype(idx)::value;
+    auto idx        = find_if(stride, [](auto x) { return not is_constant<1, decltype(x)>{}; });
+    constexpr int I = decltype(idx)::value;
     return make_layout(
         repeat_like(stride, _1{}),
-        replace<I>(stride, CustomStride{ static_cast<Func &&>(func), get<I>(stride) }));
+        replace<I>(stride, CustomStride{static_cast<Func &&>(func), get<I>(stride)}));
 }
 
 /// Helper function to optionally create a gather tensor
@@ -117,9 +118,9 @@ CUTLASS_HOST_DEVICE auto
 make_gather_tensor(Iterator iter, Shape const &shape, Stride const &stride, Func &&func) {
     if constexpr (not cutlass::platform::is_same<remove_cvref_t<Func>, NoGather>::value) {
         Layout matrix_layout = make_identity_layout(shape);
-        auto   offset        = as_arithmetic_tuple(repeat_like(shape, _0{}));
+        auto offset          = as_arithmetic_tuple(repeat_like(shape, _0{}));
         Layout gather_layout = make_custom_stride_layout(stride, static_cast<Func &&>(func));
-        return make_tensor(iter, ComposedLayout{ gather_layout, offset, matrix_layout });
+        return make_tensor(iter, ComposedLayout{gather_layout, offset, matrix_layout});
     } else {
         return make_tensor(iter, shape, stride);
     }
@@ -133,8 +134,8 @@ template <int N, int I, class Shape, class Stride>
 CUTE_HOST_DEVICE constexpr auto
 upcast(Shape const &shape, Stride const &stride) {
     if constexpr (is_tuple<Shape>::value) {
-        return transform_layout(shape, stride,
-                                [](auto const &s, auto const &d) { return upcast<N, I>(s, d); });
+        return transform_layout(
+            shape, stride, [](auto const &s, auto const &d) { return upcast<N, I>(s, d); });
     } else if constexpr (is_scaled_basis<Stride>::value) {
         if constexpr (Stride::mode() == I) {
             return make_layout(shape_div(shape, Int<N>{}), shape_div(stride, Int<N>{}));
@@ -224,7 +225,8 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
     using ElementAct = tfloat32_t;
     using ElementOut = float;
 
-    using TiledMma = TiledMMA<MMA_Atom<SM80_16x8x8_F32TF32TF32F32_TN>, Layout<Shape<_2, _2, _1>>,
+    using TiledMma = TiledMMA<MMA_Atom<SM80_16x8x8_F32TF32TF32F32_TN>,
+                              Layout<Shape<_2, _2, _1>>,
                               Tile<_32, _32, Underscore>>;
 
     static constexpr int MaxThreadsPerBlock         = size(TiledMma{});
@@ -251,9 +253,10 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
     // We have 64 elements * 32b each in the major mode that we can vectorize
     // Max vector size is 128b, so lay 16 threads along the major mode with a vector size of 4
     // Rest along the minor mode
-    using GmemTiledCopyFlt = decltype(make_tiled_copy(
-        Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementFlt>{},
-        Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _4>>{}));
+    using GmemTiledCopyFlt =
+        decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementFlt>{},
+                                 Layout<Shape<_16, _8>, Stride<_8, _1>>{},
+                                 Layout<Shape<_1, _4>>{}));
 
     // using SmemLayoutFlt = decltype(
     //     composition(Swizzle<3,2,3>{},
@@ -274,9 +277,10 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
 
     // Activation tensor is major in the contraction mode, so vectorize that mode first
     // Then lay out the rest of the threads along the other mode
-    using GmemTiledCopyAct = decltype(make_tiled_copy(
-        Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementAct>{},
-        Layout<Shape<_16, _8>, Stride<_8, _1>>{}, Layout<Shape<_1, _4>>{}));
+    using GmemTiledCopyAct =
+        decltype(make_tiled_copy(Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<uint128_t>, ElementAct>{},
+                                 Layout<Shape<_16, _8>, Stride<_8, _1>>{},
+                                 Layout<Shape<_1, _4>>{}));
 
     // Both Flt and Act are contraction major
     // using SmemLayoutAct = decltype(
@@ -296,9 +300,10 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
     // Output tensor
     //
 
-    using GmemTiledCopyOut = decltype(make_tiled_copy(
-        Copy_Atom<UniversalCopy<uint128_t>, ElementAct>{}, Layout<Shape<_8, _16>, Stride<_1, _8>>{},
-        Layout<Shape<_4, _1>>{}));
+    using GmemTiledCopyOut =
+        decltype(make_tiled_copy(Copy_Atom<UniversalCopy<uint128_t>, ElementAct>{},
+                                 Layout<Shape<_8, _16>, Stride<_1, _8>>{},
+                                 Layout<Shape<_4, _1>>{}));
 
     using SmemCopyAtomOut = Copy_Atom<UniversalCopy<uint32_t>, ElementOut>;
 
@@ -311,18 +316,18 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
     template <class EngineFlt, class TensorActivation, class TensorOutput>
     void __device__
     operator()(cute::Tensor<EngineFlt, GmemLayoutFlt> mFlt, // ( K,        (C,T,R,S))
-               TensorActivation                       mAct, // ((N,Z,P,Q), (C,T,R,S))
-               TensorOutput                           mOut, // ( K,        (N,Z,P,Q))
-               char                                  *smem_buf) const {
+               TensorActivation mAct,                       // ((N,Z,P,Q), (C,T,R,S))
+               TensorOutput mOut,                           // ( K,        (N,Z,P,Q))
+               char *smem_buf) const {
         using namespace cute;
-        uint64_t       start   = clock64();
+        uint64_t start         = clock64();
         SharedStorage &storage = *reinterpret_cast<SharedStorage *>(smem_buf);
         Tensor sA = make_tensor(make_smem_ptr(&storage.mainloop.sAMatrix[0]), SmemLayoutFlt{});
         Tensor sB = make_tensor(make_smem_ptr(&storage.mainloop.sBMatrix[0]), SmemLayoutAct{});
         Tensor sC = make_tensor(make_smem_ptr(&storage.epilogue.sCMatrix[0]), SmemLayoutOut{});
 
         TiledMma tiled_mma;
-        Tensor   accum = partition_fragment_C(tiled_mma, TilerOut{});
+        Tensor accum = partition_fragment_C(tiled_mma, TilerOut{});
         clear(accum);
         auto thr_mma = tiled_mma.get_thread_slice(threadIdx.x);
 
@@ -334,35 +339,35 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
         Tensor gC_mn = local_tile(mOut, TilerOut{}, make_coord(_, _)); // (BLK_M,BLK_N,m',n')
 
         // Compute m_coord and n_coord with their post-tiled shapes
-        auto   m_coord = idx2crd(int(blockIdx.y), shape<2>(gA_mk));
-        auto   n_coord = idx2crd(int(blockIdx.x), shape<2>(gB_nk));
-        Tensor gA      = gA_mk(_, _, m_coord, _);       // (BLK_M,BLK_K,k')
-        Tensor gB      = gB_nk(_, _, n_coord, _);       // (BLK_N,BLK_K,_1)
-        Tensor gC      = gC_mn(_, _, m_coord, n_coord); // (BLK_M,BLK_N)
+        auto m_coord = idx2crd(int(blockIdx.y), shape<2>(gA_mk));
+        auto n_coord = idx2crd(int(blockIdx.x), shape<2>(gB_nk));
+        Tensor gA    = gA_mk(_, _, m_coord, _);       // (BLK_M,BLK_K,k')
+        Tensor gB    = gB_nk(_, _, n_coord, _);       // (BLK_N,BLK_K,_1)
+        Tensor gC    = gC_mn(_, _, m_coord, n_coord); // (BLK_M,BLK_N)
 
         GmemTiledCopyFlt gmem_tiled_copy_A;
-        auto             gmem_thr_copy_A = gmem_tiled_copy_A.get_slice(threadIdx.x);
-        Tensor           tAgA = gmem_thr_copy_A.partition_S(gA); // (VEC,ACPY_M,ACPY_K,k')
-        Tensor           tAsA = gmem_thr_copy_A.partition_D(sA); // (VEC,ACPY_M,ACPY_K,PIPE)
+        auto gmem_thr_copy_A = gmem_tiled_copy_A.get_slice(threadIdx.x);
+        Tensor tAgA          = gmem_thr_copy_A.partition_S(gA); // (VEC,ACPY_M,ACPY_K,k')
+        Tensor tAsA          = gmem_thr_copy_A.partition_D(sA); // (VEC,ACPY_M,ACPY_K,PIPE)
 
         GmemTiledCopyAct gmem_tiled_copy_B;
-        auto             gmem_thr_copy_B = gmem_tiled_copy_B.get_slice(threadIdx.x);
-        Tensor           tBgB = gmem_thr_copy_B.partition_S(gB); // (VEC,ACPY_N,ACPY_K,_1)
-        Tensor           tBsB = gmem_thr_copy_B.partition_D(sB); // (VEC,ACPY_N,ACPY_K,PIPE)
+        auto gmem_thr_copy_B = gmem_tiled_copy_B.get_slice(threadIdx.x);
+        Tensor tBgB          = gmem_thr_copy_B.partition_S(gB); // (VEC,ACPY_N,ACPY_K,_1)
+        Tensor tBsB          = gmem_thr_copy_B.partition_D(sB); // (VEC,ACPY_N,ACPY_K,PIPE)
 
         // Copy and MMA partitioning
         Tensor tCrA = thr_mma.partition_fragment_A(sA(_, _, Int<0>{})); // (VEC,MMA_M,MMA_K)
         Tensor tCrB = thr_mma.partition_fragment_B(sB(_, _, Int<0>{})); // (VEC,MMA_N,MMA_K)
 
-        auto   smem_tiled_copy_A = make_tiled_copy_A(SmemCopyAtomFlt{}, tiled_mma);
-        auto   smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(threadIdx.x);
-        Tensor tCsA              = smem_thr_copy_A.partition_S(sA); // (VEC,CPY_M,CPY_K,PIPE)
-        Tensor tCrA_copy_view    = smem_thr_copy_A.retile_D(tCrA);
+        auto smem_tiled_copy_A = make_tiled_copy_A(SmemCopyAtomFlt{}, tiled_mma);
+        auto smem_thr_copy_A   = smem_tiled_copy_A.get_thread_slice(threadIdx.x);
+        Tensor tCsA            = smem_thr_copy_A.partition_S(sA); // (VEC,CPY_M,CPY_K,PIPE)
+        Tensor tCrA_copy_view  = smem_thr_copy_A.retile_D(tCrA);
 
-        auto   smem_tiled_copy_B = make_tiled_copy_B(SmemCopyAtomAct{}, tiled_mma);
-        auto   smem_thr_copy_B   = smem_tiled_copy_B.get_thread_slice(threadIdx.x);
-        Tensor tCsB              = smem_thr_copy_B.partition_S(sB); // (VEC,CPY_N,CPY_K,PIPE)
-        Tensor tCrB_copy_view    = smem_thr_copy_B.retile_D(tCrB);
+        auto smem_tiled_copy_B = make_tiled_copy_B(SmemCopyAtomAct{}, tiled_mma);
+        auto smem_thr_copy_B   = smem_tiled_copy_B.get_thread_slice(threadIdx.x);
+        Tensor tCsB            = smem_thr_copy_B.partition_S(sB); // (VEC,CPY_N,CPY_K,PIPE)
+        Tensor tCrB_copy_view  = smem_thr_copy_B.retile_D(tCrB);
 
         //
         // Prologue
@@ -370,7 +375,7 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
         int k_tile_count = size<2>(gA);
         // XXX: should be multimode (C/TILER_C, (S,R,T)) but I am going to shave off a few k clks
         // and flatten this for now
-        auto          k_tile_iter = cute::make_coord_iterator(size<2>(gA));
+        auto k_tile_iter          = cute::make_coord_iterator(size<2>(gA));
         constexpr int K_BLOCK_MAX = size<2>(tCrA); // Size of the register pipeline
 
         static_assert(Stages >= 2);
@@ -429,16 +434,20 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
 
                 // Load smem->rmem for k_block+1
                 constexpr auto k_block_next = (k_block + Int<1>{}) % K_BLOCK_MAX; // static
-                copy(smem_tiled_copy_A, tCsA_read(_, _, k_block_next),
+                copy(smem_tiled_copy_A,
+                     tCsA_read(_, _, k_block_next),
                      tCrA_copy_view(_, _, k_block_next));
-                copy(smem_tiled_copy_B, tCsB_read(_, _, k_block_next),
+                copy(smem_tiled_copy_B,
+                     tCsB_read(_, _, k_block_next),
                      tCrB_copy_view(_, _, k_block_next));
 
                 // Copy gmem to smem before computing gemm on each k-pipe
                 if (k_block == 0) {
-                    copy(gmem_tiled_copy_A, tAgA(_, _, _, *k_tile_iter),
+                    copy(gmem_tiled_copy_A,
+                         tAgA(_, _, _, *k_tile_iter),
                          tAsA(_, _, _, smem_pipe_write));
-                    copy(gmem_tiled_copy_B, tBgB(_, _, _, *k_tile_iter),
+                    copy(gmem_tiled_copy_B,
+                         tBgB(_, _, _, *k_tile_iter),
                          tBsB(_, _, _, smem_pipe_write));
                     cp_async_fence();
                     // Advance the gmem->smem pipeline
@@ -470,9 +479,9 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
         __syncthreads();
 
         GmemTiledCopyOut gmem_tiled_copy_C;
-        auto             gmem_thr_copy_C = gmem_tiled_copy_C.get_slice(threadIdx.x);
-        auto             tDsC            = gmem_thr_copy_C.partition_S(sC);
-        auto             tDgC            = gmem_thr_copy_C.partition_D(gC);
+        auto gmem_thr_copy_C = gmem_tiled_copy_C.get_slice(threadIdx.x);
+        auto tDsC            = gmem_thr_copy_C.partition_S(sC);
+        auto tDgC            = gmem_thr_copy_C.partition_D(gC);
         copy(gmem_tiled_copy_C, tDsC, tDgC);
 
         // uint64_t end = clock64();
@@ -483,18 +492,22 @@ template <class Operator, class FilterTensor, class ActivationTensor, class Outp
 __global__
 __launch_bounds__(
     Operator::MaxThreadsPerBlock,
-    Operator::MinBlocksPerMultiprocessor) void kernel_entrypoint(FilterTensor     mFlt,
+    Operator::MinBlocksPerMultiprocessor) void kernel_entrypoint(FilterTensor mFlt,
                                                                  ActivationTensor mAct,
-                                                                 OutputTensor     mOut) {
+                                                                 OutputTensor mOut) {
     extern __shared__ char smem_buf[];
-    Operator               op;
+    Operator op;
     op(mFlt, mAct, mOut, smem_buf);
 }
 
 template <int Di, int Do>
 int
-stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *inputBuffer,
-                        float *stencil, float *outputBuffer, uint32_t *output_index_buffer) {
+stencilConvolveLauncher(size_t num_bricks,
+                        uint32_t *halo_index_buffer,
+                        float *inputBuffer,
+                        float *stencil,
+                        float *outputBuffer,
+                        uint32_t *output_index_buffer) {
     using KernelFunctor = KernelFunctorV1<cute::Int<Di>, cute::Int<Do>>;
 
     using D_t = typename KernelFunctor::D;
@@ -553,7 +566,7 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
     // gather_tensor_layout(make_coord(idx_buffer_idx, dense_c_idx)) => idx in input values buffer
     auto xformed_act_gather_layout =
         make_layout(make_shape(_1{}, _1{}),
-                    make_stride(CustomStride{ IndexedGather{ halo_index_buffer }, C }, _1{}));
+                    make_stride(CustomStride{IndexedGather{halo_index_buffer}, C}, _1{}));
 
     // Composed layout that takes the composes the idx buf index and c index to map to values
     // ((nzpq), (csrt)) => (idx_buffer_idx, dense_c_idx) => (gmem_base_ptr +
@@ -564,13 +577,14 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
         xformed_act_gather_layout, make_arithmetic_tuple(_0{}, _0{}), xformed_act_basis_layout);
 
     // Output scatter layout
-    auto out_basis_stride =
-        make_stride(E<1>{}, make_stride(Z * P * Q * E<0>{}, P * Q * E<0>{}, Q * E<0>{},
-                                        _1{} * E<0>{})); // -> (crd0, crd1)
+    auto out_basis_stride = make_stride(
+        E<1>{},
+        make_stride(
+            Z * P * Q * E<0>{}, P * Q * E<0>{}, Q * E<0>{}, _1{} * E<0>{})); // -> (crd0, crd1)
     auto out_basis_layout = make_layout(shape(output_layout), out_basis_stride);
     auto out_scatter_layout =
         make_layout(make_shape(_1{}, _1{}),
-                    make_stride(CustomStride{ IndexedGather{ output_index_buffer }, K }, _1{}));
+                    make_stride(CustomStride{IndexedGather{output_index_buffer}, K}, _1{}));
     auto out_composed_layout =
         composition(out_scatter_layout, make_arithmetic_tuple(_0{}, _0{}), out_basis_layout);
 
@@ -582,8 +596,9 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
 
     cute::Tensor gOutput_mn = zipped_divide(
         mOutputScatter, typename KernelFunctor::TilerOut{});           // ((BLK_M, BLK_N), (m', n'))
-    dim3             launch_grid{ static_cast<unsigned int>(size<1, 1>(gOutput_mn)),
-                      static_cast<unsigned int>(size<1, 0>(gOutput_mn)), 1u };
+    dim3 launch_grid{static_cast<unsigned int>(size<1, 1>(gOutput_mn)),
+                     static_cast<unsigned int>(size<1, 0>(gOutput_mn)),
+                     1u};
     constexpr size_t smem_size = sizeof(typename KernelFunctor::SharedStorage);
 
 #if 0
@@ -624,18 +639,23 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
         }
 #endif
 
-    cudaFuncSetAttribute(kernel_entrypoint<KernelFunctor, decltype(mFilter),
-                                           decltype(mXformedActGather), decltype(mOutputScatter)>,
-                         cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
+    cudaFuncSetAttribute(kernel_entrypoint<KernelFunctor,
+                                           decltype(mFilter),
+                                           decltype(mXformedActGather),
+                                           decltype(mOutputScatter)>,
+                         cudaFuncAttributeMaxDynamicSharedMemorySize,
+                         smem_size);
 
     // cudaEvent_t start, stop;
     // cudaEventCreate(&start);
     // cudaEventCreate(&stop);
     // cudaEventRecord(start);
-    kernel_entrypoint<KernelFunctor, decltype(mFilter), decltype(mXformedActGather),
+    kernel_entrypoint<KernelFunctor,
+                      decltype(mFilter),
+                      decltype(mXformedActGather),
                       decltype(mOutputScatter)>
-        <<<launch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(mFilter, mXformedActGather,
-                                                                        mOutputScatter);
+        <<<launch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(
+            mFilter, mXformedActGather, mOutputScatter);
     // cudaEventRecord(stop);
     // cudaEventSynchronize(stop);
     // float milliseconds = 0;
@@ -658,7 +678,7 @@ dispatchSparseConvolutionCutlass<torch::kCUDA>(const torch::Tensor &inFeatures,
                                                const torch::Tensor &kernel,
                                                const torch::Tensor &haloIndexBuffer,
                                                const torch::Tensor &outputIndexBuffer,
-                                               bool                 benchmark) {
+                                               bool benchmark) {
     // Assuming kernel is reshaped from [Do, Di, D, H, W] to [Do, D, H, W, Di] outside
     const int inC = kernel.size(4), outC = kernel.size(0);
 
@@ -667,12 +687,12 @@ dispatchSparseConvolutionCutlass<torch::kCUDA>(const torch::Tensor &inFeatures,
 
     if (!benchmark) {
         // Pre-pad input features with 0
-        paddedInFeatures = torch::zeros({ inFeatures.size(0) + 1, inC }, inFeatures.options());
+        paddedInFeatures = torch::zeros({inFeatures.size(0) + 1, inC}, inFeatures.options());
         paddedInFeatures.slice(0, 1, inFeatures.size(0) + 1) = inFeatures;
-        outFeatures = torch::zeros({ paddedInFeatures.size(0), outC }, inFeatures.options());
+        outFeatures = torch::zeros({paddedInFeatures.size(0), outC}, inFeatures.options());
     } else {
         paddedInFeatures = inFeatures;
-        outFeatures      = torch::empty({ inFeatures.size(0), outC }, inFeatures.options());
+        outFeatures      = torch::empty({inFeatures.size(0), outC}, inFeatures.options());
     }
 
     // Run convolution
@@ -709,13 +729,17 @@ dispatchSparseConvolutionCutlass<torch::kCUDA>(const torch::Tensor &inFeatures,
     } else if (inC == 256 && outC == 512) {
         convFunc = stencilConvolveLauncher<256, 512>;
     } else {
-        TORCH_CHECK(false, "Unsupported convolution size, inC = " + std::to_string(inC) +
-                               ", outC = " + std::to_string(outC));
+        TORCH_CHECK(false,
+                    "Unsupported convolution size, inC = " + std::to_string(inC) +
+                        ", outC = " + std::to_string(outC));
     }
 
-    convFunc(haloIndexBuffer.size(0) / 96, (uint32_t *)haloIndexBuffer.data_ptr<int>(),
-             paddedInFeatures.data_ptr<float>(), kernel.data_ptr<float>(),
-             outFeatures.data_ptr<float>(), (uint32_t *)outputIndexBuffer.data_ptr<int>());
+    convFunc(haloIndexBuffer.size(0) / 96,
+             (uint32_t *)haloIndexBuffer.data_ptr<int>(),
+             paddedInFeatures.data_ptr<float>(),
+             kernel.data_ptr<float>(),
+             outFeatures.data_ptr<float>(),
+             (uint32_t *)outputIndexBuffer.data_ptr<int>());
 
     if (!benchmark) {
         // Slice out the padded part
@@ -733,7 +757,7 @@ dispatchSparseConvolutionCutlass<torch::kCUDA>(const torch::Tensor &inFeatures,
                                                const torch::Tensor &kernel,
                                                const torch::Tensor &haloIndexBuffer,
                                                const torch::Tensor &outputIndexBuffer,
-                                               bool                 benchmark) {
+                                               bool benchmark) {
     TORCH_CHECK(false, "CUDA <= 12.0 does not support c++20 standard. Compile with a newer nvcc.");
 }
 
@@ -745,7 +769,7 @@ dispatchSparseConvolutionCutlass<torch::kCPU>(const torch::Tensor &inFeatures,
                                               const torch::Tensor &kernel,
                                               const torch::Tensor &haloIndexBuffer,
                                               const torch::Tensor &outputIndexBuffer,
-                                              bool                 benchmark) {
+                                              bool benchmark) {
     TORCH_CHECK(false, "CPU not supported for SparseConvolutionHalo yet!");
 }
 

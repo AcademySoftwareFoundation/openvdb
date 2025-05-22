@@ -23,9 +23,9 @@ namespace detail {
 /// device
 ///        it is significantly slower then cached (un-pinned) memory on the host.
 class TorchDeviceBuffer {
-    uint64_t      mSize; // total number of bytes for the NanoVDB grid.
-    uint8_t      *mData; // raw buffer for the NanoVDB grid.
-    torch::Device mDevice{ torch::kCPU };
+    uint64_t mSize; // total number of bytes for the NanoVDB grid.
+    uint8_t *mData; // raw buffer for the NanoVDB grid.
+    torch::Device mDevice{torch::kCPU};
 
   public:
     /// @brief Default constructor initializes a buffer with the given size and device specified by
@@ -87,8 +87,10 @@ class TorchDeviceBuffer {
     /// @param device Device index for the buffer. If you passed in a guide buffer, then this must
     /// match the device of the guide buffer!
     /// @return An instance of this class using move semantics
-    static TorchDeviceBuffer create(uint64_t size, const TorchDeviceBuffer *guide = nullptr,
-                                    int device = cudaCpuDeviceId, void *stream = nullptr);
+    static TorchDeviceBuffer create(uint64_t size,
+                                    const TorchDeviceBuffer *guide = nullptr,
+                                    int device                     = cudaCpuDeviceId,
+                                    void *stream                   = nullptr);
 
 }; // TorchDeviceBuffer class
 

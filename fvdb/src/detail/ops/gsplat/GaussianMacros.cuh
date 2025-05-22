@@ -4,7 +4,7 @@
 #ifndef FVDB_DETAIL_OPS_GSPLAT_GAUSSIANMACROS_CUH
 #define FVDB_DETAIL_OPS_GSPLAT_GAUSSIANMACROS_CUH
 
-#define GSPLAT_CHECK_CUDA(x) TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
+#define GSPLAT_CHECK_CUDA(x)       TORCH_CHECK(x.is_cuda(), #x " must be a CUDA tensor")
 #define GSPLAT_CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
 #define GSPLAT_CHECK_INPUT(x) \
     GSPLAT_CHECK_CUDA(x);     \

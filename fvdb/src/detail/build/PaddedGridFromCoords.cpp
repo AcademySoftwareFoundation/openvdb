@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -19,7 +20,9 @@ template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::CoordBBox &bbox) {
     return AT_DISPATCH_V2(
-        jaggedCoords.scalar_type(), "buildPaddedGridFromCoords", AT_WRAP([&]() {
+        jaggedCoords.scalar_type(),
+        "buildPaddedGridFromCoords",
+        AT_WRAP([&]() {
             using ScalarT = scalar_t;
             jaggedCoords.check_valid();
 
@@ -73,7 +76,8 @@ buildPaddedGridFromCoordsCPU(const JaggedTensor &jaggedCoords, const nanovdb::Co
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromCoords(bool isMutable, const JaggedTensor &coords,
+buildPaddedGridFromCoords(bool isMutable,
+                          const JaggedTensor &coords,
                           const nanovdb::CoordBBox &bbox) {
     if (coords.device().is_cuda()) {
         JaggedTensor buildCoords = ops::dispatchPaddedIJKForCoords<torch::kCUDA>(coords, bbox);

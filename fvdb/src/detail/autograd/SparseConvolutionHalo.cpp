@@ -12,9 +12,10 @@ namespace autograd {
 
 SparseConvolutionHalo::variable_list
 SparseConvolutionHalo::forward(SparseConvolutionHalo::AutogradContext *ctx,
-                               c10::intrusive_ptr<GridBatchImpl>       grid,
-                               SparseConvolutionHalo::Variable         inFeatures,
-                               SparseConvolutionHalo::Variable kernels, int variant) {
+                               c10::intrusive_ptr<GridBatchImpl> grid,
+                               SparseConvolutionHalo::Variable inFeatures,
+                               SparseConvolutionHalo::Variable kernels,
+                               int variant) {
     // Check kernels
     TORCH_CHECK_TYPE(kernels.is_floating_point(), "kernels must have a floating point type");
     TORCH_CHECK_VALUE(
@@ -39,18 +40,18 @@ SparseConvolutionHalo::forward(SparseConvolutionHalo::AutogradContext *ctx,
             ") to equal input channels of features: " + std::to_string(inFeatures.size(1)));
 
     // [O, I, 3, 3, 3] to [3, 3, 3, I, O]
-    kernels = kernels.permute({ 4, 3, 2, 1, 0 }).contiguous();
+    kernels = kernels.permute({4, 3, 2, 1, 0}).contiguous();
 
     torch::Tensor outFeatures = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
         return ops::dispatchSparseConvolutionHalo<DeviceTag>(*grid, inFeatures, kernels, variant);
     });
 
     // Save data for backward in context
-    ctx->save_for_backward({ inFeatures, kernels });
+    ctx->save_for_backward({inFeatures, kernels});
     ctx->saved_data["grid"]    = grid;
     ctx->saved_data["variant"] = variant;
 
-    return variable_list({ outFeatures });
+    return variable_list({outFeatures});
 }
 
 SparseConvolutionHalo::variable_list
@@ -59,14 +60,14 @@ SparseConvolutionHalo::backward(AutogradContext *ctx, variable_list grad_output)
     TORCH_CHECK(
         saved.size() > 0,
         "No backward context computed during forward. Please pass in training=True when calling kmap.build_implicit_gemm()");
-    auto grid    = ctx->saved_data["grid"].toCustomClass<GridBatchImpl>();
-    int  variant = ctx->saved_data["variant"].toInt();
+    auto grid   = ctx->saved_data["grid"].toCustomClass<GridBatchImpl>();
+    int variant = ctx->saved_data["variant"].toInt();
 
     Variable inFeatures = saved.at(0);
-    Variable kernels    = saved.at(1);                                           // [3, 3, 3, I, O]
+    Variable kernels    = saved.at(1);                                       // [3, 3, 3, I, O]
     Variable gradOut    = grad_output.at(0);
 
-    kernels = kernels.permute({ 0, 1, 2, 4, 3 }).flip({ 0, 1, 2 }).contiguous(); // [3, 3, 3, O, I]
+    kernels = kernels.permute({0, 1, 2, 4, 3}).flip({0, 1, 2}).contiguous(); // [3, 3, 3, O, I]
     torch::Tensor gradInput  = FVDB_DISPATCH_KERNEL_DEVICE(inFeatures.device(), [&]() {
         return ops::dispatchSparseConvolutionHalo<DeviceTag>(*grid, gradOut, kernels, variant);
     });
@@ -75,9 +76,9 @@ SparseConvolutionHalo::backward(AutogradContext *ctx, variable_list grad_output)
     });
 
     // [3, 3, 3, I, O] to [O, I, 3, 3, 3]
-    gradKernel = gradKernel.permute({ 4, 3, 2, 1, 0 }).contiguous();
+    gradKernel = gradKernel.permute({4, 3, 2, 1, 0}).contiguous();
 
-    return { torch::Tensor(), gradInput, gradKernel, torch::Tensor() };
+    return {torch::Tensor(), gradInput, gradKernel, torch::Tensor()};
 }
 
 } // namespace autograd

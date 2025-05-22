@@ -34,7 +34,9 @@ namespace fvdb {
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 __host__ void
-forEachLeafCPU(int64_t channelsPerLeaf, const fvdb::detail::GridBatchImpl &batchHdl, Func func,
+forEachLeafCPU(int64_t channelsPerLeaf,
+               const fvdb::detail::GridBatchImpl &batchHdl,
+               Func func,
                Args... args) {
     TORCH_CHECK(batchHdl.device().is_cpu(), "Grid batch must be on the CPU");
     auto batchAccessor = batchHdl.hostAccessor<GridType>();
@@ -46,7 +48,7 @@ forEachLeafCPU(int64_t channelsPerLeaf, const fvdb::detail::GridBatchImpl &batch
         const int64_t channelIdx = static_cast<int64_t>(leafChannelIdx % channelsPerLeaf);
 
         const fvdb::JIdxType batchIdx = batchAccessor.leafBatchIndex(cumLeafIdx);
-        const int64_t        leafIdx  = cumLeafIdx - batchAccessor.leafOffset(batchIdx);
+        const int64_t leafIdx         = cumLeafIdx - batchAccessor.leafOffset(batchIdx);
 
         func(batchIdx, leafIdx, channelIdx, batchAccessor, args...);
     }
@@ -74,8 +76,11 @@ forEachLeafCPU(int64_t channelsPerLeaf, const fvdb::detail::GridBatchImpl &batch
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 void
-forEachLeafInOneGridCPU(int64_t numChannels, int64_t batchIdx,
-                        const fvdb::detail::GridBatchImpl &batchHdl, Func func, Args... args) {
+forEachLeafInOneGridCPU(int64_t numChannels,
+                        int64_t batchIdx,
+                        const fvdb::detail::GridBatchImpl &batchHdl,
+                        Func func,
+                        Args... args) {
     TORCH_CHECK(batchHdl.device().is_cpu(), "Grid batch must be on the CPU");
     TORCH_CHECK(batchIdx >= 0 && batchIdx < batchHdl.batchSize(), "Batch index out of range");
     auto batchAccessor = batchHdl.hostAccessor<GridType>();
@@ -120,7 +125,9 @@ forEachLeafInOneGridCPU(int64_t numChannels, int64_t batchIdx,
 /// @param args Any extra arguments to pass to the callback function
 template <typename GridType, typename Func, typename... Args>
 __host__ void
-forEachVoxelCPU(int64_t numChannels, const fvdb::detail::GridBatchImpl &batchHdl, Func func,
+forEachVoxelCPU(int64_t numChannels,
+                const fvdb::detail::GridBatchImpl &batchHdl,
+                Func func,
                 Args... args) {
     TORCH_CHECK(batchHdl.device().is_cpu(), "Grid batch must be on the CPU");
     constexpr int64_t VOXELS_PER_LEAF =
@@ -163,16 +170,18 @@ forEachVoxelCPU(int64_t numChannels, const fvdb::detail::GridBatchImpl &batchHdl
 /// @param ...args Any extra arguments to pass to the callback function
 template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
 void
-forEachJaggedElementChannelCPU(int64_t numChannels, const JaggedTensor &jaggedTensor, Func func,
+forEachJaggedElementChannelCPU(int64_t numChannels,
+                               const JaggedTensor &jaggedTensor,
+                               Func func,
                                Args... args) {
     TORCH_CHECK(jaggedTensor.device().is_cpu(), "JaggedTensor must be on the CPU");
     const int64_t numElements = jaggedTensor.element_count() * numChannels;
-    auto          jaggedAcc   = jaggedTensor.accessor<ScalarT, NDIMS>();
+    auto jaggedAcc            = jaggedTensor.accessor<ScalarT, NDIMS>();
 
     for (int64_t idx = 0; idx < numElements; idx += 1) {
-        const int64_t        elementIdx = idx / numChannels;
-        const fvdb::JIdxType batchIdx   = jaggedAcc.batchIdx(elementIdx);
-        const int64_t        channelIdx = idx % numChannels;
+        const int64_t elementIdx      = idx / numChannels;
+        const fvdb::JIdxType batchIdx = jaggedAcc.batchIdx(elementIdx);
+        const int64_t channelIdx      = idx % numChannels;
 
         func(batchIdx, elementIdx, channelIdx, jaggedAcc, args...);
     }
@@ -198,11 +207,13 @@ forEachJaggedElementChannelCPU(int64_t numChannels, const JaggedTensor &jaggedTe
 /// @param ...args Any extra arguments to pass to the callback function
 template <typename ScalarT, int32_t NDIMS, typename Func, typename... Args>
 void
-forEachTensorElementChannelCPU(int64_t numChannels, const torch::Tensor &tensor, Func func,
+forEachTensorElementChannelCPU(int64_t numChannels,
+                               const torch::Tensor &tensor,
+                               Func func,
                                Args... args) {
     TORCH_CHECK(tensor.device().is_cpu(), "Tensor must be on the CPU");
     const int64_t numElements = tensor.size(0) * numChannels;
-    auto          tensorAcc   = tensor.accessor<ScalarT, NDIMS>();
+    auto tensorAcc            = tensor.accessor<ScalarT, NDIMS>();
 
     for (int64_t idx = 0; idx < numElements; idx += 1) {
         const int64_t elementIdx = idx / numChannels;

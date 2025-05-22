@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -15,8 +16,10 @@ namespace build {
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
-                  const nanovdb::Coord &ijkMin, std::optional<torch::Tensor> mask) {
+buildDenseGridCPU(const uint32_t batchSize,
+                  const nanovdb::Coord &size,
+                  const nanovdb::Coord &ijkMin,
+                  std::optional<torch::Tensor> mask) {
     torch::TensorAccessor<bool, 3> maskAccessor(nullptr, nullptr, nullptr);
     if (mask.has_value()) {
         maskAccessor = mask.value().accessor<bool, 3>();
@@ -45,8 +48,8 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
 
     proxyGridAccessor.merge();
     nanovdb::GridHandle<TorchDeviceBuffer> ret =
-        nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(*proxyGrid, 0u,
-                                                                                false, false);
+        nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
+            *proxyGrid, 0u, false, false);
     ret.buffer().to(torch::kCPU);
 
     TorchDeviceBuffer guide(0, torch::kCPU);
@@ -66,8 +69,11 @@ buildDenseGridCPU(const uint32_t batchSize, const nanovdb::Coord &size,
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildDenseGrid(torch::Device device, bool isMutable, const uint32_t batchSize,
-               const nanovdb::Coord &size, const nanovdb::Coord &ijkMin,
+buildDenseGrid(torch::Device device,
+               bool isMutable,
+               const uint32_t batchSize,
+               const nanovdb::Coord &size,
+               const nanovdb::Coord &ijkMin,
                const std::optional<torch::Tensor> &mask) {
     TORCH_CHECK(size[0] > 0 && size[1] > 0 && size[2] > 0,
                 "Size must be greater than 0 in all dimensions");
@@ -86,8 +92,8 @@ buildDenseGrid(torch::Device device, bool isMutable, const uint32_t batchSize,
                     "Mask must have same size as dense grid to build");
     }
     if (device.is_cuda()) {
-        return ops::dispatchCreateNanoGridFromDense<torch::kCUDA>(batchSize, ijkMin, size,
-                                                                  isMutable, device, mask);
+        return ops::dispatchCreateNanoGridFromDense<torch::kCUDA>(
+            batchSize, ijkMin, size, isMutable, device, mask);
     } else {
         return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
             return buildDenseGridCPU<GridType>(batchSize, size, ijkMin, mask);

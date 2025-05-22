@@ -7,9 +7,8 @@
 #include <ATen/Dispatch_v2.h>
 
 #include <cub/cub.cuh>
-#include <thrust/sort.h>
-
 #include <cuda/std/atomic>
+#include <thrust/sort.h>
 
 namespace fvdb::detail::ops {
 
@@ -18,7 +17,7 @@ namespace fvdb::detail::ops {
         size_t temp_storage_bytes = 0;                                            \
         func(nullptr, temp_storage_bytes, __VA_ARGS__);                           \
         auto &caching_allocator = *::c10::cuda::CUDACachingAllocator::get();      \
-        auto  temp_storage      = caching_allocator.allocate(temp_storage_bytes); \
+        auto temp_storage       = caching_allocator.allocate(temp_storage_bytes); \
         func(temp_storage.get(), temp_storage_bytes, __VA_ARGS__);                \
     } while (false)
 
@@ -101,11 +100,12 @@ namespace fvdb::detail::ops {
 // Compute tile mask and tile ids for each pixel coordinate
 template <typename CoordType>
 __global__ void
-__launch_bounds__(256)
-    computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
-                    const int32_t tileSideLength, const int32_t numTilesW, const int32_t numTilesH,
-                    fvdb::TorchRAcc32<bool, 1>    outTileMask,
-                    fvdb::TorchRAcc32<int64_t, 1> outTileIds) {
+__launch_bounds__(256) computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
+                                       const int32_t tileSideLength,
+                                       const int32_t numTilesW,
+                                       const int32_t numTilesH,
+                                       fvdb::TorchRAcc32<bool, 1> outTileMask,
+                                       fvdb::TorchRAcc32<int64_t, 1> outTileIds) {
     for (auto pixelId = blockIdx.x * blockDim.x + threadIdx.x; pixelId < pixelCoords.elementCount();
          pixelId += blockDim.x * gridDim.x) {
         auto const batchId = pixelCoords.batchIdx(pixelId);
@@ -141,12 +141,16 @@ __launch_bounds__(256)
 template <typename CoordType>
 __global__ void
 __launch_bounds__(256) computePerTileBitMask(
-    const int64_t numUniqueTiles, const int32_t numWordsPerTile, const int32_t numTilesW,
-    const int32_t numTilesH, const int32_t tileSideLength,
-    const fvdb::TorchRAcc32<int32_t, 1>    uniqueTileIds,    // [numUniqueTiles]
-    const fvdb::TorchRAcc32<int64_t, 1>    cumPixelsPerTile, // [numUniqueTiles] (inclusive cumsum)
-    const fvdb::TorchRAcc32<int64_t, 1>    unsortPerPixelTileIds, // [numPixels]
-    const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords, fvdb::TorchRAcc32<uint64_t, 2> outBitmask) {
+    const int64_t numUniqueTiles,
+    const int32_t numWordsPerTile,
+    const int32_t numTilesW,
+    const int32_t numTilesH,
+    const int32_t tileSideLength,
+    const fvdb::TorchRAcc32<int32_t, 1> uniqueTileIds,    // [numUniqueTiles]
+    const fvdb::TorchRAcc32<int64_t, 1> cumPixelsPerTile, // [numUniqueTiles] (inclusive cumsum)
+    const fvdb::TorchRAcc32<int64_t, 1> unsortPerPixelTileIds, // [numPixels]
+    const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
+    fvdb::TorchRAcc32<uint64_t, 2> outBitmask) {
     // Contains threadsPerBlock * numWordsPerTile elements
     extern __shared__ uint64_t sharedMemBitmask[];
 
@@ -171,9 +175,9 @@ __launch_bounds__(256) computePerTileBitMask(
 
         // Note, we could use a warp per tile and do more in parallel.
         for (int i = tileStart; i < tileEnd; ++i) {
-            const int32_t   pixelId = unsortPerPixelTileIds[i];
-            const CoordType pixelU  = pixelCoords.data()[pixelId][0];
-            const CoordType pixelV  = pixelCoords.data()[pixelId][1];
+            const int32_t pixelId  = unsortPerPixelTileIds[i];
+            const CoordType pixelU = pixelCoords.data()[pixelId][0];
+            const CoordType pixelV = pixelCoords.data()[pixelId][1];
 
             const int32_t pixelUInTile = pixelU - tileStartPixelU;
             const int32_t pixelVInTile = pixelV - tileStartPixelV;
@@ -203,7 +207,9 @@ zeros(at::IntArrayRef dims, c10::ScalarType dtype, torch::Device device) {
 }
 
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const int32_t numTilesH,
+computeSparseInfo(const int32_t tileSideLength,
+                  const int32_t numTilesW,
+                  const int32_t numTilesH,
                   const fvdb::JaggedTensor &pixelsToRender) {
     TORCH_CHECK_NOT_IMPLEMENTED(pixelsToRender.device().is_cuda(),
                                 "computeSparseInfo only implemented on the device");
@@ -215,8 +221,8 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
                          pixelsToRender.scalar_type() == torch::kInt64,
                      "pixelsToRender must be of type int32 or int64");
 
-    auto const    numImages              = pixelsToRender.num_outer_lists();
-    auto const    numPixels              = pixelsToRender.rsize(0);
+    auto const numImages                 = pixelsToRender.num_outer_lists();
+    auto const numPixels                 = pixelsToRender.rsize(0);
     const int32_t numWordsPerTileBitmask = (tileSideLength * tileSideLength + 63) / 64;
 
     const torch::Device device = pixelsToRender.device();
@@ -229,15 +235,16 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
         torch::TensorOptions().device(device).dtype(torch::kBool);
 
     if (numImages == 0 || numPixels == 0) {
-        return { empty({ 0 }, torch::kInt, device),
-                 zeros({ numImages, numTilesW, numTilesH }, torch::kBool, device),
-                 empty({ 0, numWordsPerTileBitmask }, torch::kLong, device),
-                 zeros({ 1 }, torch::kLong, device), empty({ 0 }, torch::kLong, device) };
+        return {empty({0}, torch::kInt, device),
+                zeros({numImages, numTilesW, numTilesH}, torch::kBool, device),
+                empty({0, numWordsPerTileBitmask}, torch::kLong, device),
+                zeros({1}, torch::kLong, device),
+                empty({0}, torch::kLong, device)};
     }
 
     // Compute a boolean tile
-    torch::Tensor tileMask = torch::zeros({ numTilesW * numTilesH * numImages }, optionsBool);
-    torch::Tensor perPixelTileIds = torch::empty({ numPixels }, optionsInt64);
+    torch::Tensor tileMask        = torch::zeros({numTilesW * numTilesH * numImages}, optionsBool);
+    torch::Tensor perPixelTileIds = torch::empty({numPixels}, optionsInt64);
 
     auto outMaskAccessor   = fvdb::tensorAccessor<torch::kCUDA, bool, 1>(tileMask);
     auto outTileIdAccessor = fvdb::tensorAccessor<torch::kCUDA, int64_t, 1>(perPixelTileIds);
@@ -248,11 +255,15 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
         const int32_t NUM_BLOCKS  = (numPixels + NUM_THREADS - 1) / NUM_THREADS;
         computeTileMask<index_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
             pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
-            tileSideLength, numTilesW, numTilesH, outMaskAccessor, outTileIdAccessor);
+            tileSideLength,
+            numTilesW,
+            numTilesH,
+            outMaskAccessor,
+            outTileIdAccessor);
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
 
-    tileMask = tileMask.view({ numImages, numTilesH, numTilesW });
+    tileMask = tileMask.view({numImages, numTilesH, numTilesW});
 
     // Sort pixels by their tile id and store the inverse mapping from sorted to original
     // TODO can we reduce the data sizes here?
@@ -261,10 +272,15 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     torch::Tensor unsortPerPixelTileIds = torch::empty_like(perPixelTileIds);
 
     // Sort by tile ID (out-of-place)
-    CUB_WRAPPER(cub::DeviceRadixSort::SortPairs, perPixelTileIds.data_ptr<int64_t>(),
-                sortedPerPixelTileIds.data_ptr<int64_t>(), pixelIds.data_ptr<int64_t>(),
-                unsortPerPixelTileIds.data_ptr<int64_t>(), numPixels, 0 /* begin_bit */,
-                sizeof(int64_t) * 8 /* end_bit */, stream);
+    CUB_WRAPPER(cub::DeviceRadixSort::SortPairs,
+                perPixelTileIds.data_ptr<int64_t>(),
+                sortedPerPixelTileIds.data_ptr<int64_t>(),
+                pixelIds.data_ptr<int64_t>(),
+                unsortPerPixelTileIds.data_ptr<int64_t>(),
+                numPixels,
+                0 /* begin_bit */,
+                sizeof(int64_t) * 8 /* end_bit */,
+                stream);
 
     // Make a transform_iterator to extract the tile id from the sorted pixel ids
     auto tileIdIter =
@@ -273,16 +289,20 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
 
     // Run length encode to get the unique tile ids, and the number of pixels per tile
     torch::Tensor numPixelsPerTile = torch::empty(
-        { std::min(numPixels, int64_t(numImages * numTilesW * numTilesH)) }, optionsInt64);
-    torch::Tensor uniqueTileIds = torch::empty({ numPixels }, optionsInt32);
-    torch::Tensor uniqueCounts  = torch::empty({ 1 }, optionsInt32);
-    CUB_WRAPPER(cub::DeviceRunLengthEncode::Encode, tileIdIter, uniqueTileIds.data_ptr<int32_t>(),
-                numPixelsPerTile.data_ptr<int64_t>(), uniqueCounts.data_ptr<int32_t>(), numPixels,
+        {std::min(numPixels, int64_t(numImages * numTilesW * numTilesH))}, optionsInt64);
+    torch::Tensor uniqueTileIds = torch::empty({numPixels}, optionsInt32);
+    torch::Tensor uniqueCounts  = torch::empty({1}, optionsInt32);
+    CUB_WRAPPER(cub::DeviceRunLengthEncode::Encode,
+                tileIdIter,
+                uniqueTileIds.data_ptr<int32_t>(),
+                numPixelsPerTile.data_ptr<int64_t>(),
+                uniqueCounts.data_ptr<int32_t>(),
+                numPixels,
                 stream);
     cudaStreamSynchronize(stream);
     auto const numUniqueTiles = uniqueCounts.item<int32_t>();
-    uniqueTileIds             = uniqueTileIds.index({ at::indexing::Slice(0, numUniqueTiles) });
-    numPixelsPerTile          = numPixelsPerTile.index({ at::indexing::Slice(0, numUniqueTiles) });
+    uniqueTileIds             = uniqueTileIds.index({at::indexing::Slice(0, numUniqueTiles)});
+    numPixelsPerTile          = numPixelsPerTile.index({at::indexing::Slice(0, numUniqueTiles)});
 
     // Cumsum so we know where each tile starts in the sorted array
     // TODO: should we use CUB?
@@ -290,22 +310,27 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
 
     // Compute a bitmask for each tile indicating which pixels are active in that tile
     torch::Tensor tileBitMask =
-        torch::zeros({ numUniqueTiles, numWordsPerTileBitmask },
+        torch::zeros({numUniqueTiles, numWordsPerTileBitmask},
                      torch::TensorOptions().device(device).dtype(torch::kUInt64));
 
     // TODO: Check available shared memory and adjust block size accordingly
     AT_DISPATCH_INDEX_TYPES(pixelsToRender.scalar_type(), "computePerTileBitMask", [&]() {
         const uint32_t NUM_THREADS2 = 256;
         const uint32_t NUM_BLOCKS2  = (numUniqueTiles + NUM_THREADS2 - 1) / NUM_THREADS2;
-        computePerTileBitMask<index_t>
-            <<<NUM_BLOCKS2, NUM_THREADS2, NUM_THREADS2 * numWordsPerTileBitmask * sizeof(uint64_t),
-               stream>>>(
-                numUniqueTiles, numWordsPerTileBitmask, numTilesW, numTilesH, tileSideLength,
-                uniqueTileIds.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>(),
-                numPixelsPerTile.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
-                unsortPerPixelTileIds.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
-                pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
-                tileBitMask.packed_accessor32<uint64_t, 2, torch::RestrictPtrTraits>());
+        computePerTileBitMask<index_t><<<NUM_BLOCKS2,
+                                         NUM_THREADS2,
+                                         NUM_THREADS2 * numWordsPerTileBitmask * sizeof(uint64_t),
+                                         stream>>>(
+            numUniqueTiles,
+            numWordsPerTileBitmask,
+            numTilesW,
+            numTilesH,
+            tileSideLength,
+            uniqueTileIds.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>(),
+            numPixelsPerTile.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
+            unsortPerPixelTileIds.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
+            pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
+            tileBitMask.packed_accessor32<uint64_t, 2, torch::RestrictPtrTraits>());
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
 
@@ -322,8 +347,8 @@ computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const i
     //        i.e. Suppose we're rendering the k^th active pixel in tile_id = active_tiles[t],
     //             we write its rendered value to index pixel_map[tile_pixel_cumsum[tile_id-1] +
     //             k] in the output
-    return std::make_tuple(uniqueTileIds, tileMask, tileBitMask, numPixelsPerTile,
-                           unsortPerPixelTileIds);
+    return std::make_tuple(
+        uniqueTileIds, tileMask, tileBitMask, numPixelsPerTile, unsortPerPixelTileIds);
 }
 
 } // namespace fvdb::detail::ops

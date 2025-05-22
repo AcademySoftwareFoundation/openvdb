@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -15,12 +16,13 @@ namespace build {
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch::Tensor &subdivMask,
+buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl,
+                               const torch::Tensor &subdivMask,
                                const nanovdb::Coord subdivisionFactor) {
     using IndexTree = nanovdb::NanoTree<GridType>;
 
     const nanovdb::GridHandle<TorchDeviceBuffer> &coarseGridHdl = coarseBatchHdl.nanoGridHandle();
-    const torch::TensorAccessor<bool, 1>         &subdivMaskAcc = subdivMask.accessor<bool, 1>();
+    const torch::TensorAccessor<bool, 1> &subdivMaskAcc         = subdivMask.accessor<bool, 1>();
 
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(coarseGridHdl.gridCount());
@@ -70,9 +72,10 @@ buildFineGridFromCoarseGridCPU(const GridBatchImpl &coarseBatchHdl, const torch:
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseBatchHdl,
+buildFineGridFromCoarseGrid(bool isMutable,
+                            const GridBatchImpl &coarseBatchHdl,
                             const std::optional<JaggedTensor> &subdivMask,
-                            const nanovdb::Coord               subdivisionFactor) {
+                            const nanovdb::Coord subdivisionFactor) {
     if (coarseBatchHdl.device().is_cuda()) {
         JaggedTensor coords = ops::dispatchFineIJKForCoarseGrid<torch::kCUDA>(
             coarseBatchHdl, subdivisionFactor, subdivMask);
@@ -85,8 +88,8 @@ buildFineGridFromCoarseGrid(bool isMutable, const GridBatchImpl &coarseBatchHdl,
             subdivMaskTensor = torch::zeros(0, torch::TensorOptions().dtype(torch::kBool));
         }
         return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildFineGridFromCoarseGridCPU<GridType>(coarseBatchHdl, subdivMaskTensor,
-                                                            subdivisionFactor);
+            return buildFineGridFromCoarseGridCPU<GridType>(
+                coarseBatchHdl, subdivMaskTensor, subdivisionFactor);
         });
     }
 }

@@ -4,6 +4,7 @@
 #include "JaggedTensor.h"
 
 #include "Config.h"
+
 #include <detail/autograd/JaggedReduce.h>
 #include <detail/ops/Ops.h>
 #include <detail/ops/jagged/JaggedOps.h>
@@ -28,13 +29,15 @@ JaggedTensor::binary_op_check(const JaggedTensor &other) const {
         TORCH_CHECK_VALUE(torch::equal(mOffsets, other.joffsets()),
                           "offsets shape should match between this tensor and other tensor");
         TORCH_CHECK_VALUE(
-            torch::equal(other.mListIdx, mListIdx), "JaggedTensors must have the same lshape. ",
+            torch::equal(other.mListIdx, mListIdx),
+            "JaggedTensors must have the same lshape. ",
             "This error was raised because config.pendatic_error_checking was enabled");
     }
 }
 
 torch::Tensor
-JaggedTensor::joffsets_from_jidx_and_jdata(torch::Tensor jidx, torch::Tensor jdata,
+JaggedTensor::joffsets_from_jidx_and_jdata(torch::Tensor jidx,
+                                           torch::Tensor jdata,
                                            int64_t num_tensors) {
     return FVDB_DISPATCH_KERNEL_DEVICE(jdata.device(), [&]() {
         return detail::ops::dispatchJOffsetsForJIdx<DeviceTag>(jidx, jdata, num_tensors);
@@ -50,9 +53,9 @@ JaggedTensor::jidx_from_joffsets(torch::Tensor joffsets, int64_t num_elements) {
 
 JaggedTensor::JaggedTensor(torch::Tensor data)
     : mData(data), mBatchIdx(torch::empty(
-                       { 0 }, torch::TensorOptions().dtype(JIdxScalarType).device(data.device()))) {
+                       {0}, torch::TensorOptions().dtype(JIdxScalarType).device(data.device()))) {
     mListIdx =
-        torch::empty({ 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
+        torch::empty({0, 1}, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
     mOffsets       = joffsets_from_jidx_and_jdata(mBatchIdx, mData, 1);
     mNumOuterLists = 1;
 }
@@ -71,13 +74,13 @@ JaggedTensor::JaggedTensor(const std::vector<torch::Tensor> &tensors) {
         }
         TORCH_CHECK(mData.dim() > 0,
                     "assigned data must have shape [N, ...], but got data.dim() = 0");
-        mBatchIdx = torch::empty(
-            { 0 }, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
+        mBatchIdx =
+            torch::empty({0}, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
         mOffsets =
-            torch::tensor({ JOffsetsType(0), mData.size(0) },
+            torch::tensor({JOffsetsType(0), mData.size(0)},
                           torch::TensorOptions().dtype(JOffsetsScalarType).device(mData.device()));
         mListIdx = torch::empty(
-            { 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
+            {0, 1}, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
         mNumOuterLists = 1;
         return;
     }
@@ -85,8 +88,8 @@ JaggedTensor::JaggedTensor(const std::vector<torch::Tensor> &tensors) {
     torch::Device device = tensors[0].device();
 
     std::vector<torch::Tensor> jIdxs;
-    mOffsets              = torch::empty({ (JOffsetsType)tensors.size() + 1 },
-                                         torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
+    mOffsets              = torch::empty({(JOffsetsType)tensors.size() + 1},
+                            torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
     auto elementCountsAcc = mOffsets.accessor<JOffsetsType, 1>();
     elementCountsAcc[0]   = 0;
 
@@ -96,12 +99,13 @@ JaggedTensor::JaggedTensor(const std::vector<torch::Tensor> &tensors) {
     for (size_t i = 0; i < tensors.size(); ++i) {
         TORCH_CHECK_VALUE(tensors[i].device() == device, "All tensors must be on the same device");
         if (tensors[i].dim() == 0 && tensors[i].numel() == 1) {
-            tensorsReshaped.push_back(tensors[i].view({ 1 }));
+            tensorsReshaped.push_back(tensors[i].view({1}));
         } else {
             tensorsReshaped.push_back(tensors[i]);
         }
         jIdxs.push_back(torch::full(
-            { tensorsReshaped[i].size(0) }, (int)i,
+            {tensorsReshaped[i].size(0)},
+            (int)i,
             torch::TensorOptions().dtype(JIdxScalarType).device(tensorsReshaped[i].device())));
         elementCountsAcc[i + 1] = tensorsReshaped[i].size(0);
     }
@@ -109,15 +113,15 @@ JaggedTensor::JaggedTensor(const std::vector<torch::Tensor> &tensors) {
     torch::cumsum_out(mOffsets, mOffsets, 0);
     mBatchIdx = torch::cat(jIdxs, 0);
     mData     = torch::cat(tensorsReshaped, 0);
-    mListIdx = torch::empty({ 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType).device(device));
+    mListIdx  = torch::empty({0, 1}, torch::TensorOptions().dtype(JLIdxScalarType).device(device));
     mNumOuterLists = tensors.size();
 }
 
 JaggedTensor::JaggedTensor(const std::vector<std::vector<torch::Tensor>> &tensors) {
     // TODO: (Francis): rewrite as a cuda kernel
-    torch::Device device         = torch::kCPU;
-    bool          deviceIsNotSet = true;
-    JOffsetsType  totalTensors   = 0;
+    torch::Device device      = torch::kCPU;
+    bool deviceIsNotSet       = true;
+    JOffsetsType totalTensors = 0;
 
     TORCH_CHECK(tensors.size() > 0, "empty tensor list");
     for (size_t i = 0; i < tensors.size(); ++i) {
@@ -145,13 +149,13 @@ JaggedTensor::JaggedTensor(const std::vector<std::vector<torch::Tensor>> &tensor
         }
         TORCH_CHECK(mData.dim() > 0,
                     "assigned data must have shape [N, ...], but got data.dim() = 0");
-        mBatchIdx = torch::empty(
-            { 0 }, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
+        mBatchIdx =
+            torch::empty({0}, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
         mOffsets =
-            torch::tensor({ JOffsetsType(0), mData.size(0) },
+            torch::tensor({JOffsetsType(0), mData.size(0)},
                           torch::TensorOptions().dtype(JOffsetsScalarType).device(mData.device()));
         mListIdx = torch::zeros(
-            { 1, 2 }, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
+            {1, 2}, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
         mNumOuterLists = 1;
         return;
     }
@@ -160,13 +164,13 @@ JaggedTensor::JaggedTensor(const std::vector<std::vector<torch::Tensor>> &tensor
     std::vector<torch::Tensor> batchIdxs;
     batchIdxs.reserve(totalTensors);
 
-    mOffsets              = torch::empty({ totalTensors + 1 },
-                                         torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
+    mOffsets              = torch::empty({totalTensors + 1},
+                            torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
     auto elementCountsAcc = mOffsets.accessor<JOffsetsType, 1>();
     elementCountsAcc[0]   = 0;
 
     torch::Tensor listIndexes =
-        torch::empty({ totalTensors, (JLIdxType)2 },
+        torch::empty({totalTensors, (JLIdxType)2},
                      torch::TensorOptions().dtype(JLIdxScalarType).device(torch::kCPU));
     auto listIndexesAcc = listIndexes.accessor<JLIdxType, 2>();
 
@@ -181,12 +185,13 @@ JaggedTensor::JaggedTensor(const std::vector<std::vector<torch::Tensor>> &tensor
 
             torch::Tensor tij = tensors[i][j];
             if (tij.dim() == 0 && tij.numel() == 1) {
-                tensorsReshaped.push_back(tij.view({ 1 }));
+                tensorsReshaped.push_back(tij.view({1}));
             } else {
                 tensorsReshaped.push_back(tij);
             }
             batchIdxs.push_back(
-                torch::full({ tensorsReshaped[tensorCount].size(0) }, tensorCount,
+                torch::full({tensorsReshaped[tensorCount].size(0)},
+                            tensorCount,
                             torch::TensorOptions().dtype(JIdxScalarType).device(device)));
             elementCountsAcc[tensorCount + 1] = tensorsReshaped[tensorCount].size(0);
             tensorCount += 1;
@@ -211,13 +216,13 @@ JaggedTensor::JaggedTensor(const std::vector<int64_t> &lsizes, const torch::Tens
         TORCH_CHECK_VALUE(lsizes[0] == data.size(0),
                           "Sum of list sizes must equal the number of elements in data");
         mOffsets =
-            torch::tensor({ JOffsetsType(0), data.size(0) },
+            torch::tensor({JOffsetsType(0), data.size(0)},
                           torch::TensorOptions().dtype(JOffsetsScalarType).device(data.device()));
         mListIdx = torch::empty(
-            { 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
+            {0, 1}, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
         mNumOuterLists = 1;
         mBatchIdx =
-            torch::empty({ 0 }, torch::TensorOptions().dtype(JIdxScalarType).device(data.device()));
+            torch::empty({0}, torch::TensorOptions().dtype(JIdxScalarType).device(data.device()));
         mData = data;
         if (mData.dim() == 0) {
             mData = mData.unsqueeze(0);
@@ -228,12 +233,12 @@ JaggedTensor::JaggedTensor(const std::vector<int64_t> &lsizes, const torch::Tens
     }
 
     torch::Tensor offsetsCPU =
-        torch::empty({ (JOffsetsType)lsizes.size() + 1 },
+        torch::empty({(JOffsetsType)lsizes.size() + 1},
                      torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
     auto offsetsCPUAcc = offsetsCPU.accessor<JOffsetsType, 1>();
 
     mListIdx =
-        torch::empty({ 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
+        torch::empty({0, 1}, torch::TensorOptions().dtype(JLIdxScalarType).device(data.device()));
     mNumOuterLists = lsizes.size();
 
     JOffsetsType cumulativeElements = 0;
@@ -251,7 +256,8 @@ JaggedTensor::JaggedTensor(const std::vector<int64_t> &lsizes, const torch::Tens
 }
 
 JaggedTensor::JaggedTensor(const std::vector<std::vector<int64_t>> &lsizes,
-                           const int64_t totalTensors, const torch::Tensor data) {
+                           const int64_t totalTensors,
+                           const torch::Tensor data) {
     // TODO (Francis) : Rewrite as a cuda kernel
     TORCH_CHECK_VALUE(lsizes.size() > 0, "empty lshape");
 
@@ -269,28 +275,28 @@ JaggedTensor::JaggedTensor(const std::vector<std::vector<int64_t>> &lsizes,
         }
         TORCH_CHECK(mData.dim() > 0,
                     "assigned data must have shape [N, ...], but got data.dim() = 0");
-        mBatchIdx = torch::empty(
-            { 0 }, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
+        mBatchIdx =
+            torch::empty({0}, torch::TensorOptions().dtype(JIdxScalarType).device(mData.device()));
         mOffsets =
-            torch::tensor({ JOffsetsType(0), mData.size(0) },
+            torch::tensor({JOffsetsType(0), mData.size(0)},
                           torch::TensorOptions().dtype(JOffsetsScalarType).device(mData.device()));
         mListIdx = torch::zeros(
-            { 1, 2 }, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
+            {1, 2}, torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device()));
         mNumOuterLists = 1;
         return;
     }
 
     torch::Tensor offsetsCPU =
-        torch::empty({ (JOffsetsType)totalTensors + 1 },
+        torch::empty({(JOffsetsType)totalTensors + 1},
                      torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCPU));
     torch::Tensor listIdsCPU =
-        torch::empty({ (JLIdxType)totalTensors, 2 },
+        torch::empty({(JLIdxType)totalTensors, 2},
                      torch::TensorOptions().dtype(JLIdxScalarType).device(torch::kCPU));
     auto offsetsCPUAcc = offsetsCPU.accessor<JOffsetsType, 1>();
     auto listIdsCPUAcc = listIdsCPU.accessor<JLIdxType, 2>();
 
     JOffsetsType cumulativeElements = 0;
-    int64_t      tensorCount        = 0;
+    int64_t tensorCount             = 0;
     for (size_t i = 0; i < lsizes.size(); ++i) {
         TORCH_CHECK_VALUE(lsizes[i].size() > 0, "empty lshape");
         for (size_t j = 0; j < lsizes[i].size(); j += 1) {
@@ -320,7 +326,7 @@ JaggedTensor::recompute_lsizes_if_dirty() {
     mLShapeCache.clear();
     if (ldim() == 1) {
         const torch::Tensor offsetsCpu = mOffsets.cpu();
-        const auto          acc        = offsetsCpu.accessor<JOffsetsType, 1>();
+        const auto acc                 = offsetsCpu.accessor<JOffsetsType, 1>();
         for (int i = 0; i < num_tensors(); ++i) {
             const JOffsetsType startIdx = acc[i];
             const JOffsetsType endIdx   = acc[i + 1];
@@ -331,8 +337,8 @@ JaggedTensor::recompute_lsizes_if_dirty() {
     } else if (ldim() == 2) {
         const torch::Tensor offsetsCpu = mOffsets.cpu();
         const torch::Tensor listIdxCpu = mListIdx.cpu();
-        const auto          offAcc     = offsetsCpu.accessor<JOffsetsType, 1>();
-        const auto          lixAcc     = listIdxCpu.accessor<JLIdxType, 2>();
+        const auto offAcc              = offsetsCpu.accessor<JOffsetsType, 1>();
+        const auto lixAcc              = listIdxCpu.accessor<JLIdxType, 2>();
 
         ssize_t currentList = -1;
         for (int i = 0; i < num_tensors(); ++i) {
@@ -365,12 +371,12 @@ JaggedTensor::unbind1() const {
     }
 
     torch::Tensor offsetsCpu = mOffsets.cpu();
-    auto          acc        = offsetsCpu.accessor<JOffsetsType, 1>();
+    auto acc                 = offsetsCpu.accessor<JOffsetsType, 1>();
     for (int i = 0; i < num_tensors(); ++i) {
         const JOffsetsType startIdx = acc[i];
         const JOffsetsType endIdx   = acc[i + 1];
 
-        ret[i] = mData.index({ torch::indexing::Slice(startIdx, endIdx) });
+        ret[i] = mData.index({torch::indexing::Slice(startIdx, endIdx)});
     }
 
     return ret;
@@ -386,9 +392,9 @@ JaggedTensor::unbind2() const {
         TORCH_CHECK_VALUE(false, "Called unbind2() on a list with list dimension != 2");
     }
 
-    torch::Tensor listIdxCpu  = mListIdx.cpu();
-    torch::Tensor offsetsCpu  = mOffsets.cpu();
-    ssize_t       currentList = -1;
+    torch::Tensor listIdxCpu = mListIdx.cpu();
+    torch::Tensor offsetsCpu = mOffsets.cpu();
+    ssize_t currentList      = -1;
 
     auto offAcc = offsetsCpu.accessor<JOffsetsType, 1>();
     auto lixAcc = listIdxCpu.accessor<JLIdxType, 2>();
@@ -403,7 +409,7 @@ JaggedTensor::unbind2() const {
         const JOffsetsType startIdx = offAcc[i];
         const JOffsetsType endIdx   = offAcc[i + 1];
 
-        ret.back().push_back(mData.index({ torch::indexing::Slice(startIdx, endIdx) }));
+        ret.back().push_back(mData.index({torch::indexing::Slice(startIdx, endIdx)}));
     }
 
     return ret;
@@ -466,8 +472,10 @@ JaggedTensor::jagged_like(torch::Tensor data) const {
 }
 
 JaggedTensor
-JaggedTensor::from_data_indices_and_list_ids(torch::Tensor data, torch::Tensor indices,
-                                             torch::Tensor list_ids, int64_t num_tensors) {
+JaggedTensor::from_data_indices_and_list_ids(torch::Tensor data,
+                                             torch::Tensor indices,
+                                             torch::Tensor list_ids,
+                                             int64_t num_tensors) {
     JaggedTensor ret;
     ret.mData          = data;
     ret.mBatchIdx      = indices;
@@ -479,7 +487,8 @@ JaggedTensor::from_data_indices_and_list_ids(torch::Tensor data, torch::Tensor i
 }
 
 JaggedTensor
-JaggedTensor::from_data_offsets_and_list_ids(torch::Tensor data, torch::Tensor offsets,
+JaggedTensor::from_data_offsets_and_list_ids(torch::Tensor data,
+                                             torch::Tensor offsets,
                                              torch::Tensor list_ids) {
     TORCH_CHECK_VALUE(
         list_ids.dim() == 2,
@@ -502,8 +511,10 @@ JaggedTensor::from_data_offsets_and_list_ids(torch::Tensor data, torch::Tensor o
 }
 
 JaggedTensor
-JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(torch::Tensor jdata, torch::Tensor joffsets,
-                                                       torch::Tensor jidx, torch::Tensor lidx,
+JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(torch::Tensor jdata,
+                                                       torch::Tensor joffsets,
+                                                       torch::Tensor jidx,
+                                                       torch::Tensor lidx,
                                                        int64_t numOuterLists) {
     TORCH_CHECK_VALUE(
         lidx.dim() == 2,
@@ -560,14 +571,16 @@ JaggedTensor::rmask(const torch::Tensor &mask) const {
 
     TORCH_CHECK((mask.size(0) == mBatchIdx.size(0)) ||
                     (mBatchIdx.size(0) == 0 && mOffsets.size(0) == 2),
-                "Bad jidx. This should never happen. mask.size(0) = ", mask.size(0),
-                " mBatchIdx.size(0) = ", mBatchIdx.size(0));
-    const torch::Tensor retData     = mData.index({ mask, "..." });
-    const torch::Tensor retBatchIds = mBatchIdx.size(0) > 0 ? mBatchIdx.index({ mask }) : mBatchIdx;
+                "Bad jidx. This should never happen. mask.size(0) = ",
+                mask.size(0),
+                " mBatchIdx.size(0) = ",
+                mBatchIdx.size(0));
+    const torch::Tensor retData     = mData.index({mask, "..."});
+    const torch::Tensor retBatchIds = mBatchIdx.size(0) > 0 ? mBatchIdx.index({mask}) : mBatchIdx;
     const torch::Tensor retOffsets =
         joffsets_from_jidx_and_jdata(retBatchIds, retData, num_tensors());
-    return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(retData, retOffsets, retBatchIds,
-                                                                  mListIdx, mNumOuterLists);
+    return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
+        retData, retOffsets, retBatchIds, mListIdx, mNumOuterLists);
 }
 
 JaggedTensor
@@ -630,20 +643,24 @@ JaggedTensor::jflatten(const int64_t dim) const {
 
     if (ldim() == 2) {
         if (jdim == 1) {
-            torch::Tensor newJIdx = mListIdx.index({ torch::indexing::Slice(), 0 })
-                                        .index({ mBatchIdx.to(torch::kInt) })
+            torch::Tensor newJIdx = mListIdx.index({torch::indexing::Slice(), 0})
+                                        .index({mBatchIdx.to(torch::kInt)})
                                         .to(JIdxScalarType);
             torch::Tensor newOffsets =
                 joffsets_from_jidx_and_jdata(newJIdx, mData, num_outer_lists());
             return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-                mData, newOffsets, newJIdx,
-                torch::empty({ 0, 1 },
+                mData,
+                newOffsets,
+                newJIdx,
+                torch::empty({0, 1},
                              torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device())),
                 newOffsets.size(0) - 1);
         } else {
             return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-                mData, mOffsets, mBatchIdx,
-                torch::empty({ 0, 1 },
+                mData,
+                mOffsets,
+                mBatchIdx,
+                torch::empty({0, 1},
                              torch::TensorOptions().dtype(JLIdxScalarType).device(mData.device())),
                 mOffsets.size(0) - 1);
         }
@@ -666,8 +683,12 @@ JaggedTensor::jflatten(const int64_t dim) const {
 JaggedTensor
 JaggedTensor::jsum(int64_t dim, bool keepdim) const {
     const int64_t jdim = mData.dim();
-    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim < jdim, "dim must be between ", -(jdim - 1),
-                      " and ", jdim - 1, " inclusive");
+    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim < jdim,
+                      "dim must be between ",
+                      -(jdim - 1),
+                      " and ",
+                      jdim - 1,
+                      " inclusive");
     if (dim < 0) {
         dim += jdim;
     }
@@ -681,12 +702,13 @@ JaggedTensor::jsum(int64_t dim, bool keepdim) const {
                 detail::autograd::JaggedSum::apply(jdata(), jidx(), joffsets(), num_tensors())[0];
         }
         const torch::Tensor retOffsets = torch::arange(
-            0, retData.size(0) + 1,
+            0,
+            retData.size(0) + 1,
             torch::TensorOptions().dtype(JOffsetsScalarType).device(retData.device()));
         const torch::Tensor retJidx = jidx_from_joffsets(retOffsets, retData.size(0));
 
-        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(retData, retOffsets, retJidx,
-                                                                      mListIdx, mNumOuterLists);
+        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
+            retData, retOffsets, retJidx, mListIdx, mNumOuterLists);
     } else {
         return jagged_like(mData.sum(dim, keepdim));
     }
@@ -695,8 +717,12 @@ JaggedTensor::jsum(int64_t dim, bool keepdim) const {
 std::vector<JaggedTensor>
 JaggedTensor::jmin(int64_t dim, bool keepdim) const {
     const int64_t jdim = mData.dim();
-    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim, "dim must be between ", -(jdim - 1),
-                      " and ", jdim - 1, " inclusive");
+    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim,
+                      "dim must be between ",
+                      -(jdim - 1),
+                      " and ",
+                      jdim - 1,
+                      " inclusive");
     if (dim < 0) {
         dim += jdim;
     }
@@ -715,19 +741,20 @@ JaggedTensor::jmin(int64_t dim, bool keepdim) const {
         }
 
         const torch::Tensor retOffsets = torch::arange(
-            0, minVals.size(0) + 1,
+            0,
+            minVals.size(0) + 1,
             torch::TensorOptions().dtype(JOffsetsScalarType).device(minVals.device()));
         const torch::Tensor retJidx = jidx_from_joffsets(retOffsets, minVals.size(0));
 
         JaggedTensor retVals = JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
             minVals, retOffsets, retJidx, mListIdx, mNumOuterLists);
         JaggedTensor retIdxs = retVals.jagged_like(minIndices);
-        return { retVals, retIdxs };
+        return {retVals, retIdxs};
     } else {
-        auto          minTuple   = mData.min(dim, keepdim);
+        auto minTuple            = mData.min(dim, keepdim);
         torch::Tensor minVals    = std::get<0>(minTuple);
         torch::Tensor minIndices = std::get<1>(minTuple);
-        return { jagged_like(minVals), jagged_like(minIndices) };
+        return {jagged_like(minVals), jagged_like(minIndices)};
     }
 }
 
@@ -743,8 +770,12 @@ JaggedTensor::jsqueeze(std::optional<int64_t> dim) const {
 std::vector<JaggedTensor>
 JaggedTensor::jmax(int64_t dim, bool keepdim) const {
     const int64_t jdim = mData.dim();
-    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim, "dim must be between ", -(jdim - 1),
-                      " and ", jdim - 1, " inclusive");
+    TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim,
+                      "dim must be between ",
+                      -(jdim - 1),
+                      " and ",
+                      jdim - 1,
+                      " inclusive");
     if (dim < 0) {
         dim += jdim;
     }
@@ -763,18 +794,19 @@ JaggedTensor::jmax(int64_t dim, bool keepdim) const {
         }
 
         const torch::Tensor retOffsets = torch::arange(
-            0, maxVals.size(0) + 1,
+            0,
+            maxVals.size(0) + 1,
             torch::TensorOptions().dtype(JOffsetsScalarType).device(maxVals.device()));
         const torch::Tensor retJidx = jidx_from_joffsets(retOffsets, maxVals.size(0));
-        JaggedTensor        retVals = JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
+        JaggedTensor retVals        = JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
             maxVals, retOffsets, retJidx, mListIdx, mNumOuterLists);
         JaggedTensor retIdxs = retVals.jagged_like(maxIndices);
-        return { retVals, retIdxs };
+        return {retVals, retIdxs};
     } else {
-        auto          maxTuple   = mData.max(dim, keepdim);
+        auto maxTuple            = mData.max(dim, keepdim);
         torch::Tensor maxVals    = std::get<0>(maxTuple);
         torch::Tensor maxIndices = std::get<1>(maxTuple);
-        return { jagged_like(maxVals), jagged_like(maxIndices) };
+        return {jagged_like(maxVals), jagged_like(maxIndices)};
     }
 }
 
@@ -788,10 +820,10 @@ JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> 
         std::vector<torch::Tensor> data;
         std::vector<torch::Tensor> offsets;
         std::vector<torch::Tensor> lidx;
-        JOffsetsType               curOffset     = 0;
-        int64_t                    totalLists    = 0;
-        torch::Tensor              curListOffset = torch::zeros(
-            { 1, vec[0].mListIdx.size(1) },
+        JOffsetsType curOffset      = 0;
+        int64_t totalLists          = 0;
+        torch::Tensor curListOffset = torch::zeros(
+            {1, vec[0].mListIdx.size(1)},
             torch::TensorOptions().dtype(JLIdxScalarType).device(vec[0].mData.device()));
         for (size_t i = 0; i < vec.size(); ++i) {
             const auto &jvec = vec[i];
@@ -804,8 +836,7 @@ JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> 
 
             data.push_back(jvec.mData);
             if (i < vec.size() - 1) {
-                offsets.push_back(jvec.mOffsets.index({ torch::indexing::Slice(0, -1) }) +
-                                  curOffset);
+                offsets.push_back(jvec.mOffsets.index({torch::indexing::Slice(0, -1)}) + curOffset);
             } else {
                 offsets.push_back(jvec.mOffsets + curOffset);
             }
@@ -818,14 +849,18 @@ JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> 
         const torch::Tensor retJOffsets = torch::cat(offsets, 0);
         const torch::Tensor retJidx     = jidx_from_joffsets(retJOffsets, retJData.size(0));
         const torch::Tensor retLidx     = torch::cat(lidx, 0);
-        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(retJData, retJOffsets,
-                                                                      retJidx, retLidx, totalLists);
+        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
+            retJData, retJOffsets, retJidx, retLidx, totalLists);
     } else {
         int64_t dim = dimension.value();
         TORCH_CHECK_VALUE(vec.size() > 0, "empty tensor list");
         const int64_t jdim = vec[0].mData.dim();
-        TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim, "dim must be between ", -(jdim - 1),
-                          " and ", jdim - 1, " inclusive");
+        TORCH_CHECK_INDEX(dim >= -(jdim - 1) && dim <= jdim,
+                          "dim must be between ",
+                          -(jdim - 1),
+                          " and ",
+                          jdim - 1,
+                          " inclusive");
         if (dim < 0) {
             dim += jdim;
         }
@@ -838,15 +873,19 @@ JaggedTensor::jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> 
             for (const auto &jvec: vec) {
                 data.push_back(jvec.mData);
             }
-            return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-                torch::cat(data, dim), vec[0].mOffsets, vec[0].mBatchIdx, vec[0].mListIdx,
-                vec[0].mNumOuterLists);
+            return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(torch::cat(data, dim),
+                                                                          vec[0].mOffsets,
+                                                                          vec[0].mBatchIdx,
+                                                                          vec[0].mListIdx,
+                                                                          vec[0].mNumOuterLists);
         }
     }
 }
 
 JaggedTensor
-JaggedTensor::to(at::TensorOptions options, bool non_blocking, bool copy,
+JaggedTensor::to(at::TensorOptions options,
+                 bool non_blocking,
+                 bool copy,
                  std::optional<at::MemoryFormat> memory_format) const {
     JaggedTensor ret = *this;
     ret.mData        = ret.mData.to(options, non_blocking, copy, memory_format);
@@ -857,21 +896,28 @@ JaggedTensor::to(at::TensorOptions options, bool non_blocking, bool copy,
 }
 
 JaggedTensor
-JaggedTensor::to(std::optional<torch::ScalarType> dtype, std::optional<at::Layout> layout,
-                 std::optional<at::Device> device, std::optional<bool> pin_memory,
-                 bool non_blocking, bool copy, std::optional<at::MemoryFormat> memory_format) {
+JaggedTensor::to(std::optional<torch::ScalarType> dtype,
+                 std::optional<at::Layout> layout,
+                 std::optional<at::Device> device,
+                 std::optional<bool> pin_memory,
+                 bool non_blocking,
+                 bool copy,
+                 std::optional<at::MemoryFormat> memory_format) {
     JaggedTensor ret = *this;
     ret.mData = ret.mData.to(dtype, layout, device, pin_memory, non_blocking, copy, memory_format);
-    ret.mBatchIdx = ret.mBatchIdx.to(JIdxScalarType, layout, device, pin_memory, non_blocking, copy,
-                                     memory_format);
-    ret.mOffsets  = ret.mOffsets.to(JOffsetsScalarType, layout, device, pin_memory, non_blocking,
-                                    copy, memory_format);
-    ret.mListIdx  = ret.mListIdx.to(JLIdxScalarType, layout, device, pin_memory, non_blocking, copy,
-                                    memory_format);
+    ret.mBatchIdx = ret.mBatchIdx.to(
+        JIdxScalarType, layout, device, pin_memory, non_blocking, copy, memory_format);
+    ret.mOffsets = ret.mOffsets.to(
+        JOffsetsScalarType, layout, device, pin_memory, non_blocking, copy, memory_format);
+    ret.mListIdx = ret.mListIdx.to(
+        JLIdxScalarType, layout, device, pin_memory, non_blocking, copy, memory_format);
     return ret;
 }
 JaggedTensor
-JaggedTensor::to(torch::Device device, torch::ScalarType dtype, bool non_blocking, bool copy,
+JaggedTensor::to(torch::Device device,
+                 torch::ScalarType dtype,
+                 bool non_blocking,
+                 bool copy,
                  std::optional<at::MemoryFormat> memory_format) {
     JaggedTensor ret = *this;
     ret.mData        = ret.mData.to(device, dtype, non_blocking, copy, memory_format);
@@ -881,7 +927,9 @@ JaggedTensor::to(torch::Device device, torch::ScalarType dtype, bool non_blockin
     return ret;
 }
 JaggedTensor
-JaggedTensor::to(torch::ScalarType dtype, bool non_blocking, bool copy,
+JaggedTensor::to(torch::ScalarType dtype,
+                 bool non_blocking,
+                 bool copy,
                  std::optional<at::MemoryFormat> memory_format) {
     JaggedTensor ret = *this;
     ret.mData        = ret.mData.to(dtype, non_blocking, copy, memory_format);

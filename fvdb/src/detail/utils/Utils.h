@@ -97,10 +97,12 @@ struct is_floating_point_or_half
 inline std::vector<int64_t>
 intTensor1DToStdVector(torch::Tensor shapeTensor) {
     return AT_DISPATCH_V2(
-        shapeTensor.scalar_type(), "tensorToShape", AT_WRAP([&]() {
+        shapeTensor.scalar_type(),
+        "tensorToShape",
+        AT_WRAP([&]() {
             TORCH_CHECK(shapeTensor.dim() == 1, "shapeTensor must be a 1D tensor");
             TORCH_CHECK(!shapeTensor.is_floating_point(), "shapeTensor must be an integer tensor");
-            auto                 acc = shapeTensor.accessor<scalar_t, 1>();
+            auto acc = shapeTensor.accessor<scalar_t, 1>();
             std::vector<int64_t> outShape(acc.size(0));
             for (int64_t i = 0; i < acc.size(0); i += 1) {
                 outShape[i] = (int64_t)acc[i];
@@ -169,7 +171,7 @@ coordTensorToBatch(const torch::Tensor &coordOrBatch, int64_t batchSize) {
         TORCH_CHECK_VALUE(coordOrBatch.size(0) == 3,
                           "Expected coordOrBatch to have shape [3,] or [B, 3] but got shape = [" +
                               std::to_string(coordOrBatch.size(0)) + ",]");
-        return coordOrBatch.unsqueeze(0).repeat({ batchSize, 1 });
+        return coordOrBatch.unsqueeze(0).repeat({batchSize, 1});
     } else {
         TORCH_CHECK_VALUE(coordOrBatch.dim() == 2,
                           "Expected coordOrBatch to have shape [3,] or [B, 3] but got shape = [" +
@@ -196,48 +198,30 @@ TorchScalarTypeToStr(torch::ScalarType stype) {
 #if (!defined(TORCH_VERSION_MAJOR) || (TORCH_VERSION_MAJOR < 2) || \
      (TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR < 6))
     switch (stype) {
-    case torch::kInt8:
-        return "int8";
-    case torch::kUInt8:
-        return "uint8";
-    case torch::kInt16:
-        return "int16";
-    case torch::kInt32:
-        return "int32";
-    case torch::kInt64:
-        return "int64";
+    case torch::kInt8: return "int8";
+    case torch::kUInt8: return "uint8";
+    case torch::kInt16: return "int16";
+    case torch::kInt32: return "int32";
+    case torch::kInt64: return "int64";
 
-    case torch::kFloat16:
-        return "float16";
-    case torch::kFloat32:
-        return "float32";
-    case torch::kFloat64:
-        return "float64";
+    case torch::kFloat16: return "float16";
+    case torch::kFloat32: return "float32";
+    case torch::kFloat64: return "float64";
 
-    case torch::kComplexHalf:
-        return "complex32";
-    case torch::kComplexFloat:
-        return "complex64";
-    case torch::kComplexDouble:
-        return "complex128";
+    case torch::kComplexHalf: return "complex32";
+    case torch::kComplexFloat: return "complex64";
+    case torch::kComplexDouble: return "complex128";
 
-    case torch::kBool:
-        return "bool";
+    case torch::kBool: return "bool";
 
-    case torch::kQInt8:
-        return "qint8";
-    case torch::kQUInt8:
-        return "quint8";
-    case torch::kQInt32:
-        return "qint32";
+    case torch::kQInt8: return "qint8";
+    case torch::kQUInt8: return "quint8";
+    case torch::kQInt32: return "qint32";
 
-    case torch::kBFloat16:
-        return "bfloat16";
+    case torch::kBFloat16: return "bfloat16";
 
-    case torch::kQUInt2x4:
-        return "quint2x4";
-    case torch::kQUInt4x2:
-        return "quint4x2";
+    case torch::kQUInt2x4: return "quint2x4";
+    case torch::kQUInt4x2: return "quint4x2";
 
     default:
         TORCH_CHECK_VALUE(false, "Unsupported scalar type");
@@ -341,10 +325,11 @@ struct RAIIDeviceGuard {
 /// @return A uint8_t pointer to the data of the tensor
 inline uint8_t *
 tensorBytePointer(const torch::Tensor &tensor) {
-    return AT_DISPATCH_V2(tensor.scalar_type(), "tensorBytePointer", AT_WRAP([&]() {
-                              return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>());
-                          }),
-                          AT_ALL_TYPES);
+    return AT_DISPATCH_V2(
+        tensor.scalar_type(),
+        "tensorBytePointer",
+        AT_WRAP([&]() { return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>()); }),
+        AT_ALL_TYPES);
 }
 
 } // namespace detail

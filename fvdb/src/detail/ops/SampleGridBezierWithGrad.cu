@@ -13,36 +13,42 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename ScalarType, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarType,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ void
-sampleBezierWithGradCallback(int32_t bidx, int32_t eidx, int32_t cidx,
+sampleBezierWithGradCallback(int32_t bidx,
+                             int32_t eidx,
+                             int32_t cidx,
                              JaggedAccessor<ScalarType, 2> points,
                              TensorAccessor<ScalarType, 2> gridData,
-                             BatchGridAccessor<GridType>   batchAccessor,
+                             BatchGridAccessor<GridType> batchAccessor,
                              TensorAccessor<ScalarType, 2> outFeatures,
                              TensorAccessor<ScalarType, 3> outGradFeatures) {
     using MathType = at::opmath_type<ScalarType>;
 
     auto pointsData = points.data();
 
-    const nanovdb::NanoGrid<GridType> *gpuGrid    = batchAccessor.grid(bidx);
-    const VoxelCoordTransform         &transform  = batchAccessor.primalTransform(bidx);
-    const int64_t                      baseOffset = batchAccessor.voxelOffset(bidx);
+    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform       = batchAccessor.primalTransform(bidx);
+    const int64_t baseOffset                   = batchAccessor.voxelOffset(bidx);
 
     auto gridAcc = gpuGrid->tree().getAccessor();
 
-    const nanovdb::math::Vec3<MathType> xyz = transform.apply(
-        static_cast<MathType>(pointsData[eidx][0]), static_cast<MathType>(pointsData[eidx][1]),
-        static_cast<MathType>(pointsData[eidx][2]));
+    const nanovdb::math::Vec3<MathType> xyz =
+        transform.apply(static_cast<MathType>(pointsData[eidx][0]),
+                        static_cast<MathType>(pointsData[eidx][1]),
+                        static_cast<MathType>(pointsData[eidx][2]));
 
     auto gradTransform = transform.template applyGrad<MathType>(xyz);
 
     for (auto it = BezierInterpolationWithGradIterator<MathType>(xyz); it.isValid(); ++it) {
-        const nanovdb::Coord                ijk  = it->first;
+        const nanovdb::Coord ijk                 = it->first;
         const nanovdb::math::Vec4<MathType> wXYZ = it->second;
-        const bool    isActive = gridAcc.template get<ActiveOrUnmasked<GridType>>(ijk);
+        const bool isActive    = gridAcc.template get<ActiveOrUnmasked<GridType>>(ijk);
         const int64_t indexIjk = gridAcc.getValue(ijk) - 1 + baseOffset;
         if (isActive) {
             outFeatures[eidx][cidx] += wXYZ[0] * gridData[indexIjk][cidx];
@@ -57,24 +63,27 @@ sampleBezierWithGradCallback(int32_t bidx, int32_t eidx, int32_t cidx,
 
 template <c10::DeviceType DeviceTag>
 std::vector<torch::Tensor>
-SampleGridBezierWithGrad(const GridBatchImpl &batchHdl, const JaggedTensor &points,
+SampleGridBezierWithGrad(const GridBatchImpl &batchHdl,
+                         const JaggedTensor &points,
                          const torch::Tensor &gridData) {
     auto opts = torch::TensorOptions()
                     .dtype(gridData.dtype())
                     .device(gridData.device())
                     .requires_grad(gridData.requires_grad());
-    torch::Tensor gridDataReshape = featureCoalescedView(gridData);          // [N, -1]
+    torch::Tensor gridDataReshape = featureCoalescedView(gridData);        // [N, -1]
     torch::Tensor outFeatures =
-        torch::zeros({ points.rsize(0), gridDataReshape.size(1) }, opts);    // [B*M, -1]
+        torch::zeros({points.rsize(0), gridDataReshape.size(1)}, opts);    // [B*M, -1]
     torch::Tensor outGradFeatures =
-        torch::zeros({ points.rsize(0), gridDataReshape.size(1), 3 }, opts); // [B*M, -1, 3]
-    auto outShape     = spliceShape({ points.rsize(0) }, gridData, 1);       // [B*M, *]
+        torch::zeros({points.rsize(0), gridDataReshape.size(1), 3}, opts); // [B*M, -1, 3]
+    auto outShape     = spliceShape({points.rsize(0)}, gridData, 1);       // [B*M, *]
     auto gradOutShape = outShape;
-    gradOutShape.push_back(3);                                               // [B*M, *, 3]
+    gradOutShape.push_back(3);                                             // [B*M, *, 3]
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
         AT_DISPATCH_V2(
-            points.scalar_type(), "SampleGridBezierWithGrad", AT_WRAP([&] {
+            points.scalar_type(),
+            "SampleGridBezierWithGrad",
+            AT_WRAP([&] {
                 auto batchAcc = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
 
                 auto gridDataAcc        = tensorAccessor<DeviceTag, scalar_t, 2>(gridDataReshape);
@@ -82,35 +91,50 @@ SampleGridBezierWithGrad(const GridBatchImpl &batchHdl, const JaggedTensor &poin
                 auto outGradFeaturesAcc = tensorAccessor<DeviceTag, scalar_t, 3>(outGradFeatures);
 
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t eidx,
+                                             int32_t cidx,
                                              JaggedRAcc32<scalar_t, 2> pts) {
                         sampleBezierWithGradCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, cidx, pts, gridDataAcc, batchAcc, outFeaturesAcc,
+                            bidx,
+                            eidx,
+                            cidx,
+                            pts,
+                            gridDataAcc,
+                            batchAcc,
+                            outFeaturesAcc,
                             outGradFeaturesAcc);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(256, gridDataReshape.size(1),
-                                                                 points, cb);
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(
+                        256, gridDataReshape.size(1), points, cb);
                 } else {
-                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> pts) {
-                        sampleBezierWithGradCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, cidx, pts, gridDataAcc, batchAcc, outFeaturesAcc,
-                            outGradFeaturesAcc);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(gridDataReshape.size(1), points,
-                                                                cb);
+                    auto cb =
+                        [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> pts) {
+                            sampleBezierWithGradCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
+                                bidx,
+                                eidx,
+                                cidx,
+                                pts,
+                                gridDataAcc,
+                                batchAcc,
+                                outFeaturesAcc,
+                                outGradFeaturesAcc);
+                        };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(
+                        gridDataReshape.size(1), points, cb);
                 }
             }),
-            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     });
 
-    return { outFeatures.reshape(outShape), outGradFeatures.reshape(gradOutShape) };
+    return {outFeatures.reshape(outShape), outGradFeatures.reshape(gradOutShape)};
 }
 
 template <>
 std::vector<torch::Tensor>
 dispatchSampleGridBezierWithGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
-                                               const JaggedTensor  &points,
+                                               const JaggedTensor &points,
                                                const torch::Tensor &gridData) {
     return SampleGridBezierWithGrad<torch::kCUDA>(batchHdl, points, gridData);
 }
@@ -118,7 +142,7 @@ dispatchSampleGridBezierWithGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
 template <>
 std::vector<torch::Tensor>
 dispatchSampleGridBezierWithGrad<torch::kCPU>(const GridBatchImpl &batchHdl,
-                                              const JaggedTensor  &points,
+                                              const JaggedTensor &points,
                                               const torch::Tensor &gridData) {
     return SampleGridBezierWithGrad<torch::kCPU>(batchHdl, points, gridData);
 }

@@ -25,17 +25,17 @@ constexpr c10::ScalarType JOffsetsScalarType = c10::CppTypeToScalarType<JOffsets
 constexpr c10::ScalarType JLIdxScalarType    = c10::CppTypeToScalarType<JLIdxType>::value;
 
 template <typename ScalarT, size_t NDims> class JaggedAccessor {
-    torch::TensorAccessor<JIdxType, 1>     mBatchIdx;
+    torch::TensorAccessor<JIdxType, 1> mBatchIdx;
     torch::TensorAccessor<JOffsetsType, 1> mOffsets;
-    torch::TensorAccessor<JLIdxType, 2>    mListIndexes;
-    torch::TensorAccessor<ScalarT, NDims>  mData;
+    torch::TensorAccessor<JLIdxType, 2> mListIndexes;
+    torch::TensorAccessor<ScalarT, NDims> mData;
 
     friend class JaggedTensor;
 
-    JaggedAccessor(torch::TensorAccessor<JIdxType, 1>     batchIdx,
+    JaggedAccessor(torch::TensorAccessor<JIdxType, 1> batchIdx,
                    torch::TensorAccessor<JOffsetsType, 1> offsets,
-                   torch::TensorAccessor<JLIdxType, 2>    listIndexes,
-                   torch::TensorAccessor<ScalarT, NDims>  data)
+                   torch::TensorAccessor<JLIdxType, 2> listIndexes,
+                   torch::TensorAccessor<ScalarT, NDims> data)
         : mBatchIdx(batchIdx), mOffsets(offsets), mListIndexes(listIndexes), mData(data) {}
 
   public:
@@ -61,26 +61,27 @@ template <typename ScalarT, size_t NDims> class JaggedAccessor {
         return mOffsets[idx + 1];
     }
 
-    inline __hostdev__ const torch::TensorAccessor<ScalarT, NDims>                          &
+    inline __hostdev__ const torch::TensorAccessor<ScalarT, NDims> &
     data() const {
         return mData;
     }
 };
 
-template <typename ScalarT, size_t NDims,
+template <typename ScalarT,
+          size_t NDims,
           template <typename U> typename PtrTraits = torch::DefaultPtrTraits>
 class PackedJaggedAccessor32 {
-    torch::PackedTensorAccessor32<JIdxType, 1, PtrTraits>     mBatchIdx;
+    torch::PackedTensorAccessor32<JIdxType, 1, PtrTraits> mBatchIdx;
     torch::PackedTensorAccessor32<JOffsetsType, 1, PtrTraits> mOffsets;
-    torch::PackedTensorAccessor32<JLIdxType, 2, PtrTraits>    mListIndexes;
-    torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits>  mData;
+    torch::PackedTensorAccessor32<JLIdxType, 2, PtrTraits> mListIndexes;
+    torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits> mData;
 
     friend class JaggedTensor;
 
-    PackedJaggedAccessor32(torch::PackedTensorAccessor32<JIdxType, 1, PtrTraits>     batchIdx,
+    PackedJaggedAccessor32(torch::PackedTensorAccessor32<JIdxType, 1, PtrTraits> batchIdx,
                            torch::PackedTensorAccessor32<JOffsetsType, 1, PtrTraits> offsets,
-                           torch::PackedTensorAccessor32<JLIdxType, 2, PtrTraits>    listIndexes,
-                           torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits>  data)
+                           torch::PackedTensorAccessor32<JLIdxType, 2, PtrTraits> listIndexes,
+                           torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits> data)
         : mBatchIdx(batchIdx), mOffsets(offsets), mListIndexes(listIndexes), mData(data) {}
 
   public:
@@ -107,26 +108,26 @@ class PackedJaggedAccessor32 {
         return mOffsets[idx + 1];
     }
 
-    inline __hostdev__ const torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits>                          &
+    inline __hostdev__ const torch::PackedTensorAccessor32<ScalarT, NDims, PtrTraits> &
     data() const {
         return mData;
     }
 };
 
 class JaggedTensor : public torch::CustomClassHolder {
-    torch::Tensor mData;          // Actual data indexed by a jagged tensor
-    torch::Tensor mBatchIdx;      // Which (linear) batch is each datum in
-    torch::Tensor mOffsets;       // Offset of each tensor in the list of lists
-    torch::Tensor mListIdx;       // LoL indexing of tensor with shape [num_tensors, ldim]
-    int64_t       mNumOuterLists; // Number of outer lists in this JaggedTensor
+    torch::Tensor mData;     // Actual data indexed by a jagged tensor
+    torch::Tensor mBatchIdx; // Which (linear) batch is each datum in
+    torch::Tensor mOffsets;  // Offset of each tensor in the list of lists
+    torch::Tensor mListIdx;  // LoL indexing of tensor with shape [num_tensors, ldim]
+    int64_t mNumOuterLists;  // Number of outer lists in this JaggedTensor
 
     // Store the number of elements in each tensor in the jagged tensor
     // Computing this requires a GPU -> CPU copy so we cache it
     struct {
-        std::vector<int64_t>                           mLShape1;
-        std::vector<std::vector<int64_t>>              mLShape2;
+        std::vector<int64_t> mLShape1;
+        std::vector<std::vector<int64_t>> mLShape2;
         std::vector<std::vector<std::vector<int64_t>>> mLShape3;
-        bool                                           mDirty = true;
+        bool mDirty = true;
         void
         markDirty() {
             mDirty = true;
@@ -145,18 +146,21 @@ class JaggedTensor : public torch::CustomClassHolder {
     void binary_op_check(const JaggedTensor &other) const;
 
   public:
-    static torch::Tensor joffsets_from_jidx_and_jdata(torch::Tensor jidx, torch::Tensor jdata,
-                                                      int64_t num_tensors);
+    static torch::Tensor
+    joffsets_from_jidx_and_jdata(torch::Tensor jidx, torch::Tensor jdata, int64_t num_tensors);
     static torch::Tensor jidx_from_joffsets(torch::Tensor joffsets, int64_t num_elements);
-    static JaggedTensor  from_jdata_joffsets_jidx_and_lidx_unsafe(torch::Tensor jdata,
-                                                                  torch::Tensor joffsets,
-                                                                  torch::Tensor jidx,
-                                                                  torch::Tensor jlidx,
-                                                                  int64_t       numOuterLists);
+    static JaggedTensor from_jdata_joffsets_jidx_and_lidx_unsafe(torch::Tensor jdata,
+                                                                 torch::Tensor joffsets,
+                                                                 torch::Tensor jidx,
+                                                                 torch::Tensor jlidx,
+                                                                 int64_t numOuterLists);
 
-    static JaggedTensor from_data_indices_and_list_ids(torch::Tensor data, torch::Tensor indices,
-                                                       torch::Tensor list_ids, int64_t num_tensors);
-    static JaggedTensor from_data_offsets_and_list_ids(torch::Tensor data, torch::Tensor offsets,
+    static JaggedTensor from_data_indices_and_list_ids(torch::Tensor data,
+                                                       torch::Tensor indices,
+                                                       torch::Tensor list_ids,
+                                                       int64_t num_tensors);
+    static JaggedTensor from_data_offsets_and_list_ids(torch::Tensor data,
+                                                       torch::Tensor offsets,
                                                        torch::Tensor list_ids);
 
     /// @brief Concatenate the list of JaggedTensors along a given dimension.
@@ -184,9 +188,9 @@ class JaggedTensor : public torch::CustomClassHolder {
     /// @brief Create an empty JaggedTensor
     JaggedTensor() {
         mData          = torch::Tensor();
-        mBatchIdx      = torch::empty({ 0 }, torch::TensorOptions().dtype(JIdxScalarType));
-        mOffsets       = torch::zeros({ 1 }, torch::TensorOptions().dtype(JOffsetsScalarType));
-        mListIdx       = torch::empty({ 0, 1 }, torch::TensorOptions().dtype(JLIdxScalarType));
+        mBatchIdx      = torch::empty({0}, torch::TensorOptions().dtype(JIdxScalarType));
+        mOffsets       = torch::zeros({1}, torch::TensorOptions().dtype(JOffsetsScalarType));
+        mListIdx       = torch::empty({0, 1}, torch::TensorOptions().dtype(JLIdxScalarType));
         mNumOuterLists = 0;
     }
 
@@ -225,7 +229,8 @@ class JaggedTensor : public torch::CustomClassHolder {
     /// tensor
     /// @param total_tensors The total number of tensors in the list of lists
     /// @param data The raw data tensor
-    JaggedTensor(const std::vector<std::vector<int64_t>> &lsizes, const int64_t total_tensors,
+    JaggedTensor(const std::vector<std::vector<int64_t>> &lsizes,
+                 const int64_t total_tensors,
                  const torch::Tensor data);
 
     /// @brief Create a JaggedTensor with the same list structure as this one but with the given raw
@@ -443,9 +448,10 @@ class JaggedTensor : public torch::CustomClassHolder {
     template <typename Scalar, size_t NDims>
     JaggedAccessor<Scalar, NDims>
     accessor() const {
-        return JaggedAccessor<Scalar, NDims>(
-            mBatchIdx.accessor<JIdxType, 1>(), mOffsets.accessor<JOffsetsType, 1>(),
-            mListIdx.accessor<JLIdxType, 2>(), mData.accessor<Scalar, NDims>());
+        return JaggedAccessor<Scalar, NDims>(mBatchIdx.accessor<JIdxType, 1>(),
+                                             mOffsets.accessor<JOffsetsType, 1>(),
+                                             mListIdx.accessor<JLIdxType, 2>(),
+                                             mData.accessor<Scalar, NDims>());
     }
 
     /// @brief Get a packed accessor for the JaggedTensor. Useful for reading/writing values in the
@@ -454,7 +460,8 @@ class JaggedTensor : public torch::CustomClassHolder {
     /// @tparam NDims The number of dimensions of the data in the JaggedTensor (i.e. edim() + 1)
     /// @tparam PtrTraits The type of the pointer traits for the packed accessor
     /// @return A packed accessor for the JaggedTensor
-    template <typename Scalar, size_t NDims,
+    template <typename Scalar,
+              size_t NDims,
               template <typename U> typename PtrTraits = torch::DefaultPtrTraits>
     PackedJaggedAccessor32<Scalar, NDims, PtrTraits>
     packed_accessor32() const {
@@ -547,23 +554,35 @@ class JaggedTensor : public torch::CustomClassHolder {
 
     inline JaggedTensor
     contiguous() const {
-        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-            mData.contiguous(), mOffsets.contiguous(), mBatchIdx.contiguous(),
-            mListIdx.contiguous(), mNumOuterLists);
+        return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(mData.contiguous(),
+                                                                      mOffsets.contiguous(),
+                                                                      mBatchIdx.contiguous(),
+                                                                      mListIdx.contiguous(),
+                                                                      mNumOuterLists);
     }
 
-    JaggedTensor to(at::TensorOptions options = {}, bool non_blocking = false, bool copy = false,
+    JaggedTensor to(at::TensorOptions options                     = {},
+                    bool non_blocking                             = false,
+                    bool copy                                     = false,
                     std::optional<at::MemoryFormat> memory_format = std::nullopt) const;
 
-    JaggedTensor to(std::optional<torch::ScalarType> dtype, std::optional<at::Layout> layout,
-                    std::optional<at::Device> device, std::optional<bool> pin_memory,
-                    bool non_blocking, bool copy, std::optional<at::MemoryFormat> memory_format);
+    JaggedTensor to(std::optional<torch::ScalarType> dtype,
+                    std::optional<at::Layout> layout,
+                    std::optional<at::Device> device,
+                    std::optional<bool> pin_memory,
+                    bool non_blocking,
+                    bool copy,
+                    std::optional<at::MemoryFormat> memory_format);
 
-    JaggedTensor to(torch::Device device, torch::ScalarType dtype, bool non_blocking = false,
-                    bool                            copy          = false,
+    JaggedTensor to(torch::Device device,
+                    torch::ScalarType dtype,
+                    bool non_blocking                             = false,
+                    bool copy                                     = false,
                     std::optional<at::MemoryFormat> memory_format = std::nullopt);
 
-    JaggedTensor to(torch::ScalarType dtype, bool non_blocking = false, bool copy = false,
+    JaggedTensor to(torch::ScalarType dtype,
+                    bool non_blocking                             = false,
+                    bool copy                                     = false,
                     std::optional<at::MemoryFormat> memory_format = std::nullopt);
 
     torch::TensorOptions
@@ -696,9 +715,9 @@ class JaggedTensor : public torch::CustomClassHolder {
     JaggedTensor &ceil_();
 
     const JaggedTensor &set_requires_grad(bool requires_grad) const;
-    bool                requires_grad() const;
-    JaggedTensor        detach() const;
-    JaggedTensor        clone() const;
+    bool requires_grad() const;
+    JaggedTensor detach() const;
+    JaggedTensor clone() const;
 };
 
 struct JaggedTensorIndex {
@@ -787,11 +806,11 @@ struct JaggedTensorIndex {
     };
     JaggedTensorIndexType mType;
 
-    torch::Tensor          mTensor;
-    int64_t                mInteger;
+    torch::Tensor mTensor;
+    int64_t mInteger;
     torch::indexing::Slice mSlice;
-    bool                   mBoolean;
-    fvdb::JaggedTensor     mJaggedTensor;
+    bool mBoolean;
+    fvdb::JaggedTensor mJaggedTensor;
 };
 
 } // namespace fvdb

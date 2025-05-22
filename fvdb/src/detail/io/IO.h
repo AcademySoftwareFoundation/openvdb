@@ -17,24 +17,29 @@ namespace io {
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 fromNVDB(nanovdb::GridHandle<nanovdb::HostBuffer> &handle,
-         const std::optional<torch::Device>        maybeDevice = std::optional<torch::Device>());
+         const std::optional<torch::Device> maybeDevice = std::optional<torch::Device>());
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
          const std::optional<torch::Device> maybeDevice = std::optional<torch::Device>());
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
-toNVDB(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData = std::nullopt,
-       const std::vector<std::string> &names = {});
+toNVDB(const GridBatch &gridBatch,
+       const std::optional<JaggedTensor> maybeData = std::nullopt,
+       const std::vector<std::string> &names       = {});
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-loadNVDB(const std::string &path, const fvdb::NanoVDBFileGridIdentifier &gridIdentifier,
-         const torch::Device &device, bool verbose);
+loadNVDB(const std::string &path,
+         const fvdb::NanoVDBFileGridIdentifier &gridIdentifier,
+         const torch::Device &device,
+         bool verbose);
 
-void saveNVDB(const std::string &path, const GridBatch &gridBatch,
+void saveNVDB(const std::string &path,
+              const GridBatch &gridBatch,
               const std::optional<JaggedTensor> maybeData,
-              const std::vector<std::string> &names = {}, bool compressed = false,
-              bool verbose = false);
+              const std::vector<std::string> &names = {},
+              bool compressed                       = false,
+              bool verbose                          = false);
 
 } // namespace io
 } // namespace detail

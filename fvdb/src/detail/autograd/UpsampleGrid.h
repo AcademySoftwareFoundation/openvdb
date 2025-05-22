@@ -17,9 +17,11 @@ struct UpsampleGrid : public torch::autograd::Function<UpsampleGrid> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> coarseGrid,
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> coarseGrid,
                                  c10::intrusive_ptr<GridBatchImpl> fineGrid,
-                                 nanovdb::Coord upsamplingFactor, Variable coarseData);
+                                 nanovdb::Coord upsamplingFactor,
+                                 Variable coarseData);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

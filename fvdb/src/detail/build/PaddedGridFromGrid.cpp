@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -34,8 +35,8 @@ buildPaddedGridFromGridWithoutBorderCPU(const GridBatchImpl &baseBatchHdl, int B
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
         for (auto it = ActiveVoxelIterator<GridType>(baseGrid->tree()); it.isValid(); it++) {
-            nanovdb::Coord ijk0   = it->first;
-            bool           active = true;
+            nanovdb::Coord ijk0 = it->first;
+            bool active         = true;
             for (int di = BMIN; di <= BMAX && active; di += 1) {
                 for (int dj = BMIN; dj <= BMAX && active; dj += 1) {
                     for (int dk = BMIN; dk <= BMAX && active; dk += 1) {
@@ -112,8 +113,8 @@ buildPaddedGridFromGridCPU(const GridBatchImpl &baseBatchHdl, int BMIN, int BMAX
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromGrid(bool isMutable, const GridBatchImpl &baseBatchHdl, int bmin, int bmax,
-                        bool excludeBorder) {
+buildPaddedGridFromGrid(
+    bool isMutable, const GridBatchImpl &baseBatchHdl, int bmin, int bmax, bool excludeBorder) {
     if (baseBatchHdl.device().is_cuda()) {
         JaggedTensor coords;
         if (excludeBorder) {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "GaussianVectorTypes.cuh"
+
 #include <detail/ops/Ops.h>
 
 #include <ATen/cuda/Atomic.cuh>
@@ -20,10 +21,10 @@ namespace {
 // implementation
 template <typename T>
 inline __device__ T
-evalShFunction(const int64_t                     degree,  // degree of SH to be evaluated
-               const int64_t                     ci,      // camera index
-               const int64_t                     gi,      // gaussian index
-               const int64_t                     c,       // render channel
+evalShFunction(const int64_t degree,                      // degree of SH to be evaluated
+               const int64_t ci,                          // camera index
+               const int64_t gi,                          // gaussian index
+               const int64_t c,                           // render channel
                const typename Vec3Type<T>::type &viewDir, // [D]
                const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> sh0Coeffs,
                const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> shNCoeffs) {
@@ -135,7 +136,10 @@ evalShFunction(const int64_t                     degree,  // degree of SH to be 
 template <typename T>
 __global__ void
 computeSh(
-    const int64_t C, const int64_t N, const int64_t D, const int64_t shDegreeToUse,
+    const int64_t C,
+    const int64_t N,
+    const int64_t D,
+    const int64_t shDegreeToUse,
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> viewDirs,  // [C, N, 3]
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> sh0Coeffs, // [1, N, D]
     const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> shNCoeffs, // [K-1, N, D]
@@ -155,18 +159,20 @@ computeSh(
 
     T result = T(0);
     if (!(radii != nullptr && radii[eid] <= 0)) {
-        using vec3t             = typename Vec3Type<T>::type;
-        const bool  hasViewDirs = viewDirs.size(0) > 0;
-        const vec3t dir = hasViewDirs ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
-                                      : vec3t{ 0.f, 0.f, 0.f };
-        result          = evalShFunction(shDegreeToUse, cid, gid, c, dir, sh0Coeffs, shNCoeffs);
+        using vec3t            = typename Vec3Type<T>::type;
+        const bool hasViewDirs = viewDirs.size(0) > 0;
+        const vec3t dir        = hasViewDirs ? *reinterpret_cast<vec3t *>(viewDirs[cid][gid].data())
+                                             : vec3t{0.f, 0.f, 0.f};
+        result = evalShFunction(shDegreeToUse, cid, gid, c, dir, sh0Coeffs, shNCoeffs);
     }
     outRenderQuantities[eid * D + c] = result;
 }
 
 template <typename T>
 __global__ void
-computeShDiffuseOnly(const int64_t C, const int64_t N, const int64_t D,
+computeShDiffuseOnly(const int64_t C,
+                     const int64_t N,
+                     const int64_t D,
                      const torch::PackedTensorAccessor32<T, 3, torch::RestrictPtrTraits> sh0Coeffs,
                      const int *__restrict__ radii, // [C, N]
                      T *__restrict__ outRenderQuantities) {
@@ -188,8 +194,8 @@ computeShDiffuseOnly(const int64_t C, const int64_t N, const int64_t D,
 
 template <>
 torch::Tensor
-dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t        shDegreeToUse,
-                                                const int64_t        numCameras,
+dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t shDegreeToUse,
+                                                const int64_t numCameras,
                                                 const torch::Tensor &viewDirs,  // [C, N, 3]
                                                 const torch::Tensor &sh0Coeffs, // [N, 1, D]
                                                 const torch::Tensor &shNCoeffs, // [N, K-1, D]
@@ -230,12 +236,12 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t        shDegreeToU
         TORCH_CHECK_VALUE(radii.is_contiguous(), "radii must be a contiguous");
     }
 
-    const int64_t K           = hasShNCoeffs ? shNCoeffs.size(1) + 1 : 1;
-    const int64_t N           = sh0Coeffs.size(0);
-    const int64_t C           = numCameras;
-    const int64_t D           = sh0Coeffs.size(2);
-    const auto    TOTAL_ELEMS = C * N * D;
-    const auto    NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
+    const int64_t K        = hasShNCoeffs ? shNCoeffs.size(1) + 1 : 1;
+    const int64_t N        = sh0Coeffs.size(0);
+    const int64_t C        = numCameras;
+    const int64_t D        = sh0Coeffs.size(2);
+    const auto TOTAL_ELEMS = C * N * D;
+    const auto NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
 
     // If you are using degree > 0, then we are going to use the directions tensor which means
     // we need to check it has the right shape
@@ -249,25 +255,33 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t        shDegreeToU
     }
 
     if (N == 0) {
-        return torch::empty({ int64_t(C), N, D }, sh0Coeffs.options());
+        return torch::empty({int64_t(C), N, D}, sh0Coeffs.options());
     }
 
     using scalar_t                    = float;
     const at::cuda::CUDAStream stream = at::cuda::getCurrentCUDAStream(sh0Coeffs.device().index());
 
-    const int    *radiiPtr         = hasRadii ? radii.data_ptr<int>() : nullptr;
-    torch::Tensor renderQuantities = torch::empty({ int64_t(C), N, D }, sh0Coeffs.options());
+    const int *radiiPtr            = hasRadii ? radii.data_ptr<int>() : nullptr;
+    torch::Tensor renderQuantities = torch::empty({int64_t(C), N, D}, sh0Coeffs.options());
     if (hasShNCoeffs && shDegreeToUse > 0) {
         computeSh<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
-            C, N, D, shDegreeToUse,
+            C,
+            N,
+            D,
+            shDegreeToUse,
             viewDirs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
             sh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
-            shNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(), radiiPtr,
+            shNCoeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radiiPtr,
             renderQuantities.data_ptr<scalar_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     } else {
         computeShDiffuseOnly<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
-            C, N, D, sh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(), radiiPtr,
+            C,
+            N,
+            D,
+            sh0Coeffs.packed_accessor32<scalar_t, 3, torch::RestrictPtrTraits>(),
+            radiiPtr,
             renderQuantities.data_ptr<scalar_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
@@ -276,8 +290,8 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t        shDegreeToU
 
 template <>
 torch::Tensor
-dispatchSphericalHarmonicsForward<torch::kCPU>(const int64_t        shDegreeToUse,
-                                               const int64_t        numCameras,
+dispatchSphericalHarmonicsForward<torch::kCPU>(const int64_t shDegreeToUse,
+                                               const int64_t numCameras,
                                                const torch::Tensor &dirs,      // [N, 3]
                                                const torch::Tensor &sh0Coeffs, // [1, N, D]
                                                const torch::Tensor &shNCoeffs, // [K-1, N, D]

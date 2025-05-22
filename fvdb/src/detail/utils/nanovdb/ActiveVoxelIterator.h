@@ -52,7 +52,8 @@ template <typename GridType, int64_t Offset = 0> struct ActiveVoxelIterator {
 
     ActiveVoxelIterator() = delete;
 
-    ActiveVoxelIterator(const nanovdb::NanoTree<GridType> &tree, bool ignoreMasked = false,
+    ActiveVoxelIterator(const nanovdb::NanoTree<GridType> &tree,
+                        bool ignoreMasked  = false,
                         int64_t baseOffset = 0) {
         mLeaves            = tree.template getFirstNode<0>();
         mNumLeaves         = tree.nodeCount(0);
@@ -130,13 +131,13 @@ template <typename GridType, int64_t Offset = 0> struct ActiveVoxelIterator {
         mLeaves = nullptr;
         return;
     }
-    const LeafT *mLeaves            = nullptr;
-    uint32_t     mCurrentLeafOffset = 0;
-    uint64_t     mCurrentLeaf       = 0;
-    uint64_t     mNumLeaves         = 0;
-    value_type   mCurrentVoxelAndValue;
-    bool         mIgnoreMasked = false;
-    int64_t      mBaseOffset   = 0;
+    const LeafT *mLeaves        = nullptr;
+    uint32_t mCurrentLeafOffset = 0;
+    uint64_t mCurrentLeaf       = 0;
+    uint64_t mNumLeaves         = 0;
+    value_type mCurrentVoxelAndValue;
+    bool mIgnoreMasked  = false;
+    int64_t mBaseOffset = 0;
 };
 
 template <typename GridType> struct ActiveVoxelIteratorIJKOnly {
@@ -204,10 +205,10 @@ template <typename GridType> struct ActiveVoxelIteratorIJKOnly {
         }
         mLeaves = nullptr;
     }
-    const LeafT   *mLeaves            = nullptr;
-    uint32_t       mCurrentLeafOffset = 0;
-    uint64_t       mCurrentLeaf       = 0;
-    uint64_t       mNumLeaves         = 0;
+    const LeafT *mLeaves        = nullptr;
+    uint32_t mCurrentLeafOffset = 0;
+    uint64_t mCurrentLeaf       = 0;
+    uint64_t mNumLeaves         = 0;
     nanovdb::Coord mCurrentIjk;
 };
 } // namespace fvdb

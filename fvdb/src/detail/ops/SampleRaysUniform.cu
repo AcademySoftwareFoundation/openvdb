@@ -18,28 +18,35 @@ _calcDt(ScalarType t, ScalarType coneAngle, ScalarType minStepSize, const Scalar
     return nanovdb::math::Clamp(t * coneAngle, minStepSize, maxStepSize);
 }
 
-template <typename ScalarType, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarType,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ void
-countSamplesPerRayCallback(int32_t bidx, int32_t eidx,
-                           const JaggedAccessor<ScalarType, 2> rayO,         // [B*M, 3]
-                           const JaggedAccessor<ScalarType, 2> rayD,         // [B*M, 3]
-                           const JaggedAccessor<ScalarType, 1> tMin,         // [B*M,]
-                           const JaggedAccessor<ScalarType, 1> tMax,         // [B*M]
-                           TensorAccessor<int32_t, 1>          outRayCounts, // [B*M]
-                           BatchGridAccessor<GridType> batchAccessor, ScalarType minStepSize,
-                           ScalarType coneAngle, bool includeEndpointSegments, ScalarType eps) {
+countSamplesPerRayCallback(int32_t bidx,
+                           int32_t eidx,
+                           const JaggedAccessor<ScalarType, 2> rayO, // [B*M, 3]
+                           const JaggedAccessor<ScalarType, 2> rayD, // [B*M, 3]
+                           const JaggedAccessor<ScalarType, 1> tMin, // [B*M,]
+                           const JaggedAccessor<ScalarType, 1> tMax, // [B*M]
+                           TensorAccessor<int32_t, 1> outRayCounts,  // [B*M]
+                           BatchGridAccessor<GridType> batchAccessor,
+                           ScalarType minStepSize,
+                           ScalarType coneAngle,
+                           bool includeEndpointSegments,
+                           ScalarType eps) {
     const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
 
     VoxelCoordTransform transform = batchAccessor.dualTransform(bidx);
-    nanovdb::CoordBBox  dualBbox  = batchAccessor.dualBbox(bidx);
-    auto                gridAcc   = gpuGrid->getAccessor();
+    nanovdb::CoordBBox dualBbox   = batchAccessor.dualBbox(bidx);
+    auto gridAcc                  = gpuGrid->getAccessor();
 
-    const auto                    &rayOi  = rayO.data()[eidx];
-    const auto                    &rayDi  = rayD.data()[eidx];
-    const ScalarType               tMini  = tMin.data()[eidx];
-    const ScalarType               tMaxi  = tMax.data()[eidx];
+    const auto &rayOi                     = rayO.data()[eidx];
+    const auto &rayDi                     = rayD.data()[eidx];
+    const ScalarType tMini                = tMin.data()[eidx];
+    const ScalarType tMaxi                = tMax.data()[eidx];
     nanovdb::math::Ray<ScalarType> rayVox = transform.applyToRay(
         rayOi[0], rayOi[1], rayOi[2], rayDi[0], rayDi[1], rayDi[2], tMini, tMaxi);
 
@@ -60,7 +67,8 @@ countSamplesPerRayCallback(int32_t bidx, int32_t eidx,
 
     // For each contiguous segment of voxels
     for (auto it = HDDASegmentIterator<decltype(gridAcc), ScalarType>(rayVox, gridAcc, false);
-         it.isValid(); ++it) {
+         it.isValid();
+         ++it) {
         const ScalarType deltaT = it->t1 - it->t0;
         if (deltaT < eps) {
             continue;
@@ -114,32 +122,39 @@ countSamplesPerRayCallback(int32_t bidx, int32_t eidx,
     outRayCounts[eidx + 1] = numSamples;
 }
 
-template <typename ScalarType, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarType,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ void
-generateRaySamplesCallback(int32_t bidx, int32_t rayIdx,
-                           const JaggedAccessor<ScalarType, 2>         rayO,        // [B*M, 3]
-                           const JaggedAccessor<ScalarType, 2>         rayD,        // [B*M, 3]
-                           const JaggedAccessor<ScalarType, 1>         tMin,        // [B*M,]
-                           const JaggedAccessor<ScalarType, 1>         tMax,        // [B*M]
+generateRaySamplesCallback(int32_t bidx,
+                           int32_t rayIdx,
+                           const JaggedAccessor<ScalarType, 2> rayO,                // [B*M, 3]
+                           const JaggedAccessor<ScalarType, 2> rayD,                // [B*M, 3]
+                           const JaggedAccessor<ScalarType, 1> tMin,                // [B*M,]
+                           const JaggedAccessor<ScalarType, 1> tMax,                // [B*M]
                            const TensorAccessor<fvdb::JOffsetsType, 1> outJOffsets, // [B*M, 2]
-                           TensorAccessor<fvdb::JIdxType, 1>           outJIdx,     // [B*M, 2]
-                           TensorAccessor<fvdb::JLIdxType, 2>          outJLIdx,    // [B*M, 2]
-                           TensorAccessor<ScalarType, 2>               outRayTimes, // [B*M*S, 2]
-                           BatchGridAccessor<GridType> batchAccessor, ScalarType minStepSize,
-                           ScalarType coneAngle, bool includeEndpointSegments, bool returnMidpoint,
+                           TensorAccessor<fvdb::JIdxType, 1> outJIdx,               // [B*M, 2]
+                           TensorAccessor<fvdb::JLIdxType, 2> outJLIdx,             // [B*M, 2]
+                           TensorAccessor<ScalarType, 2> outRayTimes,               // [B*M*S, 2]
+                           BatchGridAccessor<GridType> batchAccessor,
+                           ScalarType minStepSize,
+                           ScalarType coneAngle,
+                           bool includeEndpointSegments,
+                           bool returnMidpoint,
                            ScalarType eps) {
     const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
 
     VoxelCoordTransform transform = batchAccessor.dualTransform(bidx);
-    nanovdb::CoordBBox  dualBbox  = batchAccessor.dualBbox(bidx);
-    auto                gridAcc   = gpuGrid->getAccessor();
+    nanovdb::CoordBBox dualBbox   = batchAccessor.dualBbox(bidx);
+    auto gridAcc                  = gpuGrid->getAccessor();
 
-    const auto                    &rayOi  = rayO.data()[rayIdx];
-    const auto                    &rayDi  = rayD.data()[rayIdx];
-    const ScalarType               tMini  = tMin.data()[rayIdx];
-    const ScalarType               tMaxi  = tMax.data()[rayIdx];
+    const auto &rayOi                     = rayO.data()[rayIdx];
+    const auto &rayDi                     = rayD.data()[rayIdx];
+    const ScalarType tMini                = tMin.data()[rayIdx];
+    const ScalarType tMaxi                = tMax.data()[rayIdx];
     nanovdb::math::Ray<ScalarType> rayVox = transform.applyToRay(
         rayOi[0], rayOi[1], rayOi[2], rayDi[0], rayDi[1], rayDi[2], tMini, tMaxi);
 
@@ -167,7 +182,8 @@ generateRaySamplesCallback(int32_t bidx, int32_t rayIdx,
 
     // For each contiguous segment of voxels
     for (auto it = HDDASegmentIterator<decltype(gridAcc), ScalarType>(rayVox, gridAcc, false);
-         it.isValid(); ++it) {
+         it.isValid();
+         ++it) {
         const ScalarType deltaT = it->t1 - it->t0;
         if (deltaT < eps) {
             continue;
@@ -257,10 +273,16 @@ generateRaySamplesCallback(int32_t bidx, int32_t rayIdx,
 
 template <c10::DeviceType DeviceTag>
 JaggedTensor
-UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
-                  const JaggedTensor &rayDirections, const JaggedTensor &tMin,
-                  const JaggedTensor &tMax, const double minStepSize, const double coneAngle,
-                  const bool includeEndpointSegments, const bool returnMidpoint, const double eps) {
+UniformRaySamples(const GridBatchImpl &batchHdl,
+                  const JaggedTensor &rayOrigins,
+                  const JaggedTensor &rayDirections,
+                  const JaggedTensor &tMin,
+                  const JaggedTensor &tMax,
+                  const double minStepSize,
+                  const double coneAngle,
+                  const bool includeEndpointSegments,
+                  const bool returnMidpoint,
+                  const double eps) {
     batchHdl.checkDevice(rayOrigins);
     batchHdl.checkDevice(rayDirections);
     batchHdl.checkDevice(tMin);
@@ -315,7 +337,9 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
 
     return FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() -> JaggedTensor {
         return AT_DISPATCH_V2(
-            rayOrigins.scalar_type(), "UniformRaySamples", AT_WRAP([&]() -> JaggedTensor {
+            rayOrigins.scalar_type(),
+            "UniformRaySamples",
+            AT_WRAP([&]() -> JaggedTensor {
                 int64_t numThreads = 256 + 128;
                 if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
                     numThreads = 256;
@@ -340,24 +364,45 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 auto tMaxAcc = jaggedAccessor<DeviceTag, scalar_t, 1>(tMax);
 
                 // Count number of segments along each ray
-                torch::Tensor rayCounts =
-                    torch::zeros({ rayOrigins.rsize(0) + 1 }, optsI32); // [B*M]
-                auto outCountsAcc = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
+                torch::Tensor rayCounts = torch::zeros({rayOrigins.rsize(0) + 1}, optsI32); // [B*M]
+                auto outCountsAcc       = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t eidx,
+                                             int32_t cidx,
                                              JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
                         countSamplesPerRayCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, tMinAcc, tMaxAcc,
-                            outCountsAcc, batchAcc, minStepSize, coneAngle, includeEndpointSegments,
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            tMinAcc,
+                            tMaxAcc,
+                            outCountsAcc,
+                            batchAcc,
+                            minStepSize,
+                            coneAngle,
+                            includeEndpointSegments,
                             eps);
                     };
                     forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cb);
                 } else {
-                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=](int32_t bidx,
+                                  int32_t eidx,
+                                  int32_t cidx,
                                   JaggedAcc<scalar_t, 2> rayOriginsAcc) {
                         countSamplesPerRayCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, tMinAcc, tMaxAcc,
-                            outCountsAcc, batchAcc, minStepSize, coneAngle, includeEndpointSegments,
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            tMinAcc,
+                            tMaxAcc,
+                            outCountsAcc,
+                            batchAcc,
+                            minStepSize,
+                            coneAngle,
+                            includeEndpointSegments,
                             eps);
                     };
                     forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cb);
@@ -370,13 +415,13 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
 
                 // Allocate output JaggedTensor indexing data
                 torch::Tensor outJLidx =
-                    torch::empty({ outJOffsets.size(0) - 1, 2 }, optsJLIdx); // [total_rays, 2]
+                    torch::empty({outJOffsets.size(0) - 1, 2}, optsJLIdx); // [total_rays, 2]
                 torch::Tensor outJIdx =
-                    torch::zeros({ totalSamples }, optsJIdx); // [total_intersections]
+                    torch::zeros({totalSamples}, optsJIdx);                // [total_intersections]
 
                 // Allocate output tensors
                 torch::Tensor outRayTimes =
-                    torch::zeros({ totalSamples, returnMidpoint ? 1 : 2 }, optsF); // [B*M*S, 2]
+                    torch::zeros({totalSamples, returnMidpoint ? 1 : 2}, optsF); // [B*M*S, 2]
 
                 // Compute output voxels and times
                 auto outJOffsetsAcc = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(outJOffsets);
@@ -386,21 +431,51 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 auto outRayTimesAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outRayTimes);
 
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t eidx,
+                                             int32_t cidx,
                                              JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
                         generateRaySamplesCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, tMinAcc, tMaxAcc,
-                            outJOffsetsAcc, outJIdxAcc, outJLIdxAcc, outRayTimesAcc, batchAcc,
-                            minStepSize, coneAngle, includeEndpointSegments, returnMidpoint, eps);
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            tMinAcc,
+                            tMaxAcc,
+                            outJOffsetsAcc,
+                            outJIdxAcc,
+                            outJLIdxAcc,
+                            outRayTimesAcc,
+                            batchAcc,
+                            minStepSize,
+                            coneAngle,
+                            includeEndpointSegments,
+                            returnMidpoint,
+                            eps);
                     };
                     forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cb);
                 } else {
-                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=](int32_t bidx,
+                                  int32_t eidx,
+                                  int32_t cidx,
                                   JaggedAcc<scalar_t, 2> rayOriginsAcc) {
                         generateRaySamplesCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, rayOriginsAcc, rayDirectionsAcc, tMinAcc, tMaxAcc,
-                            outJOffsetsAcc, outJIdxAcc, outJLIdxAcc, outRayTimesAcc, batchAcc,
-                            minStepSize, coneAngle, includeEndpointSegments, returnMidpoint, eps);
+                            bidx,
+                            eidx,
+                            rayOriginsAcc,
+                            rayDirectionsAcc,
+                            tMinAcc,
+                            tMaxAcc,
+                            outJOffsetsAcc,
+                            outJIdxAcc,
+                            outJLIdxAcc,
+                            outRayTimesAcc,
+                            batchAcc,
+                            minStepSize,
+                            coneAngle,
+                            includeEndpointSegments,
+                            returnMidpoint,
+                            eps);
                     };
                     forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cb);
                 }
@@ -411,29 +486,56 @@ UniformRaySamples(const GridBatchImpl &batchHdl, const JaggedTensor &rayOrigins,
                 return JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
                     outRayTimes, outJOffsets, outJIdx, outJLidx, batchHdl.batchSize());
             }),
-            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     });
 }
 
 template <>
 JaggedTensor
-dispatchUniformRaySamples<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
-                                        const JaggedTensor &rayD, const JaggedTensor &tMin,
-                                        const JaggedTensor &tMax, const double minStepSize,
-                                        const double coneAngle, const bool includeEndSegments,
-                                        const bool returnMidpoint, const double eps) {
-    return UniformRaySamples<torch::kCUDA>(batchHdl, rayO, rayD, tMin, tMax, minStepSize, coneAngle,
-                                           includeEndSegments, returnMidpoint, eps);
+dispatchUniformRaySamples<torch::kCUDA>(const GridBatchImpl &batchHdl,
+                                        const JaggedTensor &rayO,
+                                        const JaggedTensor &rayD,
+                                        const JaggedTensor &tMin,
+                                        const JaggedTensor &tMax,
+                                        const double minStepSize,
+                                        const double coneAngle,
+                                        const bool includeEndSegments,
+                                        const bool returnMidpoint,
+                                        const double eps) {
+    return UniformRaySamples<torch::kCUDA>(batchHdl,
+                                           rayO,
+                                           rayD,
+                                           tMin,
+                                           tMax,
+                                           minStepSize,
+                                           coneAngle,
+                                           includeEndSegments,
+                                           returnMidpoint,
+                                           eps);
 }
 template <>
 JaggedTensor
-dispatchUniformRaySamples<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
-                                       const JaggedTensor &rayD, const JaggedTensor &tMin,
-                                       const JaggedTensor &tMax, const double minStepSize,
-                                       const double coneAngle, const bool includeEndSegments,
-                                       const bool returnMidpoint, const double eps) {
-    return UniformRaySamples<torch::kCPU>(batchHdl, rayO, rayD, tMin, tMax, minStepSize, coneAngle,
-                                          includeEndSegments, returnMidpoint, eps);
+dispatchUniformRaySamples<torch::kCPU>(const GridBatchImpl &batchHdl,
+                                       const JaggedTensor &rayO,
+                                       const JaggedTensor &rayD,
+                                       const JaggedTensor &tMin,
+                                       const JaggedTensor &tMax,
+                                       const double minStepSize,
+                                       const double coneAngle,
+                                       const bool includeEndSegments,
+                                       const bool returnMidpoint,
+                                       const double eps) {
+    return UniformRaySamples<torch::kCPU>(batchHdl,
+                                          rayO,
+                                          rayD,
+                                          tMin,
+                                          tMax,
+                                          minStepSize,
+                                          coneAngle,
+                                          includeEndSegments,
+                                          returnMidpoint,
+                                          eps);
 }
 
 } // namespace ops

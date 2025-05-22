@@ -11,7 +11,7 @@ namespace detail {
 
 template <typename ScalarT> struct TrilinearInterpolationWithGradIterator {
     struct PairT {
-        nanovdb::Coord               first;
+        nanovdb::Coord first;
         nanovdb::math::Vec4<ScalarT> second;
     };
 
@@ -41,29 +41,39 @@ template <typename ScalarT> struct TrilinearInterpolationWithGradIterator {
 
         const ScalarT ONE = ScalarT(1);
         mTrilinearWXYZ    = {
-            nanovdb::math::Vec4<ScalarT>(
-                (ONE - uvw[0]) * (ONE - uvw[1]) * (ONE - uvw[2]), -(ONE - uvw[1]) * (ONE - uvw[2]),
-                -(ONE - uvw[0]) * (ONE - uvw[2]), -(ONE - uvw[0]) * (ONE - uvw[1])),
+            nanovdb::math::Vec4<ScalarT>((ONE - uvw[0]) * (ONE - uvw[1]) * (ONE - uvw[2]),
+                                         -(ONE - uvw[1]) * (ONE - uvw[2]),
+                                         -(ONE - uvw[0]) * (ONE - uvw[2]),
+                                         -(ONE - uvw[0]) * (ONE - uvw[1])),
             nanovdb::math::Vec4<ScalarT>((ONE - uvw[0]) * (ONE - uvw[1]) * uvw[2],
-                                            -(ONE - uvw[1]) * uvw[2], -(ONE - uvw[0]) * uvw[2],
-                                            (ONE - uvw[0]) * (ONE - uvw[1])),
+                                         -(ONE - uvw[1]) * uvw[2],
+                                         -(ONE - uvw[0]) * uvw[2],
+                                         (ONE - uvw[0]) * (ONE - uvw[1])),
             nanovdb::math::Vec4<ScalarT>((ONE - uvw[0]) * uvw[1] * (ONE - uvw[2]),
-                                            -uvw[1] * (ONE - uvw[2]), (ONE - uvw[0]) * (ONE - uvw[2]),
-                                            -(ONE - uvw[0]) * uvw[1]),
-            nanovdb::math::Vec4<ScalarT>((ONE - uvw[0]) * uvw[1] * uvw[2], -uvw[1] * uvw[2],
-                                            (ONE - uvw[0]) * uvw[2], (ONE - uvw[0]) * uvw[1]),
+                                         -uvw[1] * (ONE - uvw[2]),
+                                         (ONE - uvw[0]) * (ONE - uvw[2]),
+                                         -(ONE - uvw[0]) * uvw[1]),
+            nanovdb::math::Vec4<ScalarT>((ONE - uvw[0]) * uvw[1] * uvw[2],
+                                         -uvw[1] * uvw[2],
+                                         (ONE - uvw[0]) * uvw[2],
+                                         (ONE - uvw[0]) * uvw[1]),
             nanovdb::math::Vec4<ScalarT>(uvw[0] * (ONE - uvw[1]) * (ONE - uvw[2]),
-                                            (ONE - uvw[1]) * (ONE - uvw[2]), -uvw[0] * (ONE - uvw[2]),
-                                            -uvw[0] * (ONE - uvw[1])),
-            nanovdb::math::Vec4<ScalarT>(uvw[0] * (ONE - uvw[1]) * uvw[2], (ONE - uvw[1]) * uvw[2],
-                                            -uvw[0] * uvw[2], uvw[0] * (ONE - uvw[1])),
-            nanovdb::math::Vec4<ScalarT>(uvw[0] * uvw[1] * (ONE - uvw[2]), uvw[1] * (ONE - uvw[2]),
-                                            uvw[0] * (ONE - uvw[2]), -uvw[0] * uvw[1]),
-            nanovdb::math::Vec4<ScalarT>(uvw[0] * uvw[1] * uvw[2], uvw[1] * uvw[2], uvw[0] * uvw[2],
-                                            uvw[0] * uvw[1]),
+                                         (ONE - uvw[1]) * (ONE - uvw[2]),
+                                         -uvw[0] * (ONE - uvw[2]),
+                                         -uvw[0] * (ONE - uvw[1])),
+            nanovdb::math::Vec4<ScalarT>(uvw[0] * (ONE - uvw[1]) * uvw[2],
+                                         (ONE - uvw[1]) * uvw[2],
+                                         -uvw[0] * uvw[2],
+                                         uvw[0] * (ONE - uvw[1])),
+            nanovdb::math::Vec4<ScalarT>(uvw[0] * uvw[1] * (ONE - uvw[2]),
+                                         uvw[1] * (ONE - uvw[2]),
+                                         uvw[0] * (ONE - uvw[2]),
+                                         -uvw[0] * uvw[1]),
+            nanovdb::math::Vec4<ScalarT>(
+                uvw[0] * uvw[1] * uvw[2], uvw[1] * uvw[2], uvw[0] * uvw[2], uvw[0] * uvw[1]),
         };
 
-        mCoordAndWXYZ = { mVoxel, mTrilinearWXYZ[0] };
+        mCoordAndWXYZ = {mVoxel, mTrilinearWXYZ[0]};
     }
 
     __hostdev__ inline const TrilinearInterpolationWithGradIterator &
@@ -72,11 +82,11 @@ template <typename ScalarT> struct TrilinearInterpolationWithGradIterator {
         if (mCount >= 8) {
             return *this;
         }
-        const uint8_t        di  = (mCount & (1 << 2)) >> 2;
-        const uint8_t        dj  = (mCount & (1 << 1)) >> 1;
-        const uint8_t        dk  = mCount & 1;
+        const uint8_t di         = (mCount & (1 << 2)) >> 2;
+        const uint8_t dj         = (mCount & (1 << 1)) >> 1;
+        const uint8_t dk         = mCount & 1;
         const nanovdb::Coord ijk = nanovdb::Coord(di, dj, dk) + mVoxel;
-        mCoordAndWXYZ            = { ijk, mTrilinearWXYZ[mCount] };
+        mCoordAndWXYZ            = {ijk, mTrilinearWXYZ[mCount]};
         return *this;
     }
 
@@ -115,9 +125,9 @@ template <typename ScalarT> struct TrilinearInterpolationWithGradIterator {
     }
 
   private:
-    int32_t            mCount = 0;
-    value_type         mCoordAndWXYZ;
-    nanovdb::Coord     mVoxel;
+    int32_t mCount = 0;
+    value_type mCoordAndWXYZ;
+    nanovdb::Coord mVoxel;
     ArrayT<ScalarT, 8> mTrilinearWXYZ;
 };
 

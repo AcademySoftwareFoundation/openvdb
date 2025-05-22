@@ -12,7 +12,7 @@ namespace detail {
 template <typename ScalarT> struct BezierInterpolationIterator {
     struct PairT {
         nanovdb::Coord first;
-        ScalarT        second;
+        ScalarT second;
     };
 
     using value_type        = PairT;
@@ -90,16 +90,16 @@ template <typename ScalarT> struct BezierInterpolationIterator {
 
     __hostdev__ inline void
     updateCoordAndWeight() {
-        const int32_t dz  = mCount % 3 - 1;
-        const int32_t dy  = (mCount / 3) % 3 - 1;
-        const int32_t dx  = mCount / 9 - 1;
-        ScalarT       res = bezier(mUVW[0] - dx) * bezier(mUVW[1] - dy) * bezier(mUVW[2] - dz);
-        mCoordAndWeight   = { nanovdb::Coord(dx, dy, dz) + mVoxel, res };
+        const int32_t dz = mCount % 3 - 1;
+        const int32_t dy = (mCount / 3) % 3 - 1;
+        const int32_t dx = mCount / 9 - 1;
+        ScalarT res      = bezier(mUVW[0] - dx) * bezier(mUVW[1] - dy) * bezier(mUVW[2] - dz);
+        mCoordAndWeight  = {nanovdb::Coord(dx, dy, dz) + mVoxel, res};
     }
 
-    int32_t                      mCount = 0;
-    value_type                   mCoordAndWeight;
-    nanovdb::Coord               mVoxel;
+    int32_t mCount = 0;
+    value_type mCoordAndWeight;
+    nanovdb::Coord mVoxel;
     nanovdb::math::Vec3<ScalarT> mUVW;
 };
 

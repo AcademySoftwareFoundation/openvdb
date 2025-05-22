@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/ops/Ops.h>
 
 #include <torch/extension.h>
@@ -27,7 +28,11 @@ template <> struct global_load<16> {
                      "  @p ld.global.v4.u32 {%0, %1, %2, %3}, [%4];\n"
                      "}\n"
                      : "=r"(data.x), "=r"(data.y), "=r"(data.z), "=r"(data.w)
-                     : "l"(ptr), "r"((int)(pred_guard & 1)), "r"(data.x), "r"(data.y), "r"(data.z),
+                     : "l"(ptr),
+                       "r"((int)(pred_guard & 1)),
+                       "r"(data.x),
+                       "r"(data.y),
+                       "r"(data.z),
                        "r"(data.w));
     }
 };
@@ -46,8 +51,10 @@ template <> struct global_load<8> {
                          "  @p ld.global.v2.u32 {%0, %1}, [%2];\n"
                          "}\n"
                          : "=r"(data.x), "=r"(data.y)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data.x), "r"(data.y));
+                         : "l"(ptr_ldg + ldg_idx),
+                           "r"((int)(pred_guard & (1 << ldg_idx))),
+                           "r"(data.x),
+                           "r"(data.y));
         }
     }
 };
@@ -58,15 +65,15 @@ template <> struct global_load<4> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 4; ldg_idx++) {
             unsigned &data = *(reinterpret_cast<unsigned *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b32 %0, %3;\n"
-                         "  @p ld.global.u32 %0, [%1];\n"
-                         "}\n"
-                         : "=r"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b32 %0, %3;\n"
+                "  @p ld.global.u32 %0, [%1];\n"
+                "}\n"
+                : "=r"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "r"(data));
         }
     }
 };
@@ -77,15 +84,15 @@ template <> struct global_load<2> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 8; ldg_idx++) {
             uint16_t &data = *(reinterpret_cast<uint16_t *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b16 %0, %3;\n"
-                         "  @p ld.global.u16 %0, [%1];\n"
-                         "}\n"
-                         : "=h"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "h"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b16 %0, %3;\n"
+                "  @p ld.global.u16 %0, [%1];\n"
+                "}\n"
+                : "=h"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "h"(data));
         }
     }
 };
@@ -109,27 +116,29 @@ __pack_bfloat162(const __nv_bfloat16 x, const __nv_bfloat16 y) {
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_bf16bf16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(32)
-    conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd, int K_original, int N,
-                                                  int kernel_volume, int split_k_iters,
-                                                  __nv_bfloat16 *__restrict__ A,
-                                                  __nv_bfloat16 *__restrict__ B,
-                                                  int *__restrict__ out_in_map,
-                                                  __nv_bfloat16 *__restrict__ C) {
+__launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_k_iters,
+                                                                    __nv_bfloat16 *__restrict__ A,
+                                                                    __nv_bfloat16 *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    __nv_bfloat16 *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
-    float                    C_warp[8];
+    float C_warp[8];
     __shared__ __nv_bfloat16 A_shared[2560];
     __shared__ __nv_bfloat16 B_shared[2560];
-    __nv_bfloat16            A_shared_warp[8];
-    __nv_bfloat16            B_shared_warp[8];
-    __nv_bfloat16           *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
+    __nv_bfloat16 A_shared_warp[8];
+    __nv_bfloat16 B_shared_warp[8];
+    __nv_bfloat16 *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
     };
@@ -147,8 +156,8 @@ __launch_bounds__(32)
     __nv_bfloat16 *A_ptr = A + ((threadIdx.y * 256 % 16) % K_tile_padded) +
                            ((threadIdx.x * 8 % 16) % K_tile_padded) +
                            ((blockIdx_y / j_factors1 * 16) % K_tile_padded);
-    __nv_bfloat16 *B_ptr          = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
-    int            reorder_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
+    __nv_bfloat16 *B_ptr = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
+    int reorder_offset   = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
     // half *C_ptr = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 + blockIdx_y / j_factors1 * 1 * N /
     // 16 * 256 + (threadIdx.y % 1) * 1 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 16 +
     // (blockIdx_y % j_factors1) * 16 + threadIdx.y / 1 * 16 + (threadIdx.x % 4) * 2 + (threadIdx.x
@@ -191,9 +200,9 @@ __launch_bounds__(32)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        __nv_bfloat16 *A_ptr_local          = A_ptr;
-        int            reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        __nv_bfloat16 *A_ptr_local = A_ptr;
+        int reorder_offset_local   = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -290,15 +299,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -306,15 +319,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
@@ -328,9 +345,9 @@ __launch_bounds__(32)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        __nv_bfloat16 *A_ptr_local          = A_ptr;
-        int            reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        __nv_bfloat16 *A_ptr_local = A_ptr;
+        int reorder_offset_local   = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -435,15 +452,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -451,15 +472,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
@@ -484,25 +509,29 @@ __launch_bounds__(32)
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(32)
-    conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd, int K_original, int N, int kernel_volume,
-                                                int split_k_iters, half *__restrict__ A,
-                                                half *__restrict__ B, int *__restrict__ out_in_map,
-                                                half *__restrict__ C) {
+__launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_k_iters,
+                                                                  half *__restrict__ A,
+                                                                  half *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  half *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
-    float           C_warp[8];
+    float C_warp[8];
     __shared__ half A_shared[2560];
     __shared__ half B_shared[2560];
-    half            A_shared_warp[8];
-    half            B_shared_warp[8];
-    half           *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
+    half A_shared_warp[8];
+    half B_shared_warp[8];
+    half *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
     };
@@ -520,8 +549,8 @@ __launch_bounds__(32)
     half *A_ptr = A + ((threadIdx.y * 256 % 16) % K_tile_padded) +
                   ((threadIdx.x * 8 % 16) % K_tile_padded) +
                   ((blockIdx_y / j_factors1 * 16) % K_tile_padded);
-    half *B_ptr          = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
-    int   reorder_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
+    half *B_ptr        = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
+    int reorder_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
     // half *C_ptr = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 + blockIdx_y / j_factors1 * 1 * N /
     // 16 * 256 + (threadIdx.y % 1) * 1 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 16 +
     // (blockIdx_y % j_factors1) * 16 + threadIdx.y / 1 * 16 + (threadIdx.x % 4) * 2 + (threadIdx.x
@@ -563,9 +592,9 @@ __launch_bounds__(32)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        half *A_ptr_local          = A_ptr;
-        int   reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        half *A_ptr_local         = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -662,15 +691,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -678,68 +711,84 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #elif __CUDA_ARCH__ >= 750
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 0))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[0]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
-                      "f"(((float *)(C_warp + 0))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 0))[0]),
+                                       "=f"(((float *)(C_warp + 0))[1]),
+                                       "=f"(((float *)(C_warp + 0))[2]),
+                                       "=f"(((float *)(C_warp + 0))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[1]),
+                                       "f"(((float *)(C_warp + 0))[2]),
+                                       "f"(((float *)(C_warp + 0))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 0))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[0]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
-                      "f"(((float *)(C_warp + 4))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 4))[0]),
+                                       "=f"(((float *)(C_warp + 4))[1]),
+                                       "=f"(((float *)(C_warp + 4))[2]),
+                                       "=f"(((float *)(C_warp + 4))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[1]),
+                                       "f"(((float *)(C_warp + 4))[2]),
+                                       "f"(((float *)(C_warp + 4))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 4))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 2))[0]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
-                      "f"(((float *)(C_warp + 0))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 0))[0]),
+                                       "=f"(((float *)(C_warp + 0))[1]),
+                                       "=f"(((float *)(C_warp + 0))[2]),
+                                       "=f"(((float *)(C_warp + 0))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 2))[0]),
+                                       "f"(((float *)(C_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[1]),
+                                       "f"(((float *)(C_warp + 0))[2]),
+                                       "f"(((float *)(C_warp + 0))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 4))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 6))[0]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
-                      "f"(((float *)(C_warp + 4))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 4))[0]),
+                                       "=f"(((float *)(C_warp + 4))[1]),
+                                       "=f"(((float *)(C_warp + 4))[2]),
+                                       "=f"(((float *)(C_warp + 4))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 6))[0]),
+                                       "f"(((float *)(C_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[1]),
+                                       "f"(((float *)(C_warp + 4))[2]),
+                                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
 #pragma message("FP16 kernels will not be compiled for SM75-.")
@@ -752,9 +801,9 @@ __launch_bounds__(32)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        half *A_ptr_local          = A_ptr;
-        int   reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        half *A_ptr_local         = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -859,15 +908,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -875,68 +928,84 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #elif __CUDA_ARCH__ >= 750
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 0))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[0]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
-                      "f"(((float *)(C_warp + 0))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 0))[0]),
+                                       "=f"(((float *)(C_warp + 0))[1]),
+                                       "=f"(((float *)(C_warp + 0))[2]),
+                                       "=f"(((float *)(C_warp + 0))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[1]),
+                                       "f"(((float *)(C_warp + 0))[2]),
+                                       "f"(((float *)(C_warp + 0))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 0))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[0]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
-                      "f"(((float *)(C_warp + 4))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 4))[0]),
+                                       "=f"(((float *)(C_warp + 4))[1]),
+                                       "=f"(((float *)(C_warp + 4))[2]),
+                                       "=f"(((float *)(C_warp + 4))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[1]),
+                                       "f"(((float *)(C_warp + 4))[2]),
+                                       "f"(((float *)(C_warp + 4))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 4))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 2))[0]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
-                      "f"(((float *)(C_warp + 0))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 0))[0]),
+                                       "=f"(((float *)(C_warp + 0))[1]),
+                                       "=f"(((float *)(C_warp + 0))[2]),
+                                       "=f"(((float *)(C_warp + 0))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 2))[0]),
+                                       "f"(((float *)(C_warp + 0))[0]),
+                                       "f"(((float *)(C_warp + 0))[1]),
+                                       "f"(((float *)(C_warp + 0))[2]),
+                                       "f"(((float *)(C_warp + 0))[3]));
             }
 
             {
-                __asm__ __volatile__(
-                    "mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
-                    "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
-                    : "r"(((unsigned *)(A_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(A_shared_warp + 4))[1]),
-                      "r"(((unsigned *)(B_shared_warp + 6))[0]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
-                      "f"(((float *)(C_warp + 4))[3]));
+                __asm__ __volatile__("mma.sync.aligned.m16n8k8.row.col.f32.f16.f16.f32"
+                                     "{%0, %1, %2, %3}, {%4, %5}, {%6}, {%7, %8, %9, %10};"
+                                     : "=f"(((float *)(C_warp + 4))[0]),
+                                       "=f"(((float *)(C_warp + 4))[1]),
+                                       "=f"(((float *)(C_warp + 4))[2]),
+                                       "=f"(((float *)(C_warp + 4))[3])
+                                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
+                                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
+                                       "r"(((unsigned *)(B_shared_warp + 6))[0]),
+                                       "f"(((float *)(C_warp + 4))[0]),
+                                       "f"(((float *)(C_warp + 4))[1]),
+                                       "f"(((float *)(C_warp + 4))[2]),
+                                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
 #pragma message("FP16 kernels will not be compiled for SM75-.")
@@ -959,24 +1028,26 @@ __launch_bounds__(32)
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_bf16bf16f32
 __global__ void
-__launch_bounds__(64)
-    conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd, int K_original, int N,
-                                                  int kernel_volume, int split_k_iters,
-                                                  __nv_bfloat16 *__restrict__ A,
-                                                  __nv_bfloat16 *__restrict__ B,
-                                                  int *__restrict__ out_in_map,
-                                                  __nv_bfloat16 *__restrict__ C) {
+__launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_k_iters,
+                                                                    __nv_bfloat16 *__restrict__ A,
+                                                                    __nv_bfloat16 *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    __nv_bfloat16 *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);
 
-    float                    C_warp[32];
+    float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[2560];
     __shared__ __nv_bfloat16 B_shared[4608];
-    __nv_bfloat16            A_shared_warp[16];
-    __nv_bfloat16            B_shared_warp[16];
-    __nv_bfloat16           *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
+    __nv_bfloat16 A_shared_warp[16];
+    __nv_bfloat16 B_shared_warp[16];
+    __nv_bfloat16 *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -993,9 +1064,9 @@ __launch_bounds__(64)
     __nv_bfloat16 *A_ptr = A + ((threadIdx.y * 256 % 32) % K_original) +
                            ((threadIdx.x * 8 % 32) % K_original) +
                            ((blockIdx_y / j_factors1 * 32) % K_original);
-    __nv_bfloat16 *B_ptr          = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
-    int            reorder_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    __nv_bfloat16 *C_ptr          = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
+    __nv_bfloat16 *B_ptr = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
+    int reorder_offset   = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
+    __nv_bfloat16 *C_ptr = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
                            blockIdx_y / j_factors1 * 2 * N / 16 * 256 +
                            (threadIdx.y % 1) * 2 * N / 16 * 256 +
                            (blockIdx_x % 1) * j_factors1 * 64 + (blockIdx_y % j_factors1) * 64 +
@@ -1005,9 +1076,9 @@ __launch_bounds__(64)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        __nv_bfloat16 *A_ptr_local          = A_ptr;
-        int            reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        __nv_bfloat16 *A_ptr_local = A_ptr;
+        int reorder_offset_local   = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1145,9 +1216,9 @@ __launch_bounds__(64)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        __nv_bfloat16 *A_ptr_local          = A_ptr;
-        int            reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        __nv_bfloat16 *A_ptr_local = A_ptr;
+        int reorder_offset_local   = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1303,22 +1374,26 @@ __launch_bounds__(64)
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_f16f16f32
 __global__ void
-__launch_bounds__(64)
-    conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd, int K_original, int N, int kernel_volume,
-                                                int split_k_iters, half *__restrict__ A,
-                                                half *__restrict__ B, int *__restrict__ out_in_map,
-                                                half *__restrict__ C) {
+__launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_k_iters,
+                                                                  half *__restrict__ A,
+                                                                  half *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  half *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);
 
-    float           C_warp[32];
+    float C_warp[32];
     __shared__ half A_shared[2560];
     __shared__ half B_shared[4608];
-    half            A_shared_warp[16];
-    half            B_shared_warp[16];
-    half           *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
+    half A_shared_warp[16];
+    half B_shared_warp[16];
+    half *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1335,9 +1410,9 @@ __launch_bounds__(64)
     half *A_ptr = A + ((threadIdx.y * 256 % 32) % K_original) +
                   ((threadIdx.x * 8 % 32) % K_original) +
                   ((blockIdx_y / j_factors1 * 32) % K_original);
-    half *B_ptr          = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
-    int   reorder_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    half *C_ptr          = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
+    half *B_ptr        = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
+    int reorder_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
+    half *C_ptr        = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
                   blockIdx_y / j_factors1 * 2 * N / 16 * 256 +
                   (threadIdx.y % 1) * 2 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 64 +
                   (blockIdx_y % j_factors1) * 64 + threadIdx.y / 1 * 32 + (threadIdx.x % 4) * 2 +
@@ -1347,9 +1422,9 @@ __launch_bounds__(64)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        half *A_ptr_local          = A_ptr;
-        int   reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        half *A_ptr_local         = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1555,9 +1630,9 @@ __launch_bounds__(64)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        half *A_ptr_local          = A_ptr;
-        int   reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        half *A_ptr_local         = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1782,26 +1857,29 @@ __launch_bounds__(64)
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_tf32tf32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(32)
-    conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd, int K_original, int N,
-                                                  int kernel_volume, int split_k_iters,
-                                                  float *__restrict__ A, float *__restrict__ B,
-                                                  int *__restrict__ out_in_map,
-                                                  float *__restrict__ C) {
+__launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_k_iters,
+                                                                    float *__restrict__ A,
+                                                                    float *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
-    float            C_warp[8];
+    float C_warp[8];
     __shared__ float A_shared[2560];
     __shared__ float B_shared[2560];
-    float            A_shared_warp[8];
-    float            B_shared_warp[8];
-    float           *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
+    float A_shared_warp[8];
+    float B_shared_warp[8];
+    float *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
     };
@@ -1819,8 +1897,8 @@ __launch_bounds__(32)
     float *A_ptr = A + ((threadIdx.y * 256 % 16) % K_tile_padded) +
                    ((threadIdx.x * 8 % 16) % K_tile_padded) +
                    ((blockIdx_y / j_factors1 * 16) % K_tile_padded);
-    float *B_ptr          = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
-    int    reorder_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
+    float *B_ptr       = B + (blockIdx_y % j_factors1) * 16 + (threadIdx.x * 8) % 16;
+    int reorder_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
     // float *C_ptr = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 + blockIdx_y / j_factors1 * 1 * N
     // / 16 * 256 + (threadIdx.y % 1) * 1 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 16 +
     // (blockIdx_y % j_factors1) * 16 + threadIdx.y / 1 * 16 + (threadIdx.x % 4) * 2 + (threadIdx.x
@@ -1860,9 +1938,9 @@ __launch_bounds__(32)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        float *A_ptr_local          = A_ptr;
-        int    reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        float *A_ptr_local        = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1878,7 +1956,7 @@ __launch_bounds__(32)
                 //* 40)) + ((((int)threadIdx.x) & 1) * 8))) =
                 //    *(ulonglong4 *)(A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 256
                 //    % 16) % K_original));
-                uint4 A_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                uint4 A_loaded[2] = {make_uint4(0, 0, 0, 0)};
                 global_load<K_ld_factor>(A_loaded[0],
                                          A_ptr_local + input_idx * K_original +
                                              ((ax0_ax1_fused_0 * 256 % 16) % K_tile_padded),
@@ -1904,10 +1982,10 @@ __launch_bounds__(32)
             //*(ulonglong4 *)(B_shared + (((ax0_ax1_fused_0_1 * 640) + ((((int)threadIdx.x) >> 1) *
             // 40)) + ((((int)threadIdx.x) & 1) * 8))) =
             //    *(ulonglong4 *)(B_ptr + v0 * N);
-            uint4 B_loaded[2] = { make_uint4(0, 0, 0, 0) };
+            uint4 B_loaded[2] = {make_uint4(0, 0, 0, 0)};
             global_load<N_ld_factor>(B_loaded[0], B_ptr + v0 * N, B_pred_guard);
-            global_load<N_ld_factor>(B_loaded[1], B_ptr + v0 * N + 4,
-                                     B_pred_guard >> (4 * 4 / N_ld_factor));
+            global_load<N_ld_factor>(
+                B_loaded[1], B_ptr + v0 * N + 4, B_pred_guard >> (4 * 4 / N_ld_factor));
             *(ulonglong4 *)(B_shared +
                             (((ax0_ax1_fused_0_1 * 640) + ((((int)threadIdx.x) >> 1) * 40)) +
                              ((((int)threadIdx.x) & 1) * 8))) =
@@ -1934,15 +2012,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -1950,15 +2032,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 
@@ -1966,15 +2052,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
                       "r"(((unsigned *)(A_shared_warp + 4))[2]),
                       "r"(((unsigned *)(A_shared_warp + 4))[3]),
                       "r"(((unsigned *)(B_shared_warp + 2))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 2))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 2))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -1982,15 +2072,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
                       "r"(((unsigned *)(A_shared_warp + 4))[2]),
                       "r"(((unsigned *)(A_shared_warp + 4))[3]),
                       "r"(((unsigned *)(B_shared_warp + 6))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 6))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 6))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
@@ -2004,9 +2098,9 @@ __launch_bounds__(32)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        float *A_ptr_local          = A_ptr;
-        int    reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        float *A_ptr_local        = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -2020,7 +2114,7 @@ __launch_bounds__(32)
                 //* 40)) + ((((int)threadIdx.x) & 1) * 8))) =
                 //    *(ulonglong4 *)(A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 256
                 //    % 16) % K_original));
-                uint4 A_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                uint4 A_loaded[2] = {make_uint4(0, 0, 0, 0)};
                 global_load<K_ld_factor>(A_loaded[0],
                                          A_ptr_local + input_idx * K_original +
                                              ((ax0_ax1_fused_0 * 256 % 16) % K_tile_padded),
@@ -2048,10 +2142,10 @@ __launch_bounds__(32)
                 //*(ulonglong4 *)(B_shared + (((ax0_ax1_fused_0_1 * 640) + ((((int)threadIdx.x) >>
                 // 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
                 //    *(ulonglong4 *)(B_ptr + v0 * N);
-                uint4 B_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                uint4 B_loaded[2] = {make_uint4(0, 0, 0, 0)};
                 global_load<N_ld_factor>(B_loaded[0], B_ptr + v0 * N, B_pred_guard);
-                global_load<N_ld_factor>(B_loaded[1], B_ptr + v0 * N + 4,
-                                         B_pred_guard >> (4 * 4 / N_ld_factor));
+                global_load<N_ld_factor>(
+                    B_loaded[1], B_ptr + v0 * N + 4, B_pred_guard >> (4 * 4 / N_ld_factor));
                 *(ulonglong4 *)(B_shared +
                                 (((ax0_ax1_fused_0_1 * 640) + ((((int)threadIdx.x) >> 1) * 40)) +
                                  ((((int)threadIdx.x) & 1) * 8))) =
@@ -2084,15 +2178,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 0))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 0))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -2100,15 +2198,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 0))[0]),
                       "r"(((unsigned *)(A_shared_warp + 0))[1]),
                       "r"(((unsigned *)(A_shared_warp + 0))[2]),
                       "r"(((unsigned *)(A_shared_warp + 0))[3]),
                       "r"(((unsigned *)(B_shared_warp + 4))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 4))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 
@@ -2116,15 +2218,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 0))[0]), "=f"(((float *)(C_warp + 0))[1]),
-                      "=f"(((float *)(C_warp + 0))[2]), "=f"(((float *)(C_warp + 0))[3])
+                    : "=f"(((float *)(C_warp + 0))[0]),
+                      "=f"(((float *)(C_warp + 0))[1]),
+                      "=f"(((float *)(C_warp + 0))[2]),
+                      "=f"(((float *)(C_warp + 0))[3])
                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
                       "r"(((unsigned *)(A_shared_warp + 4))[2]),
                       "r"(((unsigned *)(A_shared_warp + 4))[3]),
                       "r"(((unsigned *)(B_shared_warp + 2))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 2))[1]), "f"(((float *)(C_warp + 0))[0]),
-                      "f"(((float *)(C_warp + 0))[1]), "f"(((float *)(C_warp + 0))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 2))[1]),
+                      "f"(((float *)(C_warp + 0))[0]),
+                      "f"(((float *)(C_warp + 0))[1]),
+                      "f"(((float *)(C_warp + 0))[2]),
                       "f"(((float *)(C_warp + 0))[3]));
             }
 
@@ -2132,15 +2238,19 @@ __launch_bounds__(32)
                 __asm__ __volatile__(
                     "mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32"
                     "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};"
-                    : "=f"(((float *)(C_warp + 4))[0]), "=f"(((float *)(C_warp + 4))[1]),
-                      "=f"(((float *)(C_warp + 4))[2]), "=f"(((float *)(C_warp + 4))[3])
+                    : "=f"(((float *)(C_warp + 4))[0]),
+                      "=f"(((float *)(C_warp + 4))[1]),
+                      "=f"(((float *)(C_warp + 4))[2]),
+                      "=f"(((float *)(C_warp + 4))[3])
                     : "r"(((unsigned *)(A_shared_warp + 4))[0]),
                       "r"(((unsigned *)(A_shared_warp + 4))[1]),
                       "r"(((unsigned *)(A_shared_warp + 4))[2]),
                       "r"(((unsigned *)(A_shared_warp + 4))[3]),
                       "r"(((unsigned *)(B_shared_warp + 6))[0]),
-                      "r"(((unsigned *)(B_shared_warp + 6))[1]), "f"(((float *)(C_warp + 4))[0]),
-                      "f"(((float *)(C_warp + 4))[1]), "f"(((float *)(C_warp + 4))[2]),
+                      "r"(((unsigned *)(B_shared_warp + 6))[1]),
+                      "f"(((float *)(C_warp + 4))[0]),
+                      "f"(((float *)(C_warp + 4))[1]),
+                      "f"(((float *)(C_warp + 4))[2]),
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
@@ -2164,23 +2274,26 @@ __launch_bounds__(32)
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_tf32tf32f32
 __global__ void
-__launch_bounds__(64)
-    conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd, int K_original, int N,
-                                                  int kernel_volume, int split_k_iters,
-                                                  float *__restrict__ A, float *__restrict__ B,
-                                                  int *__restrict__ out_in_map,
-                                                  float *__restrict__ C) {
+__launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    int split_k_iters,
+                                                                    float *__restrict__ A,
+                                                                    float *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    float *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);
 
-    float            C_warp[32];
+    float C_warp[32];
     __shared__ float A_shared[2560];
     __shared__ float B_shared[4608];
-    float            A_shared_warp[16];
-    float            B_shared_warp[16];
-    float           *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
+    float A_shared_warp[16];
+    float B_shared_warp[16];
+    float *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -2197,9 +2310,9 @@ __launch_bounds__(64)
     float *A_ptr = A + ((threadIdx.y * 256 % 32) % K_original) +
                    ((threadIdx.x * 8 % 32) % K_original) +
                    ((blockIdx_y / j_factors1 * 32) % K_original);
-    float *B_ptr          = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
-    int    reorder_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    float *C_ptr          = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
+    float *B_ptr       = B + (blockIdx_y % j_factors1) * 64 + (threadIdx.x * 8) % 64;
+    int reorder_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
+    float *C_ptr       = cur_C + blockIdx_x / 1 * 108 * N / 16 * 256 +
                    blockIdx_y / j_factors1 * 2 * N / 16 * 256 +
                    (threadIdx.y % 1) * 2 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 64 +
                    (blockIdx_y % j_factors1) * 64 + threadIdx.y / 1 * 32 + (threadIdx.x % 4) * 2 +
@@ -2209,9 +2322,9 @@ __launch_bounds__(64)
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        float *A_ptr_local          = A_ptr;
-        int    reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        float *A_ptr_local        = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -2362,9 +2475,9 @@ __launch_bounds__(64)
         if (i2_0_0 >= (M_fwd + 63) / 64)
             break;
 
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
-        float *A_ptr_local          = A_ptr;
-        int    reorder_offset_local = reorder_offset + i2_0_0 * 64;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 64 * kernel_volume;
+        float *A_ptr_local        = A_ptr;
+        int reorder_offset_local  = reorder_offset + i2_0_0 * 64;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -2534,20 +2647,24 @@ __launch_bounds__(64)
 // conv_backward_cuda_m16n16k64_f32f32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(32)
-    conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd, int K_original, int N, int kernel_volume,
-                                                int split_k_iters, float *__restrict__ A,
-                                                float *__restrict__ B, int *__restrict__ out_in_map,
-                                                float *__restrict__ C) {
+__launch_bounds__(32) conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_k_iters,
+                                                                  float *__restrict__ A,
+                                                                  float *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
-    float            C_local[8];
+    float C_local[8];
     __shared__ float A_shared[1024];
     __shared__ float B_shared[1024];
 
@@ -2565,12 +2682,12 @@ __launch_bounds__(32)
     int K_loops        = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
 
     // hoisting shared pointer offsets
-    int   *out_in_map_ptr = out_in_map + (threadIdx_x / (16 / 4)) * kernel_volume + kernel_offset;
-    float *A_ptr          = A + channel_offset;
+    int *out_in_map_ptr = out_in_map + (threadIdx_x / (16 / 4)) * kernel_volume + kernel_offset;
+    float *A_ptr        = A + channel_offset;
 
     // reorder is performed on B's rows.
-    float *B_ptr          = B + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
-    int    reorder_offset = threadIdx_x / (16 / 4);
+    float *B_ptr       = B + (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
+    int reorder_offset = threadIdx_x / (16 / 4);
 
     float *A_shared_ptr = A_shared + (threadIdx_x * 4);
     float *B_shared_ptr = B_shared + (threadIdx_x * 4);
@@ -2579,10 +2696,10 @@ __launch_bounds__(32)
     float *B_shared_reduce_ptr = B_shared + (threadIdx_x % 4);
 
     // splitK offset
-    float *cur_C          = C + blockIdx_z * K_original * kernel_volume * N;
-    int    cur_C_ic_start = (blockIdx_m * 16 + (threadIdx_x / 4)) % K_tile_padded;
-    int    cur_C_oc_start = blockIdx_n * 16 + (threadIdx_x % 4);
-    float *C_ptr = cur_C + (kernel_offset * K_original + cur_C_ic_start) * N + cur_C_oc_start;
+    float *cur_C       = C + blockIdx_z * K_original * kernel_volume * N;
+    int cur_C_ic_start = (blockIdx_m * 16 + (threadIdx_x / 4)) % K_tile_padded;
+    int cur_C_oc_start = blockIdx_n * 16 + (threadIdx_x % 4);
+    float *C_ptr       = cur_C + (kernel_offset * K_original + cur_C_ic_start) * N + cur_C_oc_start;
 
     int A_pred_guard = 0;
     int B_pred_guard = 0;
@@ -2610,9 +2727,9 @@ __launch_bounds__(32)
 
 #pragma unroll
     for (int _k_0 = 0; _k_0 < K_loops - 1; ++_k_0) {
-        int  k_0                  = blockIdx_z + split_k_iters * _k_0; // splitK offset
+        int k_0                   = blockIdx_z + split_k_iters * _k_0; // splitK offset
         int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 64 * kernel_volume;
-        int  reorder_offset_local = reorder_offset + k_0 * 64;
+        int reorder_offset_local  = reorder_offset + k_0 * 64;
 
         __syncthreads();
 #pragma unroll
@@ -2662,7 +2779,7 @@ __launch_bounds__(32)
             break;
 
         int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 64 * kernel_volume;
-        int  reorder_offset_local = reorder_offset + k_0 * 64;
+        int reorder_offset_local  = reorder_offset + k_0 * 64;
 
         __syncthreads();
 #pragma unroll
@@ -2728,17 +2845,21 @@ __launch_bounds__(32)
 
 // conv_backward_cuda_m32n64k64_f32f32f32
 __global__ void
-__launch_bounds__(64)
-    conv_backward_cuda_setting2_mode0_f32f32f32(int M_fwd, int K_original, int N, int kernel_volume,
-                                                int split_k_iters, float *__restrict__ A,
-                                                float *__restrict__ B, int *__restrict__ out_in_map,
-                                                float *__restrict__ C) {
+__launch_bounds__(64) conv_backward_cuda_setting2_mode0_f32f32f32(int M_fwd,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  int split_k_iters,
+                                                                  float *__restrict__ A,
+                                                                  float *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  float *__restrict__ C) {
     int j_factors1 = (N + 63) / 64;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);
 
-    float            C_local[32];
+    float C_local[32];
     __shared__ float A_shared[2048];
     __shared__ float B_shared[4096];
 
@@ -2756,12 +2877,12 @@ __launch_bounds__(64)
     int K_loops        = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
 
     // hoisting shared pointer offsets
-    int   *out_in_map_ptr = out_in_map + (threadIdx_x / (32 / 4)) * kernel_volume + kernel_offset;
-    float *A_ptr          = A + channel_offset;
+    int *out_in_map_ptr = out_in_map + (threadIdx_x / (32 / 4)) * kernel_volume + kernel_offset;
+    float *A_ptr        = A + channel_offset;
 
     // reorder is performed on B's rows.
-    float *B_ptr          = B + (blockIdx_n * 64) + ((threadIdx_x * 4) % 64);
-    int    reorder_offset = threadIdx_x / (64 / 4);
+    float *B_ptr       = B + (blockIdx_n * 64) + ((threadIdx_x * 4) % 64);
+    int reorder_offset = threadIdx_x / (64 / 4);
 
     float *A_shared_ptr = A_shared + (threadIdx_x * 4);
     float *B_shared_ptr = B_shared + (threadIdx_x * 4);
@@ -2770,16 +2891,16 @@ __launch_bounds__(64)
     float *B_shared_reduce_ptr = B_shared + (threadIdx_x % 16);
 
     // splitK offset
-    float *cur_C      = C + blockIdx_z * K_original * kernel_volume * N;
-    int    C_m_offset = blockIdx_m * 32 + (threadIdx_x / 16); // C_m_offset
-    int    C_n_offset = blockIdx_n * 64 + (threadIdx_x % 16);
+    float *cur_C   = C + blockIdx_z * K_original * kernel_volume * N;
+    int C_m_offset = blockIdx_m * 32 + (threadIdx_x / 16); // C_m_offset
+    int C_n_offset = blockIdx_n * 64 + (threadIdx_x % 16);
     // float * C_ptr = cur_C + C_m_offset * N + C_n_offset;
 
 #pragma unroll
     for (int _k_0 = 0; _k_0 < K_loops - 1; ++_k_0) {
-        int  k_0                  = blockIdx_z + split_k_iters * _k_0; // splitK offset
+        int k_0                   = blockIdx_z + split_k_iters * _k_0; // splitK offset
         int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 64 * kernel_volume;
-        int  reorder_offset_local = reorder_offset + k_0 * 64;
+        int reorder_offset_local  = reorder_offset + k_0 * 64;
 
         __syncthreads();
 #pragma unroll
@@ -2824,7 +2945,7 @@ __launch_bounds__(64)
             break;
 
         int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 64 * kernel_volume;
-        int  reorder_offset_local = reorder_offset + k_0 * 64;
+        int reorder_offset_local  = reorder_offset + k_0 * 64;
 
         __syncthreads();
 #pragma unroll
@@ -2882,20 +3003,21 @@ torch::Tensor
 dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
                                                         torch::Tensor _kernel,
                                                         torch::Tensor _out_in_map,
-                                                        const int split_k_iters, bool allow_tf32,
+                                                        const int split_k_iters,
+                                                        bool allow_tf32,
                                                         bool allow_fp16) {
-    bool       is_tf           = allow_tf32;
-    int        num_in_feats    = _in_feats.size(0);
-    int        num_in_channels = _in_feats.size(1);
-    int        kernel_volume   = _out_in_map.size(1);
-    auto       options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
+    bool is_tf          = allow_tf32;
+    int num_in_feats    = _in_feats.size(0);
+    int num_in_channels = _in_feats.size(1);
+    int kernel_volume   = _out_in_map.size(1);
+    auto options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
     at::Tensor _out_feats =
-        torch::empty({ split_k_iters, num_in_channels * kernel_volume, _kernel.size(1) }, options);
-    int  num_out_feats    = _out_feats.size(1);
-    int  num_out_channels = _out_feats.size(2);
-    auto out_in_map       = _out_in_map.data_ptr<int>();
-    bool is_half          = _in_feats.scalar_type() == at::ScalarType::Half;
-    bool is_bfloat16      = _in_feats.scalar_type() == at::ScalarType::BFloat16;
+        torch::empty({split_k_iters, num_in_channels * kernel_volume, _kernel.size(1)}, options);
+    int num_out_feats    = _out_feats.size(1);
+    int num_out_channels = _out_feats.size(2);
+    auto out_in_map      = _out_in_map.data_ptr<int>();
+    bool is_half         = _in_feats.scalar_type() == at::ScalarType::Half;
+    bool is_bfloat16     = _in_feats.scalar_type() == at::ScalarType::BFloat16;
 
     if (is_half) {
         if (!allow_fp16) {
@@ -2907,16 +3029,23 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
         auto out_feats = reinterpret_cast<half *>(_out_feats.data_ptr<at::Half>());
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 64 / 1;
+            int j_factors1 = num_out_channels / 64 / 1;
             dim3 num_blocks(num_in_channels * kernel_volume / 32 * j_factors1 * split_k_iters);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_backward_cuda_setting2_mode0_f16f16f32<<<num_blocks, threads_per_block>>>(
-                _kernel.size(0), num_in_channels, num_out_channels, kernel_volume, split_k_iters,
-                in_feats, kernel, out_in_map, out_feats);
+                _kernel.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_k_iters,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_in_channels + 15) / 16 * kernel_volume * j_factors1 *
                             split_k_iters);
             // threadIdx.x: 32
@@ -2928,137 +3057,287 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f16f16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f16f16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f16f16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f16f16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f16f16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3072,16 +3351,23 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
         auto kernel    = reinterpret_cast<__nv_bfloat16 *>(_kernel.data_ptr<at::BFloat16>());
         auto out_feats = reinterpret_cast<__nv_bfloat16 *>(_out_feats.data_ptr<at::BFloat16>());
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 64 / 1;
+            int j_factors1 = num_out_channels / 64 / 1;
             dim3 num_blocks(num_in_channels * kernel_volume / 32 * j_factors1 * split_k_iters);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_backward_cuda_setting2_mode0_bf16bf16f32<<<num_blocks, threads_per_block>>>(
-                _kernel.size(0), num_in_channels, num_out_channels, kernel_volume, split_k_iters,
-                in_feats, kernel, out_in_map, out_feats);
+                _kernel.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_k_iters,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_in_channels + 15) / 16 * kernel_volume * j_factors1 *
                             split_k_iters);
             // threadIdx.x: 32
@@ -3093,137 +3379,287 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_bf16bf16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3233,16 +3669,23 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
         auto out_feats = _out_feats.data_ptr<float>();
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 64 / 1;
+            int j_factors1 = num_out_channels / 64 / 1;
             dim3 num_blocks(num_in_channels * kernel_volume / 32 * j_factors1 * split_k_iters);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_backward_cuda_setting2_mode0_tf32tf32f32<<<num_blocks, threads_per_block>>>(
-                _kernel.size(0), num_in_channels, num_out_channels, kernel_volume, split_k_iters,
-                in_feats, kernel, out_in_map, out_feats);
+                _kernel.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_k_iters,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_in_channels + 15) / 16 * kernel_volume * j_factors1 *
                             split_k_iters);
             // threadIdx.x: 32
@@ -3254,90 +3697,186 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_tf32tf32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3355,8 +3894,15 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
             dim3 num_blocks(block_num_M * block_num_N * split_k_iters);
             dim3 threads_per_block(64);
             conv_backward_cuda_setting2_mode0_f32f32f32<<<num_blocks, threads_per_block>>>(
-                _kernel.size(0), num_in_channels, num_out_channels, kernel_volume, split_k_iters,
-                in_feats, kernel, out_in_map, out_feats);
+                _kernel.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                split_k_iters,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
             int block_num_M = (num_in_channels + 15) / 16 * kernel_volume;
             int block_num_N = (num_out_channels - 1) / 16 + 1;
@@ -3369,90 +3915,186 @@ dispatchSparseConvolutionImplicitGEMMGrad<torch::kCUDA>(torch::Tensor _in_feats,
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f32f32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f32f32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_backward_cuda_setting1_mode0_f32f32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_backward_cuda_setting1_mode0_f32f32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _kernel.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            split_k_iters, in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_kernel.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            split_k_iters,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3465,7 +4107,8 @@ torch::Tensor
 dispatchSparseConvolutionImplicitGEMMGrad<torch::kCPU>(torch::Tensor _in_feats,
                                                        torch::Tensor _kernel,
                                                        torch::Tensor _out_in_map,
-                                                       const int split_k_iters, bool allow_tf32,
+                                                       const int split_k_iters,
+                                                       bool allow_tf32,
                                                        bool allow_fp16) {
     TORCH_CHECK(false, "No support for CPU-based ImplicitGEMM!");
 }

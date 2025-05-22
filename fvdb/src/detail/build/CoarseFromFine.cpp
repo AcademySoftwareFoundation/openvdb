@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -55,7 +56,8 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildCoarseGridFromFineGrid(bool isMutable, const GridBatchImpl &fineBatchHdl,
+buildCoarseGridFromFineGrid(bool isMutable,
+                            const GridBatchImpl &fineBatchHdl,
                             const nanovdb::Coord branchingFactor) {
     if (fineBatchHdl.device().is_cuda()) {
         JaggedTensor coords =

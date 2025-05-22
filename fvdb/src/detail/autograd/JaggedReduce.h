@@ -17,8 +17,8 @@ struct JaggedSum : public torch::autograd::Function<JaggedSum> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, Variable jdata, Variable jidx,
-                                 Variable joffsets, int64_t dim_size);
+    static variable_list forward(
+        AutogradContext *ctx, Variable jdata, Variable jidx, Variable joffsets, int64_t dim_size);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
@@ -28,8 +28,8 @@ struct JaggedMin : public torch::autograd::Function<JaggedMin> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, Variable jdata, Variable jidx,
-                                 Variable joffsets, int64_t dim_size);
+    static variable_list forward(
+        AutogradContext *ctx, Variable jdata, Variable jidx, Variable joffsets, int64_t dim_size);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };
@@ -39,8 +39,8 @@ struct JaggedMax : public torch::autograd::Function<JaggedMax> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, Variable jdata, Variable jidx,
-                                 Variable joffsets, int64_t dim_size);
+    static variable_list forward(
+        AutogradContext *ctx, Variable jdata, Variable jidx, Variable joffsets, int64_t dim_size);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

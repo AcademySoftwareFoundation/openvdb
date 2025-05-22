@@ -45,14 +45,14 @@ using Vec3iBatch =
 ///        from an .nvdb file). You can specify the set of grids to load as a integer index, a
 ///        single string name, a vector of integer indices, or a vector of string names
 class NanoVDBFileGridIdentifier {
-    std::vector<uint64_t>    mIndices;
+    std::vector<uint64_t> mIndices;
     std::vector<std::string> mGridNames;
 
   public:
     NanoVDBFileGridIdentifier() : mIndices(), mGridNames() {};
-    NanoVDBFileGridIdentifier(uint64_t index) : mIndices({ index }) {};
+    NanoVDBFileGridIdentifier(uint64_t index) : mIndices({index}) {};
     NanoVDBFileGridIdentifier(std::vector<uint64_t> indices) : mIndices(indices) {};
-    NanoVDBFileGridIdentifier(std::string gridName) : mGridNames({ gridName }) {};
+    NanoVDBFileGridIdentifier(std::string gridName) : mGridNames({gridName}) {};
     NanoVDBFileGridIdentifier(std::vector<std::string> gridNames) : mGridNames(gridNames) {};
 
     std::string

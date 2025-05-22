@@ -18,8 +18,11 @@ struct SparseConvolutionHalo : public torch::autograd::Function<SparseConvolutio
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 Variable inFeatures, Variable kernels, int variant);
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 Variable inFeatures,
+                                 Variable kernels,
+                                 int variant);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

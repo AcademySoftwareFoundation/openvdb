@@ -18,9 +18,14 @@ namespace ops {
 // in the pixel coordinates of the image.
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
-                  projectGaussianPerspective(const nanovdb::math::Vec3<T> &mean3d,
-                                             const nanovdb::math::Mat3<T> &cov3d, const T fx, const T fy, const T cx,
-                                             const T cy, const int64_t width, const int64_t height) {
+projectGaussianPerspective(const nanovdb::math::Vec3<T> &mean3d,
+                           const nanovdb::math::Mat3<T> &cov3d,
+                           const T fx,
+                           const T fy,
+                           const T cx,
+                           const T cy,
+                           const int64_t width,
+                           const int64_t height) {
     using Mat2x3 = nanovdb::math::Mat2x3<T>;
     using Mat2   = nanovdb::math::Mat2<T>;
     using Vec2   = nanovdb::math::Vec2<T>;
@@ -41,14 +46,18 @@ inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
     const T tx  = z * min(limXPos, max(-limXNeg, x * rz));
     const T ty  = z * min(limYPos, max(-limYNeg, y * rz));
 
-    const Mat2x3 J(fx * rz, 0.f, -fx * tx * rz2, // 1st row
-                                     0.f, fy * rz, -fy * ty * rz2  // 2nd row
-                      );
+    const Mat2x3 J(fx * rz,
+                   0.f,
+                   -fx * tx * rz2, // 1st row
+                   0.f,
+                   fy * rz,
+                   -fy * ty * rz2  // 2nd row
+    );
 
     const Mat2 cov2d = J * cov3d * J.transpose();
-    const Vec2 mean2d({ fx * x * rz + cx, fy * y * rz + cy });
+    const Vec2 mean2d({fx * x * rz + cx, fy * y * rz + cy});
 
-    return { cov2d, mean2d };
+    return {cov2d, mean2d};
 }
 
 // Compute the Jacobian-vector product of the perspective projection operator which maps 3D
@@ -58,9 +67,13 @@ inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat3<T>, nanovdb::math::Vec3<T>>
 projectGaussianPerspectiveVectorJacobianProduct(const nanovdb::math::Vec3<T> &mean3d,
-                                                const nanovdb::math::Mat3<T> &cov3d, const T fx,
-                                                const T fy, const T cx, const T cy,
-                                                const int64_t width, const int64_t height,
+                                                const nanovdb::math::Mat3<T> &cov3d,
+                                                const T fx,
+                                                const T fy,
+                                                const T cx,
+                                                const T cy,
+                                                const int64_t width,
+                                                const int64_t height,
                                                 const nanovdb::math::Mat2<T> &dLossDCovar2d,
                                                 const nanovdb::math::Vec2<T> &dLossDMean2d) {
     using Mat2x3 = nanovdb::math::Mat2x3<T>;
@@ -83,8 +96,12 @@ projectGaussianPerspectiveVectorJacobianProduct(const nanovdb::math::Vec3<T> &me
     const T tx  = z * min(limXPos, max(-limXNeg, x * rz));
     const T ty  = z * min(limYPos, max(-limYNeg, y * rz));
 
-    const Mat2x3 J(fx * rz, 0.f, -fx * tx * rz2, // 1st row
-                   0.f, fy * rz, -fy * ty * rz2  // 2nd row
+    const Mat2x3 J(fx * rz,
+                   0.f,
+                   -fx * tx * rz2, // 1st row
+                   0.f,
+                   fy * rz,
+                   -fy * ty * rz2  // 2nd row
     );
 
     // cov = J * V * Jt; G = df/dcov = v_cov
@@ -95,14 +112,15 @@ projectGaussianPerspectiveVectorJacobianProduct(const nanovdb::math::Vec3<T> &me
     // df/dx = fx * rz * df/dpixx
     // df/dy = fy * rz * df/dpixy
     // df/dz = - fx * mean.x * rz2 * df/dpixx - fy * mean.y * rz2 * df/dpixy
-    Vec3 dLossDMean3d(fx * rz * dLossDMean2d[0], fy * rz * dLossDMean2d[1],
+    Vec3 dLossDMean3d(fx * rz * dLossDMean2d[0],
+                      fy * rz * dLossDMean2d[1],
                       -(fx * x * dLossDMean2d[0] + fy * y * dLossDMean2d[1]) * rz2);
 
     // df/dx = -fx * rz2 * df/dJ_02
     // df/dy = -fy * rz2 * df/dJ_12
     // df/dz = -fx * rz2 * df/dJ_00 - fy * rz2 * df/dJ_11
     //         + 2 * fx * tx * rz3 * df/dJ_02 + 2 * fy * ty * rz3
-    const T      rz3 = rz2 * rz;
+    const T rz3 = rz2 * rz;
     const Mat2x3 dLossDJ =
         dLossDCovar2d * J * cov3d.transpose() + dLossDCovar2d.transpose() * J * cov3d;
 
@@ -120,7 +138,7 @@ projectGaussianPerspectiveVectorJacobianProduct(const nanovdb::math::Vec3<T> &me
     dLossDMean3d[2] += -fx * rz2 * dLossDJ[0][0] - fy * rz2 * dLossDJ[1][1] +
                        2.f * fx * tx * rz3 * dLossDJ[0][2] + 2.f * fy * ty * rz3 * dLossDJ[1][2];
 
-    return { dLossDCovar3d, dLossDMean3d };
+    return {dLossDCovar3d, dLossDMean3d};
 }
 
 // Apply orthographic projection to a 3D Gaussian defined by it's 3D mean and 3x3 covariance matrix.
@@ -129,9 +147,14 @@ projectGaussianPerspectiveVectorJacobianProduct(const nanovdb::math::Vec3<T> &me
 // in the pixel coordinates of the image.
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
-                  projectGaussianOrthographic(const nanovdb::math::Vec3<T> &mean3d,
-                                              const nanovdb::math::Mat3<T> &cov3d, const T fx, const T fy, const T cx,
-                                              const T cy, const uint32_t width, const uint32_t height) {
+projectGaussianOrthographic(const nanovdb::math::Vec3<T> &mean3d,
+                            const nanovdb::math::Mat3<T> &cov3d,
+                            const T fx,
+                            const T fy,
+                            const T cx,
+                            const T cy,
+                            const uint32_t width,
+                            const uint32_t height) {
     using Mat2x3 = nanovdb::math::Mat2x3<T>;
     using Mat2   = nanovdb::math::Mat2<T>;
     using Vec2   = nanovdb::math::Vec2<T>;
@@ -140,14 +163,18 @@ inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
     const T y = mean3d[1];
     const T z = mean3d[2];
 
-    const Mat2x3 J(fx, 0.f, 0.f, // 1st row
-                                     0.f, fy, 0.f  // 2nd row
-                      );
+    const Mat2x3 J(fx,
+                   0.f,
+                   0.f, // 1st row
+                   0.f,
+                   fy,
+                   0.f  // 2nd row
+    );
 
     const Mat2 cov2d = J * cov3d * J.transpose();
-    const Vec2 mean2d({ fx * x + cx, fy * y + cy });
+    const Vec2 mean2d({fx * x + cx, fy * y + cy});
 
-    return { cov2d, mean2d };
+    return {cov2d, mean2d};
 }
 
 // Compute the Jacobian-vector product of the orthographic projection operator which maps 3D
@@ -157,9 +184,13 @@ inline __device__ std::tuple<nanovdb::math::Mat2<T>, nanovdb::math::Vec2<T>>
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat3<T>, nanovdb::math::Vec3<T>>
 projectGaussianOrthographicVectorJacobianProduct(const nanovdb::math::Vec3<T> &mean3d,
-                                                 const nanovdb::math::Mat3<T> &cov3d, const T fx,
-                                                 const T fy, const T cx, const T cy,
-                                                 const int64_t width, const int64_t height,
+                                                 const nanovdb::math::Mat3<T> &cov3d,
+                                                 const T fx,
+                                                 const T fy,
+                                                 const T cx,
+                                                 const T cy,
+                                                 const int64_t width,
+                                                 const int64_t height,
                                                  const nanovdb::math::Mat2<T> &dLossDCovar2d,
                                                  const nanovdb::math::Vec2<T> &dLossDMean2d) {
     using Mat2x3 = nanovdb::math::Mat2x3<T>;
@@ -170,8 +201,12 @@ projectGaussianOrthographicVectorJacobianProduct(const nanovdb::math::Vec3<T> &m
     const T y = mean3d[1];
     const T z = mean3d[2];
 
-    const Mat2x3 J(fx, 0.f, 0.f, // 1st row
-                   0.f, fy, 0.f  // 2nd row
+    const Mat2x3 J(fx,
+                   0.f,
+                   0.f, // 1st row
+                   0.f,
+                   fy,
+                   0.f  // 2nd row
     );
 
     // cov = J * V * Jt; G = df/dcov = v_cov
@@ -184,7 +219,7 @@ projectGaussianOrthographicVectorJacobianProduct(const nanovdb::math::Vec3<T> &m
     // df/dz = 0
     const Vec3 dLossDMean3d(fx * dLossDMean2d[0], fy * dLossDMean2d[1], 0.f);
 
-    return { dLossDCovar3d, dLossDMean3d };
+    return {dLossDCovar3d, dLossDMean3d};
 }
 
 } // namespace ops

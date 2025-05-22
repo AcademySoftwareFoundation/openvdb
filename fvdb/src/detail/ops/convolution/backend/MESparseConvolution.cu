@@ -46,29 +46,19 @@ namespace ops {
 const char *
 cublasGetErrorString(cublasStatus_t error) {
     switch (error) {
-    case CUBLAS_STATUS_SUCCESS:
-        return "CUBLAS_STATUS_SUCCESS";
-    case CUBLAS_STATUS_NOT_INITIALIZED:
-        return "CUBLAS_STATUS_NOT_INITIALIZED";
-    case CUBLAS_STATUS_ALLOC_FAILED:
-        return "CUBLAS_STATUS_ALLOC_FAILED";
-    case CUBLAS_STATUS_INVALID_VALUE:
-        return "CUBLAS_STATUS_INVALID_VALUE";
-    case CUBLAS_STATUS_ARCH_MISMATCH:
-        return "CUBLAS_STATUS_ARCH_MISMATCH";
-    case CUBLAS_STATUS_MAPPING_ERROR:
-        return "CUBLAS_STATUS_MAPPING_ERROR";
-    case CUBLAS_STATUS_EXECUTION_FAILED:
-        return "CUBLAS_STATUS_EXECUTION_FAILED";
-    case CUBLAS_STATUS_INTERNAL_ERROR:
-        return "CUBLAS_STATUS_INTERNAL_ERROR";
+    case CUBLAS_STATUS_SUCCESS: return "CUBLAS_STATUS_SUCCESS";
+    case CUBLAS_STATUS_NOT_INITIALIZED: return "CUBLAS_STATUS_NOT_INITIALIZED";
+    case CUBLAS_STATUS_ALLOC_FAILED: return "CUBLAS_STATUS_ALLOC_FAILED";
+    case CUBLAS_STATUS_INVALID_VALUE: return "CUBLAS_STATUS_INVALID_VALUE";
+    case CUBLAS_STATUS_ARCH_MISMATCH: return "CUBLAS_STATUS_ARCH_MISMATCH";
+    case CUBLAS_STATUS_MAPPING_ERROR: return "CUBLAS_STATUS_MAPPING_ERROR";
+    case CUBLAS_STATUS_EXECUTION_FAILED: return "CUBLAS_STATUS_EXECUTION_FAILED";
+    case CUBLAS_STATUS_INTERNAL_ERROR: return "CUBLAS_STATUS_INTERNAL_ERROR";
 #if CUDA_VERSION >= 6000
-    case CUBLAS_STATUS_NOT_SUPPORTED:
-        return "CUBLAS_STATUS_NOT_SUPPORTED";
+    case CUBLAS_STATUS_NOT_SUPPORTED: return "CUBLAS_STATUS_NOT_SUPPORTED";
 #endif
 #if CUDA_VERSION >= 6050
-    case CUBLAS_STATUS_LICENSE_ERROR:
-        return "CUBLAS_STATUS_LICENSE_ERROR";
+    case CUBLAS_STATUS_LICENSE_ERROR: return "CUBLAS_STATUS_LICENSE_ERROR";
 #endif
     }
     return "Unknown cublas status";
@@ -76,20 +66,34 @@ cublasGetErrorString(cublasStatus_t error) {
 
 // TODO(cfujitsang): use at::cuda::blas::gemm
 template <typename Dtype>
-void gpu_gemm(const cublasOperation_t transA, const cublasOperation_t transB, const int M,
-              const int N, const int K, const at::opmath_type<Dtype> alpha, const Dtype *A,
-              const Dtype *B, const at::opmath_type<Dtype> beta, Dtype *C);
+void gpu_gemm(const cublasOperation_t transA,
+              const cublasOperation_t transB,
+              const int M,
+              const int N,
+              const int K,
+              const at::opmath_type<Dtype> alpha,
+              const Dtype *A,
+              const Dtype *B,
+              const at::opmath_type<Dtype> beta,
+              Dtype *C);
 
 template <>
 void
-gpu_gemm<at::Half>(const cublasOperation_t transA, const cublasOperation_t transB, const int M,
-                   const int N, const int K, const float alpha, const at::Half *A,
-                   const at::Half *B, const float beta, at::Half *C) {
+gpu_gemm<at::Half>(const cublasOperation_t transA,
+                   const cublasOperation_t transB,
+                   const int M,
+                   const int N,
+                   const int K,
+                   const float alpha,
+                   const at::Half *A,
+                   const at::Half *B,
+                   const float beta,
+                   at::Half *C) {
     // Note that cublas follows (column-major) fortran order.
     cublasHandle_t handle = at::cuda::getCurrentCUDABlasHandle();
 
-    int          lda          = (transA == CUBLAS_OP_N) ? K : M;
-    int          ldb          = (transB == CUBLAS_OP_N) ? N : K;
+    int lda                   = (transA == CUBLAS_OP_N) ? K : M;
+    int ldb                   = (transB == CUBLAS_OP_N) ? N : K;
     cublasMath_t cublas_flags = CUBLAS_DEFAULT_MATH;
     if (!at::globalContext().allowFP16ReductionCuBLAS()) {
         cublas_flags = static_cast<cublasMath_t>(cublas_flags |
@@ -97,16 +101,39 @@ gpu_gemm<at::Half>(const cublasOperation_t transA, const cublasOperation_t trans
     }
 
     CUBLAS_CHECK(cublasSetMathMode(handle, cublas_flags));
-    CUBLAS_CHECK(cublasGemmEx(handle, transB, transA, N, M, K, &alpha, B, CUDA_R_16F, ldb, A,
-                              CUDA_R_16F, lda, &beta, C, CUDA_R_16F, N, CUDA_R_32F,
+    CUBLAS_CHECK(cublasGemmEx(handle,
+                              transB,
+                              transA,
+                              N,
+                              M,
+                              K,
+                              &alpha,
+                              B,
+                              CUDA_R_16F,
+                              ldb,
+                              A,
+                              CUDA_R_16F,
+                              lda,
+                              &beta,
+                              C,
+                              CUDA_R_16F,
+                              N,
+                              CUDA_R_32F,
                               CUBLAS_GEMM_DEFAULT_TENSOR_OP));
 }
 
 template <>
 void
-gpu_gemm<float>(const cublasOperation_t transA, const cublasOperation_t transB, const int M,
-                const int N, const int K, const float alpha, const float *A, const float *B,
-                const float beta, float *C) {
+gpu_gemm<float>(const cublasOperation_t transA,
+                const cublasOperation_t transB,
+                const int M,
+                const int N,
+                const int K,
+                const float alpha,
+                const float *A,
+                const float *B,
+                const float beta,
+                float *C) {
     // Note that cublas follows (column-major) fortran order.
     cublasHandle_t handle = at::cuda::getCurrentCUDABlasHandle();
 
@@ -117,9 +144,16 @@ gpu_gemm<float>(const cublasOperation_t transA, const cublasOperation_t transB, 
 
 template <>
 void
-gpu_gemm<double>(const cublasOperation_t transA, const cublasOperation_t transB, const int M,
-                 const int N, const int K, const double alpha, const double *A, const double *B,
-                 const double beta, double *C) {
+gpu_gemm<double>(const cublasOperation_t transA,
+                 const cublasOperation_t transB,
+                 const int M,
+                 const int N,
+                 const int K,
+                 const double alpha,
+                 const double *A,
+                 const double *B,
+                 const double beta,
+                 double *C) {
     // Note that cublas follows fortran order.
     cublasHandle_t handle = at::cuda::getCurrentCUDABlasHandle();
 
@@ -130,16 +164,18 @@ gpu_gemm<double>(const cublasOperation_t transA, const cublasOperation_t transB,
 
 template <typename Dtype, typename Itype>
 __global__ void
-__shared_copy_kernel_map(Dtype *__restrict__ dst, const Dtype *__restrict__ const src,
-                         const Itype *__restrict__ const map, const Itype nthreads,
+__shared_copy_kernel_map(Dtype *__restrict__ dst,
+                         const Dtype *__restrict__ const src,
+                         const Itype *__restrict__ const map,
+                         const Itype nthreads,
                          const Itype length) {
     // cchoy: cache map and benchmark.
     extern __shared__ unsigned int smap[];
-    const unsigned int             i            = blockIdx.x * blockDim.x + threadIdx.x;
-    const Itype                    src_index    = i / length;
-    const Itype                    length_index = i % length;
-    const Itype                    block_rem    = (blockIdx.x * blockDim.x) % length;
-    const Itype                    smap_index   = (threadIdx.x + block_rem) / length;
+    const unsigned int i     = blockIdx.x * blockDim.x + threadIdx.x;
+    const Itype src_index    = i / length;
+    const Itype length_index = i % length;
+    const Itype block_rem    = (blockIdx.x * blockDim.x) % length;
+    const Itype smap_index   = (threadIdx.x + block_rem) / length;
     if ((threadIdx.x == 0 || (threadIdx.x + block_rem) % length == 0) && i < nthreads)
         smap[smap_index] = map[src_index];
     __syncthreads();
@@ -150,34 +186,41 @@ __shared_copy_kernel_map(Dtype *__restrict__ dst, const Dtype *__restrict__ cons
 
 template <typename Dtype, typename Itype>
 void
-shared_copy_kernel_map(Dtype *dst, const Dtype *const src, const Itype *const map,
-                       const Itype nthreads, const Itype length) {
+shared_copy_kernel_map(Dtype *dst,
+                       const Dtype *const src,
+                       const Itype *const map,
+                       const Itype nthreads,
+                       const Itype length) {
     constexpr Itype MAX_THREADS = 512;
     if (MAX_THREADS >= length) {
         __shared_copy_kernel_map<Dtype, Itype>
-            <<<GET_BLOCKS(nthreads, MAX_THREADS), MAX_THREADS,
-               GET_BLOCKS(MAX_THREADS, length) * sizeof(unsigned int)>>>(dst, src, map, nthreads,
-                                                                         length);
+            <<<GET_BLOCKS(nthreads, MAX_THREADS),
+               MAX_THREADS,
+               GET_BLOCKS(MAX_THREADS, length) * sizeof(unsigned int)>>>(
+                dst, src, map, nthreads, length);
     } else {
         __shared_copy_kernel_map<Dtype, Itype>
-            <<<GET_BLOCKS(nthreads, MAX_THREADS), MAX_THREADS,
-               GET_BLOCKS(length, MAX_THREADS) * sizeof(unsigned int)>>>(dst, src, map, nthreads,
-                                                                         length);
+            <<<GET_BLOCKS(nthreads, MAX_THREADS),
+               MAX_THREADS,
+               GET_BLOCKS(length, MAX_THREADS) * sizeof(unsigned int)>>>(
+                dst, src, map, nthreads, length);
     }
 }
 
 template <typename Dtype, typename Itype>
 __global__ void
-__shared_accumulate_kernel_map(Dtype *__restrict__ dst, const Dtype *__restrict__ const src,
-                               const Itype *__restrict__ const map, const Itype nthreads,
+__shared_accumulate_kernel_map(Dtype *__restrict__ dst,
+                               const Dtype *__restrict__ const src,
+                               const Itype *__restrict__ const map,
+                               const Itype nthreads,
                                const Itype length) {
     // cchoy: cache map and benchmark.
     extern __shared__ unsigned int smap[];
-    const unsigned int             i            = blockIdx.x * blockDim.x + threadIdx.x;
-    const Itype                    src_index    = i / length;
-    const Itype                    length_index = i % length;
-    const Itype                    block_rem    = (blockIdx.x * blockDim.x) % length;
-    const Itype                    smap_index   = (threadIdx.x + block_rem) / length;
+    const unsigned int i     = blockIdx.x * blockDim.x + threadIdx.x;
+    const Itype src_index    = i / length;
+    const Itype length_index = i % length;
+    const Itype block_rem    = (blockIdx.x * blockDim.x) % length;
+    const Itype smap_index   = (threadIdx.x + block_rem) / length;
     if ((threadIdx.x == 0 || (threadIdx.x + block_rem) % length == 0) && i < nthreads)
         smap[smap_index] = map[src_index];
     __syncthreads();
@@ -187,25 +230,33 @@ __shared_accumulate_kernel_map(Dtype *__restrict__ dst, const Dtype *__restrict_
 
 template <typename Dtype, typename Itype>
 void
-shared_accumulate_kernel_map(Dtype *dst, const Dtype *const src, const Itype *const map,
-                             const Itype nthreads, const Itype length) {
+shared_accumulate_kernel_map(Dtype *dst,
+                             const Dtype *const src,
+                             const Itype *const map,
+                             const Itype nthreads,
+                             const Itype length) {
     constexpr Itype MAX_THREADS = 512;
     if (MAX_THREADS >= length)
         __shared_accumulate_kernel_map<Dtype, Itype>
-            <<<GET_BLOCKS(nthreads, MAX_THREADS), MAX_THREADS,
-               GET_BLOCKS(MAX_THREADS, length) * sizeof(unsigned int)>>>(dst, src, map, nthreads,
-                                                                         length);
+            <<<GET_BLOCKS(nthreads, MAX_THREADS),
+               MAX_THREADS,
+               GET_BLOCKS(MAX_THREADS, length) * sizeof(unsigned int)>>>(
+                dst, src, map, nthreads, length);
     else
         __shared_accumulate_kernel_map<Dtype, Itype>
-            <<<GET_BLOCKS(nthreads, MAX_THREADS), MAX_THREADS,
-               GET_BLOCKS(length, MAX_THREADS) * sizeof(unsigned int)>>>(dst, src, map, nthreads,
-                                                                         length);
+            <<<GET_BLOCKS(nthreads, MAX_THREADS),
+               MAX_THREADS,
+               GET_BLOCKS(length, MAX_THREADS) * sizeof(unsigned int)>>>(
+                dst, src, map, nthreads, length);
 }
 
 template <typename Dtype, typename Itype>
 __global__ void
-add_mapped_output_tr(const size_t n, const Dtype *__restrict__ in_feat, const size_t in_nchannel,
-                     Dtype *__restrict__ out_feat, const size_t out_nchannel,
+add_mapped_output_tr(const size_t n,
+                     const Dtype *__restrict__ in_feat,
+                     const size_t in_nchannel,
+                     Dtype *__restrict__ out_feat,
+                     const size_t out_nchannel,
                      const Itype *__restrict__ map) {
     extern __shared__ Itype map_index[];
     // Block index
@@ -244,8 +295,10 @@ enum Mode { DEFAULT = 0, MEMORY_EFFICIENT = 1, SPEED_OPTIMIZED = 2 };
 
 bool
 check_direct_gemm_forward(MinkowskiAlgorithm::Mode const algo_index, //
-                          ConvolutionMode::Type const &convolution_mode, long const sA,
-                          long const sB, long const N) {
+                          ConvolutionMode::Type const &convolution_mode,
+                          long const sA,
+                          long const sB,
+                          long const N) {
     if ((convolution_mode == ConvolutionMode::DIRECT_GEMM) ||
         (algo_index == MinkowskiAlgorithm::MEMORY_EFFICIENT))
         return true;
@@ -278,8 +331,10 @@ check_direct_gemm_forward(MinkowskiAlgorithm::Mode const algo_index, //
 
 bool
 check_direct_gemm_backward(MinkowskiAlgorithm::Mode const algo_index, //
-                           ConvolutionMode::Type const &convolution_mode, long const sA,
-                           long const sB, long const N) {
+                           ConvolutionMode::Type const &convolution_mode,
+                           long const sA,
+                           long const sB,
+                           long const N) {
     if ((convolution_mode == ConvolutionMode::DIRECT_GEMM) ||
         (algo_index == MinkowskiAlgorithm::MEMORY_EFFICIENT))
         return true;
@@ -316,10 +371,15 @@ check_direct_gemm_backward(MinkowskiAlgorithm::Mode const algo_index, //
  */
 template <typename Dtype, typename Itype, int BLOCK_SIZE>
 __global__ void
-matmul(const Dtype *__restrict__ A, const int wA, const int hA, //
-       const Dtype *__restrict__ B, const int wB, const int hB, //
-       Dtype *__restrict__ C,                                   //
-       const Itype *__restrict__ in_map, const Itype *__restrict__ out_map) {
+matmul(const Dtype *__restrict__ A,
+       const int wA,
+       const int hA,          //
+       const Dtype *__restrict__ B,
+       const int wB,
+       const int hB,          //
+       Dtype *__restrict__ C, //
+       const Itype *__restrict__ in_map,
+       const Itype *__restrict__ out_map) {
     // Use in_feat as A and kernel as B
 
     // Block index
@@ -400,10 +460,18 @@ matmul(const Dtype *__restrict__ A, const int wA, const int hA, //
  */
 template <typename Dtype, typename Itype, int BLOCK_SIZE>
 __global__ void
-matmul2(const Dtype *__restrict__ A, const int wA, const int hA, //
-        const Dtype *__restrict__ B, const int wB, const int hB, //
-        const Dtype *__restrict__ D, const int wD, const int hD, //
-        Dtype *__restrict__ C, Dtype *__restrict__ E, const Itype *__restrict__ in_map,
+matmul2(const Dtype *__restrict__ A,
+        const int wA,
+        const int hA, //
+        const Dtype *__restrict__ B,
+        const int wB,
+        const int hB, //
+        const Dtype *__restrict__ D,
+        const int wD,
+        const int hD, //
+        Dtype *__restrict__ C,
+        Dtype *__restrict__ E,
+        const Itype *__restrict__ in_map,
         const Itype *__restrict__ out_map) {
     // Use grad_out_feat as A, transposed kernel weight as B, and in_feat as D
 
@@ -652,38 +720,44 @@ matmul2(const Dtype *__restrict__ A, const int wA, const int hA, //
 //    cudaStream_t stream);
 
 void
-dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_feat,
-                                         at::Tensor grad_out_feat, at::Tensor kernel,
-                                         at::Tensor grad_kernel, at::Tensor neighbor_map,
-                                         at::Tensor neighbor_offset, const bool transpose) {
+dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat,
+                                         at::Tensor grad_in_feat,
+                                         at::Tensor grad_out_feat,
+                                         at::Tensor kernel,
+                                         at::Tensor grad_kernel,
+                                         at::Tensor neighbor_map,
+                                         at::Tensor neighbor_offset,
+                                         const bool transpose) {
     grad_in_feat.resize_as_(in_feat);
     grad_in_feat.zero_();
     grad_kernel.resize_as_(kernel);
     grad_kernel.zero_();
     const auto full_in_map =
-        neighbor_map.index({ torch::indexing::Slice(), int(transpose) }).contiguous();
+        neighbor_map.index({torch::indexing::Slice(), int(transpose)}).contiguous();
     const auto full_out_map =
-        neighbor_map.index({ torch::indexing::Slice(), int(!transpose) }).contiguous();
-    bool         is_half      = in_feat.scalar_type() == at::ScalarType::Half;
-    int          in_nrows     = in_feat.size(0);
-    int          in_nchannel  = in_feat.size(1);
-    int          out_nrows    = grad_out_feat.size(0);
-    int          out_nchannel = kernel.size(-1);
-    cudaStream_t stream       = at::cuda::getCurrentCUDAStream().stream();
+        neighbor_map.index({torch::indexing::Slice(), int(!transpose)}).contiguous();
+    bool is_half        = in_feat.scalar_type() == at::ScalarType::Half;
+    int in_nrows        = in_feat.size(0);
+    int in_nchannel     = in_feat.size(1);
+    int out_nrows       = grad_out_feat.size(0);
+    int out_nchannel    = kernel.size(-1);
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
 
     AT_DISPATCH_V2(
-        in_feat.scalar_type(), "convolution_backward_cuda", AT_WRAP([&] {
+        in_feat.scalar_type(),
+        "convolution_backward_cuda",
+        AT_WRAP([&] {
             // using scalar_t = float;
             using Dtype = scalar_t;
             using Itype = uint32_t;
 
             const scalar_t *d_in_feat       = in_feat.data_ptr<scalar_t>();
-            scalar_t       *d_grad_in_feat  = grad_in_feat.data_ptr<scalar_t>();
+            scalar_t *d_grad_in_feat        = grad_in_feat.data_ptr<scalar_t>();
             const scalar_t *d_grad_out_feat = grad_out_feat.data_ptr<scalar_t>();
             scalar_t const *d_kernel        = kernel.data_ptr<scalar_t>();
-            scalar_t       *d_grad_kernel   = grad_kernel.data_ptr<scalar_t>();
+            scalar_t *d_grad_kernel         = grad_kernel.data_ptr<scalar_t>();
 
-            int    kernel_volume = kernel.size(0);
+            int kernel_volume = kernel.size(0);
             size_t n_active_in_volume, shared_mem_size;
             // Define the shared memory size
             if ((in_nchannel > 16 && out_nchannel > 16 && in_nchannel * out_nchannel >= 512) ||
@@ -698,16 +772,18 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                 shared_mem_size = 8;
             int cur_offset = 0;
             if (!check_direct_gemm_backward(MinkowskiAlgorithm::Mode::DEFAULT,
-                                            ConvolutionMode::Type::DEFAULT, in_nchannel,
-                                            out_nchannel, in_nrows)) {
+                                            ConvolutionMode::Type::DEFAULT,
+                                            in_nchannel,
+                                            out_nchannel,
+                                            in_nrows)) {
                 // find max size
                 size_t max_active =
                     *std::max_element(neighbor_offset.data_ptr<int>(),
                                       neighbor_offset.data_ptr<int>() + kernel_volume);
 
-                size_t    in_buffer_size  = max_active * in_nchannel * sizeof(scalar_t);
-                size_t    out_buffer_size = max_active * out_nchannel * sizeof(scalar_t);
-                scalar_t *d_input_buffer  = reinterpret_cast<scalar_t *>(
+                size_t in_buffer_size    = max_active * in_nchannel * sizeof(scalar_t);
+                size_t out_buffer_size   = max_active * out_nchannel * sizeof(scalar_t);
+                scalar_t *d_input_buffer = reinterpret_cast<scalar_t *>(
                     c10::cuda::CUDACachingAllocator::raw_alloc(in_buffer_size));
                 scalar_t *d_output_buffer = reinterpret_cast<scalar_t *>(
                     c10::cuda::CUDACachingAllocator::raw_alloc(out_buffer_size));
@@ -721,10 +797,13 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                         reinterpret_cast<Itype *>(full_in_map.data_ptr<int>()) + cur_offset;
                     const Itype *d_out_map =
                         reinterpret_cast<Itype *>(full_out_map.data_ptr<int>()) + cur_offset;
-                    shared_copy_kernel_map<Dtype, Itype>(
-                        d_output_buffer, d_grad_out_feat, d_out_map,
-                        n_active_in_volume * out_nchannel, out_nchannel);
-                    gpu_gemm<Dtype>(CUBLAS_OP_N, CUBLAS_OP_T,
+                    shared_copy_kernel_map<Dtype, Itype>(d_output_buffer,
+                                                         d_grad_out_feat,
+                                                         d_out_map,
+                                                         n_active_in_volume * out_nchannel,
+                                                         out_nchannel);
+                    gpu_gemm<Dtype>(CUBLAS_OP_N,
+                                    CUBLAS_OP_T,
                                     in_nchannel,                               // M
                                     n_active_in_volume,                        // N
                                     out_nchannel,                              // K
@@ -741,21 +820,25 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                     add_mapped_output_tr<Dtype, Itype>
                         <<<grid_tr, threads, threads.x * sizeof(Itype), stream>>>(
                             n_active_in_volume,
-                            d_input_buffer,              // In
-                            n_active_in_volume,          // In channel
-                            d_grad_in_feat, in_nchannel, // Out
-                            d_in_map);                   // Out channel
+                            d_input_buffer,     // In
+                            n_active_in_volume, // In channel
+                            d_grad_in_feat,
+                            in_nchannel,        // Out
+                            d_in_map);          // Out channel
 
                     // Compute gradient for kernel
                     // Copy features to the buffer
                     dim3 const grid_in(GET_BLOCKS(n_active_in_volume, threads.x),
                                        GET_BLOCKS(in_nchannel, threads.y));
-                    shared_copy_kernel_map<Dtype, Itype>(d_input_buffer, d_in_feat, d_in_map,
+                    shared_copy_kernel_map<Dtype, Itype>(d_input_buffer,
+                                                         d_in_feat,
+                                                         d_in_map,
                                                          n_active_in_volume * in_nchannel,
                                                          in_nchannel);
 
                     CUDA_CHECK(cudaStreamSynchronize(stream));
-                    gpu_gemm<Dtype>(CUBLAS_OP_T, CUBLAS_OP_N,
+                    gpu_gemm<Dtype>(CUBLAS_OP_T,
+                                    CUBLAS_OP_N,
                                     in_nchannel,                                   // M
                                     out_nchannel,                                  // N
                                     n_active_in_volume,                            // K
@@ -790,48 +873,72 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                         size_t const offset          = step * s;
                         size_t const remainder       = n_active_in_volume - offset;
                         size_t const curr_num_active = remainder < step ? remainder : step;
-                        dim3 const   grid((in_nchannel + threads.x - 1) / threads.x,
-                                          (curr_num_active + threads.y - 1) / threads.y);
+                        dim3 const grid((in_nchannel + threads.x - 1) / threads.x,
+                                        (curr_num_active + threads.y - 1) / threads.y);
                         switch (shared_mem_size) {
                         case 32:
                             matmul2<Dtype, Itype, 32><<<grid, threads, 0, stream>>>(
-                                d_grad_out_feat, out_nchannel, curr_num_active, // A
-                                &d_kernel[k * in_nchannel * out_nchannel], out_nchannel,
+                                d_grad_out_feat,
+                                out_nchannel,
+                                curr_num_active,                                // A
+                                &d_kernel[k * in_nchannel * out_nchannel],
+                                out_nchannel,
                                 in_nchannel,                                    // B
-                                d_in_feat, in_nchannel, curr_num_active,        // D
+                                d_in_feat,
+                                in_nchannel,
+                                curr_num_active,                                // D
                                 d_grad_in_feat,                                 // C
                                 &d_grad_kernel[k * in_nchannel * out_nchannel], // E
-                                d_in_map + offset, d_out_map + offset);
+                                d_in_map + offset,
+                                d_out_map + offset);
                             break;
                         case 24:
                             matmul2<Dtype, Itype, 24><<<grid, threads, 0, stream>>>(
-                                d_grad_out_feat, out_nchannel, curr_num_active, // A
-                                &d_kernel[k * in_nchannel * out_nchannel], out_nchannel,
+                                d_grad_out_feat,
+                                out_nchannel,
+                                curr_num_active,                                // A
+                                &d_kernel[k * in_nchannel * out_nchannel],
+                                out_nchannel,
                                 in_nchannel,                                    // B
-                                d_in_feat, in_nchannel, curr_num_active,        // D
+                                d_in_feat,
+                                in_nchannel,
+                                curr_num_active,                                // D
                                 d_grad_in_feat,                                 // C
                                 &d_grad_kernel[k * in_nchannel * out_nchannel], // E
-                                d_in_map + offset, d_out_map + offset);
+                                d_in_map + offset,
+                                d_out_map + offset);
                             break;
                         case 16:
                             matmul2<Dtype, Itype, 16><<<grid, threads, 0, stream>>>(
-                                d_grad_out_feat, out_nchannel, curr_num_active, // A
-                                &d_kernel[k * in_nchannel * out_nchannel], out_nchannel,
+                                d_grad_out_feat,
+                                out_nchannel,
+                                curr_num_active,                                // A
+                                &d_kernel[k * in_nchannel * out_nchannel],
+                                out_nchannel,
                                 in_nchannel,                                    // B
-                                d_in_feat, in_nchannel, curr_num_active,        // D
+                                d_in_feat,
+                                in_nchannel,
+                                curr_num_active,                                // D
                                 d_grad_in_feat,                                 // C
                                 &d_grad_kernel[k * in_nchannel * out_nchannel], // E
-                                d_in_map + offset, d_out_map + offset);
+                                d_in_map + offset,
+                                d_out_map + offset);
                             break;
                         case 8:
                             matmul2<Dtype, Itype, 8><<<grid, threads, 0, stream>>>(
-                                d_grad_out_feat, out_nchannel, curr_num_active, // A
-                                &d_kernel[k * in_nchannel * out_nchannel], out_nchannel,
+                                d_grad_out_feat,
+                                out_nchannel,
+                                curr_num_active,                                // A
+                                &d_kernel[k * in_nchannel * out_nchannel],
+                                out_nchannel,
                                 in_nchannel,                                    // B
-                                d_in_feat, in_nchannel, curr_num_active,        // D
+                                d_in_feat,
+                                in_nchannel,
+                                curr_num_active,                                // D
                                 d_grad_in_feat,                                 // C
                                 &d_grad_kernel[k * in_nchannel * out_nchannel], // E
-                                d_in_map + offset, d_out_map + offset);
+                                d_in_map + offset,
+                                d_out_map + offset);
                             break;
                         }
                     }
@@ -841,7 +948,8 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                 CUDA_CHECK(cudaStreamSynchronize(stream));
             }
         }),
-        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 }
 
 } // namespace ops

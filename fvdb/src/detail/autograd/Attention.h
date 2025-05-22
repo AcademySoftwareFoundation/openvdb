@@ -15,9 +15,13 @@ struct Attention : public torch::autograd::Function<Attention> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, const Variable &query, const Variable &key,
-                                 const Variable &value, const Variable &qLengths,
-                                 const Variable &kvLengths, float scale);
+    static variable_list forward(AutogradContext *ctx,
+                                 const Variable &query,
+                                 const Variable &key,
+                                 const Variable &value,
+                                 const Variable &qLengths,
+                                 const Variable &kvLengths,
+                                 float scale);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);
 };

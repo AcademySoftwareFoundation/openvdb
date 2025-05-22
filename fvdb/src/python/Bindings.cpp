@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "TypeCasters.h"
+
 #include <Config.h>
 #include <FVDB.h>
 
@@ -14,46 +15,58 @@ void bind_grid_batch(py::module &m);
 void bind_jagged_tensor(py::module &m);
 void bind_gaussian_splat3d(py::module &m);
 
-#define __FVDB__BUILDER_INNER(FUNC_NAME, FUNC_STR, LSHAPE_TYPE)                               \
-    m.def(                                                                                    \
-        FUNC_STR,                                                                             \
-        [](const LSHAPE_TYPE &lshape, std::optional<const std::vector<int64_t>> &rshape,      \
-           std::optional<torch::ScalarType> dtype, std::optional<torch::Device> device,       \
-           bool requires_grad, bool pin_memory) {                                             \
-            const torch::Device        device_ = device.value_or(torch::kCPU);                \
-            const torch::ScalarType    dtype_  = dtype.value_or(torch::kFloat32);             \
-            const torch::TensorOptions opts    = torch::TensorOptions()                       \
-                                                  .dtype(dtype_)                              \
-                                                  .device(device_)                            \
-                                                  .requires_grad(requires_grad)               \
-                                                  .pinned_memory(pin_memory);                 \
-            const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>());     \
-            return fvdb::FUNC_NAME(lshape, rshape_, opts);                                    \
-        },                                                                                    \
-        py::arg("lshape"), py::arg("rshape") = std::nullopt, py::arg("dtype") = std::nullopt, \
-        py::arg("device") = std::nullopt, py::arg("requires_grad") = false,                   \
-        py::arg("pin_memory") = false);                                                       \
-    m.def(                                                                                    \
-        FUNC_STR,                                                                             \
-        [](const LSHAPE_TYPE &lshape, std::optional<const std::vector<int64_t>> &rshape,      \
-           std::optional<torch::ScalarType> dtype, std::optional<std::string> device,         \
-           bool requires_grad, bool pin_memory) {                                             \
-            torch::Device device_(device.value_or("cpu"));                                    \
-            if (device_.is_cuda() && !device_.has_index()) {                                  \
-                device_.set_index(c10::cuda::current_device());                               \
-            }                                                                                 \
-            const torch::ScalarType    dtype_ = dtype.value_or(torch::kFloat32);              \
-            const torch::TensorOptions opts   = torch::TensorOptions()                        \
-                                                  .dtype(dtype_)                              \
-                                                  .device(device_)                            \
-                                                  .requires_grad(requires_grad)               \
-                                                  .pinned_memory(pin_memory);                 \
-            const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>());     \
-            return fvdb::FUNC_NAME(lshape, rshape_, opts);                                    \
-        },                                                                                    \
-        py::arg("lshape"), py::arg("rshape") = std::nullopt, py::arg("dtype") = std::nullopt, \
-        py::arg("device") = std::nullopt, py::arg("requires_grad") = false,                   \
-        py::arg("pin_memory") = false);
+#define __FVDB__BUILDER_INNER(FUNC_NAME, FUNC_STR, LSHAPE_TYPE)                           \
+    m.def(                                                                                \
+        FUNC_STR,                                                                         \
+        [](const LSHAPE_TYPE &lshape,                                                     \
+           std::optional<const std::vector<int64_t>> &rshape,                             \
+           std::optional<torch::ScalarType> dtype,                                        \
+           std::optional<torch::Device> device,                                           \
+           bool requires_grad,                                                            \
+           bool pin_memory) {                                                             \
+            const torch::Device device_     = device.value_or(torch::kCPU);               \
+            const torch::ScalarType dtype_  = dtype.value_or(torch::kFloat32);            \
+            const torch::TensorOptions opts = torch::TensorOptions()                      \
+                                                  .dtype(dtype_)                          \
+                                                  .device(device_)                        \
+                                                  .requires_grad(requires_grad)           \
+                                                  .pinned_memory(pin_memory);             \
+            const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>()); \
+            return fvdb::FUNC_NAME(lshape, rshape_, opts);                                \
+        },                                                                                \
+        py::arg("lshape"),                                                                \
+        py::arg("rshape")        = std::nullopt,                                          \
+        py::arg("dtype")         = std::nullopt,                                          \
+        py::arg("device")        = std::nullopt,                                          \
+        py::arg("requires_grad") = false,                                                 \
+        py::arg("pin_memory")    = false);                                                   \
+    m.def(                                                                                \
+        FUNC_STR,                                                                         \
+        [](const LSHAPE_TYPE &lshape,                                                     \
+           std::optional<const std::vector<int64_t>> &rshape,                             \
+           std::optional<torch::ScalarType> dtype,                                        \
+           std::optional<std::string> device,                                             \
+           bool requires_grad,                                                            \
+           bool pin_memory) {                                                             \
+            torch::Device device_(device.value_or("cpu"));                                \
+            if (device_.is_cuda() && !device_.has_index()) {                              \
+                device_.set_index(c10::cuda::current_device());                           \
+            }                                                                             \
+            const torch::ScalarType dtype_  = dtype.value_or(torch::kFloat32);            \
+            const torch::TensorOptions opts = torch::TensorOptions()                      \
+                                                  .dtype(dtype_)                          \
+                                                  .device(device_)                        \
+                                                  .requires_grad(requires_grad)           \
+                                                  .pinned_memory(pin_memory);             \
+            const std::vector<int64_t> rshape_ = rshape.value_or(std::vector<int64_t>()); \
+            return fvdb::FUNC_NAME(lshape, rshape_, opts);                                \
+        },                                                                                \
+        py::arg("lshape"),                                                                \
+        py::arg("rshape")        = std::nullopt,                                          \
+        py::arg("dtype")         = std::nullopt,                                          \
+        py::arg("device")        = std::nullopt,                                          \
+        py::arg("requires_grad") = false,                                                 \
+        py::arg("pin_memory")    = false);
 
 #define __FVDB__BUILDER(FUNC_NAME, FUNC_STR)                         \
     __FVDB__BUILDER_INNER(FUNC_NAME, FUNC_STR, std::vector<int64_t>) \
@@ -94,12 +107,23 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
 
     // volume rendering
     // TODO: (@fwilliams) JaggedTensor interface
-    m.def("volume_render", &fvdb::volumeRender, py::arg("sigmas"), py::arg("rgbs"),
-          py::arg("deltaTs"), py::arg("ts"), py::arg("packInfo"), py::arg("transmittanceThresh"));
+    m.def("volume_render",
+          &fvdb::volumeRender,
+          py::arg("sigmas"),
+          py::arg("rgbs"),
+          py::arg("deltaTs"),
+          py::arg("ts"),
+          py::arg("packInfo"),
+          py::arg("transmittanceThresh"));
 
     // attention
-    m.def("scaled_dot_product_attention", &fvdb::scaledDotProductAttention, py::arg("query"),
-          py::arg("key"), py::arg("value"), py::arg("scale"), R"_FVDB_(
+    m.def("scaled_dot_product_attention",
+          &fvdb::scaledDotProductAttention,
+          py::arg("query"),
+          py::arg("key"),
+          py::arg("value"),
+          py::arg("scale"),
+          R"_FVDB_(
       Computes scaled dot product attention on query, key and value tensors.
             Different SDP kernels could be chosen similar to
             https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
@@ -116,12 +140,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
             out (JaggedTensor): Attention result of shape [B, -1, H, V].)_FVDB_");
 
     // Concatenate grids or jagged tensors
-    m.def("jcat", py::overload_cast<const std::vector<fvdb::GridBatch> &>(&fvdb::jcat),
+    m.def("jcat",
+          py::overload_cast<const std::vector<fvdb::GridBatch> &>(&fvdb::jcat),
           py::arg("grid_batches"));
     m.def("jcat",
           py::overload_cast<const std::vector<fvdb::JaggedTensor> &, std::optional<int64_t>>(
               &fvdb::jcat),
-          py::arg("jagged_tensors"), py::arg("dim") = std::nullopt);
+          py::arg("jagged_tensors"),
+          py::arg("dim") = std::nullopt);
 
     // Build a jagged tensor from a grid batch or another jagged tensor and a data tensor. They will
     // have the same offset structure m.def("jagged_like", py::overload_cast<fvdb::JaggedTensor,
@@ -130,68 +156,117 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // py::arg("data"));
 
     // Static grid construction
-    m.def("gridbatch_from_points", &fvdb::gridbatch_from_points, py::arg("points"),
-          py::arg("pad_min") = torch::zeros({ 3 }, torch::kInt32),
-          py::arg("pad_max") = torch::zeros({ 3 }, torch::kInt32), py::arg("voxel_sizes") = 1.0,
-          py::arg("origins") = torch::zeros({ 3 }), py::arg("mutable") = false);
-    m.def("gridbatch_from_nearest_voxels_to_points", &fvdb::gridbatch_from_nearest_voxels_to_points,
-          py::arg("points"), py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
-          py::arg("mutable") = false);
-    m.def("gridbatch_from_ijk", &fvdb::gridbatch_from_ijk, py::arg("ijk"),
-          py::arg("pad_min") = torch::zeros({ 3 }, torch::kInt32),
-          py::arg("pad_max") = torch::zeros({ 3 }, torch::kInt32), py::arg("voxel_sizes") = 1.0,
-          py::arg("origins") = torch::zeros({ 3 }), py::arg("mutable") = false);
-    m.def(
-        "gridbatch_from_dense",
-        static_cast<fvdb::GridBatch (*)(const int64_t, const fvdb::Vec3i &, const fvdb::Vec3i &,
-                                        const fvdb::Vec3dBatchOrScalar &, const fvdb::Vec3dBatch &,
-                                        typename std::optional<torch::Tensor> mask,
-                                        const torch::Device &, bool)>(&fvdb::gridbatch_from_dense),
-        py::arg("num_grids"), py::arg("dense_dims"),
-        py::arg("ijk_min") = torch::zeros(3, torch::kInt32), py::arg("voxel_sizes") = 1.0,
-        py::arg("origins") = torch::zeros({ 3 }), py::arg("mask") = nullptr,
-        py::arg("device") = "cpu", py::arg("mutable") = false);
+    m.def("gridbatch_from_points",
+          &fvdb::gridbatch_from_points,
+          py::arg("points"),
+          py::arg("pad_min")     = torch::zeros({3}, torch::kInt32),
+          py::arg("pad_max")     = torch::zeros({3}, torch::kInt32),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mutable")     = false);
+    m.def("gridbatch_from_nearest_voxels_to_points",
+          &fvdb::gridbatch_from_nearest_voxels_to_points,
+          py::arg("points"),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mutable")     = false);
+    m.def("gridbatch_from_ijk",
+          &fvdb::gridbatch_from_ijk,
+          py::arg("ijk"),
+          py::arg("pad_min")     = torch::zeros({3}, torch::kInt32),
+          py::arg("pad_max")     = torch::zeros({3}, torch::kInt32),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mutable")     = false);
+    m.def("gridbatch_from_dense",
+          static_cast<fvdb::GridBatch (*)(const int64_t,
+                                          const fvdb::Vec3i &,
+                                          const fvdb::Vec3i &,
+                                          const fvdb::Vec3dBatchOrScalar &,
+                                          const fvdb::Vec3dBatch &,
+                                          typename std::optional<torch::Tensor> mask,
+                                          const torch::Device &,
+                                          bool)>(&fvdb::gridbatch_from_dense),
+          py::arg("num_grids"),
+          py::arg("dense_dims"),
+          py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mask")        = nullptr,
+          py::arg("device")      = "cpu",
+          py::arg("mutable")     = false);
 
-    m.def(
-        "gridbatch_from_dense",
-        static_cast<fvdb::GridBatch (*)(const int64_t, const fvdb::Vec3i &, const fvdb::Vec3i &,
-                                        const fvdb::Vec3dBatchOrScalar &, const fvdb::Vec3dBatch &,
-                                        typename std::optional<torch::Tensor> mask,
-                                        const std::string &, bool)>(&fvdb::gridbatch_from_dense),
-        py::arg("num_grids"), py::arg("dense_dims"),
-        py::arg("ijk_min") = torch::zeros(3, torch::kInt32), py::arg("voxel_sizes") = 1.0,
-        py::arg("origins") = torch::zeros({ 3 }), py::arg("mask") = nullptr,
-        py::arg("device") = "cpu", py::arg("mutable") = false);
+    m.def("gridbatch_from_dense",
+          static_cast<fvdb::GridBatch (*)(const int64_t,
+                                          const fvdb::Vec3i &,
+                                          const fvdb::Vec3i &,
+                                          const fvdb::Vec3dBatchOrScalar &,
+                                          const fvdb::Vec3dBatch &,
+                                          typename std::optional<torch::Tensor> mask,
+                                          const std::string &,
+                                          bool)>(&fvdb::gridbatch_from_dense),
+          py::arg("num_grids"),
+          py::arg("dense_dims"),
+          py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mask")        = nullptr,
+          py::arg("device")      = "cpu",
+          py::arg("mutable")     = false);
 
-    m.def("gridbatch_from_mesh", &fvdb::gridbatch_from_mesh, py::arg("vertices"), py::arg("faces"),
-          py::arg("voxel_sizes") = 1.0, py::arg("origins") = torch::zeros({ 3 }),
-          py::arg("mutable") = false);
+    m.def("gridbatch_from_mesh",
+          &fvdb::gridbatch_from_mesh,
+          py::arg("vertices"),
+          py::arg("faces"),
+          py::arg("voxel_sizes") = 1.0,
+          py::arg("origins")     = torch::zeros({3}),
+          py::arg("mutable")     = false);
 
     // Loading and saving grids
     m.def("load",
-          py::overload_cast<const std::string &, fvdb::NanoVDBFileGridIdentifier,
-                            const torch::Device &, bool>(&fvdb::load),
-          py::arg("path"), py::arg("grid_id") = py::none(), py::arg("device") = torch::kCPU,
+          py::overload_cast<const std::string &,
+                            fvdb::NanoVDBFileGridIdentifier,
+                            const torch::Device &,
+                            bool>(&fvdb::load),
+          py::arg("path"),
+          py::arg("grid_id") = py::none(),
+          py::arg("device")  = torch::kCPU,
           py::arg("verbose") = false);
     m.def("load",
-          py::overload_cast<const std::string &, fvdb::NanoVDBFileGridIdentifier,
-                            const std::string &, bool>(&fvdb::load),
-          py::arg("path"), py::arg("grid_id") = py::none(), py::arg("device") = "cpu",
+          py::overload_cast<const std::string &,
+                            fvdb::NanoVDBFileGridIdentifier,
+                            const std::string &,
+                            bool>(&fvdb::load),
+          py::arg("path"),
+          py::arg("grid_id") = py::none(),
+          py::arg("device")  = "cpu",
           py::arg("verbose") = false);
     m.def("save",
-          py::overload_cast<const std::string &, const fvdb::GridBatch &,
+          py::overload_cast<const std::string &,
+                            const fvdb::GridBatch &,
                             const std::optional<fvdb::JaggedTensor>,
-                            const std::vector<std::string> &, bool, bool>(&fvdb::save),
-          py::arg("path"), py::arg("grid_batch"), py::arg("data") = py::none(),
-          py::arg("names") = std::vector<std::string>(), py::arg("compressed") = false,
-          py::arg("verbose") = false);
-    m.def(
-        "save",
-        py::overload_cast<const std::string &, const fvdb::GridBatch &,
-                          const std::optional<fvdb::JaggedTensor>, const std::string &, bool, bool>(
-            &fvdb::save),
-        py::arg("path"), py::arg("grid_batch"), py::arg("data") = py::none(),
-        py::arg("name") = std::string(), py::arg("compressed") = false, py::arg("verbose") = false);
+                            const std::vector<std::string> &,
+                            bool,
+                            bool>(&fvdb::save),
+          py::arg("path"),
+          py::arg("grid_batch"),
+          py::arg("data")       = py::none(),
+          py::arg("names")      = std::vector<std::string>(),
+          py::arg("compressed") = false,
+          py::arg("verbose")    = false);
+    m.def("save",
+          py::overload_cast<const std::string &,
+                            const fvdb::GridBatch &,
+                            const std::optional<fvdb::JaggedTensor>,
+                            const std::string &,
+                            bool,
+                            bool>(&fvdb::save),
+          py::arg("path"),
+          py::arg("grid_batch"),
+          py::arg("data")       = py::none(),
+          py::arg("name")       = std::string(),
+          py::arg("compressed") = false,
+          py::arg("verbose")    = false);
 
     /*
               py::overload_cast<const std::vector<int64_t>&,
@@ -225,9 +300,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .export_values();
 
     py::class_<fvdb::SparseConvPackInfo>(m, "SparseConvPackInfo")
-        .def(py::init<fvdb::Vec3iOrScalar, fvdb::Vec3iOrScalar, fvdb::GridBatch,
+        .def(py::init<fvdb::Vec3iOrScalar,
+                      fvdb::Vec3iOrScalar,
+                      fvdb::GridBatch,
                       std::optional<fvdb::GridBatch>>(),
-             py::arg("kernel_size"), py::arg("stride"), py::arg("source_grid"),
+             py::arg("kernel_size"),
+             py::arg("stride"),
+             py::arg("source_grid"),
              py::arg("target_grid"))
         .def_property_readonly("neighborhood_map", &fvdb::SparseConvPackInfo::neighborMap)
         .def_property_readonly("neighborhood_sizes", &fvdb::SparseConvPackInfo::neighborSizes)
@@ -260,23 +339,34 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def_property_readonly("kernel_size",
                                [](const fvdb::SparseConvPackInfo &self) {
                                    nanovdb::math::Coord kernel_size = self.kernelSize().value();
-                                   return py::make_tuple(kernel_size.x(), kernel_size.y(),
-                                                         kernel_size.z());
+                                   return py::make_tuple(
+                                       kernel_size.x(), kernel_size.y(), kernel_size.z());
                                })
         .def_property_readonly("source_grid", &fvdb::SparseConvPackInfo::sourceGrid)
         .def_property_readonly("target_grid", &fvdb::SparseConvPackInfo::targetGrid)
-        .def("build_gather_scatter", &fvdb::SparseConvPackInfo::buildGatherScatter,
+        .def("build_gather_scatter",
+             &fvdb::SparseConvPackInfo::buildGatherScatter,
              py::arg("use_me") = false)
-        .def("build_implicit_gemm", &fvdb::SparseConvPackInfo::buildImplicitGEMM,
-             py::arg("sorted") = false, py::arg("split_mask_num") = 1, py::arg("training") = false,
-             py::arg("split_mask_num_bwd") = 1, py::arg("use_tf32") = false)
+        .def("build_implicit_gemm",
+             &fvdb::SparseConvPackInfo::buildImplicitGEMM,
+             py::arg("sorted")             = false,
+             py::arg("split_mask_num")     = 1,
+             py::arg("training")           = false,
+             py::arg("split_mask_num_bwd") = 1,
+             py::arg("use_tf32")           = false)
         .def("build_cutlass", &fvdb::SparseConvPackInfo::buildCutlass, py::arg("benchmark") = false)
         .def("build_lggs", &fvdb::SparseConvPackInfo::buildLGGS)
-        .def("sparse_conv_3d", &fvdb::SparseConvPackInfo::sparseConv3d, "Sparse 3d convolution",
-             py::arg("input"), py::arg("weights"),
+        .def("sparse_conv_3d",
+             &fvdb::SparseConvPackInfo::sparseConv3d,
+             "Sparse 3d convolution",
+             py::arg("input"),
+             py::arg("weights"),
              py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER)
-        .def("sparse_transpose_conv_3d", &fvdb::SparseConvPackInfo::sparseTransposeConv3d,
-             "Sparse 3d convolution transpose", py::arg("input"), py::arg("weights"),
+        .def("sparse_transpose_conv_3d",
+             &fvdb::SparseConvPackInfo::sparseTransposeConv3d,
+             "Sparse 3d convolution transpose",
+             py::arg("input"),
+             py::arg("weights"),
              py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER)
         .def("to",
              py::overload_cast<const torch::Device &>(&fvdb::SparseConvPackInfo::to, py::const_),

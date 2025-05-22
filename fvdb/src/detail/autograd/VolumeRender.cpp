@@ -11,9 +11,12 @@ namespace detail {
 namespace autograd {
 
 VolumeRender::variable_list
-VolumeRender::forward(VolumeRender::AutogradContext *ctx, const VolumeRender::Variable &sigmas,
-                      const VolumeRender::Variable &rgbs, const VolumeRender::Variable &deltaTs,
-                      const VolumeRender::Variable &ts, const VolumeRender::Variable &jOffsets,
+VolumeRender::forward(VolumeRender::AutogradContext *ctx,
+                      const VolumeRender::Variable &sigmas,
+                      const VolumeRender::Variable &rgbs,
+                      const VolumeRender::Variable &deltaTs,
+                      const VolumeRender::Variable &ts,
+                      const VolumeRender::Variable &jOffsets,
                       double tsmtThreshold) {
     const int numRays = jOffsets.size(0) - 1;
     const int N       = sigmas.size(0);
@@ -44,65 +47,84 @@ VolumeRender::forward(VolumeRender::AutogradContext *ctx, const VolumeRender::Va
                 "sigmas and deltaTs must have the same number of elements");
     TORCH_CHECK(sigmas.size(0) == ts.size(0),
                 "sigmas and ts must have the same number of elements");
-    torch::Tensor outOpacity = torch::zeros({ numRays }, sigmas.options());
-    torch::Tensor outDepth   = torch::zeros({ numRays }, sigmas.options());
+    torch::Tensor outOpacity = torch::zeros({numRays}, sigmas.options());
+    torch::Tensor outDepth   = torch::zeros({numRays}, sigmas.options());
     // torch::Tensor outDepthSq = torch::zeros({numRays}, sigmas.options());
-    torch::Tensor outRgb = torch::zeros({ numRays, 3 }, sigmas.options());
-    torch::Tensor outWs  = torch::zeros({ N }, sigmas.options());
+    torch::Tensor outRgb = torch::zeros({numRays, 3}, sigmas.options());
+    torch::Tensor outWs  = torch::zeros({N}, sigmas.options());
     torch::Tensor outTotalSamples =
-        torch::zeros({ numRays }, torch::dtype(torch::kLong).device(sigmas.device()));
+        torch::zeros({numRays}, torch::dtype(torch::kLong).device(sigmas.device()));
 
     FVDB_DISPATCH_KERNEL_DEVICE(sigmas.device(), [&]() {
-        ops::dispatchVolumeRender<DeviceTag>(sigmas, rgbs, deltaTs, ts, jOffsets, tsmtThreshold,
-                                             outOpacity, outDepth, outRgb, outWs, outTotalSamples);
+        ops::dispatchVolumeRender<DeviceTag>(sigmas,
+                                             rgbs,
+                                             deltaTs,
+                                             ts,
+                                             jOffsets,
+                                             tsmtThreshold,
+                                             outOpacity,
+                                             outDepth,
+                                             outRgb,
+                                             outWs,
+                                             outTotalSamples);
     });
 
     ctx->saved_data["tsmtThreshold"] = tsmtThreshold;
 
     ctx->save_for_backward(
-        { sigmas, rgbs, deltaTs, ts, jOffsets, outOpacity, outDepth, outRgb, outWs });
+        {sigmas, rgbs, deltaTs, ts, jOffsets, outOpacity, outDepth, outRgb, outWs});
 
-    return { outRgb, outDepth, outOpacity, outWs, outTotalSamples };
+    return {outRgb, outDepth, outOpacity, outWs, outTotalSamples};
 }
 
 VolumeRender::variable_list
 VolumeRender::backward(VolumeRender::AutogradContext *ctx,
-                       VolumeRender::variable_list    grad_output) {
+                       VolumeRender::variable_list grad_output) {
     Variable dLdRgb     = grad_output.at(0);
     Variable dLdDepth   = grad_output.at(1);
     Variable dLdOpacity = grad_output.at(2);
     Variable dLdWs      = grad_output.at(3);
     // Variable dLdDepthSq = grad_output.at(3);
 
-    variable_list saved    = ctx->get_saved_variables();
-    Variable      sigmas   = saved.at(0);
-    Variable      rgbs     = saved.at(1);
-    Variable      deltaTs  = saved.at(2);
-    Variable      ts       = saved.at(3);
-    Variable      jOffsets = saved.at(4);
+    variable_list saved = ctx->get_saved_variables();
+    Variable sigmas     = saved.at(0);
+    Variable rgbs       = saved.at(1);
+    Variable deltaTs    = saved.at(2);
+    Variable ts         = saved.at(3);
+    Variable jOffsets   = saved.at(4);
 
     Variable outOpacity = saved.at(5);
     Variable outDepth   = saved.at(6);
     // Variable outDepthSq = ctx->saved_data["outDepthSq"].toTensor();
-    Variable     outRgb        = saved.at(7);
-    Variable     outWs         = saved.at(8);
+    Variable outRgb            = saved.at(7);
+    Variable outWs             = saved.at(8);
     const double tsmtThreshold = ctx->saved_data["tsmtThreshold"].toDouble();
 
     const int N = sigmas.size(0);
 
-    Variable dLdSigmas = torch::zeros({ N }, sigmas.options());
-    Variable dLdRgbs   = torch::zeros({ N, 3 }, sigmas.options());
+    Variable dLdSigmas = torch::zeros({N}, sigmas.options());
+    Variable dLdRgbs   = torch::zeros({N, 3}, sigmas.options());
 
     FVDB_DISPATCH_KERNEL_DEVICE(sigmas.device(), [&]() {
-        ops::dispatchVolumeRenderBackward<DeviceTag>(
-            dLdOpacity, dLdDepth, /*dLdDepthSq,*/ dLdRgb, dLdWs, sigmas, rgbs, outWs, deltaTs, ts,
-            jOffsets, outOpacity, outDepth, /*outDepthSq,*/ outRgb, tsmtThreshold, dLdSigmas,
-            dLdRgbs);
+        ops::dispatchVolumeRenderBackward<DeviceTag>(dLdOpacity,
+                                                     dLdDepth,
+                                                     /*dLdDepthSq,*/ dLdRgb,
+                                                     dLdWs,
+                                                     sigmas,
+                                                     rgbs,
+                                                     outWs,
+                                                     deltaTs,
+                                                     ts,
+                                                     jOffsets,
+                                                     outOpacity,
+                                                     outDepth,
+                                                     /*outDepthSq,*/ outRgb,
+                                                     tsmtThreshold,
+                                                     dLdSigmas,
+                                                     dLdRgbs);
     });
 
-    return {
-        dLdSigmas, dLdRgbs, torch::Tensor(), torch::Tensor(), torch::Tensor(), torch::Tensor()
-    };
+    return {dLdSigmas, dLdRgbs, torch::Tensor(), torch::Tensor(), torch::Tensor(), torch::Tensor()};
 }
 
 } // namespace autograd

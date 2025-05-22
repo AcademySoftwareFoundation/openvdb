@@ -1,10 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#include <tests/utils/ImageUtils.h>
+
 #include <torch/torch.h>
 
 #include <png.h>
-#include <tests/utils/ImageUtils.h>
 
 #include <algorithm>
 #include <csetjmp>
@@ -16,7 +17,8 @@
 namespace fvdb::test {
 
 void
-writePNG(const torch::Tensor &colors, const torch::Tensor &alphas,
+writePNG(const torch::Tensor &colors,
+         const torch::Tensor &alphas,
          const std::string &outputFilename) {
     // 1. Validate inputs
     TORCH_CHECK(colors.dim() == 3, "colors must have shape [H, W, 3]");
@@ -40,7 +42,7 @@ writePNG(const torch::Tensor &colors, const torch::Tensor &alphas,
     TORCH_CHECK(color_channels == 3, "This function currently expects 3 color channels (RGB)");
 
     // 2. Combine color and alpha, convert to uint8 RGBA
-    auto rgba_tensor = torch::empty({ height, width, 4 }, torch::kUInt8);
+    auto rgba_tensor = torch::empty({height, width, 4}, torch::kUInt8);
     // Convert inputs to float32 for processing
     auto colors_float = colors.to(torch::kFloat32);
     auto alphas_float = alphas.to(torch::kFloat32);
@@ -98,10 +100,15 @@ writePNG(const torch::Tensor &colors, const torch::Tensor &alphas,
     png_init_io(png_ptr, fp);
 
     // 4. Write header (IHDR)
-    png_set_IHDR(png_ptr, info_ptr, width, height,
+    png_set_IHDR(png_ptr,
+                 info_ptr,
+                 width,
+                 height,
                  8,                   // Bit depth per channel
                  PNG_COLOR_TYPE_RGBA, // We are writing RGBA
-                 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+                 PNG_INTERLACE_NONE,
+                 PNG_COMPRESSION_TYPE_DEFAULT,
+                 PNG_FILTER_TYPE_DEFAULT);
 
     png_write_info(png_ptr, info_ptr);
 

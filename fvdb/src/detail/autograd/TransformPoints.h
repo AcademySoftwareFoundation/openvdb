@@ -18,8 +18,11 @@ struct TransformPoints : public torch::autograd::Function<TransformPoints> {
     using Variable        = torch::autograd::Variable;
     using JaggedVariable  = JaggedTensor;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                                 JaggedVariable points, Variable pointsData, bool isInverse,
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> grid,
+                                 JaggedVariable points,
+                                 Variable pointsData,
+                                 bool isInverse,
                                  bool isDual);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);

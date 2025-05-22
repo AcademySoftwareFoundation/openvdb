@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 
 #include <THC/THCAtomics.cuh>
@@ -19,8 +20,12 @@ template <typename GridType>
 __global__
 __launch_bounds__(
     1024) // Hinting maximum threads per block during launch to optimize register usage.
-    void stencilConvHaloKernel(int kM, int kN, int numLeaves, BatchGridAccessor<GridType> gridAcc,
-                               TorchRAcc64<float, 2> inFeatures, TorchRAcc64<float, 7> stencil,
+    void stencilConvHaloKernel(int kM,
+                               int kN,
+                               int numLeaves,
+                               BatchGridAccessor<GridType> gridAcc,
+                               TorchRAcc64<float, 2> inFeatures,
+                               TorchRAcc64<float, 7> stencil,
                                TorchRAcc64<float, 2> outFeatures) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
@@ -53,13 +58,13 @@ __launch_bounds__(
     const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
     const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
-    const LeafNodeType  &leaf   = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
+    const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
     const nanovdb::Coord origin = leaf.origin();
-    auto                 deviceGridAcc = deviceGrid->getAccessor();
+    auto deviceGridAcc          = deviceGrid->getAccessor();
 
     // Shared memory buffer (re-used by both 10x10x10 of size Di, or 8x8x8 of size Do)
     __shared__ float sBufferRaw[8192];
-    HaloBufferType   sHaloBuffer = reinterpret_cast<HaloBufferType>(sBufferRaw[0]);
+    HaloBufferType sHaloBuffer = reinterpret_cast<HaloBufferType>(sBufferRaw[0]);
 
     // Dense gathering of input features 10x10x10 = 1000
     if (tid < 1000) {
@@ -126,11 +131,19 @@ __launch_bounds__(
 #endif
 
                 // Declare the fragments
-                nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, M, N, K,
-                                       nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major>
+                nvcuda::wmma::fragment<nvcuda::wmma::matrix_a,
+                                       M,
+                                       N,
+                                       K,
+                                       nvcuda::wmma::precision::tf32,
+                                       nvcuda::wmma::row_major>
                     a_frag;
-                nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, M, N, K,
-                                       nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major>
+                nvcuda::wmma::fragment<nvcuda::wmma::matrix_b,
+                                       M,
+                                       N,
+                                       K,
+                                       nvcuda::wmma::precision::tf32,
+                                       nvcuda::wmma::row_major>
                     b_frag;
 
                 MatrixAType matrixA = reinterpret_cast<MatrixAType>(spokeStencil[i][J][0][0]);
@@ -138,7 +151,8 @@ __launch_bounds__(
                     reinterpret_cast<MatrixBType>(stencil[di][dj][dk][mIdx][nIdx][0][0]);
 
                 nvcuda::wmma::load_matrix_sync(a_frag, &matrixA[0][0], K);
-                nvcuda::wmma::load_matrix_sync(b_frag, &matrixB[0][0],
+                nvcuda::wmma::load_matrix_sync(b_frag,
+                                               &matrixB[0][0],
                                                N); // b is row-major, hence the stride
 
 #if 1
@@ -156,7 +170,7 @@ __launch_bounds__(
             }
 
     DenseOutputBufferType sOutputBuffer = reinterpret_cast<DenseOutputBufferType>(sBufferRaw[0]);
-    MatrixCType           matrixC       = reinterpret_cast<MatrixCType>(sOutputBuffer[i][J][0][0]);
+    MatrixCType matrixC                 = reinterpret_cast<MatrixCType>(sOutputBuffer[i][J][0][0]);
     __syncthreads();
 
     nvcuda::wmma::store_matrix_sync(&matrixC[0][0], c_frag, N, nvcuda::wmma::mem_row_major);
@@ -186,10 +200,12 @@ __launch_bounds__(
 
 template <typename GridType>
 __global__
-__launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int numLeaves,
+__launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
+                                                            int kN,
+                                                            int numLeaves,
                                                             BatchGridAccessor<GridType> gridAcc,
-                                                            TorchRAcc64<float, 2>       inFeatures,
-                                                            TorchRAcc64<float, 7>       stencil,
+                                                            TorchRAcc64<float, 2> inFeatures,
+                                                            TorchRAcc64<float, 7> stencil,
                                                             TorchRAcc64<float, 2> outFeatures) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
@@ -215,13 +231,13 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
     const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
     const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
-    const LeafNodeType  &leaf   = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
+    const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
     const nanovdb::Coord origin = leaf.origin();
-    auto                 deviceGridAcc = deviceGrid->getAccessor();
+    auto deviceGridAcc          = deviceGrid->getAccessor();
 
     // Check if the current brick is active (this will ignore disabling status)
-    const auto &valueMask  = leaf.valueMask();
-    uint64_t    activeMask = valueMask.words()[Bi] | valueMask.words()[Bi + 1]; // 8x8 slice
+    const auto &valueMask = leaf.valueMask();
+    uint64_t activeMask   = valueMask.words()[Bi] | valueMask.words()[Bi + 1]; // 8x8 slice
     activeMask &= (0xffffUL << (Bj << 3));
     activeMask &= (0xf0f0f0f0f0f0f0fUL << Bk);
     if (!activeMask)
@@ -233,9 +249,9 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
     __shared__ float sOutputBuffer[2][2][4][Do];
 
     // Gathering data from input features (collectively)
-    const int II   = (tid >> 6) & 0x3; // First 2 bits
-    const int E    = tid & 0x3f;       // Last 6 bits = 64 input channels
-    int       tDim = E + mIdx * Di;
+    const int II = (tid >> 6) & 0x3; // First 2 bits
+    const int E  = tid & 0x3f;       // Last 6 bits = 64 input channels
+    int tDim     = E + mIdx * Di;
     for (int jj = 0; jj < 4; ++jj) {
         for (int kk = 0; kk < 6; ++kk) {
             auto coord = origin.offsetBy(Bi + II - 1, Bj + jj - 1, Bk + kk - 1);
@@ -251,11 +267,19 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
     __syncthreads();
 
     // Preparation of GEMM
-    using a_frag_t = nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, 16, 16, 8,
-                                            nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major>;
-    nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, 16, 16, 8, nvcuda::wmma::precision::tf32,
+    using a_frag_t = nvcuda::wmma::fragment<nvcuda::wmma::matrix_a,
+                                            16,
+                                            16,
+                                            8,
+                                            nvcuda::wmma::precision::tf32,
+                                            nvcuda::wmma::row_major>;
+    nvcuda::wmma::fragment<nvcuda::wmma::matrix_b,
+                           16,
+                           16,
+                           8,
+                           nvcuda::wmma::precision::tf32,
                            nvcuda::wmma::row_major>
-                                                                        b_frag;
+        b_frag;
     nvcuda::wmma::fragment<nvcuda::wmma::accumulator, 16, 16, 8, float> c_frag;
     nvcuda::wmma::fill_fragment(c_frag, 0.0f);
 
@@ -288,8 +312,8 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
 
                     a_frag_t &a_frag =
                         *reinterpret_cast<a_frag_t *>(sFragBuffer[inBlockIdx][tid & 0x1f]);
-                    nvcuda::wmma::load_matrix_sync(a_frag, &sSpokeStencil[0][0][0][inBlockIdx << 3],
-                                                   64);
+                    nvcuda::wmma::load_matrix_sync(
+                        a_frag, &sSpokeStencil[0][0][0][inBlockIdx << 3], 64);
 #pragma unroll
                     for (int t = 0; t < a_frag.num_elements; t++)
                         a_frag.x[t] = nvcuda::wmma::__float_to_tf32(a_frag.x[t]);
@@ -307,7 +331,8 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
                     a_frag_t &a_frag =
                         *reinterpret_cast<a_frag_t *>(sFragBuffer[inBlockIdx][tid & 0x1f]);
                     nvcuda::wmma::load_matrix_sync(
-                        b_frag, &stencil[di][dj][dk][mIdx][nIdx][inBlockIdx << 3][outBlockIdx << 4],
+                        b_frag,
+                        &stencil[di][dj][dk][mIdx][nIdx][inBlockIdx << 3][outBlockIdx << 4],
                         128);
 #pragma unroll
                     for (int t = 0; t < b_frag.num_elements; t++)
@@ -320,8 +345,8 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM, int kN, int 
             }
 
     // Store the result to the output buffer
-    nvcuda::wmma::store_matrix_sync(&sOutputBuffer[0][0][0][(tid >> 5) << 4], c_frag, 128,
-                                    nvcuda::wmma::mem_row_major);
+    nvcuda::wmma::store_matrix_sync(
+        &sOutputBuffer[0][0][0][(tid >> 5) << 4], c_frag, 128, nvcuda::wmma::mem_row_major);
 
     // Sparse commit
     __syncthreads();
@@ -366,10 +391,11 @@ template <>
 torch::Tensor
 dispatchSparseConvolutionHalo<torch::kCUDA>(const GridBatchImpl &batchHdl,
                                             const torch::Tensor &inFeatures,
-                                            const torch::Tensor &kernel, int variant) {
+                                            const torch::Tensor &kernel,
+                                            int variant) {
     // Check compute capability
     {
-        int            device_id = inFeatures.device().index();
+        int device_id = inFeatures.device().index();
         cudaDeviceProp deviceProp;
         cudaGetDeviceProperties(&deviceProp, device_id);
         int computeCapability = deviceProp.major * 100 + deviceProp.minor * 10;
@@ -385,7 +411,7 @@ dispatchSparseConvolutionHalo<torch::kCUDA>(const GridBatchImpl &batchHdl,
 
     // Output features
     const int outC = kernel.size(4), inC = kernel.size(3);
-    auto      outFeatures = torch::zeros({ inFeatures.size(0), outC }, inFeatures.options());
+    auto outFeatures = torch::zeros({inFeatures.size(0), outC}, inFeatures.options());
 
     // Pad kernel: [3, 3, 3, I, O] -> [3, 3, 3, MxDi, NxDo] -> [3, 3, 3, M, N, Di, Do]
     const int M = (inC + Di - 1) / Di;
@@ -393,11 +419,11 @@ dispatchSparseConvolutionHalo<torch::kCUDA>(const GridBatchImpl &batchHdl,
 
     torch::Tensor paddedKernel = kernel;
     if (M * Di != inC || N * Do != outC) {
-        paddedKernel = torch::zeros({ 3, 3, 3, M * Di, N * Do }, kernel.options());
+        paddedKernel = torch::zeros({3, 3, 3, M * Di, N * Do}, kernel.options());
         paddedKernel.slice(3, 0, inC).slice(4, 0, outC) = kernel;
     }
-    paddedKernel = paddedKernel.view({ 3, 3, 3, M, Di, N, Do });
-    paddedKernel = paddedKernel.permute({ 0, 1, 2, 3, 5, 4, 6 }).contiguous();
+    paddedKernel = paddedKernel.view({3, 3, 3, M, Di, N, Do});
+    paddedKernel = paddedKernel.permute({0, 1, 2, 3, 5, 4, 6}).contiguous();
 
     // Launch kernels for each M x N x leaf.
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
@@ -405,13 +431,19 @@ dispatchSparseConvolutionHalo<torch::kCUDA>(const GridBatchImpl &batchHdl,
 
         if (variant == 8) {
             stencilConvHaloKernel<<<M * N * numLeaves, 1024>>>(
-                M, N, numLeaves, gridAccessor,
+                M,
+                N,
+                numLeaves,
+                gridAccessor,
                 inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
                 outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
         } else {
             stencilConvHaloLargeDepthKernel<<<M * N * numLeaves * 32, 256>>>(
-                M, N, numLeaves, gridAccessor,
+                M,
+                N,
+                numLeaves,
+                gridAccessor,
                 inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
                 outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
@@ -427,7 +459,8 @@ template <>
 torch::Tensor
 dispatchSparseConvolutionHalo<torch::kCPU>(const GridBatchImpl &batchHdl,
                                            const torch::Tensor &inFeatures,
-                                           const torch::Tensor &kernel, int variant) {
+                                           const torch::Tensor &kernel,
+                                           int variant) {
     TORCH_CHECK(false, "CPU not supported for SparseConvolutionHalo yet!");
 }
 

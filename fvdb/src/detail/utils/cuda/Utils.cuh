@@ -4,6 +4,8 @@
 #ifndef FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
 #define FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
 
+#include <c10/util/Exception.h>
+
 #include <limits>
 
 namespace fvdb {
@@ -11,7 +13,7 @@ namespace fvdb {
 /// @brief Get the number of blocks for a CUDA kernel launch given the number of elements and the
 /// maximum number of threads per block
 /// @param N The number of elements to parallelize over
-/// @param maxThreadsPerBlock The maximum number of threads per block
+/// @param maxThreadsPer dBlock The maximum number of threads per block
 /// @return The number of blocks for a CUDA kernel launch
 static int
 GET_BLOCKS(const int64_t N, const int64_t maxThreadsPerBlock) {

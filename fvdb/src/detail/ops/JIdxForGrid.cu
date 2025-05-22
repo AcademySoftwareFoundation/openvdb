@@ -13,15 +13,17 @@ namespace ops {
 /// @brief Per-voxel callback for getting the batch index of each enabled voxel in a batch of grids
 template <typename GridType, template <typename T, int32_t D> typename TorchAccessor>
 __hostdev__ inline void
-enabledGridCoordsVoxelCallback(int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx,
+enabledGridCoordsVoxelCallback(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t voxelIdx,
                                GridBatchImpl::Accessor<GridType> gridAccessor,
-                               TorchAccessor<int64_t, 1>         leafBaseOffset,
-                               TorchAccessor<fvdb::JIdxType, 1>  outJIdx) {
-    const nanovdb::NanoGrid<GridType>                        *grid = gridAccessor.grid(batchIdx);
+                               TorchAccessor<int64_t, 1> leafBaseOffset,
+                               TorchAccessor<fvdb::JIdxType, 1> outJIdx) {
+    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
     const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(voxelIdx);
-    const int64_t        outIdx =
+    const int64_t outIdx =
         leafBaseOffset[leafIdx] + leaf.template get<UnmaskedPerLeaf<GridType>>(voxelIdx);
     if (leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx)) {
         outJIdx[outIdx] = batchIdx;
@@ -39,20 +41,26 @@ EnabledVoxelsJIdx(const GridBatchImpl &gridBatch) {
     const int64_t numEnabledCoords = leafBaseOffset[-1].item<int64_t>();
 
     torch::Tensor outJIdx = torch::empty(
-        { numEnabledCoords }, torch::dtype(fvdb::JIdxScalarType).device(gridBatch.device()));
+        {numEnabledCoords}, torch::dtype(fvdb::JIdxScalarType).device(gridBatch.device()));
 
     // Get the enabled grid batch indices
     auto leafBaseOffsetAcc = tensorAccessor<DeviceTag, int64_t, 1>(leafBaseOffset);
     auto outJIdxAcc        = tensorAccessor<DeviceTag, fvdb::JIdxType, 1>(outJIdx);
     if constexpr (DeviceTag == torch::kCUDA) {
-        auto cb = [=] __device__(int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+        auto cb = [=] __device__(int32_t batchIdx,
+                                 int32_t leafIdx,
+                                 int32_t voxelIdx,
+                                 int32_t,
                                  GridBatchImpl::Accessor<GridType> gridAccessor) {
             enabledGridCoordsVoxelCallback<GridType, TorchRAcc32>(
                 batchIdx, leafIdx, voxelIdx, gridAccessor, leafBaseOffsetAcc, outJIdxAcc);
         };
         forEachVoxelCUDA<GridType>(1024, 1, gridBatch, cb);
     } else {
-        auto cb = [=](int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+        auto cb = [=](int32_t batchIdx,
+                      int32_t leafIdx,
+                      int32_t voxelIdx,
+                      int32_t,
                       GridBatchImpl::Accessor<GridType> gridAccessor) {
             enabledGridCoordsVoxelCallback<GridType, TorchAcc>(
                 batchIdx, leafIdx, voxelIdx, gridAccessor, leafBaseOffsetAcc, outJIdxAcc);

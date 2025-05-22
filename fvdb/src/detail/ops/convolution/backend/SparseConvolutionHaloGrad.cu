@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 
 #include <THC/THCAtomics.cuh>
@@ -33,9 +34,14 @@ struct GradStencilFunctor {
 
     template <typename GridType>
     __device__ void
-    operator()(int kM, int kN, int numLeaves, BatchGridAccessor<GridType> gridAcc,
-               TorchRAcc64<float, 2> inFeatures, TorchRAcc64<float, 2> gradOutFeatures,
-               TorchRAcc64<float, 5> gradStencil, char *smemBuffer) {
+    operator()(int kM,
+               int kN,
+               int numLeaves,
+               BatchGridAccessor<GridType> gridAcc,
+               TorchRAcc64<float, 2> inFeatures,
+               TorchRAcc64<float, 2> gradOutFeatures,
+               TorchRAcc64<float, 5> gradStencil,
+               char *smemBuffer) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
 #if __CUDA_ARCH__ >= 800
@@ -46,17 +52,17 @@ struct GradStencilFunctor {
         using MatrixCAltType = float(&)[2][8][16];
 
         SharedStorage &storage = *reinterpret_cast<SharedStorage *>(smemBuffer);
-        int            tid     = threadIdx.x;
-        int            leafIdx = blockIdx.x % numLeaves;
-        int            nIdx    = (blockIdx.x / numLeaves) % kN;
-        int            mIdx    = blockIdx.x / numLeaves / kN;
+        int tid                = threadIdx.x;
+        int leafIdx            = blockIdx.x % numLeaves;
+        int nIdx               = (blockIdx.x / numLeaves) % kN;
+        int mIdx               = blockIdx.x / numLeaves / kN;
 
         // Shared memory buffer
         auto &sInputHaloBuffer      = storage.inputHaloBuffer;
         auto &sInputSpokeBuffer     = storage.inputSpokeBuffer;
         auto &sGradOutputLeafBuffer = storage.gradOutputLeafBuffer;
         auto &sGradStencil          = storage.gradStencil;
-        auto  sWarpMatrixC          = storage.warpMatrixC;
+        auto sWarpMatrixC           = storage.warpMatrixC;
 
         using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
 
@@ -65,9 +71,9 @@ struct GradStencilFunctor {
         const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
         const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
-        const LeafNodeType  &leaf   = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
+        const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
         const nanovdb::Coord origin = leaf.origin();
-        auto                 deviceGridAcc = deviceGrid->getAccessor();
+        auto deviceGridAcc          = deviceGrid->getAccessor();
 
         // Dense gathering of 10x10x10 input features and 8x8x8 grad output features
         // We don't have 1000 threads so have to iterate a bit.
@@ -155,11 +161,19 @@ struct GradStencilFunctor {
                 nvcuda::wmma::fill_fragment(c_frag, 0.0f);
 
                 // Declare the fragments
-                nvcuda::wmma::fragment<nvcuda::wmma::matrix_a, 16, 16, 8,
-                                       nvcuda::wmma::precision::tf32, nvcuda::wmma::col_major>
+                nvcuda::wmma::fragment<nvcuda::wmma::matrix_a,
+                                       16,
+                                       16,
+                                       8,
+                                       nvcuda::wmma::precision::tf32,
+                                       nvcuda::wmma::col_major>
                     a_frag;
-                nvcuda::wmma::fragment<nvcuda::wmma::matrix_b, 16, 16, 8,
-                                       nvcuda::wmma::precision::tf32, nvcuda::wmma::row_major>
+                nvcuda::wmma::fragment<nvcuda::wmma::matrix_b,
+                                       16,
+                                       16,
+                                       8,
+                                       nvcuda::wmma::precision::tf32,
+                                       nvcuda::wmma::row_major>
                     b_frag;
 
                 nvcuda::wmma::load_matrix_sync(a_frag, &matrixA[0][0], 16);
@@ -176,8 +190,8 @@ struct GradStencilFunctor {
 #endif
 
                 nvcuda::wmma::mma_sync(c_frag, a_frag, b_frag, c_frag);
-                nvcuda::wmma::store_matrix_sync(&matrixC[0][0], c_frag, 16,
-                                                nvcuda::wmma::mem_row_major);
+                nvcuda::wmma::store_matrix_sync(
+                    &matrixC[0][0], c_frag, 16, nvcuda::wmma::mem_row_major);
 
                 __syncthreads();
 
@@ -212,12 +226,16 @@ struct GradStencilFunctor {
 template <typename GridType>
 __global__
 __launch_bounds__(GradStencilFunctor::MaxThreadsPerBlock) void stencilConvHaloGradKernel(
-    int kM, int kN, int numLeaves, BatchGridAccessor<GridType> gridAcc,
-    TorchRAcc64<float, 2> inFeatures, TorchRAcc64<float, 2> gradOutFeatures,
+    int kM,
+    int kN,
+    int numLeaves,
+    BatchGridAccessor<GridType> gridAcc,
+    TorchRAcc64<float, 2> inFeatures,
+    TorchRAcc64<float, 2> gradOutFeatures,
     TorchRAcc64<float, 5> gradStencil) {
     extern __shared__ char smemBuffer[];
-    GradStencilFunctor()(kM, kN, numLeaves, gridAcc, inFeatures, gradOutFeatures, gradStencil,
-                         smemBuffer);
+    GradStencilFunctor()(
+        kM, kN, numLeaves, gridAcc, inFeatures, gradOutFeatures, gradStencil, smemBuffer);
 }
 
 template <>
@@ -227,7 +245,7 @@ dispatchSparseConvolutionHaloGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
                                                 const torch::Tensor &gradOutFeatures) {
     // Check compute capability
     {
-        int            device_id = inFeatures.device().index();
+        int device_id = inFeatures.device().index();
         cudaDeviceProp deviceProp;
         cudaGetDeviceProperties(&deviceProp, device_id);
         int computeCapability = deviceProp.major * 100 + deviceProp.minor * 10;
@@ -239,9 +257,9 @@ dispatchSparseConvolutionHaloGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
 
     // Kernel Grad size: [3, 3, 3, I, O]
     const int outC = gradOutFeatures.size(1), inC = inFeatures.size(1);
-    auto      gradStencil = torch::zeros({ 3, 3, 3, inC, outC }, inFeatures.options());
-    const int M           = (inC + GradStencilFunctor::Di - 1) / GradStencilFunctor::Di;
-    const int N           = (outC + GradStencilFunctor::Do - 1) / GradStencilFunctor::Do;
+    auto gradStencil = torch::zeros({3, 3, 3, inC, outC}, inFeatures.options());
+    const int M      = (inC + GradStencilFunctor::Di - 1) / GradStencilFunctor::Di;
+    const int N      = (outC + GradStencilFunctor::Do - 1) / GradStencilFunctor::Do;
 
     constexpr size_t smemSize = sizeof(typename GradStencilFunctor::SharedStorage);
 
@@ -249,11 +267,15 @@ dispatchSparseConvolutionHaloGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
         auto gridAccessor = batchHdl.deviceAccessor<GridType>();
         cudaFuncSetAttribute(stencilConvHaloGradKernel<GridType>,
-                             cudaFuncAttributeMaxDynamicSharedMemorySize, smemSize);
+                             cudaFuncAttributeMaxDynamicSharedMemorySize,
+                             smemSize);
 
         stencilConvHaloGradKernel<GridType>
             <<<M * N * numLeaves, GradStencilFunctor::MaxThreadsPerBlock, smemSize>>>(
-                M, N, numLeaves, gridAccessor,
+                M,
+                N,
+                numLeaves,
+                gridAccessor,
                 inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 gradOutFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
                 gradStencil.packed_accessor64<float, 5, torch::RestrictPtrTraits>());

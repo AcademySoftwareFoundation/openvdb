@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <detail/ops/Ops.h>
+#include <tests/utils/Tensor.h>
 
 #include <torch/script.h>
 #include <torch/torch.h>
 
 #include <gtest/gtest.h>
-#include <tests/utils/Tensor.h>
 
 #include <cstddef>
 #include <cstdlib>
@@ -78,10 +78,14 @@ struct GaussianProjectionForwardTestFixture : public ::testing::Test {
     }
 
     const std::vector<std::string> inputNames = {
-        "means", "quats", "scales", "viewmats", "Ks",
+        "means",
+        "quats",
+        "scales",
+        "viewmats",
+        "Ks",
     };
 
-    const std::vector<std::string> outputNames = { "radii", "means2d", "depths", "conics" };
+    const std::vector<std::string> outputNames = {"radii", "means2d", "depths", "conics"};
 
     // Input tensors
     torch::Tensor means;    // [C, N, 3] or [nnz, 3]
@@ -112,11 +116,21 @@ TEST_F(GaussianProjectionForwardTestFixture, DISABLED_GenerateOutputData) {
     {
         // Perspective projection
         const auto [radii, means2d, depths, conics, compensations] =
-            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0,
-                false, false);
+            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                               quats,
+                                                                               scales,
+                                                                               viewmats,
+                                                                               Ks,
+                                                                               imageWidth,
+                                                                               imageHeight,
+                                                                               0.3,
+                                                                               1e-2,
+                                                                               1e10,
+                                                                               0,
+                                                                               false,
+                                                                               false);
 
-        std::vector<torch::Tensor> outputData = { radii, means2d, depths, conics };
+        std::vector<torch::Tensor> outputData = {radii, means2d, depths, conics};
 
         auto outputFilename = std::string("projection_persp_forward_outputs.pt");
 
@@ -126,11 +140,21 @@ TEST_F(GaussianProjectionForwardTestFixture, DISABLED_GenerateOutputData) {
     {
         // Orthographic projection
         const auto [radii, means2d, depths, conics, compensations] =
-            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0,
-                false, true);
+            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                               quats,
+                                                                               scales,
+                                                                               viewmats,
+                                                                               Ks,
+                                                                               imageWidth,
+                                                                               imageHeight,
+                                                                               0.3,
+                                                                               1e-2,
+                                                                               1e10,
+                                                                               0,
+                                                                               false,
+                                                                               true);
 
-        std::vector<torch::Tensor> outputData = { radii, means2d, depths, conics };
+        std::vector<torch::Tensor> outputData = {radii, means2d, depths, conics};
 
         auto outputFilename = std::string("projection_ortho_forward_outputs.pt");
 
@@ -142,9 +166,19 @@ TEST_F(GaussianProjectionForwardTestFixture, TestPerspectiveProjection) {
     loadTestData("projection_forward_inputs.pt", "projection_persp_forward_outputs.pt");
 
     const auto [radii, means2d, depths, conics, compensations] =
-        fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-            means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0, false,
-            false);
+        fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                           quats,
+                                                                           scales,
+                                                                           viewmats,
+                                                                           Ks,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           0.3,
+                                                                           1e-2,
+                                                                           1e10,
+                                                                           0,
+                                                                           false,
+                                                                           false);
 
     EXPECT_TRUE(torch::allclose(means2d, expectedMeans2d));
     EXPECT_TRUE(torch::allclose(radii, expectedRadii));
@@ -156,18 +190,28 @@ TEST_F(GaussianProjectionForwardTestFixture, TestOrthographicProjection) {
     loadTestData("projection_forward_inputs.pt", "projection_ortho_forward_outputs.pt");
 
     const auto [radii, means2d, depths, conics, compensations] =
-        fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-            means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0, false,
-            true);
+        fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                           quats,
+                                                                           scales,
+                                                                           viewmats,
+                                                                           Ks,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           0.3,
+                                                                           1e-2,
+                                                                           1e10,
+                                                                           0,
+                                                                           false,
+                                                                           true);
 
     // other outputs are undefined where radii is zero
     auto radiiNonZeroMask = radii > 0; // [C, N]
 
-    EXPECT_TRUE(torch::allclose(means2d.index({ radiiNonZeroMask }),
-                                expectedMeans2d.index({ radiiNonZeroMask })));
+    EXPECT_TRUE(torch::allclose(means2d.index({radiiNonZeroMask}),
+                                expectedMeans2d.index({radiiNonZeroMask})));
     EXPECT_TRUE(torch::allclose(radii, expectedRadii));
-    EXPECT_TRUE(torch::allclose(depths.index({ radiiNonZeroMask }),
-                                expectedDepths.index({ radiiNonZeroMask })));
-    EXPECT_TRUE(torch::allclose(conics.index({ radiiNonZeroMask }),
-                                expectedConics.index({ radiiNonZeroMask })));
+    EXPECT_TRUE(torch::allclose(depths.index({radiiNonZeroMask}),
+                                expectedDepths.index({radiiNonZeroMask})));
+    EXPECT_TRUE(torch::allclose(conics.index({radiiNonZeroMask}),
+                                expectedConics.index({radiiNonZeroMask})));
 }

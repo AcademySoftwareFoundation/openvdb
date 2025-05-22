@@ -2,32 +2,32 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <detail/ops/Ops.h>
+#include <tests/utils/Tensor.h>
 
 #include <torch/torch.h>
 
 #include <gtest/gtest.h>
-#include <tests/utils/Tensor.h>
 
 #include <cstddef>
 #include <cstdlib>
 
 struct TestParams {
-    float   azimuth;
-    float   elevation;
+    float azimuth;
+    float elevation;
     int64_t shDegreeToUse;
     int64_t numGaussians;
     int64_t numChannels;
     int64_t numCameras;
-    bool    setZeroRadii;
-    bool    noRadii;
+    bool setZeroRadii;
+    bool noRadii;
 };
 
 struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<TestParams> {
     void
     SetUp() override {
         TestParams testParams = GetParam();
-        float      azimuth    = testParams.azimuth;
-        float      elevation  = testParams.elevation;
+        float azimuth         = testParams.azimuth;
+        float elevation       = testParams.elevation;
         shDegreeToUse         = testParams.shDegreeToUse;
         numGaussians          = testParams.numGaussians;
         numChannels           = testParams.numChannels;
@@ -39,26 +39,26 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
         const auto intOptsCUDA   = fvdb::test::tensorOpts<int>(torch::kCUDA);
 
         const auto cosAzimuth =
-            torch::cos(torch::full({ numCameras, numGaussians, 1 }, azimuth, floatOptsCUDA));
+            torch::cos(torch::full({numCameras, numGaussians, 1}, azimuth, floatOptsCUDA));
         const auto sinAzimuth =
-            torch::sin(torch::full({ numCameras, numGaussians, 1 }, azimuth, floatOptsCUDA));
+            torch::sin(torch::full({numCameras, numGaussians, 1}, azimuth, floatOptsCUDA));
         const auto cosElevation =
-            torch::cos(torch::full({ numCameras, numGaussians, 1 }, elevation, floatOptsCUDA));
+            torch::cos(torch::full({numCameras, numGaussians, 1}, elevation, floatOptsCUDA));
         const auto sinElevation =
-            torch::sin(torch::full({ numCameras, numGaussians, 1 }, elevation, floatOptsCUDA));
+            torch::sin(torch::full({numCameras, numGaussians, 1}, elevation, floatOptsCUDA));
 
-        viewDirs = torch::cat(
-            { cosAzimuth * cosElevation, sinAzimuth * cosElevation, sinElevation }, 2); // [C, N, 3]
+        viewDirs = torch::cat({cosAzimuth * cosElevation, sinAzimuth * cosElevation, sinElevation},
+                              2); // [C, N, 3]
 
-        sh0Coeffs = torch::full({ numGaussians, 1, numChannels }, 1.0f, floatOptsCUDA);
+        sh0Coeffs = torch::full({numGaussians, 1, numChannels}, 1.0f, floatOptsCUDA);
 
         K         = (shDegreeToUse + 1) * (shDegreeToUse + 1);
-        shNCoeffs = torch::full({ numGaussians, K - 1, numChannels }, 1.0f, floatOptsCUDA);
+        shNCoeffs = torch::full({numGaussians, K - 1, numChannels}, 1.0f, floatOptsCUDA);
 
-        radii = torch::full({ numCameras, numGaussians }, 1, intOptsCUDA);
+        radii = torch::full({numCameras, numGaussians}, 1, intOptsCUDA);
 
         dLossDRenderQuantities =
-            torch::full({ numCameras, numGaussians, numChannels }, 1.0f, floatOptsCUDA);
+            torch::full({numCameras, numGaussians, numChannels}, 1.0f, floatOptsCUDA);
 
         if (noRadii) {
             radii = torch::Tensor();
@@ -82,26 +82,36 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
     }
 
     void
-    checkSh(const int64_t numCameras, const int64_t numGaussians, const int64_t numChannels,
-            const int64_t shDegreeToUse, const bool setZeroRadii = false) {
+    checkSh(const int64_t numCameras,
+            const int64_t numGaussians,
+            const int64_t numChannels,
+            const int64_t shDegreeToUse,
+            const bool setZeroRadii = false) {
         const auto floatOptsCUDA = fvdb::test::tensorOpts<float>(torch::kCUDA);
 
         {
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                    shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                    dLossDRenderQuantities, radii, true);
+                    shDegreeToUse,
+                    numCameras,
+                    numGaussians,
+                    viewDirs,
+                    shNCoeffs,
+                    dLossDRenderQuantities,
+                    radii,
+                    true);
 
             if (setZeroRadii) {
-                const auto dLdSh0Slice =
-                    dLossDSh0Coeffs.index({ torch::indexing::Slice(0, -1, 2),
-                                            torch::indexing::Slice(), torch::indexing::Slice() });
-                const auto dLdShNSlice =
-                    dLossDShNCoeffs.index({ torch::indexing::Slice(0, -1, 2),
-                                            torch::indexing::Slice(), torch::indexing::Slice() });
-                const auto dLDViewDirsSlice = dLossDViewDirs.index(
-                    { torch::indexing::Slice(), torch::indexing::Slice(0, -1, 2),
-                      torch::indexing::Slice() });
+                const auto dLdSh0Slice = dLossDSh0Coeffs.index({torch::indexing::Slice(0, -1, 2),
+                                                                torch::indexing::Slice(),
+                                                                torch::indexing::Slice()});
+                const auto dLdShNSlice = dLossDShNCoeffs.index({torch::indexing::Slice(0, -1, 2),
+                                                                torch::indexing::Slice(),
+                                                                torch::indexing::Slice()});
+                const auto dLDViewDirsSlice =
+                    dLossDViewDirs.index({torch::indexing::Slice(),
+                                          torch::indexing::Slice(0, -1, 2),
+                                          torch::indexing::Slice()});
 
                 EXPECT_TRUE(torch::allclose(dLdSh0Slice, torch::zeros_like(dLdSh0Slice)));
                 EXPECT_TRUE(torch::allclose(dLdShNSlice, torch::zeros_like(dLdShNSlice)));
@@ -116,15 +126,21 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
         {
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                    shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                    dLossDRenderQuantities, radii, false);
+                    shDegreeToUse,
+                    numCameras,
+                    numGaussians,
+                    viewDirs,
+                    shNCoeffs,
+                    dLossDRenderQuantities,
+                    radii,
+                    false);
             if (setZeroRadii) {
-                const auto dLdSh0Slice =
-                    dLossDSh0Coeffs.index({ torch::indexing::Slice(0, -1, 2),
-                                            torch::indexing::Slice(), torch::indexing::Slice() });
-                const auto dLdShNSlice =
-                    dLossDShNCoeffs.index({ torch::indexing::Slice(0, -1, 2),
-                                            torch::indexing::Slice(), torch::indexing::Slice() });
+                const auto dLdSh0Slice = dLossDSh0Coeffs.index({torch::indexing::Slice(0, -1, 2),
+                                                                torch::indexing::Slice(),
+                                                                torch::indexing::Slice()});
+                const auto dLdShNSlice = dLossDShNCoeffs.index({torch::indexing::Slice(0, -1, 2),
+                                                                torch::indexing::Slice(),
+                                                                torch::indexing::Slice()});
 
                 EXPECT_TRUE(torch::allclose(dLdSh0Slice, torch::zeros_like(dLdSh0Slice)));
                 EXPECT_TRUE(torch::allclose(dLdShNSlice, torch::zeros_like(dLdShNSlice)));
@@ -136,29 +152,38 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
     }
 
     void
-    checkOnlySh0(const int64_t numCameras, const int64_t numGaussians, const int64_t numChannels,
-                 const int64_t shDegreeToUse, bool setZeroRadii = false) {
+    checkOnlySh0(const int64_t numCameras,
+                 const int64_t numGaussians,
+                 const int64_t numChannels,
+                 const int64_t shDegreeToUse,
+                 bool setZeroRadii = false) {
         const auto floatOptsCUDA = fvdb::test::tensorOpts<float>(torch::kCUDA);
 
         if (setZeroRadii) {
             setHalfOfRadiiToZero();
         }
         torch::Tensor expectedDLossDSh0Coeffs =
-            torch::full({ numGaussians, numCameras, numChannels }, 0.282095, floatOptsCUDA);
+            torch::full({numGaussians, numCameras, numChannels}, 0.282095, floatOptsCUDA);
         if (setZeroRadii) {
-            expectedDLossDSh0Coeffs.index_put_({ torch::indexing::Slice(0, -1, 2),
-                                                 torch::indexing::Slice(),
-                                                 torch::indexing::Slice() },
+            expectedDLossDSh0Coeffs.index_put_({torch::indexing::Slice(0, -1, 2),
+                                                torch::indexing::Slice(),
+                                                torch::indexing::Slice()},
                                                0.0f);
         }
 
-        const auto expectedSh0Sizes = std::vector({ numGaussians, int64_t(1), numChannels });
+        const auto expectedSh0Sizes = std::vector({numGaussians, int64_t(1), numChannels});
 
         {
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                    shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                    dLossDRenderQuantities, radii, true);
+                    shDegreeToUse,
+                    numCameras,
+                    numGaussians,
+                    viewDirs,
+                    shNCoeffs,
+                    dLossDRenderQuantities,
+                    radii,
+                    true);
             EXPECT_TRUE(dLossDSh0Coeffs.sizes() == expectedSh0Sizes);
             EXPECT_FALSE(dLossDShNCoeffs.defined());
             EXPECT_FALSE(dLossDViewDirs.defined());
@@ -171,8 +196,14 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
             shNCoeffs = torch::Tensor();
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                    shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                    dLossDRenderQuantities, radii, true);
+                    shDegreeToUse,
+                    numCameras,
+                    numGaussians,
+                    viewDirs,
+                    shNCoeffs,
+                    dLossDRenderQuantities,
+                    radii,
+                    true);
             EXPECT_TRUE(dLossDSh0Coeffs.sizes() == expectedSh0Sizes);
             EXPECT_FALSE(dLossDShNCoeffs.defined());
             EXPECT_FALSE(dLossDViewDirs.defined());
@@ -186,8 +217,14 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
             viewDirs  = torch::Tensor();
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                    shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                    dLossDRenderQuantities, radii, true);
+                    shDegreeToUse,
+                    numCameras,
+                    numGaussians,
+                    viewDirs,
+                    shNCoeffs,
+                    dLossDRenderQuantities,
+                    radii,
+                    true);
             EXPECT_TRUE(dLossDSh0Coeffs.sizes() == expectedSh0Sizes);
             EXPECT_FALSE(dLossDShNCoeffs.defined());
             EXPECT_FALSE(dLossDViewDirs.defined());
@@ -200,14 +237,14 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
     torch::Tensor viewDirs;
     torch::Tensor radii;
     torch::Tensor dLossDRenderQuantities;
-    int64_t       K;
+    int64_t K;
 
     int64_t numCameras;
     int64_t numChannels;
     int64_t numGaussians;
     int64_t shDegreeToUse;
-    bool    setZeroRadii;
-    bool    noRadii;
+    bool setZeroRadii;
+    bool noRadii;
 };
 
 TEST_P(SphericalHarmonincsBackwardTestFixture, TestShBackward) {
@@ -221,8 +258,8 @@ TEST_P(SphericalHarmonincsBackwardTestFixture, TestShBackward) {
 #undef DEBUG_BENCHMARK
 #ifdef DEBUG_BENCHMARK
 TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0) {
-    const float   azimuth       = 0.0f;
-    const float   elevation     = 0.0f;
+    const float azimuth         = 0.0f;
+    const float elevation       = 0.0f;
     const int64_t shDegreeToUse = 0;
     const int64_t numGaussians  = 6128356;
     const int64_t numChannels   = 3;
@@ -236,20 +273,32 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0) {
         torch::cuda::synchronize();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
     }
 
     const int totalIters = 1000;
-    int64_t   totalTime  = 0;
+    int64_t totalTime    = 0;
     for (int i = 0; i < totalIters; i += 1) {
         torch::cuda::synchronize();
         auto start = std::chrono::high_resolution_clock::now();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
         auto end      = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -262,8 +311,8 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0) {
 }
 
 TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0WithViewDirGrad) {
-    const float   azimuth       = 0.0f;
-    const float   elevation     = 0.0f;
+    const float azimuth         = 0.0f;
+    const float elevation       = 0.0f;
     const int64_t shDegreeToUse = 0;
     const int64_t numGaussians  = 6128356;
     const int64_t numChannels   = 3;
@@ -277,20 +326,32 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0WithViewDirGrad) {
         torch::cuda::synchronize();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
     }
 
     const int totalIters = 1000;
-    int64_t   totalTime  = 0;
+    int64_t totalTime    = 0;
     for (int i = 0; i < totalIters; i += 1) {
         torch::cuda::synchronize();
         auto start = std::chrono::high_resolution_clock::now();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, true);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                true);
         torch::cuda::synchronize();
         auto end      = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -302,8 +363,8 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkSh0WithViewDirGrad) {
 }
 
 TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithViewDirGrad) {
-    const float   azimuth       = 0.0f;
-    const float   elevation     = 0.0f;
+    const float azimuth         = 0.0f;
+    const float elevation       = 0.0f;
     const int64_t shDegreeToUse = 4;
     const int64_t numGaussians  = 6128356;
     const int64_t numChannels   = 3;
@@ -317,20 +378,32 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithViewDirGrad) {
         torch::cuda::synchronize();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
     }
 
     const int totalIters = 1000;
-    int64_t   totalTime  = 0;
+    int64_t totalTime    = 0;
     for (int i = 0; i < totalIters; i += 1) {
         torch::cuda::synchronize();
         auto start = std::chrono::high_resolution_clock::now();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, true);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                true);
         torch::cuda::synchronize();
         auto end      = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -342,8 +415,8 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithViewDirGrad) {
 }
 
 TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithoutViewDirGrad) {
-    const float   azimuth       = 0.0f;
-    const float   elevation     = 0.0f;
+    const float azimuth         = 0.0f;
+    const float elevation       = 0.0f;
     const int64_t shDegreeToUse = 4;
     const int64_t numGaussians  = 6128356;
     const int64_t numChannels   = 3;
@@ -357,20 +430,32 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithoutViewDirGrad) {
         torch::cuda::synchronize();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
     }
 
     const int totalIters = 1000;
-    int64_t   totalTime  = 0;
+    int64_t totalTime    = 0;
     for (int i = 0; i < totalIters; i += 1) {
         torch::cuda::synchronize();
         auto start = std::chrono::high_resolution_clock::now();
         auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
             fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(
-                shDegreeToUse, numCameras, numGaussians, viewDirs, shNCoeffs,
-                dLossDRenderQuantities, radii, false);
+                shDegreeToUse,
+                numCameras,
+                numGaussians,
+                viewDirs,
+                shNCoeffs,
+                dLossDRenderQuantities,
+                radii,
+                false);
         torch::cuda::synchronize();
         auto end      = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -383,51 +468,52 @@ TEST_F(SphericalHarmonincsBackwardTestFixture, BenchmarkShNWithoutViewDirGrad) {
 }
 #endif
 
-INSTANTIATE_TEST_SUITE_P(ShBackwardTests, SphericalHarmonincsBackwardTestFixture,
-                         ::testing::Values(TestParams{ 0.0f, 0.0f, 0, 0, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 1, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 1, false, true },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 1, true, false },
+INSTANTIATE_TEST_SUITE_P(ShBackwardTests,
+                         SphericalHarmonincsBackwardTestFixture,
+                         ::testing::Values(TestParams{0.0f, 0.0f, 0, 0, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 1, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 1, false, true},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 1, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 0, 0, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 1, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 8, 1, false, true },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 8, 1, true, false },
+                                           TestParams{0.0f, 0.0f, 0, 0, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 1, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 8, 1, false, true},
+                                           TestParams{0.0f, 0.0f, 0, 10, 8, 1, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 0, 0, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 1, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 2, false, true },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 3, 2, true, false },
+                                           TestParams{0.0f, 0.0f, 0, 0, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 1, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 2, false, true},
+                                           TestParams{0.0f, 0.0f, 0, 10, 3, 2, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 0, 0, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 1, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 7, 2, false, true },
-                                           TestParams{ 0.0f, 0.0f, 0, 10, 7, 2, true, false },
+                                           TestParams{0.0f, 0.0f, 0, 0, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 1, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 0, 10, 7, 2, false, true},
+                                           TestParams{0.0f, 0.0f, 0, 10, 7, 2, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 4, 0, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 1, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 1, false, true },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 1, true, false },
+                                           TestParams{0.0f, 0.0f, 4, 0, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 1, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 1, false, true},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 1, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 4, 0, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 1, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 8, 1, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 8, 1, false, true },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 8, 1, true, false },
+                                           TestParams{0.0f, 0.0f, 4, 0, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 1, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 8, 1, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 8, 1, false, true},
+                                           TestParams{0.0f, 0.0f, 4, 10, 8, 1, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 4, 0, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 1, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 2, false, true },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 3, 2, true, false },
+                                           TestParams{0.0f, 0.0f, 4, 0, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 1, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 2, false, true},
+                                           TestParams{0.0f, 0.0f, 4, 10, 3, 2, true, false},
 
-                                           TestParams{ 0.0f, 0.0f, 4, 0, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 1, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 7, 2, false, false },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 7, 2, false, true },
-                                           TestParams{ 0.0f, 0.0f, 4, 10, 7, 2, true, false }));
+                                           TestParams{0.0f, 0.0f, 4, 0, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 1, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 7, 2, false, false},
+                                           TestParams{0.0f, 0.0f, 4, 10, 7, 2, false, true},
+                                           TestParams{0.0f, 0.0f, 4, 10, 7, 2, true, false}));

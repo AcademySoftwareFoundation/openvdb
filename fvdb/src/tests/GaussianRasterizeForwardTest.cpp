@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <detail/ops/Ops.h>
+#include <tests/utils/ImageUtils.h>
+#include <tests/utils/Tensor.h>
 
 #include <torch/script.h>
 #include <torch/torch.h>
 
 #include <gtest/gtest.h>
-#include <tests/utils/ImageUtils.h>
-#include <tests/utils/Tensor.h>
 
 #include <cstddef>
 #include <cstdlib>
@@ -111,10 +111,8 @@ struct GaussianRasterizeForwardTestFixture : public ::testing::Test {
     }
 
     const std::vector<std::string> inputNames = {
-        "means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids"
-    };
-    const std::vector<std::string> outputNames = { "rendered_colors", "rendered_alphas",
-                                                   "last_ids" };
+        "means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids"};
+    const std::vector<std::string> outputNames = {"rendered_colors", "rendered_alphas", "last_ids"};
 
     // Input tensors
     torch::Tensor means2d;         // [C, N, 2] or [nnz, 2]
@@ -146,11 +144,19 @@ TEST_F(GaussianRasterizeForwardTestFixture, DISABLED_GenerateOutputData) {
     // Test with 3 channels
     {
         const auto [renderedColors, renderedAlphas, lastIds] =
-            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-                means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW,
-                imageOriginH, tileSize, tileOffsets, tileGaussianIds);
+            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d,
+                                                                              conics,
+                                                                              colors,
+                                                                              opacities,
+                                                                              imageWidth,
+                                                                              imageHeight,
+                                                                              imageOriginW,
+                                                                              imageOriginH,
+                                                                              tileSize,
+                                                                              tileOffsets,
+                                                                              tileGaussianIds);
 
-        std::vector<torch::Tensor> outputData = { renderedColors, renderedAlphas, lastIds };
+        std::vector<torch::Tensor> outputData = {renderedColors, renderedAlphas, lastIds};
 
         auto outputFilename = std::string("rasterize_forward_outputs.pt");
 
@@ -162,11 +168,19 @@ TEST_F(GaussianRasterizeForwardTestFixture, DISABLED_GenerateOutputData) {
         auto colors_64 = catChannelsToDim(colors, 64);
 
         const auto [renderedColors, renderedAlphas, lastIds] =
-            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-                means2d, conics, colors_64, opacities, imageWidth, imageHeight, imageOriginW,
-                imageOriginH, tileSize, tileOffsets, tileGaussianIds);
+            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d,
+                                                                              conics,
+                                                                              colors_64,
+                                                                              opacities,
+                                                                              imageWidth,
+                                                                              imageHeight,
+                                                                              imageOriginW,
+                                                                              imageOriginH,
+                                                                              tileSize,
+                                                                              tileOffsets,
+                                                                              tileGaussianIds);
 
-        std::vector<torch::Tensor> outputData = { renderedColors, renderedAlphas, lastIds };
+        std::vector<torch::Tensor> outputData = {renderedColors, renderedAlphas, lastIds};
 
         auto outputFilename = std::string("rasterize_forward_outputs_64.pt");
         storeData(outputFilename, outputData);
@@ -177,9 +191,17 @@ TEST_F(GaussianRasterizeForwardTestFixture, TestBasicInputsAndOutputs) {
     loadTestData("rasterize_forward_inputs.pt", "rasterize_forward_outputs.pt");
 
     const auto [outColors, outAlphas, outLastIds] =
-        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds);
+        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d,
+                                                                          conics,
+                                                                          colors,
+                                                                          opacities,
+                                                                          imageWidth,
+                                                                          imageHeight,
+                                                                          imageOriginW,
+                                                                          imageOriginH,
+                                                                          tileSize,
+                                                                          tileOffsets,
+                                                                          tileGaussianIds);
 
     EXPECT_TRUE(torch::allclose(outColors, expectedRenderedColors));
     EXPECT_TRUE(torch::allclose(outAlphas, expectedRenderedAlphas));
@@ -193,9 +215,17 @@ TEST_F(GaussianRasterizeForwardTestFixture, TestConcatenatedChannels) {
     expectedRenderedColors = catChannelsToDim(expectedRenderedColors, 64);
 
     const auto [outColors, outAlphas, outLastIds] =
-        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds);
+        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d,
+                                                                          conics,
+                                                                          colors,
+                                                                          opacities,
+                                                                          imageWidth,
+                                                                          imageHeight,
+                                                                          imageOriginW,
+                                                                          imageOriginH,
+                                                                          tileSize,
+                                                                          tileOffsets,
+                                                                          tileGaussianIds);
 
     EXPECT_TRUE(torch::allclose(outColors, expectedRenderedColors));
     EXPECT_TRUE(torch::allclose(outAlphas, expectedRenderedAlphas));
@@ -210,9 +240,17 @@ TEST_F(GaussianRasterizeForwardTestFixture, TestMultipleCameras) {
 
     // run all 3 cameras at once
     const auto [outColorsAll, outAlphasAll, outLastIdsAll] =
-        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds);
+        fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d,
+                                                                          conics,
+                                                                          colors,
+                                                                          opacities,
+                                                                          imageWidth,
+                                                                          imageHeight,
+                                                                          imageOriginW,
+                                                                          imageOriginH,
+                                                                          tileSize,
+                                                                          tileOffsets,
+                                                                          tileGaussianIds);
 
     // rasterize each camera individually
     std::vector<torch::Tensor> outColorsList;
@@ -235,16 +273,24 @@ TEST_F(GaussianRasterizeForwardTestFixture, TestMultipleCameras) {
 
         // slice out this camera's tileGaussianIds and adjust to 0-based
         auto tileGaussianIds_1cam =
-            tileGaussianIds.index({ torch::indexing::Slice(start, end) }) - i * means2d.size(1);
+            tileGaussianIds.index({torch::indexing::Slice(start, end)}) - i * means2d.size(1);
 
         // Adjust the tileOffsets to be 0-based
         tileOffsets_1cam = tileOffsets_1cam - start;
 
         // Kernel receives adjusted offsets and 0-based IDs for this camera
         auto [outColors, outAlphas, outLastIds] =
-            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(
-                means2d_1cam, conics_1cam, colors_1cam, opacities_1cam, imageWidth, imageHeight,
-                imageOriginW, imageOriginH, tileSize, tileOffsets_1cam, tileGaussianIds_1cam);
+            fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCUDA>(means2d_1cam,
+                                                                              conics_1cam,
+                                                                              colors_1cam,
+                                                                              opacities_1cam,
+                                                                              imageWidth,
+                                                                              imageHeight,
+                                                                              imageOriginW,
+                                                                              imageOriginH,
+                                                                              tileSize,
+                                                                              tileOffsets_1cam,
+                                                                              tileGaussianIds_1cam);
 
         // add start offset back to non-background pixels
         outLastIds = outLastIds + start;
@@ -310,8 +356,16 @@ TEST_F(GaussianRasterizeForwardTestFixture, TestMultipleCameras) {
 TEST_F(GaussianRasterizeForwardTestFixture, CPUThrows) {
     loadTestData("rasterize_forward_inputs.pt", "rasterize_forward_outputs.pt");
     moveToDevice(torch::kCPU);
-    EXPECT_THROW(fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCPU>(
-                     means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW,
-                     imageOriginH, tileSize, tileOffsets, tileGaussianIds),
+    EXPECT_THROW(fvdb::detail::ops::dispatchGaussianRasterizeForward<torch::kCPU>(means2d,
+                                                                                  conics,
+                                                                                  colors,
+                                                                                  opacities,
+                                                                                  imageWidth,
+                                                                                  imageHeight,
+                                                                                  imageOriginW,
+                                                                                  imageOriginH,
+                                                                                  tileSize,
+                                                                                  tileOffsets,
+                                                                                  tileGaussianIds),
                  c10::NotImplementedError);
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -15,11 +16,13 @@ namespace build {
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagged,
+buildPaddedGridFromPointsCPU(const JaggedTensor &pointsJagged,
                              const std::vector<VoxelCoordTransform> &txs,
-                             const nanovdb::CoordBBox               &bbox) {
+                             const nanovdb::CoordBBox &bbox) {
     return AT_DISPATCH_V2(
-        pointsJagged.scalar_type(), "buildPaddedGridFromPoints", AT_WRAP([&]() {
+        pointsJagged.scalar_type(),
+        "buildPaddedGridFromPoints",
+        AT_WRAP([&]() {
             using ScalarT = scalar_t;
             static_assert(is_floating_point_or_half<ScalarT>::value,
                           "Invalid type for points, must be floating point");
@@ -74,13 +77,15 @@ buildPaddedGridFromPointsCPU(const JaggedTensor                     &pointsJagge
                 return nanovdb::mergeGrids(batchHandles);
             }
         }),
-        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildPaddedGridFromPoints(bool isMutable, const JaggedTensor &points,
+buildPaddedGridFromPoints(bool isMutable,
+                          const JaggedTensor &points,
                           const std::vector<VoxelCoordTransform> &txs,
-                          const nanovdb::CoordBBox               &bbox) {
+                          const nanovdb::CoordBBox &bbox) {
     if (points.device().is_cuda()) {
         JaggedTensor coords = ops::dispatchPaddedIJKForPoints<torch::kCUDA>(points, bbox, txs);
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);

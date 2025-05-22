@@ -62,7 +62,7 @@ binSearch(const T *arr, const uint32_t len, const T val) {
 /// @return nanovdb::math::Mat3<T> 3x3 rotation matrix equivalent to the quaternion
 template <typename T>
 inline __device__ nanovdb::math::Mat3<T>
-                  quaternionToRotationMatrix(nanovdb::math::Vec4<T> const &quat) {
+quaternionToRotationMatrix(nanovdb::math::Vec4<T> const &quat) {
     T w = quat[0], x = quat[1], y = quat[2], z = quat[3];
     // normalize
     T inverseNormalization = rsqrt(x * x + y * y + z * z + w * w);
@@ -73,10 +73,15 @@ inline __device__ nanovdb::math::Mat3<T>
     T x2 = x * x, y2 = y * y, z2 = z * z;
     T xy = x * y, xz = x * z, yz = y * z;
     T wx = w * x, wy = w * y, wz = w * z;
-    return nanovdb::math::Mat3<T>(
-        (1.f - 2.f * (y2 + z2)), (2.f * (xy - wz)), (2.f * (xz + wy)), // 1st row
-        (2.f * (xy + wz)), (1.f - 2.f * (x2 + z2)), (2.f * (yz - wx)), // 2nd row
-        (2.f * (xz - wy)), (2.f * (yz + wx)), (1.f - 2.f * (x2 + y2))  // 3rd row
+    return nanovdb::math::Mat3<T>((1.f - 2.f * (y2 + z2)),
+                                  (2.f * (xy - wz)),
+                                  (2.f * (xz + wy)),      // 1st row
+                                  (2.f * (xy + wz)),
+                                  (1.f - 2.f * (x2 + z2)),
+                                  (2.f * (yz - wx)),      // 2nd row
+                                  (2.f * (xz - wy)),
+                                  (2.f * (yz + wx)),
+                                  (1.f - 2.f * (x2 + y2)) // 3rd row
     );
 }
 
@@ -191,7 +196,7 @@ quaternionAndScaleToCovarianceVectorJacobianProduct(const nanovdb::math::Vec4<T>
         R[0][1] * dLossDM[0][1] + R[1][1] * dLossDM[1][1] + R[2][1] * dLossDM[2][1],
         R[0][2] * dLossDM[0][2] + R[1][2] * dLossDM[1][2] + R[2][2] * dLossDM[2][2]);
 
-    return { dLossDQuat, dLossDScale };
+    return {dLossDQuat, dLossDScale};
 }
 
 /// @brief Convert a quaternion and scale to a covariance matrix
@@ -212,8 +217,8 @@ quaternionAndScaleToCovarianceVectorJacobianProduct(const nanovdb::math::Vec4<T>
 /// @return 3x3 covariance matrix representing the Gaussian's shape and orientation
 template <typename T>
 inline __device__ nanovdb::math::Mat3<T>
-                  quaternionAndScaleToCovariance(const nanovdb::math::Vec4<T> &quat,
-                                                 const nanovdb::math::Vec3<T> &scale) {
+quaternionAndScaleToCovariance(const nanovdb::math::Vec4<T> &quat,
+                               const nanovdb::math::Vec3<T> &scale) {
     const nanovdb::math::Mat3<T> &R = quaternionToRotationMatrix<T>(quat);
     // C = R * S * S * Rt
     const nanovdb::math::Mat3<T> S(scale[0], 0.f, 0.f, 0.f, scale[1], 0.f, 0.f, 0.f, scale[2]);
@@ -269,8 +274,10 @@ addBlur(const T eps2d, nanovdb::math::Mat2<T> &outCovar, T &outCompensation) {
 /// @return 2x2 matrix representing the gradient of loss with respect to the original covariance
 template <typename T>
 inline __device__ nanovdb::math::Mat2<T>
-generateBlurVectorJacobianProduct(const T eps2d, const nanovdb::math::Mat2<T> &conic_blur,
-                                  const T compensation, const T dLossDCompensation) {
+generateBlurVectorJacobianProduct(const T eps2d,
+                                  const nanovdb::math::Mat2<T> &conic_blur,
+                                  const T compensation,
+                                  const T dLossDCompensation) {
     const T det_conic_blur =
         conic_blur[0][0] * conic_blur[1][1] - conic_blur[0][1] * conic_blur[1][0];
     const T v_sqr_comp         = dLossDCompensation * 0.5 / (compensation + 1e-6);
@@ -295,9 +302,9 @@ generateBlurVectorJacobianProduct(const T eps2d, const nanovdb::math::Mat2<T> &c
 /// @return The transformed point in camera coordinates
 template <typename T>
 inline __device__ nanovdb::math::Vec3<T>
-                  transformPointWorldToCam(nanovdb::math::Mat3<T> const &camToWorldRotation,
-                                           nanovdb::math::Vec3<T> const &camToWorldTranslation,
-                                           nanovdb::math::Vec3<T> const &worldSpacePoint) {
+transformPointWorldToCam(nanovdb::math::Mat3<T> const &camToWorldRotation,
+                         nanovdb::math::Vec3<T> const &camToWorldTranslation,
+                         nanovdb::math::Vec3<T> const &worldSpacePoint) {
     return camToWorldRotation * worldSpacePoint + camToWorldTranslation;
 }
 
@@ -332,8 +339,9 @@ transformPointWorldToCamVectorJacobianProduct(const nanovdb::math::Mat3<T> &camT
                                               const nanovdb::math::Vec3<T> &dLossDPointCamera) {
     // for D = W * X, G = df/dD
     // df/dW = G * XT, df/dX = WT * G
-    return { dLossDPointCamera.outer(worldSpacePoint), dLossDPointCamera,
-             camToWorldRotation.transpose() * dLossDPointCamera };
+    return {dLossDPointCamera.outer(worldSpacePoint),
+            dLossDPointCamera,
+            camToWorldRotation.transpose() * dLossDPointCamera};
 }
 
 /// @brief Transform a covariance matrix from world to camera coordinates
@@ -356,8 +364,8 @@ transformPointWorldToCamVectorJacobianProduct(const nanovdb::math::Mat3<T> &camT
 /// @return Transformed covariance matrix in camera coordinates
 template <typename T>
 inline __device__ nanovdb::math::Mat3<T>
-                  transformCovarianceWorldToCam(nanovdb::math::Mat3<T> const &R,
-                                                nanovdb::math::Mat3<T> const &covar) {
+transformCovarianceWorldToCam(nanovdb::math::Mat3<T> const &R,
+                              nanovdb::math::Mat3<T> const &covar) {
     return R * covar * R.transpose();
 }
 
@@ -382,9 +390,10 @@ inline __device__ nanovdb::math::Mat3<T>
 /// @return Tuple of gradients (dL/dR, dL/dcovar_world)
 template <typename T>
 inline __device__ std::tuple<nanovdb::math::Mat3<T>, nanovdb::math::Mat3<T>>
-                  transformCovarianceWorldToCamVectorJacobianProduct(
-                      // fwd inputs
-    const nanovdb::math::Mat3<T> &R, const nanovdb::math::Mat3<T> &covar,
+transformCovarianceWorldToCamVectorJacobianProduct(
+    // fwd inputs
+    const nanovdb::math::Mat3<T> &R,
+    const nanovdb::math::Mat3<T> &covar,
     // grad outputs
     const nanovdb::math::Mat3<T> &dLossDCovarCamera) {
     // for D = W * X * WT, G = df/dD
@@ -393,8 +402,8 @@ inline __device__ std::tuple<nanovdb::math::Mat3<T>, nanovdb::math::Mat3<T>>
     // = G * (X * WT)T + ((W * X)T * G)T
     // = G * W * XT + (XT * WT * G)T
     // = G * W * XT + GT * W * X
-    return { dLossDCovarCamera * R * covar.transpose() + dLossDCovarCamera.transpose() * R * covar,
-             R.transpose() * dLossDCovarCamera * R };
+    return {dLossDCovarCamera * R * covar.transpose() + dLossDCovarCamera.transpose() * R * covar,
+            R.transpose() * dLossDCovarCamera * R};
 }
 
 /// @brief Computes gradient for matrix inverse operation

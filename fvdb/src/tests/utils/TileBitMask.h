@@ -27,14 +27,14 @@ template <typename T = std::uint64_t> class TileBitMask {
 
     /// @brief Construct a TileBitMask for a square tile of the given size.
     TileBitMask(std::size_t tileSize)
-        : mTileSize{ tileSize }, mBitMask(numWordsPerTile(tileSize), 0) {}
+        : mTileSize{tileSize}, mBitMask(numWordsPerTile(tileSize), 0) {}
 
     /// @brief Return whether the bit at the given index is set.
     /// @param bit The index of the bit to check.
     /// @return true if the bit is set, false otherwise.
     bool
     isBitSet(std::size_t bit) const {
-        return mBitMask[word(bit)] & (T{ 1 } << bitInWord(bit));
+        return mBitMask[word(bit)] & (T{1} << bitInWord(bit));
     }
 
     /// @brief Whether the bit at the given row and column is set.
@@ -51,7 +51,7 @@ template <typename T = std::uint64_t> class TileBitMask {
     void
     setBit(std::size_t bit) {
         // important that we use T{1} here to ensure the shifted value is as large as the shift
-        mBitMask[word(bit)] |= (T{ 1 } << bitInWord(bit));
+        mBitMask[word(bit)] |= (T{1} << bitInWord(bit));
     }
 
     /// @brief Set the bit of the tile containig the given linear pixel index within an image
@@ -76,7 +76,7 @@ template <typename T = std::uint64_t> class TileBitMask {
         for (int i = 0; i < mTileSize * mTileSize; ++i) {
             if (isBitSet(i)) {
                 uvs.emplace_back(
-                    std::pair<std::size_t, std::size_t>({ i % mTileSize, i / mTileSize }));
+                    std::pair<std::size_t, std::size_t>({i % mTileSize, i / mTileSize}));
             }
         }
         return uvs;
@@ -113,8 +113,8 @@ template <typename T = std::uint64_t> class TileBitMask {
         return bit % wordSize;
     }
 
-    std::size_t    mTileSize; ///< The size of the square tile.
-    std::vector<T> mBitMask;  ///< The bitmask storage for the tile.
+    std::size_t mTileSize;   ///< The size of the square tile.
+    std::vector<T> mBitMask; ///< The bitmask storage for the tile.
 };
 } // namespace fvdb::test
 

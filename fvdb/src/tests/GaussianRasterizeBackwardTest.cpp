@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <detail/ops/Ops.h>
+#include <tests/utils/Tensor.h>
 
 #include <torch/torch.h>
 
 #include <gtest/gtest.h>
-#include <tests/utils/Tensor.h>
 
 #include <cstddef>
 #include <cstdlib>
@@ -72,7 +72,7 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
         for (int i = 0; i < numOutChannels / numInChannels; i += 1) {
             tensorsToCat.push_back(input);
         }
-        tensorsToCat.push_back(input.index({ Ellipsis, Slice(0, numOutChannels % numInChannels) }));
+        tensorsToCat.push_back(input.index({Ellipsis, Slice(0, numOutChannels % numInChannels)}));
         torch::Tensor ret = torch::cat(tensorsToCat, -1);
         return ret;
     }
@@ -91,18 +91,18 @@ struct GaussianRasterizeTestFixture : public ::testing::Test {
         dLossDRenderedAlphas    = dLossDRenderedAlphas.to(device);
     }
 
-    const std::vector<std::string> inputNames  = { "means2d",
-                                                   "conics",
-                                                   "colors",
-                                                   "opacities",
-                                                   "tile_offsets",
-                                                   "tile_gaussian_ids",
-                                                   "rendered_alphas",
-                                                   "last_gaussian_ids_per_pixel",
-                                                   "d_loss_d_rendered_colors",
-                                                   "d_loss_d_rendered_alphas" };
-    const std::vector<std::string> outputNames = { "d_loss_d_means2d", "d_loss_d_conics",
-                                                   "d_loss_d_colors", "d_loss_d_opacities" };
+    const std::vector<std::string> inputNames  = {"means2d",
+                                                  "conics",
+                                                  "colors",
+                                                  "opacities",
+                                                  "tile_offsets",
+                                                  "tile_gaussian_ids",
+                                                  "rendered_alphas",
+                                                  "last_gaussian_ids_per_pixel",
+                                                  "d_loss_d_rendered_colors",
+                                                  "d_loss_d_rendered_alphas"};
+    const std::vector<std::string> outputNames = {
+        "d_loss_d_means2d", "d_loss_d_conics", "d_loss_d_colors", "d_loss_d_opacities"};
 
     torch::Tensor means2d;
     torch::Tensor conics;
@@ -131,10 +131,22 @@ TEST_F(GaussianRasterizeTestFixture, TestBasicInputsAndOutputs) {
     loadTestData("rasterize_backward_inputs.pt", "rasterize_backward_outputs.pt");
 
     const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
-        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-            dLossDRenderedColors, dLossDRenderedAlphas, false);
+        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(means2d,
+                                                                           conics,
+                                                                           colors,
+                                                                           opacities,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           imageOriginW,
+                                                                           imageOriginH,
+                                                                           tileSize,
+                                                                           tileOffsets,
+                                                                           tileGaussianIds,
+                                                                           renderedAlphas,
+                                                                           lastGaussianIdsPerPixel,
+                                                                           dLossDRenderedColors,
+                                                                           dLossDRenderedAlphas,
+                                                                           false);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
 
@@ -154,10 +166,22 @@ TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChannels) {
     expectedDLossDColors = catChannelsToDim(expectedDLossDColors, 64);
 
     const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
-        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-            dLossDRenderedColors, dLossDRenderedAlphas, false);
+        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(means2d,
+                                                                           conics,
+                                                                           colors,
+                                                                           opacities,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           imageOriginW,
+                                                                           imageOriginH,
+                                                                           tileSize,
+                                                                           tileOffsets,
+                                                                           tileGaussianIds,
+                                                                           renderedAlphas,
+                                                                           lastGaussianIdsPerPixel,
+                                                                           dLossDRenderedColors,
+                                                                           dLossDRenderedAlphas,
+                                                                           false);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
 
@@ -176,10 +200,23 @@ TEST_F(GaussianRasterizeTestFixture, TestConcatenatedChunkedChannelsWithUnusedCh
     dLossDRenderedColors = catChannelsToDim(dLossDRenderedColors, 47);
 
     const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
-        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-            dLossDRenderedColors, dLossDRenderedAlphas, false, 32);
+        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(means2d,
+                                                                           conics,
+                                                                           colors,
+                                                                           opacities,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           imageOriginW,
+                                                                           imageOriginH,
+                                                                           tileSize,
+                                                                           tileOffsets,
+                                                                           tileGaussianIds,
+                                                                           renderedAlphas,
+                                                                           lastGaussianIdsPerPixel,
+                                                                           dLossDRenderedColors,
+                                                                           dLossDRenderedAlphas,
+                                                                           false,
+                                                                           32);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
     EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
@@ -194,10 +231,23 @@ TEST_F(GaussianRasterizeTestFixture, TestChunkedChannels) {
     expectedDLossDColors = catChannelsToDim(expectedDLossDColors, 64);
 
     const auto [dLossDMeans2dAbs, dLossDMeans2d, dLossDConics, dLossDColors, dLossDOpacities] =
-        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(
-            means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW, imageOriginH,
-            tileSize, tileOffsets, tileGaussianIds, renderedAlphas, lastGaussianIdsPerPixel,
-            dLossDRenderedColors, dLossDRenderedAlphas, false, 32);
+        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCUDA>(means2d,
+                                                                           conics,
+                                                                           colors,
+                                                                           opacities,
+                                                                           imageWidth,
+                                                                           imageHeight,
+                                                                           imageOriginW,
+                                                                           imageOriginH,
+                                                                           tileSize,
+                                                                           tileOffsets,
+                                                                           tileGaussianIds,
+                                                                           renderedAlphas,
+                                                                           lastGaussianIdsPerPixel,
+                                                                           dLossDRenderedColors,
+                                                                           dLossDRenderedAlphas,
+                                                                           false,
+                                                                           32);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans2d, expectedDLossDMeans2d));
     EXPECT_TRUE(torch::allclose(dLossDColors, expectedDLossDColors));
@@ -207,11 +257,24 @@ TEST_F(GaussianRasterizeTestFixture, TestChunkedChannels) {
 TEST_F(GaussianRasterizeTestFixture, CPUThrows) {
     loadTestData("rasterize_backward_inputs.pt", "rasterize_backward_outputs.pt");
     moveToDevice(torch::kCPU);
-    EXPECT_THROW(fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCPU>(
-                     means2d, conics, colors, opacities, imageWidth, imageHeight, imageOriginW,
-                     imageOriginH, tileSize, tileOffsets, tileGaussianIds, renderedAlphas,
-                     lastGaussianIdsPerPixel, dLossDRenderedColors, dLossDRenderedAlphas, false),
-                 c10::NotImplementedError);
+    EXPECT_THROW(
+        fvdb::detail::ops::dispatchGaussianRasterizeBackward<torch::kCPU>(means2d,
+                                                                          conics,
+                                                                          colors,
+                                                                          opacities,
+                                                                          imageWidth,
+                                                                          imageHeight,
+                                                                          imageOriginW,
+                                                                          imageOriginH,
+                                                                          tileSize,
+                                                                          tileOffsets,
+                                                                          tileGaussianIds,
+                                                                          renderedAlphas,
+                                                                          lastGaussianIdsPerPixel,
+                                                                          dLossDRenderedColors,
+                                                                          dLossDRenderedAlphas,
+                                                                          false),
+        c10::NotImplementedError);
 }
 
 // NOTE: This is called as a backward pass so the forward pass will handle most of the error

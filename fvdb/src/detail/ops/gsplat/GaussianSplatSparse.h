@@ -41,7 +41,9 @@ namespace fvdb::detail::ops {
 //       which are duplicates
 /// @return Tuple of (active_tiles, active_tile_mask, tile_pixel_mask, tile_pixel_cumsum, pixel_map)
 std::tuple<torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor, torch::Tensor>
-computeSparseInfo(const int32_t tileSideLength, const int32_t numTilesW, const int32_t numTilesH,
+computeSparseInfo(const int32_t tileSideLength,
+                  const int32_t numTilesW,
+                  const int32_t numTilesH,
                   const fvdb::JaggedTensor &pixelsToRender);
 
 /// @brief Computes the intersection between a set of 2D gaussians and a set of image tiles.
@@ -86,8 +88,10 @@ dispatchGaussianTileIntersectionSparse(const torch::Tensor &means2d,      // [C,
                                        const torch::Tensor &tile_mask,    // [C, H, W]
                                        const torch::Tensor &active_tiles, // [num_active_tiles]
                                        const at::optional<torch::Tensor> &camera_ids, // NULL or [M]
-                                       const uint32_t num_cameras, const uint32_t tile_size,
-                                       const uint32_t num_tiles_h, const uint32_t num_tiles_w);
+                                       const uint32_t num_cameras,
+                                       const uint32_t tile_size,
+                                       const uint32_t num_tiles_h,
+                                       const uint32_t num_tiles_w);
 
 } // namespace fvdb::detail::ops
 

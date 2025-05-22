@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -56,13 +57,14 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildConvGridFromGridCPU(const GridBatchImpl &baseBatchHdl, const nanovdb::Coord &kernelSize,
+buildConvGridFromGridCPU(const GridBatchImpl &baseBatchHdl,
+                         const nanovdb::Coord &kernelSize,
                          const nanovdb::Coord &stride) {
     if (stride == nanovdb::Coord(1) || stride == kernelSize) {
         return buildCoarseGridFromFineGridCPU<GridType>(baseBatchHdl, stride);
     }
 
-    const nanovdb::GridHandle<TorchDeviceBuffer>       &baseGridHdl = baseBatchHdl.nanoGridHandle();
+    const nanovdb::GridHandle<TorchDeviceBuffer> &baseGridHdl = baseBatchHdl.nanoGridHandle();
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(baseGridHdl.gridCount());
 
@@ -120,8 +122,10 @@ buildConvGridFromGridCPU(const GridBatchImpl &baseBatchHdl, const nanovdb::Coord
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildConvGridFromGrid(bool isMutable, const GridBatchImpl &baseGridHdl,
-                      const nanovdb::Coord &kernelSize, const nanovdb::Coord &stride) {
+buildConvGridFromGrid(bool isMutable,
+                      const GridBatchImpl &baseGridHdl,
+                      const nanovdb::Coord &kernelSize,
+                      const nanovdb::Coord &stride) {
     /**
      * Logic for building the conv grid is the same as torchsparse 2.0.0b.
      *  However, torchsparse has a bug that creates excessive voxels in the void space, it is fixed

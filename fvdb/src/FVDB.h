@@ -13,12 +13,17 @@
 
 namespace fvdb {
 
-std::vector<torch::Tensor> volumeRender(const torch::Tensor &sigmas, const torch::Tensor &rgbs,
-                                        const torch::Tensor &deltaTs, const torch::Tensor &ts,
-                                        const torch::Tensor &packInfo, double transmittanceThresh);
+std::vector<torch::Tensor> volumeRender(const torch::Tensor &sigmas,
+                                        const torch::Tensor &rgbs,
+                                        const torch::Tensor &deltaTs,
+                                        const torch::Tensor &ts,
+                                        const torch::Tensor &packInfo,
+                                        double transmittanceThresh);
 
-JaggedTensor scaledDotProductAttention(const JaggedTensor &query, const JaggedTensor &key,
-                                       const JaggedTensor &value, float scale);
+JaggedTensor scaledDotProductAttention(const JaggedTensor &query,
+                                       const JaggedTensor &key,
+                                       const JaggedTensor &value,
+                                       float scale);
 
 /// @brief Concatenate a list of grid batches into a single grid batch
 /// @param vec A list of grid batches to concatenate
@@ -38,10 +43,12 @@ JaggedTensor jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> d
 /// @param rsizes The rshape of the JaggedTensor (feature dimension of each tensor)
 /// @param options The options to use for the created tensor
 /// @return A JaggedTensor filled with random numbers from the uniform distribution on [0, 1).
-JaggedTensor jrand(const std::vector<int64_t> &lsizes, const std::vector<int64_t> rsizes = {},
-                   at::TensorOptions options = {});
+JaggedTensor jrand(const std::vector<int64_t> &lsizes,
+                   const std::vector<int64_t> rsizes = {},
+                   at::TensorOptions options         = {});
 JaggedTensor jrand(const std::vector<std::vector<int64_t>> &lsizes,
-                   const std::vector<int64_t> rsizes = {}, at::TensorOptions options = {});
+                   const std::vector<int64_t> rsizes = {},
+                   at::TensorOptions options         = {});
 
 /// @brief Create a JaggedTensor filled with random numbers from a normal distribution
 ///        with mean 0 and variance 1 (also called the standard normal distribution).
@@ -49,40 +56,48 @@ JaggedTensor jrand(const std::vector<std::vector<int64_t>> &lsizes,
 /// @param rsizes The rshape of the JaggedTensor (feature dimension of each tensor)
 /// @param options The options to use for the created tensor
 /// @return A JaggedTensor filled with random numbers from the standard normal distribution.
-JaggedTensor jrandn(const std::vector<int64_t> &lsizes, const std::vector<int64_t> rsizes = {},
-                    at::TensorOptions options = {});
+JaggedTensor jrandn(const std::vector<int64_t> &lsizes,
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 JaggedTensor jrandn(const std::vector<std::vector<int64_t>> &lsizes,
-                    const std::vector<int64_t> rsizes = {}, at::TensorOptions options = {});
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 
 /// @brief Create a JaggedTensor filled with zeros.
 /// @param lsizes The lshape of the JaggedTensor (number of elements per tensor)
 /// @param rsizes The rshape of the JaggedTensor (feature dimension of each tensor)
 /// @param options The options to use for the created tensor
 /// @return A JaggedTensor filled with zeros.
-JaggedTensor jzeros(const std::vector<int64_t> &lsizes, const std::vector<int64_t> rsizes = {},
-                    at::TensorOptions options = {});
+JaggedTensor jzeros(const std::vector<int64_t> &lsizes,
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 JaggedTensor jzeros(const std::vector<std::vector<int64_t>> &lsizes,
-                    const std::vector<int64_t> rsizes = {}, at::TensorOptions options = {});
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 
 /// @brief Create a JaggedTensor filled with ones.
 /// @param lsizes The lshape of the JaggedTensor (number of elements per tensor)
 /// @param rsizes The rshape of the JaggedTensor (feature dimension of each tensor)
 /// @param options The options to use for the created tensor
 /// @return A JaggedTensor filled with ones.
-JaggedTensor jones(const std::vector<int64_t> &lsizes, const std::vector<int64_t> rsizes = {},
-                   at::TensorOptions options = {});
+JaggedTensor jones(const std::vector<int64_t> &lsizes,
+                   const std::vector<int64_t> rsizes = {},
+                   at::TensorOptions options         = {});
 JaggedTensor jones(const std::vector<std::vector<int64_t>> &lsizes,
-                   const std::vector<int64_t> rsizes = {}, at::TensorOptions options = {});
+                   const std::vector<int64_t> rsizes = {},
+                   at::TensorOptions options         = {});
 
 /// @brief Create an empty JaggedTensor with uninitialized values.
 /// @param lsizes The lshape of the JaggedTensor (number of elements per tensor)
 /// @param rsizes The rshape of the JaggedTensor (feature dimension of each tensor)
 /// @param options The options to use for the created tensor
 /// @return A JaggedTensor filled with uninitialized values.
-JaggedTensor jempty(const std::vector<int64_t> &lsizes, const std::vector<int64_t> rsizes = {},
-                    at::TensorOptions options = {});
+JaggedTensor jempty(const std::vector<int64_t> &lsizes,
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 JaggedTensor jempty(const std::vector<std::vector<int64_t>> &lsizes,
-                    const std::vector<int64_t> rsizes = {}, at::TensorOptions options = {});
+                    const std::vector<int64_t> rsizes = {},
+                    at::TensorOptions options         = {});
 
 /// @brief Return a grid batch with voxels which contain a point in an input set of point clouds
 ///        (possibly padding each voxel containing a point)
@@ -99,11 +114,11 @@ JaggedTensor jempty(const std::vector<std::vector<int64_t>> &lsizes,
 /// @param is_mutable Whether the grid should be mutable or not
 /// @return A GridBatch containing the created grid batch
 GridBatch gridbatch_from_points(const JaggedTensor &points,
-                                const Vec3i        &pad_min = torch::zeros({ 3 }, torch::kInt32),
-                                const Vec3i        &pad_max = torch::zeros({ 3 }, torch::kInt32),
+                                const Vec3i &pad_min = torch::zeros({3}, torch::kInt32),
+                                const Vec3i &pad_max = torch::zeros({3}, torch::kInt32),
                                 const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                                const Vec3dBatch         &origins     = torch::zeros({ 3 }),
-                                bool                      is_mutable  = false);
+                                const Vec3dBatch &origins             = torch::zeros({3}),
+                                bool is_mutable                       = false);
 
 /// @brief Return a grid batch with the eight nearest voxels to each point in an input set of point
 /// clouds
@@ -115,10 +130,10 @@ GridBatch gridbatch_from_points(const JaggedTensor &points,
 ///                     for each grid in the batch, or one origin for all grids
 /// @param is_mutable Whether the grid should be mutable or not
 /// @return A GridBatch containing the created grid batch
-GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor       &points,
+GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor &points,
                                                   const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                                                  const Vec3dBatch &origins = torch::zeros({ 3 }),
-                                                  bool              is_mutable = false);
+                                                  const Vec3dBatch &origins = torch::zeros({3}),
+                                                  bool is_mutable           = false);
 
 /// @brief Return a grid batch with the specified voxel coordinates (possibly with padding)
 /// @param coords A JaggedTensor of shape [B, -1, 3] specifying the coordinates of each voxel to
@@ -133,12 +148,12 @@ GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor       &poin
 /// 0, 0] voxel
 ///                for each grid in the batch, or one origin for all grids
 /// @return A GridBatch containing the created grid batch
-GridBatch gridbatch_from_ijk(const JaggedTensor       &ijk,
-                             const Vec3i              &pad_min = torch::zeros({ 3 }, torch::kInt32),
-                             const Vec3i              &pad_max = torch::zeros({ 3 }, torch::kInt32),
+GridBatch gridbatch_from_ijk(const JaggedTensor &ijk,
+                             const Vec3i &pad_min = torch::zeros({3}, torch::kInt32),
+                             const Vec3i &pad_max = torch::zeros({3}, torch::kInt32),
                              const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                             const Vec3dBatch         &origins     = torch::zeros({ 3 }),
-                             bool                      is_mutable  = false);
+                             const Vec3dBatch &origins             = torch::zeros({3}),
+                             bool is_mutable                       = false);
 
 /// @brief Return a grid batch densely from ijkMin to ijkMin + size
 /// @param numGrids The number of grids to create in the batch
@@ -155,11 +170,14 @@ GridBatch gridbatch_from_ijk(const JaggedTensor       &ijk,
 /// @param device Which device to build the grid batch on
 /// @param mutable If the returned grid batch should be mutable
 /// @return A GridBatch containing a batch of dense grids
-GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
-                               const Vec3dBatchOrScalar    &voxel_sizes = 1.0,
-                               const Vec3dBatch            &origins     = torch::zeros({ 3 }),
-                               std::optional<torch::Tensor> mask        = std::nullopt,
-                               const torch::Device &device = torch::kCPU, bool is_mutable = false);
+GridBatch gridbatch_from_dense(const int64_t numGrids,
+                               const Vec3i &denseDims,
+                               const Vec3i &ijkMin,
+                               const Vec3dBatchOrScalar &voxel_sizes = 1.0,
+                               const Vec3dBatch &origins             = torch::zeros({3}),
+                               std::optional<torch::Tensor> mask     = std::nullopt,
+                               const torch::Device &device           = torch::kCPU,
+                               bool is_mutable                       = false);
 
 /// @brief Return a grid batch densely from ijkMin to ijkMin + size
 /// @param numGrids The number of grids to create in the batch
@@ -176,11 +194,14 @@ GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, c
 /// @param device String specifying which device to build the grid batch on
 /// @param mutable If the returned grid batch should be mutable
 /// @return A GridBatch containing a batch of dense grids
-GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
-                               const Vec3dBatchOrScalar    &voxel_sizes = 1.0,
-                               const Vec3dBatch            &origins     = torch::zeros({ 3 }),
-                               std::optional<torch::Tensor> mask        = std::nullopt,
-                               const std::string &device_string = "cpu", bool is_mutable = false);
+GridBatch gridbatch_from_dense(const int64_t numGrids,
+                               const Vec3i &denseDims,
+                               const Vec3i &ijkMin,
+                               const Vec3dBatchOrScalar &voxel_sizes = 1.0,
+                               const Vec3dBatch &origins             = torch::zeros({3}),
+                               std::optional<torch::Tensor> mask     = std::nullopt,
+                               const std::string &device_string      = "cpu",
+                               bool is_mutable                       = false);
 
 /// @brief Return a grid batch from a jagged batch of triangle meshes (i.e. each voxel intersects
 /// the mesh)
@@ -194,8 +215,10 @@ GridBatch gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, c
 ///                for each grid in the batch, or one origin for all grids
 /// @param is_mutable Whether the grid should be mutable or not
 /// @return A GridBatch containing the created grid batch
-GridBatch gridbatch_from_mesh(const JaggedTensor &vertices, const JaggedTensor &faces,
-                              const Vec3dBatchOrScalar &voxel_sizes, const Vec3dBatch &origins,
+GridBatch gridbatch_from_mesh(const JaggedTensor &vertices,
+                              const JaggedTensor &faces,
+                              const Vec3dBatchOrScalar &voxel_sizes,
+                              const Vec3dBatch &origins,
                               bool is_mutable);
 
 /// @brief Return a grid batch, tensors of data, and names from a nanovdb grid handle
@@ -218,8 +241,9 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle);
 /// @return A nanovdb grid handle, whose type is inferred from the data, containing the converted
 /// grids
 nanovdb::GridHandle<nanovdb::HostBuffer>
-to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData = std::nullopt,
-           const std::vector<std::string> &names = {});
+to_nanovdb(const GridBatch &gridBatch,
+           const std::optional<JaggedTensor> maybeData = std::nullopt,
+           const std::vector<std::string> &names       = {});
 
 /// @brief Save a grid batch and optional jagged tensor to a .nvdb file. Will overwrite existing
 /// files.
@@ -230,10 +254,12 @@ to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeDa
 /// @param names Optional list of names for each grid in the batch
 /// @param compressed Whether to compress the stored grid using Blosc (https://www.blosc.org/)
 /// @param verbose Whether to print information about the saved grids
-void save(const std::string &path, const GridBatch &gridBatch,
+void save(const std::string &path,
+          const GridBatch &gridBatch,
           const std::optional<JaggedTensor> maybeData = std::nullopt,
-          const std::vector<std::string> &names = {}, bool compressed = false,
-          bool verbose = false);
+          const std::vector<std::string> &names       = {},
+          bool compressed                             = false,
+          bool verbose                                = false);
 
 /// @brief Save a grid batch and optional jagged tensor to a .nvdb file. Will overwrite existing
 /// files.
@@ -244,9 +270,12 @@ void save(const std::string &path, const GridBatch &gridBatch,
 /// @param names Optional single name to use for every grid in the batch
 /// @param compressed Whether to compress the stored grid using Blosc (https://www.blosc.org/)
 /// @param verbose Whether to print information about the saved grids
-void save(const std::string &path, const GridBatch &gridBatch,
+void save(const std::string &path,
+          const GridBatch &gridBatch,
           const std::optional<JaggedTensor> maybeData = std::nullopt,
-          const std::string &name = std::string(), bool compressed = false, bool verbose = false);
+          const std::string &name                     = std::string(),
+          bool compressed                             = false,
+          bool verbose                                = false);
 
 /// @brief Load a grid batch from a .nvdb file. This function loads each nanovdb grid into the batch
 /// as well
@@ -262,7 +291,9 @@ void save(const std::string &path, const GridBatch &gridBatch,
 ///         data is a JaggedTensor containing the data of the grids, and names is a list of strings
 ///         containing the name of each grid
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, const torch::Device &device,
+load(const std::string &path,
+     NanoVDBFileGridIdentifier gridIdentifier,
+     const torch::Device &device,
      bool verbose = false);
 
 /// @brief Load a grid batch from a .nvdb file. This function loads each nanovdb grid into the batch
@@ -279,8 +310,10 @@ load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, const to
 ///         data is a JaggedTensor containing the data of the grids, and names is a list of strings
 ///         containing the name of each grid
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier,
-     const std::string &device_string, bool verbose = false);
+load(const std::string &path,
+     NanoVDBFileGridIdentifier gridIdentifier,
+     const std::string &device_string,
+     bool verbose = false);
 
 } // namespace fvdb
 

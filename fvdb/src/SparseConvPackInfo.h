@@ -28,7 +28,7 @@ class SparseConvPackInfo : torch::CustomClassHolder {
     std::optional<torch::Tensor>
         mGSNeighborSizes; // [#IO, 2] (int32), GATHER_SCATTER, GATHER_SCATTER(me)
 
-    bool                         mIGEMMUseTF32 = false;
+    bool mIGEMMUseTF32 = false;
     std::optional<torch::Tensor> mIGEMMOutInMap;          // [#O-P, K] (int32), IGEMM, IGEMM(sorted)
     std::optional<torch::Tensor> mIGEMMReorderLoc;        // [S, #O-P] (int32), IGEMM(sorted)
     std::optional<torch::Tensor> mIGEMMSortedMask;        // [S, #O-P] (int32), IGEMM(sorted)
@@ -250,22 +250,26 @@ class SparseConvPackInfo : torch::CustomClassHolder {
         return mSourceGrid;
     }
 
-    SparseConvPackInfo(Vec3iOrScalar kernelsize, Vec3iOrScalar stride, GridBatch src,
+    SparseConvPackInfo(Vec3iOrScalar kernelsize,
+                       Vec3iOrScalar stride,
+                       GridBatch src,
                        std::optional<GridBatch> maybeTarget);
 
     SparseConvPackInfo transposed() const;
 
     // Will not rebuild if already built
     void buildGatherScatter(bool use_me = false);
-    void buildImplicitGEMM(bool sorted, int splitMaskNum, bool training, int splitMaskNumBwd,
-                           bool use_tf32 = false);
+    void buildImplicitGEMM(
+        bool sorted, int splitMaskNum, bool training, int splitMaskNumBwd, bool use_tf32 = false);
     void buildCutlass(bool benchmark = false);
     void buildLGGS();
 
-    JaggedTensor sparseConv3d(const JaggedTensor &input, const torch::Tensor &weights,
+    JaggedTensor sparseConv3d(const JaggedTensor &input,
+                              const torch::Tensor &weights,
                               ConvPackBackend backend = ConvPackBackend::GATHER_SCATTER) const;
     JaggedTensor
-    sparseTransposeConv3d(const JaggedTensor &input, const torch::Tensor &weights,
+    sparseTransposeConv3d(const JaggedTensor &input,
+                          const torch::Tensor &weights,
                           ConvPackBackend backend = ConvPackBackend::GATHER_SCATTER) const;
 };
 

@@ -5,6 +5,7 @@
 #define FVDB_GAUSSIANSPLATTING_H
 
 #include "JaggedTensor.h"
+
 #include <detail/ops/gsplat/GaussianRenderSettings.h>
 
 #include <torch/all.h>
@@ -20,9 +21,12 @@ namespace fvdb {
 /// optimize these quantities without clipping them to a specific range.
 class GaussianSplat3d {
   public:
-    GaussianSplat3d(const torch::Tensor &means, const torch::Tensor &quats,
-                    const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
-                    const torch::Tensor &sh0, const torch::Tensor &shN,
+    GaussianSplat3d(const torch::Tensor &means,
+                    const torch::Tensor &quats,
+                    const torch::Tensor &logScales,
+                    const torch::Tensor &logitOpacities,
+                    const torch::Tensor &sh0,
+                    const torch::Tensor &shN,
                     const bool requiresGrad = false);
 
     /// @brief Create a GaussianSplat3d object from a state_dict (similar to Pytorch's nn.Module).
@@ -323,9 +327,12 @@ class GaussianSplat3d {
     ///            coefficients of the Gaussians in this scene.
     /// @param requiresGrad Whether to track gradients and accumulated projection statisitics used
     ///                     for splitting/deleting/duplicating Gaussians during optimization.
-    void setState(const torch::Tensor &means, const torch::Tensor &quats,
-                  const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
-                  const torch::Tensor &sh0, const torch::Tensor &shN,
+    void setState(const torch::Tensor &means,
+                  const torch::Tensor &quats,
+                  const torch::Tensor &logScales,
+                  const torch::Tensor &logitOpacities,
+                  const torch::Tensor &sh0,
+                  const torch::Tensor &shN,
                   const bool requiresGrad = false);
 
     /// @brief Return the number of Gaussians in the scene.
@@ -427,12 +434,17 @@ class GaussianSplat3d {
     /// @param antialias Whether to antialias the image
     /// @return ProjectedGaussianSplats object that can be used to render images with @ref
     /// renderFromProjectedGaussians
-    ProjectedGaussianSplats
-    projectGaussiansForImages(const torch::Tensor &worldToCameraMatrices,
-                              const torch::Tensor &projectionMatrices, size_t imageWidth,
-                              size_t imageHeight, const float near, const float far,
-                              const ProjectionType projectionType, const int64_t shDegreeToUse,
-                              const float minRadius2d, const float eps2d, const bool antialias);
+    ProjectedGaussianSplats projectGaussiansForImages(const torch::Tensor &worldToCameraMatrices,
+                                                      const torch::Tensor &projectionMatrices,
+                                                      size_t imageWidth,
+                                                      size_t imageHeight,
+                                                      const float near,
+                                                      const float far,
+                                                      const ProjectionType projectionType,
+                                                      const int64_t shDegreeToUse,
+                                                      const float minRadius2d,
+                                                      const float eps2d,
+                                                      const bool antialias);
 
     /// @brief Precompute the projected Gaussians to be re-used for rendering depths (e.g. if
     /// you want to render multiple depth maps with the same camera settings or image patches).
@@ -450,10 +462,13 @@ class GaussianSplat3d {
     /// renderFromProjectedGaussians
     ProjectedGaussianSplats projectGaussiansForDepths(const torch::Tensor &worldToCameraMatrices,
                                                       const torch::Tensor &projectionMatrices,
-                                                      size_t imageWidth, size_t imageHeight,
-                                                      const float near, const float far,
+                                                      size_t imageWidth,
+                                                      size_t imageHeight,
+                                                      const float near,
+                                                      const float far,
                                                       const ProjectionType projectionType,
-                                                      const float minRadius2d, const float eps2d,
+                                                      const float minRadius2d,
+                                                      const float eps2d,
                                                       const bool antialias);
 
     /// @brief Precompute the projected Gaussians to be re-used for rendering images and depths
@@ -472,11 +487,18 @@ class GaussianSplat3d {
     /// @param antialias Whether to antialias the image
     /// @return ProjectedGaussianSplats object that can be used to render images and depths with
     /// @ref renderFromProjectedGaussians
-    ProjectedGaussianSplats projectGaussiansForImagesAndDepths(
-        const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
-        size_t imageWidth, size_t imageHeight, const float near, const float far,
-        const ProjectionType projectionType, const int64_t shDegreeToUse, const float minRadius2d,
-        const float eps2d, const bool antialias);
+    ProjectedGaussianSplats
+    projectGaussiansForImagesAndDepths(const torch::Tensor &worldToCameraMatrices,
+                                       const torch::Tensor &projectionMatrices,
+                                       size_t imageWidth,
+                                       size_t imageHeight,
+                                       const float near,
+                                       const float far,
+                                       const ProjectionType projectionType,
+                                       const int64_t shDegreeToUse,
+                                       const float minRadius2d,
+                                       const float eps2d,
+                                       const bool antialias);
 
     /// Save this scene to a PLY file with the given filename
     void savePly(const std::string &filename) const;
@@ -501,9 +523,11 @@ class GaussianSplat3d {
     ///     alphas: A [C, W, H, 1] tensor containing the alpha values of the rendered images
     std::tuple<torch::Tensor, torch::Tensor>
     renderFromProjectedGaussians(const GaussianSplat3d::ProjectedGaussianSplats &projectedGaussians,
-                                 const ssize_t cropWidth = -1, const ssize_t cropHeight = -1,
-                                 const ssize_t cropOriginW = -1, const ssize_t cropOriginH = -1,
-                                 const size_t tileSize = 16);
+                                 const ssize_t cropWidth   = -1,
+                                 const ssize_t cropHeight  = -1,
+                                 const ssize_t cropOriginW = -1,
+                                 const ssize_t cropOriginH = -1,
+                                 const size_t tileSize     = 16);
 
     /// @brief Render images of this Gaussian splat scene from the given camera matrices and
     /// projection matrices.
@@ -522,12 +546,19 @@ class GaussianSplat3d {
     /// @return Tuple of two tensors:
     ///     images: A [C, W, H, D] tensor containing the the rendered image for each camera
     ///     alphas: A [C, W, H, 1] tensor containing the alpha values of the rendered images
-    std::tuple<torch::Tensor, torch::Tensor> renderImages(
-        const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
-        const size_t imageWidth, const size_t imageHeight, const float near, const float far,
-        const ProjectionType projectionType = ProjectionType::PERSPECTIVE,
-        const int64_t shDegreeToUse = -1, const size_t tileSize = 16, const float minRadius2d = 0.0,
-        const float eps2d = 0.3, const bool antialias = false);
+    std::tuple<torch::Tensor, torch::Tensor>
+    renderImages(const torch::Tensor &worldToCameraMatrices,
+                 const torch::Tensor &projectionMatrices,
+                 const size_t imageWidth,
+                 const size_t imageHeight,
+                 const float near,
+                 const float far,
+                 const ProjectionType projectionType = ProjectionType::PERSPECTIVE,
+                 const int64_t shDegreeToUse         = -1,
+                 const size_t tileSize               = 16,
+                 const float minRadius2d             = 0.0,
+                 const float eps2d                   = 0.3,
+                 const bool antialias                = false);
 
     /// @brief Render depths of this Gaussian splat scene from the given camera matrices and
     /// projection matrices.
@@ -547,18 +578,30 @@ class GaussianSplat3d {
     ///     alphas: A [C, W, H, 1] tensor containing the alpha values of the rendered depths
     std::tuple<torch::Tensor, torch::Tensor>
     renderDepths(const torch::Tensor &worldToCameraMatrices,
-                 const torch::Tensor &projectionMatrices, const size_t imageWidth,
-                 const size_t imageHeight, const float near, const float far,
+                 const torch::Tensor &projectionMatrices,
+                 const size_t imageWidth,
+                 const size_t imageHeight,
+                 const float near,
+                 const float far,
                  const ProjectionType projectionType = ProjectionType::PERSPECTIVE,
-                 const size_t tileSize = 16, const float minRadius2d = 0.0, const float eps2d = 0.3,
-                 const bool antialias = false);
+                 const size_t tileSize               = 16,
+                 const float minRadius2d             = 0.0,
+                 const float eps2d                   = 0.3,
+                 const bool antialias                = false);
 
-    std::tuple<torch::Tensor, torch::Tensor> renderImagesAndDepths(
-        const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
-        const size_t imageWidth, const size_t imageHeight, const float near, const float far,
-        const ProjectionType projectionType = ProjectionType::PERSPECTIVE,
-        const int64_t shDegreeToUse = -1, const size_t tileSize = 16, const float minRadius2d = 0.0,
-        const float eps2d = 0.3, const bool antialias = false);
+    std::tuple<torch::Tensor, torch::Tensor>
+    renderImagesAndDepths(const torch::Tensor &worldToCameraMatrices,
+                          const torch::Tensor &projectionMatrices,
+                          const size_t imageWidth,
+                          const size_t imageHeight,
+                          const float near,
+                          const float far,
+                          const ProjectionType projectionType = ProjectionType::PERSPECTIVE,
+                          const int64_t shDegreeToUse         = -1,
+                          const size_t tileSize               = 16,
+                          const float minRadius2d             = 0.0,
+                          const float eps2d                   = 0.3,
+                          const bool antialias                = false);
 
   private:
     torch::Tensor mMeans;          // [N, 3]
@@ -572,26 +615,34 @@ class GaussianSplat3d {
     torch::Tensor mAccumulatedNormalized2dMeansGradientNormsForGrad; // [N]
     torch::Tensor mAccumulated2dRadiiForGrad;                        // [N]
     torch::Tensor mGradientStepCountForGrad;                         // [N]
-    bool          mRequiresGrad           = false;
-    bool          mTrackMax2dRadiiForGrad = false;
+    bool mRequiresGrad           = false;
+    bool mTrackMax2dRadiiForGrad = false;
 
-    static void checkState(const torch::Tensor &means, const torch::Tensor &quats,
-                           const torch::Tensor &logScales, const torch::Tensor &logitOpacities,
-                           const torch::Tensor &sh0, const torch::Tensor &shN);
+    static void checkState(const torch::Tensor &means,
+                           const torch::Tensor &quats,
+                           const torch::Tensor &logScales,
+                           const torch::Tensor &logitOpacities,
+                           const torch::Tensor &sh0,
+                           const torch::Tensor &shN);
 
     ProjectedGaussianSplats projectGaussiansImpl(const torch::Tensor &worldToCameraMatrices,
                                                  const torch::Tensor &projectionMatrices,
                                                  const fvdb::detail::ops::RenderSettings &settings);
 
-    std::tuple<torch::Tensor, torch::Tensor> renderCropFromProjectedGaussiansImpl(
-        const ProjectedGaussianSplats &state, const size_t tileSize, const ssize_t cropWidth,
-        const ssize_t cropHeight, const ssize_t cropOriginW, const ssize_t cropOriginH);
+    std::tuple<torch::Tensor, torch::Tensor>
+    renderCropFromProjectedGaussiansImpl(const ProjectedGaussianSplats &state,
+                                         const size_t tileSize,
+                                         const ssize_t cropWidth,
+                                         const ssize_t cropHeight,
+                                         const ssize_t cropOriginW,
+                                         const ssize_t cropOriginH);
 
     std::tuple<torch::Tensor, torch::Tensor>
-    renderImpl(const torch::Tensor &worldToCameraMatrices, const torch::Tensor &projectionMatrices,
+    renderImpl(const torch::Tensor &worldToCameraMatrices,
+               const torch::Tensor &projectionMatrices,
                const fvdb::detail::ops::RenderSettings &settings);
 
-    torch::Tensor evalSphericalHarmonicsImpl(const int64_t        shDegreeToUse,
+    torch::Tensor evalSphericalHarmonicsImpl(const int64_t shDegreeToUse,
                                              const torch::Tensor &worldToCameraMatrices,
                                              const torch::Tensor &perGaussianProjectedRadii) const;
 };
@@ -604,13 +655,19 @@ gaussianRenderJagged(const JaggedTensor &means,     // [N1 + N2 + ..., 3]
                      const JaggedTensor &sh_coeffs, // [N1 + N2 + ..., K, 3]
                      const JaggedTensor &viewmats,  // [C1 + C2 + ..., 4, 4]
                      const JaggedTensor &Ks,        // [C1 + C2 + ..., 3, 3]
-                     const uint32_t image_width, const uint32_t image_height,
-                     const float near_plane = 0.01, const float far_plane = 1e10,
-                     const int sh_degree_to_use = -1, const int tile_size = 16,
-                     const float radius_clip = 0.0, const float eps2d = 0.3,
-                     const bool antialias = false, const bool render_depth_channel = false,
-                     const bool return_debug_info = false, const bool render_depth_only = false,
-                     const bool ortho = false);
+                     const uint32_t image_width,
+                     const uint32_t image_height,
+                     const float near_plane          = 0.01,
+                     const float far_plane           = 1e10,
+                     const int sh_degree_to_use      = -1,
+                     const int tile_size             = 16,
+                     const float radius_clip         = 0.0,
+                     const float eps2d               = 0.3,
+                     const bool antialias            = false,
+                     const bool render_depth_channel = false,
+                     const bool return_debug_info    = false,
+                     const bool render_depth_only    = false,
+                     const bool ortho                = false);
 
 } // namespace fvdb
 

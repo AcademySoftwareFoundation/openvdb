@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
+
 #include <detail/ops/Ops.h>
 
 #include <torch/extension.h>
@@ -14,7 +15,7 @@ namespace ops {
 
 template <int bytes> struct global_load;
 #define XSTR(x) STR(x)
-#define STR(x) #x
+#define STR(x)  #x
 
 #pragma message "The value of __CUDA_ARCH__: " XSTR(__CUDA_ARCH__)
 
@@ -31,7 +32,11 @@ template <> struct global_load<16> {
                      "  @p ld.global.v4.u32 {%0, %1, %2, %3}, [%4];\n"
                      "}\n"
                      : "=r"(data.x), "=r"(data.y), "=r"(data.z), "=r"(data.w)
-                     : "l"(ptr), "r"((int)(pred_guard & 1)), "r"(data.x), "r"(data.y), "r"(data.z),
+                     : "l"(ptr),
+                       "r"((int)(pred_guard & 1)),
+                       "r"(data.x),
+                       "r"(data.y),
+                       "r"(data.z),
                        "r"(data.w));
     }
 };
@@ -50,8 +55,10 @@ template <> struct global_load<8> {
                          "  @p ld.global.v2.u32 {%0, %1}, [%2];\n"
                          "}\n"
                          : "=r"(data.x), "=r"(data.y)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data.x), "r"(data.y));
+                         : "l"(ptr_ldg + ldg_idx),
+                           "r"((int)(pred_guard & (1 << ldg_idx))),
+                           "r"(data.x),
+                           "r"(data.y));
         }
     }
 };
@@ -62,15 +69,15 @@ template <> struct global_load<4> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 4; ldg_idx++) {
             unsigned &data = *(reinterpret_cast<unsigned *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b32 %0, %3;\n"
-                         "  @p ld.global.u32 %0, [%1];\n"
-                         "}\n"
-                         : "=r"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "r"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b32 %0, %3;\n"
+                "  @p ld.global.u32 %0, [%1];\n"
+                "}\n"
+                : "=r"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "r"(data));
         }
     }
 };
@@ -81,15 +88,15 @@ template <> struct global_load<2> {
 #pragma unroll
         for (int ldg_idx = 0; ldg_idx < 8; ldg_idx++) {
             uint16_t &data = *(reinterpret_cast<uint16_t *>(&D) + ldg_idx);
-            asm volatile("{\n"
-                         "  .reg .pred p;\n"
-                         "  setp.ne.b32 p, %2, 0;\n"
-                         "  mov.b16 %0, %3;\n"
-                         "  @p ld.global.u16 %0, [%1];\n"
-                         "}\n"
-                         : "=h"(data)
-                         : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))),
-                           "h"(data));
+            asm volatile(
+                "{\n"
+                "  .reg .pred p;\n"
+                "  setp.ne.b32 p, %2, 0;\n"
+                "  mov.b16 %0, %3;\n"
+                "  @p ld.global.u16 %0, [%1];\n"
+                "}\n"
+                : "=h"(data)
+                : "l"(ptr_ldg + ldg_idx), "r"((int)(pred_guard & (1 << ldg_idx))), "h"(data));
         }
     }
 };
@@ -113,22 +120,24 @@ __pack_bfloat162(const __nv_bfloat16 x, const __nv_bfloat16 y) {
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_bf16bf16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting1_mode0_bf16bf16f32(int M, int K_original, int N, int kernel_volume,
-                                                 __nv_bfloat16 *__restrict__ A,
-                                                 __nv_bfloat16 *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 __nv_bfloat16 *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting1_mode0_bf16bf16f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   __nv_bfloat16 *__restrict__ A,
+                                                                   __nv_bfloat16 *__restrict__ B,
+                                                                   int *__restrict__ out_in_map,
+                                                                   __nv_bfloat16 *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    const int K_tile        = 16; // min(16, K_original);
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+    const int K_tile  = 16; // min(16, K_original);
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float                    C_warp[32];
+    float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[640];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[8];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -161,8 +170,8 @@ __launch_bounds__(64)
     // const int K_ld_factor = (8 * !(K_original % 8)) + (4 * !(K_original % 4)) + (2 * !(K_original
     // % 2)) + 2;
     // TODO: A_ld_start related to i2_0_0
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx.x % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -199,8 +208,8 @@ __launch_bounds__(64)
 
         // int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_original;
         // half *A_ptr_local = A_ptr + (i2_0_0 * K_tile % K_original);
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
-        __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
+        __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
         // half *B_ptr_local = B_ptr + i2_0_0 * K_tile * N;
         __nv_bfloat16 *B_ptr_local;
         if constexpr (K_ld_check)
@@ -387,20 +396,24 @@ __launch_bounds__(64)
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting1_mode0_f16f16f32(int M, int K_original, int N, int kernel_volume,
-                                               half *__restrict__ A, half *__restrict__ B,
-                                               int *__restrict__ out_in_map, half *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 half *__restrict__ A,
+                                                                 half *__restrict__ B,
+                                                                 int *__restrict__ out_in_map,
+                                                                 half *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    const int K_tile        = 16; // min(16, K_original);
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+    const int K_tile  = 16; // min(16, K_original);
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float           C_warp[32];
+    float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[640];
-    half            A_shared_warp[32];
-    half            B_shared_warp[8];
+    half A_shared_warp[32];
+    half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -432,8 +445,8 @@ __launch_bounds__(64)
     // const int K_ld_factor = (8 * !(K_original % 8)) + (4 * !(K_original % 4)) + (2 * !(K_original
     // % 2)) + 2;
     // TODO: A_ld_start related to i2_0_0
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx.x % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -470,8 +483,8 @@ __launch_bounds__(64)
 
         // int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_original;
         // half *A_ptr_local = A_ptr + (i2_0_0 * K_tile % K_original);
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
-        half *A_ptr_local          = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
+        half *A_ptr_local         = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
         // half *B_ptr_local = B_ptr + i2_0_0 * K_tile * N;
         half *B_ptr_local;
         if constexpr (K_ld_check)
@@ -719,19 +732,21 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_bf16bf16f32
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting2_mode0_bf16bf16f32(int M, int K_original, int N, int kernel_volume,
-                                                 __nv_bfloat16 *__restrict__ A,
-                                                 __nv_bfloat16 *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 __nv_bfloat16 *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting2_mode0_bf16bf16f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   __nv_bfloat16 *__restrict__ A,
+                                                                   __nv_bfloat16 *__restrict__ B,
+                                                                   int *__restrict__ out_in_map,
+                                                                   __nv_bfloat16 *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    int                      K_implicit = K_original * kernel_volume;
-    float                    C_warp[32];
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[1280];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[8];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -739,7 +754,7 @@ __launch_bounds__(64)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 1;
+    int j_factors1 = N / 16 / 1;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -759,9 +774,9 @@ __launch_bounds__(64)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        __nv_bfloat16 *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * 32 % K_original);
+        __nv_bfloat16 *B_ptr_local = B_ptr + i2_0_0 * 32 * N;
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
             // related to input
@@ -917,17 +932,21 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_f16f16f32
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting2_mode0_f16f16f32(int M, int K_original, int N, int kernel_volume,
-                                               half *__restrict__ A, half *__restrict__ B,
-                                               int *__restrict__ out_in_map, half *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 half *__restrict__ A,
+                                                                 half *__restrict__ B,
+                                                                 int *__restrict__ out_in_map,
+                                                                 half *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    int             K_implicit = K_original * kernel_volume;
-    float           C_warp[32];
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[1280];
-    half            A_shared_warp[32];
-    half            B_shared_warp[8];
+    half A_shared_warp[32];
+    half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -935,7 +954,7 @@ __launch_bounds__(64)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 1;
+    int j_factors1 = N / 16 / 1;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -954,9 +973,9 @@ __launch_bounds__(64)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        half *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        half *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        half *A_ptr_local         = A_ptr + (i2_0_0 * 32 % K_original);
+        half *B_ptr_local         = B_ptr + i2_0_0 * 32 * N;
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
             // related to input
@@ -1175,16 +1194,20 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_f16f16f32
 __global__ void
-__launch_bounds__(128)
-    conv_forward_cuda_setting3_mode0_f16f16f32(int M, int K_original, int N, int kernel_volume,
-                                               half *__restrict__ A, half *__restrict__ B,
-                                               int *__restrict__ out_in_map, half *__restrict__ C) {
-    int             K_implicit = K_original * kernel_volume;
-    float           C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f32(int M,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  half *__restrict__ A,
+                                                                  half *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  half *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[2304];
-    half            A_shared_warp[32];
-    half            B_shared_warp[16];
+    half A_shared_warp[32];
+    half B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1194,7 +1217,7 @@ __launch_bounds__(128)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 4;
+    int j_factors1 = N / 16 / 4;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -1217,9 +1240,9 @@ __launch_bounds__(128)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int  *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        half *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        half *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        half *A_ptr_local         = A_ptr + (i2_0_0 * 32 % K_original);
+        half *B_ptr_local         = B_ptr + i2_0_0 * 32 * N;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1455,18 +1478,20 @@ __launch_bounds__(128)
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_bf16bf16f32
 __global__ void
-__launch_bounds__(128)
-    conv_forward_cuda_setting3_mode0_bf16bf16f32(int M, int K_original, int N, int kernel_volume,
-                                                 __nv_bfloat16 *__restrict__ A,
-                                                 __nv_bfloat16 *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 __nv_bfloat16 *__restrict__ C) {
-    int                      K_implicit = K_original * kernel_volume;
-    float                    C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode0_bf16bf16f32(int M,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    __nv_bfloat16 *__restrict__ A,
+                                                                    __nv_bfloat16 *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    __nv_bfloat16 *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[2304];
-    __nv_bfloat16            A_shared_warp[32];
-    __nv_bfloat16            B_shared_warp[16];
+    __nv_bfloat16 A_shared_warp[32];
+    __nv_bfloat16 B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1476,7 +1501,7 @@ __launch_bounds__(128)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 4;
+    int j_factors1 = N / 16 / 4;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -1500,9 +1525,9 @@ __launch_bounds__(128)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int           *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        __nv_bfloat16 *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        __nv_bfloat16 *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local  = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        __nv_bfloat16 *A_ptr_local = A_ptr + (i2_0_0 * 32 % K_original);
+        __nv_bfloat16 *B_ptr_local = B_ptr + i2_0_0 * 32 * N;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -1674,21 +1699,24 @@ __launch_bounds__(128)
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_tf32tf32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting1_mode0_tf32tf32f32(int M, int K_original, int N, int kernel_volume,
-                                                 float *__restrict__ A, float *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 float *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting1_mode0_tf32tf32f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   float *__restrict__ A,
+                                                                   float *__restrict__ B,
+                                                                   int *__restrict__ out_in_map,
+                                                                   float *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    const int K_tile        = 16; // min(16, K_original);
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+    const int K_tile  = 16; // min(16, K_original);
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float            C_warp[32];
+    float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[640];
-    float            A_shared_warp[32];
-    float            B_shared_warp[8];
+    float A_shared_warp[32];
+    float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -1718,8 +1746,8 @@ __launch_bounds__(64)
                    + (blockIdx.x % j_factors1) * 16 + threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx.x % j_factors1) * 16 + (threadIdx.x * 8) % 16;
@@ -1755,8 +1783,8 @@ __launch_bounds__(64)
 
         // int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 16 / K_original;
         // float *A_ptr_local = A_ptr + (i2_0_0 * 16 % K_original);
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
-        float *A_ptr_local          = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * K_tile / K_tile_padded;
+        float *A_ptr_local        = A_ptr + (i2_0_0 * K_tile % K_tile_padded);
         // float *B_ptr_local = B_ptr + i2_0_0 * 16 * N;
         float *B_ptr_local;
         if constexpr (K_ld_check)
@@ -1779,7 +1807,7 @@ __launch_bounds__(64)
                 // 640)) + ((((int)threadIdx.x) >> 1) * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
                 //    *(ulonglong4 *)(A_ptr_local + input_idx * K_original + ((ax0_ax1_fused_0 * 512
                 //    % 16) % K_original));
-                uint4 A_loaded[2] = { make_uint4(0, 0, 0, 0) };
+                uint4 A_loaded[2] = {make_uint4(0, 0, 0, 0)};
                 global_load<K_ld_factor>(A_loaded[0],
                                          A_ptr_local + input_idx * K_original +
                                              ((ax0_ax1_fused_0 * 512 % 16) % K_tile_padded),
@@ -1806,10 +1834,10 @@ __launch_bounds__(64)
             // *(ulonglong4 *)(B_shared + (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1)
             // * 40)) + ((((int)threadIdx.x) & 1) * 8))) =
             //     *(ulonglong4 *)(B_ptr_local);
-            uint4 B_loaded[2] = { make_uint4(0, 0, 0, 0) };
+            uint4 B_loaded[2] = {make_uint4(0, 0, 0, 0)};
             global_load<N_ld_factor>(B_loaded[0], B_ptr_local, B_pred_guard);
-            global_load<N_ld_factor>(B_loaded[1], B_ptr_local + 4,
-                                     B_pred_guard >> (4 * 4 / N_ld_factor));
+            global_load<N_ld_factor>(
+                B_loaded[1], B_ptr_local + 4, B_pred_guard >> (4 * 4 / N_ld_factor));
             *(ulonglong4 *)(B_shared +
                             (((((int)threadIdx.y) * 640) + ((((int)threadIdx.x) >> 1) * 40)) +
                              ((((int)threadIdx.x) & 1) * 8))) =
@@ -1950,18 +1978,21 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_tf32tf32f32
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting2_mode0_tf32tf32f32(int M, int K_original, int N, int kernel_volume,
-                                                 float *__restrict__ A, float *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 float *__restrict__ C) {
+__launch_bounds__(64) conv_forward_cuda_setting2_mode0_tf32tf32f32(int M,
+                                                                   int K_original,
+                                                                   int N,
+                                                                   int kernel_volume,
+                                                                   float *__restrict__ A,
+                                                                   float *__restrict__ B,
+                                                                   int *__restrict__ out_in_map,
+                                                                   float *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
-    int              K_implicit = K_original * kernel_volume;
-    float            C_warp[32];
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[1280];
-    float            A_shared_warp[32];
-    float            B_shared_warp[8];
+    float A_shared_warp[32];
+    float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -1969,7 +2000,7 @@ __launch_bounds__(64)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 1;
+    int j_factors1 = N / 16 / 1;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -1988,9 +2019,9 @@ __launch_bounds__(64)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        float *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        float *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        float *A_ptr_local        = A_ptr + (i2_0_0 * 32 % K_original);
+        float *B_ptr_local        = B_ptr + i2_0_0 * 32 * N;
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 8; ++ax0_ax1_fused_0) {
             // related to input
@@ -2155,17 +2186,20 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_tf32tf32f32
 __global__ void
-__launch_bounds__(128)
-    conv_forward_cuda_setting3_mode0_tf32tf32f32(int M, int K_original, int N, int kernel_volume,
-                                                 float *__restrict__ A, float *__restrict__ B,
-                                                 int *__restrict__ out_in_map,
-                                                 float *__restrict__ C) {
-    int              K_implicit = K_original * kernel_volume;
-    float            C_warp[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32f32(int M,
+                                                                    int K_original,
+                                                                    int N,
+                                                                    int kernel_volume,
+                                                                    float *__restrict__ A,
+                                                                    float *__restrict__ B,
+                                                                    int *__restrict__ out_in_map,
+                                                                    float *__restrict__ C) {
+    int K_implicit = K_original * kernel_volume;
+    float C_warp[64];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[2304];
-    float            A_shared_warp[32];
-    float            B_shared_warp[16];
+    float A_shared_warp[32];
+    float B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -2175,7 +2209,7 @@ __launch_bounds__(128)
     }
 
     // hoisting shared pointer offsets
-    int  j_factors1 = N / 16 / 4;
+    int j_factors1 = N / 16 / 4;
     int *out_in_map_ptr =
         out_in_map +
         (blockIdx.x / j_factors1 * 128 + threadIdx.y * 8 + threadIdx.x / 4) * kernel_volume +
@@ -2198,9 +2232,9 @@ __launch_bounds__(128)
     for (int i2_0_0 = 0; i2_0_0 < K_implicit / 32; ++i2_0_0)
 
     {
-        int   *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
-        float *A_ptr_local          = A_ptr + (i2_0_0 * 32 % K_original);
-        float *B_ptr_local          = B_ptr + i2_0_0 * 32 * N;
+        int *out_in_map_ptr_local = out_in_map_ptr + i2_0_0 * 32 / K_original;
+        float *A_ptr_local        = A_ptr + (i2_0_0 * 32 % K_original);
+        float *B_ptr_local        = B_ptr + i2_0_0 * 32 * N;
 
         __syncthreads();
         for (int ax0_ax1_fused_0 = 0; ax0_ax1_fused_0 < 4; ++ax0_ax1_fused_0) {
@@ -2380,16 +2414,19 @@ __launch_bounds__(128)
 // conv_forward_cuda_m128n16k16_f32f32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting1_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume,
-                                               float *__restrict__ A, float *__restrict__ B,
-                                               int *__restrict__ out_in_map,
-                                               float *__restrict__ C) {
-    const int K_tile        = 16;
-    int       K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int       K_implicit    = K_tile_padded * kernel_volume;
+__launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 float *__restrict__ A,
+                                                                 float *__restrict__ B,
+                                                                 int *__restrict__ out_in_map,
+                                                                 float *__restrict__ C) {
+    const int K_tile  = 16;
+    int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
+    int K_implicit    = K_tile_padded * kernel_volume;
 
-    float            C_local[32];
+    float C_local[32];
     __shared__ float A_shared[2048];
     __shared__ float B_shared[256];
 
@@ -2426,8 +2463,8 @@ __launch_bounds__(64)
     // const int K_ld_factor = (8 * !(K_original % 8)) + (4 * !(K_original % 4)) + (2 * !(K_original
     // % 2)) + 1;
     // TODO: A_ld_start related to k_0
-    int  A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
-    int  B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
+    int A_ld_start, A_ld_amount, A_ld_bound, A_pred_guard;
+    int B_ld_start, B_ld_amount, B_ld_bound, B_pred_guard, B_ld_amount_N, B_ld_K_bound;
     bool B_ld_K;
     if constexpr (N_ld_check || K_ld_check) {
         B_ld_start    = (blockIdx_n * 16) + ((threadIdx_x * 4) % 16);
@@ -2461,8 +2498,8 @@ __launch_bounds__(64)
                     B_pred_guard |= (1 << i);
             }
 
-            int   *out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
-            float *A_ptr_local          = A + (k_0 * 16 % K_tile_padded) + channel_offset_A;
+            int *out_in_map_ptr_local = out_in_map_ptr + k_0 * 16 / K_tile_padded;
+            float *A_ptr_local        = A + (k_0 * 16 % K_tile_padded) + channel_offset_A;
 
             // float *B_ptr_local = B_ptr + i2_0_0 * K_tile * N;
             float *B_ptr_local;
@@ -2482,8 +2519,8 @@ __launch_bounds__(64)
                     // elements loaded in each loop
                     //     *(float4*)(A + (input_idx * K_original) + channel_offset);
                     uint4 A_loaded = make_uint4(0, 0, 0, 0);
-                    global_load<K_ld_factor>(A_loaded, A_ptr_local + (input_idx * K_original),
-                                             A_pred_guard);
+                    global_load<K_ld_factor>(
+                        A_loaded, A_ptr_local + (input_idx * K_original), A_pred_guard);
                     *(uint4 *)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = A_loaded;
                 } else {
                     // *(float4*)(A_shared_ptr + (ax0_ax1_fused_0 * 256)) = make_float4(0.0, 0.0,
@@ -2498,8 +2535,8 @@ __launch_bounds__(64)
                 // ax0_ax1_fused_0_1 * elements loaded in each loop
                 //       *(float4*)(B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N);
                 uint4 B_loaded = make_uint4(0, 0, 0, 0);
-                global_load<N_ld_factor>(B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N,
-                                         B_pred_guard);
+                global_load<N_ld_factor>(
+                    B_loaded, B_ptr_local + (ax0_ax1_fused_0_1 * 16) * N, B_pred_guard);
                 *(uint4 *)(B_shared_ptr + (ax0_ax1_fused_0_1 * 256)) = B_loaded;
             }
 
@@ -2537,12 +2574,15 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n16k32_f32f32f32
 __global__ void
-__launch_bounds__(64)
-    conv_forward_cuda_setting2_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume,
-                                               float *__restrict__ A, float *__restrict__ B,
-                                               int *__restrict__ out_in_map,
-                                               float *__restrict__ C) {
-    float            C_local[32];
+__launch_bounds__(64) conv_forward_cuda_setting2_mode0_f32f32f32(int M,
+                                                                 int K_original,
+                                                                 int N,
+                                                                 int kernel_volume,
+                                                                 float *__restrict__ A,
+                                                                 float *__restrict__ B,
+                                                                 int *__restrict__ out_in_map,
+                                                                 float *__restrict__ C) {
+    float C_local[32];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[512];
 
@@ -2578,8 +2618,8 @@ __launch_bounds__(64)
 
 #pragma unroll
     for (int k_0 = 0; k_0 < K_loops; ++k_0) {
-        int  channel_offset   = k_0 % (K_original / 32) * 32 + channel_offset_A;
-        int  kernel_offset    = k_0 / (K_original / 32);
+        int channel_offset    = k_0 % (K_original / 32) * 32 + channel_offset_A;
+        int kernel_offset     = k_0 / (K_original / 32);
         int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
         {
@@ -2635,12 +2675,15 @@ __launch_bounds__(64)
 
 // conv_forward_cuda_m128n64k32_f32f32f32
 __global__ void
-__launch_bounds__(128)
-    conv_forward_cuda_setting3_mode0_f32f32f32(int M, int K_original, int N, int kernel_volume,
-                                               float *__restrict__ A, float *__restrict__ B,
-                                               int *__restrict__ out_in_map,
-                                               float *__restrict__ C) {
-    float            C_local[64];
+__launch_bounds__(128) conv_forward_cuda_setting3_mode0_f32f32f32(int M,
+                                                                  int K_original,
+                                                                  int N,
+                                                                  int kernel_volume,
+                                                                  float *__restrict__ A,
+                                                                  float *__restrict__ B,
+                                                                  int *__restrict__ out_in_map,
+                                                                  float *__restrict__ C) {
+    float C_local[64];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[2048];
 
@@ -2676,8 +2719,8 @@ __launch_bounds__(128)
 
 #pragma unroll
     for (int k_0 = 0; k_0 < K_loops; ++k_0) {
-        int  channel_offset   = k_0 % (K_original / 32) * 32 + channel_offset_A;
-        int  kernel_offset    = k_0 / (K_original / 32);
+        int channel_offset    = k_0 % (K_original / 32) * 32 + channel_offset_A;
+        int kernel_offset     = k_0 / (K_original / 32);
         int *out_in_map_ptr_k = out_in_map_ptr + kernel_offset;
 
         {
@@ -2733,17 +2776,20 @@ __launch_bounds__(128)
 
 template <>
 torch::Tensor
-dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, torch::Tensor _kernel,
-                                                    torch::Tensor _out_in_map, int num_out_feats,
-                                                    int num_out_channels, bool allow_tf32,
+dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats,
+                                                    torch::Tensor _kernel,
+                                                    torch::Tensor _out_in_map,
+                                                    int num_out_feats,
+                                                    int num_out_channels,
+                                                    bool allow_tf32,
                                                     bool allow_fp16) {
-    bool is_tf           = allow_tf32;
-    int  num_in_feats    = _in_feats.size(0);
-    int  num_in_channels = _in_feats.size(1);
-    int  kernel_volume   = _out_in_map.size(1);
+    bool is_tf          = allow_tf32;
+    int num_in_feats    = _in_feats.size(0);
+    int num_in_channels = _in_feats.size(1);
+    int kernel_volume   = _out_in_map.size(1);
 
-    auto       options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
-    at::Tensor _out_feats = torch::empty({ num_out_feats, num_out_channels }, options);
+    auto options = torch::TensorOptions().dtype(_in_feats.dtype()).device(_in_feats.device());
+    at::Tensor _out_feats = torch::empty({num_out_feats, num_out_channels}, options);
 
     auto out_in_map  = _out_in_map.data_ptr<int>();
     bool is_half     = _in_feats.scalar_type() == at::ScalarType::Half;
@@ -2759,26 +2805,38 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
         auto out_feats = reinterpret_cast<half *>(_out_feats.data_ptr<at::Half>());
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode0_f16f16f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode0_f16f16f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -2789,137 +2847,262 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f16f16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f16f16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f16f16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f16f16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f16f16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -2933,26 +3116,38 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
         auto kernel    = reinterpret_cast<__nv_bfloat16 *>(_kernel.data_ptr<at::BFloat16>());
         auto out_feats = reinterpret_cast<__nv_bfloat16 *>(_out_feats.data_ptr<at::BFloat16>());
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode0_bf16bf16f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode0_bf16bf16f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -2963,137 +3158,262 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 2, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 8 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<16, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<8, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<4, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<2, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 8 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<2, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<2, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<2, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_bf16bf16f32<2, 2, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3103,26 +3423,38 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
         auto out_feats = _out_feats.data_ptr<float>();
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 4;
+            int j_factors1 = num_out_channels / 16 / 4;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 4);
             conv_forward_cuda_setting3_mode0_tf32tf32f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  j_factors1 = num_out_channels / 16 / 1;
+            int j_factors1 = num_out_channels / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
             dim3 threads_per_block(32, 2);
             conv_forward_cuda_setting2_mode0_tf32tf32f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
             // throw std::invalid_argument("IC is too small for this kernel");
-            int  j_factors1 = (num_out_channels + 15) / 16 / 1;
+            int j_factors1 = (num_out_channels + 15) / 16 / 1;
             dim3 num_blocks((num_out_feats + 127) / 128 * j_factors1);
             // threadIdx.x: 32
             // threadIdx.y: i_factors[2] * j_factors[2]
@@ -3133,90 +3465,170 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_tf32tf32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3228,24 +3640,36 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
         auto out_feats = _out_feats.data_ptr<float>();
 
         if (num_out_channels % 64 == 0 && num_in_channels % 32 == 0) {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = num_out_channels / 64; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = num_out_channels / 64; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N);
             dim3 threads_per_block(128);
             conv_forward_cuda_setting3_mode0_f32f32f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else if (num_in_channels % 32 == 0 && num_out_channels % 16 == 0) {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = num_out_channels / 16; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = num_out_channels / 16; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N);
             dim3 threads_per_block(64);
             conv_forward_cuda_setting2_mode0_f32f32f32<<<num_blocks, threads_per_block>>>(
-                _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume, in_feats,
-                kernel, out_in_map, out_feats);
+                _out_feats.size(0),
+                num_in_channels,
+                num_out_channels,
+                kernel_volume,
+                in_feats,
+                kernel,
+                out_in_map,
+                out_feats);
         } else {
-            int  block_num_M = (num_out_feats + 127) / 128;
-            int  block_num_N = (num_out_channels + 15) / 16; // j_factors1
+            int block_num_M = (num_out_feats + 127) / 128;
+            int block_num_N = (num_out_channels + 15) / 16; // j_factors1
             dim3 num_blocks(block_num_M * block_num_N);
             dim3 threads_per_block(64);
             // conv_forward_cuda_setting1_mode0_tf32tf32f32<<<num_blocks, threads_per_block>>>(
@@ -3255,90 +3679,170 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
             if (num_in_channels % 16 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 16, false, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 16, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 8, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 4, false, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 4 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f32f32f32<16, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else if (num_in_channels % 2 == 0) {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<8, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<8, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<8, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f32f32f32<8, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             } else {
                 if (num_out_channels % 16 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<4, 16, true, false>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 4 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<4, 16, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else if (num_out_channels % 2 == 0) {
                     conv_forward_cuda_setting1_mode0_f32f32f32<4, 8, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 } else {
                     conv_forward_cuda_setting1_mode0_f32f32f32<4, 4, true, true>
-                        <<<num_blocks, threads_per_block>>>(
-                            _out_feats.size(0), num_in_channels, num_out_channels, kernel_volume,
-                            in_feats, kernel, out_in_map, out_feats);
+                        <<<num_blocks, threads_per_block>>>(_out_feats.size(0),
+                                                            num_in_channels,
+                                                            num_out_channels,
+                                                            kernel_volume,
+                                                            in_feats,
+                                                            kernel,
+                                                            out_in_map,
+                                                            out_feats);
                 }
             }
         }
@@ -3348,9 +3852,12 @@ dispatchSparseConvolutionImplicitGEMM<torch::kCUDA>(torch::Tensor _in_feats, tor
 
 template <>
 torch::Tensor
-dispatchSparseConvolutionImplicitGEMM<torch::kCPU>(torch::Tensor in_feat, torch::Tensor kernel,
-                                                   torch::Tensor out_in_map, int num_out_feats,
-                                                   int num_out_channels, bool allow_tf32,
+dispatchSparseConvolutionImplicitGEMM<torch::kCPU>(torch::Tensor in_feat,
+                                                   torch::Tensor kernel,
+                                                   torch::Tensor out_in_map,
+                                                   int num_out_feats,
+                                                   int num_out_channels,
+                                                   bool allow_tf32,
                                                    bool allow_fp16) {
     TORCH_CHECK(false, "No support for CPU-based ImplicitGEMM!");
 }

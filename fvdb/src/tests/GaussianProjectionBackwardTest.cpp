@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <detail/ops/Ops.h>
+#include <tests/utils/Tensor.h>
 
 #include <torch/script.h>
 #include <torch/torch.h>
 
 #include <gtest/gtest.h>
-#include <tests/utils/Tensor.h>
 
 #include <cstddef>
 #include <cstdlib>
@@ -106,13 +106,13 @@ struct GaussianProjectionBackwardTestFixture : public ::testing::Test {
         "conics" // disable if reading projection inputs and writing backwards outputs
     };
 
-    const std::vector<std::string> outputNames = { "dLossDMeans",
-                                                   "dLossDQuats",
-                                                   "dLossDScales",
-                                                   "dLossDCamToWorlds",
-                                                   "normalizeddLossdMeans2dNormAccum",
-                                                   "normalizedMaxRadiiAccum",
-                                                   "gradientStepCounts" };
+    const std::vector<std::string> outputNames = {"dLossDMeans",
+                                                  "dLossDQuats",
+                                                  "dLossDScales",
+                                                  "dLossDCamToWorlds",
+                                                  "normalizeddLossdMeans2dNormAccum",
+                                                  "normalizedMaxRadiiAccum",
+                                                  "gradientStepCounts"};
 
     // Input tensors
     torch::Tensor means;         // [C, N, 3] or [nnz, 3]
@@ -139,7 +139,7 @@ struct GaussianProjectionBackwardTestFixture : public ::testing::Test {
     uint32_t imageHeight;
     uint32_t imageOriginW;
     uint32_t imageOriginH;
-    float    eps2d;
+    float eps2d;
 };
 
 // This is a helper function to generate the output data for the test cases.
@@ -157,44 +157,74 @@ TEST_F(GaussianProjectionBackwardTestFixture, DISABLED_GenerateOutputData) {
     {
         // Perspective projection
         const auto [radii_proj, means2d_proj, depths_proj, conics_proj, compensations_proj] =
-            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0,
-                true, false);
+            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                               quats,
+                                                                               scales,
+                                                                               viewmats,
+                                                                               Ks,
+                                                                               imageWidth,
+                                                                               imageHeight,
+                                                                               0.3,
+                                                                               1e-2,
+                                                                               1e10,
+                                                                               0,
+                                                                               true,
+                                                                               false);
 
         const auto C = radii_proj.size(0);
         const auto N = radii_proj.size(1);
 
         // store the input data for the backward pass
         auto backwardInputFilename = std::string("projection_persp_backward_inputs.pt");
-        storeData(backwardInputFilename, { means, quats, scales, viewmats, Ks, compensations_proj,
-                                           radii_proj, conics_proj });
+        storeData(
+            backwardInputFilename,
+            {means, quats, scales, viewmats, Ks, compensations_proj, radii_proj, conics_proj});
 
         // run backwards pass and store outputs
-        torch::Tensor dLossDMeans2d       = torch::full({ C, N, 2 }, 0.1, torch::kCUDA);
-        torch::Tensor dLossDDepths        = torch::full({ C, N }, 0.2, torch::kCUDA);
-        torch::Tensor dLossDConics        = torch::full({ C, N, 3 }, 0.3, torch::kCUDA);
-        torch::Tensor dLossDCompensations = torch::full({ C, N }, 0.4, torch::kCUDA);
+        torch::Tensor dLossDMeans2d       = torch::full({C, N, 2}, 0.1, torch::kCUDA);
+        torch::Tensor dLossDDepths        = torch::full({C, N}, 0.2, torch::kCUDA);
+        torch::Tensor dLossDConics        = torch::full({C, N, 3}, 0.3, torch::kCUDA);
+        torch::Tensor dLossDCompensations = torch::full({C, N}, 0.4, torch::kCUDA);
 
         torch::TensorOptions options = torch::kCUDA;
-        auto                 outNormalizeddLossdMeans2dNormAccum =
-            torch::zeros({ N }, options.dtype(torch::kFloat32));
-        auto outNormalizedMaxRadiiAccum = torch::zeros({ N }, options.dtype(torch::kInt32));
-        auto outGradientStepCounts      = torch::zeros({ N }, options.dtype(torch::kInt32));
+        auto outNormalizeddLossdMeans2dNormAccum =
+            torch::zeros({N}, options.dtype(torch::kFloat32));
+        auto outNormalizedMaxRadiiAccum = torch::zeros({N}, options.dtype(torch::kInt32));
+        auto outGradientStepCounts      = torch::zeros({N}, options.dtype(torch::kInt32));
 
         const auto [dLossDMeans, dLossDCovars, dLossDQuats, dLossDScales, dLossDCamToWorlds] =
             fvdb::detail::ops::dispatchGaussianProjectionBackward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, compensations_proj, imageWidth, imageHeight,
-                eps2d, radii_proj, conics_proj, dLossDMeans2d, dLossDDepths, dLossDConics,
-                dLossDCompensations, true, false, outNormalizeddLossdMeans2dNormAccum,
-                outNormalizedMaxRadiiAccum, outGradientStepCounts);
+                means,
+                quats,
+                scales,
+                viewmats,
+                Ks,
+                compensations_proj,
+                imageWidth,
+                imageHeight,
+                eps2d,
+                radii_proj,
+                conics_proj,
+                dLossDMeans2d,
+                dLossDDepths,
+                dLossDConics,
+                dLossDCompensations,
+                true,
+                false,
+                outNormalizeddLossdMeans2dNormAccum,
+                outNormalizedMaxRadiiAccum,
+                outGradientStepCounts);
 
         std::vector<torch::Tensor> outputData = {
             dLossDMeans,
             // dLossDCovars, Currently dLossDCovars is not output, not exposed, see
             // dispatchGaussianProjectionBackward
-            dLossDQuats, dLossDScales, dLossDCamToWorlds, outNormalizeddLossdMeans2dNormAccum,
-            outNormalizedMaxRadiiAccum, outGradientStepCounts
-        };
+            dLossDQuats,
+            dLossDScales,
+            dLossDCamToWorlds,
+            outNormalizeddLossdMeans2dNormAccum,
+            outNormalizedMaxRadiiAccum,
+            outGradientStepCounts};
         auto outputFilename = std::string("projection_persp_backward_outputs.pt");
 
         storeData(outputFilename, outputData);
@@ -203,44 +233,74 @@ TEST_F(GaussianProjectionBackwardTestFixture, DISABLED_GenerateOutputData) {
     {
         // Orthographic projection
         const auto [radii_proj, means2d_proj, depths_proj, conics_proj, compensations_proj] =
-            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, imageWidth, imageHeight, 0.3, 1e-2, 1e10, 0,
-                true, true);
+            fvdb::detail::ops::dispatchGaussianProjectionForward<torch::kCUDA>(means,
+                                                                               quats,
+                                                                               scales,
+                                                                               viewmats,
+                                                                               Ks,
+                                                                               imageWidth,
+                                                                               imageHeight,
+                                                                               0.3,
+                                                                               1e-2,
+                                                                               1e10,
+                                                                               0,
+                                                                               true,
+                                                                               true);
 
         const auto C = radii_proj.size(0);
         const auto N = radii_proj.size(1);
 
         // store the input data for the backward pass
         auto backwardInputFilename = std::string("projection_ortho_backward_inputs.pt");
-        storeData(backwardInputFilename, { means, quats, scales, viewmats, Ks, compensations_proj,
-                                           radii_proj, conics_proj });
+        storeData(
+            backwardInputFilename,
+            {means, quats, scales, viewmats, Ks, compensations_proj, radii_proj, conics_proj});
 
         // run backwards pass and store outputs
-        torch::Tensor dLossDMeans2d       = torch::full({ C, N, 2 }, 0.1, torch::kCUDA);
-        torch::Tensor dLossDDepths        = torch::full({ C, N }, 0.2, torch::kCUDA);
-        torch::Tensor dLossDConics        = torch::full({ C, N, 3 }, 0.3, torch::kCUDA);
-        torch::Tensor dLossDCompensations = torch::full({ C, N }, 0.4, torch::kCUDA);
+        torch::Tensor dLossDMeans2d       = torch::full({C, N, 2}, 0.1, torch::kCUDA);
+        torch::Tensor dLossDDepths        = torch::full({C, N}, 0.2, torch::kCUDA);
+        torch::Tensor dLossDConics        = torch::full({C, N, 3}, 0.3, torch::kCUDA);
+        torch::Tensor dLossDCompensations = torch::full({C, N}, 0.4, torch::kCUDA);
 
         torch::TensorOptions options = torch::kCUDA;
-        auto                 outNormalizeddLossdMeans2dNormAccum =
-            torch::zeros({ N }, options.dtype(torch::kFloat32));
-        auto outNormalizedMaxRadiiAccum = torch::zeros({ N }, options.dtype(torch::kInt32));
-        auto outGradientStepCounts      = torch::zeros({ N }, options.dtype(torch::kInt32));
+        auto outNormalizeddLossdMeans2dNormAccum =
+            torch::zeros({N}, options.dtype(torch::kFloat32));
+        auto outNormalizedMaxRadiiAccum = torch::zeros({N}, options.dtype(torch::kInt32));
+        auto outGradientStepCounts      = torch::zeros({N}, options.dtype(torch::kInt32));
 
         const auto [dLossDMeans, dLossDCovars, dLossDQuats, dLossDScales, dLossDCamToWorlds] =
             fvdb::detail::ops::dispatchGaussianProjectionBackward<torch::kCUDA>(
-                means, quats, scales, viewmats, Ks, compensations_proj, imageWidth, imageHeight,
-                eps2d, radii_proj, conics_proj, dLossDMeans2d, dLossDDepths, dLossDConics,
-                dLossDCompensations, true, true, outNormalizeddLossdMeans2dNormAccum,
-                outNormalizedMaxRadiiAccum, outGradientStepCounts);
+                means,
+                quats,
+                scales,
+                viewmats,
+                Ks,
+                compensations_proj,
+                imageWidth,
+                imageHeight,
+                eps2d,
+                radii_proj,
+                conics_proj,
+                dLossDMeans2d,
+                dLossDDepths,
+                dLossDConics,
+                dLossDCompensations,
+                true,
+                true,
+                outNormalizeddLossdMeans2dNormAccum,
+                outNormalizedMaxRadiiAccum,
+                outGradientStepCounts);
 
         std::vector<torch::Tensor> outputData = {
             dLossDMeans,
             // dLossDCovars, Currently dLossDCovars is not output, not exposed, see
             // dispatchGaussianProjectionBackward
-            dLossDQuats, dLossDScales, dLossDCamToWorlds, outNormalizeddLossdMeans2dNormAccum,
-            outNormalizedMaxRadiiAccum, outGradientStepCounts
-        };
+            dLossDQuats,
+            dLossDScales,
+            dLossDCamToWorlds,
+            outNormalizeddLossdMeans2dNormAccum,
+            outNormalizedMaxRadiiAccum,
+            outGradientStepCounts};
         auto outputFilename = std::string("projection_ortho_backward_outputs.pt");
 
         storeData(outputFilename, outputData);
@@ -253,23 +313,39 @@ TEST_F(GaussianProjectionBackwardTestFixture, DISABLED_GenerateOutputData) {
 TEST_F(GaussianProjectionBackwardTestFixture, TestPerspectiveProjection) {
     loadTestData("projection_persp_backward_inputs.pt", "projection_persp_backward_outputs.pt");
 
-    const auto    C                   = radii.size(0);
-    const auto    N                   = radii.size(1);
-    torch::Tensor dLossDMeans2d       = torch::full({ C, N, 2 }, 0.1, torch::kCUDA);
-    torch::Tensor dLossDDepths        = torch::full({ C, N }, 0.2, torch::kCUDA);
-    torch::Tensor dLossDConics        = torch::full({ C, N, 3 }, 0.3, torch::kCUDA);
-    torch::Tensor dLossDCompensations = torch::full({ C, N }, 0.4, torch::kCUDA);
+    const auto C                      = radii.size(0);
+    const auto N                      = radii.size(1);
+    torch::Tensor dLossDMeans2d       = torch::full({C, N, 2}, 0.1, torch::kCUDA);
+    torch::Tensor dLossDDepths        = torch::full({C, N}, 0.2, torch::kCUDA);
+    torch::Tensor dLossDConics        = torch::full({C, N, 3}, 0.3, torch::kCUDA);
+    torch::Tensor dLossDCompensations = torch::full({C, N}, 0.4, torch::kCUDA);
 
     torch::TensorOptions options             = torch::kCUDA;
-    auto outNormalizeddLossdMeans2dNormAccum = torch::zeros({ N }, options.dtype(torch::kFloat32));
-    auto outNormalizedMaxRadiiAccum          = torch::zeros({ N }, options.dtype(torch::kInt32));
-    auto outGradientStepCounts               = torch::zeros({ N }, options.dtype(torch::kInt32));
+    auto outNormalizeddLossdMeans2dNormAccum = torch::zeros({N}, options.dtype(torch::kFloat32));
+    auto outNormalizedMaxRadiiAccum          = torch::zeros({N}, options.dtype(torch::kInt32));
+    auto outGradientStepCounts               = torch::zeros({N}, options.dtype(torch::kInt32));
 
     const auto [dLossDMeans, dLossDCovars, dLossDQuats, dLossDScales, dLossDCamToWorlds] =
         fvdb::detail::ops::dispatchGaussianProjectionBackward<torch::kCUDA>(
-            means, quats, scales, viewmats, Ks, compensations, imageWidth, imageHeight, eps2d,
-            radii, conics, dLossDMeans2d, dLossDDepths, dLossDConics, dLossDCompensations, true,
-            false, outNormalizeddLossdMeans2dNormAccum, outNormalizedMaxRadiiAccum,
+            means,
+            quats,
+            scales,
+            viewmats,
+            Ks,
+            compensations,
+            imageWidth,
+            imageHeight,
+            eps2d,
+            radii,
+            conics,
+            dLossDMeans2d,
+            dLossDDepths,
+            dLossDConics,
+            dLossDCompensations,
+            true,
+            false,
+            outNormalizeddLossdMeans2dNormAccum,
+            outNormalizedMaxRadiiAccum,
             outGradientStepCounts);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans, expectedDLossDMeans));
@@ -285,23 +361,39 @@ TEST_F(GaussianProjectionBackwardTestFixture, TestPerspectiveProjection) {
 TEST_F(GaussianProjectionBackwardTestFixture, TestOrthographicProjection) {
     loadTestData("projection_ortho_backward_inputs.pt", "projection_ortho_backward_outputs.pt");
 
-    const auto    C                   = radii.size(0);
-    const auto    N                   = radii.size(1);
-    torch::Tensor dLossDMeans2d       = torch::full({ C, N, 2 }, 0.1, torch::kCUDA);
-    torch::Tensor dLossDDepths        = torch::full({ C, N }, 0.2, torch::kCUDA);
-    torch::Tensor dLossDConics        = torch::full({ C, N, 3 }, 0.3, torch::kCUDA);
-    torch::Tensor dLossDCompensations = torch::full({ C, N }, 0.4, torch::kCUDA);
+    const auto C                      = radii.size(0);
+    const auto N                      = radii.size(1);
+    torch::Tensor dLossDMeans2d       = torch::full({C, N, 2}, 0.1, torch::kCUDA);
+    torch::Tensor dLossDDepths        = torch::full({C, N}, 0.2, torch::kCUDA);
+    torch::Tensor dLossDConics        = torch::full({C, N, 3}, 0.3, torch::kCUDA);
+    torch::Tensor dLossDCompensations = torch::full({C, N}, 0.4, torch::kCUDA);
 
     torch::TensorOptions options             = torch::kCUDA;
-    auto outNormalizeddLossdMeans2dNormAccum = torch::zeros({ N }, options.dtype(torch::kFloat32));
-    auto outNormalizedMaxRadiiAccum          = torch::zeros({ N }, options.dtype(torch::kInt32));
-    auto outGradientStepCounts               = torch::zeros({ N }, options.dtype(torch::kInt32));
+    auto outNormalizeddLossdMeans2dNormAccum = torch::zeros({N}, options.dtype(torch::kFloat32));
+    auto outNormalizedMaxRadiiAccum          = torch::zeros({N}, options.dtype(torch::kInt32));
+    auto outGradientStepCounts               = torch::zeros({N}, options.dtype(torch::kInt32));
 
     const auto [dLossDMeans, dLossDCovars, dLossDQuats, dLossDScales, dLossDCamToWorlds] =
         fvdb::detail::ops::dispatchGaussianProjectionBackward<torch::kCUDA>(
-            means, quats, scales, viewmats, Ks, compensations, imageWidth, imageHeight, eps2d,
-            radii, conics, dLossDMeans2d, dLossDDepths, dLossDConics, dLossDCompensations, true,
-            true, outNormalizeddLossdMeans2dNormAccum, outNormalizedMaxRadiiAccum,
+            means,
+            quats,
+            scales,
+            viewmats,
+            Ks,
+            compensations,
+            imageWidth,
+            imageHeight,
+            eps2d,
+            radii,
+            conics,
+            dLossDMeans2d,
+            dLossDDepths,
+            dLossDConics,
+            dLossDCompensations,
+            true,
+            true,
+            outNormalizeddLossdMeans2dNormAccum,
+            outNormalizedMaxRadiiAccum,
             outGradientStepCounts);
 
     EXPECT_TRUE(torch::allclose(dLossDMeans, expectedDLossDMeans));

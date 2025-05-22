@@ -14,26 +14,30 @@ namespace ops {
 template <typename GridType, typename ScalarType>
 __hostdev__ inline void
 fillToGridVoxelCallback(
-    int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t channelIdx,
-    GridBatchImpl::Accessor<GridType> fromGridHdl, GridBatchImpl::Accessor<GridType> toGridHdl,
+    int32_t batchIdx,
+    int32_t leafIdx,
+    int32_t voxelIdx,
+    int32_t channelIdx,
+    GridBatchImpl::Accessor<GridType> fromGridHdl,
+    GridBatchImpl::Accessor<GridType> toGridHdl,
     torch::PackedTensorAccessor64<ScalarType, 2, torch::RestrictPtrTraits> fromFeatures,
     torch::PackedTensorAccessor64<ScalarType, 2, torch::RestrictPtrTraits> toFeatures) {
     using LeafNodeT = typename nanovdb::NanoGrid<GridType>::LeafNodeType;
 
-    const nanovdb::NanoGrid<GridType> *gpuFromGrid    = fromGridHdl.grid(batchIdx);
-    const int64_t                      fromBaseOffset = fromGridHdl.voxelOffset(batchIdx);
+    const nanovdb::NanoGrid<GridType> *gpuFromGrid = fromGridHdl.grid(batchIdx);
+    const int64_t fromBaseOffset                   = fromGridHdl.voxelOffset(batchIdx);
 
-    const LeafNodeT     &fromLeaf     = gpuFromGrid->tree().template getFirstNode<0>()[leafIdx];
-    const nanovdb::Coord voxIjk       = fromLeaf.offsetToGlobalCoord(voxelIdx);
-    const bool           isFromActive = fromLeaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx);
+    const LeafNodeT &fromLeaf   = gpuFromGrid->tree().template getFirstNode<0>()[leafIdx];
+    const nanovdb::Coord voxIjk = fromLeaf.offsetToGlobalCoord(voxelIdx);
+    const bool isFromActive     = fromLeaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx);
 
     if (!isFromActive) {
         return;
     }
 
-    const nanovdb::NanoGrid<GridType> *gpuToGrid    = toGridHdl.grid(batchIdx);
-    const int64_t                      toBaseOffset = toGridHdl.voxelOffset(batchIdx);
-    const auto                         toGridAcc    = gpuToGrid->getAccessor();
+    const nanovdb::NanoGrid<GridType> *gpuToGrid = toGridHdl.grid(batchIdx);
+    const int64_t toBaseOffset                   = toGridHdl.voxelOffset(batchIdx);
+    const auto toGridAcc                         = gpuToGrid->getAccessor();
     if (!toGridAcc.template get<ActiveOrUnmasked<GridType>>(voxIjk)) {
         return;
     }
@@ -46,10 +50,11 @@ fillToGridVoxelCallback(
 
 template <typename GridType, typename ScalarType>
 void
-fillToGridCPU(const GridBatchImpl::Accessor<GridType>   &fromGridHandle,
-              const GridBatchImpl::Accessor<GridType>   &toGridHandle,
+fillToGridCPU(const GridBatchImpl::Accessor<GridType> &fromGridHandle,
+              const GridBatchImpl::Accessor<GridType> &toGridHandle,
               const torch::TensorAccessor<ScalarType, 2> fromFeatures,
-              torch::TensorAccessor<ScalarType, 2> toFeatures, bool isContiguous) {
+              torch::TensorAccessor<ScalarType, 2> toFeatures,
+              bool isContiguous) {
     for (size_t bi = 0; bi < fromGridHandle.batchSize(); bi += 1) {
         const nanovdb::NanoGrid<GridType> *fromGrid = fromGridHandle.grid(bi);
         const nanovdb::NanoGrid<GridType> *toGrid   = toGridHandle.grid(bi);
@@ -58,7 +63,8 @@ fillToGridCPU(const GridBatchImpl::Accessor<GridType>   &fromGridHandle,
         const int64_t toBaseOffset   = toGridHandle.voxelOffset(bi);
 
         for (auto it = ActiveVoxelIterator<GridType, -1>(fromGrid->tree(), false, fromBaseOffset);
-             it.isValid(); it++) {
+             it.isValid();
+             it++) {
             const nanovdb::Coord voxIjk = it->first;
 
             if (!toGrid->getAccessor().template get<ActiveOrUnmasked<GridType>>(voxIjk)) {
@@ -67,7 +73,8 @@ fillToGridCPU(const GridBatchImpl::Accessor<GridType>   &fromGridHandle,
             const int64_t toIndex =
                 (int64_t)toGrid->getAccessor().getValue(voxIjk) + toBaseOffset - 1;
             if (isContiguous) {
-                memcpy(toFeatures[toIndex].data(), fromFeatures[it->second].data(),
+                memcpy(toFeatures[toIndex].data(),
+                       fromFeatures[it->second].data(),
                        fromFeatures.size(1) * sizeof(ScalarType));
             } else {
                 for (int c = 0; c < toFeatures.size(1); ++c) {
@@ -80,43 +87,61 @@ fillToGridCPU(const GridBatchImpl::Accessor<GridType>   &fromGridHandle,
 
 template <>
 void
-dispatchFillFromGrid<torch::kCUDA>(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
-                                   const torch::Tensor &fromFeatures, torch::Tensor &toFeatures) {
+dispatchFillFromGrid<torch::kCUDA>(const GridBatchImpl &fromGrid,
+                                   const GridBatchImpl &toGrid,
+                                   const torch::Tensor &fromFeatures,
+                                   torch::Tensor &toFeatures) {
     FVDB_DISPATCH_GRID_TYPES(fromGrid, [&]() {
         AT_DISPATCH_V2(
-            fromFeatures.scalar_type(), "fillToGrid", AT_WRAP([&]() {
+            fromFeatures.scalar_type(),
+            "fillToGrid",
+            AT_WRAP([&]() {
                 auto fromFeaturesAcc =
                     fromFeatures.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
                 auto toFeaturesAcc =
                     toFeatures.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
                 auto toGridAcc = toGrid.deviceAccessor<GridType>();
-                auto callback  = [=] __device__(int64_t bidx, int64_t lidx, int64_t vidx,
-                                                int64_t                           cidx,
-                                                GridBatchImpl::Accessor<GridType> fromGridAcc) {
-                    fillToGridVoxelCallback<GridType, scalar_t>(bidx, lidx, vidx, cidx, fromGridAcc,
-                                                                 toGridAcc, fromFeaturesAcc,
-                                                                 toFeaturesAcc);
+                auto callback  = [=] __device__(int64_t bidx,
+                                               int64_t lidx,
+                                               int64_t vidx,
+                                               int64_t cidx,
+                                               GridBatchImpl::Accessor<GridType> fromGridAcc) {
+                    fillToGridVoxelCallback<GridType, scalar_t>(bidx,
+                                                                lidx,
+                                                                vidx,
+                                                                cidx,
+                                                                fromGridAcc,
+                                                                toGridAcc,
+                                                                fromFeaturesAcc,
+                                                                toFeaturesAcc);
                 };
                 forEachVoxelCUDA<GridType>(512, fromFeatures.size(1), fromGrid, callback);
             }),
-            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     });
 }
 
 template <>
 void
-dispatchFillFromGrid<torch::kCPU>(const GridBatchImpl &fromGrid, const GridBatchImpl &toGrid,
-                                  const torch::Tensor &fromFeatures, torch::Tensor &toFeatures) {
+dispatchFillFromGrid<torch::kCPU>(const GridBatchImpl &fromGrid,
+                                  const GridBatchImpl &toGrid,
+                                  const torch::Tensor &fromFeatures,
+                                  torch::Tensor &toFeatures) {
     bool isContiguous = fromFeatures.is_contiguous() && toFeatures.is_contiguous();
 
     FVDB_DISPATCH_GRID_TYPES(toGrid, [&]() {
-        AT_DISPATCH_V2(fromFeatures.scalar_type(), "fillToGrid", AT_WRAP([&]() {
-                           fillToGridCPU<GridType, scalar_t>(
-                               fromGrid.hostAccessor<GridType>(), toGrid.hostAccessor<GridType>(),
-                               fromFeatures.accessor<scalar_t, 2>(),
-                               toFeatures.accessor<scalar_t, 2>(), isContiguous);
+        AT_DISPATCH_V2(fromFeatures.scalar_type(),
+                       "fillToGrid",
+                       AT_WRAP([&]() {
+                           fillToGridCPU<GridType, scalar_t>(fromGrid.hostAccessor<GridType>(),
+                                                             toGrid.hostAccessor<GridType>(),
+                                                             fromFeatures.accessor<scalar_t, 2>(),
+                                                             toFeatures.accessor<scalar_t, 2>(),
+                                                             isContiguous);
                        }),
-                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+                       AT_EXPAND(AT_FLOATING_TYPES),
+                       c10::kHalf);
     });
 }
 

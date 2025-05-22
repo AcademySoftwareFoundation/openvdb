@@ -13,7 +13,7 @@ namespace detail {
 
 template <bool AllowScalar> class Vec3dImpl {
     nanovdb::Vec3d mValue;
-    bool           mWasScalar = false;
+    bool mWasScalar = false;
 
   public:
     static constexpr bool SupportsScalarCast = AllowScalar;
@@ -51,7 +51,7 @@ template <bool AllowScalar> class Vec3dImpl {
 
 template <bool AllowScalar> class Coord3Impl {
     nanovdb::Coord mValue;
-    bool           mWasScalar = false;
+    bool mWasScalar = false;
 
   public:
     static constexpr bool SupportsScalarCast = AllowScalar;
@@ -123,8 +123,8 @@ template <bool AllowScalar> class Coord4Impl {
 template <typename VecT, bool AllowScalar, bool AllowBroadcast> class Vec3BatchImpl {
   private:
     std::vector<VecT> mValue;
-    bool              isScalar = false;
-    bool              isSingle = false;
+    bool isScalar = false;
+    bool isSingle = false;
 
     std::vector<VecT>
     repeatIt(int64_t batchSize, bool onlyPositive) const {
@@ -162,7 +162,8 @@ template <typename VecT, bool AllowScalar, bool AllowBroadcast> class Vec3BatchI
 
         if constexpr (AllowBroadcast) {
             if (squeezed.numel() == 3) {
-                mValue.push_back(VecT(squeezed[0].item<double>(), squeezed[1].item<double>(),
+                mValue.push_back(VecT(squeezed[0].item<double>(),
+                                      squeezed[1].item<double>(),
                                       squeezed[2].item<double>()));
                 isSingle = true;
                 return;
@@ -175,7 +176,8 @@ template <typename VecT, bool AllowScalar, bool AllowBroadcast> class Vec3BatchI
                           "Expected a batch of 3D coordinates with size [B, 3]");
         mValue.reserve(squeezed.size(0));
         for (int i = 0; i < squeezed.size(0); ++i) {
-            mValue.push_back(VecT(squeezed[i][0].item<double>(), squeezed[i][1].item<double>(),
+            mValue.push_back(VecT(squeezed[i][0].item<double>(),
+                                  squeezed[i][1].item<double>(),
                                   squeezed[i][2].item<double>()));
         }
     }
@@ -261,9 +263,9 @@ template <typename VecT, bool AllowScalar, bool AllowBroadcast> class Vec3BatchI
         std::vector<VecT> vec = value(batchSize, onlyPositive, name);
 
         if constexpr (nanovdb::util::is_same<VecT, nanovdb::Coord>::value) {
-            return torch::from_blob(vec.data(), { (int64_t)vec.size(), 3 }, torch::kInt32).clone();
+            return torch::from_blob(vec.data(), {(int64_t)vec.size(), 3}, torch::kInt32).clone();
         } else if constexpr (nanovdb::util::is_same<VecT, nanovdb::Vec3d>::value) {
-            return torch::from_blob(vec.data(), { (int64_t)vec.size(), 3 }, torch::kDouble).clone();
+            return torch::from_blob(vec.data(), {(int64_t)vec.size(), 3}, torch::kDouble).clone();
         } else {
             static_assert("Only Coord and Vec3d are supported for now");
         }

@@ -71,8 +71,9 @@ template <typename AccT, typename ScalarT> struct HDDASegmentIterator {
         : mAcc(acc) {
         mIgnoreMasked = ignoreMasked;
         mRay          = RayTInternal(nanovdb::math::Vec3<MathType>(rayVox.eye()),
-                                     nanovdb::math::Vec3<MathType>(rayVox.dir()),
-                                     static_cast<MathType>(rayVox.t0()), static_cast<MathType>(rayVox.t1()));
+                            nanovdb::math::Vec3<MathType>(rayVox.dir()),
+                            static_cast<MathType>(rayVox.t0()),
+                            static_cast<MathType>(rayVox.t1()));
         CoordT ijk    = nanovdb::math::RoundDown<CoordT>(
             rayVox(mRay.t0() + nanovdb::math::Delta<ScalarT>::value()));
         mHdda.init(mRay, mAcc.getDim(ijk, mRay));
@@ -127,17 +128,17 @@ template <typename AccT, typename ScalarT> struct HDDASegmentIterator {
         return mTimespan.valid(0.0);
     }
 
-    const AccT  &mAcc;
+    const AccT &mAcc;
     RayTInternal mRay;
-    HDDAT        mHdda;
-    TimespanT    mTimespan;
-    bool         mIgnoreMasked;
+    HDDAT mHdda;
+    TimespanT mTimespan;
+    bool mIgnoreMasked;
 };
 
 template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
     using MathType = at::opmath_type<ScalarT>;
     struct PairT {
-        nanovdb::Coord                                  first;
+        nanovdb::Coord first;
         typename nanovdb::math::Ray<MathType>::TimeSpan second;
     };
     using BuildT       = typename AccT::BuildType;
@@ -159,7 +160,8 @@ template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
         : mAcc(acc) {
         mRay = RayTInternal(nanovdb::math::Vec3<MathType>(rayVox.eye()),
                             nanovdb::math::Vec3<MathType>(rayVox.dir()),
-                            static_cast<MathType>(rayVox.t0()), static_cast<MathType>(rayVox.t1()));
+                            static_cast<MathType>(rayVox.t0()),
+                            static_cast<MathType>(rayVox.t1()));
 
         CoordT ijk = mRay(mRay.t0() + nanovdb::math::Delta<ScalarT>::value()).floor();
         mHdda.init(mRay, mAcc.getDim(ijk, mRay));
@@ -209,7 +211,7 @@ template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
             // NOTE: This will return true if a tile is active
             if (mAcc.template get<fvdb::ActiveOrUnmasked<BuildT>>(
                     mHdda.voxel())) { // We hit an active voxel, increment hdda and return
-                mData = { mHdda.voxel(), TimespanT(mHdda.time(), mHdda.next()) };
+                mData = {mHdda.voxel(), TimespanT(mHdda.time(), mHdda.next())};
                 mHdda.step();
                 return true;
             }
@@ -219,11 +221,11 @@ template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
         return false;
     }
 
-    bool         mIsValid = false;
-    const AccT  &mAcc;
+    bool mIsValid = false;
+    const AccT &mAcc;
     RayTInternal mRay;
-    HDDAT        mHdda;
-    value_type   mData;
+    HDDAT mHdda;
+    value_type mData;
 };
 
 } // namespace fvdb

@@ -17,8 +17,10 @@ namespace autograd {
 TransformPoints::variable_list
 TransformPoints::forward(TransformPoints::AutogradContext *ctx,
                          c10::intrusive_ptr<GridBatchImpl> grid,
-                         TransformPoints::JaggedVariable points, Variable pointsData,
-                         bool isInverse, bool isDual) {
+                         TransformPoints::JaggedVariable points,
+                         Variable pointsData,
+                         bool isInverse,
+                         bool isDual) {
     grid->checkDevice(points);
     TORCH_CHECK_VALUE(points.rdim() == 2, "points must have shape [B*N, 3]");
     TORCH_CHECK_VALUE(points.rsize(-1) == 3, "points must have shape [B*N, 3]");
@@ -39,18 +41,18 @@ TransformPoints::forward(TransformPoints::AutogradContext *ctx,
         });
     }
 
-    ctx->save_for_backward({ points.joffsets(), points.jlidx() });
+    ctx->save_for_backward({points.joffsets(), points.jlidx()});
 
     ctx->saved_data["grid"]      = grid;
     ctx->saved_data["isDual"]    = isDual;
     ctx->saved_data["isInverse"] = isInverse;
 
-    return { outTxPoints }; // [B*N, 3]
+    return {outTxPoints}; // [B*N, 3]
 }
 
 TransformPoints::variable_list
 TransformPoints::backward(TransformPoints::AutogradContext *ctx,
-                          TransformPoints::variable_list    grad_output) {
+                          TransformPoints::variable_list grad_output) {
     variable_list saved = ctx->get_saved_variables();
 
     Variable pointsJOffsets = saved.at(0);
@@ -58,7 +60,7 @@ TransformPoints::backward(TransformPoints::AutogradContext *ctx,
     Variable gradOut        = grad_output.at(0); // [B*N, 3]
 
     // Use data saved in forward
-    auto       grid      = ctx->saved_data["grid"].toCustomClass<GridBatchImpl>();
+    auto grid            = ctx->saved_data["grid"].toCustomClass<GridBatchImpl>();
     const bool isDual    = ctx->saved_data["isDual"].toBool();
     const bool isInverse = ctx->saved_data["isInverse"].toBool();
 
@@ -81,7 +83,7 @@ TransformPoints::backward(TransformPoints::AutogradContext *ctx,
 
     // Variable outGradIn = outGradInReshape.reshape(getShapeButReplaceFirstDim(fineData.size(0),
     // gradOut));
-    return { torch::Tensor(), torch::Tensor(), outGradIn, torch::Tensor(), torch::Tensor() };
+    return {torch::Tensor(), torch::Tensor(), outGradIn, torch::Tensor(), torch::Tensor()};
 }
 
 } // namespace autograd

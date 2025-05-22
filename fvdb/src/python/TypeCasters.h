@@ -28,7 +28,7 @@ template <> struct type_caster<fvdb::JaggedTensor> : public type_caster_base<fvd
         if (THPVariable_Check(src.ptr())) {
             // TODO: (@fwilliams) Might need to reinterpret steal here?
             torch::Tensor data = THPVariable_Unpack(src.ptr());
-            jag_value          = fvdb::JaggedTensor({ data });
+            jag_value          = fvdb::JaggedTensor({data});
             value              = &jag_value;
             return true;
         } else {
@@ -85,7 +85,7 @@ struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::Jagg
         }
         if (py::isinstance<py::slice>(src)) {
             py::ssize_t start, stop, step;
-            py::slice   slice = src.cast<py::slice>();
+            py::slice slice = src.cast<py::slice>();
             PySlice_Unpack(slice.ptr(), &start, &stop, &step);
 
             // FIXME: (@fwilliams) -- This is a bit weird. Ideally we want the same behavior as
@@ -156,9 +156,7 @@ struct type_caster<fvdb::NanoVDBFileGridIdentifier>
             } catch (pybind11::cast_error &e) {
                 try {
                     id_value = src.cast<std::vector<std::string>>();
-                } catch (pybind11::cast_error &e) {
-                    return false;
-                }
+                } catch (pybind11::cast_error &e) { return false; }
             }
             value = &id_value;
             return true;

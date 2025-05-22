@@ -26,7 +26,7 @@ namespace detail {
 template <typename ScalarT> struct TrilinearInterpolationIterator {
     struct PairT {
         nanovdb::Coord first;
-        ScalarT        second;
+        ScalarT second;
     };
 
     template <typename Scalar, int N> struct ArrayT {
@@ -65,7 +65,7 @@ template <typename ScalarT> struct TrilinearInterpolationIterator {
             uvw[0] * uvw[1] * uvw[2],
         };
 
-        mCoordAndWeight = { mVoxel, mTrilinearWeights[0] };
+        mCoordAndWeight = {mVoxel, mTrilinearWeights[0]};
     }
 
     __hostdev__ inline const TrilinearInterpolationIterator &
@@ -74,12 +74,12 @@ template <typename ScalarT> struct TrilinearInterpolationIterator {
         if (mCount >= 8) {
             return *this;
         }
-        const uint8_t        di     = (mCount & (1 << 2)) >> 2;
-        const uint8_t        dj     = (mCount & (1 << 1)) >> 1;
-        const uint8_t        dk     = mCount & 1;
-        const nanovdb::Coord ijk    = nanovdb::Coord(di, dj, dk) + mVoxel;
-        const ScalarT        weight = mTrilinearWeights[mCount];
-        mCoordAndWeight             = { ijk, weight };
+        const uint8_t di         = (mCount & (1 << 2)) >> 2;
+        const uint8_t dj         = (mCount & (1 << 1)) >> 1;
+        const uint8_t dk         = mCount & 1;
+        const nanovdb::Coord ijk = nanovdb::Coord(di, dj, dk) + mVoxel;
+        const ScalarT weight     = mTrilinearWeights[mCount];
+        mCoordAndWeight          = {ijk, weight};
         return *this;
     }
 
@@ -118,9 +118,9 @@ template <typename ScalarT> struct TrilinearInterpolationIterator {
     }
 
   private:
-    int32_t            mCount = 0;
-    value_type         mCoordAndWeight;
-    nanovdb::Coord     mVoxel;
+    int32_t mCount = 0;
+    value_type mCoordAndWeight;
+    nanovdb::Coord mVoxel;
     ArrayT<ScalarT, 8> mTrilinearWeights;
     // std::array<ScalarT, 8> mTrilinearWeights;
 };

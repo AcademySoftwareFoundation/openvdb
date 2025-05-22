@@ -15,12 +15,16 @@ namespace ops {
 /// @brief Per-voxel callback which computes the active grid coordinates for a batch of grids
 template <typename GridType, template <typename T, int32_t D> typename TorchAccessor>
 __hostdev__ inline void
-gridEdgeNetworkCallback(int64_t batchIdx, int32_t leafIdx, int32_t voxelIdx,
+gridEdgeNetworkCallback(int64_t batchIdx,
+                        int32_t leafIdx,
+                        int32_t voxelIdx,
                         GridBatchImpl::Accessor<GridType> gridAccessor,
-                        TorchAccessor<float, 2> outV, TorchAccessor<fvdb::JIdxType, 1> outVBidx,
-                        TorchAccessor<int64_t, 2> outE, TorchAccessor<fvdb::JIdxType, 1> outEBidx,
+                        TorchAccessor<float, 2> outV,
+                        TorchAccessor<fvdb::JIdxType, 1> outVBidx,
+                        TorchAccessor<int64_t, 2> outE,
+                        TorchAccessor<fvdb::JIdxType, 1> outEBidx,
                         bool returnVoxelCoordinates) {
-    const nanovdb::NanoGrid<GridType>                        *grid = gridAccessor.grid(batchIdx);
+    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
     const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const int64_t baseOffset = gridAccessor.voxelOffset(batchIdx);
@@ -29,15 +33,15 @@ gridEdgeNetworkCallback(int64_t batchIdx, int32_t leafIdx, int32_t voxelIdx,
 
     const nanovdb::Coord voxIjk = leaf.offsetToGlobalCoord(voxelIdx);
     if (leaf.isActive(voxelIdx)) {
-        int64_t       vIdx      = (int64_t)leaf.getValue(voxelIdx) - 1;
+        int64_t vIdx            = (int64_t)leaf.getValue(voxelIdx) - 1;
         const int64_t globalIdx = baseOffset + vIdx;
         const int64_t countV    = globalIdx * 8;
         const int64_t countE    = globalIdx * 12;
 
         for (int idx = 0; idx < 8; idx += 1) {
-            const int32_t  iz((idx & 1));
-            const int32_t  iy((idx & 2) >> 1);
-            const int32_t  ix((idx & 4) >> 2);
+            const int32_t iz((idx & 1));
+            const int32_t iy((idx & 2) >> 1);
+            const int32_t ix((idx & 4) >> 2);
             nanovdb::Vec3f xyz =
                 (voxIjk + nanovdb::Coord(ix, iy, iz)).asVec3s() - nanovdb::Vec3f(0.5);
             if (!returnVoxelCoordinates) {
@@ -91,15 +95,15 @@ GridEdgeNetwork(const GridBatchImpl &batchHdl, bool returnVoxelCoordinates) {
         const int64_t numUnmasked = batchHdl.totalEnabledVoxels(false /*ignoreDisabledVoxels*/);
 
         auto optsV = torch::TensorOptions().dtype(torch::kFloat32).device(batchHdl.device());
-        torch::Tensor outV = torch::empty({ 8 * numUnmasked, 3 }, optsV);
+        torch::Tensor outV = torch::empty({8 * numUnmasked, 3}, optsV);
 
-        auto          optsE = torch::TensorOptions().dtype(torch::kInt64).device(batchHdl.device());
-        torch::Tensor outE  = torch::empty({ 12 * numUnmasked, 2 }, optsE);
+        auto optsE         = torch::TensorOptions().dtype(torch::kInt64).device(batchHdl.device());
+        torch::Tensor outE = torch::empty({12 * numUnmasked, 2}, optsE);
 
         auto optsBIdx =
             torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(batchHdl.device());
-        torch::Tensor outVBidx = torch::empty({ 8 * numUnmasked }, optsBIdx);
-        torch::Tensor outEBidx = torch::empty({ 12 * numUnmasked }, optsBIdx);
+        torch::Tensor outVBidx = torch::empty({8 * numUnmasked}, optsBIdx);
+        torch::Tensor outEBidx = torch::empty({12 * numUnmasked}, optsBIdx);
 
         auto outVAcc     = tensorAccessor<DeviceTag, float, 2>(outV);
         auto outVBidxAcc = tensorAccessor<DeviceTag, fvdb::JIdxType, 1>(outVBidx);
@@ -107,32 +111,50 @@ GridEdgeNetwork(const GridBatchImpl &batchHdl, bool returnVoxelCoordinates) {
         auto outEBidxAcc = tensorAccessor<DeviceTag, fvdb::JIdxType, 1>(outEBidx);
 
         if constexpr (DeviceTag == torch::kCUDA) {
-            auto cb = [=] __device__(int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+            auto cb = [=] __device__(int32_t batchIdx,
+                                     int32_t leafIdx,
+                                     int32_t voxelIdx,
+                                     int32_t,
                                      GridBatchImpl::Accessor<GridType> gridAccessor) {
-                gridEdgeNetworkCallback<GridType, TorchRAcc32>(
-                    batchIdx, leafIdx, voxelIdx, gridAccessor, outVAcc, outVBidxAcc, outEAcc,
-                    outEBidxAcc, returnVoxelCoordinates);
+                gridEdgeNetworkCallback<GridType, TorchRAcc32>(batchIdx,
+                                                               leafIdx,
+                                                               voxelIdx,
+                                                               gridAccessor,
+                                                               outVAcc,
+                                                               outVBidxAcc,
+                                                               outEAcc,
+                                                               outEBidxAcc,
+                                                               returnVoxelCoordinates);
             };
             forEachVoxelCUDA<GridType>(1024, 1, batchHdl, cb);
         } else {
-            auto cb = [=](int32_t batchIdx, int32_t leafIdx, int32_t voxelIdx, int32_t,
+            auto cb = [=](int32_t batchIdx,
+                          int32_t leafIdx,
+                          int32_t voxelIdx,
+                          int32_t,
                           GridBatchImpl::Accessor<GridType> gridAccessor) {
-                gridEdgeNetworkCallback<GridType, TorchAcc>(
-                    batchIdx, leafIdx, voxelIdx, gridAccessor, outVAcc, outVBidxAcc, outEAcc,
-                    outEBidxAcc, returnVoxelCoordinates);
+                gridEdgeNetworkCallback<GridType, TorchAcc>(batchIdx,
+                                                            leafIdx,
+                                                            voxelIdx,
+                                                            gridAccessor,
+                                                            outVAcc,
+                                                            outVBidxAcc,
+                                                            outEAcc,
+                                                            outEBidxAcc,
+                                                            returnVoxelCoordinates);
             };
             forEachVoxelCPU<GridType>(1, batchHdl, cb);
         }
 
         // FIXME: (@fwilliams) Be smarter about this
         const torch::Tensor outVBidx2 =
-            batchHdl.batchSize() == 1 ? torch::empty({ 0 }, optsBIdx) : outVBidx;
+            batchHdl.batchSize() == 1 ? torch::empty({0}, optsBIdx) : outVBidx;
         const torch::Tensor outEBidx2 =
-            batchHdl.batchSize() == 1 ? torch::empty({ 0 }, optsBIdx) : outEBidx;
-        return { JaggedTensor::from_data_indices_and_list_ids(outV, outVBidx2, batchHdl.jlidx(),
-                                                              batchHdl.batchSize()),
-                 JaggedTensor::from_data_indices_and_list_ids(outE, outEBidx2, batchHdl.jlidx(),
-                                                              batchHdl.batchSize()) };
+            batchHdl.batchSize() == 1 ? torch::empty({0}, optsBIdx) : outEBidx;
+        return {JaggedTensor::from_data_indices_and_list_ids(
+                    outV, outVBidx2, batchHdl.jlidx(), batchHdl.batchSize()),
+                JaggedTensor::from_data_indices_and_list_ids(
+                    outE, outEBidx2, batchHdl.jlidx(), batchHdl.batchSize())};
     });
 }
 

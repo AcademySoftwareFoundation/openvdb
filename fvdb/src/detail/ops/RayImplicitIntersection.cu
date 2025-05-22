@@ -22,23 +22,30 @@ sgn(const T &val) {
     return (T(0) < val) - (val < T(0));
 }
 
-template <typename ScalarT, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarT,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ inline void
-rayImplicitCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarT, 2> raysO,
-                    JaggedAccessor<ScalarT, 2> raysD, JaggedAccessor<ScalarT, 1> gridScalarsJ,
-                    BatchGridAccessor<GridType> batchAcc, TensorAccessor<ScalarT, 1> outTimes,
+rayImplicitCallback(int32_t bidx,
+                    int32_t eidx,
+                    JaggedAccessor<ScalarT, 2> raysO,
+                    JaggedAccessor<ScalarT, 2> raysD,
+                    JaggedAccessor<ScalarT, 1> gridScalarsJ,
+                    BatchGridAccessor<GridType> batchAcc,
+                    TensorAccessor<ScalarT, 1> outTimes,
                     ScalarT eps) {
     const nanovdb::NanoGrid<GridType> *gpuGrid = batchAcc.grid(bidx);
-    const auto                         gridAcc = gpuGrid->getAccessor();
+    const auto gridAcc                         = gpuGrid->getAccessor();
 
     const VoxelCoordTransform transform = batchAcc.dualTransform(bidx);
-    const nanovdb::CoordBBox  dualBbox  = batchAcc.dualBbox(bidx);
+    const nanovdb::CoordBBox dualBbox   = batchAcc.dualBbox(bidx);
 
-    const auto                  rayO        = raysO.data()[eidx];
-    const auto                  rayD        = raysD.data()[eidx];
-    auto                        gridScalars = gridScalarsJ.data();
+    const auto rayO  = raysO.data()[eidx];
+    const auto rayD  = raysD.data()[eidx];
+    auto gridScalars = gridScalarsJ.data();
     nanovdb::math::Ray<ScalarT> rayVox =
         transform.applyToRay(rayO[0], rayO[1], rayO[2], rayD[0], rayD[1], rayD[2]);
     if (!rayVox.clip(dualBbox)) {
@@ -46,16 +53,16 @@ rayImplicitCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarT, 2> raysO
         return;
     }
 
-    int     scalarSign = INVALID_SIGN; // Initialize to dummy value to check if first intersection
+    int scalarSign     = INVALID_SIGN; // Initialize to dummy value to check if first intersection
     ScalarT lastScalar = 0.0;
     ScalarT lastTime   = rayVox.t0();
-    bool    found      = false;
+    bool found         = false;
 
     for (auto it = HDDAVoxelIterator<decltype(gridAcc), ScalarT>(rayVox, gridAcc); it.isValid();
          it++) {
-        const ScalarT         t0 = it->second.t0, t1 = it->second.t1;
-        const ScalarT         deltaT = t1 - t0;
-        const nanovdb::Coord &ijk    = it->first;
+        const ScalarT t0 = it->second.t0, t1 = it->second.t1;
+        const ScalarT deltaT      = t1 - t0;
+        const nanovdb::Coord &ijk = it->first;
         if (deltaT < eps) {
             continue;
         }
@@ -63,7 +70,7 @@ rayImplicitCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarT, 2> raysO
         const int64_t voxelIndex = gridAcc.getValue(ijk) - 1;
         const ScalarT voxelValue = gridScalars[voxelIndex];
         const ScalarT voxelTime  = 0.5 * (t0 + t1);
-        const int     voxelSign  = sgn(voxelValue);
+        const int voxelSign      = sgn(voxelValue);
 
         // Francis: This might be faster than the if below since it doesn't require a branch
         // const bool hit = (scalarSign != INVALID_SIGN) && (voxelSign != INVALID_SIGN) &&
@@ -94,8 +101,11 @@ rayImplicitCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarT, 2> raysO
 
 template <c10::DeviceType DeviceTag>
 JaggedTensor
-RayImplicitIntersection(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
-                        const JaggedTensor &rayD, const JaggedTensor &gridScalars, float eps) {
+RayImplicitIntersection(const GridBatchImpl &batchHdl,
+                        const JaggedTensor &rayO,
+                        const JaggedTensor &rayD,
+                        const JaggedTensor &gridScalars,
+                        float eps) {
     batchHdl.checkDevice(rayO);
     batchHdl.checkDevice(rayD);
     batchHdl.checkDevice(gridScalars);
@@ -129,12 +139,14 @@ RayImplicitIntersection(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
                     std::to_string(gridScalars.rsize(0)) + " scalars and there are " +
                     std::to_string(batchHdl.totalVoxels()) + " voxels.");
 
-    auto          optsF    = torch::TensorOptions().dtype(rayO.dtype()).device(rayO.device());
-    torch::Tensor outTimes = torch::empty({ rayO.rsize(0) }, optsF);
+    auto optsF             = torch::TensorOptions().dtype(rayO.dtype()).device(rayO.device());
+    torch::Tensor outTimes = torch::empty({rayO.rsize(0)}, optsF);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
         AT_DISPATCH_V2(
-            rayO.scalar_type(), "RayImplicitIntersection", AT_WRAP([&]() {
+            rayO.scalar_type(),
+            "RayImplicitIntersection",
+            AT_WRAP([&]() {
                 int64_t numThreads = 256 + 128;
                 if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
                     numThreads = 256;
@@ -146,14 +158,18 @@ RayImplicitIntersection(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
                 auto outTimesAcc    = tensorAccessor<DeviceTag, scalar_t, 1>(outTimes);
 
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t eidx,
+                                             int32_t cidx,
                                              JaggedRAcc32<scalar_t, 2> rOA) {
                         rayImplicitCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
                             bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
                     };
                     forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayO, cb);
                 } else {
-                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=](int32_t bidx,
+                                  int32_t eidx,
+                                  int32_t cidx,
                                   JaggedAcc<scalar_t, 2> rOA) {
                         rayImplicitCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
                             bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
@@ -170,21 +186,23 @@ RayImplicitIntersection(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
 template <>
 JaggedTensor
 dispatchRayImplicitIntersection<torch::kCUDA>(const GridBatchImpl &batchHdl,
-                                              const JaggedTensor  &rayOrigins,
-                                              const JaggedTensor  &rayDirections,
-                                              const JaggedTensor &gridScalars, float eps) {
-    return RayImplicitIntersection<torch::kCUDA>(batchHdl, rayOrigins, rayDirections, gridScalars,
-                                                 eps);
+                                              const JaggedTensor &rayOrigins,
+                                              const JaggedTensor &rayDirections,
+                                              const JaggedTensor &gridScalars,
+                                              float eps) {
+    return RayImplicitIntersection<torch::kCUDA>(
+        batchHdl, rayOrigins, rayDirections, gridScalars, eps);
 }
 
 template <>
 JaggedTensor
 dispatchRayImplicitIntersection<torch::kCPU>(const GridBatchImpl &batchHdl,
-                                             const JaggedTensor  &rayOrigins,
-                                             const JaggedTensor  &rayDirections,
-                                             const JaggedTensor &gridScalars, float eps) {
-    return RayImplicitIntersection<torch::kCPU>(batchHdl, rayOrigins, rayDirections, gridScalars,
-                                                eps);
+                                             const JaggedTensor &rayOrigins,
+                                             const JaggedTensor &rayDirections,
+                                             const JaggedTensor &gridScalars,
+                                             float eps) {
+    return RayImplicitIntersection<torch::kCPU>(
+        batchHdl, rayOrigins, rayDirections, gridScalars, eps);
 }
 
 } // namespace ops

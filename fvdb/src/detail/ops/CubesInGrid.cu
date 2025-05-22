@@ -15,21 +15,29 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename ScalarType, bool IsTouch, typename GridType,
-          template <typename T, int32_t D> typename JaggedAccessor,
-          template <typename T, int32_t D> typename TensorAccessor>
+template <typename ScalarType,
+          bool IsTouch,
+          typename GridType,
+          template <typename T, int32_t D>
+          typename JaggedAccessor,
+          template <typename T, int32_t D>
+          typename TensorAccessor>
 __hostdev__ inline void
-cubesInGridCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarType, 2> points,
-                    TensorAccessor<bool, 1> outMask, BatchGridAccessor<GridType> batchAccessor,
+cubesInGridCallback(int32_t bidx,
+                    int32_t eidx,
+                    JaggedAccessor<ScalarType, 2> points,
+                    TensorAccessor<bool, 1> outMask,
+                    BatchGridAccessor<GridType> batchAccessor,
                     nanovdb::math::Vec3<at::opmath_type<ScalarType>> deltaStart,
-                    nanovdb::math::Vec3<at::opmath_type<ScalarType>> deltaEnd, bool ignoreMasked) {
+                    nanovdb::math::Vec3<at::opmath_type<ScalarType>> deltaEnd,
+                    bool ignoreMasked) {
     using MathType = at::opmath_type<ScalarType>;
 
-    const auto                *gpuGrid   = batchAccessor.grid(bidx);
-    auto                       primalAcc = gpuGrid->getAccessor();
+    const auto *gpuGrid                  = batchAccessor.grid(bidx);
+    auto primalAcc                       = gpuGrid->getAccessor();
     const VoxelCoordTransform &transform = batchAccessor.primalTransform(bidx);
 
-    const auto                          pointCoord = points.data()[eidx];
+    const auto pointCoord = points.data()[eidx];
     const nanovdb::math::Vec3<MathType> xyz_s =
         transform.apply(static_cast<MathType>(pointCoord[0]) + deltaStart[0],
                         static_cast<MathType>(pointCoord[1]) + deltaStart[1],
@@ -45,10 +53,10 @@ cubesInGridCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarType, 2> po
     for (int vx = s[0]; vx <= e[0]; ++vx) {
         for (int vy = s[1]; vy <= e[1]; ++vy) {
             for (int vz = s[2]; vz <= e[2]; ++vz) {
-                const nanovdb::Coord vox{ vx, vy, vz };
-                const bool           isActive = ignoreMasked
-                                                    ? primalAcc.isActive(vox)
-                                                    : primalAcc.template get<ActiveOrUnmasked<GridType>>(vox);
+                const nanovdb::Coord vox{vx, vy, vz};
+                const bool isActive = ignoreMasked
+                                          ? primalAcc.isActive(vox)
+                                          : primalAcc.template get<ActiveOrUnmasked<GridType>>(vox);
                 // IsTouch -> isActive? True : mask
                 // !IsTouch -> notActive? False : mask
                 mask = (IsTouch == isActive) ? IsTouch : mask;
@@ -60,8 +68,10 @@ cubesInGridCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarType, 2> po
 
 template <c10::DeviceType DeviceTag, bool IsTouch>
 JaggedTensor
-CubesInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
-            const Vec3dOrScalar &padMinTensor, const Vec3dOrScalar &padMaxTensor,
+CubesInGrid(const GridBatchImpl &batchHdl,
+            const JaggedTensor &cubeCenters,
+            const Vec3dOrScalar &padMinTensor,
+            const Vec3dOrScalar &padMaxTensor,
             bool ignoreDisabledVoxels) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(cubeCenters);
@@ -78,12 +88,14 @@ CubesInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
     const nanovdb::Vec3d padMin = padMinTensor.value();
     const nanovdb::Vec3d padMax = padMaxTensor.value();
 
-    auto          opts    = torch::TensorOptions().dtype(torch::kBool).device(cubeCenters.device());
-    torch::Tensor outMask = torch::empty({ cubeCenters.rsize(0) }, opts);
+    auto opts             = torch::TensorOptions().dtype(torch::kBool).device(cubeCenters.device());
+    torch::Tensor outMask = torch::empty({cubeCenters.rsize(0)}, opts);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
         AT_DISPATCH_V2(
-            cubeCenters.scalar_type(), "CubesInGrid", AT_WRAP([&]() {
+            cubeCenters.scalar_type(),
+            "CubesInGrid",
+            AT_WRAP([&]() {
                 using opmath_t = at::opmath_type<scalar_t>;
 
                 auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
@@ -92,24 +104,39 @@ CubesInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
                 nanovdb::math::Vec3<opmath_t> dend(padMax);
 
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t eidx,
+                                             int32_t cidx,
                                              JaggedRAcc32<scalar_t, 2> ptsA) {
                         cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
+                            bidx,
+                            eidx,
+                            ptsA,
+                            outMaskAccessor,
+                            batchAcc,
+                            dstart,
+                            dend,
                             ignoreDisabledVoxels);
                     };
                     forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, cubeCenters, cb);
                 } else {
-                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> ptsA) {
-                        cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, ptsA, outMaskAccessor, batchAcc, dstart, dend,
-                            ignoreDisabledVoxels);
-                    };
+                    auto cb =
+                        [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                            cubesInGridCallback<scalar_t, IsTouch, GridType, JaggedAcc, TorchAcc>(
+                                bidx,
+                                eidx,
+                                ptsA,
+                                outMaskAccessor,
+                                batchAcc,
+                                dstart,
+                                dend,
+                                ignoreDisabledVoxels);
+                        };
                     forEachJaggedElementChannelCPU<scalar_t, 2>(1, cubeCenters, cb);
                 }
             }),
-            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     });
 
     return cubeCenters.jagged_like(outMask);
@@ -117,40 +144,46 @@ CubesInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
 
 template <>
 JaggedTensor
-dispatchCubesInGrid<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
-                                  const Vec3dOrScalar &padMin, const Vec3dOrScalar &padMax,
+dispatchCubesInGrid<torch::kCUDA>(const GridBatchImpl &batchHdl,
+                                  const JaggedTensor &cubeCenters,
+                                  const Vec3dOrScalar &padMin,
+                                  const Vec3dOrScalar &padMax,
                                   bool ignoreDisabledVoxels) {
-    return CubesInGrid<torch::kCUDA, false>(batchHdl, cubeCenters, padMin, padMax,
-                                            ignoreDisabledVoxels);
+    return CubesInGrid<torch::kCUDA, false>(
+        batchHdl, cubeCenters, padMin, padMax, ignoreDisabledVoxels);
 }
 
 template <>
 JaggedTensor
-dispatchCubesInGrid<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &cubeCenters,
-                                 const Vec3dOrScalar &padMin, const Vec3dOrScalar &padMax,
+dispatchCubesInGrid<torch::kCPU>(const GridBatchImpl &batchHdl,
+                                 const JaggedTensor &cubeCenters,
+                                 const Vec3dOrScalar &padMin,
+                                 const Vec3dOrScalar &padMax,
                                  bool ignoreDisabledVoxels) {
-    return CubesInGrid<torch::kCPU, false>(batchHdl, cubeCenters, padMin, padMax,
-                                           ignoreDisabledVoxels);
+    return CubesInGrid<torch::kCPU, false>(
+        batchHdl, cubeCenters, padMin, padMax, ignoreDisabledVoxels);
 }
 
 template <>
 JaggedTensor
 dispatchCubesIntersectGrid<torch::kCUDA>(const GridBatchImpl &batchHdl,
-                                         const JaggedTensor  &cubeCenters,
-                                         const Vec3dOrScalar &padMin, const Vec3dOrScalar &padMax,
+                                         const JaggedTensor &cubeCenters,
+                                         const Vec3dOrScalar &padMin,
+                                         const Vec3dOrScalar &padMax,
                                          bool ignoreDisabledVoxels) {
-    return CubesInGrid<torch::kCUDA, true>(batchHdl, cubeCenters, padMin, padMax,
-                                           ignoreDisabledVoxels);
+    return CubesInGrid<torch::kCUDA, true>(
+        batchHdl, cubeCenters, padMin, padMax, ignoreDisabledVoxels);
 }
 
 template <>
 JaggedTensor
 dispatchCubesIntersectGrid<torch::kCPU>(const GridBatchImpl &batchHdl,
-                                        const JaggedTensor  &cubeCenters,
-                                        const Vec3dOrScalar &padMin, const Vec3dOrScalar &padMax,
+                                        const JaggedTensor &cubeCenters,
+                                        const Vec3dOrScalar &padMin,
+                                        const Vec3dOrScalar &padMax,
                                         bool ignoreDisabledVoxels) {
-    return CubesInGrid<torch::kCPU, true>(batchHdl, cubeCenters, padMin, padMax,
-                                          ignoreDisabledVoxels);
+    return CubesInGrid<torch::kCPU, true>(
+        batchHdl, cubeCenters, padMin, padMax, ignoreDisabledVoxels);
 }
 
 } // namespace ops

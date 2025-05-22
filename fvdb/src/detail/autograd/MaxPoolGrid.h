@@ -17,9 +17,11 @@ struct MaxPoolGrid : public torch::autograd::Function<MaxPoolGrid> {
     using AutogradContext = torch::autograd::AutogradContext;
     using Variable        = torch::autograd::Variable;
 
-    static variable_list forward(AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> fineGrid,
+    static variable_list forward(AutogradContext *ctx,
+                                 c10::intrusive_ptr<GridBatchImpl> fineGrid,
                                  c10::intrusive_ptr<GridBatchImpl> coarseGrid,
-                                 nanovdb::Coord poolingFactor, nanovdb::Coord stride,
+                                 nanovdb::Coord poolingFactor,
+                                 nanovdb::Coord stride,
                                  Variable fineData);
 
     static variable_list backward(AutogradContext *ctx, variable_list grad_output);

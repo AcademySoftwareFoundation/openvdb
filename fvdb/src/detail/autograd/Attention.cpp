@@ -11,13 +11,16 @@ namespace detail {
 namespace autograd {
 
 Attention::variable_list
-Attention::forward(Attention::AutogradContext *ctx, const Attention::Variable &query,
-                   const Attention::Variable &key, const Attention::Variable &value,
-                   const Attention::Variable &qLengths, const Attention::Variable &kvLengths,
+Attention::forward(Attention::AutogradContext *ctx,
+                   const Attention::Variable &query,
+                   const Attention::Variable &key,
+                   const Attention::Variable &value,
+                   const Attention::Variable &qLengths,
+                   const Attention::Variable &kvLengths,
                    float scale) {
     torch::Tensor out = FVDB_DISPATCH_KERNEL_DEVICE(query.device(), [&]() {
-        return ops::dispatchScaledDotProductAttention<DeviceTag>(query, key, value, qLengths,
-                                                                 kvLengths, true, scale);
+        return ops::dispatchScaledDotProductAttention<DeviceTag>(
+            query, key, value, qLengths, kvLengths, true, scale);
     });
 
     // ctx->saved_data["tsmtThreshold"] = tsmtThreshold;
@@ -27,7 +30,7 @@ Attention::forward(Attention::AutogradContext *ctx, const Attention::Variable &q
     //     outOpacity, outDepth, outRgb, outWs
     // });
 
-    return { out };
+    return {out};
 }
 
 Attention::variable_list

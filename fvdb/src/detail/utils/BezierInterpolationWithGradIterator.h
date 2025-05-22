@@ -11,7 +11,7 @@ namespace detail {
 
 template <typename ScalarT> struct BezierInterpolationWithGradIterator {
     struct PairT {
-        nanovdb::Coord               first;
+        nanovdb::Coord first;
         nanovdb::math::Vec4<ScalarT> second;
     };
 
@@ -109,14 +109,14 @@ template <typename ScalarT> struct BezierInterpolationWithGradIterator {
         ScalarT bx = bezier(mUVW[0] - dx), by = bezier(mUVW[1] - dy), bz = bezier(mUVW[2] - dz);
         ScalarT dbx = bezierGrad(mUVW[0] - dx), dby = bezierGrad(mUVW[1] - dy),
                 dbz   = bezierGrad(mUVW[2] - dz);
-        mCoordAndWXYZ = { nanovdb::Coord(dx, dy, dz) + mVoxel,
-                          nanovdb::math::Vec4<ScalarT>(bx * by * bz, dbx * by * bz, bx * dby * bz,
-                                                       bx * by * dbz) };
+        mCoordAndWXYZ = {nanovdb::Coord(dx, dy, dz) + mVoxel,
+                         nanovdb::math::Vec4<ScalarT>(
+                             bx * by * bz, dbx * by * bz, bx * dby * bz, bx * by * dbz)};
     }
 
-    int32_t                      mCount = 0;
-    value_type                   mCoordAndWXYZ;
-    nanovdb::Coord               mVoxel;
+    int32_t mCount = 0;
+    value_type mCoordAndWXYZ;
+    nanovdb::Coord mVoxel;
     nanovdb::math::Vec3<ScalarT> mUVW;
 };
 

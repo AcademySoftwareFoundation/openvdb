@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Ops.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 
 #include <c10/cuda/CUDACachingAllocator.h>
@@ -23,8 +24,8 @@ joffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
     TORCH_CHECK_VALUE(jidx.dim() == 1, "jidx must be a 1D tensor");
 
     if (jidx.size(0) == 0 && numTensors == 1) {
-        torch::Tensor ret = torch::empty({ 2 }, JOffsetsScalarType);
-        auto          acc = ret.accessor<JOffsetsType, 1>();
+        torch::Tensor ret = torch::empty({2}, JOffsetsScalarType);
+        auto acc          = ret.accessor<JOffsetsType, 1>();
         acc[0]            = 0;
         acc[1]            = jdata.size(0);
         return ret.to(jdata.device());
@@ -38,10 +39,11 @@ joffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
     torch::Tensor uniqueBatchCounts = std::get<2>(uniqueRes); // [n0, n1, n3, ...]
 
     torch::Tensor fullBatchCounts =
-        torch::full({ numTensors + 1 }, 0,
+        torch::full({numTensors + 1},
+                    0,
                     torch::TensorOptions().dtype(JOffsetsScalarType).device(jdata.device()));
-    fullBatchCounts.index({ torch::indexing::Slice(1, torch::indexing::None, 1) })
-        .index_put_({ uniqueBatchValues }, uniqueBatchCounts);
+    fullBatchCounts.index({torch::indexing::Slice(1, torch::indexing::None, 1)})
+        .index_put_({uniqueBatchValues}, uniqueBatchCounts);
 
     torch::Tensor cumOffsets = torch::cumsum(fullBatchCounts, 0, JOffsetsScalarType);
     return cumOffsets;

@@ -13,9 +13,9 @@ namespace fvdb {
 /// of scope
 /// @tparam T The type of data this buffer points to
 template <typename T> struct RAIIRawDeviceBuffer {
-    T           *devicePtr  = nullptr;
-    size_t       bufferSize = 0;
-    cudaStream_t stream     = 0;
+    T *devicePtr        = nullptr;
+    size_t bufferSize   = 0;
+    cudaStream_t stream = 0;
 
     RAIIRawDeviceBuffer()                            = default;
     RAIIRawDeviceBuffer(const RAIIRawDeviceBuffer &) = delete;
@@ -54,8 +54,8 @@ template <typename T> struct RAIIRawDeviceBuffer {
     /// @param hostData The host data to copy (assumes it points to a buffer of size bufferSize)
     void
     setData(const T *hostData, bool blocking) {
-        cudaMemcpyAsync((void *)devicePtr, (const void *)hostData, bufferSize,
-                        cudaMemcpyHostToDevice, stream);
+        cudaMemcpyAsync(
+            (void *)devicePtr, (const void *)hostData, bufferSize, cudaMemcpyHostToDevice, stream);
         if (blocking) {
             C10_CUDA_CHECK(cudaStreamSynchronize(stream));
         }

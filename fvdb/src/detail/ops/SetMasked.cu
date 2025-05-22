@@ -13,15 +13,20 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename ScalarType, c10::DeviceType DeviceTag,
-          template <typename T, int32_t D> typename JaggedAccessor>
+template <typename ScalarType,
+          c10::DeviceType DeviceTag,
+          template <typename T, int32_t D>
+          typename JaggedAccessor>
 __hostdev__ inline void
-setMaskedIjkCallback(int32_t bidx, int32_t eidx, JaggedAccessor<ScalarType, 2> coords,
-                     BatchGridAccessor<nanovdb::ValueOnIndexMask> batchAccessor, bool maskedState) {
+setMaskedIjkCallback(int32_t bidx,
+                     int32_t eidx,
+                     JaggedAccessor<ScalarType, 2> coords,
+                     BatchGridAccessor<nanovdb::ValueOnIndexMask> batchAccessor,
+                     bool maskedState) {
     const nanovdb::NanoGrid<nanovdb::ValueOnIndexMask> *gpuGrid = batchAccessor.grid(bidx);
-    auto                                                acc     = gpuGrid->getAccessor();
+    auto acc                                                    = gpuGrid->getAccessor();
 
-    const auto           coord = coords.data()[eidx];
+    const auto coord = coords.data()[eidx];
     const nanovdb::Coord ijk(coord[0], coord[1], coord[2]);
 
     if constexpr (DeviceTag == torch::kCUDA) {
@@ -39,30 +44,36 @@ SetMaskedIjk(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool masked
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(ijk);
     TORCH_CHECK(batchHdl.isMutable(), "Cannot disable voxels in an immutable grid");
-    TORCH_CHECK_VALUE(ijk.rdim() == 2, "Expected 2 dimensional ijk with shape (N, 3) but got = " +
-                                           std::to_string(ijk.jdata().dim()) + " dimensional ijk.");
-    TORCH_CHECK_VALUE(ijk.rsize(1) == 3, "Expected 3 dimensional ijk but got points.shape[1] = " +
-                                             std::to_string(ijk.rsize(1)));
+    TORCH_CHECK_VALUE(ijk.rdim() == 2,
+                      "Expected 2 dimensional ijk with shape (N, 3) but got = " +
+                          std::to_string(ijk.jdata().dim()) + " dimensional ijk.");
+    TORCH_CHECK_VALUE(ijk.rsize(1) == 3,
+                      "Expected 3 dimensional ijk but got points.shape[1] = " +
+                          std::to_string(ijk.rsize(1)));
     if (ijk.rsize(0) == 0) {
         return; // nothing to do
     }
     TORCH_CHECK(ijk.rsize(0) > 0, "Empty tensor (ijk)");
 
     AT_DISPATCH_V2(
-        ijk.scalar_type(), "SetMaskedIjk", AT_WRAP([&]() {
+        ijk.scalar_type(),
+        "SetMaskedIjk",
+        AT_WRAP([&]() {
             auto batchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndexMask>(batchHdl);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
                                          JaggedRAcc32<scalar_t, 2> cA) {
-                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedRAcc32>(bidx, eidx, cA,
-                                                                            batchAcc, maskedState);
+                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedRAcc32>(
+                        bidx, eidx, cA, batchAcc, maskedState);
                 };
                 forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
             } else {
                 auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> cA) {
-                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedAcc>(bidx, eidx, cA, batchAcc,
-                                                                         maskedState);
+                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedAcc>(
+                        bidx, eidx, cA, batchAcc, maskedState);
                 };
                 forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
             }
@@ -72,14 +83,16 @@ SetMaskedIjk(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool masked
 
 template <>
 void
-dispatchSetMaskedIjk<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &coords,
+dispatchSetMaskedIjk<torch::kCUDA>(const GridBatchImpl &batchHdl,
+                                   const JaggedTensor &coords,
                                    bool maskedState) {
     SetMaskedIjk<torch::kCUDA>(batchHdl, coords, maskedState);
 }
 
 template <>
 void
-dispatchSetMaskedIjk<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &coords,
+dispatchSetMaskedIjk<torch::kCPU>(const GridBatchImpl &batchHdl,
+                                  const JaggedTensor &coords,
                                   bool maskedState) {
     SetMaskedIjk<torch::kCPU>(batchHdl, coords, maskedState);
 }

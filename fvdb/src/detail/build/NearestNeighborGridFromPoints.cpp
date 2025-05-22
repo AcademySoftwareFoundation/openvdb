@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
+
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -15,10 +16,12 @@ namespace build {
 
 template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &jaggedPoints,
+buildNearestNeighborGridFromPointsCPU(const JaggedTensor &jaggedPoints,
                                       const std::vector<VoxelCoordTransform> &txs) {
     return AT_DISPATCH_V2(
-        jaggedPoints.scalar_type(), "buildNearestNeighborGridFromPoints", AT_WRAP([&]() {
+        jaggedPoints.scalar_type(),
+        "buildNearestNeighborGridFromPoints",
+        AT_WRAP([&]() {
             using ScalarT    = scalar_t;
             using MathT      = typename at::opmath_type<ScalarT>;
             using Vec3T      = typename nanovdb::math::Vec3<MathT>;
@@ -46,9 +49,9 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &ja
                 const int64_t end   = pointsBOffsetsAcc[bi + 1];
 
                 for (int64_t pi = start; pi < end; pi += 1) {
-                    Vec3T          ijk0   = tx.apply(static_cast<MathT>(pointsAcc[pi][0]),
-                                                     static_cast<MathT>(pointsAcc[pi][1]),
-                                                     static_cast<MathT>(pointsAcc[pi][2]));
+                    Vec3T ijk0            = tx.apply(static_cast<MathT>(pointsAcc[pi][0]),
+                                          static_cast<MathT>(pointsAcc[pi][1]),
+                                          static_cast<MathT>(pointsAcc[pi][2]));
                     nanovdb::Coord ijk000 = ijk0.floor();
                     nanovdb::Coord ijk001 = ijk000 + nanovdb::Coord(0, 0, 1);
                     nanovdb::Coord ijk010 = ijk000 + nanovdb::Coord(0, 1, 0);
@@ -81,11 +84,13 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &ja
                 return nanovdb::mergeGrids(batchHandles);
             }
         }),
-        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildNearestNeighborGridFromPoints(bool isMutable, const JaggedTensor &points,
+buildNearestNeighborGridFromPoints(bool isMutable,
+                                   const JaggedTensor &points,
                                    const std::vector<VoxelCoordTransform> &txs) {
     if (points.device().is_cuda()) {
         JaggedTensor coords = ops::dispatchNearestNeighborIJKForPoints<torch::kCUDA>(points, txs);

@@ -17,11 +17,13 @@ struct EvaluateSphericalHarmonics : public torch::autograd::Function<EvaluateSph
     using Variable        = torch::autograd::Variable;
 
     static VariableList
-    forward(AutogradContext *ctx, const ssize_t shDegreeToUse, const size_t numCameras,
-            const std::optional<Variable>  viewDirections, // [N, 3] or empty for deg 0
-            const Variable                &sh0Coeffs,      // [N, 1, D]
-            const std::optional<Variable> &shNCoeffs,      // [N, K-1, D]
-            const Variable                &radii           // [N,]
+    forward(AutogradContext *ctx,
+            const ssize_t shDegreeToUse,
+            const size_t numCameras,
+            const std::optional<Variable> viewDirections, // [N, 3] or empty for deg 0
+            const Variable &sh0Coeffs,                    // [N, 1, D]
+            const std::optional<Variable> &shNCoeffs,     // [N, K-1, D]
+            const Variable &radii                         // [N,]
     );
 
     static VariableList backward(AutogradContext *ctx, VariableList gradOutput);

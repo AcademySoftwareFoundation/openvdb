@@ -12,7 +12,7 @@ namespace ops {
 
 __global__ void
 jIdxForJOffsets(TorchRAcc32<fvdb::JOffsetsType, 1> offsets,
-                TorchRAcc32<fvdb::JIdxType, 1>     outJIdx) {
+                TorchRAcc32<fvdb::JIdxType, 1> outJIdx) {
     const int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (idx >= outJIdx.size(0)) {
@@ -50,10 +50,10 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
 
     if (numElements == 0) {
         return torch::zeros(
-            { 0 }, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
+            {0}, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
     }
     torch::Tensor retJIdx =
-        torch::empty({ numElements },
+        torch::empty({numElements},
                      torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
 
     const int NUM_THREADS = 1024;
@@ -72,14 +72,15 @@ dispatchJIdxForJOffsets<torch::kCPU>(torch::Tensor joffsets, int64_t numElements
                 "Cannot call dispatchJIDxForOffsets with negaive number of elements");
     if (numElements == 0) {
         return torch::zeros(
-            { 0 }, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
+            {0}, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device()));
     }
     std::vector<torch::Tensor> batchIdxs;
     batchIdxs.reserve(joffsets.size(0));
     for (int i = 0; i < joffsets.size(0) - 1; i += 1) {
         batchIdxs.push_back(torch::full(
-            { joffsets[i + 1].item<fvdb::JOffsetsType>() - joffsets[i].item<fvdb::JOffsetsType>() },
-            i, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device())));
+            {joffsets[i + 1].item<fvdb::JOffsetsType>() - joffsets[i].item<fvdb::JOffsetsType>()},
+            i,
+            torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(joffsets.device())));
     }
     return torch::cat(batchIdxs, 0);
 }
