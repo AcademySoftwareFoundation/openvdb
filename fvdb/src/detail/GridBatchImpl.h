@@ -327,6 +327,11 @@ class GridBatchImpl : public torch::CustomClassHolder {
         return *mGridHdl;
     }
 
+    nanovdb::GridHandle<TorchDeviceBuffer> &
+    nanoGridHandleMut() const {
+        return *mGridHdl;
+    }
+
     bool
     isMutable() const {
         return mBatchMetadata.mIsMutable;

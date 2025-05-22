@@ -988,6 +988,21 @@ GridBatch::conv_grid(Vec3iOrScalar kernel_size, Vec3iOrScalar stride) const {
     return ret;
 }
 
+GridBatch
+GridBatch::dilated_grid(const int dilation) const {
+    detail::RAIIDeviceGuard guard(device());
+    TORCH_CHECK_VALUE(dilation > 0, "dilation must be strictly positive. Got ", dilation);
+    GridBatch ret = GridBatch(device(), is_mutable());
+    if (grid_count() == 0) {
+        return ret;
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    impl()->gridVoxelSizesAndOrigins(voxS, voxO);
+    ret.mImpl = c10::make_intrusive<detail::GridBatchImpl>(
+        detail::build::buildDilatedGridFromGrid(ret.is_mutable(), *impl(), dilation), voxS, voxO);
+    return ret;
+}
+
 void
 GridBatch::buildCoarseFromFineGrid(const GridBatch &fineGrid, nanovdb::Coord branchFactor) {
     detail::RAIIDeviceGuard guard(device());

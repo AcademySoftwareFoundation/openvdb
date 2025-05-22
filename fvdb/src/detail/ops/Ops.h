@@ -15,6 +15,10 @@ namespace detail {
 namespace ops {
 
 template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer> dispatchDilateGrid(const GridBatchImpl &gridBatch,
+                                                          const int dilation);
+
+template <c10::DeviceType>
 JaggedTensor dispatchJaggedTensorIndexInt(const JaggedTensor &jt, int64_t idxVal);
 
 template <c10::DeviceType>

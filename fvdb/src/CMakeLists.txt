@@ -51,6 +51,7 @@ set(FVDB_CPP_FILES
     detail/build/EmptyGrid.cpp
     detail/build/FineFromCoarse.cpp
     detail/build/FromMesh.cpp
+    detail/build/DilatedGrid.cpp
     detail/build/NearestNeighborGridFromPoints.cpp
     detail/build/PaddedGridFromCoords.cpp
     detail/build/PaddedGridFromGrid.cpp
@@ -60,6 +61,7 @@ set(FVDB_CPP_FILES
     detail/TorchDeviceBuffer.cpp)
 
 set(FVDB_CU_FILES
+    detail/ops/DilateGrid.cu
     detail/ops/MarchingCubes.cu
     detail/ops/ReadIntoDense.cu
     detail/ops/JOffsetsFromJIdx.cu

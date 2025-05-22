@@ -1,7 +1,32 @@
 import typing
-from typing import Any, ClassVar, overload
+from typing import Any, ClassVar, List, Tuple, overload
 
+import numpy as np
 import torch
+
+Vec3d = List[float] | List[int] | Tuple[float, float, float] | Tuple[int, int, int] | torch.Tensor | np.ndarray
+Vec3dOrScalar = Vec3d | float | int
+Vec3dBatch = (
+    Vec3d
+    | List[List[float]]
+    | List[List[int]]
+    | List[Tuple[float, float, float]]
+    | List[Tuple[int, int, int]]
+    | Tuple[Tuple[float, float, float], ...]
+    | Tuple[Tuple[int, int, int], ...]
+    | torch.Tensor
+    | np.ndarray
+)
+Vec3dBatchOrScalar = Vec3dBatch | float | int
+
+Vec3i = List[int] | Tuple[int, int, int] | torch.Tensor | np.ndarray
+Vec3iOrScalar = Vec3i | int
+Vec3iBatch = (
+    Vec3i | List[List[int]] | List[Tuple[int, int, int]] | Tuple[Tuple[int, int, int], ...] | torch.Tensor | np.ndarray
+)
+Vec3iBatchOrScalar = Vec3iBatch | float | int
+
+Vec4i = List[int] | Tuple[int, int, int, int] | torch.Tensor | np.ndarray
 
 CUTLASS: ConvPackBackend
 GATHER_SCATTER: ConvPackBackend
@@ -249,6 +274,7 @@ class GridBatch:
         voxel_sizes: Vec3dBatchOrScalar = ...,
         origins: Vec3dBatch = ...,
     ) -> None: ...
+    def dilated_grid(self, dilation: int) -> GridBatch: ...
     def set_from_mesh(
         self, mesh_vertices, mesh_faces, voxel_sizes: Vec3dBatchOrScalar = ..., origins: Vec3dBatch = ...
     ) -> None: ...
@@ -402,7 +428,7 @@ class JaggedTensor:
     def jreshape(self, lshape: list[int]) -> JaggedTensor: ...
     @overload
     def jreshape(self, lshape: list[list[int]]) -> JaggedTensor: ...
-    def jreshape_as(self, other: JaggedTensor) -> JaggedTensor: ...
+    def jreshape_as(self, other: JaggedTensor | torch.Tensor) -> JaggedTensor: ...
     def jsqueeze(self, dim: int | None = None) -> JaggedTensor: ...
     def jsum(self, dim: int = ..., keepdim: bool = ...) -> JaggedTensor: ...
     def long(self) -> JaggedTensor: ...
@@ -423,7 +449,7 @@ class JaggedTensor:
     @overload
     def to(self, device: str) -> JaggedTensor: ...
     def type(self, arg0: torch.dtype) -> JaggedTensor: ...
-    def type_as(self, arg0: JaggedTensor) -> JaggedTensor: ...
+    def type_as(self, arg0: JaggedTensor | torch.Tensor) -> JaggedTensor: ...
     def unbind(self) -> object: ...
     @overload
     def __add__(self, other: torch.Tensor) -> JaggedTensor: ...
@@ -676,10 +702,10 @@ class SparseConvPackInfo:
     def cpu(self) -> SparseConvPackInfo: ...
     def cuda(self) -> SparseConvPackInfo: ...
     def sparse_conv_3d(
-        self, input: JaggedTensor, weights: torch.Tensor, backend: ConvPackBackend = ...
+        self, input: JaggedTensor | torch.Tensor, weights: torch.Tensor, backend: ConvPackBackend = ...
     ) -> JaggedTensor: ...
     def sparse_transpose_conv_3d(
-        self, input: JaggedTensor, weights: torch.Tensor, backend: ConvPackBackend = ...
+        self, input: JaggedTensor | torch.Tensor, weights: torch.Tensor, backend: ConvPackBackend = ...
     ) -> JaggedTensor: ...
     @overload
     def to(self, to_device: torch.device) -> SparseConvPackInfo: ...
@@ -732,30 +758,6 @@ class SparseConvPackInfo:
     @property
     def use_tf32(self) -> bool: ...
 
-class Vec3d:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3dBatch:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3dBatchOrScalar:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3dOrScalar:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3i:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3iBatch:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec3iOrScalar:
-    def __init__(self, *args, **kwargs) -> None: ...
-
-class Vec4i:
-    def __init__(self, *args, **kwargs) -> None: ...
-
 class config:
     enable_ultra_sparse_acceleration: ClassVar[bool] = ...
     pedantic_error_checking: ClassVar[bool] = ...
@@ -785,7 +787,7 @@ def gridbatch_from_dense(
     mutable: bool = ...,
 ) -> GridBatch: ...
 def gridbatch_from_ijk(
-    ijk: JaggedTensor,
+    ijk: JaggedTensor | torch.Tensor,
     pad_min: Vec3i = ...,
     pad_max: Vec3i = ...,
     voxel_sizes: Vec3dBatchOrScalar = ...,
@@ -793,17 +795,20 @@ def gridbatch_from_ijk(
     mutable: bool = ...,
 ) -> GridBatch: ...
 def gridbatch_from_mesh(
-    vertices: JaggedTensor,
-    faces: JaggedTensor,
+    vertices: JaggedTensor | torch.Tensor,
+    faces: JaggedTensor | torch.Tensor,
     voxel_sizes: Vec3dBatchOrScalar = ...,
     origins: Vec3dBatch = ...,
     mutable: bool = ...,
 ) -> GridBatch: ...
 def gridbatch_from_nearest_voxels_to_points(
-    points: JaggedTensor, voxel_sizes: Vec3dBatchOrScalar = ..., origins: Vec3dBatch = ..., mutable: bool = ...
+    points: JaggedTensor | torch.Tensor,
+    voxel_sizes: Vec3dBatchOrScalar = ...,
+    origins: Vec3dBatch = ...,
+    mutable: bool = ...,
 ) -> GridBatch: ...
 def gridbatch_from_points(
-    points: JaggedTensor,
+    points: JaggedTensor | torch.Tensor,
     pad_min: Vec3i = ...,
     pad_max: Vec3i = ...,
     voxel_sizes: Vec3dBatchOrScalar = ...,
@@ -813,7 +818,7 @@ def gridbatch_from_points(
 @overload
 def jcat(grid_batches: list[GridBatch]) -> GridBatch: ...
 @overload
-def jcat(jagged_tensors: list[JaggedTensor], dim: int | None = ...) -> JaggedTensor: ...
+def jcat(jagged_tensors: list[JaggedTensor | torch.Tensor], dim: int | None = ...) -> JaggedTensor: ...
 @overload
 def jempty(
     lshape: list[int],
@@ -1021,7 +1026,10 @@ def save(
     verbose: bool = ...,
 ) -> None: ...
 def scaled_dot_product_attention(
-    query: JaggedTensor, key: JaggedTensor, value: JaggedTensor, scale: float
+    query: JaggedTensor | torch.Tensor,
+    key: JaggedTensor | torch.Tensor,
+    value: JaggedTensor | torch.Tensor,
+    scale: float,
 ) -> JaggedTensor: ...
 def volume_render(
     sigmas: torch.Tensor,

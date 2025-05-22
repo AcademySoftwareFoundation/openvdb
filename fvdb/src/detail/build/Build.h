@@ -14,6 +14,14 @@ namespace fvdb {
 namespace detail {
 namespace build {
 
+/// @brief Build a dilated grid from the given grid
+/// @param isMutable Whether the grid should be mutable or not
+/// @param gridBatch The grid batch from which to build the dilated grid
+/// @param dilation The dilation factor
+/// @return A handle to the dilated nanovdb grid (the device will match gridBatch)
+nanovdb::GridHandle<TorchDeviceBuffer>
+buildDilatedGridFromGrid(bool isMutable, const GridBatchImpl &gridBatch, const int dilation);
+
 /// @brief Build an empty NanovVDB index grid or mutable index grid on the given device
 /// @param device The device on which the grid will be allocated
 /// @param isMutable Whether the grid should be mutable or not

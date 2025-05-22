@@ -638,6 +638,7 @@ struct PostProcessGridTreeFunctor
         auto leafCount = tree.mNodeCount[0];
         tree.mVoxelCount = d_voxelOffsets[leafCount];
         grid.mGridSize = d_data->size;
+        grid.mGridCount = 1;
         grid.mBlindMetadataOffset = d_data->size;
         grid.mData1 = tree.mVoxelCount+1;
     }

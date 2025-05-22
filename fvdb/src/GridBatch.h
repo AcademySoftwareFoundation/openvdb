@@ -786,6 +786,11 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A GridBatch representing the convolved grid.
     GridBatch conv_grid(Vec3iOrScalar kernel_size, Vec3iOrScalar stride) const;
 
+    /// @brief Return a batch of grids representing the dilated version of this batch of grids.
+    /// @param dilation The dilation factor of the grid batch
+    /// @return A GridBatch representing the dilated version of this batch of grids.
+    GridBatch dilated_grid(const int dilation) const;
+
     /// @brief Return a batch of grids representing the clipped version of this batch of grids and
     /// corresponding features.
     /// @param features A JaggedTensor of shape [B, -1, *] containing features associated with this

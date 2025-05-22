@@ -11,7 +11,7 @@ from parameterized import parameterized
 
 import fvdb
 import fvdb.nn as fvnn
-from fvdb import GridBatch, JaggedTensor
+from fvdb import GridBatch, JaggedTensor, gridbatch_from_ijk
 from fvdb.utils.tests import (
     dtype_to_atol,
     expand_tests,
@@ -41,6 +41,45 @@ class TestBasicOps(unittest.TestCase):
         torch.random.manual_seed(0)
         np.random.seed(0)
         pass
+
+    @parameterized.expand(["cpu", "cuda"])
+    def test_aaaadilate_grid(self, device):
+        def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
+            batch_size = len(npc)
+            plist = []
+            for i in range(batch_size):
+                ni = npc[i]
+                plist.append(torch.randn((ni, 3), dtype=torch.float32, device=device, requires_grad=False))
+            return plist
+
+        batch_size = 2
+        vxl_size = 0.4
+        npc = torch.randint(low=0, high=1000, size=(batch_size,), device=device).tolist()
+        plist = get_point_list(npc, device)
+        pc_jagged = fvdb.JaggedTensor(plist)
+        grid_batch = fvdb.gridbatch_from_points(pc_jagged, voxel_sizes=[[vxl_size] * 3] * batch_size)
+
+        d_amt = 2
+        dilated_grid_batch = grid_batch.dilated_grid(d_amt)
+        expected_ijk = []
+        for i in range(batch_size):
+            ijk_i = grid_batch.ijk[i].jdata
+            if ijk_i.numel == 0:
+                expected_ijk.append(ijk_i)
+            else:
+                dilated_ijk_i = torch.cat(
+                    [
+                        ijk_i + torch.tensor([[a, b, c]]).to(ijk_i)
+                        for (a, b, c) in itertools.product(range(-d_amt, d_amt + 1), repeat=3)
+                    ],
+                    dim=0,
+                )
+                expected_ijk.append(dilated_ijk_i)
+        expected_ijk = fvdb.JaggedTensor(expected_ijk)
+
+        expected_grid = gridbatch_from_ijk(expected_ijk, voxel_sizes=grid_batch.voxel_sizes, origins=grid_batch.origins)
+
+        self.assertTrue(torch.equal(dilated_grid_batch.ijk.jdata, expected_grid.ijk.jdata))
 
     @parameterized.expand(all_device_dtype_combos)
     def test_subdivide_1x_with_mask(self, device, dtype, mutable):

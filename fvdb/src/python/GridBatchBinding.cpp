@@ -491,6 +491,18 @@ bind_grid_batch(py::module &m) {
                 Returns:
                     conv_grid (GridBatch): A GridBatch representing the convolution of this grid batch.
              )_FVDB_")
+        .def("dilated_grid",
+             &fvdb::GridBatch::dilated_grid,
+             py::arg("dilation"),
+             R"_FVDB_(
+                Return a batch of grids representing the dilated version of this batch.
+
+                Args:
+                    dilation (int): How much to dilate by
+
+                Returns:
+                    dilated_grid (GridBatch): A GridBatch representing the dilated version of this grid batch.
+             )_FVDB_")
 
         // Clipping to a bounding box
         .def("clip",

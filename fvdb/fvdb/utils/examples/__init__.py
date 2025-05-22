@@ -152,7 +152,13 @@ def load_mesh(
     for a in attrs:
         if a is None:
             raise ValueError(f"Failed to load mesh {data_path}, missing attributes")
-    attrs = [torch.from_numpy(a[::skip_every]).to(device).to(dtype) for a in attrs]
+    if mode == "vf":
+        attrs = [
+            torch.from_numpy(attrs[0][::skip_every]).to(device).to(dtype),
+            torch.from_numpy(attrs[1][::skip_every]).to(device),
+        ]
+    else:
+        attrs = [torch.from_numpy(a[::skip_every]).to(device).to(dtype) for a in attrs]
     logging.info(f"Done in {timeit.default_timer() - start}s")
 
     return attrs
