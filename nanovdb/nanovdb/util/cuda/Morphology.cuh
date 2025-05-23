@@ -58,6 +58,9 @@ struct DilateInternalNodesFunctor
         auto sOffsetMasks = reinterpret_cast<LowerMaskStencilT>(sOffsetMasksRaw[0]);
         auto sNeighborMasks = reinterpret_cast<LowerMaskStencilT>(sNeighborMasksRaw[0]);
 
+        using WarpReduce = cub::WarpReduce<uint32_t>;
+        __shared__ typename WarpReduce::TempStorage temp_storage[WarpsPerBlock];
+
         // TODO: Use all available threads
         if (tID < LowerMaskT::WORD_COUNT)
             for (int i = 0; i < 3; i++)
@@ -82,11 +85,8 @@ struct DilateInternalNodesFunctor
             // Combine information from LeafNodes processed into an offset mask
             for (int bit = 0; bit < 27; bit++) {
                 uint32_t mask = (neighborMask & (1u << bit)) ? (1u << threadInWarpID) : 0;
-#if __CUDA_ARCH__ >= 800
-                mask = __reduce_or_sync(0xffffffffu, mask);
-#else
-#pragma message("CUDA implementation of dilation requires SM80")
-#endif
+                mask = WarpReduce(temp_storage[warpID]).Sum( mask ); // Really a bitwise or, but since the inputs
+                                                                     // have disjoint bits set, a sum is equivalent
                 auto warpMaskPtr = reinterpret_cast<uint32_t*>(sOffsetMasks[0][0][bit].words()) + (jj >> 5);
                 // Do we need to guard this ??
                 if (threadInWarpID == 0)
@@ -343,16 +343,15 @@ struct EnumerateNodesFunctor
         auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
         auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
 
+        using WarpReduce = cub::WarpReduce<uint32_t>;
+        __shared__ typename WarpReduce::TempStorage temp_storage[WarpsPerBlock];
+
         for ( std::size_t jj = sliceID*LowerNodesPerSlice + warpID; jj < (sliceID+1)*LowerNodesPerSlice; jj += WarpsPerBlock ) {
             if (upperMasks[upperID].isOn(jj)) {
                 auto& lowerMask = lowerMasks[upperID][jj];
                 uint32_t lowerCountOn = util::countOn(lowerMask.words()[2*threadInWarpID]) + util::countOn(lowerMask.words()[2*threadInWarpID+1]);
-#if __CUDA_ARCH__ >= 800
-                lowerCountOn = __reduce_add_sync( 0xffffffff, lowerCountOn );
-#else
-#pragma message("CUDA implementation of dilation requires SM80")
-#endif
-                if (threadInWarpID == 0) { // TODO: do we need to guard this?
+                lowerCountOn = WarpReduce(temp_storage[warpID]).Sum( lowerCountOn );
+                if (threadInWarpID == 0) { // Only lane 0 in each warp has the proper reduction sum
                     lowerCounts[upperID][jj] = 1;
                     leafCounts[upperID][jj] = lowerCountOn; } }
             else if (threadInWarpID == 0) // TODO: do we need to guard this?

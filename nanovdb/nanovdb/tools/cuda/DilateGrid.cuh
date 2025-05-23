@@ -192,6 +192,8 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.restart("Count dilated tree nodes");
     countNodes();
 
+    cudaStreamSynchronize(mStream);
+
     // Allocate new device grid buffer for dilated result
     if (mVerbose==1) mTimer.restart("Allocating dilated grid buffer");
     auto buffer = getBuffer(pool);
@@ -276,17 +278,17 @@ void DilateGrid<BuildT>::dilateInternalNodes()
     if (mOp == morphology::NN_FACE) {
         using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
         util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
     else if (mOp == morphology::NN_FACE_EDGE) {
         using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
         util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
     else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
         using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
         util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
 }// DilateGrid<BuildT>::dilateInternalNodes
 
@@ -314,7 +316,7 @@ void DilateGrid<BuildT>::countNodes()
 
     using Op = morphology::cuda::EnumerateNodesFunctor;
     util::cuda::operatorKernel<Op>
-        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock>>>
+        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>
         (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
 
     mUpperOffsets = nanovdb::cuda::DeviceBuffer::create((dilatedTileCount+1)*sizeof(uint32_t), nullptr, device, mStream);
@@ -373,7 +375,7 @@ BufferT DilateGrid<BuildT>::getBuffer(const BufferT &pool)
     data()->d_bufferPtr = buffer.deviceData();
     if (data()->d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
     data()->d_upperOffsets = static_cast<uint32_t*>(mUpperOffsets.deviceData());
-    mData.deviceUpload();
+    mData.deviceUpload(device, mStream, false);
 
     return buffer;
 }// DilateGrid<BuildT>::getBuffer
@@ -476,7 +478,7 @@ inline void DilateGrid<BuildT>::processLowerNodes()
 
     using Op = morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
     util::cuda::operatorKernel<Op>
-        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock>>>(
+        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>(
             deviceUpperMasks(),
             deviceLowerMasks(),
             static_cast<uint32_t*>(mUpperOffsets.deviceData()),
@@ -487,11 +489,11 @@ inline void DilateGrid<BuildT>::processLowerNodes()
             static_cast<uint32_t*>(mLeafParents.deviceData())
         );
     cudaCheckError();
-    mDilatedRoot.clear();
-    mUpperMasks.clear();
-    mLowerMasks.clear();
-    mLowerOffsets.clear();
-    mLeafOffsets.clear();
+    mDilatedRoot.clear(mStream);
+    mUpperMasks.clear(mStream);
+    mLowerMasks.clear(mStream);
+    mLowerOffsets.clear(mStream);
+    mLeafOffsets.clear(mStream);
 }// DilateGrid<BuildT>::processLowerNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -530,7 +532,7 @@ void DilateGrid<BuildT>::dilateLeafNodes()
     if (mOp == morphology::NN_FACE) {
         using Op = morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
         nanovdb::util::cuda::operatorKernel<Op>
-            <<<dim3(data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+            <<<dim3(data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (deviceSrcGrid(), static_cast<GridT*>(data()->d_bufferPtr)); }
     else if (mOp == morphology::NN_FACE_EDGE)
         throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
@@ -608,13 +610,13 @@ inline void DilateGrid<BuildT>::processBBox()
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[0]), mNumThreads, 0, mStream>>>(
         data()->nodeCount[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLeafParents.deviceData()));
-    mLeafParents.clear();
+    mLeafParents.clear(mStream);
     cudaCheckError();
 
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(data()->nodeCount[1]), mNumThreads, 0, mStream>>>(
         data()->nodeCount[1], PropagateLowerBBoxFunctor<BuildT>(), deviceData(), static_cast<uint32_t*>(mLowerParents.deviceData()));
-    mLowerParents.clear();
+    mLowerParents.clear(mStream);
     cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
@@ -650,7 +652,7 @@ inline void DilateGrid<BuildT>::postProcessGridTree()
     // Finish updates to GridData/TreeData and (optionally) update checksum
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, PostProcessGridTreeFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData()));
     cudaCheckError();
-    mVoxelOffsets.clear();
+    mVoxelOffsets.clear(mStream);
 
     tools::cuda::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum, mStream);
 }// DilateGrid<BuildT>::postProcessGridTree
