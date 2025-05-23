@@ -329,7 +329,7 @@ tensorBytePointer(const torch::Tensor &tensor) {
         tensor.scalar_type(),
         "tensorBytePointer",
         AT_WRAP([&]() { return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>()); }),
-        AT_ALL_TYPES);
+        AT_EXPAND(AT_ALL_TYPES));
 }
 
 } // namespace detail

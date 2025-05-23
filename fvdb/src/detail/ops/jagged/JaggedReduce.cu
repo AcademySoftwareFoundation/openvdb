@@ -181,7 +181,7 @@ JaggedReduce(const torch::Tensor &jdataRaw,
                 }
             }
         }),
-        AT_ALL_TYPES,
+        AT_EXPAND(AT_ALL_TYPES),
         c10::kHalf);
 
     torch::Tensor rOut                   = out.reshape(spliceShape({out.size(0)}, jdataRaw));

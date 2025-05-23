@@ -131,7 +131,7 @@ JaggedArgsort(const JaggedTensor &jt) {
                 forEachTensorElementChannelCPU<int64_t, 2>(1, offsets, cb);
             }
         }),
-        AT_ALL_TYPES,
+        AT_EXPAND(AT_ALL_TYPES),
         c10::kHalf,
         c10::kBFloat16);
 
