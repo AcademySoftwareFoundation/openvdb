@@ -530,6 +530,18 @@ GaussianSplat3d::projectGaussiansForImagesAndDepths(
     return projectGaussiansImpl(worldToCameraMatrices, projectionMatrices, settings);
 }
 
+namespace {
+
+/// @brief Get a uint8_t pointer to the data of a tensor
+/// @param tensor The tensor to get the pointer to
+/// @return A uint8_t pointer to the data of the tensor
+inline uint8_t *
+tensorBytePointer(const torch::Tensor &tensor) {
+    return static_cast<uint8_t *>(tensor.data_ptr());
+}
+
+} // namespace
+
 void
 GaussianSplat3d::savePly(const std::string &filename) const {
     using namespace tinyply;
@@ -570,28 +582,28 @@ GaussianSplat3d::savePly(const std::string &filename) const {
                                    {"x", "y", "z"},
                                    Type::FLOAT32,
                                    meansCPU.size(0),
-                                   detail::tensorBytePointer(meansCPU),
+                                   tensorBytePointer(meansCPU),
                                    Type::INVALID,
                                    0);
     plyf.add_properties_to_element("vertex",
                                    {"opacity"},
                                    Type::FLOAT32,
                                    opacitiesCPU.size(0),
-                                   detail::tensorBytePointer(opacitiesCPU),
+                                   tensorBytePointer(opacitiesCPU),
                                    Type::INVALID,
                                    0);
     plyf.add_properties_to_element("vertex",
                                    {"scale_0", "scale_1", "scale_2"},
                                    Type::FLOAT32,
                                    scalesCPU.size(0),
-                                   detail::tensorBytePointer(scalesCPU),
+                                   tensorBytePointer(scalesCPU),
                                    Type::INVALID,
                                    0);
     plyf.add_properties_to_element("vertex",
                                    {"rot_0", "rot_1", "rot_2", "rot_3"},
                                    Type::FLOAT32,
                                    quatsCPU.size(0),
-                                   detail::tensorBytePointer(quatsCPU),
+                                   tensorBytePointer(quatsCPU),
                                    Type::INVALID,
                                    0);
 
@@ -603,7 +615,7 @@ GaussianSplat3d::savePly(const std::string &filename) const {
                                    shCoeff0Names,
                                    Type::FLOAT32,
                                    shCoeffs0CPU.size(0),
-                                   detail::tensorBytePointer(shCoeffs0CPU),
+                                   tensorBytePointer(shCoeffs0CPU),
                                    Type::INVALID,
                                    0);
 
@@ -615,7 +627,7 @@ GaussianSplat3d::savePly(const std::string &filename) const {
                                    shCoeffNNames,
                                    Type::FLOAT32,
                                    shCoeffsNCPU.size(0),
-                                   detail::tensorBytePointer(shCoeffsNCPU),
+                                   tensorBytePointer(shCoeffsNCPU),
                                    Type::INVALID,
                                    0);
 

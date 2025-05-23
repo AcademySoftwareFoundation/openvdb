@@ -320,18 +320,6 @@ struct RAIIDeviceGuard {
     c10::cuda::CUDAGuard *mGuard = nullptr;
 };
 
-/// @brief Get a uint8_t pointer to the data of a tensor
-/// @param tensor The tensor to get the pointer to
-/// @return A uint8_t pointer to the data of the tensor
-inline uint8_t *
-tensorBytePointer(const torch::Tensor &tensor) {
-    return AT_DISPATCH_V2(
-        tensor.scalar_type(),
-        "tensorBytePointer",
-        AT_WRAP([&]() { return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>()); }),
-        AT_EXPAND(AT_ALL_TYPES));
-}
-
 } // namespace detail
 } // namespace fvdb
 
