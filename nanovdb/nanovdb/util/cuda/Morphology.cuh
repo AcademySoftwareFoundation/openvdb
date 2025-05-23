@@ -82,7 +82,11 @@ struct DilateInternalNodesFunctor
             // Combine information from LeafNodes processed into an offset mask
             for (int bit = 0; bit < 27; bit++) {
                 uint32_t mask = (neighborMask & (1u << bit)) ? (1u << threadInWarpID) : 0;
+#if __CUDA_ARCH__ >= 800
                 mask = __reduce_or_sync(0xffffffffu, mask);
+#else
+#pragma message("CUDA implementation of dilation requires SM80")
+#endif
                 auto warpMaskPtr = reinterpret_cast<uint32_t*>(sOffsetMasks[0][0][bit].words()) + (jj >> 5);
                 // Do we need to guard this ??
                 if (threadInWarpID == 0)
@@ -343,7 +347,11 @@ struct EnumerateNodesFunctor
             if (upperMasks[upperID].isOn(jj)) {
                 auto& lowerMask = lowerMasks[upperID][jj];
                 uint32_t lowerCountOn = util::countOn(lowerMask.words()[2*threadInWarpID]) + util::countOn(lowerMask.words()[2*threadInWarpID+1]);
+#if __CUDA_ARCH__ >= 800
                 lowerCountOn = __reduce_add_sync( 0xffffffff, lowerCountOn );
+#else
+#pragma message("CUDA implementation of dilation requires SM80")
+#endif
                 if (threadInWarpID == 0) { // TODO: do we need to guard this?
                     lowerCounts[upperID][jj] = 1;
                     leafCounts[upperID][jj] = lowerCountOn; } }

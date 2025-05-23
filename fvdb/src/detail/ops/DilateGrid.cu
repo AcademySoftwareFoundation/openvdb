@@ -3,12 +3,12 @@
 //
 
 #include "detail/TorchDeviceBuffer.h"
-#include "nanovdb/util/MorphologyHelpers.h"
 
 #include <detail/ops/Ops.h>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
+#include <nanovdb/util/MorphologyHelpers.h>
 
 namespace fvdb::detail::ops {
 
