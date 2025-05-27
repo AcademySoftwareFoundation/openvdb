@@ -131,13 +131,12 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
                                                                    __nv_bfloat16 *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int K_implicit    = K_tile_padded * kernel_volume;
 
     float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[640];
-    __nv_bfloat16 A_shared_warp[32];
-    __nv_bfloat16 B_shared_warp[8];
+    [[maybe_unused]] __nv_bfloat16 A_shared_warp[32];
+    [[maybe_unused]] __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -175,15 +174,11 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
     } else
         B_pred_guard = 1;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
     for (int i2_0_0 = K_st * K_tile_padded / K_tile; i2_0_0 < K_ed * K_tile_padded / K_tile;
-         ++i2_0_0)
-
-    {
+         ++i2_0_0) {
         int kernel_offset = i2_0_0 / ((K_original + K_tile - 1) / K_tile) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -262,7 +257,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
 
             for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -279,13 +274,13 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
                                            "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -300,7 +295,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
             for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3) {
@@ -411,7 +406,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_bf16bf16f32(int M,
                           "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                 }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
         }
@@ -455,13 +450,12 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
                                                                  half *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int K_implicit    = K_tile_padded * kernel_volume;
 
     float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[640];
-    half A_shared_warp[32];
-    half B_shared_warp[8];
+    [[maybe_unused]] half A_shared_warp[32];
+    [[maybe_unused]] half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -498,15 +492,11 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
     } else
         B_pred_guard = 1;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
     for (int i2_0_0 = K_st * K_tile_padded / K_tile; i2_0_0 < K_ed * K_tile_padded / K_tile;
-         ++i2_0_0)
-
-    {
+         ++i2_0_0) {
         int kernel_offset = i2_0_0 / ((K_original + K_tile - 1) / K_tile) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -585,7 +575,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
 
             for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -602,13 +592,13 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
                                            "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -623,7 +613,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
             for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3) {
@@ -734,7 +724,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f16f16f32(int M,
                           "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                 }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
         }
@@ -775,12 +765,11 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
                                                                    int *__restrict__ out_in_map,
                                                                    int *__restrict__ reorder_loc,
                                                                    __nv_bfloat16 *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[1280];
-    __nv_bfloat16 A_shared_warp[32];
-    __nv_bfloat16 B_shared_warp[8];
+    [[maybe_unused]] [[maybe_unused]] __nv_bfloat16 A_shared_warp[32];
+    [[maybe_unused]] [[maybe_unused]] __nv_bfloat16 B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -813,10 +802,8 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
                            threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
     for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
 
@@ -872,7 +859,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
             for (int i2_0_1 = 0; i2_0_1 < 2; ++i2_0_1) {
                 for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -890,13 +877,13 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
                                                "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
 
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -912,7 +899,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
                                            "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
                 for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3) {
@@ -1020,7 +1007,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_bf16bf16f32(int M,
                               "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                     }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1052,12 +1039,11 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
                                                                  int *__restrict__ out_in_map,
                                                                  int *__restrict__ reorder_loc,
                                                                  half *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[32];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[1280];
-    half A_shared_warp[32];
-    half B_shared_warp[8];
+    [[maybe_unused]] half A_shared_warp[32];
+    [[maybe_unused]] half B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -1090,10 +1076,8 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
                   threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
     for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
 
@@ -1149,7 +1133,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
             for (int i2_0_1 = 0; i2_0_1 < 2; ++i2_0_1) {
                 for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -1167,13 +1151,13 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
                                                "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
 
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1189,7 +1173,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
                                            "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
                 for (int i0_0_3 = 0; i0_0_3 < 4; ++i0_0_3) {
@@ -1297,7 +1281,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f16f16f32(int M,
                               "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                     }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1329,12 +1313,11 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
                                                                     int *__restrict__ out_in_map,
                                                                     int *__restrict__ reorder_loc,
                                                                     __nv_bfloat16 *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ __nv_bfloat16 A_shared[5120];
     __shared__ __nv_bfloat16 B_shared[2304];
-    __nv_bfloat16 A_shared_warp[32];
-    __nv_bfloat16 B_shared_warp[16];
+    [[maybe_unused]] [[maybe_unused]] __nv_bfloat16 A_shared_warp[32];
+    [[maybe_unused]] [[maybe_unused]] __nv_bfloat16 B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1369,14 +1352,10 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
                            threadIdx.y / 2 * 32 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
-    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
-
-    {
+    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0) {
         int kernel_offset = i2_0_0 / (K_original / 32) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -1435,7 +1414,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
             for (int i2_0_1 = 0; i2_0_1 < 2; ++i2_0_1) {
                 for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -1453,13 +1432,13 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
                                                "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
                 for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -1477,7 +1456,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
                                                "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
@@ -1613,7 +1592,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_bf16bf16f32(int M,
                                                  (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                         }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
@@ -1654,12 +1633,11 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
                                                                   int *__restrict__ out_in_map,
                                                                   int *__restrict__ reorder_loc,
                                                                   half *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ half A_shared[5120];
     __shared__ half B_shared[2304];
-    half A_shared_warp[32];
-    half B_shared_warp[16];
+    [[maybe_unused]] half A_shared_warp[32];
+    [[maybe_unused]] half B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -1694,14 +1672,10 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
                   threadIdx.y / 2 * 32 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
-    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
-
-    {
+    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0) {
         int kernel_offset = i2_0_0 / (K_original / 32) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -1760,7 +1734,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
             for (int i2_0_1 = 0; i2_0_1 < 2; ++i2_0_1) {
                 for (int ax0_0 = 0; ax0_0 < 4; ++ax0_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -1778,13 +1752,13 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
                                                "=r"(((unsigned *)(A_shared_warp + (ax0_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
                 for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                     {
-                        unsigned int addr;
+                        [[maybe_unused]] unsigned int addr{};
                         __asm__ __volatile__(
                             "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                             : "=r"(addr)
@@ -1802,7 +1776,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
                                                "=r"(((unsigned *)(B_shared_warp + (ax1_0 * 8)))[3])
                                              : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
@@ -1938,7 +1912,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f16f16f32(int M,
                                                  (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                         }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                        PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                     }
                 }
@@ -1982,13 +1956,12 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(int M,
                                                                    float *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
-    int K_implicit    = K_tile_padded * kernel_volume;
 
     float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[640];
-    float A_shared_warp[32];
-    float B_shared_warp[8];
+    [[maybe_unused]] float A_shared_warp[32];
+    [[maybe_unused]] float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -2025,15 +1998,11 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(int M,
     } else
         B_pred_guard = 3;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
     for (int i2_0_0 = K_st * K_tile_padded / K_tile; i2_0_0 < K_ed * K_tile_padded / K_tile;
-         ++i2_0_0)
-
-    {
+         ++i2_0_0) {
         int kernel_offset = i2_0_0 / ((K_original + K_tile - 1) / K_tile) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -2210,7 +2179,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_tf32tf32f32(int M,
                           "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                 }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+                PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
             }
         }
@@ -2251,12 +2220,11 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(int M,
                                                                    int *__restrict__ out_in_map,
                                                                    int *__restrict__ reorder_loc,
                                                                    float *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[32];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[1280];
-    float A_shared_warp[32];
-    float B_shared_warp[8];
+    [[maybe_unused]] float A_shared_warp[32];
+    [[maybe_unused]] float B_shared_warp[8];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i = 0; i < 8; ++i) {
             C_warp[(i0_0_3_init * 8) + i] = 0.0;
@@ -2289,14 +2257,10 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(int M,
                    threadIdx.y / 2 * 16 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 16 + threadIdx.x * 8 / 16;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
-    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
-
-    {
+    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0) {
         int kernel_offset = i2_0_0 / (K_original / 32) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -2443,7 +2407,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_tf32tf32f32(int M,
                               "f"(((float *)(C_warp + ((i0_0_3 * 8) + 4)))[3]));
                     }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+                    PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
                 }
             }
@@ -2475,12 +2439,11 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(int M,
                                                                     int *__restrict__ out_in_map,
                                                                     int *__restrict__ reorder_loc,
                                                                     float *__restrict__ C) {
-    int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ float A_shared[5120];
     __shared__ float B_shared[2304];
-    float A_shared_warp[32];
-    float B_shared_warp[16];
+    [[maybe_unused]] float A_shared_warp[32];
+    [[maybe_unused]] float B_shared_warp[16];
     for (int i0_0_3_init = 0; i0_0_3_init < 4; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
             for (int i = 0; i < 8; ++i) {
@@ -2515,14 +2478,10 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(int M,
                    threadIdx.y / 2 * 32 + (threadIdx.x % 4) * 2;
     //+ (threadIdx.x / 4) * N;
 
-    // Shang: kernel offset for loading B
-    int B_kernel_offset = threadIdx.y * 256 / 64 + threadIdx.x * 8 / 64;
-    int K_st            = blockIdx_z * split_mask_len;
-    int K_ed            = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
+    int K_st = blockIdx_z * split_mask_len;
+    int K_ed = min(kernel_volume, (blockIdx_z + 1) * split_mask_len);
 
-    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0)
-
-    {
+    for (int i2_0_0 = K_st * K_original / 32; i2_0_0 < K_ed * K_original / 32; ++i2_0_0) {
         int kernel_offset = i2_0_0 / (K_original / 32) - K_st;
 
         bool bit_flag = (bool)(reduced_mask_ptr[blockIdx_y / j_factors1] & (1 << kernel_offset));
@@ -2691,7 +2650,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_tf32tf32f32(int M,
                                                  (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                         }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+                        PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
                     }
                 }
@@ -2734,7 +2693,7 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode1_f32f32f32(int M,
                                                                  int *__restrict__ reorder_loc,
                                                                  float *__restrict__ C) {
     int j_factors1 = (N - 1) / 16 + 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 
@@ -2914,7 +2873,7 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode1_f32f32f32(int M,
                                                                  int *__restrict__ reorder_loc,
                                                                  float *__restrict__ C) {
     int j_factors1 = (N - 1) / 16 + 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 
@@ -3034,7 +2993,7 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode1_f32f32f32(int M,
                                                                   int *__restrict__ reorder_loc,
                                                                   float *__restrict__ C) {
     int j_factors1 = (N - 1) / 64 + 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((M + 127) / 128 * j_factors1);
     int blockIdx_z = blockIdx.x / ((M + 127) / 128 * j_factors1);
 

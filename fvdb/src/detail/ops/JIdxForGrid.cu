@@ -22,7 +22,6 @@ enabledGridCoordsVoxelCallback(int32_t batchIdx,
     const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
     const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
-    const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(voxelIdx);
     const int64_t outIdx =
         leafBaseOffset[leafIdx] + leaf.template get<UnmaskedPerLeaf<GridType>>(voxelIdx);
     if (leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx)) {

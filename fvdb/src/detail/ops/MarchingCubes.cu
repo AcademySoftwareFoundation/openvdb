@@ -224,7 +224,6 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
         AT_DISPATCH_V2(sdf.scalar_type(),
                        "countVertices",
                        AT_WRAP([&] {
-                           auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
                            auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
                            auto nVerticesAcc = tensorAccessor<DeviceTag, int64_t, 1>(nVertices);
                            if constexpr (DeviceTag == torch::kCUDA) {
@@ -282,7 +281,6 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
             AT_DISPATCH_V2(sdf.scalar_type(),
                            "meshingCubes",
                            AT_WRAP([&] {
-                               auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
                                auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
                                auto countCsumAcc = tensorAccessor<DeviceTag, int64_t, 1>(countCsum);
                                auto trianglesAcc =

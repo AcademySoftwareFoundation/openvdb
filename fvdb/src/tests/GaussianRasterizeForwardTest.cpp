@@ -73,7 +73,7 @@ struct GaussianRasterizeForwardTestFixture : public ::testing::Test {
     /// @param numChannels The number of channels to concatenate
     /// @return The concatenated tensor
     torch::Tensor
-    catChannelsToDim(const torch::Tensor &tensor, size_t numChannels) {
+    catChannelsToDim(const torch::Tensor &tensor, int numChannels) {
         const int64_t lastDim = tensor.dim() - 1;
         TORCH_CHECK(lastDim >= 0, "tensor must have at least one dimension");
         TORCH_CHECK(numChannels >= tensor.size(lastDim),

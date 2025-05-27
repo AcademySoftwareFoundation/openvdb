@@ -77,7 +77,7 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
     std::vector<torch::Tensor> shNVec;
 
     std::int64_t totalElements = 0;
-    for (auto i = 0; i < batchSize; i += 1) {
+    for (std::size_t i = 0; i < batchSize; i += 1) {
         // Use the same number of Gaussians for all tensors in this batch
         auto const numGaussians = 10 + (std::rand() % 100);
 
@@ -121,7 +121,7 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
     }
 
     auto const expectedMask = torch::ones({totalElements}, boolOptsCPU);
-    for (auto i = 0; i < badIndices.size(); i += 1) {
+    for (std::size_t i = 0; i < badIndices.size(); i += 1) {
         expectedMask[badIndices[i]] = false;
     }
 
@@ -141,6 +141,6 @@ TEST_P(NanInfMaskTestFixture, TestNanInfMaskMeansNan) {
     EXPECT_TRUE(torch::equal(expectedMask.to(torch::kCUDA), mask.jdata()));
 }
 
-INSTANTIATE_TEST_CASE_P(NanInfMaskTests,
-                        NanInfMaskTestFixture,
-                        ::testing::Values(-1, 0, 1, 2, 3, 4, 5));
+INSTANTIATE_TEST_SUITE_P(NanInfMaskTests,
+                         NanInfMaskTestFixture,
+                         ::testing::Values(-1, 0, 1, 2, 3, 4, 5));

@@ -71,9 +71,9 @@ class GaussianTileIntersectionTest : public ::testing::Test {
                        const torch::Tensor &tile_mask = torch::Tensor()) {
         // Handle dense case - iterate through 3D tensor
         if (tile_offsets.dim() == 3) {
-            for (int c = 0; c < num_cameras; c++) {
-                for (int h = 0; h < num_tiles_h; h++) {
-                    for (int w = 0; w < num_tiles_w; w++) {
+            for (uint32_t c = 0; c < num_cameras; c++) {
+                for (uint32_t h = 0; h < num_tiles_h; h++) {
+                    for (uint32_t w = 0; w < num_tiles_w; w++) {
                         int start = tile_offsets[c][h][w].item<int32_t>();
                         int end;
                         if (w < num_tiles_w - 1) {
@@ -188,11 +188,12 @@ class GaussianTileIntersectionTest : public ::testing::Test {
         EXPECT_EQ(intersection_values.size(0), total_expected);
 
         int32_t curr_offset = 0;
-        for (int64_t i = 0; i < num_active_tiles; i++) {
-            int32_t next_offset       = tile_offsets[i + 1].item<int32_t>();
+        for (int32_t i = 0; i < num_active_tiles; i++) {
+            int32_t next_offset = tile_offsets[i + 1].item<int32_t>();
+            EXPECT_GE(next_offset, curr_offset) << "Tile offsets must be monotonically increasing";
             int32_t num_intersections = next_offset - curr_offset;
 
-            EXPECT_EQ(num_intersections, expected_intersections[i].size())
+            EXPECT_EQ(static_cast<std::size_t>(num_intersections), expected_intersections[i].size())
                 << "Number of intersections mismatch for tile " << i;
 
             for (int32_t j = 0; j < num_intersections; j++) {
@@ -505,7 +506,6 @@ TEST_F(GaussianTileIntersectionTest, SparseIntersectionTest) {
 TEST_F(GaussianTileIntersectionTest, SparseCPUNotImplementedTest) {
     auto const [means2d, radii, depths] = createTestData();
     auto tile_mask                      = torch::ones({1, num_tiles_h, num_tiles_w}, torch::kBool);
-    auto num_active_tiles               = num_tiles_h * num_tiles_w;
     auto active_tiles                   = tile_mask_to_active_tiles(tile_mask);
 
     EXPECT_THROW(fvdb::detail::ops::dispatchGaussianTileIntersectionSparse<torch::kCPU>(
@@ -609,14 +609,8 @@ TEST_F(GaussianTileIntersectionTest, RandomSparsePatternTest) {
         tile_mask[0][0][0] = true;
     }
 
-    auto active_tiles        = tile_mask_to_active_tiles(tile_mask);
-    int32_t num_active_tiles = active_tiles.size(0);
-
+    auto active_tiles = tile_mask_to_active_tiles(tile_mask);
 #if 0
-    // Print sparsity pattern and active tile indices
-    std::cout << "Active tiles pattern:\n";
-    for (int c = 0; c < num_cameras; c++) {
-        std::cout << "Camera " << c << ":\n";
         for (int h = 0; h < num_tiles_h; h++) {
             for (int w = 0; w < num_tiles_w; w++) {
                 std::cout << (tile_mask[c][h][w].item<bool>() ? "1 " : "0 ");

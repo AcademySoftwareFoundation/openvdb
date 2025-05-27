@@ -34,7 +34,6 @@ buildDilatedGridCPU(const GridBatchImpl &gridBatch, const int dilation) {
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        const int64_t joffset = gridBatch.cumVoxels(bidx);
         for (auto it = ActiveVoxelIterator<GridType, -1>(tree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk = it->first;
 

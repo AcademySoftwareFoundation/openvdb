@@ -69,7 +69,7 @@ convolutionKernelMapCPU(const GridBatchImpl::Accessor<GridType> &sourceGridBatch
                                       (int)std::floor(-kernelSize.y() / 2.0 + 1),
                                       (int)std::floor(-kernelSize.z() / 2.0 + 1)});
 
-    for (size_t bi = 0; bi < sourceGridBatchAcc.batchSize(); bi += 1) {
+    for (int64_t bi = 0; bi < sourceGridBatchAcc.batchSize(); bi += 1) {
         const auto *sourceGrid = sourceGridBatchAcc.grid(bi);
         const auto *targetGrid = targetGridBatchAcc.grid(bi);
 
@@ -120,7 +120,6 @@ dispatchConvolutionKernelMap<torch::kCUDA>(const GridBatchImpl &sourceBatchHdl,
                                           (int)std::floor(-kernelSizeCoord.z() / 2.0 + 1)});
 
         auto sourceBatchAccessor = sourceBatchHdl.deviceAccessor<GridType>();
-        auto targetBatchAccessor = targetBatchHdl.deviceAccessor<GridType>();
         auto kernelMapAcc = kernelMap.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
 
         auto cb = [=] __device__(int32_t bidx,

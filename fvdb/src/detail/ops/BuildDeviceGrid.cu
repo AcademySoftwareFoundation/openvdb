@@ -239,7 +239,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize,
 
         // Create a grid for each batch item and store the handles
         std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> handles;
-        for (int i = 0; i < batchSize; i += 1) {
+        for (uint32_t i = 0; i < batchSize; i += 1) {
             const int64_t nVoxels = ijkData.size(0);
             handles.push_back(
                 nVoxels == 0 ? build::buildEmptyGrid(guide.device(), isMutable)

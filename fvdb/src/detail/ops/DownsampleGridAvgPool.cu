@@ -48,9 +48,9 @@ avgPoolVoxelCallback(int32_t batchIdx,
     const int64_t coarseIndex = coarseVoxelIndex - static_cast<int64_t>(1) + coarseBaseOffset;
     accscalar_t avgValue      = static_cast<accscalar_t>(0.0);
 
-    for (unsigned i = 0; i < poolingFactor[0]; i += 1) {
-        for (unsigned j = 0; j < poolingFactor[1]; j += 1) {
-            for (unsigned k = 0; k < poolingFactor[2]; k += 1) {
+    for (nanovdb::Coord::ValueType i = 0; i < poolingFactor[0]; i += 1) {
+        for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
+            for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
                 if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
                     continue;
@@ -98,9 +98,9 @@ avgPoolBackardVoxelCallback(int32_t batchIdx,
     const nanovdb::Coord fineIjk0(
         coarseIjk[0] * stride[0], coarseIjk[1] * stride[1], coarseIjk[2] * stride[2]);
 
-    for (unsigned i = 0; i < poolingFactor[0]; i += 1) {
-        for (unsigned j = 0; j < poolingFactor[1]; j += 1) {
-            for (unsigned k = 0; k < poolingFactor[2]; k += 1) {
+    for (nanovdb::Coord::ValueType i = 0; i < poolingFactor[0]; i += 1) {
+        for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
+            for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
                 if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
                     continue;

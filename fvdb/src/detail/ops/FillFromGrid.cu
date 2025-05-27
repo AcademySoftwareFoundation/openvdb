@@ -55,7 +55,7 @@ fillToGridCPU(const GridBatchImpl::Accessor<GridType> &fromGridHandle,
               const torch::TensorAccessor<ScalarType, 2> fromFeatures,
               torch::TensorAccessor<ScalarType, 2> toFeatures,
               bool isContiguous) {
-    for (size_t bi = 0; bi < fromGridHandle.batchSize(); bi += 1) {
+    for (int64_t bi = 0; bi < fromGridHandle.batchSize(); bi += 1) {
         const nanovdb::NanoGrid<GridType> *fromGrid = fromGridHandle.grid(bi);
         const nanovdb::NanoGrid<GridType> *toGrid   = toGridHandle.grid(bi);
 

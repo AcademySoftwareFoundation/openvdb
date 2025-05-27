@@ -126,7 +126,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                                                                     int *__restrict__ out_in_map,
                                                                     __nv_bfloat16 *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
@@ -136,8 +136,8 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
     float C_warp[8];
     __shared__ __nv_bfloat16 A_shared[2560];
     __shared__ __nv_bfloat16 B_shared[2560];
-    __nv_bfloat16 A_shared_warp[8];
-    __nv_bfloat16 B_shared_warp[8];
+    [[maybe_unused]] __nv_bfloat16 A_shared_warp[8];
+    [[maybe_unused]] __nv_bfloat16 B_shared_warp[8];
     __nv_bfloat16 *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
@@ -254,7 +254,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
         __syncthreads();
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -270,12 +270,12 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                                        "=r"(((unsigned *)(A_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -291,7 +291,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
             }
 #if __CUDA_ARCH__ >= 800
@@ -335,7 +335,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("BF16 kernels will not be compiled for SM80-.")
+            PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM80-.")
 #endif
         }
     }
@@ -407,7 +407,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
         __syncthreads();
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -423,12 +423,12 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                                        "=r"(((unsigned *)(A_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -444,7 +444,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
             }
 #if __CUDA_ARCH__ >= 800
@@ -488,7 +488,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("BF16 kernels will not be compiled for SM80-.")
+            PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM80-.")
 #endif
         }
     }
@@ -519,7 +519,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                                                   int *__restrict__ out_in_map,
                                                                   half *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
@@ -529,8 +529,8 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
     float C_warp[8];
     __shared__ half A_shared[2560];
     __shared__ half B_shared[2560];
-    half A_shared_warp[8];
-    half B_shared_warp[8];
+    [[maybe_unused]] half A_shared_warp[8];
+    [[maybe_unused]] half B_shared_warp[8];
     half *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
@@ -646,7 +646,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
         __syncthreads();
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -662,12 +662,12 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "=r"(((unsigned *)(A_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -683,7 +683,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
 #if __CUDA_ARCH__ >= 800
@@ -791,7 +791,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+            PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
         }
     }
@@ -863,7 +863,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
         __syncthreads();
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -879,12 +879,12 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "=r"(((unsigned *)(A_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
 
             {
-                unsigned int addr;
+                [[maybe_unused]] unsigned int addr{};
                 __asm__ __volatile__(
                     "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                     : "=r"(addr)
@@ -900,7 +900,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "=r"(((unsigned *)(B_shared_warp + 0))[3])
                                      : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
             }
 #if __CUDA_ARCH__ >= 800
@@ -1008,7 +1008,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
                                        "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+            PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
         }
     }
@@ -1045,8 +1045,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
     float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[2560];
     __shared__ __nv_bfloat16 B_shared[4608];
-    __nv_bfloat16 A_shared_warp[16];
-    __nv_bfloat16 B_shared_warp[16];
+    [[maybe_unused]] __nv_bfloat16 A_shared_warp[16];
+    [[maybe_unused]] __nv_bfloat16 B_shared_warp[16];
     __nv_bfloat16 *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
@@ -1071,8 +1071,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                            (threadIdx.y % 1) * 2 * N / 16 * 256 +
                            (blockIdx_x % 1) * j_factors1 * 64 + (blockIdx_y % j_factors1) * 64 +
                            threadIdx.y / 1 * 32 + (threadIdx.x % 4) * 2 + (threadIdx.x / 4) * N;
-    int K_iters       = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
-    int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
+    int K_iters = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
+    // int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
@@ -1118,7 +1118,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1134,13 +1134,13 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                                            "=r"(((unsigned *)(A_shared_warp + (ax1_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
             for (int ax1_0_1 = 0; ax1_0_1 < 2; ++ax1_0_1) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1157,7 +1157,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                                            "=r"(((unsigned *)(B_shared_warp + (ax1_0_1 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1204,7 +1204,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("BF16 kernels will not be compiled for SM80-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM80-.")
 #endif
                 }
             }
@@ -1266,7 +1266,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1282,13 +1282,13 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                                            "=r"(((unsigned *)(A_shared_warp + (ax1_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
             for (int ax1_0_1 = 0; ax1_0_1 < 2; ++ax1_0_1) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1305,7 +1305,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                                            "=r"(((unsigned *)(B_shared_warp + (ax1_0_1 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("BF16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1352,7 +1352,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("BF16 kernels will not be compiled for SM80-.")
+                    PRAGMA_MESSAGE("BF16 kernels will not be compiled for SM80-.")
 #endif
                 }
             }
@@ -1391,8 +1391,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
     float C_warp[32];
     __shared__ half A_shared[2560];
     __shared__ half B_shared[4608];
-    half A_shared_warp[16];
-    half B_shared_warp[16];
+    [[maybe_unused]] half A_shared_warp[16];
+    [[maybe_unused]] half B_shared_warp[16];
     half *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
@@ -1417,8 +1417,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                   (threadIdx.y % 1) * 2 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 64 +
                   (blockIdx_y % j_factors1) * 64 + threadIdx.y / 1 * 32 + (threadIdx.x % 4) * 2 +
                   (threadIdx.x / 4) * N;
-    int K_iters       = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
-    int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
+    int K_iters = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
+    // int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
@@ -1464,7 +1464,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1480,13 +1480,13 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                                            "=r"(((unsigned *)(A_shared_warp + (ax1_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
             for (int ax1_0_1 = 0; ax1_0_1 < 2; ++ax1_0_1) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1503,7 +1503,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                                            "=r"(((unsigned *)(B_shared_warp + (ax1_0_1 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1618,7 +1618,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1680,7 +1680,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
         for (int i2_0_1 = 0; i2_0_1 < 4; ++i2_0_1) {
             for (int ax1_0 = 0; ax1_0 < 2; ++ax1_0) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1696,13 +1696,13 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                                            "=r"(((unsigned *)(A_shared_warp + (ax1_0 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
             for (int ax1_0_1 = 0; ax1_0_1 < 2; ++ax1_0_1) {
                 {
-                    unsigned int addr;
+                    [[maybe_unused]] unsigned int addr{};
                     __asm__ __volatile__(
                         "{ .reg .u64 addr; cvta.to.shared.u64 addr, %1; cvt.u32.u64 %0, addr; }"
                         : "=r"(addr)
@@ -1719,7 +1719,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                                            "=r"(((unsigned *)(B_shared_warp + (ax1_0_1 * 8)))[3])
                                          : "r"(addr));
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1834,7 +1834,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("FP16 kernels will not be compiled for SM75-.")
+                    PRAGMA_MESSAGE("FP16 kernels will not be compiled for SM75-.")
 #endif
                 }
             }
@@ -1867,7 +1867,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
                                                                     int *__restrict__ out_in_map,
                                                                     float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
@@ -1877,8 +1877,8 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
     float C_warp[8];
     __shared__ float A_shared[2560];
     __shared__ float B_shared[2560];
-    float A_shared_warp[8];
-    float B_shared_warp[8];
+    [[maybe_unused]] float A_shared_warp[8];
+    [[maybe_unused]] float B_shared_warp[8];
     float *cur_C = C + blockIdx_z * kernel_volume * K_original * N;
     for (int i = 0; i < 8; ++i) {
         C_warp[0 + i] = 0.0;
@@ -2088,7 +2088,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+            PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
         }
     }
@@ -2254,7 +2254,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
                       "f"(((float *)(C_warp + 4))[3]));
             }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+            PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
         }
     }
@@ -2291,8 +2291,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
     float C_warp[32];
     __shared__ float A_shared[2560];
     __shared__ float B_shared[4608];
-    float A_shared_warp[16];
-    float B_shared_warp[16];
+    [[maybe_unused]] float A_shared_warp[16];
+    [[maybe_unused]] float B_shared_warp[16];
     float *cur_C = C + blockIdx_z * kernel_volume * N * K_original;
     for (int i0_0_3_init = 0; i0_0_3_init < 2; ++i0_0_3_init) {
         for (int i1_0_4_init = 0; i1_0_4_init < 2; ++i1_0_4_init) {
@@ -2317,8 +2317,8 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
                    (threadIdx.y % 1) * 2 * N / 16 * 256 + (blockIdx_x % 1) * j_factors1 * 64 +
                    (blockIdx_y % j_factors1) * 64 + threadIdx.y / 1 * 32 + (threadIdx.x % 4) * 2 +
                    (threadIdx.x / 4) * N;
-    int K_iters       = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
-    int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
+    int K_iters = ((M_fwd + 63) / 64 + split_k_iters - 1) / split_k_iters;
+    // int kernel_offset = (blockIdx_y / j_factors1) / (K_original / 32);
     for (int _i2_0_0 = 0; _i2_0_0 < K_iters - 1; ++_i2_0_0) {
         int i2_0_0 = blockIdx_z + split_k_iters * _i2_0_0;
 
@@ -2463,7 +2463,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+                    PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
                 }
             }
@@ -2625,7 +2625,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
                               "f"(((float *)(C_warp + (((i0_0_3 * 16) + (i1_0_4 * 8)) + 4)))[3]));
                     }
 #else
-#pragma message("TF32 kernels will not be compiled.")
+                    PRAGMA_MESSAGE("TF32 kernels will not be compiled.")
 #endif
                 }
             }
@@ -2657,7 +2657,7 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd,
                                                                   int *__restrict__ out_in_map,
                                                                   float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
 
@@ -2855,7 +2855,7 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f32f32f32(int M_fwd,
                                                                   int *__restrict__ out_in_map,
                                                                   float *__restrict__ C) {
     int j_factors1 = (N + 63) / 64;
-    int blockIdx_x = 0;
+    // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);
 

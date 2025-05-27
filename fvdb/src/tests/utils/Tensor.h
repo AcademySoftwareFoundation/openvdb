@@ -41,7 +41,7 @@ checkTensor(const torch::Tensor &tensor,
     std::cout << "Expected device: " << device << std::endl;
     std::cout << "Actual device: " << tensor.device() << std::endl;
 #endif
-    return tensor.dim() == shape.size() && tensor.sizes().vec() == shape &&
+    return tensor.dim() == static_cast<int64_t>(shape.size()) && tensor.sizes().vec() == shape &&
            tensor.scalar_type() == type && tensor.device() == device;
 }
 

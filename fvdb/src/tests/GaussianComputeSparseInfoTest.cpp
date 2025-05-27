@@ -66,7 +66,7 @@ expectedTensors(fvdb::JaggedTensor const &uvsCPU,
     }
 
     // Sort each bucket by the linearized pixel order (called pixelId above)
-    for (int tileId = 0; tileId < tilePixelKeys.size(); tileId += 1) {
+    for (std::size_t tileId = 0; tileId < tilePixelKeys.size(); tileId += 1) {
         std::sort(tilePixelIds[tileId].begin(), tilePixelIds[tileId].end());
         thrust::sort_by_key(tilePixelKeys[tileId].begin(),
                             tilePixelKeys[tileId].end(),
@@ -79,7 +79,7 @@ expectedTensors(fvdb::JaggedTensor const &uvsCPU,
         pixelsPerTile.push_back(tilePixelIds[tileId].size());
         TileBitMask bitMask{static_cast<std::size_t>(tileSize)};
 
-        for (int i = 0; i < tilePixelKeys[tileId].size(); i++) {
+        for (std::size_t i = 0; i < tilePixelKeys[tileId].size(); i++) {
             expectedPixelMap.push_back(tilePixelIds[tileId][i]);
             bitMask.setBit(tilePixelKeys[tileId][i], numTilesPerAxis);
         }

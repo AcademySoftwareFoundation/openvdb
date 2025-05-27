@@ -87,8 +87,6 @@ struct SphericalHarmonincsBackwardTestFixture : public ::testing::TestWithParam<
             const int64_t numChannels,
             const int64_t shDegreeToUse,
             const bool setZeroRadii = false) {
-        const auto floatOptsCUDA = fvdb::test::tensorOpts<float>(torch::kCUDA);
-
         {
             auto [dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs] =
                 fvdb::detail::ops::dispatchSphericalHarmonicsBackward<torch::kCUDA>(

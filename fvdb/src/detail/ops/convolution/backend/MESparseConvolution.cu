@@ -869,7 +869,7 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat,
                         reinterpret_cast<Itype *>(full_in_map.data_ptr<int>()) + cur_offset;
                     const Itype *d_out_map =
                         reinterpret_cast<Itype *>(full_out_map.data_ptr<int>()) + cur_offset;
-                    for (int s = 0; s < num_div; s++) {
+                    for (size_t s = 0; s < num_div; s++) {
                         size_t const offset          = step * s;
                         size_t const remainder       = n_active_in_volume - offset;
                         size_t const curr_num_active = remainder < step ? remainder : step;

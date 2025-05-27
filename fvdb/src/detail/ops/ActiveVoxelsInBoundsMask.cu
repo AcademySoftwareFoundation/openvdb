@@ -169,8 +169,8 @@ ActiveVoxelsInBoundsMask(const GridBatchImpl &batchHdl,
         torch::empty({batchHdl.batchSize(), 2, 3},
                      torch::TensorOptions().dtype(torch::kInt32).device(batchHdl.device()));
 
-    for (size_t batchIdx = 0; batchIdx < batchHdl.batchSize(); batchIdx++) {
-        for (size_t dimIdx = 0; dimIdx < 3; dimIdx++) {
+    for (int64_t batchIdx = 0; batchIdx < batchHdl.batchSize(); batchIdx++) {
+        for (int32_t dimIdx = 0; dimIdx < 3; dimIdx++) {
             batchBboxes[batchIdx][0][dimIdx] = bboxMins[batchIdx][dimIdx];
             batchBboxes[batchIdx][1][dimIdx] = bboxMaxs[batchIdx][dimIdx];
         }

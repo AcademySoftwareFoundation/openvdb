@@ -9,6 +9,12 @@
 
 #include <torch/extension.h>
 
+#ifdef ENABLE_CONV_PRAGMA_MESSAGE
+#define PRAGMA_MESSAGE(x) _Pragma(#x)
+#else
+#define PRAGMA_MESSAGE(x)
+#endif
+
 namespace fvdb {
 namespace detail {
 namespace ops {

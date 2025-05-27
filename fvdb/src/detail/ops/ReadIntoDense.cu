@@ -58,7 +58,7 @@ readIntoDenseCPU(const GridBatchImpl::Accessor<GridType> &gridHandle,
                  torch::TensorAccessor<ScalarType, 5> outDenseTensor,
                  bool ignoreMasked,
                  bool isContiguous) {
-    for (size_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
+    for (int64_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
         const nanovdb::NanoGrid<GridType> *grid = gridHandle.grid(bi);
 
         const nanovdb::Coord bbmin(denseOrigins[bi][0], denseOrigins[bi][1], denseOrigins[bi][2]);

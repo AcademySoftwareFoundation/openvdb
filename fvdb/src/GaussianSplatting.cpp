@@ -287,8 +287,6 @@ GaussianSplat3d::projectGaussiansImpl(const torch::Tensor &worldToCameraMatrices
     const bool ortho = settings.projectionType == fvdb::detail::ops::ProjectionType::ORTHOGRAPHIC;
     const int C      = worldToCameraMatrices.size(0); // number of cameras
     const int N      = mMeans.size(0);                // number of gaussians
-    const int K      = mShN.size(1) + 1;              // number of SH bases
-    const int D      = mSh0.size(-1);                 // Dimension of output
 
     TORCH_CHECK(worldToCameraMatrices.sizes() == torch::IntArrayRef({C, 4, 4}),
                 "worldToCameraMatrices must have shape (C, 4, 4)");
