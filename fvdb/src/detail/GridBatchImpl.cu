@@ -89,7 +89,7 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 
 GridBatchImpl::~GridBatchImpl() {
     torch::Device device = mGridHdl->buffer().device();
-    delete[] mHostGridMetadata;
+    freeHostGridMetadata();
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
@@ -158,7 +158,7 @@ GridBatchImpl::indexInternal(const Indexable &idx, int64_t size) const {
 
     // If the grid we're creating a view over is contiguous, we inherit that
     bool isContiguous      = mBatchMetadata.mIsContiguous;
-    ret->mHostGridMetadata = new GridMetadata[size];
+    ret->mHostGridMetadata = allocateHostGridMetadata(size);
     ret->mBatchSize        = size;
     for (int64_t i = 0; i < size; i += 1) {
         int64_t bi = idx[i];
@@ -381,6 +381,8 @@ setCoarseTransformFromFineGridKernel(GridBatchImpl::GridMetadata *metadata,
 
 void
 GridBatchImpl::setGlobalPrimalTransform(const VoxelCoordTransform &transform) {
+    TORCH_CHECK(batchSize() > 0, "Cannot set global voxel size on an empty batch of grids");
+
     for (int64_t i = 0; i < batchSize(); i++) {
         mHostGridMetadata[i].mPrimalTransform = transform;
     }
@@ -397,6 +399,8 @@ GridBatchImpl::setGlobalPrimalTransform(const VoxelCoordTransform &transform) {
 
 void
 GridBatchImpl::setGlobalDualTransform(const VoxelCoordTransform &transform) {
+    TORCH_CHECK(batchSize() > 0, "Cannot set global voxel size on an empty batch of grids");
+
     for (int64_t i = 0; i < batchSize(); i++) {
         mHostGridMetadata[i].mDualTransform = transform;
     }
@@ -470,6 +474,9 @@ GridBatchImpl::setGlobalVoxelSizeAndOrigin(const nanovdb::Vec3d &voxelSize,
 void
 GridBatchImpl::setFineTransformFromCoarseGrid(const GridBatchImpl &coarseBatch,
                                               nanovdb::Coord subdivisionFactor) {
+    TORCH_CHECK(batchSize() > 0,
+                "Cannot set global voxel size and origin on an empty batch of grids");
+
     TORCH_CHECK(coarseBatch.batchSize() == batchSize(),
                 "Coarse grid batch size must match fine grid batch size");
     TORCH_CHECK(subdivisionFactor[0] > 0 && subdivisionFactor[1] > 0 && subdivisionFactor[2] > 0,
@@ -496,6 +503,9 @@ GridBatchImpl::setFineTransformFromCoarseGrid(const GridBatchImpl &coarseBatch,
 void
 GridBatchImpl::setCoarseTransformFromFineGrid(const GridBatchImpl &fineBatch,
                                               nanovdb::Coord coarseningFactor) {
+    TORCH_CHECK(batchSize() > 0,
+                "Cannot set global voxel size and origin on an empty batch of grids");
+
     TORCH_CHECK(fineBatch.batchSize() == batchSize(),
                 "Fine grid batch size must match coarse grid batch size");
     TORCH_CHECK(coarseningFactor[0] > 0 && coarseningFactor[1] > 0 && coarseningFactor[2] > 0,
@@ -520,6 +530,9 @@ GridBatchImpl::setCoarseTransformFromFineGrid(const GridBatchImpl &fineBatch,
 
 void
 GridBatchImpl::setPrimalTransformFromDualGrid(const GridBatchImpl &dualBatch) {
+    TORCH_CHECK(batchSize() > 0,
+                "Cannot set global voxel size and origin on an empty batch of grids");
+
     TORCH_CHECK(dualBatch.batchSize() == batchSize(),
                 "Dual grid batch size must match primal grid batch size");
 
@@ -559,7 +572,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     const torch::Device device = gridHdl.buffer().device();
 
     // Clear out old grid metadata
-    delete[] mHostGridMetadata;
+    freeHostGridMetadata();
     mHostGridMetadata = nullptr;
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
@@ -569,7 +582,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     mBatchSize = 0;
 
     // Allocate host memory for metadata
-    mHostGridMetadata = new GridMetadata[gridHdl.gridCount()];
+    mHostGridMetadata = allocateHostGridMetadata(gridHdl.gridCount());
     mBatchSize        = gridHdl.gridCount();
 
     FVDB_DISPATCH_KERNEL_DEVICE(device, [&]() {
@@ -1025,21 +1038,24 @@ GridBatchImpl::deserializeV0(const torch::Tensor &serialized) {
     const int8_t *serializedPtr = serialized.data_ptr<int8_t>();
 
     const V01Header *header = reinterpret_cast<const V01Header *>(serializedPtr);
-    TORCH_CHECK(header->magic == 0x0F0F0F0F0F0F0F0F, "Serialized data is not a valid grid handle");
-    TORCH_CHECK(header->version == 0, "Serialized data is not a valid grid handle");
+    TORCH_CHECK(header->magic == 0x0F0F0F0F0F0F0F0F,
+                "Serialized data is not a valid grid handle. Bad magic.");
+    TORCH_CHECK(header->version == 0, "Serialized data is not a valid grid handle. Bad version.");
     TORCH_CHECK(serialized.numel() == header->totalBytes,
-                "Serialized data is not a valid grid handle");
+                "Serialized data is not a valid grid handle. Bad total bytes.");
 
     const uint64_t numGrids = header->numGrids;
 
     const GridBatchMetadata *batchMetadata =
         reinterpret_cast<const GridBatchMetadata *>(serializedPtr + sizeof(V01Header));
-    TORCH_CHECK(batchMetadata->version == 1, "Serialized data is not a valid grid handle");
+    TORCH_CHECK(batchMetadata->version == 1,
+                "Serialized data is not a valid grid handle. Bad batch metadata version.");
 
     const GridMetadata *gridMetadata = reinterpret_cast<const GridMetadata *>(
         serializedPtr + sizeof(V01Header) + sizeof(GridBatchMetadata));
     for (uint64_t i = 0; i < numGrids; i += 1) {
-        TORCH_CHECK(gridMetadata[i].version == 1, "Serialized data is not a valid grid handle");
+        TORCH_CHECK(gridMetadata[i].version == 1,
+                    "Serialized data is not a valid grid handle. Bad grid metadata version.");
     }
     const int8_t *gridBuffer = serializedPtr + sizeof(V01Header) + sizeof(GridBatchMetadata) +
                                numGrids * sizeof(GridMetadata);

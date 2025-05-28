@@ -6,7 +6,6 @@
 
 #include "TorchDeviceBuffer.h"
 #include "VoxelCoordTransform.h"
-#include "utils/Utils.h"
 
 #include <JaggedTensor.h>
 
@@ -82,6 +81,24 @@ class GridBatchImpl : public torch::CustomClassHolder {
     };
 
   private:
+    GridMetadata *
+    allocateHostGridMetadata(int64_t batchSize) const {
+        TORCH_CHECK(batchSize > 0, "Batch size must be greater than 0");
+        GridMetadata *ret =
+            reinterpret_cast<GridMetadata *>(std::malloc(sizeof(GridMetadata) * batchSize));
+        for (auto i = 0; i < batchSize; ++i) {
+            ret[i] = GridMetadata();
+        }
+        return ret;
+    }
+
+    void
+    freeHostGridMetadata() {
+        if (mHostGridMetadata) {
+            std::free(mHostGridMetadata);
+            mHostGridMetadata = nullptr;
+        }
+    }
     // Metadata for each grid in the batch. There is a seperate host and device version of these.
     // The caller of this class sets the host version and is responsible for syncing the device
     // version with the host version by calling syncMetadataToDeviceIfCUDA
