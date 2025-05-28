@@ -144,34 +144,27 @@ load(const std::string &path,
 
 GridBatch
 gridbatch_from_points(const JaggedTensor &points,
-                      const Vec3i &pad_min,
-                      const Vec3i &pad_max,
                       const Vec3dBatchOrScalar &voxel_sizes,
-                      const Vec3dBatch &origins,
-                      bool is_mutable) {
-    auto ret = GridBatch(points.device(), is_mutable);
-    ret.set_from_points(points, pad_min, pad_max, voxel_sizes, origins);
+                      const Vec3dBatch &origins) {
+    auto ret = GridBatch(points.device());
+    ret.set_from_points(points, voxel_sizes, origins);
     return ret;
 }
 
 GridBatch
 gridbatch_from_ijk(const JaggedTensor &ijk,
-                   const Vec3i &pad_min,
-                   const Vec3i &pad_max,
                    const Vec3dBatchOrScalar &voxel_sizes,
-                   const Vec3dBatch &origins,
-                   bool is_mutable) {
-    auto ret = GridBatch(ijk.device(), is_mutable);
-    ret.set_from_ijk(ijk, pad_min, pad_max, voxel_sizes, origins);
+                   const Vec3dBatch &origins) {
+    auto ret = GridBatch(ijk.device());
+    ret.set_from_ijk(ijk, voxel_sizes, origins);
     return ret;
 }
 
 GridBatch
 gridbatch_from_nearest_voxels_to_points(const JaggedTensor &points,
                                         const Vec3dBatchOrScalar &voxel_sizes,
-                                        const Vec3dBatch &origins,
-                                        bool is_mutable) {
-    auto ret = GridBatch(points.device(), is_mutable);
+                                        const Vec3dBatch &origins) {
+    auto ret = GridBatch(points.device());
     ret.set_from_nearest_voxels_to_points(points, voxel_sizes, origins);
     return ret;
 }
@@ -183,9 +176,8 @@ gridbatch_from_dense(const int64_t numGrids,
                      const Vec3dBatchOrScalar &voxel_sizes,
                      const Vec3dBatch &origins,
                      std::optional<torch::Tensor> mask,
-                     const torch::Device &device,
-                     bool is_mutable) {
-    auto ret = GridBatch(device, is_mutable);
+                     const torch::Device &device) {
+    auto ret = GridBatch(device);
     ret.set_from_dense_grid(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask);
     return ret;
 }
@@ -197,23 +189,20 @@ gridbatch_from_dense(const int64_t numGrids,
                      const Vec3dBatchOrScalar &voxel_sizes,
                      const Vec3dBatch &origins,
                      std::optional<torch::Tensor> mask,
-                     const std::string &device_string,
-                     bool is_mutable) {
+                     const std::string &device_string) {
     torch::Device device(device_string);
     if (device.is_cuda() && !device.has_index()) {
         device.set_index(c10::cuda::current_device());
     }
-    return gridbatch_from_dense(
-        numGrids, denseDims, ijkMin, voxel_sizes, origins, mask, device, is_mutable);
+    return gridbatch_from_dense(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask, device);
 }
 
 GridBatch
 gridbatch_from_mesh(const JaggedTensor &vertices,
                     const JaggedTensor &faces,
                     const Vec3dBatchOrScalar &voxel_sizes,
-                    const Vec3dBatch &origins,
-                    bool is_mutable) {
-    auto ret = GridBatch(vertices.device(), is_mutable);
+                    const Vec3dBatch &origins) {
+    auto ret = GridBatch(vertices.device());
     ret.set_from_mesh(vertices, faces, voxel_sizes, origins);
     return ret;
 }

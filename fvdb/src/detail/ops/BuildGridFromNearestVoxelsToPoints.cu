@@ -1,23 +1,40 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "Build.h"
-
-#include <detail/ops/Ops.h>
+#include <detail/GridBatchImpl.h>
+#include <detail/utils/AccessorHelpers.cuh>
+#include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
+#include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
+#include <detail/utils/cuda/Utils.cuh>
 
-#include <nanovdb/NanoVDB.h>
-#include <nanovdb/tools/CreateNanoGrid.h>
-#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/cuda/PointsToGrid.cuh>
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAMathCompat.h>
+#include <torch/csrc/api/include/torch/types.h>
+
+#include <thrust/device_vector.h>
 
 namespace fvdb {
 namespace detail {
-namespace build {
+namespace ops {
 
-template <typename GridType>
+template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildNearestNeighborGridFromPointsCPU(const JaggedTensor &jaggedPoints,
-                                      const std::vector<VoxelCoordTransform> &txs) {
+dispatchBuildGridFromNearestVoxelsToPoints<torch::kCUDA>(
+    const JaggedTensor &points, const std::vector<VoxelCoordTransform> &txs) {
+    JaggedTensor coords = ops::dispatchNearestNeighborIJKForPoints<torch::kCUDA>(points, txs);
+    return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords);
+}
+
+template <>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromNearestVoxelsToPoints<torch::kCPU>(
+    const JaggedTensor &jaggedPoints, const std::vector<VoxelCoordTransform> &txs) {
+    using GridType = nanovdb::ValueOnIndex;
+
     return AT_DISPATCH_V2(
         jaggedPoints.scalar_type(),
         "buildNearestNeighborGridFromPoints",
@@ -88,20 +105,6 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor &jaggedPoints,
         c10::kHalf);
 }
 
-nanovdb::GridHandle<TorchDeviceBuffer>
-buildNearestNeighborGridFromPoints(bool isMutable,
-                                   const JaggedTensor &points,
-                                   const std::vector<VoxelCoordTransform> &txs) {
-    if (points.device().is_cuda()) {
-        JaggedTensor coords = ops::dispatchNearestNeighborIJKForPoints<torch::kCUDA>(points, txs);
-        return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
-    } else {
-        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildNearestNeighborGridFromPointsCPU<GridType>(points, txs);
-        });
-    }
-}
-
-} // namespace build
+} // namespace ops
 } // namespace detail
 } // namespace fvdb

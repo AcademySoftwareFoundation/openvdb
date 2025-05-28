@@ -36,8 +36,6 @@ struct SparseConvolutionImplicitGEMM
 
         const std::vector<int> sizes = {(int)packInfo.sourceGrid().total_voxels(),
                                         (int)packInfo.targetGrid().total_voxels()};
-        TORCH_CHECK(packInfo.sourceGrid().is_mutable() == packInfo.targetGrid().is_mutable(),
-                    "Source and target grids must both be mutable or immutable");
 
         // Check features and kernels
         TORCH_CHECK_VALUE(inFeatures.is_contiguous(), "features must be contiguous");

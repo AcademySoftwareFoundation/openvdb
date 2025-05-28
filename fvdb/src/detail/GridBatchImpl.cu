@@ -3,8 +3,8 @@
 //
 #include "GridBatchImpl.h"
 
-#include <detail/build/Build.h>
 #include <detail/ops/Ops.h>
+#include <detail/utils/CreateEmptyGrid.h>
 
 #include <nanovdb/cuda/GridHandle.cuh>
 
@@ -43,7 +43,7 @@ GridBatchImpl::GridBatchImpl(const torch::Device &device, bool isMutable) {
     mBatchOffsets     = torch::zeros({1}, deviceTensorOptions.dtype(fvdb::JOffsetsScalarType));
     mListIndices      = torch::empty({0, 1}, deviceTensorOptions.dtype(fvdb::JLIdxScalarType));
 
-    auto gridHdl = build::buildEmptyGrid(device, isMutable);
+    auto gridHdl = createEmptyGrid(device);
     mGridHdl     = std::make_shared<nanovdb::GridHandle<TorchDeviceBuffer>>(std::move(gridHdl));
 
     mBatchMetadata.mIsMutable    = isMutable;

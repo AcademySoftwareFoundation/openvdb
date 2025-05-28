@@ -103,7 +103,6 @@ fvdbToNanovdbGridWithValues(const GridBatch &gridBatch,
         "Invalid parameter for names, must be empty or a list of the same length as the batch size. Got " +
             std::to_string(names.size()) + " names for batch size " +
             std::to_string(gridBatch.grid_count()));
-    TORCH_CHECK(!gridBatch.is_mutable(), "Need to use indexing with mutable grids!");
 
     using ProxyGridT     = nanovdb::tools::build::Grid<OutGridType>;
     using GridValueT     = typename ProxyGridT::ValueType;
@@ -209,12 +208,6 @@ nanovdb::GridHandle<nanovdb::HostBuffer>
 maybeConvertToStandardNanovdbGrid(const fvdb::GridBatch &gridBatch,
                                   const fvdb::JaggedTensor data,
                                   const std::vector<std::string> names) {
-    // We can't convert mutable grids to a standard format because we don't know what do with
-    // disabled voxels
-    if (gridBatch.is_mutable()) {
-        return nanovdb::GridHandle<nanovdb::HostBuffer>();
-    }
-
     // Get a squeezed view of the tensor so we can save data with redundant dimensions
     // (e.g. shape (N, 1, 3) can get saved as a Vec3f grid)
     torch::Tensor jdataSqueezed = data.jdata().squeeze();
@@ -428,10 +421,9 @@ saveIndexGridWithBlindData(const std::string &path,
             memcpy((void *)writeHead, (void *)readHead, sourceGridByteSize);
         }
         // Update the metadata for the copied grid in the buffer to be a tensor grid with blind data
-        nanovdb::GridData *writeGridData = reinterpret_cast<nanovdb::GridData *>(writeHead);
-        writeGridData->mGridClass        = nanovdb::GridClass::TensorGrid;
-        writeGridData->mGridType =
-            gridBatch.is_mutable() ? nanovdb::GridType::OnIndexMask : nanovdb::GridType::OnIndex;
+        nanovdb::GridData *writeGridData    = reinterpret_cast<nanovdb::GridData *>(writeHead);
+        writeGridData->mGridClass           = nanovdb::GridClass::TensorGrid;
+        writeGridData->mGridType            = nanovdb::GridType::OnIndex;
         writeGridData->mBlindMetadataCount  = 1;
         writeGridData->mBlindMetadataOffset = sourceGridByteSize;
         const std::string name              = names.size() > 0 ? names[bi] : "";

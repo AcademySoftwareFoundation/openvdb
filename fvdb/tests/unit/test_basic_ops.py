@@ -17,23 +17,17 @@ from fvdb.utils.tests import (
     expand_tests,
     make_dense_grid_and_point_data,
     make_gridbatch_and_point_data,
-    random_drop_points_if_mutable,
 )
 
 all_device_dtype_combos = [
-    ["cuda", torch.float16, False],
-    ["cpu", torch.float32, False],
-    ["cuda", torch.float32, False],
-    ["cpu", torch.float64, False],
-    ["cuda", torch.float64, False],
-    ["cuda", torch.float16, True],
-    ["cpu", torch.float32, True],
-    ["cuda", torch.float32, True],
-    ["cpu", torch.float64, True],
-    ["cuda", torch.float64, True],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
-bfloat16_combos = [["cuda", torch.bfloat16, False], ["cuda", torch.bfloat16, True]]
+bfloat16_combos = [["cuda", torch.bfloat16]]
 
 
 class TestBasicOps(unittest.TestCase):
@@ -44,7 +38,7 @@ class TestBasicOps(unittest.TestCase):
 
     @parameterized.expand(["cpu", "cuda"])
     @unittest.skip("Test fails with an illegal memory access")
-    def test_aaaadilate_grid(self, device):
+    def test_dilate_grid(self, device):
         def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
             batch_size = len(npc)
             plist = []
@@ -83,7 +77,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.equal(dilated_grid_batch.ijk.jdata, expected_grid.ijk.jdata))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_subdivide_1x_with_mask(self, device, dtype, mutable):
+    def test_subdivide_1x_with_mask(self, device, dtype):
         def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
             batch_size = len(npc)
             plist = []
@@ -147,24 +141,15 @@ class TestBasicOps(unittest.TestCase):
         self.assertFalse(outvdbt.grid.is_same(outvdbt2.grid))
         self.assertNotEqual(outvdbt.grid.address, outvdbt2.grid.address)
 
-    @parameterized.expand(["cpu", "cuda"])
-    def test_joffsets_mutable(self, device):
-        # This is a test for https://github.com/voxel-foundation/feature-vdb/issues/196
-        grid = GridBatch(mutable=True, device=device)
-        grid.set_from_dense_grid(3, [32, 32, 32], [0, 0, 0], voxel_sizes=1.0 / 32, origins=[0, 0, 0])
-        joffsets = grid.joffsets
-        self.assertTrue(joffsets.shape[0] == 4 and len(joffsets.shape) == 1)
-
     @parameterized.expand(all_device_dtype_combos)
-    def test_voxel_neighborhood(self, device, dtype, mutable):
+    def test_voxel_neighborhood(self, device, dtype):
         randvox = torch.randint(0, 256, size=(10_000, 3), dtype=torch.int32).to(device)
         randvox = torch.cat(
             [randvox, randvox + torch.ones(1, 3).to(randvox)], dim=0
         )  # Ensure there are always neighbors
 
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_ijk(randvox)
-        random_drop_points_if_mutable(grid)
 
         gt_nhood = torch.zeros((randvox.shape[0], 3, 3, 3), dtype=torch.int32).to(device)
         for i in range(3):
@@ -181,16 +166,16 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.equal(nhood, gt_nhood))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_world_to_dual(self, device, dtype, mutable):
+    def test_world_to_dual(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid = grid.dual_grid()
-        random_drop_points_if_mutable(grid)
 
         target_dual_coordinates = ((pts - vox_origin) / vox_size) + 0.5
         pred_dual_coordinates = grid.world_to_grid(pts).jdata
@@ -201,15 +186,15 @@ class TestBasicOps(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_world_to_primal(self, device, dtype, mutable):
+    def test_world_to_primal(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
 
         target_primal_coordinates = (pts - vox_origin) / vox_size
         pred_primal_coordinates = grid.world_to_grid(pts).jdata
@@ -217,17 +202,17 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(target_primal_coordinates, pred_primal_coordinates, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_world_to_dual_grad(self, device, dtype, mutable):
+    def test_world_to_dual_grad(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
         pts.requires_grad = True
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid = grid.dual_grid()
-        random_drop_points_if_mutable(grid)
 
         pred_dual_coordinates = grid.world_to_grid(pts).jdata
         grad_out = torch.rand_like(pred_dual_coordinates)
@@ -247,16 +232,16 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(pts.grad, pred_grad, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_world_to_primal_grad(self, device, dtype, mutable):
+    def test_world_to_primal_grad(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
         pts.requires_grad = True
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
 
         pred_primal_coordinates = grid.world_to_grid(pts).jdata
         grad_out = torch.rand_like(pred_primal_coordinates)
@@ -277,16 +262,16 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(pts.grad, pred_grad, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_to_primal_to_world(self, device, dtype, mutable):
+    def test_to_primal_to_world(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
         grid_pts = torch.randint_like(pts, -100, 100).to(dtype) + torch.randn_like(pts)
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
 
         target_world_pts = (grid_pts * vox_size) + vox_origin
         pred_world_pts = grid.grid_to_world(grid_pts).jdata
@@ -294,16 +279,16 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(target_world_pts, pred_world_pts, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_to_dual_to_world(self, device, dtype, mutable):
+    def test_to_dual_to_world(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
         grid_pts = torch.randint_like(pts, -100, 100).to(dtype) + torch.randn_like(pts)
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid = grid.dual_grid()
 
         target_world_pts = ((grid_pts - 0.5) * vox_size) + vox_origin
@@ -312,7 +297,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(target_world_pts, pred_world_pts, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_to_primal_to_world_grad(self, device, dtype, mutable):
+    def test_to_primal_to_world_grad(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
@@ -320,9 +305,9 @@ class TestBasicOps(unittest.TestCase):
         grid_pts = torch.randint_like(pts, -100, 100).to(dtype) + torch.randn_like(pts)
         grid_pts.requires_grad = True
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
 
         pred_world_pts = grid.grid_to_world(grid_pts).jdata
         grad_out = torch.rand_like(pred_world_pts)
@@ -342,7 +327,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(grid_pts.grad, pred_grad, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_to_dual_to_world_grad(self, device, dtype, mutable):
+    def test_to_dual_to_world_grad(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
@@ -350,9 +335,9 @@ class TestBasicOps(unittest.TestCase):
         grid_pts = torch.randint_like(pts, -100, 100).to(dtype) + torch.randn_like(pts)
         grid_pts.requires_grad = True
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid = grid.dual_grid()
 
         pred_world_pts = grid.grid_to_world(grid_pts).jdata
@@ -373,16 +358,16 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.allclose(grid_pts.grad, pred_grad, atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_dual_of_dual_is_primal(self, device, dtype, mutable):
+    def test_aaaadual_of_dual_is_primal(self, device, dtype):
         torch.random.manual_seed(0)
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(dtype).to(device)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
 
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid_d = grid.dual_grid()
         grid_dd = grid_d.dual_grid()
 
@@ -411,10 +396,10 @@ class TestBasicOps(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_index(self, device, dtype, mutable):
+    def test_ijk_to_index(self, device, dtype):
         gsize = 7
 
-        grid_p, grid_d, _ = make_dense_grid_and_point_data(gsize, device, dtype, mutable)
+        grid_p, grid_d, _ = make_dense_grid_and_point_data(gsize, device, dtype)
 
         pijk = grid_p.ijk.jdata
         dijk = grid_d.ijk.jdata
@@ -442,11 +427,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(didx == target_didx[dpmt]))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_index_batched(self, device, dtype, mutable):
+    def test_ijk_to_index_batched(self, device, dtype):
         gsize = 7
 
-        grid_p1, grid_d1, _ = make_dense_grid_and_point_data(gsize, device, dtype, mutable)
-        grid_p2, grid_d2, _ = make_dense_grid_and_point_data(gsize - 2, device, dtype, mutable)
+        grid_p1, grid_d1, _ = make_dense_grid_and_point_data(gsize, device, dtype)
+        grid_p2, grid_d2, _ = make_dense_grid_and_point_data(gsize - 2, device, dtype)
 
         grid_p, grid_d = fvdb.jcat([grid_p1, grid_p2]), fvdb.jcat([grid_d1, grid_d2])
 
@@ -486,12 +471,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(didx.jdata == target_didx[dpmt].jdata))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_coords_in_grid(self, device, _, mutable):
+    def test_coords_in_grid(self, device, _):
         num_inside = 1000 if device == "cpu" else 100_000
         random_coords = torch.randint(-1024, 1024, (num_inside, 3), dtype=torch.int32).to(device)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_ijk(random_coords)
-        random_drop_points_if_mutable(grid)
 
         enabled_coords = grid.ijk.jdata
         num_outside = 1000 if device == "cpu" else 10_000
@@ -501,19 +485,18 @@ class TestBasicOps(unittest.TestCase):
 
         all_coords = torch.cat([outside_random_coords, inside_coords])
 
-        pred_mask = grid.coords_in_active_voxel(all_coords, ignore_disabled=True).jdata
+        pred_mask = grid.coords_in_active_voxel(all_coords).jdata
         target_mask = torch.ones(all_coords.shape[0], dtype=torch.bool).to(device)
         target_mask[:num_outside] = False
 
         self.assertTrue(torch.all(pred_mask == target_mask))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_points_in_grid(self, device, dtype, mutable):
+    def test_points_in_grid(self, device, dtype):
         num_inside = 1000 if device == "cpu" else 100_000
         random_coords = torch.randint(-1024, 1024, (num_inside, 3), dtype=torch.int32).to(device)
-        grid = GridBatch(device, mutable)
+        grid = GridBatch(device)
         grid.set_from_ijk(random_coords)
-        random_drop_points_if_mutable(grid)
 
         enabled_coords = grid.ijk.jdata
         num_outside = 1000 if device == "cpu" else 10_000
@@ -524,21 +507,21 @@ class TestBasicOps(unittest.TestCase):
 
         all_world_points = grid.grid_to_world(all_coords.to(dtype)).jdata
 
-        pred_mask = grid.points_in_active_voxel(all_world_points, ignore_disabled=True).jdata
+        pred_mask = grid.points_in_active_voxel(all_world_points).jdata
         target_mask = torch.ones(all_coords.shape[0], dtype=torch.bool).to(device)
         target_mask[:num_outside] = False
 
         self.assertTrue(torch.all(pred_mask == target_mask))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_cubes_intersect_grid(self, device, dtype, mutable):
+    def test_cubes_intersect_grid(self, device, dtype):
         # TODO: (@Caenorst) tests are a bit too light, should test on more variety of range
         # import random
         torch.random.manual_seed(0)
         # random.seed(0)
         # np.random.seed(0)
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True)
         voxel_size = grid.voxel_sizes
 
         primal_mask = grid.cubes_in_grid(p).jdata
@@ -582,48 +565,38 @@ class TestBasicOps(unittest.TestCase):
         # _ = grid_d.cubes_intersect_grid(p, -1, 1).jdata
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_subdivided_grid(self, device, dtype, mutable):
+    def test_subdivided_grid(self, device, dtype):
         p = torch.randn(100, 3, device=device, dtype=torch.float)
         vox_size = 0.1
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(p, [-1, -1, -1], [1, 1, 1], vox_size, (0.0, 0.0, 0.0))
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(p, vox_size, (0.0, 0.0, 0.0))
+        grid = grid.dilated_grid(1)
 
         grids = [grid]
         for i in range(2):
             subdiv_factor = i + 2
             mask = torch.rand(grids[i].total_voxels, device=device) > 0.5
 
-            # This line sets false values in disabled voxels
-            # This is not needed for the subdivision, but we use the mask to count how
-            # many voxels there should be in the subdivided grid so this needs to be correct
-            mask[grids[i].disabled_mask.jdata] = False
-
             grids.append(grids[-1].subdivided_grid(subdiv_factor, mask))
-            self.assertEqual(int(mask.sum().item()) * subdiv_factor**3, grids[-1].total_enabled_voxels)
+            self.assertEqual(int(mask.sum().item()) * subdiv_factor**3, grids[-1].total_voxels)
 
         grids = [grid]
         for i, subdiv_factor in enumerate([(2, 2, 1), (3, 2, 2), (1, 1, 3)]):
             mask = torch.rand(grids[i].total_voxels, device=device) > 0.5
 
-            # This line sets false values in disabled voxels
-            # This is not needed for the subdivision, but we use the mask to count how
-            # many voxels there should be in the subdivided grid so this needs to be correct
-            mask[grids[i].disabled_mask.jdata] = False
             nsubvox = subdiv_factor[0] * subdiv_factor[1] * subdiv_factor[2]
             grids.append(grids[-1].subdivided_grid(subdiv_factor, mask))
-            self.assertEqual(int(mask.sum().item()) * nsubvox, grids[-1].total_enabled_voxels)
+            self.assertEqual(int(mask.sum().item()) * nsubvox, grids[-1].total_voxels)
         if device == "cuda":
             torch.cuda.synchronize()
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_build_from_pointcloud_nearest_voxels(self, device, dtype, mutable):
+    def test_build_from_pointcloud_nearest_voxels(self, device, dtype):
         p = torch.randn((100, 3), device=device, dtype=dtype)
 
         vox_size = 0.01
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_nearest_voxels_to_points(p, vox_size)
-        random_drop_points_if_mutable(grid)
 
         if p.dtype == torch.half:
             p = p.float()
@@ -646,9 +619,6 @@ class TestBasicOps(unittest.TestCase):
         expected_ijk = expected_ijk.unsqueeze(1) + offsets.unsqueeze(0)
         expected_ijk = expected_ijk.view(-1, 3).to(torch.int32)
 
-        if mutable:
-            expected_ijk = expected_ijk[grid.coords_in_active_voxel(expected_ijk).jdata]
-
         expected_ijk_set = set(
             {
                 (expected_ijk[i, 0].item(), expected_ijk[i, 1].item(), expected_ijk[i, 2].item())
@@ -656,7 +626,7 @@ class TestBasicOps(unittest.TestCase):
             }
         )
 
-        predicted_ijk = grid.ijk_enabled.jdata
+        predicted_ijk = grid.ijk.jdata
 
         predicted_ijk_set = set(
             {
@@ -668,7 +638,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(predicted_ijk_set, expected_ijk_set)
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_subdivide(self, device, dtype, mutable):
+    def test_subdivide(self, device, dtype):
         p = torch.randn(100, 3, device=device, dtype=torch.float)
         vox_size = 0.01
 
@@ -683,15 +653,10 @@ class TestBasicOps(unittest.TestCase):
                 subvec = subdiv_factor
 
             vox_size = 0.01
-            grid = GridBatch(mutable=mutable, device=device)
+            grid = GridBatch(device=device)
             grid.set_from_nearest_voxels_to_points(p, vox_size, (0.0, 0.0, 0.0))
-            random_drop_points_if_mutable(grid)
 
             feats = torch.randn(grid.total_voxels, 32).to(p)
-            if mutable:
-                # Zero out disabled values so we don't get gradients
-                # when we compare
-                feats[grid.disabled_mask.jdata] = 0.0
             feats.requires_grad = True
 
             mask = torch.ones(grid.total_voxels, dtype=torch.bool).to(device)
@@ -723,7 +688,7 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(feats_grad_thru_subdiv == feats.grad))
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_subdivide_with_mask(self, device, dtype, mutable):
+    def test_subdivide_with_mask(self, device, dtype):
         p = torch.randn(100, 3, device=device, dtype=torch.float)
         vox_size = 0.01
         subdiv_factor = 4
@@ -738,15 +703,10 @@ class TestBasicOps(unittest.TestCase):
                 fac_sub_one = subdiv_factor - 1
                 subvec = subdiv_factor
 
-            grid = GridBatch(mutable=mutable, device=device)
+            grid = GridBatch(device=device)
             grid.set_from_nearest_voxels_to_points(p, vox_size, (0.0, 0.0, 0.0))
-            random_drop_points_if_mutable(grid)
 
             feats = torch.randn(grid.total_voxels, 32).to(p)
-            if mutable:
-                # Zero out disabled values so we don't get gradients
-                # when we compare
-                feats[grid.disabled_mask.jdata] = 0.0
             feats.requires_grad = True
 
             mask = torch.rand(grid.total_voxels).to(device) > 0.5
@@ -784,11 +744,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(masked_gradients == torch.zeros_like(masked_gradients)))
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_max_pool(self, device, dtype, mutable):
+    def test_max_pool(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         grid_vals = torch.randn(grid.total_voxels, 3).to(device).to(dtype)
@@ -836,11 +796,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.all(grid_vals_coarse == grid_vals_coarse_t_flat))
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_strided_max_pool(self, device, dtype, mutable):
+    def test_strided_max_pool(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         grid_vals = torch.randn(grid.total_voxels, 3).to(device).to(dtype)
@@ -900,11 +860,11 @@ class TestBasicOps(unittest.TestCase):
                 self.assertTrue(torch.all(grid_vals_coarse == grid_vals_coarse_t_flat))
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_max_pool_grad(self, device, dtype, mutable):
+    def test_max_pool_grad(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         for pool_factor in ((2, 3, 1), 1, 2, 3, 4, 5, 7, 15, 10):
@@ -991,11 +951,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertEqual(torch.abs(grid_vals_grad_t_flat - grid_vals_grad).max().item(), 0.0)
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_avg_pool_grad(self, device, dtype, mutable):
+    def test_avg_pool_grad(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         for pool_factor in ((2, 4, 5), 1, 2, 4, 5, 10):
@@ -1092,11 +1052,11 @@ class TestBasicOps(unittest.TestCase):
             self.assertTrue(torch.abs(grid_vals_grad_t_flat - grid_vals_grad).max().item() < dtype_to_atol(dtype))
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_strided_max_pool_grad(self, device, dtype, mutable):
+    def test_strided_max_pool_grad(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         for pool_factor in (2, 4, 5, 10):
@@ -1169,26 +1129,24 @@ class TestBasicOps(unittest.TestCase):
                 self.assertEqual(torch.abs(grid_vals_grad_t_flat - grid_vals_grad).max().item(), 0.0)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_pickle(self, device, dtype, mutable):
-        grid, _, _ = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
+    def test_pickle(self, device, dtype):
+        grid, _, _ = make_gridbatch_and_point_data(device, dtype)
         pkl_str = pickle.dumps(grid)
         grid_2 = pickle.loads(pkl_str)
         self.assertTrue(torch.all(grid.ijk.jdata == grid_2.ijk.jdata))
-        self.assertTrue(torch.all(grid.ijk_enabled.jdata == grid_2.ijk_enabled.jdata))
         self.assertEqual(grid.device, grid_2.device)
         self.assertTrue(torch.all(grid.voxel_sizes[0] == grid_2.voxel_sizes[0]))
         self.assertTrue(torch.all(grid.origins[0] == grid_2.origins[0]))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_to_device(self, device, dtype, mutable):
+    def test_to_device(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
         grid = grid.dual_grid()
 
         target_dual_coordinates = ((pts - vox_origin) / vox_size) + 0.5
@@ -1221,7 +1179,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(grid2.device, to_device)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_fill_from_grid(self, device, dtype, mutable):
+    def test_fill_from_grid(self, device, dtype):
         grid1 = GridBatch(device)
         grid2 = GridBatch(device)
 
@@ -1274,27 +1232,27 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.all(one_indices == frominds))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_grid_construction(self, device, dtype, mutable):
+    def test_grid_construction(self, device, dtype):
         rand_ijk = torch.randint(-100, 100, (1000, 3), device=device)
         rand_pts = torch.randn(1000, 3, device=device, dtype=dtype)
 
         def build_from_ijk(vsize, vorigin):
-            grid = GridBatch(mutable=mutable, device=device)
-            grid.set_from_ijk(rand_ijk, [0] * 3, [0] * 3, vsize, vorigin)
+            grid = GridBatch(device=device)
+            grid.set_from_ijk(rand_ijk, vsize, vorigin)
             return grid
 
         def build_from_pts(vsize, vorigin):
-            grid = GridBatch(mutable=mutable, device=device)
-            grid.set_from_points(rand_pts, [0] * 3, [0] * 3, vsize, vorigin)
+            grid = GridBatch(device=device)
+            grid.set_from_points(rand_pts, vsize, vorigin)
             return grid
 
         def build_from_pts_nn(vsize, vorigin):
-            grid = GridBatch(mutable=mutable, device=device)
+            grid = GridBatch(device=device)
             grid.set_from_nearest_voxels_to_points(rand_pts, vsize, vorigin)
             return grid
 
         def build_from_dense(vsize, vorigin):
-            grid = GridBatch(mutable=mutable, device=device)
+            grid = GridBatch(device=device)
             grid.set_from_dense_grid(1, [10, 10, 10], [0, 0, 0], vsize, vorigin)
             return grid
 
@@ -1302,9 +1260,9 @@ class TestBasicOps(unittest.TestCase):
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.randn(10000, 3).to(device=device, dtype=dtype)
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        grid = grid.dilated_grid(1)
 
         for builder in [build_from_ijk, build_from_pts, build_from_pts_nn, build_from_dense]:
             with self.assertRaises(TypeError):
@@ -1332,14 +1290,14 @@ class TestBasicOps(unittest.TestCase):
                 grid = builder(vox_size, [0.01] * 1)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_inv_index(self, device, dtype, mutable):
+    def test_ijk_to_inv_index(self, device, dtype):
         vox_size = 0.1
 
         # Unique IJK since for duplicates the permutation is non-bijective
         ijk = list(set([tuple([a for a in (np.random.randn(3) / vox_size).astype(np.int32)]) for _ in range(10000)]))
         ijk = torch.from_numpy(np.array([list(a) for a in ijk])).to(torch.int32).to(device)
 
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_ijk(ijk, voxel_sizes=vox_size, origins=[0.0] * 3)
 
         inv_index = grid.ijk_to_inv_index(ijk).jdata
@@ -1394,7 +1352,7 @@ class TestBasicOps(unittest.TestCase):
             assert check_order(grid.ijk.jdata[grid.ijk.jidx == i], inv_ijks.jdata)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_inv_index_batched(self, device, dtype, mutable):
+    def test_ijk_to_inv_index_batched(self, device, dtype):
         vox_size = 0.1
 
         # Unique IJK since for duplicates the permutation is non-bijective
@@ -1412,7 +1370,7 @@ class TestBasicOps(unittest.TestCase):
         ijk = [torch.from_numpy(np.array([list(a) for a in ijk_i])).to(torch.int32).to(device) for ijk_i in ijk]
         ijk = fvdb.JaggedTensor(ijk)
 
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_ijk(ijk, voxel_sizes=vox_size, origins=[0.0] * 3)
 
         inv_index = grid.ijk_to_inv_index(ijk).jdata
@@ -1468,13 +1426,13 @@ class TestBasicOps(unittest.TestCase):
             assert check_order(grid.ijk.jdata[grid.ijk.jidx == i], inv_ijks.jdata)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_inv_index_batched_noncumulative(self, device, dtype, mutable):
+    def test_ijk_to_inv_index_batched_noncumulative(self, device, dtype):
         batch_size = 5
 
         ijks = [torch.randint(-10, 10, (int(torch.randint(1_000, 10_000, (1,))), 3)) for i in range(batch_size)]
         ijks = fvdb.JaggedTensor([i.to(device) for i in ijks])
 
-        gridbatch = fvdb.gridbatch_from_ijk(ijks, mutable=mutable)
+        gridbatch = fvdb.gridbatch_from_ijk(ijks)
 
         inv_idx = gridbatch.ijk_to_inv_index(ijks, cumulative=False)
 
@@ -1486,13 +1444,13 @@ class TestBasicOps(unittest.TestCase):
         assert torch.equal(double_ijks[d_inv_idx].jdata, gridbatch.ijk.jdata)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ijk_to_index_batched_noncumulative(self, device, dtype, mutable):
+    def test_ijk_to_index_batched_noncumulative(self, device, dtype):
         batch_size = 5
 
         ijks = [torch.randint(-10, 10, (int(torch.randint(1_000, 10_000, (1,))), 3)) for i in range(batch_size)]
         ijks = fvdb.JaggedTensor([i.to(device) for i in ijks])
 
-        gridbatch = fvdb.gridbatch_from_ijk(ijks, mutable=mutable)
+        gridbatch = fvdb.gridbatch_from_ijk(ijks)
 
         idx = gridbatch.ijk_to_index(ijks, cumulative=False)
 
@@ -1504,11 +1462,9 @@ class TestBasicOps(unittest.TestCase):
         assert torch.equal(double_ijks.jdata, gridbatch.ijk[d_idx].jdata)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_no_use_after_free_on_backward(self, device, dtype, mutable):
+    def test_no_use_after_free_on_backward(self, device, dtype):
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -1519,7 +1475,7 @@ class TestBasicOps(unittest.TestCase):
         fv.backward(grad_out)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_ray_implicit_intersection(self, device, dtype, mutable):
+    def test_ray_implicit_intersection(self, device, dtype):
         if dtype == torch.float16:
             return  # TODO: Implement rayimplicit marching for half
 
@@ -1551,7 +1507,7 @@ class TestBasicOps(unittest.TestCase):
         sphere_sdf, cam_o, cam_d = sphere_sdf.to(dtype), cam_o.to(dtype), cam_d.to(dtype)
 
         # Build a grid with the SDF
-        grid = GridBatch(device=device, mutable=mutable)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(
             1, [sphere_sdf.shape[i] for i in range(3)], [0] * 3, voxel_sizes=1.0 / N, origins=[0] * 3
         )
@@ -1604,7 +1560,7 @@ class TestBasicOps(unittest.TestCase):
             )  # [B, N, N, N, 1] sdf
 
             # Build a grid with the SDF
-            grid = GridBatch(device=device, mutable=False)
+            grid = GridBatch(device=device)
             grid.set_from_dense_grid(
                 batch_size, [sphere_sdf[0].shape[i] for i in range(3)], [0] * 3, voxel_sizes=1.0 / N, origins=[0] * 3
             )
@@ -1626,8 +1582,8 @@ class TestBasicOps(unittest.TestCase):
                 # ps.show()
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_subdivide_empty_grid(self, device, dtype, mutable):
-        grid = GridBatch(device=device, mutable=mutable)
+    def test_subdivide_empty_grid(self, device, dtype):
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [32, 32, 32], [0, 0, 0], voxel_sizes=1.0 / 32, origins=[0, 0, 0])
         values = torch.randn(grid.total_voxels, 17, device=device, dtype=dtype)
         values, subgrid = grid.subdivide(
@@ -1638,8 +1594,8 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(values.rshape[1] == 17)
 
     @parameterized.expand(all_device_dtype_combos + bfloat16_combos)
-    def test_conv_empty_grid(self, device, dtype, mutable):
-        grid = GridBatch(device=device, mutable=mutable)
+    def test_conv_empty_grid(self, device, dtype):
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [32, 32, 32], [0, 0, 0], voxel_sizes=1.0 / 32, origins=[0, 0, 0])
         values_in = torch.randn(grid.total_voxels, 17, device=device, dtype=dtype)
         values, subgrid = grid.subdivide(
@@ -1656,8 +1612,8 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(res.rshape[1] == 17)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_setting_transform_on_empty_batch_fails(self, device, dtype, mutable):
-        grid = GridBatch(device=device, mutable=mutable)
+    def test_setting_transform_on_empty_batch_fails(self, device, dtype):
+        grid = GridBatch(device=device)
         with self.assertRaises(RuntimeError):
             grid.set_global_origin(torch.zeros(3).to(device))
 
@@ -1665,8 +1621,8 @@ class TestBasicOps(unittest.TestCase):
             grid.set_global_voxel_size(torch.ones(3).to(device))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_bbox_attrs(self, device, dtype, mutable):
-        grid = GridBatch(device=device, mutable=mutable)
+    def test_bbox_attrs(self, device, dtype):
+        grid = GridBatch(device=device)
         self.assertTrue(torch.equal(grid.bbox, torch.empty(0, 2, 3, device=device)))
         grid.set_from_dense_grid(1, [32, 32, 32], [0, 0, 0], voxel_sizes=1.0 / 32, origins=[0, 0, 0])
         self.assertTrue(torch.equal(grid.bbox, torch.tensor([[[0, 0, 0], [31, 31, 31]]], device=device)))
@@ -1674,12 +1630,9 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.equal(grid.total_bbox, torch.tensor([[0, 0, 0], [31, 31, 31]], device=device)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_clip_grid(self, device, dtype, mutable):
-        # TODO: issue #196
-        if device == "cpu" and mutable is True:
-            return
+    def test_clip_grid(self, device, dtype):
 
-        grid = GridBatch(device=device, mutable=mutable)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [32, 32, 32], [0, 0, 0], voxel_sizes=1.0 / 32, origins=[0, 0, 0])
         values_in = torch.randn(grid.total_voxels, 17, device=device, dtype=dtype)
         clipped_data, clipped_grid = grid.clip(values_in, [[0, 0, 0]], [[5, 5, 5]])
@@ -1718,13 +1671,12 @@ class TestBasicOps(unittest.TestCase):
         self.assertTrue(torch.equal(clipped_features_grad, features.grad))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_dual_without_border(self, device, dtype, mutable):
-        # FIXME: This test fails for mutable grids because dual grid doesn't preserve mask
+    def test_dual_without_border(self, device, dtype):
         vox_size = np.random.rand() * 0.1 + 0.05
         vox_origin = torch.rand(3).to(dtype).to(device)
         for b in [1, 3]:
             pts = JaggedTensor([torch.randn(np.random.randint(100_000, 300_000), 3).to(device=device, dtype=dtype)] * b)
-            grid = fvdb.gridbatch_from_points(pts, [0] * 3, [0] * 3, vox_size, vox_origin)
+            grid = fvdb.gridbatch_from_points(pts, vox_size, vox_origin)
             dual_grid = grid.dual_grid()
 
             neighbors = grid.neighbor_indexes(dual_grid.ijk, 1)
@@ -1750,7 +1702,7 @@ class TestBasicOps(unittest.TestCase):
         faces_too_big = fvdb.JaggedTensor([torch.randint(2, (2, 3)).to(device=device)] * VAL_BIG)
 
         with self.assertRaises(ValueError):
-            fvdb.gridbatch_from_points(pts_too_big, [0] * 3, [0] * 3, 1.0, [0] * 3)
+            fvdb.gridbatch_from_points(pts_too_big, 1.0, [0] * 3)
 
         with self.assertRaises(ValueError):
             fvdb.gridbatch_from_ijk(ijk_too_big, voxel_sizes=1.0, origins=[0] * 3)
@@ -1764,7 +1716,7 @@ class TestBasicOps(unittest.TestCase):
         with self.assertRaises(ValueError):
             fvdb.gridbatch_from_dense(VAL_BIG, [10, 10, 10], [0, 0, 0], 1.0, [0] * 3)
 
-        fvdb.gridbatch_from_points(pts_too_big[:-1], [0] * 3, [0] * 3, 1.0, [0] * 3)
+        fvdb.gridbatch_from_points(pts_too_big[:-1], 1.0, [0] * 3)
         fvdb.gridbatch_from_ijk(ijk_too_big[:-1], voxel_sizes=1.0, origins=[0] * 3)
         fvdb.gridbatch_from_mesh(pts_too_big[:-1], faces_too_big[:-1], voxel_sizes=1.0, origins=[0] * 3)
         fvdb.gridbatch_from_nearest_voxels_to_points(pts_too_big[:-1], voxel_sizes=1.0, origins=[0] * 3)

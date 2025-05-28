@@ -159,25 +159,18 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("gridbatch_from_points",
           &fvdb::gridbatch_from_points,
           py::arg("points"),
-          py::arg("pad_min")     = torch::zeros({3}, torch::kInt32),
-          py::arg("pad_max")     = torch::zeros({3}, torch::kInt32),
           py::arg("voxel_sizes") = 1.0,
-          py::arg("origins")     = torch::zeros({3}),
-          py::arg("mutable")     = false);
+          py::arg("origins")     = torch::zeros({3}));
     m.def("gridbatch_from_nearest_voxels_to_points",
           &fvdb::gridbatch_from_nearest_voxels_to_points,
           py::arg("points"),
           py::arg("voxel_sizes") = 1.0,
-          py::arg("origins")     = torch::zeros({3}),
-          py::arg("mutable")     = false);
+          py::arg("origins")     = torch::zeros({3}));
     m.def("gridbatch_from_ijk",
           &fvdb::gridbatch_from_ijk,
           py::arg("ijk"),
-          py::arg("pad_min")     = torch::zeros({3}, torch::kInt32),
-          py::arg("pad_max")     = torch::zeros({3}, torch::kInt32),
           py::arg("voxel_sizes") = 1.0,
-          py::arg("origins")     = torch::zeros({3}),
-          py::arg("mutable")     = false);
+          py::arg("origins")     = torch::zeros({3}));
     m.def("gridbatch_from_dense",
           static_cast<fvdb::GridBatch (*)(const int64_t,
                                           const fvdb::Vec3i &,
@@ -185,16 +178,14 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
                                           const fvdb::Vec3dBatchOrScalar &,
                                           const fvdb::Vec3dBatch &,
                                           typename std::optional<torch::Tensor> mask,
-                                          const torch::Device &,
-                                          bool)>(&fvdb::gridbatch_from_dense),
+                                          const torch::Device &)>(&fvdb::gridbatch_from_dense),
           py::arg("num_grids"),
           py::arg("dense_dims"),
           py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
           py::arg("voxel_sizes") = 1.0,
           py::arg("origins")     = torch::zeros({3}),
           py::arg("mask")        = nullptr,
-          py::arg("device")      = "cpu",
-          py::arg("mutable")     = false);
+          py::arg("device")      = "cpu");
 
     m.def("gridbatch_from_dense",
           static_cast<fvdb::GridBatch (*)(const int64_t,
@@ -203,24 +194,21 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
                                           const fvdb::Vec3dBatchOrScalar &,
                                           const fvdb::Vec3dBatch &,
                                           typename std::optional<torch::Tensor> mask,
-                                          const std::string &,
-                                          bool)>(&fvdb::gridbatch_from_dense),
+                                          const std::string &)>(&fvdb::gridbatch_from_dense),
           py::arg("num_grids"),
           py::arg("dense_dims"),
           py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
           py::arg("voxel_sizes") = 1.0,
           py::arg("origins")     = torch::zeros({3}),
           py::arg("mask")        = nullptr,
-          py::arg("device")      = "cpu",
-          py::arg("mutable")     = false);
+          py::arg("device")      = "cpu");
 
     m.def("gridbatch_from_mesh",
           &fvdb::gridbatch_from_mesh,
           py::arg("vertices"),
           py::arg("faces"),
           py::arg("voxel_sizes") = 1.0,
-          py::arg("origins")     = torch::zeros({3}),
-          py::arg("mutable")     = false);
+          py::arg("origins")     = torch::zeros({3}));
 
     // Loading and saving grids
     m.def("load",

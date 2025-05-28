@@ -1,24 +1,32 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "Build.h"
-
-#include <detail/ops/Ops.h>
+#include <detail/GridBatchImpl.h>
+#include <detail/utils/AccessorHelpers.cuh>
+#include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
+#include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
+#include <detail/utils/cuda/Utils.cuh>
 
-#include <nanovdb/NanoVDB.h>
-#include <nanovdb/tools/CreateNanoGrid.h>
-#include <nanovdb/tools/GridBuilder.h>
+#include <nanovdb/tools/cuda/PointsToGrid.cuh>
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAMathCompat.h>
+#include <torch/csrc/api/include/torch/types.h>
+
+#include <thrust/device_vector.h>
 
 namespace fvdb {
 namespace detail {
-namespace build {
+namespace ops {
 
-template <typename GridType, typename ScalarType>
+template <typename ScalarType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildGridFromMeshCPU(const JaggedTensor &vertices,
                      const JaggedTensor &triangles,
                      const std::vector<VoxelCoordTransform> &tx) {
+    using GridType   = nanovdb::ValueOnIndex;
     using Vec3T      = nanovdb::math::Vec3<ScalarType>;
     using ProxyGridT = nanovdb::tools::build::Grid<float>;
 
@@ -89,27 +97,27 @@ buildGridFromMeshCPU(const JaggedTensor &vertices,
     }
 }
 
+template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildGridFromMesh(bool isMutable,
-                  const JaggedTensor meshVertices,
-                  const JaggedTensor meshFaces,
-                  const std::vector<VoxelCoordTransform> &tx) {
-    if (meshVertices.device().is_cuda()) {
-        JaggedTensor coords = ops::dispatchIJKForMesh<torch::kCUDA>(meshVertices, meshFaces, tx);
-        return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
-    } else {
-        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return AT_DISPATCH_V2(meshVertices.scalar_type(),
-                                  "buildGridFromMeshCPU",
-                                  AT_WRAP([&]() {
-                                      return buildGridFromMeshCPU<GridType, scalar_t>(
-                                          meshVertices, meshFaces, tx);
-                                  }),
-                                  AT_EXPAND(AT_FLOATING_TYPES));
-        });
-    }
+dispatchBuildGridFromMesh<torch::kCUDA>(const JaggedTensor &meshVertices,
+                                        const JaggedTensor &meshFaces,
+                                        const std::vector<VoxelCoordTransform> &tx) {
+    JaggedTensor coords = ops::dispatchIJKForMesh<torch::kCUDA>(meshVertices, meshFaces, tx);
+    return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords);
 }
 
-} // namespace build
+template <>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromMesh<torch::kCPU>(const JaggedTensor &meshVertices,
+                                       const JaggedTensor &meshFaces,
+                                       const std::vector<VoxelCoordTransform> &tx) {
+    return AT_DISPATCH_V2(
+        meshVertices.scalar_type(),
+        "buildGridFromMeshCPU",
+        AT_WRAP([&]() { return buildGridFromMeshCPU<scalar_t>(meshVertices, meshFaces, tx); }),
+        AT_EXPAND(AT_FLOATING_TYPES));
+}
+
+} // namespace ops
 } // namespace detail
 } // namespace fvdb

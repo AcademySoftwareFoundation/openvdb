@@ -27,16 +27,11 @@ struct SparseConvolutionKernelMap : public torch::autograd::Function<SparseConvo
         TORCH_CHECK(packInfo.neighborMap().has_value() && packInfo.neighborSizes().has_value(),
                     "Neighbor map must be built for sparse convolution");
 
-        torch::Tensor nbmaps         = packInfo.neighborMap().value();
-        torch::Tensor nbsizes        = packInfo.neighborSizes().value();
-        const std::vector<int> sizes = {(int)packInfo.sourceGrid().total_voxels(),
-                                        (int)packInfo.targetGrid().total_voxels()};
-        const bool middleAcceleration =
-            !(packInfo.sourceGrid().is_mutable() && packInfo.targetGrid().is_mutable()) &&
-            packInfo.stride().value() == Vec3iOrScalar(1).value();
-
-        TORCH_CHECK(packInfo.sourceGrid().is_mutable() == packInfo.targetGrid().is_mutable(),
-                    "Source and target grids must both be mutable or immutable");
+        torch::Tensor nbmaps          = packInfo.neighborMap().value();
+        torch::Tensor nbsizes         = packInfo.neighborSizes().value();
+        const std::vector<int> sizes  = {(int)packInfo.sourceGrid().total_voxels(),
+                                         (int)packInfo.targetGrid().total_voxels()};
+        const bool middleAcceleration = packInfo.stride().value() == Vec3iOrScalar(1).value();
 
         // Check features
         TORCH_CHECK_VALUE(inFeatures.is_contiguous(), "features must be contiguous");

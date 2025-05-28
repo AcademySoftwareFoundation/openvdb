@@ -1,23 +1,40 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include "Build.h"
-
+#include <detail/GridBatchImpl.h>
 #include <detail/ops/Ops.h>
+#include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/Utils.h>
+#include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
+#include <detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/GridBuilder.h>
 
-namespace fvdb {
-namespace detail {
-namespace build {
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#include <c10/cuda/CUDAMathCompat.h>
+#include <torch/csrc/api/include/torch/types.h>
 
-template <typename GridType>
+#include <thrust/device_vector.h>
+
+namespace fvdb::detail::ops {
+
+template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
-buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
-                               const nanovdb::Coord branchingFactor) {
+dispatchBuildCoarseGridFromFine<torch::kCUDA>(const GridBatchImpl &fineGridBatch,
+                                              const nanovdb::Coord branchingFactor) {
+    JaggedTensor coords =
+        ops::dispatchCoarseIJKForFineGrid<torch::kCUDA>(fineGridBatch, branchingFactor);
+    return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords);
+}
+
+template <>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildCoarseGridFromFine<torch::kCPU>(const GridBatchImpl &fineBatchHdl,
+                                             const nanovdb::Coord branchingFactor) {
+    using GridType  = nanovdb::ValueOnIndex;
     using IndexTree = nanovdb::NanoTree<GridType>;
 
     const nanovdb::GridHandle<TorchDeviceBuffer> &fineGridHdl = fineBatchHdl.nanoGridHandle();
@@ -55,21 +72,4 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
     }
 }
 
-nanovdb::GridHandle<TorchDeviceBuffer>
-buildCoarseGridFromFineGrid(bool isMutable,
-                            const GridBatchImpl &fineBatchHdl,
-                            const nanovdb::Coord branchingFactor) {
-    if (fineBatchHdl.device().is_cuda()) {
-        JaggedTensor coords =
-            ops::dispatchCoarseIJKForFineGrid<torch::kCUDA>(fineBatchHdl, branchingFactor);
-        return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
-    } else {
-        return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return buildCoarseGridFromFineGridCPU<GridType>(fineBatchHdl, branchingFactor);
-        });
-    }
-}
-
-} // namespace build
-} // namespace detail
-} // namespace fvdb
+} // namespace fvdb::detail::ops

@@ -22,8 +22,8 @@ struct GridBatch : torch::CustomClassHolder {
     // Set some speed limits so you don't shoot yourself in the foot
     constexpr static int64_t MAX_GRIDS_PER_BATCH = 1024;
 
-    explicit GridBatch(const torch::Device &device, bool isMutable);
-    explicit GridBatch(const std::string &device_string, bool isMutable);
+    explicit GridBatch(const torch::Device &device);
+    explicit GridBatch(const std::string &device_string);
     explicit GridBatch();
 
     GridBatch(c10::intrusive_ptr<detail::GridBatchImpl> gridHdl) : mImpl(gridHdl) {}
@@ -90,15 +90,6 @@ struct GridBatch : torch::CustomClassHolder {
         return impl()->batchSize();
     }
 
-    /// @brief The total number of enabled voxels indexed by this batch of grids
-    ///        For immutable grids, this returns the same value as total_voxels()
-    /// @return The total number of enabled voxels indexed by this batch of grids
-    int64_t
-    total_enabled_voxels() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->totalEnabledVoxels(false);
-    }
-
     /// @brief Get the total number of voxels indexed by this batch of grids
     /// @return The total number of voxels indexed by this batch of grids
     int64_t
@@ -116,12 +107,6 @@ struct GridBatch : torch::CustomClassHolder {
         return impl()->numVoxels(bi);
     }
 
-    /// @brief Get the number of enabled voxels indexed by the bi^th grid in the batch.
-    ///        For immutable grids, this returns the same value as num_voxels_at(bi)
-    /// @param bi The batch index of the grid for which to get the number of enabled voxels
-    /// @return The number of enabled voxels indexed by the bi^th grid in the batch
-    int64_t num_enabled_voxels_at(int64_t bi) const;
-
     /// @brief Get the cumulative number of voxels indexed by the first bi+1 grids
     /// @param bi The batch index
     /// @return The cumulative number of voxels indexed by the first bi+1 grids
@@ -131,33 +116,15 @@ struct GridBatch : torch::CustomClassHolder {
         return impl()->cumVoxels(bi);
     }
 
-    /// @brief Get the cumulative number of enabled voxels indexed by the first bi+1 grids.
-    ///        For immutable grids, this returns the same value as cum_voxels_at(bi)
-    /// @param bi The batch index for which to get the cumulative number of enabled voxels
-    /// @return The cumulative number of enabled voxels indexed by the first bi+1 grids
-    int64_t cum_enabled_voxels_at(int64_t bi) const;
-
     /// @brief Get the number of voxels per grid indexed by this batch of grids
     /// @return An integer tensor containing the number of voxels per grid indexed by this batch
     torch::Tensor num_voxels() const;
-
-    /// @brief Get the number of enabled voxels indexed by this batch of grids
-    ///        For immutable grids, this returns the same value as num_voxels()
-    /// @return An integer tensor containing the number of enabled voxels per grid indexed by this
-    /// batch
-    torch::Tensor num_enabled_voxels() const;
 
     /// @brief Get the cumulative number of voxels indexed by the grids in this batch
     ///        i.e. [nvox_0, nvox_0+nvox_1, nvox_0+nvox_1+nvox_2, ...]
     /// @return An integer tensor containing the cumulative number of voxels indexed by the grids in
     /// this batch
     torch::Tensor cum_voxels() const;
-
-    /// @brief Get the cumulative number of voxels indexed by the grids in this batch
-    ///        i.e. [nvox_0, nvox_0+nvox_1, nvox_0+nvox_1+nvox_2, ...]
-    /// @return An integer tensor containing the cumulative number of voxels indexed by the grids in
-    /// this batch
-    torch::Tensor cum_enabled_voxels() const;
 
     /// @brief Get the total number of bytes required to store all grids indexed by this batch
     /// @return The total number of bytes required to store all grids indexed by this batch
@@ -240,14 +207,6 @@ struct GridBatch : torch::CustomClassHolder {
     set_global_origin(const Vec3d &origin) {
         detail::RAIIDeviceGuard guard(device());
         impl()->setGlobalVoxelOrigin(origin.value());
-    }
-
-    /// @brief Return true if this grid is mutable
-    /// @return Whether the grid is mutable
-    inline bool
-    is_mutable() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->isMutable();
     }
 
     /// @brief Get the device on which this grid is stored
@@ -535,68 +494,44 @@ struct GridBatch : torch::CustomClassHolder {
     /// @brief Return whether each point lies inside the grid batch
     /// @param points A JaggedTensor of points with shape [B, -1, 3] (one point set per grid in the
     /// batch)
-    /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to
-    /// mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per point)
     ///         where the [bi, i]^th entry is true if points[bi, i] lies inside the bi^th grid in
     ///         the batch
-    JaggedTensor points_in_active_voxel(const JaggedTensor &points,
-                                        bool ignore_disabled = false) const;
+    JaggedTensor points_in_active_voxel(const JaggedTensor &points) const;
 
     /// @brief Return whether the cube with corners at cube_min and cube_max centered at each point
-    /// in world space
-    ///        intersect the grid batch
+    /// in world space intersect the grid batch
     /// @param cube_centers A JaggedTensor of points with shape [B, -1, 3] (one point set per grid
     /// in the batch)
     /// @param cube_min A 3D tensor specifying the min corner relative to each point to check
     /// @param cube_max A 3D tensor specifying the max corner relative to each point to check
-    /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to
-    /// mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per point)
     ///         where the [bi, i]^th entry is true if the cube with extent (min, max) + points[bi,
     ///         i] intersects the bi^th grid in the batch
     JaggedTensor cubes_intersect_grid(const JaggedTensor &cube_centers,
                                       const Vec3dOrScalar &cube_min = 0.0,
-                                      const Vec3dOrScalar &cube_max = 0.0,
-                                      bool ignore_disabled          = false) const;
+                                      const Vec3dOrScalar &cube_max = 0.0) const;
 
     /// @brief Return whether the cube with corners at cube_min and cube_max centered at each point
-    /// in world space
-    ///        is fully contained in the grid batch's stencil
+    /// in world space is fully contained in the grid batch's stencil
     /// @param cube_centers A JaggedTensor of points with shape [B, -1, 3] (one point set per grid
     /// in the batch)
     /// @param cube_min A 3D tensor specifying the min corner relative to each point to check
     /// @param cube_max A 3D tensor specifying the max corner relative to each point to check
-    /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to
-    /// mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per point)
     ///         where the [bi, i]^th entry is true if the cube with extent (min, max) + points[bi,
     ///         i] lies inside the bi^th grid in the batch
     JaggedTensor cubes_in_grid(const JaggedTensor &cube_centers,
                                const Vec3dOrScalar &cube_min = 0.0,
-                               const Vec3dOrScalar &cube_max = 0.0,
-                               bool ignore_disabled          = false) const;
-
-    /// @brief Return a boolean mask indicating whether each voxel in the grid is enabled or not
-    /// @return A boolean JaggedTensor of shape [B, -1] indicating whether each voxel in the grid is
-    /// enabled or not
-    JaggedTensor enabled_mask() const;
-
-    /// @brief Return a boolean mask indicating whether each voxel in the grid is disabled or not
-    /// @return A boolean JaggedTensor of shape [B, -1] indicating whether each voxel in the grid is
-    /// disabled or not
-    JaggedTensor disabled_mask() const;
+                               const Vec3dOrScalar &cube_max = 0.0) const;
 
     /// @brief Return whether each coordinate is in the grid batch or not
     /// @param ijk A JaggedTensor of ijk coordinates with lshape [N_0, ..., N_B] and eshape (3,)
     ///            (one coordinate set per grid in the batch)
-    /// @param ignore_disabled Whether to ignore voxels that have been disabled (only applicable to
-    /// mutable grids)
     /// @return A JaggedTensor of booleans with shape [B, -1] (one boolean per coordinate)
     ///         where the [bi, i]^th entry is true if coords[bi, i] lies inside the bi^th grid in
     ///         the batch
-    JaggedTensor coords_in_active_voxel(const JaggedTensor &ijk,
-                                        bool ignore_disabled = false) const;
+    JaggedTensor coords_in_active_voxel(const JaggedTensor &ijk) const;
 
     /// @brief Return the integer offset of each ijk value in the grid batch
     /// @param ijk A JaggedTensor of ijk coordinates with shape [B, -1, 3] (one coordinate set per
@@ -623,11 +558,6 @@ struct GridBatch : torch::CustomClassHolder {
     /// @brief Return the set of active ijk coordinates indexed by this grid batch
     /// @return A JaggedTensor of voxel coordinates indexed by this grid batch (shape [B, -1, 3])
     JaggedTensor ijk() const;
-
-    /// @brief Return the set of enabled ijk coordinates indexed by this grid batch
-    /// @note For non mutable grids, this function returns the same values as ijk()
-    /// @return A JaggedTensor of voxel coordinates indexed by this grid batch (shape [B, -1, 3])
-    JaggedTensor ijk_enabled() const;
 
     /// @brief Find the intersection between a collection of rays and the zero level set of a scalar
     /// field
@@ -691,8 +621,7 @@ struct GridBatch : torch::CustomClassHolder {
     JaggedTensor segments_along_rays(const JaggedTensor &ray_origins,
                                      const JaggedTensor &ray_directions,
                                      int64_t max_segments,
-                                     double eps         = 0.0,
-                                     bool ignore_masked = false) const;
+                                     double eps = 0.0) const;
 
     /// @brief Generate a set of uniform samples in active regions along a specified set of rays
     /// @param ray_origins A JaggedTensor of ray origins with lshape [N_0, ..., N_B] and eshape [3,]
@@ -730,22 +659,6 @@ struct GridBatch : torch::CustomClassHolder {
     ///         (one vertex set per grid in the batch) and edges is a JaggedTensor of edge indices
     ///         of shape [B, -1, 2] (one edge set per grid in the batch)
     std::vector<JaggedTensor> viz_edge_network(bool return_voxel_coordinates = false) const;
-
-    /// @brief Disable the specified voxels in the grid batch. If the input ijk values refer to
-    /// non-indexed voxels,
-    ///        then these are simply ignored.
-    /// @param ijk A Jagged tensor of shape [B, -1, 3] of coordinates to disable(one set of
-    /// coordinates per grid in the batch)
-    /// @note This is only applicable to mutable grids
-    void disable_ijk(const JaggedTensor &ijk);
-
-    /// @brief Enable the specified voxels in the grid batch. If the input ijk values refer to
-    /// non-indexed voxels,
-    ///        then these are simply ignored.
-    /// @param ijk A Jagged tensor of shape [B, -1, 3] of coordinates to enable (one set of
-    /// coordinates per grid in the batch)
-    /// @note This is only applicable to mutable grids
-    void enable_ijk(const JaggedTensor &ijk);
 
     /// @brief Return a batch of grids representing the dual of this batch. i.e. The centers of the
     /// dual grid correspond
@@ -935,13 +848,11 @@ struct GridBatch : torch::CustomClassHolder {
     /// @brief Return a JaggedTensor whose joffsets and jidx match this grid batch's
     /// @param data The data to use for the JaggedTensor (first dimension must match the total
     /// number of voxels in the grid batch)
-    /// @param ignore_disabled If true, then voxels which are disabled will be included in the
-    /// returned JaggedTensor
     /// @return A JaggedTensor corresponding to the voxel grid of this grid batch
     JaggedTensor
-    jagged_like(const torch::Tensor &data, bool ignore_disabled = true) const {
+    jagged_like(const torch::Tensor &data) const {
         detail::RAIIDeviceGuard guard(device());
-        return impl()->jaggedTensor(data, ignore_disabled);
+        return impl()->jaggedTensor(data, true);
     }
 
     /// @brief Populate the grid batch with voxels that intersect a triangle mesh
@@ -960,22 +871,14 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Populate the grid batch with voxels which contain a point in an input set of point
     /// clouds
-    ///        (possibly padding each voxel containing a point)
     /// @param points A JaggedTensor with shape [B, -1, 3] containing one point set per grid to
     /// create
-    /// @param pad_min A tensor of shape [3,] containing the number of voxels to pad each inserted
-    /// voxel with to the left/back/bottom
-    /// @param pad_max A tensor of shape [3,] containing the number of voxels to pad each inserted
-    /// voxel with to the right/front/top
     /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid
     /// in the batch or one voxel size for all grids
     /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the
     /// [0, 0, 0] voxel
     ///                for each grid in the batch, or one origin for all grids
-    /// @param isMutable Whether the grid should be mutable or not
     void set_from_points(const JaggedTensor &points,
-                         const Vec3i &pad_min                  = torch::zeros(3, torch::kInt32),
-                         const Vec3i &pad_max                  = torch::zeros(3, torch::kInt32),
                          const Vec3dBatchOrScalar &voxel_sizes = 1.0,
                          const Vec3dBatch &origins             = torch::zeros(3, torch::kInt32));
 
@@ -988,27 +891,20 @@ struct GridBatch : torch::CustomClassHolder {
     /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the
     /// [0, 0, 0] voxel
     ///                for each grid in the batch, or one origin for all grids
-    /// @param isMutable Whether the grid should be mutable or not
     void set_from_nearest_voxels_to_points(const JaggedTensor &points,
                                            const Vec3dBatchOrScalar &voxel_sizes = 1.0,
                                            const Vec3dBatch &origins             = torch::zeros(3,
                                                                                     torch::kInt32));
 
-    /// @brief Populate the grid batch with the specified voxel coordinates (possibly with padding)
+    /// @brief Populate the grid batch with the specified voxel coordinates
     /// @param ijk A JaggedTensor of shape [B, -1, 3] specifying the coordinates of each voxel to
     /// insert
-    /// @param pad_min A tensor of shape [3,] containing the number of voxels to pad each inserted
-    /// voxel with to the left/back/bottom
-    /// @param pad_max A tensor of shape [3,] containing the number of voxels to pad each inserted
-    /// voxel with to the right/front/top
     /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid
     /// in the batch or one voxel size for all grids
     /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the
     /// [0, 0, 0] voxel
     ///                for each grid in the batch, or one origin for all grids
     void set_from_ijk(const JaggedTensor &ijk,
-                      const Vec3i &pad_min                  = torch::zeros(3, torch::kInt32),
-                      const Vec3i &pad_max                  = torch::zeros(3, torch::kInt32),
                       const Vec3dBatchOrScalar &voxel_sizes = 1.0,
                       const Vec3dBatch &origins             = torch::zeros(3, torch::kInt32));
 

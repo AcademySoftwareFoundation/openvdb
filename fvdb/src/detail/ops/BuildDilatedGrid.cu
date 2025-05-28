@@ -7,6 +7,8 @@
 #include <detail/ops/Ops.h>
 
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
+#include <nanovdb/tools/GridBuilder.h>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/util/MorphologyHelpers.h>
 
@@ -35,7 +37,7 @@ dispatchDilateGrid<torch::kCUDA>(const GridBatchImpl &gridBatch, const int dilat
             nanovdb::tools::cuda::DilateGrid<nanovdb::ValueOnIndex> dilateOp(grid);
             dilateOp.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
             dilateOp.setChecksum(nanovdb::CheckMode::Default);
-            dilateOp.setVerbose(0);
+            dilateOp.setVerbose(1);
 
             handle = dilateOp.getHandle(guide);
             C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -53,6 +55,54 @@ dispatchDilateGrid<torch::kCUDA>(const GridBatchImpl &gridBatch, const int dilat
         // This copies all the handles into a single handle -- only do it if there are multiple
         // grids
         return nanovdb::cuda::mergeGridHandles(handles, &guide);
+    }
+}
+
+template <>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchDilateGrid<torch::kCPU>(const GridBatchImpl &gridBatch, const int dilation) {
+    using GridType  = nanovdb::ValueOnIndex;
+    using IndexTree = nanovdb::NanoTree<GridType>;
+
+    const nanovdb::GridHandle<TorchDeviceBuffer> &gridHdl = gridBatch.nanoGridHandle();
+
+    std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> gridHandles;
+    gridHandles.reserve(gridHdl.gridCount());
+    for (uint32_t bidx = 0; bidx < gridHdl.gridCount(); bidx += 1) {
+        const nanovdb::NanoGrid<GridType> *grid = gridHdl.template grid<GridType>(bidx);
+        if (!grid) {
+            throw std::runtime_error("Failed to get pointer to nanovdb index grid");
+        }
+        const IndexTree &tree = grid->tree();
+
+        using ProxyGridT       = nanovdb::tools::build::Grid<float>;
+        auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
+        auto proxyGridAccessor = proxyGrid->getWriteAccessor();
+
+        for (auto it = ActiveVoxelIterator<GridType, -1>(tree); it.isValid(); it++) {
+            const nanovdb::Coord baseIjk = it->first;
+
+            for (int i = -dilation; i <= dilation; i += 1) {
+                for (int j = -dilation; j <= dilation; j += 1) {
+                    for (int k = -dilation; k <= dilation; k += 1) {
+                        const nanovdb::Coord fineIjk = baseIjk + nanovdb::Coord(i, j, k);
+                        proxyGridAccessor.setValue(fineIjk, 1);
+                    }
+                }
+            }
+        }
+
+        proxyGridAccessor.merge();
+        auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
+            *proxyGrid, 0u, false, false);
+        ret.buffer().to(torch::kCPU);
+        gridHandles.push_back(std::move(ret));
+    }
+
+    if (gridHandles.size() == 1) {
+        return std::move(gridHandles[0]);
+    } else {
+        return nanovdb::mergeGrids(gridHandles);
     }
 }
 

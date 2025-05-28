@@ -13,20 +13,13 @@
 void
 bind_grid_batch(py::module &m) {
     py::class_<fvdb::GridBatch>(m, "GridBatch", "A batch of sparse VDB grids.")
-        .def(py::init<const torch::Device &, bool>(),
-             py::arg("device")  = torch::kCPU,
-             py::arg("mutable") = false)
-        .def(py::init<const std::string &, bool>(),
-             py::arg("device")  = "cpu",
-             py::arg("mutable") = false)
+        .def(py::init<const torch::Device &>(), py::arg("device") = torch::kCPU)
+        .def(py::init<const std::string &>(), py::arg("device") = "cpu")
 
         // Properties
         .def_property_readonly("total_voxels",
                                &fvdb::GridBatch::total_voxels,
                                "The total number of voxels indexed by this batch of grids.")
-        .def_property_readonly("total_enabled_voxels",
-                               &fvdb::GridBatch::total_enabled_voxels,
-                               "The total number of enabled voxels indexed by this batch of grids.")
         .def_property_readonly("total_bbox", &fvdb::GridBatch::total_bbox, R"_FVDB_(
             A tensor, total_bbox, of shape [2, 3] where total_bbox = `[[bmin_i, bmin_j, bmin_z=k],
               [bmax_i, bmax_j, bmax_k]]` is the bounding box such that `bmin <= ijk < bmax` for all voxels
@@ -37,17 +30,7 @@ bind_grid_batch(py::module &m) {
             [](py::object) -> int64_t { return fvdb::GridBatch::MAX_GRIDS_PER_BATCH; },
             "The maximum number of grids that can be stored in a single batch.")
         .def_property_readonly(
-            "mutable", &fvdb::GridBatch::is_mutable, "Whether the grid is mutable.")
-        .def_property_readonly(
             "device", &fvdb::GridBatch::device, "The device on which this grid is stored.")
-        .def_property_readonly(
-            "enabled_mask",
-            &fvdb::GridBatch::enabled_mask,
-            "A boolean JaggedTensor of shape [B, -1] indicating whether each voxel in the grid is enabled or not.")
-        .def_property_readonly(
-            "disabled_mask",
-            &fvdb::GridBatch::disabled_mask,
-            "A boolean JaggedTensor of shape [B, -1] indicating whether each voxel in the grid is disabled or not.")
         .def_property_readonly("grid_count",
                                &fvdb::GridBatch::grid_count,
                                "The number of grids indexed by this batch.")
@@ -59,14 +42,6 @@ bind_grid_batch(py::module &m) {
             An integer tensor containing the cumulative number of voxels indexed by the grids in this batch.
               i.e. `[nvox_0, nvox_0+nvox_1, nvox_0+nvox_1+nvox_2, ...]`
         )_FVDB_")
-        .def_property_readonly(
-            "num_enabled_voxels",
-            &fvdb::GridBatch::num_enabled_voxels,
-            "An integer tensor containing the number of enabled voxels per grid indexed by this batch. If this grid is not mutable, this will be the same as num_voxels.")
-        .def_property_readonly(
-            "cum_enabled_voxels",
-            &fvdb::GridBatch::cum_enabled_voxels,
-            "An integer tensor containing the cumulative number of voxels enabled in each grid in this batch. i.e. `[nvox_0, nvox_0+nvox_1, nvox_0+nvox_1+nvox_2, ...]`")
         .def_property_readonly(
             "origins",
             [](const fvdb::GridBatch &self) { return self.origins(torch::kFloat32); },
@@ -101,10 +76,6 @@ bind_grid_batch(py::module &m) {
             "ijk",
             &fvdb::GridBatch::ijk,
             "A [num_grids, -1, 3] JaggedTensor of the ijk coordinates of each voxel in this batch.")
-        .def_property_readonly(
-            "ijk_enabled",
-            &fvdb::GridBatch::ijk_enabled,
-            "A [num_grids, -1, 3] JaggedTensor of the ijk coordinates of each enabled voxel in this batch.")
         .def_property_readonly(
             "viz_edge_network",
             [](const fvdb::GridBatch &self) { return self.viz_edge_network(false); },
@@ -153,14 +124,6 @@ bind_grid_batch(py::module &m) {
             "cum_voxels_at",
             &fvdb::GridBatch::cum_voxels_at,
             "Get the cumulative number of voxels in the bi^th grid in the batch. i.e. `nvox_0+nvox_1+...+nvox_i`")
-        .def(
-            "num_enabled_voxels_at",
-            &fvdb::GridBatch::num_enabled_voxels_at,
-            "Get the number of enabled voxels in the bi^th grid in the batch. If this grid isn't mutable, this returns the same value as num_voxels_at.")
-        .def(
-            "cum_enabled_voxels_at",
-            &fvdb::GridBatch::cum_enabled_voxels_at,
-            "Get the cumulative number of enabled voxels in the bi^th grid in the batch. i.e. `nvox_0+nvox_1+...+nvox_i`. If this grid isn't mutable, this returns the same value as cum_voxels_at.")
         .def("bbox_at",
              &fvdb::GridBatch::bbox_at,
              R"_FVDB_(
@@ -184,13 +147,11 @@ bind_grid_batch(py::module &m) {
         .def("jagged_like",
              &fvdb::GridBatch::jagged_like,
              py::arg("data"),
-             py::arg("ignore_disabled") = true,
              R"_FVDB_(
             Create a JaggedTensor with the same offsets as this grid batch.
 
             Args:
                 data (torch.Tensor): A tensor of shape `[total_voxels, *]` to be converted to a JaggedTensor.
-                ignore_disabled (bool): Whether to ignore disabled voxels when creating the JaggedTensor.
 
             Returns:
                 jagged_data (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, *]` with the same offsets as this grid batch.
@@ -307,8 +268,6 @@ bind_grid_batch(py::module &m) {
         .def("set_from_points",
              &fvdb::GridBatch::set_from_points,
              py::arg("points"),
-             py::arg("pad_min")     = torch::zeros(3, torch::kInt32),
-             py::arg("pad_max")     = torch::zeros(3, torch::kInt32),
              py::arg("voxel_sizes") = 1.0,
              py::arg("origins")     = torch::zeros(3, torch::kInt32),
              R"_FVDB_(
@@ -316,8 +275,6 @@ bind_grid_batch(py::module &m) {
 
             Args:
                 points (JaggedTensor): A JaggedTensor of shape [num_grids, -1, 3] of point positions.
-                pad_min (triple of ints): Index space minimum bound of the padding region.
-                pad_max (triple of ints): Index space maximum bound of the padding region.
                 mesh_faces (JaggedTensor): A JaggedTensor of shape [num_grids, -1, 3] of integer indexes into `mesh_vertices` specifying the faces of each mesh.
                 voxel_sizes (float, list, tensor): Either a float or triple specifyng the voxel size of all the grids in the batch or a tensor of shape [num_grids, 3] specifying the voxel size for each grid.
                 origins (float, list, tensor): Either a float or triple specifyng the world space origin of all the grids in the batch or a tensor of shape [num_grids, 3] specifying the world space origin for each grid.)_FVDB_")
@@ -343,8 +300,6 @@ bind_grid_batch(py::module &m) {
         .def("set_from_ijk",
              &fvdb::GridBatch::set_from_ijk,
              py::arg("ijk"),
-             py::arg("pad_min")     = torch::zeros(3, torch::kInt32),
-             py::arg("pad_max")     = torch::zeros(3, torch::kInt32),
              py::arg("voxel_sizes") = 1.0,
              py::arg("origins")     = torch::zeros(3),
              R"_FVDB_(
@@ -352,8 +307,6 @@ bind_grid_batch(py::module &m) {
 
                     Args:
                         ijk (JaggedTensor): A JaggedTensor of shape [num_grids, -1, 3] of ijk coordinates.
-                        pad_min (triple of ints): Index space minimum bound of the padding region.
-                        pad_max (triple of ints): Index space maximum bound of the padding region.
                         voxel_sizes (float, list, tensor): Either a float or triple specifyng the voxel size of all the grids in the batch or a tensor of shape [num_grids, 3] specifying the voxel size for each grid.
                         origins (float, list, tensor): Either a float or triple specifyng the world space origin of all the grids in the batch or a tensor of shape [num_grids, 3] specifying the world space origin for each grid.
                 )_FVDB_")
@@ -589,33 +542,15 @@ bind_grid_batch(py::module &m) {
                     fine_grid (GridBatch): A GridBatch representing the subdivided version of this grid batch.
                 )_FVDB_")
 
-        // Mutating functions
-        .def("disable_ijk", &fvdb::GridBatch::disable_ijk, py::arg("ijk"), R"_FVDB_(
-            If this is grid is mutable, disable voxels at the specified coordinates, otherwise throw an exception.
-            If the ijk values are already disabled or are not represented in this GridBatch, then this function is no-op.
-
-            Args:
-                ijk (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of ijk coordinates to disable.
-        )_FVDB_")
-        .def("enable_ijk", &fvdb::GridBatch::enable_ijk, py::arg("ijk"), R"_FVDB_(
-            If this is grid is mutable, enable voxels at the specified coordinates, otherwise throw an exception.
-            If the ijk values are already enabled or are not represented in this GridBatch, then this function is no-op.
-
-            Args:
-                ijk (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of ijk coordinates to disable.
-        )_FVDB_")
-
         // Grid intersects/contains objects
         .def("points_in_active_voxel",
              &fvdb::GridBatch::points_in_active_voxel,
              py::arg("points"),
-             py::arg("ignore_disabled") = false,
              R"_FVDB_(
             Given a set of points, return a JaggedTensor of booleans indicating which points are in active voxels.
 
             Args:
                 points (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of point positions.
-                ignore_disabled (bool): Whether to ignore disabled voxels when computing the output.
 
             Returns:
                 points_in_active_voxel (JaggedTensor): A JaggedTensor of shape `[num_grids, -1]` of booleans indicating which points are in active voxels.
@@ -623,13 +558,11 @@ bind_grid_batch(py::module &m) {
         .def("coords_in_active_voxel",
              &fvdb::GridBatch::coords_in_active_voxel,
              py::arg("ijk"),
-             py::arg("ignore_disabled") = false,
              R"_FVDB_(
             Given a set of ijk coordinates, return a JaggedTensor of booleans indicating which coordinates are active in this gridbatch
 
             Args:
                 ijk (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of integer ijk coordinates.
-                ignore_disabled (bool): Whether to ignore disabled voxels when computing the output.
 
             Returns:
                 coords_in_active_voxel (JaggedTensor): A JaggedTensor of shape `[num_grids, -1]` of booleans indicating which coordinates are in the grid.
@@ -637,9 +570,8 @@ bind_grid_batch(py::module &m) {
         .def("cubes_intersect_grid",
              &fvdb::GridBatch::cubes_intersect_grid,
              py::arg("cube_centers"),
-             py::arg("cube_min")        = 0.0,
-             py::arg("cube_max")        = 0.0,
-             py::arg("ignore_disabled") = false,
+             py::arg("cube_min") = 0.0,
+             py::arg("cube_max") = 0.0,
              R"_FVDB_(
             Given a set of cube centers and extents, return a JaggedTensor of booleans indicating whether cubes intersect active voxels.
 
@@ -647,7 +579,6 @@ bind_grid_batch(py::module &m) {
                 cube_centers (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of cube centers.
                 cube_min (float or triple of floats): The minimum extent of each cube (all cubes have the same size).
                 cube_max (float or triple of floats): The maximum extent of the cube (all cubes have the same size).
-                ignore_disabled (bool): Whether to ignore disabled voxels when computing the output.
 
             Returns:
                 cubes_intersect_grid (JaggedTensor): A JaggedTensor of shape `[num_grids, -1]` of booleans indicating whether cubes intersect active voxels.
@@ -655,9 +586,8 @@ bind_grid_batch(py::module &m) {
         .def("cubes_in_grid",
              &fvdb::GridBatch::cubes_in_grid,
              py::arg("cube_centers"),
-             py::arg("cube_min")        = 0.0,
-             py::arg("cube_max")        = 0.0,
-             py::arg("ignore_disabled") = false,
+             py::arg("cube_min") = 0.0,
+             py::arg("cube_max") = 0.0,
              R"_FVDB_(
             Given a set of cube centers and extents, return a JaggedTensor of booleans indicating whether cubes fully reside in active voxels.
 
@@ -665,7 +595,6 @@ bind_grid_batch(py::module &m) {
                 cube_centers (JaggedTensor): A JaggedTensor of shape `[num_grids, -1, 3]` of cube centers.
                 cube_min (float or triple of floats): The minimum extent of each cube (all cubes have the same size).
                 cube_max (float or triple of floats): The maximum extent of the cube (all cubes have the same size).
-                ignore_disabled (bool): Whether to ignore disabled voxels when computing the output.
 
             Returns:
                 cubes_intersect_grid (JaggedTensor): A JaggedTensor of shape `[num_grids, -1]` of booleans indicating whether cubes fully reside in active voxels.
@@ -700,8 +629,7 @@ bind_grid_batch(py::module &m) {
              py::arg("ray_origins"),
              py::arg("ray_directions"),
              py::arg("max_segments"),
-             py::arg("eps")           = 0.0,
-             py::arg("ignore_masked") = false)
+             py::arg("eps") = 0.0)
         .def("uniform_ray_samples",
              &fvdb::GridBatch::uniform_ray_samples,
              py::arg("ray_origins"),

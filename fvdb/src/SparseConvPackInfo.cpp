@@ -30,8 +30,6 @@ SparseConvPackInfo::SparseConvPackInfo(Vec3iOrScalar kernelsize,
         targetGrid = maybeTarget.value();
     }
 
-    TORCH_CHECK(srcGrid.is_mutable() == targetGrid.is_mutable(),
-                "Source and target grids must both be mutable or immutable");
     TORCH_CHECK(srcGrid.device() == targetGrid.device(),
                 "Source and target grids must both be on the same device");
     TORCH_CHECK(srcGrid.device() == targetGrid.device(),

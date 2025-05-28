@@ -13,7 +13,6 @@ from fvdb.utils.tests import (
     dtype_to_atol,
     get_fvdb_test_data_path,
     make_dense_grid_and_point_data,
-    random_drop_points_if_mutable,
 )
 
 all_device_combos = [
@@ -24,16 +23,11 @@ all_device_combos = [
 ]
 
 all_device_dtype_combos = [
-    ["cuda", torch.float16, False],
-    ["cpu", torch.float32, False],
-    ["cuda", torch.float32, False],
-    ["cpu", torch.float64, False],
-    ["cuda", torch.float64, False],
-    ["cuda", torch.float16, True],
-    ["cpu", torch.float32, True],
-    ["cuda", torch.float32, True],
-    ["cpu", torch.float64, True],
-    ["cuda", torch.float64, True],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 
@@ -42,7 +36,7 @@ class TestRayMarching(unittest.TestCase):
         pass
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_segments_with_misses(self, device, dtype, mutable):
+    def test_segments_with_misses(self, device, dtype):
         grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
@@ -78,7 +72,7 @@ class TestRayMarching(unittest.TestCase):
                 self.assertEqual(sls[j], tlsj)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_voxels_with_misses(self, device, dtype, mutable):
+    def test_voxels_with_misses(self, device, dtype):
         grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
@@ -126,7 +120,7 @@ class TestRayMarching(unittest.TestCase):
                 self.assertEqual(vls[j], tlsj)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_uniform_samples_with_misses(self, device, dtype, mutable):
+    def test_uniform_samples_with_misses(self, device, dtype):
         grid = fvdb.gridbatch_from_dense(
             num_grids=1, dense_dims=[32, 32, 32], device=device, voxel_sizes=[0.1, 0.1, 0.1], origins=[0, 0, 0]
         )
@@ -165,15 +159,15 @@ class TestRayMarching(unittest.TestCase):
                 self.assertEqual(sls[j], tlsj)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_volume_render(self, device, dtype, mutable):
+    def test_volume_render(self, device, dtype):
         vox_size = np.random.rand(3) * 0.2 + 0.05
         step_size = 0.1 * float(np.linalg.norm(vox_size))
         vox_origin = torch.rand(3).to(device).to(dtype)
 
         pts = torch.rand(10000, 3).to(device=device, dtype=dtype) - 0.5
-        grid = GridBatch(mutable=mutable, device=device)
-        grid.set_from_points(pts, [-1] * 3, [1] * 3, vox_size, vox_origin)
-        random_drop_points_if_mutable(grid, drop_pct=0.3)
+        grid = GridBatch(device=device)
+        grid.set_from_points(pts, vox_size, vox_origin)
+        # grid = grid.dilated_grid(1)
         grid_dual = grid.dual_grid()
 
         def make_ray_grid(origin, nrays, minb=(-0.45, -0.45), maxb=(0.45, 0.45)):
@@ -310,10 +304,9 @@ class TestRayMarching(unittest.TestCase):
         assert torch.allclose(intervals.jidx, torch.zeros_like(intervals.jidx))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_uniform_step_size_first_step_is_multiple_of_step_size(self, device, dtype, mutable):
+    def test_uniform_step_size_first_step_is_multiple_of_step_size(self, device, dtype):
         gsize = 8
-        grid, _, _ = make_dense_grid_and_point_data(gsize, device, dtype, mutable)
-        random_drop_points_if_mutable(grid)
+        grid, _, _ = make_dense_grid_and_point_data(gsize, device, dtype)
 
         grid_centers = grid.grid_to_world(grid.ijk.float()).jdata
         camera_origin_inside = torch.mean(grid_centers, dim=0)
@@ -347,7 +340,7 @@ class TestRayMarching(unittest.TestCase):
         self.assertTrue(torch.allclose(nsteps_outside, torch.round(nsteps_outside), atol=dtype_to_atol(dtype)))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_segments_along_rays_bug(self, device, dtype, mutable):
+    def test_segments_along_rays_bug(self, device, dtype):
         data_path = get_fvdb_test_data_path()
         data = torch.load(str(data_path / "ray_marching" / "repro_bug.pth"))
         grid = gridbatch_from_ijk(data["ijk"].to(device), voxel_sizes=data["vox_size"], origins=data["vox_origin"])
@@ -362,12 +355,12 @@ class TestRayMarching(unittest.TestCase):
             self.assertEqual(segments[0][0].jdata.shape[0], 52)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_segments_along_rays_always_sorted(self, device, dtype, mutable):
+    def test_segments_along_rays_always_sorted(self, device, dtype):
         for eps in [0.0, 1e-5]:
             pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
-            grid = GridBatch(mutable=mutable).to(device)
-            grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
-            random_drop_points_if_mutable(grid)
+            grid = GridBatch().to(device)
+            grid.set_from_points(pts, 0.0001, torch.zeros(3))
+            # grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[:100] - rays_o
@@ -387,12 +380,12 @@ class TestRayMarching(unittest.TestCase):
                 self.assertTrue(torch.all(segments_i[1:, 1] - segments_i[:-1, 1] >= eps))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_segments_along_rays_always_sorted_batched(self, device, dtype, mutable):
+    def test_segments_along_rays_always_sorted_batched(self, device, dtype):
         for eps in [0.0, 1e-5]:
             pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)] * 2)
-            grid = GridBatch(mutable=mutable).to(device)
-            grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
-            random_drop_points_if_mutable(grid)
+            grid = GridBatch().to(device)
+            grid.set_from_points(pts, 0.0001, torch.zeros(3))
+            # grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[0].jdata[:100] - rays_o
@@ -415,12 +408,12 @@ class TestRayMarching(unittest.TestCase):
                     self.assertTrue(torch.all(segments_i[1:, 1] - segments_i[:-1, 1] >= eps))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_segments_along_rays_batch_size_mismatch_throws(self, device, dtype, mutable):
+    def test_segments_along_rays_batch_size_mismatch_throws(self, device, dtype):
         pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
         # pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)]*2)
-        grid = GridBatch(mutable=mutable).to(device)
-        grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch().to(device)
+        grid.set_from_points(pts, 0.0001, torch.zeros(3))
+        # grid = grid.dilated_grid(1)
 
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
@@ -432,12 +425,12 @@ class TestRayMarching(unittest.TestCase):
             segments = grid.segments_along_rays(rays_o, rays_d, 100, eps=1e-4)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_voxels_along_rays_always_sorted(self, device, dtype, mutable):
+    def test_voxels_along_rays_always_sorted(self, device, dtype):
         for i in range(3):
             pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
-            grid = GridBatch(mutable=mutable).to(device)
-            grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.01, torch.zeros(3))
-            random_drop_points_if_mutable(grid)
+            grid = GridBatch().to(device)
+            grid.set_from_points(pts, 0.01, torch.zeros(3))
+            # grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[:100] - rays_o
@@ -468,12 +461,12 @@ class TestRayMarching(unittest.TestCase):
                 )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_voxels_along_rays_batch_size_mismatch_throws(self, device, dtype, mutable):
+    def test_voxels_along_rays_batch_size_mismatch_throws(self, device, dtype):
         pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
         # pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)]*2)
-        grid = GridBatch(mutable=mutable).to(device)
-        grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.0001, torch.zeros(3))
-        random_drop_points_if_mutable(grid)
+        grid = GridBatch().to(device)
+        grid.set_from_points(pts, 0.0001, torch.zeros(3))
+        # grid = grid.dilated_grid(1)
 
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
@@ -485,13 +478,13 @@ class TestRayMarching(unittest.TestCase):
             out_voxels, out_times = grid.voxels_along_rays(rays_o, rays_d, 100, 1.0e-5)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_voxels_along_rays_always_sorted_batched(self, device, dtype, mutable):
+    def test_voxels_along_rays_always_sorted_batched(self, device, dtype):
         for i in range(3):
             # pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
             pts = fvdb.JaggedTensor([torch.rand(100, 3).to(device=device, dtype=dtype)] * 2)
-            grid = GridBatch(mutable=mutable).to(device)
-            grid.set_from_points(pts, (0, 0, 0), (1, 1, 1), 0.01, torch.zeros(3))
-            random_drop_points_if_mutable(grid)
+            grid = GridBatch().to(device)
+            grid.set_from_points(pts, 0.01, torch.zeros(3))
+            # grid = grid.dilated_grid(1)
 
             rays_o = [-torch.ones(100, 3).to(device).to(dtype)] * 2
             rays_d = [pts[i].jdata[:100] - rays_o[i] for i in range(2)]

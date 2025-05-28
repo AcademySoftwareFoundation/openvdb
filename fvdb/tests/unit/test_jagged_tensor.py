@@ -598,7 +598,7 @@ class TestJaggedTensor(unittest.TestCase):
             pts_list = [torch.rand(1000 + np.random.randint(10), 3, device=device, dtype=dtype) for _ in range(4)]
         randpts = fvdb.JaggedTensor(pts_list)
         self.check_lshape(randpts, pts_list)
-        gridbatch = fvdb.GridBatch(device=device, mutable=False)
+        gridbatch = fvdb.GridBatch(device=device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.1)
 
         grid = gridbatch[0]
@@ -625,7 +625,7 @@ class TestJaggedTensor(unittest.TestCase):
                 ijk_list.append(ijk)
                 pts_list.append(pts)
         randpts = fvdb.JaggedTensor(pts_list)
-        gridbatch = fvdb.GridBatch(device=device, mutable=False)
+        gridbatch = fvdb.GridBatch(device=device)
         gridbatch.set_from_points(randpts, voxel_sizes=0.5)
 
         idx = np.random.randint(len(gridbatch))

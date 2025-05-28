@@ -600,7 +600,7 @@ subdiv_normals, subdiv_grid = grid.subdivide(2, vox_normals, mask=mask)
 ![](../imgs/fig/subdiv_mask.png)
 
 
-## Getting the number of enabled voxels per grid in a batch
+## Getting the number of voxels per grid in a batch
 
 Getting the number of voxels in the grids of a `GridBatch` can be easily accomplished with `num_voxels`:
 
@@ -611,7 +611,7 @@ import torch
 # Create a GridBatch of random points
 batch_size = 4
 pts = fvdb.JaggedTensor([torch.rand(10_000*(i+1),3) for i in range(batch_size)])
-grid = fvdb.GridBatch(mutable=False)
+grid = fvdb.GridBatch()
 grid.set_from_points(pts, voxel_sizes=0.02)
 
 # Get the number of voxels per grid in the batch
@@ -623,26 +623,6 @@ Grid 0 has 9645 voxels
 Grid 1 has 18503 voxels
 Grid 2 has 26749 voxels
 Grid 3 has 34378 voxels
-```
-
-If the grid is *mutable* and the number of enabled voxels has changed, you can use `num_enabled_voxels` to get the number of *enabled* voxels.  If a grid is not mutable, `num_enabled_voxels` will return the same value as `num_voxels`.
-
-```python continuation
-# Create a mutable GridBatch of random points
-grid = fvdb.GridBatch(mutable=True)
-grid.set_from_points(pts, voxel_sizes=0.02)
-# Disable some voxels randomly
-grid.disable_ijk(fvdb.JaggedTensor([torch.randint(0,50,(100_000,3)) for _ in range(batch_size)]))
-
-# Get the number of enabled voxels per grid in the batch
-for batch, num_voxels in enumerate(grid.num_enabled_voxels):
-    print(f"Grid {batch} has {grid.num_enabled_voxels_at(batch)} enabled voxels and {grid.num_voxels_at(batch)} total voxels")
-```
-```bash
-Grid 0 has 4434 enabled voxels and 9645 total voxels
-Grid 1 has 8620 enabled voxels and 18503 total voxels
-Grid 2 has 12456 enabled voxels and 26749 total voxels
-Grid 3 has 16155 enabled voxels and 34378 total voxels
 ```
 
 ## Converting between ijk (grid) coordinates and world coordinates

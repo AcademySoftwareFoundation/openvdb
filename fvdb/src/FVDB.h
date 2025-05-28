@@ -100,25 +100,16 @@ JaggedTensor jempty(const std::vector<std::vector<int64_t>> &lsizes,
                     at::TensorOptions options         = {});
 
 /// @brief Return a grid batch with voxels which contain a point in an input set of point clouds
-///        (possibly padding each voxel containing a point)
 /// @param points A JaggedTensor with shape [B, -1, 3] containing one point set per grid to create
-/// @param pad_min A tensor of shape [3,] containing the number of voxels to pad each inserted voxel
-/// with to the left/back/bottom
-/// @param pad_max A tensor of shape [3,] containing the number of voxels to pad each inserted voxel
-/// with to the right/front/top
 /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid in
 /// the batch or one voxel size for all grids
 /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the [0,
 /// 0, 0] voxel
 ///                for each grid in the batch, or one origin for all grids
-/// @param is_mutable Whether the grid should be mutable or not
 /// @return A GridBatch containing the created grid batch
 GridBatch gridbatch_from_points(const JaggedTensor &points,
-                                const Vec3i &pad_min = torch::zeros({3}, torch::kInt32),
-                                const Vec3i &pad_max = torch::zeros({3}, torch::kInt32),
                                 const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                                const Vec3dBatch &origins             = torch::zeros({3}),
-                                bool is_mutable                       = false);
+                                const Vec3dBatch &origins             = torch::zeros({3}));
 
 /// @brief Return a grid batch with the eight nearest voxels to each point in an input set of point
 /// clouds
@@ -126,22 +117,15 @@ GridBatch gridbatch_from_points(const JaggedTensor &points,
 /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid in
 /// the batch or one voxel size for all grids
 /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the [0,
-/// 0, 0] voxel
-///                     for each grid in the batch, or one origin for all grids
-/// @param is_mutable Whether the grid should be mutable or not
+/// 0, 0] voxel for each grid in the batch, or one origin for all grids
 /// @return A GridBatch containing the created grid batch
 GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor &points,
                                                   const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                                                  const Vec3dBatch &origins = torch::zeros({3}),
-                                                  bool is_mutable           = false);
+                                                  const Vec3dBatch &origins = torch::zeros({3}));
 
-/// @brief Return a grid batch with the specified voxel coordinates (possibly with padding)
+/// @brief Return a grid batch with the specified voxel coordinates
 /// @param coords A JaggedTensor of shape [B, -1, 3] specifying the coordinates of each voxel to
 /// insert
-/// @param pad_min A tensor of shape [3,] containing the number of voxels to pad each inserted voxel
-/// with to the left/back/bottom
-/// @param pad_max A tensor of shape [3,] containing the number of voxels to pad each inserted voxel
-/// with to the right/front/top
 /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid in
 /// the batch or one voxel size for all grids
 /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the [0,
@@ -149,11 +133,8 @@ GridBatch gridbatch_from_nearest_voxels_to_points(const JaggedTensor &points,
 ///                for each grid in the batch, or one origin for all grids
 /// @return A GridBatch containing the created grid batch
 GridBatch gridbatch_from_ijk(const JaggedTensor &ijk,
-                             const Vec3i &pad_min = torch::zeros({3}, torch::kInt32),
-                             const Vec3i &pad_max = torch::zeros({3}, torch::kInt32),
                              const Vec3dBatchOrScalar &voxel_sizes = 1.0,
-                             const Vec3dBatch &origins             = torch::zeros({3}),
-                             bool is_mutable                       = false);
+                             const Vec3dBatch &origins             = torch::zeros({3}));
 
 /// @brief Return a grid batch densely from ijkMin to ijkMin + size
 /// @param numGrids The number of grids to create in the batch
@@ -168,7 +149,6 @@ GridBatch gridbatch_from_ijk(const JaggedTensor &ijk,
 /// grid.
 ///             Note that the same mask will be re-used for all the grids in the batch.
 /// @param device Which device to build the grid batch on
-/// @param mutable If the returned grid batch should be mutable
 /// @return A GridBatch containing a batch of dense grids
 GridBatch gridbatch_from_dense(const int64_t numGrids,
                                const Vec3i &denseDims,
@@ -176,8 +156,7 @@ GridBatch gridbatch_from_dense(const int64_t numGrids,
                                const Vec3dBatchOrScalar &voxel_sizes = 1.0,
                                const Vec3dBatch &origins             = torch::zeros({3}),
                                std::optional<torch::Tensor> mask     = std::nullopt,
-                               const torch::Device &device           = torch::kCPU,
-                               bool is_mutable                       = false);
+                               const torch::Device &device           = torch::kCPU);
 
 /// @brief Return a grid batch densely from ijkMin to ijkMin + size
 /// @param numGrids The number of grids to create in the batch
@@ -192,7 +171,6 @@ GridBatch gridbatch_from_dense(const int64_t numGrids,
 /// grid.
 ///             Note that the same mask will be re-used for all the grids in the batch.
 /// @param device String specifying which device to build the grid batch on
-/// @param mutable If the returned grid batch should be mutable
 /// @return A GridBatch containing a batch of dense grids
 GridBatch gridbatch_from_dense(const int64_t numGrids,
                                const Vec3i &denseDims,
@@ -200,8 +178,7 @@ GridBatch gridbatch_from_dense(const int64_t numGrids,
                                const Vec3dBatchOrScalar &voxel_sizes = 1.0,
                                const Vec3dBatch &origins             = torch::zeros({3}),
                                std::optional<torch::Tensor> mask     = std::nullopt,
-                               const std::string &device_string      = "cpu",
-                               bool is_mutable                       = false);
+                               const std::string &device_string      = "cpu");
 
 /// @brief Return a grid batch from a jagged batch of triangle meshes (i.e. each voxel intersects
 /// the mesh)
@@ -211,15 +188,12 @@ GridBatch gridbatch_from_dense(const int64_t numGrids,
 /// @param voxel_sizes A tensor of shape [B, 3] or [3,] containing the voxel size of each grid in
 /// the batch or one voxel size for all grids
 /// @param origins A tensor of shape [B, 3] or [3,] containing the world space coordinate of the [0,
-/// 0, 0] voxel
-///                for each grid in the batch, or one origin for all grids
-/// @param is_mutable Whether the grid should be mutable or not
+/// 0, 0] voxel for each grid in the batch, or one origin for all grids
 /// @return A GridBatch containing the created grid batch
 GridBatch gridbatch_from_mesh(const JaggedTensor &vertices,
                               const JaggedTensor &faces,
                               const Vec3dBatchOrScalar &voxel_sizes,
-                              const Vec3dBatch &origins,
-                              bool is_mutable);
+                              const Vec3dBatch &origins);
 
 /// @brief Return a grid batch, tensors of data, and names from a nanovdb grid handle
 /// @param handle nanovdb grid handle

@@ -45,23 +45,22 @@ set(FVDB_CPP_FILES
     detail/autograd/TransformPoints.cpp
     detail/autograd/UpsampleGrid.cpp
     detail/autograd/VolumeRender.cpp
-    detail/build/CoarseFromFine.cpp
-    detail/build/ConvGrid.cpp
-    detail/build/DenseGrid.cpp
-    detail/build/EmptyGrid.cpp
-    detail/build/FineFromCoarse.cpp
-    detail/build/FromMesh.cpp
-    detail/build/DilatedGrid.cpp
-    detail/build/NearestNeighborGridFromPoints.cpp
-    detail/build/PaddedGridFromCoords.cpp
-    detail/build/PaddedGridFromGrid.cpp
-    detail/build/PaddedGridFromPoints.cpp
     detail/io/LoadNanovdb.cpp
     detail/io/SaveNanoVDB.cpp
     detail/TorchDeviceBuffer.cpp)
 
 set(FVDB_CU_FILES
-    detail/ops/DilateGrid.cu
+    detail/ops/BuildPaddedGrid.cu
+    detail/ops/BuildGridFromNearestVoxelsToPoints.cu
+    detail/ops/BuildGridForConv.cu
+    detail/ops/BuildGridFromPoints.cu
+    detail/ops/BuildGridFromMesh.cu
+    detail/ops/BuildFineGridFromCoarse.cu
+    detail/ops/BuildDilatedGrid.cu
+    detail/ops/BuildDenseGrid.cu
+    detail/ops/BuildCoarseGridFromFine.cu
+    detail/ops/BuildGridFromIjk.cu
+    detail/ops/CoarseIjkForFineGrid.cu
     detail/ops/MarchingCubes.cu
     detail/ops/ReadIntoDense.cu
     detail/ops/JOffsetsFromJIdx.cu
@@ -73,7 +72,7 @@ set(FVDB_CU_FILES
     detail/ops/VolumeRender.cu
     detail/ops/RayImplicitIntersection.cu
     detail/ops/SegmentsAlongRays.cu
-    detail/ops/BuildDeviceGrid.cu
+    detail/ops/PopulateGridMetadata.cu
     detail/ops/CountEnabledVoxels.cu
     detail/ops/VoxelNeighborhood.cu
     detail/ops/SampleGridTrilinearWithGrad.cu
@@ -105,7 +104,7 @@ set(FVDB_CU_FILES
     detail/ops/SetMasked.cu
     detail/ops/IjkToInvIndex.cu
     detail/ops/ReadFromDense.cu
-    detail/ops/VoxelsForGridBuilding.cu
+    detail/ops/NearestIjkForPoints.cu
     detail/ops/EnabledMask.cu
     detail/ops/ActiveVoxelsInBoundsMask.cu
     detail/ops/JIdxForGrid.cu
@@ -113,7 +112,7 @@ set(FVDB_CU_FILES
     detail/ops/SampleGridTrilinear.cu
     detail/ops/SplatIntoGridBezier.cu
     detail/ops/ScaledDotProductAttention.cu
-    detail/ops/PaddedIJKForMesh.cu
+    detail/ops/IjkForMesh.cu
     detail/ops/SampleGridBezierWithGradBackward.cu
     detail/ops/convolution/pack_info/ConvolutionKernelMap.cu
     detail/ops/convolution/pack_info/BrickHaloBuffer.cu

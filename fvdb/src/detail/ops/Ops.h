@@ -15,8 +15,44 @@ namespace detail {
 namespace ops {
 
 template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildPaddedGrid(const GridBatchImpl &baseBatchHdl, int bmin, int bmax, bool excludeBorder);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromNearestVoxelsToPoints(const JaggedTensor &points,
+                                           const std::vector<VoxelCoordTransform> &txs);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer> dispatchBuildGridForConv(const GridBatchImpl &baseBatchHdl,
+                                                                const nanovdb::Coord &kernelSize,
+                                                                const nanovdb::Coord &stride);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromPoints(const JaggedTensor &points,
+                            const std::vector<VoxelCoordTransform> &txs);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromMesh(const JaggedTensor &meshVertices,
+                          const JaggedTensor &meshFaces,
+                          const std::vector<VoxelCoordTransform> &tx);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildFineGridFromCoarse(const GridBatchImpl &coarseBatchHdl,
+                                const nanovdb::Coord subdivisionFactor,
+                                const std::optional<JaggedTensor> &subdivMask);
+
+template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer> dispatchDilateGrid(const GridBatchImpl &gridBatch,
                                                           const int dilation);
+
+template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildCoarseGridFromFine(const GridBatchImpl &fineGridBatch,
+                                const nanovdb::Coord branchingFactor);
 
 template <c10::DeviceType>
 JaggedTensor dispatchJaggedTensorIndexInt(const JaggedTensor &jt, int64_t idxVal);
@@ -43,15 +79,13 @@ template <c10::DeviceType>
 torch::Tensor dispatchJIdxForGrid(const GridBatchImpl &batchHdl, bool ignoreDisabledVoxels);
 
 template <c10::DeviceType>
-nanovdb::GridHandle<TorchDeviceBuffer> dispatchCreateNanoGridFromIJK(const JaggedTensor &ijk,
-                                                                     bool isMutable);
+nanovdb::GridHandle<TorchDeviceBuffer> dispatchCreateNanoGridFromIJK(const JaggedTensor &ijk);
 
 template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromDense(uint32_t batchSize,
                                 nanovdb::Coord origin,
                                 nanovdb::Coord size,
-                                bool isMutable,
                                 torch::Device device,
                                 const std::optional<torch::Tensor> &maybeMask);
 template <c10::DeviceType>
@@ -326,22 +360,6 @@ JaggedTensor dispatchIJKForMesh(const JaggedTensor &meshVertices,
                                 const std::vector<VoxelCoordTransform> &transforms);
 
 template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForGrid(const GridBatchImpl &batchHdl,
-                                      const nanovdb::CoordBBox &bbox);
-
-template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForGridWithoutBorder(const GridBatchImpl &batchHdl,
-                                                   const nanovdb::CoordBBox &bbox);
-
-template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForPoints(const JaggedTensor &points,
-                                        const nanovdb::CoordBBox &bbox,
-                                        const std::vector<VoxelCoordTransform> &transforms);
-
-template <c10::DeviceType>
-JaggedTensor dispatchPaddedIJKForCoords(const JaggedTensor &coords, const nanovdb::CoordBBox &bbox);
-
-template <c10::DeviceType>
 JaggedTensor
 dispatchNearestNeighborIJKForPoints(const JaggedTensor &points,
                                     const std::vector<VoxelCoordTransform> &transforms);
@@ -349,16 +367,6 @@ dispatchNearestNeighborIJKForPoints(const JaggedTensor &points,
 template <c10::DeviceType>
 JaggedTensor dispatchCoarseIJKForFineGrid(const GridBatchImpl &batchHdl,
                                           nanovdb::Coord coarseningFactor);
-
-template <c10::DeviceType>
-JaggedTensor dispatchFineIJKForCoarseGrid(const GridBatchImpl &batchHdl,
-                                          nanovdb::Coord upsamplingFactor,
-                                          const std::optional<JaggedTensor> &maybeMask);
-
-template <c10::DeviceType>
-JaggedTensor dispatchConvIJKForGrid(const GridBatchImpl &batchHdl,
-                                    const nanovdb::Coord &kernelSize,
-                                    const nanovdb::Coord &stride);
 
 template <c10::DeviceType>
 torch::Tensor dispatchScaledDotProductAttention(const torch::Tensor &query,

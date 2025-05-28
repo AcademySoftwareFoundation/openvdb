@@ -28,7 +28,6 @@ Please refer to the tutorials for examples of how to install and use fVDB to bui
    tutorials/ray_tracing
    tutorials/simple_unet
    tutorials/io
-   tutorials/mutable_grids
    tutorials/volume_rendering
 
 .. toctree::
