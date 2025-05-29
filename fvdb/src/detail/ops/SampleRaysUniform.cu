@@ -347,13 +347,10 @@ UniformRaySamples(const GridBatchImpl &batchHdl,
                 torch::TensorOptions().dtype(torch::kInt32).device(rayOrigins.device());
             const auto optsJIdx =
                 torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(rayOrigins.device());
-            const auto optsJOffsets =
-                torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(rayOrigins.device());
             const auto optsJLIdx =
                 torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(rayOrigins.device());
 
             auto batchAcc         = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
-            auto rayOriginsAcc    = jaggedAccessor<DeviceTag, scalar_t, 2>(rayOrigins);
             auto rayDirectionsAcc = jaggedAccessor<DeviceTag, scalar_t, 2>(rayDirections);
 
             auto tMinAcc = jaggedAccessor<DeviceTag, scalar_t, 1>(tMin);

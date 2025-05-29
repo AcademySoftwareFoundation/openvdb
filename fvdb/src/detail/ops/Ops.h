@@ -67,7 +67,7 @@ JaggedTensor dispatchJaggedTensorIndexJaggedTensor(const JaggedTensor &jt, const
 template <c10::DeviceType> JaggedTensor dispatchJCat0(const std::vector<JaggedTensor> &tensors);
 
 template <c10::DeviceType>
-torch::Tensor dispatchJOffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors);
+torch::Tensor dispatchJOffsetsFromJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors);
 
 template <c10::DeviceType>
 torch::Tensor dispatchJIdxForJOffsets(torch::Tensor joffsets, int64_t numElements);

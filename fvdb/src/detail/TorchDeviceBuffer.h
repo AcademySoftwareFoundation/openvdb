@@ -59,11 +59,11 @@ class TorchDeviceBuffer {
     void to(const torch::Device &device);
 
     /// @brief Returns a pointer to the CPU memory buffer managed by this allocator if the device is
-    /// torch::kCPU, nullptr otherwise.
+    /// torch::kCPU or torch::kPrivateUse1, nullptr otherwise.
     uint8_t *data() const;
 
     /// @brief Returns a pointer to the GPU memory buffer managed by this allocator if the device is
-    /// torch::kCUDA, nullptr otherwise.
+    /// torch::kCUDA or torch::kPrivateUse1, nullptr otherwise.
     uint8_t *deviceData() const;
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this allocator.

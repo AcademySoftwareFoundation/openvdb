@@ -242,7 +242,8 @@ class GridBatchImpl : public torch::CustomClassHolder {
     Accessor<GridType>
     deviceAccessor() const {
         TORCH_CHECK(!isEmpty(), "Cannot access empty grid");
-        TORCH_CHECK(device().is_cuda(), "Cannot access device accessor on non-CUDA device");
+        TORCH_CHECK(device().is_cuda() || device().is_privateuseone(),
+                    "Cannot access device accessor without a CUDA or PrivateUse1 device");
         TORCH_CHECK(mGridHdl->template deviceGrid<GridType>(), "Failed to get device grid pointer");
         Accessor<GridType> ret(mDeviceGridMetadata,
                                mGridHdl->template deviceGrid<GridType>(),

@@ -4,6 +4,7 @@
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/ForEachCPU.h>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
+#include <detail/utils/cuda/ForEachPrivateUse1.cuh>
 
 #include <c10/cuda/CUDAException.h>
 
@@ -35,9 +36,42 @@ pointsInGridCallback(int32_t bidx,
     outMask[eidx]       = isActive;
 }
 
-template <c10::DeviceType DeviceTag>
+template <c10::DeviceType DeviceTag, typename scalar_t>
 JaggedTensor
 PointsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points) {
+    auto opts             = torch::TensorOptions().dtype(torch::kBool).device(points.device());
+    torch::Tensor outMask = torch::empty({points.rsize(0)}, opts);
+
+    auto batchAcc        = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+    auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
+    if constexpr (DeviceTag == torch::kCUDA) {
+        auto cb = [=] __device__(
+                      int32_t bidx, int32_t eidx, int32_t cidx, JaggedRAcc32<scalar_t, 2> ptsA) {
+            pointsInGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                bidx, eidx, ptsA, outMaskAccessor, batchAcc);
+        };
+        forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, points, cb);
+    } else if constexpr (DeviceTag == torch::kPrivateUse1) {
+        auto cb = [=] __device__(
+                      int32_t bidx, int32_t eidx, int32_t cidx, JaggedRAcc32<scalar_t, 2> ptsA) {
+            pointsInGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                bidx, eidx, ptsA, outMaskAccessor, batchAcc);
+        };
+        forEachJaggedElementChannelPrivateUse1<scalar_t, 2>(1, points, cb);
+    } else {
+        auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+            pointsInGridCallback<scalar_t, JaggedAcc, TorchAcc>(
+                bidx, eidx, ptsA, outMaskAccessor, batchAcc);
+        };
+        forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
+    }
+
+    return points.jagged_like(outMask);
+}
+
+template <c10::DeviceType DeviceTag>
+JaggedTensor
+dispatchPointsInGrid<DeviceTag>(const GridBatchImpl &batchHdl, const JaggedTensor &points) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(points);
     TORCH_CHECK_TYPE(points.is_floating_point(), "points must have a floating point type");
@@ -49,50 +83,20 @@ PointsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points) {
                 "Expected 3 dimensional points but got points.shape[1] = " +
                     std::to_string(points.rsize(1)));
 
-    auto opts             = torch::TensorOptions().dtype(torch::kBool).device(points.device());
-    torch::Tensor outMask = torch::empty({points.rsize(0)}, opts);
-
-    AT_DISPATCH_V2(
+    return AT_DISPATCH_V2(
         points.scalar_type(),
         "PointsInGrid",
-        AT_WRAP([&]() {
-            auto batchAcc        = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
-            auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx,
-                                         int32_t eidx,
-                                         int32_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> ptsA) {
-                    pointsInGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, ptsA, outMaskAccessor, batchAcc);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, points, cb);
-            } else {
-                auto cb =
-                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
-                        pointsInGridCallback<scalar_t, JaggedAcc, TorchAcc>(
-                            bidx, eidx, ptsA, outMaskAccessor, batchAcc);
-                    };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
-            }
-        }),
+        AT_WRAP([&]() { return PointsInGrid<DeviceTag, scalar_t>(batchHdl, points); }),
         AT_EXPAND(AT_FLOATING_TYPES),
         c10::kHalf);
-
-    return points.jagged_like(outMask);
 }
 
-template <>
-JaggedTensor
-dispatchPointsInGrid<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &points) {
-    return PointsInGrid<torch::kCUDA>(batchHdl, points);
-}
-
-template <>
-JaggedTensor
-dispatchPointsInGrid<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &points) {
-    return PointsInGrid<torch::kCPU>(batchHdl, points);
-}
+template JaggedTensor dispatchPointsInGrid<torch::kCPU>(const GridBatchImpl &,
+                                                        const JaggedTensor &);
+template JaggedTensor dispatchPointsInGrid<torch::kCUDA>(const GridBatchImpl &,
+                                                         const JaggedTensor &);
+template JaggedTensor dispatchPointsInGrid<torch::kPrivateUse1>(const GridBatchImpl &,
+                                                                const JaggedTensor &);
 
 } // namespace ops
 } // namespace detail

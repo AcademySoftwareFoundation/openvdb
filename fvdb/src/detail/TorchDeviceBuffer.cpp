@@ -77,6 +77,9 @@ TorchDeviceBuffer::TorchDeviceBuffer(uint64_t size /* = 0*/,
         c10::cuda::CUDAGuard deviceGuard(mDevice);
         mData = reinterpret_cast<uint8_t *>(c10::cuda::CUDACachingAllocator::raw_alloc(size));
         checkPtr(mData, "failed to allocate device data");
+    } else if (mDevice.is_privateuseone()) {
+        auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+        mData          = reinterpret_cast<uint8_t *>(allocator->raw_allocate(size));
     }
 }
 
@@ -138,6 +141,16 @@ TorchDeviceBuffer::to(const torch::Device &device) {
             c10::cuda::CUDAGuard deviceGuard(mDevice);
             c10::cuda::CUDACachingAllocator::raw_delete(mData);
         }
+    } else if (mDevice.is_cpu() && device.is_privateuseone()) {
+        auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+        data           = reinterpret_cast<uint8_t *>(allocator->raw_allocate(mSize));
+        cudaMemcpy(data, mData, mSize, cudaMemcpyDefault);
+        free(mData);
+    } else if (mDevice.is_privateuseone() && device.is_cpu()) {
+        auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+        data           = reinterpret_cast<uint8_t *>(malloc(mSize));
+        cudaMemcpy(data, mData, mSize, cudaMemcpyDefault);
+        allocator->raw_deallocate(mData);
     } else {
         TORCH_CHECK(false, "Unsupported source and destination device combination");
     }
@@ -148,12 +161,12 @@ TorchDeviceBuffer::to(const torch::Device &device) {
 
 uint8_t *
 TorchDeviceBuffer::data() const {
-    return mDevice.is_cpu() ? mData : nullptr;
+    return (mDevice.is_cpu() || mDevice.is_privateuseone()) ? mData : nullptr;
 }
 
 uint8_t *
 TorchDeviceBuffer::deviceData() const {
-    return mDevice.is_cuda() ? mData : nullptr;
+    return (mDevice.is_cuda() || mDevice.is_privateuseone()) ? mData : nullptr;
 }
 
 uint64_t
@@ -178,7 +191,10 @@ TorchDeviceBuffer::clear() {
         return;
     }
 
-    if (mDevice.is_cuda()) {
+    if (mDevice.is_privateuseone()) {
+        auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+        allocator->raw_deallocate(mData);
+    } else if (mDevice.is_cuda()) {
         c10::cuda::CUDAGuard deviceGuard(mDevice);
         c10::cuda::CUDACachingAllocator::raw_delete(mData);
     } else if (mDevice.is_cpu()) {

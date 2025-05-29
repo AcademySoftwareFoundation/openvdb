@@ -56,7 +56,7 @@ readFromDenseCPU(const GridBatchImpl::Accessor<nanovdb::ValueOnIndex> &gridHandl
                  const torch::TensorAccessor<int32_t, 2> denseOrigins,
                  torch::TensorAccessor<ScalarType, 2> outSparseTensor,
                  bool isContiguous) {
-    for (size_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
+    for (int64_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
         const nanovdb::OnIndexGrid *grid = gridHandle.grid(bi);
         const nanovdb::Coord denseOrigin(
             denseOrigins[bi][0], denseOrigins[bi][1], denseOrigins[bi][2]);

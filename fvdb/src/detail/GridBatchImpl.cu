@@ -45,6 +45,48 @@ allocateHostGridMetadata(int64_t batchSize) {
     return ret;
 }
 
+void
+freeHostGridMetadata(fvdb::detail::GridBatchImpl::GridMetadata *hostGridMetadata) {
+    std::free(hostGridMetadata);
+}
+
+fvdb::detail::GridBatchImpl::GridMetadata *
+allocateDeviceGridMetadata(torch::Device device, int64_t batchSize) {
+    using GridMetadata = fvdb::detail::GridBatchImpl::GridMetadata;
+    TORCH_CHECK(batchSize > 0, "Batch size must be greater than 0");
+
+    c10::cuda::CUDAGuard deviceGuard(device);
+    auto wrapper                  = c10::cuda::getCurrentCUDAStream(device.index());
+    const size_t metadataByteSize = sizeof(GridMetadata) * batchSize;
+    auto data =
+        c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(metadataByteSize, wrapper.stream());
+    return static_cast<GridMetadata *>(data);
+}
+
+void
+freeDeviceGridMetadata(torch::Device device,
+                       fvdb::detail::GridBatchImpl::GridMetadata *deviceGridMetadata) {
+    c10::cuda::CUDAGuard deviceGuard(device);
+    c10::cuda::CUDACachingAllocator::raw_delete(deviceGridMetadata);
+}
+
+fvdb::detail::GridBatchImpl::GridMetadata *
+allocateUnifiedMemoryGridMetadata(int64_t batchSize) {
+    using GridMetadata = fvdb::detail::GridBatchImpl::GridMetadata;
+    TORCH_CHECK(batchSize > 0, "Batch size must be greater than 0");
+
+    auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+    auto data      = allocator->raw_allocate(sizeof(GridMetadata) * batchSize);
+    return static_cast<GridMetadata *>(data);
+}
+
+void
+freeUnifiedMemoryGridMetadata(
+    fvdb::detail::GridBatchImpl::GridMetadata *unifiedMemoryGridMetadata) {
+    auto allocator = c10::GetAllocator(c10::DeviceType::PrivateUse1);
+    allocator->raw_deallocate(unifiedMemoryGridMetadata);
+}
+
 } // namespace
 
 namespace fvdb {
@@ -101,12 +143,20 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 };
 
 GridBatchImpl::~GridBatchImpl() {
-    torch::Device device = mGridHdl->buffer().device();
-    std::free(mHostGridMetadata);
-    mHostGridMetadata = nullptr;
-    if (mDeviceGridMetadata != nullptr) {
-        c10::cuda::CUDAGuard deviceGuard(device);
-        c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
+    const torch::Device device = mGridHdl->buffer().device();
+    if (device.is_cpu() || device.is_cuda()) {
+        freeHostGridMetadata(mHostGridMetadata);
+        mHostGridMetadata = nullptr;
+        if (device.is_cuda()) {
+            freeDeviceGridMetadata(device, mDeviceGridMetadata);
+            mDeviceGridMetadata = nullptr;
+        }
+    } else if (device.is_privateuseone()) {
+        freeUnifiedMemoryGridMetadata(mDeviceGridMetadata);
+        mHostGridMetadata   = nullptr;
+        mDeviceGridMetadata = nullptr;
+    } else {
+        TORCH_CHECK(false, "Only CPU, CUDA, and PrivateUse1 devices are supported");
     }
 };
 
@@ -271,23 +321,21 @@ GridBatchImpl::syncMetadataToDeviceIfCUDA(bool blocking) {
     // There is something to sync and we're on a cuda device
     // Global device guards as we operate on this.
     c10::cuda::CUDAGuard deviceGuard(device());
-    at::cuda::CUDAStream wrapper = at::cuda::getCurrentCUDAStream(device().index());
+    c10::cuda::CUDAStream wrapper = c10::cuda::getCurrentCUDAStream(device().index());
 
     // There are no grids in the batch so we need to free the device metadata if it exists
     if (!mHostGridMetadata && mDeviceGridMetadata) {
-        c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
+        freeDeviceGridMetadata(device(), mDeviceGridMetadata);
         mDeviceGridMetadata = nullptr;
         return;
     }
 
-    const size_t metadataByteSize = sizeof(GridMetadata) * batchSize();
     if (!mDeviceGridMetadata) { // Allocate the CUDA memory if it hasn't been allocated already
-        mDeviceGridMetadata =
-            static_cast<GridMetadata *>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
-                metadataByteSize, wrapper.stream()));
+        mDeviceGridMetadata = allocateDeviceGridMetadata(device(), batchSize());
     }
 
     // Copy host grid metadata to device grid metadata
+    const size_t metadataByteSize = sizeof(GridMetadata) * batchSize();
     C10_CUDA_CHECK(cudaMemcpyAsync(mDeviceGridMetadata,
                                    mHostGridMetadata,
                                    metadataByteSize,
@@ -582,35 +630,38 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     TORCH_CHECK((gridHdl.gridType(0) == nanovdb::GridType::OnIndex) ||
                     (gridHdl.gridType(0) == nanovdb::GridType::OnIndexMask),
                 "GridBatchImpl only supports ValueOnIndex and ValueOnIndexMask grids");
+
+    // Reallocate GridMetadata
+    mBatchSize = gridHdl.gridCount();
+
     const torch::Device device = gridHdl.buffer().device();
+    if (device.is_cpu() || device.is_cuda()) {
+        freeHostGridMetadata(mHostGridMetadata);
+        mHostGridMetadata = allocateHostGridMetadata(gridHdl.gridCount());
 
-    // Clear out old grid metadata
-    std::free(mHostGridMetadata);
-    mHostGridMetadata = nullptr;
-    if (mDeviceGridMetadata != nullptr) {
-        c10::cuda::CUDAGuard deviceGuard(device);
-        c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
-        mDeviceGridMetadata = nullptr;
+        if (device.is_cuda()) {
+            freeDeviceGridMetadata(device, mDeviceGridMetadata);
+            mDeviceGridMetadata = allocateDeviceGridMetadata(device, mBatchSize);
+        } else {
+            TORCH_CHECK(!mDeviceGridMetadata, "mDeviceGridMetadata should be null for CPU devices");
+        }
+    } else if (device.is_privateuseone()) {
+        freeUnifiedMemoryGridMetadata(mDeviceGridMetadata);
+        mDeviceGridMetadata = allocateUnifiedMemoryGridMetadata(mBatchSize);
+        mHostGridMetadata   = mDeviceGridMetadata;
+    } else {
+        TORCH_CHECK(false, "Only CPU, CUDA, and PrivateUse1 devices are supported");
     }
-    mBatchSize = 0;
 
-    // Allocate host memory for metadata
-    mHostGridMetadata = allocateHostGridMetadata(gridHdl.gridCount());
-    mBatchSize        = gridHdl.gridCount();
-
-    FVDB_DISPATCH_KERNEL_DEVICE(device, [&]() {
+    FVDB_DISPATCH_KERNEL(device, [&]() {
         // Allocate device memory for metadata
         GridBatchMetadata *deviceBatchMetadataPtr = nullptr;
         if constexpr (DeviceTag == torch::kCUDA) {
             c10::cuda::CUDAGuard deviceGuard(device);
-            const size_t metaDataByteSize      = sizeof(GridMetadata) * gridHdl.gridCount();
-            at::cuda::CUDAStream defaultStream = at::cuda::getCurrentCUDAStream(device.index());
-            mDeviceGridMetadata =
-                static_cast<GridMetadata *>(c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
-                    metaDataByteSize, defaultStream.stream()));
-            deviceBatchMetadataPtr = static_cast<GridBatchMetadata *>(
-                c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(sizeof(GridBatchMetadata),
-                                                                       defaultStream.stream()));
+            auto wrapper = c10::cuda::getCurrentCUDAStream(device.index());
+            auto data    = c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(
+                sizeof(GridBatchMetadata), wrapper.stream());
+            deviceBatchMetadataPtr = static_cast<GridBatchMetadata *>(data);
         }
 
         // Populate host and/or device metadata

@@ -5,6 +5,7 @@
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/ForEachCPU.h>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
+#include <detail/utils/cuda/ForEachPrivateUse1.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
@@ -55,6 +56,16 @@ GetActiveGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords
                 batchIdx, leafIdx, voxelIdx, gridAccessor, outCoordsAcc);
         };
         forEachVoxelCUDA<nanovdb::ValueOnIndex>(1024, 1, gridBatch, cb);
+    } else if constexpr (DeviceTag == torch::kPrivateUse1) {
+        auto cb = [=] __device__(int64_t batchIdx,
+                                 int64_t leafIdx,
+                                 int64_t voxelIdx,
+                                 int64_t,
+                                 GridBatchImpl::Accessor<nanovdb::ValueOnIndex> gridAccessor) {
+            activeGridCoordsVoxelCallback<TorchRAcc32>(
+                batchIdx, leafIdx, voxelIdx, gridAccessor, outCoordsAcc);
+        };
+        forEachVoxelPrivateUse1<nanovdb::ValueOnIndex>(1, gridBatch, cb);
     } else {
         auto cb = [=](int64_t batchIdx,
                       int64_t leafIdx,
@@ -95,6 +106,12 @@ template <>
 JaggedTensor
 dispatchActiveGridCoords<torch::kCPU>(const GridBatchImpl &gridBatch) {
     return ActiveGridCoords<torch::kCPU>(gridBatch);
+}
+
+template <>
+JaggedTensor
+dispatchActiveGridCoords<torch::kPrivateUse1>(const GridBatchImpl &gridBatch) {
+    return ActiveGridCoords<torch::kPrivateUse1>(gridBatch);
 }
 
 } // namespace ops

@@ -5,15 +5,10 @@
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <detail/utils/cuda/Utils.cuh>
-
-#include <nanovdb/tools/cuda/PointsToGrid.cuh>
 
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAMathCompat.h>
-
-#include <thrust/device_vector.h>
 
 namespace fvdb {
 namespace detail {
@@ -168,6 +163,31 @@ dispatchPopulateGridMetadata<torch::kCUDA>(
 template <>
 void
 dispatchPopulateGridMetadata<torch::kCPU>(
+    const nanovdb::GridHandle<TorchDeviceBuffer> &gridHdl,
+    const std::vector<nanovdb::Vec3d> &voxelSizes,
+    const std::vector<nanovdb::Vec3d> &voxelOrigins,
+    torch::Tensor &outBatchOffsets,
+    GridBatchImpl::GridMetadata *outPerGridMetadataHost,
+    GridBatchImpl::GridMetadata *outPerGridMetadataDevice,
+    GridBatchImpl::GridBatchMetadata *outBatchMetadataHost,
+    GridBatchImpl::GridBatchMetadata *outBatchMetadataDevice) {
+    outBatchOffsets = torch::empty(
+        {(fvdb::JOffsetsType)(voxelOrigins.size() + 1)},
+        torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(gridHdl.buffer().device()));
+    TORCH_CHECK(gridHdl.data() != nullptr, "GridHandle is empty");
+    const nanovdb::OnIndexGrid *grids = (nanovdb::OnIndexGrid *)gridHdl.data();
+    populateGridMetadataKernel<TorchAcc>(gridHdl.gridCount(),
+                                         grids,
+                                         voxelSizes.data(),
+                                         voxelOrigins.data(),
+                                         outBatchOffsets.accessor<fvdb::JOffsetsType, 1>(),
+                                         outPerGridMetadataHost,
+                                         outBatchMetadataHost);
+}
+
+template <>
+void
+dispatchPopulateGridMetadata<torch::kPrivateUse1>(
     const nanovdb::GridHandle<TorchDeviceBuffer> &gridHdl,
     const std::vector<nanovdb::Vec3d> &voxelSizes,
     const std::vector<nanovdb::Vec3d> &voxelOrigins,

@@ -20,7 +20,7 @@ setZero(T *thingToSet) {
 }
 
 torch::Tensor
-joffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
+joffsetsFromJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
     TORCH_CHECK_VALUE(jidx.dim() == 1, "jidx must be a 1D tensor");
 
     if (jidx.size(0) == 0 && numTensors == 1) {
@@ -51,12 +51,14 @@ joffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
 
 template <>
 torch::Tensor
-dispatchJOffsetsForJIdx<torch::kCUDA>(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
+dispatchJOffsetsFromJIdx<torch::kCUDA>(torch::Tensor jidx,
+                                       torch::Tensor jdata,
+                                       int64_t numTensors) {
     TORCH_CHECK_VALUE(jidx.dim() == 1, "jidx must be a 1D tensor");
     TORCH_CHECK_VALUE(jdata.device().is_cuda(), "Invalid device for jdata");
     TORCH_CHECK_VALUE(jidx.size(0) == 0 || jidx.device().is_cuda(), "Invalid device for jidx");
     c10::cuda::CUDAGuard deviceGuard(jdata.device());
-    return joffsetsForJIdx(jidx, jdata, numTensors);
+    return joffsetsFromJIdx(jidx, jdata, numTensors);
 
     // FIXME: (Francis) Sadly this implementation doesn't work with empty tensors, but the above one
     // is still pretty good
@@ -128,11 +130,23 @@ dispatchJOffsetsForJIdx<torch::kCUDA>(torch::Tensor jidx, torch::Tensor jdata, i
 
 template <>
 torch::Tensor
-dispatchJOffsetsForJIdx<torch::kCPU>(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
+dispatchJOffsetsFromJIdx<torch::kPrivateUse1>(torch::Tensor jidx,
+                                              torch::Tensor jdata,
+                                              int64_t numTensors) {
+    TORCH_CHECK_VALUE(jidx.dim() == 1, "jidx must be a 1D tensor");
+    TORCH_CHECK_VALUE(jdata.device().is_privateuseone(), "Invalid device for jdata");
+    TORCH_CHECK_VALUE(jidx.size(0) == 0 || jidx.device().is_privateuseone(),
+                      "Invalid device for jidx");
+    return joffsetsFromJIdx(jidx, jdata, numTensors);
+}
+
+template <>
+torch::Tensor
+dispatchJOffsetsFromJIdx<torch::kCPU>(torch::Tensor jidx, torch::Tensor jdata, int64_t numTensors) {
     TORCH_CHECK_VALUE(jidx.dim() == 1, "jidx must be a 1D tensor");
     TORCH_CHECK_VALUE(jdata.device().is_cpu(), "Invalid device for jdata");
     TORCH_CHECK_VALUE(jidx.size(0) == 0 || jidx.device().is_cpu(), "Invalid device for jidx");
-    return joffsetsForJIdx(jidx, jdata, numTensors);
+    return joffsetsFromJIdx(jidx, jdata, numTensors);
 }
 
 } // namespace ops

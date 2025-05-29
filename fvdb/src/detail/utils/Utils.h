@@ -40,8 +40,28 @@ template <typename T> struct RestrictPtrTraits {
             static constexpr c10::DeviceType DeviceTag = torch::kCUDA;     \
             return __VA_ARGS__();                                          \
         } else {                                                           \
-            TORCH_CHECK(false, "Only CUDA and CPU devices are supported"); \
+            TORCH_CHECK(false, "Only CPU and CUDA devices are supported"); \
         }                                                                  \
+    }()
+
+/// @brief Given a torch::Device, define DeviceTag to torch::kCPU, torch::kCUDA, or
+/// torch::kPrivateUse1.
+///        This macro calls the passed in function with the typedef DeviceTag to the correct device
+///        tag.
+#define FVDB_DISPATCH_KERNEL(DEVICE, ...)                                                \
+    [&]() {                                                                              \
+        if (DEVICE.is_cpu()) {                                                           \
+            static constexpr c10::DeviceType DeviceTag = torch::kCPU;                    \
+            return __VA_ARGS__();                                                        \
+        } else if (DEVICE.is_cuda()) {                                                   \
+            static constexpr c10::DeviceType DeviceTag = torch::kCUDA;                   \
+            return __VA_ARGS__();                                                        \
+        } else if (DEVICE.is_privateuseone()) {                                          \
+            static constexpr c10::DeviceType DeviceTag = torch::kPrivateUse1;            \
+            return __VA_ARGS__();                                                        \
+        } else {                                                                         \
+            TORCH_CHECK(false, "Only CPU, CUDA, and PrivateUse1 devices are supported"); \
+        }                                                                                \
     }()
 
 namespace fvdb {

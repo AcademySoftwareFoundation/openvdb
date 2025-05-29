@@ -32,11 +32,11 @@ TransformPoints::forward(TransformPoints::AutogradContext *ctx,
 
     torch::Tensor outTxPoints;
     if (isInverse) {
-        outTxPoints = FVDB_DISPATCH_KERNEL_DEVICE(points.device(), [&]() {
+        outTxPoints = FVDB_DISPATCH_KERNEL(points.device(), [&]() {
             return ops::dispatchInvTransformPointsToGrid<DeviceTag>(*grid, pointsWrap, !isDual);
         });
     } else {
-        outTxPoints = FVDB_DISPATCH_KERNEL_DEVICE(points.device(), [&]() {
+        outTxPoints = FVDB_DISPATCH_KERNEL(points.device(), [&]() {
             return ops::dispatchTransformPointsToGrid<DeviceTag>(*grid, pointsWrap, !isDual);
         });
     }
@@ -66,14 +66,14 @@ TransformPoints::backward(TransformPoints::AutogradContext *ctx,
 
     Variable outGradIn; // = torch::empty_like(gradOut);  // [B*N, 3]
     if (isInverse) {
-        outGradIn = FVDB_DISPATCH_KERNEL_DEVICE(gradOut.device(), [&]() {
+        outGradIn = FVDB_DISPATCH_KERNEL(gradOut.device(), [&]() {
             return ops::dispatchInvTransformPointsToGridBackward<DeviceTag>(
                 *grid,
                 JaggedTensor::from_data_offsets_and_list_ids(gradOut, pointsJOffsets, pointsJLidx),
                 !isDual);
         });
     } else {
-        outGradIn = FVDB_DISPATCH_KERNEL_DEVICE(gradOut.device(), [&]() {
+        outGradIn = FVDB_DISPATCH_KERNEL(gradOut.device(), [&]() {
             return ops::dispatchTransformPointsToGridBackward<DeviceTag>(
                 *grid,
                 JaggedTensor::from_data_offsets_and_list_ids(gradOut, pointsJOffsets, pointsJLidx),

@@ -6,6 +6,7 @@
 #include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
+#include <detail/utils/cuda/ForEachPrivateUse1.cuh>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <detail/utils/cuda/Utils.cuh>
 
@@ -14,9 +15,8 @@
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAMathCompat.h>
-#include <torch/csrc/api/include/torch/types.h>
 
-#include <thrust/device_vector.h>
+#include <thrust/universal_vector.h>
 
 namespace fvdb {
 namespace detail {
@@ -24,7 +24,7 @@ namespace ops {
 
 template <typename ScalarT>
 __device__ void
-iJKForPointsCallback(int32_t bidx,
+ijkForPointsCallback(int32_t bidx,
                      int32_t eidx,
                      const JaggedRAcc32<ScalarT, 2> points,
                      const VoxelCoordTransform *transforms,
@@ -43,7 +43,7 @@ iJKForPointsCallback(int32_t bidx,
 }
 
 JaggedTensor
-iJKForPoints(const JaggedTensor &jaggedPoints, const std::vector<VoxelCoordTransform> &transforms) {
+ijkForPoints(const JaggedTensor &jaggedPoints, const std::vector<VoxelCoordTransform> &transforms) {
     TORCH_CHECK(jaggedPoints.device().is_cuda(), "GridBatchImpl must be on CUDA device");
     TORCH_CHECK(jaggedPoints.device().has_index(), "GridBatchImpl must have a valid index");
 
@@ -53,7 +53,7 @@ iJKForPoints(const JaggedTensor &jaggedPoints, const std::vector<VoxelCoordTrans
 
     AT_DISPATCH_V2(
         jaggedPoints.scalar_type(),
-        "iJKForPoints",
+        "ijkForPoints",
         AT_WRAP([&] {
             RAIIRawDeviceBuffer<VoxelCoordTransform> transformsDVec(transforms.size(),
                                                                     jaggedPoints.device());
@@ -66,7 +66,7 @@ iJKForPoints(const JaggedTensor &jaggedPoints, const std::vector<VoxelCoordTrans
                                      int32_t eidx,
                                      int32_t cidx,
                                      JaggedRAcc32<scalar_t, 2> pacc) {
-                iJKForPointsCallback(bidx, eidx, pacc, transformDevPtr, outIJKAcc);
+                ijkForPointsCallback(bidx, eidx, pacc, transformDevPtr, outIJKAcc);
             };
             forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, jaggedPoints, cb);
         }),
@@ -79,8 +79,43 @@ template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchBuildGridFromPoints<torch::kCUDA>(const JaggedTensor &points,
                                           const std::vector<VoxelCoordTransform> &txs) {
-    JaggedTensor coords = iJKForPoints(points, txs);
+    JaggedTensor coords = ijkForPoints(points, txs);
     return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords);
+}
+
+template <>
+nanovdb::GridHandle<TorchDeviceBuffer>
+dispatchBuildGridFromPoints<torch::kPrivateUse1>(const JaggedTensor &points,
+                                                 const std::vector<VoxelCoordTransform> &txs) {
+    TORCH_CHECK(points.device().is_privateuseone(), "GridBatchImpl must be on PrivateUse1 device");
+
+    const torch::TensorOptions deviceOptions = torch::TensorOptions().device(points.device());
+    const torch::TensorOptions ijkOptions    = deviceOptions.dtype(torch::kInt32);
+
+    torch::Tensor ijk = torch::empty({points.jdata().size(0), 3}, ijkOptions);
+    auto ijkAcc       = ijk.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
+
+    thrust::universal_vector<VoxelCoordTransform> transforms(txs.size());
+    auto transformsPtr = transforms.data().get();
+    cudaMemcpy(
+        transformsPtr, txs.data(), sizeof(VoxelCoordTransform) * txs.size(), cudaMemcpyDefault);
+
+    AT_DISPATCH_V2(points.scalar_type(),
+                   "ijkForPoints",
+                   AT_WRAP([&] {
+                       auto cb = [=] __device__(int32_t bidx,
+                                                int32_t eidx,
+                                                int32_t cidx,
+                                                JaggedRAcc32<scalar_t, 2> pacc) {
+                           ijkForPointsCallback(bidx, eidx, pacc, transformsPtr, ijkAcc);
+                       };
+                       forEachJaggedElementChannelPrivateUse1<scalar_t, 2>(1, points, cb);
+                   }),
+                   AT_EXPAND(AT_FLOATING_TYPES),
+                   c10::kHalf);
+
+    JaggedTensor coords = points.jagged_like(ijk);
+    return ops::dispatchCreateNanoGridFromIJK<torch::kPrivateUse1>(coords);
 }
 
 template <>

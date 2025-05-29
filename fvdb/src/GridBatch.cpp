@@ -562,7 +562,7 @@ GridBatch::set_from_points(const JaggedTensor &points,
             detail::primalVoxelTransformForSizeAndOrigin(voxSizesVec[i], voxOriginsVec[i]));
     }
 
-    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL(device(), [&]() {
         return detail::ops::dispatchBuildGridFromPoints<DeviceTag>(points, transforms);
     });
 
@@ -1125,7 +1125,7 @@ GridBatch::points_in_active_voxel(const JaggedTensor &points) const {
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
         points.ldim(),
         "list dimensions");
-    return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+    return FVDB_DISPATCH_KERNEL(device(), [&]() {
         return fvdb::detail::ops::dispatchPointsInGrid<DeviceTag>(*impl(), points);
     });
 }
@@ -1204,7 +1204,7 @@ GridBatch::ijk_to_inv_index(const JaggedTensor &ijk, bool cumulative) const {
 JaggedTensor
 GridBatch::ijk() const {
     detail::RAIIDeviceGuard guard(device());
-    return FVDB_DISPATCH_KERNEL_DEVICE(this->device(), [&]() {
+    return FVDB_DISPATCH_KERNEL(this->device(), [&]() {
         return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
 }

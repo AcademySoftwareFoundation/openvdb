@@ -177,8 +177,6 @@ SegmentsAlongRays(const GridBatchImpl &batchHdl,
                 torch::TensorOptions().dtype(torch::kInt32).device(rayOrigins.device());
             const auto optsJIdx =
                 torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(rayOrigins.device());
-            const auto optsJOffsets =
-                torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(rayOrigins.device());
             const auto optsJLIdx =
                 torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(rayOrigins.device());
 

@@ -39,14 +39,14 @@ torch::Tensor
 JaggedTensor::joffsets_from_jidx_and_jdata(torch::Tensor jidx,
                                            torch::Tensor jdata,
                                            int64_t num_tensors) {
-    return FVDB_DISPATCH_KERNEL_DEVICE(jdata.device(), [&]() {
-        return detail::ops::dispatchJOffsetsForJIdx<DeviceTag>(jidx, jdata, num_tensors);
+    return FVDB_DISPATCH_KERNEL(jdata.device(), [&]() {
+        return detail::ops::dispatchJOffsetsFromJIdx<DeviceTag>(jidx, jdata, num_tensors);
     });
 }
 
 torch::Tensor
 JaggedTensor::jidx_from_joffsets(torch::Tensor joffsets, int64_t num_elements) {
-    return FVDB_DISPATCH_KERNEL_DEVICE(joffsets.device(), [&]() {
+    return FVDB_DISPATCH_KERNEL(joffsets.device(), [&]() {
         return detail::ops::dispatchJIdxForJOffsets<DeviceTag>(joffsets, num_elements);
     });
 }
