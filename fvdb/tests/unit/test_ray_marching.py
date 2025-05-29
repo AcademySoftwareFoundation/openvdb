@@ -167,7 +167,7 @@ class TestRayMarching(unittest.TestCase):
         pts = torch.rand(10000, 3).to(device=device, dtype=dtype) - 0.5
         grid = GridBatch(device=device)
         grid.set_from_points(pts, vox_size, vox_origin)
-        # grid = grid.dilated_grid(1)
+        grid = grid.dilated_grid(1)
         grid_dual = grid.dual_grid()
 
         def make_ray_grid(origin, nrays, minb=(-0.45, -0.45), maxb=(0.45, 0.45)):
@@ -360,7 +360,7 @@ class TestRayMarching(unittest.TestCase):
             pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
             grid = GridBatch().to(device)
             grid.set_from_points(pts, 0.0001, torch.zeros(3))
-            # grid = grid.dilated_grid(1)
+            grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[:100] - rays_o
@@ -385,7 +385,7 @@ class TestRayMarching(unittest.TestCase):
             pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)] * 2)
             grid = GridBatch().to(device)
             grid.set_from_points(pts, 0.0001, torch.zeros(3))
-            # grid = grid.dilated_grid(1)
+            grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[0].jdata[:100] - rays_o
@@ -413,7 +413,7 @@ class TestRayMarching(unittest.TestCase):
         # pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)]*2)
         grid = GridBatch().to(device)
         grid.set_from_points(pts, 0.0001, torch.zeros(3))
-        # grid = grid.dilated_grid(1)
+        grid = grid.dilated_grid(1)
 
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
@@ -430,7 +430,7 @@ class TestRayMarching(unittest.TestCase):
             pts = torch.rand(10000, 3).to(device=device, dtype=dtype)
             grid = GridBatch().to(device)
             grid.set_from_points(pts, 0.01, torch.zeros(3))
-            # grid = grid.dilated_grid(1)
+            grid = grid.dilated_grid(1)
 
             rays_o = -torch.ones(100, 3).to(device).to(dtype)
             rays_d = pts[:100] - rays_o
@@ -466,7 +466,7 @@ class TestRayMarching(unittest.TestCase):
         # pts = fvdb.JaggedTensor([torch.rand(10000, 3).to(device=device, dtype=dtype)]*2)
         grid = GridBatch().to(device)
         grid.set_from_points(pts, 0.0001, torch.zeros(3))
-        # grid = grid.dilated_grid(1)
+        grid = grid.dilated_grid(1)
 
         rays_o = -torch.ones(100, 3).to(device).to(dtype)
         rays_d = pts[:100] - rays_o
@@ -484,7 +484,7 @@ class TestRayMarching(unittest.TestCase):
             pts = fvdb.JaggedTensor([torch.rand(100, 3).to(device=device, dtype=dtype)] * 2)
             grid = GridBatch().to(device)
             grid.set_from_points(pts, 0.01, torch.zeros(3))
-            # grid = grid.dilated_grid(1)
+            grid = grid.dilated_grid(1)
 
             rays_o = [-torch.ones(100, 3).to(device).to(dtype)] * 2
             rays_d = [pts[i].jdata[:100] - rays_o[i] for i in range(2)]

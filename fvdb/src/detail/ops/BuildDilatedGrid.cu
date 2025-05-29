@@ -37,7 +37,7 @@ dispatchDilateGrid<torch::kCUDA>(const GridBatchImpl &gridBatch, const int dilat
             nanovdb::tools::cuda::DilateGrid<nanovdb::ValueOnIndex> dilateOp(grid);
             dilateOp.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
             dilateOp.setChecksum(nanovdb::CheckMode::Default);
-            dilateOp.setVerbose(1);
+            dilateOp.setVerbose(0);
 
             handle = dilateOp.getHandle(guide);
             C10_CUDA_KERNEL_LAUNCH_CHECK();
