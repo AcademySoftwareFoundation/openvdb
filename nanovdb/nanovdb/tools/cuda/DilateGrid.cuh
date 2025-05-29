@@ -233,17 +233,59 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
 template<typename BuildT>
 void DilateGrid<BuildT>::dilateRoot()
 {
-    // In this initial implementation, the root node of the source tree is simply duplicated,
-    // under the assumption that the dilation will not create any additional root tiles.
-    // This should be replaced with a conservative, speculative dilation of all root tiles,
-    // which will be pruned later if not used.
+    // This method conservatively and speculatively dilates the root tiles, to accommodate
+    // any new root nodes that might be introduced by the dilation operation.
+    // The index-space bounding box of each tile is examined, and if it is within a 1-pixel of
+    // intersecting any of the 26-connected neighboring root tiles, those are preemptively
+    // introduced into the root topology.
+    // (As of the present implementation this presumes a maximum of 1-voxel radius in dilation)
+    // Root tiles that were preemptively introduced, but end up having no active contents will
+    // be pruned in later stages of processing.
+
     int device = 0;
     cudaGetDevice(&device);
+
+    // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
+    // TODO: Consider avoiding to copy the entire set of upper nodes
     auto deviceSrcRoot = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
-    uint64_t rootSize = mSrcTreeData.mNodeOffset[2] - mSrcTreeData.mNodeOffset[3];
-    // The dilated root is presumed to be available on the host, too (probably created there)
+    uint64_t rootAndUpperSize = mSrcTreeData.mNodeOffset[1] - mSrcTreeData.mNodeOffset[3];
+    auto srcRootAndUpperBuffer = nanovdb::HostBuffer::create(rootAndUpperSize);
+    cudaCheck(cudaMemcpy(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost));
+    auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
+
+    // Keep a hashed list of root tiles to include; initialize with the ones in the source topology
+    std::set<nanovdb::Coord> dilatedTileOrigins;
+    std::vector<typename RootT::Tile> dilatedTiles;
+    for (int t = 0; t < srcRootAndUpper->tileCount(); t++) {
+        auto srcTile = srcRootAndUpper->tile(t);
+        dilatedTiles.push_back(*srcTile);
+        dilatedTileOrigins.insert(srcTile->origin()); }
+
+    // For each original root tile, consider adding those tiles in its 26-connected neighborhood
+    for (int t = 0; t < srcRootAndUpper->tileCount(); t++) {
+        auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
+        const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
+
+        static constexpr int32_t rootTileDim = UpperT::DIM; // 4096
+        for (int di = -rootTileDim; di <= rootTileDim; di += rootTileDim)
+        for (int dj = -rootTileDim; dj <= rootTileDim; dj += rootTileDim)
+        for (int dk = -rootTileDim; dk <= rootTileDim; dk += rootTileDim) {
+            nanovdb::CoordBBox testBBox = nanovdb::CoordBBox::createCube(srcUpper->origin().offsetBy(di,dj,dk), rootTileDim);
+            if (testBBox.hasOverlap(dilatedBBox) & (dilatedTileOrigins.count(testBBox.min()) == 0)) {
+                typename RootT::Tile neighborTile{RootT::CoordToKey(testBBox.min())}; // Only the key value is needed; child pointer & value will be unused
+                dilatedTiles.push_back(neighborTile);
+                dilatedTileOrigins.insert(testBBox.min());
+            }
+        }
+    }
+
+    // Package the new root topology into a RootNode plus Tile list; upload to the GPU
+    uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
     mDilatedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    cudaCheck(cudaMemcpy(mDilatedRoot.data(), deviceSrcRoot, rootSize, cudaMemcpyDeviceToHost));
+    auto dilatedRootPtr = static_cast<RootT*>(mDilatedRoot.data());
+    dilatedRootPtr->mTableSize = dilatedTiles.size();
+    for (int t = 0; t < dilatedTiles.size(); t++)
+        *dilatedRootPtr->tile(t) = dilatedTiles[t];
     mDilatedRoot.deviceUpload(device, mStream, false);
 }// DilateGrid<BuildT>::dilateRoot
 

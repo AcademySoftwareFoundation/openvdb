@@ -305,8 +305,8 @@ struct DilateInternalNodesFunctor
                     if (computedWord) {
                         auto dilatedTile = dilatedRoot->probeTile(neighborOrigin);
                         uint64_t tileChildIndex =
-                            util::PtrDiff(dilatedRoot->getChild(dilatedTile), dilatedRoot->getChild(dilatedRoot->tile(0)))
-                            / sizeof(NanoUpper<BuildT>); // TODO: consider some faster integer division? or a way to avoid this?
+                            util::PtrDiff(dilatedTile, dilatedRoot->tile(0))
+                            / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid this?
                         auto& outputUpperMask = upperMasks[tileChildIndex];
                         outputUpperMask.setOnAtomic(upperChildIndex);
                         auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
@@ -395,9 +395,9 @@ struct ProcessLowerNodesFunctor
         __shared__ typename WarpScan::TempStorage temp_storage[WarpsPerBlock];
 
         const auto& dstTree = dstGrid->tree();
-        const auto upperOrigin = dstTree.root().tile(upperID)->origin();
 
         if (upperOffsets[dilatedTileID+1] > upperID) { // check that this particular dilated tile is not empty, i.e. it exists in the tree
+            const auto upperOrigin = dstTree.root().tile(upperID)->origin();
             auto& upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[upperID]);
             for ( int jj = sliceID*LowerNodesPerSlice + warpID; jj < (sliceID+1)*LowerNodesPerSlice; jj += WarpsPerBlock ) {
                 if (upperMasks[dilatedTileID].isOn(jj)) {
