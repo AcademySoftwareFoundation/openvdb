@@ -127,9 +127,9 @@ ijkForGridVoxelCallback(int32_t bidx,
                         TorchRAcc64<fvdb::JIdxType, 1> outIJKBIdx) {
     const int32_t totalPadAmount = static_cast<int32_t>(bbox.volume());
 
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const int64_t totalVoxels                               = gridPtr->activeVoxelCount();
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const int64_t totalVoxels           = gridPtr->activeVoxelCount();
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     const int64_t baseOffset = batchAcc.voxelOffset(bidx);
 
@@ -151,9 +151,9 @@ ijkForGridVoxelCallbackWithoutBorder(int32_t bidx,
                                      const TorchRAcc64<int64_t, 1> packInfoBase,
                                      TorchRAcc64<int32_t, 2> outIJKData,
                                      TorchRAcc64<fvdb::JIdxType, 1> outIJKBIdx) {
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const auto gridAccessor                                 = gridPtr->getAccessor();
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const auto gridAccessor             = gridPtr->getAccessor();
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     const int64_t baseOffset = batchAcc.voxelOffset(bidx);
 
@@ -175,9 +175,9 @@ ijkForGridVoxelCallbackWithoutBorderCount(
     const GridBatchImpl::Accessor<nanovdb::ValueOnIndex> batchAcc,
     const nanovdb::CoordBBox bbox,
     TorchRAcc64<int64_t, 1> outCounter) {
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const auto gridAccessor                                 = gridPtr->getAccessor();
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const auto gridAccessor             = gridPtr->getAccessor();
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     const int64_t baseOffset = batchAcc.voxelOffset(bidx);
 
@@ -218,7 +218,7 @@ paddedIJKForGrid(const GridBatchImpl &batchHdl, const nanovdb::CoordBBox &bbox) 
     forEachVoxelCUDA<nanovdb::ValueOnIndex>(1024, 1, batchHdl, cb);
 
     return JaggedTensor::from_data_offsets_and_list_ids(
-        outIJK, batchHdl.voxelOffsets(true) * totalPadAmount, batchHdl.jlidx(true));
+        outIJK, batchHdl.voxelOffsets() * totalPadAmount, batchHdl.jlidx());
 }
 
 JaggedTensor
@@ -288,7 +288,7 @@ buildPaddedGridFromGridWithoutBorderCPU(const GridBatchImpl &baseBatchHdl, int B
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(baseGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < baseGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *baseGrid = baseGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *baseGrid = baseGridHdl.template grid<GridType>(bidx);
         if (!baseGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -298,7 +298,7 @@ buildPaddedGridFromGridWithoutBorderCPU(const GridBatchImpl &baseBatchHdl, int B
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType>(baseGrid->tree()); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator(baseGrid->tree()); it.isValid(); it++) {
             nanovdb::Coord ijk0 = it->first;
             bool active         = true;
             for (int di = BMIN; di <= BMAX && active; di += 1) {
@@ -342,7 +342,7 @@ buildPaddedGridFromGridCPU(const GridBatchImpl &baseBatchHdl, int BMIN, int BMAX
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(baseGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < baseGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *baseGrid = baseGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *baseGrid = baseGridHdl.template grid<GridType>(bidx);
         if (!baseGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -351,7 +351,7 @@ buildPaddedGridFromGridCPU(const GridBatchImpl &baseBatchHdl, int BMIN, int BMAX
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType>(baseGrid->tree()); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator(baseGrid->tree()); it.isValid(); it++) {
             nanovdb::Coord ijk0 = it->first;
             for (int di = BMIN; di <= BMAX; di += 1) {
                 for (int dj = BMIN; dj <= BMAX; dj += 1) {

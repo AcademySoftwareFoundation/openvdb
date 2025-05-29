@@ -158,7 +158,7 @@ struct GridBatch : torch::CustomClassHolder {
     torch::Tensor
     joffsets() const {
         detail::RAIIDeviceGuard guard(device());
-        return impl()->voxelOffsets(true);
+        return impl()->voxelOffsets();
     }
 
     /// @brief Get the list indices for theis batch of grids
@@ -167,7 +167,7 @@ struct GridBatch : torch::CustomClassHolder {
     torch::Tensor
     jlidx() const {
         detail::RAIIDeviceGuard guard(device());
-        const torch::Tensor ret = impl()->jlidx(true);
+        const torch::Tensor ret = impl()->jlidx();
         if (ret.numel() == 0) {
             return torch::arange(
                 {grid_count()},
@@ -183,7 +183,7 @@ struct GridBatch : torch::CustomClassHolder {
     torch::Tensor
     jidx() const {
         detail::RAIIDeviceGuard guard(device());
-        const torch::Tensor ret = impl()->jidx(true);
+        const torch::Tensor ret = impl()->jidx();
         if (grid_count() == 1 && ret.numel() == 0) {
             return torch::zeros(
                 {total_voxels()},
@@ -615,7 +615,6 @@ struct GridBatch : torch::CustomClassHolder {
     ///                       where N_i is the number of rays to intersect with the i^th grid
     /// @param max_segments The maximum number of segments to return per ray
     /// @param eps Skip segments whose length is less than this distance
-    /// @param ignore_masked If set to true, will treat masked voxels as active
     /// @return A JaggedTensor containing the segments intersected by the rays. i.e. a JaggedTensor
     ///         with lshape [[S_{0,0}, ..., S_{0,N_0}], ..., [S_{B,0}, ..., S_{B,N_B}]]
     JaggedTensor segments_along_rays(const JaggedTensor &ray_origins,
@@ -852,7 +851,7 @@ struct GridBatch : torch::CustomClassHolder {
     JaggedTensor
     jagged_like(const torch::Tensor &data) const {
         detail::RAIIDeviceGuard guard(device());
-        return impl()->jaggedTensor(data, true);
+        return impl()->jaggedTensor(data);
     }
 
     /// @brief Populate the grid batch with voxels that intersect a triangle mesh

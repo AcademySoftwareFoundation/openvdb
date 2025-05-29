@@ -29,7 +29,7 @@ dispatchDilateGrid<torch::kCUDA>(const GridBatchImpl &gridBatch, const int dilat
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> handles;
     for (int i = 0; i < gridBatch.batchSize(); i += 1) {
         nanovdb::GridHandle<TorchDeviceBuffer> handle;
-        nanovdb::NanoGrid<nanovdb::ValueOnIndex> *grid =
+        nanovdb::OnIndexGrid *grid =
             gridBatch.nanoGridHandleMut().deviceGrid<nanovdb::ValueOnIndex>(i);
         TORCH_CHECK(grid, "Grid is null");
 
@@ -69,7 +69,7 @@ dispatchDilateGrid<torch::kCPU>(const GridBatchImpl &gridBatch, const int dilati
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> gridHandles;
     gridHandles.reserve(gridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < gridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *grid = gridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *grid = gridHdl.template grid<GridType>(bidx);
         if (!grid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -79,7 +79,8 @@ dispatchDilateGrid<torch::kCPU>(const GridBatchImpl &gridBatch, const int dilati
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType, -1>(tree); it.isValid(); it++) {
+        const int64_t joffset = gridBatch.cumVoxels(bidx);
+        for (auto it = ActiveVoxelIterator<-1>(tree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk = it->first;
 
             for (int i = -dilation; i <= dilation; i += 1) {

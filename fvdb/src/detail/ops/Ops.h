@@ -72,11 +72,7 @@ torch::Tensor dispatchJOffsetsForJIdx(torch::Tensor jidx, torch::Tensor jdata, i
 template <c10::DeviceType>
 torch::Tensor dispatchJIdxForJOffsets(torch::Tensor joffsets, int64_t numElements);
 
-template <c10::DeviceType>
-JaggedTensor dispatchEnabledMask(const GridBatchImpl &batchHdl, bool returnDisabled);
-
-template <c10::DeviceType>
-torch::Tensor dispatchJIdxForGrid(const GridBatchImpl &batchHdl, bool ignoreDisabledVoxels);
+template <c10::DeviceType> torch::Tensor dispatchJIdxForGrid(const GridBatchImpl &batchHdl);
 
 template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer> dispatchCreateNanoGridFromIJK(const JaggedTensor &ijk);
@@ -92,7 +88,6 @@ template <c10::DeviceType>
 void dispatchPopulateGridMetadata(const nanovdb::GridHandle<TorchDeviceBuffer> &batchHdl,
                                   const std::vector<nanovdb::Vec3d> &voxelSizes,
                                   const std::vector<nanovdb::Vec3d> &voxelOrigins,
-                                  const bool isMutable,
                                   torch::Tensor &outBatchOffsets,
                                   GridBatchImpl::GridMetadata *outPerGridMetadataHost,
                                   GridBatchImpl::GridMetadata *outPerGridMetadataDevice,
@@ -103,15 +98,13 @@ template <c10::DeviceType>
 void dispatchReadIntoDense(const GridBatchImpl &batchHdl,
                            const torch::Tensor &inGridData,
                            const torch::Tensor &denseOrigins,
-                           torch::Tensor &outDenseTensor,
-                           bool ignoreMasked);
+                           torch::Tensor &outDenseTensor);
 
 template <c10::DeviceType>
 void dispatchReadFromDense(const GridBatchImpl &batchHdl,
                            const torch::Tensor &inDenseTensor,
                            const torch::Tensor &denseOrigins,
-                           torch::Tensor &outSparseTensor,
-                           bool ignoreMasked);
+                           torch::Tensor &outSparseTensor);
 
 template <c10::DeviceType>
 void dispatchFillFromGrid(const GridBatchImpl &fromGrid,
@@ -131,21 +124,12 @@ JaggedTensor dispatchRayImplicitIntersection(const GridBatchImpl &batchHdl,
                                              float eps);
 
 template <c10::DeviceType>
-JaggedTensor
-dispatchCoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &coords, bool ignoreMasked);
-
-template <c10::DeviceType>
-int64_t dispatchCountEnabledVoxels(const GridBatchImpl &batchHdl, int batchIdx = -1);
+JaggedTensor dispatchCoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &coords);
 
 template <c10::DeviceType>
 JaggedTensor dispatchActiveVoxelsInBoundsMask(const GridBatchImpl &batchHdl,
                                               const Vec3iBatch &ijkMin,
-                                              const Vec3iBatch &ijkMax,
-                                              bool ignoreDisabledVoxels);
-
-template <c10::DeviceType>
-void
-dispatchSetMaskedIjk(const GridBatchImpl &batchHdl, const JaggedTensor &coords, bool maskedState);
+                                              const Vec3iBatch &ijkMax);
 
 template <c10::DeviceType>
 std::vector<JaggedTensor> dispatchGridEdgeNetwork(const GridBatchImpl &gridHdl,
@@ -218,22 +202,19 @@ JaggedTensor
 dispatchIjkToIndex(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool cumulative);
 
 template <c10::DeviceType>
-JaggedTensor
-dispatchPointsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points, bool ignoreMasked);
+JaggedTensor dispatchPointsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points);
 
 template <c10::DeviceType>
 JaggedTensor dispatchCubesInGrid(const GridBatchImpl &batchHdl,
                                  const JaggedTensor &cubeCenters,
                                  const Vec3dOrScalar &padMin,
-                                 const Vec3dOrScalar &padMax,
-                                 bool ignoreDisabledVoxels);
+                                 const Vec3dOrScalar &padMax);
 
 template <c10::DeviceType>
 JaggedTensor dispatchCubesIntersectGrid(const GridBatchImpl &batchHdl,
                                         const JaggedTensor &cubeCenters,
                                         const Vec3dOrScalar &padMin,
-                                        const Vec3dOrScalar &padMax,
-                                        bool ignoreDisabledVoxels);
+                                        const Vec3dOrScalar &padMax);
 
 template <c10::DeviceType>
 std::vector<torch::Tensor> dispatchSampleGridTrilinear(const GridBatchImpl &batchHdl,
@@ -293,11 +274,9 @@ JaggedTensor dispatchSegmentsAlongRays(const GridBatchImpl &batchHdl,
                                        const JaggedTensor &rayOrigins,
                                        const JaggedTensor &rayDirections,
                                        int64_t maxSegments,
-                                       const double eps,
-                                       const bool ignoreMasked);
+                                       const double eps);
 
-template <c10::DeviceType>
-JaggedTensor dispatchActiveGridCoords(const GridBatchImpl &gridAccessor, bool ignoreDisabledVoxels);
+template <c10::DeviceType> JaggedTensor dispatchActiveGridCoords(const GridBatchImpl &gridAccessor);
 
 template <c10::DeviceType>
 torch::Tensor dispatchTransformPointsToGrid(const GridBatchImpl &batchHdl,

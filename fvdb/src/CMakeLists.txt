@@ -73,7 +73,6 @@ set(FVDB_CU_FILES
     detail/ops/RayImplicitIntersection.cu
     detail/ops/SegmentsAlongRays.cu
     detail/ops/PopulateGridMetadata.cu
-    detail/ops/CountEnabledVoxels.cu
     detail/ops/VoxelNeighborhood.cu
     detail/ops/SampleGridTrilinearWithGrad.cu
     detail/ops/CoordsInGrid.cu
@@ -101,11 +100,9 @@ set(FVDB_CU_FILES
     detail/ops/PointsInGrid.cu
     detail/ops/IjkToIndex.cu
     detail/ops/ActiveGridGoords.cu
-    detail/ops/SetMasked.cu
     detail/ops/IjkToInvIndex.cu
     detail/ops/ReadFromDense.cu
     detail/ops/NearestIjkForPoints.cu
-    detail/ops/EnabledMask.cu
     detail/ops/ActiveVoxelsInBoundsMask.cu
     detail/ops/JIdxForGrid.cu
     detail/ops/VoxelsAlongRays.cu

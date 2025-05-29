@@ -12,7 +12,6 @@ namespace detail {
 namespace ops {
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -22,7 +21,7 @@ transformPointsToGridCallback(int32_t bidx,
                               int32_t eidx,
                               JaggedAccessor<ScalarType, 2> pts,
                               TensorAccessor<ScalarType, 2> outPts,
-                              BatchGridAccessor<GridType> batchAccessor,
+                              BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                               bool primal) {
     const auto tx =
         primal ? batchAccessor.primalTransform(bidx) : batchAccessor.dualTransform(bidx);
@@ -35,7 +34,6 @@ transformPointsToGridCallback(int32_t bidx,
 }
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -45,7 +43,7 @@ transformPointsToGridBackwardCallback(int32_t bidx,
                                       int32_t eidx,
                                       JaggedAccessor<ScalarType, 2> gradOut,
                                       TensorAccessor<ScalarType, 2> outGradIn,
-                                      BatchGridAccessor<GridType> batchAccessor,
+                                      BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                                       bool primal) {
     const auto tx =
         primal ? batchAccessor.primalTransform(bidx) : batchAccessor.dualTransform(bidx);
@@ -57,7 +55,6 @@ transformPointsToGridBackwardCallback(int32_t bidx,
 }
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -67,7 +64,7 @@ invTransformPointsToGridCallback(int32_t bidx,
                                  int32_t eidx,
                                  JaggedAccessor<ScalarType, 2> pts,
                                  TensorAccessor<ScalarType, 2> outPts,
-                                 BatchGridAccessor<GridType> batchAccessor,
+                                 BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                                  bool primal) {
     const auto tx =
         primal ? batchAccessor.primalTransform(bidx) : batchAccessor.dualTransform(bidx);
@@ -79,7 +76,6 @@ invTransformPointsToGridCallback(int32_t bidx,
 }
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -89,7 +85,7 @@ invTransformPointsToGridBackwardCallback(int32_t bidx,
                                          int32_t eidx,
                                          JaggedAccessor<ScalarType, 2> gradOut,
                                          TensorAccessor<ScalarType, 2> outGradIn,
-                                         BatchGridAccessor<GridType> batchAccessor,
+                                         BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                                          bool primal) {
     const auto tx =
         primal ? batchAccessor.primalTransform(bidx) : batchAccessor.dualTransform(bidx);
@@ -113,37 +109,32 @@ TransformPointsToGrid(const GridBatchImpl &batchHdl, const JaggedTensor &points,
     auto opts               = torch::TensorOptions().dtype(points.dtype()).device(points.device());
     torch::Tensor outCoords = torch::empty({points.rsize(0), points.rsize(1)}, opts);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            points.scalar_type(),
-            "pointsInGrid",
-            AT_WRAP([&]() {
-                auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto outCoordsAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoords);
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ptsA) {
-                        transformPointsToGridCallback<scalar_t,
-                                                      GridType,
-                                                      JaggedRAcc32,
-                                                      TorchRAcc32>(
+    AT_DISPATCH_V2(
+        points.scalar_type(),
+        "PointsToGrid",
+        AT_WRAP([&]() {
+            auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outCoordsAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoords);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    transformPointsToGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, points, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        transformPointsToGridCallback<scalar_t, JaggedAcc, TorchAcc>(
                             bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, points, cb);
-                } else {
-                    auto cb =
-                        [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
-                            transformPointsToGridCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                                bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
-                        };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf);
-    });
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
     return outCoords;
 }
 
@@ -159,39 +150,33 @@ InvTransformPointsToGrid(const GridBatchImpl &batchHdl, const JaggedTensor &poin
     auto opts               = torch::TensorOptions().dtype(points.dtype()).device(points.device());
     torch::Tensor outCoords = torch::empty({points.rsize(0), points.rsize(1)}, opts);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            points.scalar_type(),
-            "pointsInGrid",
-            AT_WRAP([&]() {
-                auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto outCoordsAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoords);
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ptsA) {
-                        invTransformPointsToGridCallback<scalar_t,
-                                                         GridType,
-                                                         JaggedRAcc32,
-                                                         TorchRAcc32>(
+    AT_DISPATCH_V2(
+        points.scalar_type(),
+        "InvPointsToGrid",
+        AT_WRAP([&]() {
+            auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outCoordsAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoords);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    invTransformPointsToGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, points, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        invTransformPointsToGridCallback<scalar_t, JaggedAcc, TorchAcc>(
                             bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, points, cb);
-                } else {
-                    auto cb = [=](int32_t bidx,
-                                  int32_t eidx,
-                                  int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> ptsA) {
-                        invTransformPointsToGridCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, ptsA, outCoordsAcc, batchAcc, isPrimal);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf);
-    });
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, points, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
+
     return outCoords;
 }
 
@@ -202,41 +187,32 @@ TransformPointsToGridBackward(const GridBatchImpl &batchHdl,
                               bool isPrimal) {
     torch::Tensor outGradIn = torch::empty_like(gradOut.jdata());
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(gradOut.scalar_type(),
-                       "pointsInGrid",
-                       AT_WRAP([&]() {
-                           auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                           auto outGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradIn);
-                           if constexpr (DeviceTag == torch::kCUDA) {
-                               auto cb = [=] __device__(int32_t bidx,
-                                                        int32_t eidx,
-                                                        int32_t cidx,
-                                                        JaggedRAcc32<scalar_t, 2> ptsA) {
-                                   transformPointsToGridBackwardCallback<scalar_t,
-                                                                         GridType,
-                                                                         JaggedRAcc32,
-                                                                         TorchRAcc32>(
-                                       bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
-                               };
-                               forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, gradOut, cb);
-                           } else {
-                               auto cb = [=](int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedAcc<scalar_t, 2> ptsA) {
-                                   transformPointsToGridBackwardCallback<scalar_t,
-                                                                         GridType,
-                                                                         JaggedAcc,
-                                                                         TorchAcc>(
-                                       bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
-                               };
-                               forEachJaggedElementChannelCPU<scalar_t, 2>(1, gradOut, cb);
-                           }
-                       }),
-                       AT_EXPAND(AT_FLOATING_TYPES),
-                       c10::kHalf);
-    });
+    AT_DISPATCH_V2(
+        gradOut.scalar_type(),
+        "pointsToGridBackward",
+        AT_WRAP([&]() {
+            auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradIn);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    transformPointsToGridBackwardCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, gradOut, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        transformPointsToGridBackwardCallback<scalar_t, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
+                    };
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, gradOut, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
     return outGradIn;
 }
 
@@ -247,41 +223,33 @@ InvTransformPointsToGridBackward(const GridBatchImpl &batchHdl,
                                  bool isPrimal) {
     torch::Tensor outGradIn = torch::empty_like(gradOut.jdata());
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(gradOut.scalar_type(),
-                       "pointsInGrid",
-                       AT_WRAP([&]() {
-                           auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                           auto outGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradIn);
-                           if constexpr (DeviceTag == torch::kCUDA) {
-                               auto cb = [=] __device__(int32_t bidx,
-                                                        int32_t eidx,
-                                                        int32_t cidx,
-                                                        JaggedRAcc32<scalar_t, 2> ptsA) {
-                                   invTransformPointsToGridBackwardCallback<scalar_t,
-                                                                            GridType,
-                                                                            JaggedRAcc32,
-                                                                            TorchRAcc32>(
-                                       bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
-                               };
-                               forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, gradOut, cb);
-                           } else {
-                               auto cb = [=](int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedAcc<scalar_t, 2> ptsA) {
-                                   invTransformPointsToGridBackwardCallback<scalar_t,
-                                                                            GridType,
-                                                                            JaggedAcc,
-                                                                            TorchAcc>(
-                                       bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
-                               };
-                               forEachJaggedElementChannelCPU<scalar_t, 2>(1, gradOut, cb);
-                           }
-                       }),
-                       AT_EXPAND(AT_FLOATING_TYPES),
-                       c10::kHalf);
-    });
+    AT_DISPATCH_V2(
+        gradOut.scalar_type(),
+        "invPointsToGridBackward",
+        AT_WRAP([&]() {
+            auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradIn);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    invTransformPointsToGridBackwardCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, gradOut, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        invTransformPointsToGridBackwardCallback<scalar_t, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ptsA, outGradInAcc, batchAcc, isPrimal);
+                    };
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, gradOut, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
+
     return outGradIn;
 }
 

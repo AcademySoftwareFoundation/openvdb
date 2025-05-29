@@ -254,12 +254,12 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
         auto ret = detail::autograd::SparseConvolutionKernelMap::apply(
             input.jdata(), weights, *this, false /* transposed */)[0];
 
-        return mTargetGrid.impl()->jaggedTensor(ret, false);
+        return mTargetGrid.impl()->jaggedTensor(ret);
     } else if (backend == ConvPackBackend::IGEMM) {
         auto ret = detail::autograd::SparseConvolutionImplicitGEMM::apply(
             input.jdata(), weights, *this, false /* transposed */)[0];
 
-        return mTargetGrid.impl()->jaggedTensor(ret, false);
+        return mTargetGrid.impl()->jaggedTensor(ret);
     } else if (backend == ConvPackBackend::CUTLASS) {
         // Re-shape kernel from [Do, Di, D, H, W] to [Do, D, H, W, Di].
         TORCH_CHECK(mCUTLASSHaloIndexBuffer.has_value() && mCUTLASSOutputIndexBuffer.has_value(),
@@ -273,7 +273,7 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
                 mCUTLASSOutputIndexBuffer.value(),
                 mCUTLASSBenchmark);
         });
-        return mTargetGrid.impl()->jaggedTensor(out, false);
+        return mTargetGrid.impl()->jaggedTensor(out);
     } else if (backend == ConvPackBackend::LGGS) {
         TORCH_CHECK(mLGGSSpokeIndicesFlattenedOffset.has_value() &&
                         mLGGSSpokeInputGlobalIndicesFlattenedData.has_value() &&
@@ -292,7 +292,7 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
                     mLGGSSpokeInputGlobalIndicesFlattenedData.value(),
                     mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData.value());
             });
-        return mTargetGrid.impl()->jaggedTensor(out, false);
+        return mTargetGrid.impl()->jaggedTensor(out);
 
     } else {
         TORCH_CHECK(false, "Unknown backend");
@@ -312,12 +312,12 @@ SparseConvPackInfo::sparseTransposeConv3d(const JaggedTensor &input,
         auto ret = detail::autograd::SparseConvolutionKernelMap::apply(
             input.jdata(), weights, *this, true /* transposed */)[0];
 
-        return mSourceGrid.impl()->jaggedTensor(ret, false);
+        return mSourceGrid.impl()->jaggedTensor(ret);
     } else if (backend == ConvPackBackend::IGEMM) {
         auto ret = detail::autograd::SparseConvolutionImplicitGEMM::apply(
             input.jdata(), weights, *this, true /* transposed */)[0];
 
-        return mSourceGrid.impl()->jaggedTensor(ret, false);
+        return mSourceGrid.impl()->jaggedTensor(ret);
     } else if (backend == ConvPackBackend::CUTLASS) {
         TORCH_CHECK(false, "Cutlass does not support transpose convolution yet");
     } else {

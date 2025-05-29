@@ -15,7 +15,6 @@ namespace ops {
 
 template <c10::DeviceType DeviceTag,
           typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -26,15 +25,15 @@ splatIntoGridBezierCallback(int32_t bidx,
                             int32_t cidx,
                             JaggedAccessor<ScalarType, 2> points,
                             TensorAccessor<ScalarType, 2> pointsData,
-                            BatchGridAccessor<GridType> batchAccessor,
+                            BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                             TensorAccessor<at::opmath_type<ScalarType>, 2> outGridData) {
     using MathType = at::opmath_type<ScalarType>;
 
-    const auto pointCoords                     = points.data();
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
-    auto gridAcc                               = gpuGrid->getAccessor();
-    const int64_t baseOffset                   = batchAccessor.voxelOffset(bidx);
-    const VoxelCoordTransform &transform       = batchAccessor.primalTransform(bidx);
+    const auto pointCoords               = points.data();
+    const nanovdb::OnIndexGrid *gpuGrid  = batchAccessor.grid(bidx);
+    auto gridAcc                         = gpuGrid->getAccessor();
+    const int64_t baseOffset             = batchAccessor.voxelOffset(bidx);
+    const VoxelCoordTransform &transform = batchAccessor.primalTransform(bidx);
 
     const nanovdb::math::Vec3<MathType> xyz =
         transform.apply(static_cast<MathType>(pointCoords[eidx][0]),
@@ -43,7 +42,7 @@ splatIntoGridBezierCallback(int32_t bidx,
 
 #pragma unroll
     for (auto it = BezierInterpolationIterator<MathType>(xyz); it.isValid(); ++it) {
-        if (gridAcc.template get<ActiveOrUnmasked<GridType>>(it->first)) {
+        if (gridAcc.isActive(it->first)) {
             const int64_t indexIjk  = (int64_t)gridAcc.getValue(it->first) - 1 + baseOffset;
             const MathType addValue = it->second * static_cast<MathType>(pointsData[eidx][cidx]);
             if constexpr (DeviceTag == torch::kCUDA) {
@@ -69,58 +68,47 @@ SplatIntoGridBezier(const GridBatchImpl &batchHdl,
     torch::Tensor pointsDataReshape  = featureCoalescedView(pointsData);   // [B*M, -1]
     torch::Tensor outGridDataReshape = featureCoalescedView(outGridData);  // [N, -1]
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            points.scalar_type(),
-            "SplatIntoGridBezier",
-            AT_WRAP([&] {
-                torch::Tensor _outGridData;
-                if (points.scalar_type() == at::kHalf) {
-                    _outGridData = torch::zeros_like(outGridDataReshape,
-                                                     outGridData.options().dtype(torch::kFloat32));
-                } else {
-                    _outGridData = outGridDataReshape;
-                }
+    AT_DISPATCH_V2(
+        points.scalar_type(),
+        "SplatIntoGridBezier",
+        AT_WRAP([&] {
+            torch::Tensor _outGridData;
+            if (points.scalar_type() == at::kHalf) {
+                _outGridData = torch::zeros_like(outGridDataReshape,
+                                                 outGridData.options().dtype(torch::kFloat32));
+            } else {
+                _outGridData = outGridDataReshape;
+            }
 
-                auto batchAcc      = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto pointsDataAcc = tensorAccessor<DeviceTag, scalar_t, 2>(pointsData);
-                auto outGridDataAcc =
-                    tensorAccessor<DeviceTag, at::opmath_type<scalar_t>, 2>(_outGridData);
+            auto batchAcc      = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto pointsDataAcc = tensorAccessor<DeviceTag, scalar_t, 2>(pointsData);
+            auto outGridDataAcc =
+                tensorAccessor<DeviceTag, at::opmath_type<scalar_t>, 2>(_outGridData);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ptsA) {
-                        splatIntoGridBezierCallback<DeviceTag,
-                                                    scalar_t,
-                                                    GridType,
-                                                    JaggedRAcc32,
-                                                    TorchRAcc32>(
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    splatIntoGridBezierCallback<DeviceTag, scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, cidx, ptsA, pointsDataAcc, batchAcc, outGridDataAcc);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(256, pointsData.size(1), points, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        splatIntoGridBezierCallback<DeviceTag, scalar_t, JaggedAcc, TorchAcc>(
                             bidx, eidx, cidx, ptsA, pointsDataAcc, batchAcc, outGridDataAcc);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(
-                        256, pointsData.size(1), points, cb);
-                } else {
-                    auto cb =
-                        [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
-                            splatIntoGridBezierCallback<DeviceTag,
-                                                        scalar_t,
-                                                        GridType,
-                                                        JaggedAcc,
-                                                        TorchAcc>(
-                                bidx, eidx, cidx, ptsA, pointsDataAcc, batchAcc, outGridDataAcc);
-                        };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(pointsData.size(1), points, cb);
-                }
+                forEachJaggedElementChannelCPU<scalar_t, 2>(pointsData.size(1), points, cb);
+            }
 
-                if (points.scalar_type() == at::kHalf) {
-                    outGridData.copy_(_outGridData);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf);
-    });
+            if (points.scalar_type() == at::kHalf) {
+                outGridData.copy_(_outGridData);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 
     return outGridData;
 }

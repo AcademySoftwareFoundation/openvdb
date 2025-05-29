@@ -52,8 +52,7 @@ struct ReadFromDense : public torch::autograd::Function<ReadFromDense> {
                 .to(denseData.device());
 
         FVDB_DISPATCH_KERNEL_DEVICE(grid->device(), [&]() {
-            ops::dispatchReadFromDense<DeviceTag>(
-                *grid, denseDataReshape, denseOriginsI32, ret, false);
+            ops::dispatchReadFromDense<DeviceTag>(*grid, denseDataReshape, denseOriginsI32, ret);
         });
 
         // Reshape [B, N, -1] to [B, N, *] given [B, W, H, D, *]
@@ -93,7 +92,7 @@ struct ReadFromDense : public torch::autograd::Function<ReadFromDense> {
             denseDataOpts);                                // [B, W, H, D, -1]
 
         FVDB_DISPATCH_KERNEL_DEVICE(grid->device(), [&]() {
-            ops::dispatchReadIntoDense<DeviceTag>(*grid, gradOutReshape, denseOrigins, ret, false);
+            ops::dispatchReadIntoDense<DeviceTag>(*grid, gradOutReshape, denseOrigins, ret);
         });
 
         torch::Tensor retReshape = ret.view(finalShapeTensor); // [B, W, H, D, *]

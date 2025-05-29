@@ -32,12 +32,11 @@ struct GradStencilFunctor {
         float warpMatrixC[nWarps][16][16];
     };
 
-    template <typename GridType>
     __device__ void
     operator()(int kM,
                int kN,
                int numLeaves,
-               BatchGridAccessor<GridType> gridAcc,
+               BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
                TorchRAcc64<float, 2> inFeatures,
                TorchRAcc64<float, 2> gradOutFeatures,
                TorchRAcc64<float, 5> gradStencil,
@@ -64,13 +63,13 @@ struct GradStencilFunctor {
         auto &sGradStencil          = storage.gradStencil;
         auto sWarpMatrixC           = storage.warpMatrixC;
 
-        using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+        using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
         const int64_t batchIdx     = gridAcc.leafBatchIndex(leafIdx);
         const int64_t localLeafIdx = leafIdx - gridAcc.leafOffset(batchIdx);
         const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
-        const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
+        const nanovdb::OnIndexGrid *deviceGrid = gridAcc.grid(batchIdx);
         const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
         const nanovdb::Coord origin = leaf.origin();
         auto deviceGridAcc          = deviceGrid->getAccessor();
@@ -87,7 +86,7 @@ struct GradStencilFunctor {
                 auto coord  = origin.offsetBy(di, dj, dk);
                 bool inLeaf = (di >= 0 && di < 8 && dj >= 0 && dj < 8 && dk >= 0 && dk < 8);
 
-                if (deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+                if (deviceGridAcc.isActive(coord)) {
                     auto offset = deviceGridAcc.getValue(coord) - 1 + baseOffset;
                     for (int s = 0; s < Di; s++) {
                         int tDim = s + mIdx * Di;
@@ -223,13 +222,12 @@ struct GradStencilFunctor {
     } // operator()
 };
 
-template <typename GridType>
 __global__
 __launch_bounds__(GradStencilFunctor::MaxThreadsPerBlock) void stencilConvHaloGradKernel(
     int kM,
     int kN,
     int numLeaves,
-    BatchGridAccessor<GridType> gridAcc,
+    BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
     TorchRAcc64<float, 2> inFeatures,
     TorchRAcc64<float, 2> gradOutFeatures,
     TorchRAcc64<float, 5> gradStencil) {
@@ -264,23 +262,21 @@ dispatchSparseConvolutionHaloGrad<torch::kCUDA>(const GridBatchImpl &batchHdl,
     constexpr size_t smemSize = sizeof(typename GradStencilFunctor::SharedStorage);
 
     // Launch kernels for each M x N x leaf.
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        auto gridAccessor = batchHdl.deviceAccessor<GridType>();
-        cudaFuncSetAttribute(stencilConvHaloGradKernel<GridType>,
-                             cudaFuncAttributeMaxDynamicSharedMemorySize,
-                             smemSize);
+    auto gridAccessor = batchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
+    cudaFuncSetAttribute(
+        stencilConvHaloGradKernel, cudaFuncAttributeMaxDynamicSharedMemorySize, smemSize);
 
-        stencilConvHaloGradKernel<GridType>
-            <<<M * N * numLeaves, GradStencilFunctor::MaxThreadsPerBlock, smemSize>>>(
-                M,
-                N,
-                numLeaves,
-                gridAccessor,
-                inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
-                gradOutFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
-                gradStencil.packed_accessor64<float, 5, torch::RestrictPtrTraits>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    });
+    stencilConvHaloGradKernel<<<M * N * numLeaves,
+                                GradStencilFunctor::MaxThreadsPerBlock,
+                                smemSize>>>(
+        M,
+        N,
+        numLeaves,
+        gridAccessor,
+        inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
+        gradOutFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
+        gradStencil.packed_accessor64<float, 5, torch::RestrictPtrTraits>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return gradStencil;
 }

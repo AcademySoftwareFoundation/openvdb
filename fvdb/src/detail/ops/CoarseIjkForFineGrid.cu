@@ -22,8 +22,8 @@ coarseIjkForFineGridVoxelCallback(int32_t bidx,
                                   nanovdb::Coord coarseningFactor,
                                   TorchRAcc64<int32_t, 2> outIJKData,
                                   TorchRAcc64<fvdb::JIdxType, 1> outIJKBIdx) {
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     const int64_t baseOffset = batchAcc.voxelOffset(bidx);
 
@@ -70,7 +70,7 @@ dispatchCoarseIJKForFineGrid<torch::kCUDA>(const GridBatchImpl &batchHdl,
     forEachVoxelCUDA<nanovdb::ValueOnIndex>(1024, 1, batchHdl, cb);
 
     return JaggedTensor::from_data_offsets_and_list_ids(
-        outIJK, batchHdl.voxelOffsets(true), batchHdl.jlidx(true));
+        outIJK, batchHdl.voxelOffsets(), batchHdl.jlidx());
 }
 
 } // namespace fvdb::detail::ops

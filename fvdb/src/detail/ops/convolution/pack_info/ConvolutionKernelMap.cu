@@ -5,7 +5,6 @@
 
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
-#include <detail/utils/nanovdb/CustomAccessors.h>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
@@ -14,22 +13,21 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename GridType>
-__hostdev__ inline void
+__device__ inline void
 convolutionKernelMapVoxelCallback(int32_t batchIdx,
                                   int32_t leafIdx,
                                   int32_t voxelIdx,
                                   int32_t channelIdx,
-                                  BatchGridAccessor<GridType> targetBatchAcc,
-                                  BatchGridAccessor<GridType> sourceBatchAcc,
+                                  BatchGridAccessor<nanovdb::ValueOnIndex> targetBatchAcc,
+                                  BatchGridAccessor<nanovdb::ValueOnIndex> sourceBatchAcc,
                                   TorchRAcc32<int32_t, 2> kmap,
                                   const nanovdb::Coord &kernelStart,
                                   const nanovdb::Coord &kernelSize,
                                   const nanovdb::Coord &stride) {
-    using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+    using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
-    const nanovdb::NanoGrid<GridType> *source = sourceBatchAcc.grid(batchIdx);
-    const nanovdb::NanoGrid<GridType> *target = targetBatchAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *source = sourceBatchAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *target = targetBatchAcc.grid(batchIdx);
 
     const LeafNodeType &leaf = target->tree().template getFirstNode<0>()[leafIdx];
     auto sourceAcc           = source->getAccessor();
@@ -47,9 +45,9 @@ convolutionKernelMapVoxelCallback(int32_t batchIdx,
     const int ky   = kernelStart.y() + ((channelIdx % ks0ks1) / kernelSize.x());
     const int kx   = kernelStart.x() + ((channelIdx % ks0ks1) % kernelSize.x());
 
-    if (leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx)) {
+    if (leaf.isActive(voxelIdx)) {
         const nanovdb::Coord sOffset = sCoord + nanovdb::Coord(kz, ky, kx);
-        if (sourceAcc.template get<ActiveOrUnmasked<GridType>>(sOffset)) {
+        if (sourceAcc.isActive(sOffset)) {
             kmap[targetBaseOffset + leaf.getValue(voxelIdx) - 1][kIdx] =
                 sourceBaseOffset + sourceAcc.getValue(sOffset) - 1;
         } else {
@@ -58,10 +56,9 @@ convolutionKernelMapVoxelCallback(int32_t batchIdx,
     }
 }
 
-template <typename GridType>
 void
-convolutionKernelMapCPU(const GridBatchImpl::Accessor<GridType> &sourceGridBatchAcc,
-                        const GridBatchImpl::Accessor<GridType> &targetGridBatchAcc,
+convolutionKernelMapCPU(const GridBatchImpl::Accessor<nanovdb::ValueOnIndex> &sourceGridBatchAcc,
+                        const GridBatchImpl::Accessor<nanovdb::ValueOnIndex> &targetGridBatchAcc,
                         const nanovdb::Coord &kernelSize,
                         const nanovdb::Coord &stride,
                         torch::TensorAccessor<int, 2> outKernelMap) {
@@ -78,9 +75,7 @@ convolutionKernelMapCPU(const GridBatchImpl::Accessor<GridType> &sourceGridBatch
 
         auto sourceAcc = sourceGrid->getAccessor();
 
-        for (auto it =
-                 ActiveVoxelIterator<GridType, -1>(targetGrid->tree(), false, targetBaseOffset);
-             it.isValid();
+        for (auto it = ActiveVoxelIterator<-1>(targetGrid->tree(), targetBaseOffset); it.isValid();
              it++) {
             // Note that stride and kernelSize is in DHW
             const nanovdb::Coord sCoord(
@@ -92,7 +87,7 @@ convolutionKernelMapCPU(const GridBatchImpl::Accessor<GridType> &sourceGridBatch
                     for (int kx = kernelStart.x(); kx < kernelStart.x() + kernelSize.x();
                          ++kx, ++kIdx) {
                         const nanovdb::Coord &sOffset = sCoord + nanovdb::Coord(kz, ky, kx);
-                        if (sourceAcc.template get<ActiveOrUnmasked<GridType>>(sOffset)) {
+                        if (sourceAcc.isActive(sOffset)) {
                             outKernelMap[it->second][kIdx] =
                                 sourceAcc.getValue(sOffset) - 1 + sourceBaseOffset;
                         } else {
@@ -114,35 +109,33 @@ dispatchConvolutionKernelMap<torch::kCUDA>(const GridBatchImpl &sourceBatchHdl,
                                            const Vec3iOrScalar &stride) {
     const nanovdb::Coord &kernelSizeCoord = kernelSize.value();
     const nanovdb::Coord &strideCoord     = stride.value();
-    FVDB_DISPATCH_GRID_TYPES(sourceBatchHdl, [&]() {
-        const nanovdb::Coord kernelStart({(int)std::floor(-kernelSizeCoord.x() / 2.0 + 1),
-                                          (int)std::floor(-kernelSizeCoord.y() / 2.0 + 1),
-                                          (int)std::floor(-kernelSizeCoord.z() / 2.0 + 1)});
 
-        auto sourceBatchAccessor = sourceBatchHdl.deviceAccessor<GridType>();
-        auto kernelMapAcc = kernelMap.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
+    const nanovdb::Coord kernelStart({(int)std::floor(-kernelSizeCoord.x() / 2.0 + 1),
+                                      (int)std::floor(-kernelSizeCoord.y() / 2.0 + 1),
+                                      (int)std::floor(-kernelSizeCoord.z() / 2.0 + 1)});
 
-        auto cb = [=] __device__(int32_t bidx,
-                                 int32_t lidx,
-                                 int32_t vidx,
-                                 int32_t cidx,
-                                 BatchGridAccessor<GridType> batchAcc) {
-            convolutionKernelMapVoxelCallback<GridType>(bidx,
-                                                        lidx,
-                                                        vidx,
-                                                        cidx,
-                                                        batchAcc,
-                                                        sourceBatchAccessor,
-                                                        kernelMapAcc,
-                                                        kernelStart,
-                                                        kernelSizeCoord,
-                                                        strideCoord);
-        };
-        forEachVoxelCUDA<GridType>(128,
-                                   kernelSizeCoord.x() * kernelSizeCoord.y() * kernelSizeCoord.z(),
-                                   targetBatchHdl,
-                                   cb);
-    });
+    auto sourceBatchAccessor = sourceBatchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
+    auto targetBatchAccessor = targetBatchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
+    auto kernelMapAcc        = kernelMap.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
+
+    auto cb = [=] __device__(int32_t bidx,
+                             int32_t lidx,
+                             int32_t vidx,
+                             int32_t cidx,
+                             BatchGridAccessor<nanovdb::ValueOnIndex> batchAcc) {
+        convolutionKernelMapVoxelCallback(bidx,
+                                          lidx,
+                                          vidx,
+                                          cidx,
+                                          batchAcc,
+                                          sourceBatchAccessor,
+                                          kernelMapAcc,
+                                          kernelStart,
+                                          kernelSizeCoord,
+                                          strideCoord);
+    };
+    forEachVoxelCUDA<nanovdb::ValueOnIndex>(
+        128, kernelSizeCoord.x() * kernelSizeCoord.y() * kernelSizeCoord.z(), targetBatchHdl, cb);
 }
 
 template <>
@@ -154,13 +147,11 @@ dispatchConvolutionKernelMap<torch::kCPU>(const GridBatchImpl &source,
                                           const Vec3iOrScalar &stride) {
     const nanovdb::Coord &kernelSizeCoord = kernelSize.value();
     const nanovdb::Coord &strideCoord     = stride.value();
-    FVDB_DISPATCH_GRID_TYPES(source, [&]() {
-        convolutionKernelMapCPU<GridType>(source.hostAccessor<GridType>(),
-                                          target.hostAccessor<GridType>(),
-                                          kernelSizeCoord,
-                                          strideCoord,
-                                          kernelMap.accessor<int, 2>());
-    });
+    convolutionKernelMapCPU(source.hostAccessor<nanovdb::ValueOnIndex>(),
+                            target.hostAccessor<nanovdb::ValueOnIndex>(),
+                            kernelSizeCoord,
+                            strideCoord,
+                            kernelMap.accessor<int, 2>());
 }
 
 } // namespace ops

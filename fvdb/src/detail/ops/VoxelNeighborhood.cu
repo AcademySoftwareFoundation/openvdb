@@ -13,7 +13,6 @@ namespace detail {
 namespace ops {
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -23,12 +22,12 @@ voxelNeighborhoodCallback(int32_t bidx,
                           int32_t eidx,
                           JaggedAccessor<ScalarType, 2> coords,
                           TensorAccessor<int64_t, 4> outIndex,
-                          BatchGridAccessor<GridType> batchAccessor,
+                          BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                           nanovdb::Coord extentMin,
                           nanovdb::Coord extentMax,
                           int32_t shift) {
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
-    auto acc                                   = gpuGrid->getAccessor();
+    const nanovdb::OnIndexGrid *gpuGrid = batchAccessor.grid(bidx);
+    auto acc                            = gpuGrid->getAccessor();
 
     auto coord          = coords.data()[eidx];
     nanovdb::Coord ijk0 = nanovdb::Coord(coord[0], coord[1], coord[2]) << shift;
@@ -37,9 +36,7 @@ voxelNeighborhoodCallback(int32_t bidx,
         for (int32_t j = extentMin[1]; j <= extentMax[1]; j += 1) {
             for (int32_t k = extentMin[2]; k <= extentMax[2]; k += 1) {
                 const nanovdb::Coord ijk = nanovdb::Coord(i, j, k) + ijk0;
-                const int64_t index      = acc.template get<ActiveOrUnmasked<GridType>>(ijk)
-                                               ? ((int64_t)acc.getValue(ijk) - 1)
-                                               : -1;
+                const int64_t index = acc.isActive(ijk) ? ((int64_t)acc.getValue(ijk) - 1) : -1;
                 outIndex[eidx][i - extentMin[0]][j - extentMin[1]][k - extentMin[2]] = index;
             }
         }
@@ -75,36 +72,32 @@ VoxelNeighborhood(const GridBatchImpl &batchHdl,
     torch::Tensor outIndex =
         torch::empty({ijk.rsize(0), extentPerAxis[0], extentPerAxis[1], extentPerAxis[2]}, opts);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            ijk.scalar_type(),
-            "VoxelNeighborhood",
-            AT_WRAP([&]() {
-                auto batchAcc    = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 4>(outIndex);
+    AT_DISPATCH_V2(
+        ijk.scalar_type(),
+        "VoxelNeighborhood",
+        AT_WRAP([&]() {
+            auto batchAcc    = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outIndexAcc = tensorAccessor<DeviceTag, int64_t, 4>(outIndex);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ptsA) {
-                        voxelNeighborhoodCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ptsA) {
+                    voxelNeighborhoodCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, ijk, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ptsA) {
+                        voxelNeighborhoodCallback<scalar_t, JaggedAcc, TorchAcc>(
                             bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(256, 1, ijk, cb);
-                } else {
-                    auto cb = [=](int32_t bidx,
-                                  int32_t eidx,
-                                  int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> ptsA) {
-                        voxelNeighborhoodCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, ptsA, outIndexAcc, batchAcc, extentMin, extentMax, shift);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-                }
-            }),
-            AT_EXPAND(AT_INTEGRAL_TYPES));
-    });
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+            }
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 
     return ijk.jagged_like(outIndex);
 }

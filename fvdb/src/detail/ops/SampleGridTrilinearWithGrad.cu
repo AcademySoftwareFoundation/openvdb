@@ -14,7 +14,6 @@ namespace detail {
 namespace ops {
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -25,16 +24,16 @@ sampleTrilinearWithGradCallback(int32_t bidx,
                                 int32_t cidx,
                                 JaggedAccessor<ScalarType, 2> points,
                                 TensorAccessor<ScalarType, 2> gridData,
-                                BatchGridAccessor<GridType> batchAccessor,
+                                BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                                 TensorAccessor<ScalarType, 2> outFeatures,
                                 TensorAccessor<ScalarType, 3> outGradFeatures) {
     using MathType = at::opmath_type<ScalarType>;
 
     const auto &pointsData = points.data();
 
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
-    const VoxelCoordTransform &transform       = batchAccessor.primalTransform(bidx);
-    const int64_t baseOffset                   = batchAccessor.voxelOffset(bidx);
+    const nanovdb::OnIndexGrid *gpuGrid  = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform = batchAccessor.primalTransform(bidx);
+    const int64_t baseOffset             = batchAccessor.voxelOffset(bidx);
 
     auto gridAcc = gpuGrid->tree().getAccessor();
 
@@ -49,7 +48,7 @@ sampleTrilinearWithGradCallback(int32_t bidx,
     for (auto it = TrilinearInterpolationWithGradIterator<MathType>(xyz); it.isValid(); ++it) {
         const nanovdb::math::Vec4<MathType> wXYZ = it->second;
         const nanovdb::Coord ijk                 = it->first;
-        if (gridAcc.template get<ActiveOrUnmasked<GridType>>(ijk)) {
+        if (gridAcc.isActive(ijk)) {
             const int64_t indexIjk = gridAcc.getValue(ijk) - 1 + baseOffset;
             outFeatures[eidx][cidx] += wXYZ[0] * gridData[indexIjk][cidx];
 #pragma unroll
@@ -79,40 +78,35 @@ SampleGridTrilinearWithGrad(const GridBatchImpl &batchHdl,
     std::vector<int64_t> outGradShape = outShape;
     outGradShape.push_back(3);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            points.scalar_type(),
-            "SampleGridTrilinearWithGrad",
-            AT_WRAP([&] {
-                auto batchAcc           = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto gridDataAcc        = tensorAccessor<DeviceTag, scalar_t, 2>(gridDataReshape);
-                auto outFeaturesAcc     = tensorAccessor<DeviceTag, scalar_t, 2>(outFeatures);
-                auto outGradFeaturesAcc = tensorAccessor<DeviceTag, scalar_t, 3>(outGradFeatures);
+    AT_DISPATCH_V2(
+        points.scalar_type(),
+        "SampleGridTrilinearWithGrad",
+        AT_WRAP([&] {
+            auto batchAcc           = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto gridDataAcc        = tensorAccessor<DeviceTag, scalar_t, 2>(gridDataReshape);
+            auto outFeaturesAcc     = tensorAccessor<DeviceTag, scalar_t, 2>(outFeatures);
+            auto outGradFeaturesAcc = tensorAccessor<DeviceTag, scalar_t, 3>(outGradFeatures);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> pts) {
-                        sampleTrilinearWithGradCallback<scalar_t,
-                                                        GridType,
-                                                        JaggedRAcc32,
-                                                        TorchRAcc32>(bidx,
-                                                                     eidx,
-                                                                     cidx,
-                                                                     pts,
-                                                                     gridDataAcc,
-                                                                     batchAcc,
-                                                                     outFeaturesAcc,
-                                                                     outGradFeaturesAcc);
-                    };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(256, gridData.size(1), points, cb);
-                } else {
-                    auto cb = [=](int32_t bidx,
-                                  int32_t eidx,
-                                  int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> pts) {
-                        sampleTrilinearWithGradCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> pts) {
+                    sampleTrilinearWithGradCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx,
+                        eidx,
+                        cidx,
+                        pts,
+                        gridDataAcc,
+                        batchAcc,
+                        outFeaturesAcc,
+                        outGradFeaturesAcc);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(256, gridData.size(1), points, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> pts) {
+                        sampleTrilinearWithGradCallback<scalar_t, JaggedAcc, TorchAcc>(
                             bidx,
                             eidx,
                             cidx,
@@ -122,12 +116,11 @@ SampleGridTrilinearWithGrad(const GridBatchImpl &batchHdl,
                             outFeaturesAcc,
                             outGradFeaturesAcc);
                     };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(gridData.size(1), points, cb);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf);
-    });
+                forEachJaggedElementChannelCPU<scalar_t, 2>(gridData.size(1), points, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 
     return {outFeatures.reshape(outShape), outGradFeatures.reshape(outGradShape)};
 }

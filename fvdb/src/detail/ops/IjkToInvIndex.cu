@@ -11,8 +11,7 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename GridType,
-          typename ScalarType,
+template <typename ScalarType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -20,13 +19,13 @@ template <typename GridType,
 __hostdev__ inline void
 ijkToInvIndexCallback(fvdb::JIdxType bidx,
                       int64_t eidx,
-                      BatchGridAccessor<GridType> batchAccessor,
+                      BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                       const JaggedAccessor<ScalarType, 2> ijk,
                       TensorAccessor<int64_t, 1> outInvIndex,
                       bool cumulative) {
-    const nanovdb::NanoGrid<GridType> *grid = batchAccessor.grid(bidx);
-    const auto acc                          = grid->getAccessor();
-    const auto &ijkCoord                    = ijk.data()[eidx];
+    const nanovdb::OnIndexGrid *grid = batchAccessor.grid(bidx);
+    const auto acc                   = grid->getAccessor();
+    const auto &ijkCoord             = ijk.data()[eidx];
     const nanovdb::Coord vox(ijkCoord[0], ijkCoord[1], ijkCoord[2]);
     if (acc.isActive(vox)) {
         const fvdb::JOffsetsType baseOffset = cumulative ? 0 : ijk.offsetStart(bidx);
@@ -53,38 +52,36 @@ IjkToInvIndex(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool cumul
     torch::Tensor outInvIndex =
         torch::full({batchHdl.totalVoxels()}, at::Scalar(int64_t(-1)), opts);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            ijk.scalar_type(),
-            "IjkToInvIndex",
-            AT_WRAP([&]() {
-                auto batchAcc       = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto outInvIndexAcc = tensorAccessor<DeviceTag, int64_t, 1>(outInvIndex);
+    AT_DISPATCH_V2(ijk.scalar_type(),
+                   "IjkToInvIndex",
+                   AT_WRAP([&]() {
+                       auto batchAcc =
+                           gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+                       auto outInvIndexAcc = tensorAccessor<DeviceTag, int64_t, 1>(outInvIndex);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(fvdb::JIdxType bidx,
-                                             int64_t eidx,
-                                             int64_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ijkAcc) {
-                        ijkToInvIndexCallback<GridType, scalar_t, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
-                    };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, ijk, cb);
-                } else {
-                    auto cb = [=](fvdb::JIdxType bidx,
-                                  int64_t eidx,
-                                  int64_t cidx,
-                                  JaggedAcc<scalar_t, 2> ijkAcc) {
-                        ijkToInvIndexCallback<GridType, scalar_t, JaggedAcc, TorchAcc>(
-                            bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-                }
-            }),
-            AT_EXPAND(AT_INTEGRAL_TYPES));
-    });
+                       if constexpr (DeviceTag == torch::kCUDA) {
+                           auto cb = [=] __device__(fvdb::JIdxType bidx,
+                                                    int64_t eidx,
+                                                    int64_t cidx,
+                                                    JaggedRAcc32<scalar_t, 2> ijkAcc) {
+                               ijkToInvIndexCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                                   bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
+                           };
+                           forEachJaggedElementChannelCUDA<scalar_t, 2>(512, 1, ijk, cb);
+                       } else {
+                           auto cb = [=](fvdb::JIdxType bidx,
+                                         int64_t eidx,
+                                         int64_t cidx,
+                                         JaggedAcc<scalar_t, 2> ijkAcc) {
+                               ijkToInvIndexCallback<scalar_t, JaggedAcc, TorchAcc>(
+                                   bidx, eidx, batchAcc, ijkAcc, outInvIndexAcc, cumulative);
+                           };
+                           forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+                       }
+                   }),
+                   AT_EXPAND(AT_INTEGRAL_TYPES));
 
-    return batchHdl.jaggedTensor(outInvIndex, false);
+    return batchHdl.jaggedTensor(outInvIndex);
 }
 
 template <>

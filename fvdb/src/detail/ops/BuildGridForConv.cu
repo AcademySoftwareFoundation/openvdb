@@ -33,7 +33,7 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(fineGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < fineGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *fineGrid = fineGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *fineGrid = fineGridHdl.template grid<GridType>(bidx);
         if (!fineGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -43,7 +43,7 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType>(fineTree); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator(fineTree); it.isValid(); it++) {
             const nanovdb::Coord coarseIjk =
                 (it->first.asVec3d() / branchingFactor.asVec3d()).floor();
             proxyGridAccessor.setValue(coarseIjk, 1.0f);
@@ -75,8 +75,8 @@ convIjkForGridCallback(int32_t bidx,
                        TorchRAcc32<int32_t, 2> outIJKData,
                        TorchRAcc32<fvdb::JIdxType, 1> outIJKBIdx,
                        TorchRAcc32<bool, 1> outMask) {
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     if (!leaf.isActive(vidx))
         return;
@@ -213,7 +213,7 @@ dispatchBuildGridForConv<torch::kCPU>(const GridBatchImpl &baseBatchHdl,
     }
 
     for (uint32_t bidx = 0; bidx < baseGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *baseGrid = baseGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *baseGrid = baseGridHdl.template grid<GridType>(bidx);
         if (!baseGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -222,7 +222,7 @@ dispatchBuildGridForConv<torch::kCPU>(const GridBatchImpl &baseBatchHdl,
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType>(baseGrid->tree()); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator(baseGrid->tree()); it.isValid(); it++) {
             const nanovdb::Coord &ijk0 = it->first;
 
             for (int di = lower[0]; di <= upper[0]; di += 1) {

@@ -4,7 +4,7 @@
 #ifndef FVDB_DETAIL_UTILS_NANOVDB_ACTIVEVOXELITERATOR_H
 #define FVDB_DETAIL_UTILS_NANOVDB_ACTIVEVOXELITERATOR_H
 
-#include "CustomAccessors.h"
+#include <nanovdb/NanoVDB.h>
 
 namespace fvdb {
 
@@ -39,9 +39,9 @@ struct ActiveVoxelIteratorDataTypeExtractor<nanovdb::NanoTree<nanovdb::ValueOnIn
  *   ijk is the coordinate of the active voxel
  *   offset is the offset into the index grid
  */
-template <typename GridType, int64_t Offset = 0> struct ActiveVoxelIterator {
+template <int64_t Offset = 0> struct ActiveVoxelIterator {
     // Iterator traits from std::iterator.
-    using TreeT             = typename nanovdb::NanoTree<GridType>;
+    using TreeT             = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>;
     using DataType          = typename ActiveVoxelIteratorDataTypeExtractor<TreeT>::DataType;
     using value_type        = std::pair<nanovdb::Coord, DataType>;
     using pointer           = value_type *;
@@ -52,14 +52,12 @@ template <typename GridType, int64_t Offset = 0> struct ActiveVoxelIterator {
 
     ActiveVoxelIterator() = delete;
 
-    ActiveVoxelIterator(const nanovdb::NanoTree<GridType> &tree,
-                        bool ignoreMasked  = false,
+    ActiveVoxelIterator(const nanovdb::NanoTree<nanovdb::ValueOnIndex> &tree,
                         int64_t baseOffset = 0) {
         mLeaves            = tree.template getFirstNode<0>();
         mNumLeaves         = tree.nodeCount(0);
         mCurrentLeaf       = 0;
         mCurrentLeafOffset = 0;
-        mIgnoreMasked      = ignoreMasked;
         mBaseOffset        = baseOffset;
 
         // Move iterator to the first active voxel (or to the end if the tree is empty)
@@ -113,9 +111,7 @@ template <typename GridType, int64_t Offset = 0> struct ActiveVoxelIterator {
         for (uint64_t li = mCurrentLeaf; li < mNumLeaves; li += 1) {
             const LeafT &leaf = mLeaves[li];
             for (uint32_t lo = mCurrentLeafOffset; lo < LeafT::NUM_VALUES; lo += 1) {
-                const bool isActive = mIgnoreMasked
-                                          ? leaf.isActive(lo)
-                                          : leaf.template get<fvdb::ActiveOrUnmasked<GridType>>(lo);
+                const bool isActive = leaf.isActive(lo);
                 if (isActive) {
                     mCurrentVoxelAndValue =
                         std::make_pair(leaf.offsetToGlobalCoord(lo),

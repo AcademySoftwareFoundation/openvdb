@@ -1,6 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
+#include "nanovdb/NanoVDB.h"
+
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
 
@@ -11,23 +13,21 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename GridType, typename ScalarType>
+template <typename ScalarType>
 __hostdev__ inline void
 readIntoDenseVoxelCallback(
     int32_t batchIdx,
     int32_t leafIdx,
     int32_t voxelIdx,
     int32_t channelIdx,
-    GridBatchImpl::Accessor<GridType> batchHandle,
+    GridBatchImpl::Accessor<nanovdb::ValueOnIndex> batchHandle,
     torch::PackedTensorAccessor64<int32_t, 2, torch::RestrictPtrTraits> denseOrigins, // [B, 3]
     torch::PackedTensorAccessor64<ScalarType, 2, torch::RestrictPtrTraits>
         inSparseTensor,                                                               // [B*N, C]
-    torch::PackedTensorAccessor64<ScalarType, 5, torch::RestrictPtrTraits>
-        outDenseTensor, // [B, W, H, D, C]
-    bool ignoreMasked) {
-    using LeafNodeT = typename nanovdb::NanoGrid<GridType>::LeafNodeType;
+    torch::PackedTensorAccessor64<ScalarType, 5, torch::RestrictPtrTraits> outDenseTensor) {
+    using LeafNodeT = typename nanovdb::OnIndexGrid::LeafNodeType;
 
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchHandle.grid(batchIdx);
+    const nanovdb::OnIndexGrid *gpuGrid = batchHandle.grid(batchIdx);
     const nanovdb::Coord denseDim(
         outDenseTensor.size(1), outDenseTensor.size(2), outDenseTensor.size(3));
     const nanovdb::Coord denseOrigin(
@@ -38,8 +38,7 @@ readIntoDenseVoxelCallback(
     const LeafNodeT &leaf       = gpuGrid->tree().template getFirstNode<0>()[leafIdx];
     const nanovdb::Coord voxIjk = leaf.offsetToGlobalCoord(voxelIdx);
 
-    const bool isActive = ignoreMasked ? leaf.isActive(voxelIdx)
-                                       : leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx);
+    const bool isActive = leaf.isActive(voxelIdx);
 
     const nanovdb::Coord ijk = voxIjk - denseOrigin;
     const int64_t offset     = baseOffset + leaf.getValue(voxelIdx) - 1;
@@ -50,16 +49,15 @@ readIntoDenseVoxelCallback(
     }
 }
 
-template <typename GridType, typename ScalarType>
+template <typename ScalarType>
 void
-readIntoDenseCPU(const GridBatchImpl::Accessor<GridType> &gridHandle,
+readIntoDenseCPU(const GridBatchImpl::Accessor<nanovdb::ValueOnIndex> &gridHandle,
                  const torch::TensorAccessor<ScalarType, 2> inGridData,
                  const torch::TensorAccessor<int32_t, 2> denseOrigins,
                  torch::TensorAccessor<ScalarType, 5> outDenseTensor,
-                 bool ignoreMasked,
                  bool isContiguous) {
-    for (int64_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
-        const nanovdb::NanoGrid<GridType> *grid = gridHandle.grid(bi);
+    for (size_t bi = 0; bi < gridHandle.batchSize(); bi += 1) {
+        const nanovdb::OnIndexGrid *grid = gridHandle.grid(bi);
 
         const nanovdb::Coord bbmin(denseOrigins[bi][0], denseOrigins[bi][1], denseOrigins[bi][2]);
         const nanovdb::Coord bbsize(
@@ -69,9 +67,7 @@ readIntoDenseCPU(const GridBatchImpl::Accessor<GridType> &gridHandle,
 
         auto outBatch = outDenseTensor[bi];
 
-        for (auto it = ActiveVoxelIterator<GridType, -1>(grid->tree(), ignoreMasked, baseOffset);
-             it.isValid();
-             it++) {
+        for (auto it = ActiveVoxelIterator<-1>(grid->tree(), baseOffset); it.isValid(); it++) {
             const nanovdb::Coord voxIjk = it->first;
             if (bbox.isInside(voxIjk)) {
                 const nanovdb::Coord ijk = voxIjk - bbox.min();
@@ -95,40 +91,31 @@ void
 dispatchReadIntoDense<torch::kCUDA>(const GridBatchImpl &batchHdl,
                                     const torch::Tensor &inGridData,
                                     const torch::Tensor &denseOrigins,
-                                    torch::Tensor &outDenseTensor,
-                                    bool ignoreMasked) {
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            outDenseTensor.scalar_type(),
-            "readIntoDense",
-            AT_WRAP([&]() {
-                auto outDenseAcc =
-                    outDenseTensor.packed_accessor64<scalar_t, 5, torch::RestrictPtrTraits>();
-                auto denseOriginsAcc =
-                    denseOrigins.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
-                auto inGridDataAcc =
-                    inGridData.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
-                auto callback = [=] __device__(int32_t bidx,
-                                               int32_t lidx,
-                                               int32_t vidx,
-                                               int32_t cidx,
-                                               GridBatchImpl::Accessor<GridType> batchAcc) {
-                    readIntoDenseVoxelCallback<GridType, scalar_t>(bidx,
-                                                                   lidx,
-                                                                   vidx,
-                                                                   cidx,
-                                                                   batchAcc,
-                                                                   denseOriginsAcc,
-                                                                   inGridDataAcc,
-                                                                   outDenseAcc,
-                                                                   ignoreMasked);
-                };
-                forEachVoxelCUDA<GridType>(1024, inGridData.size(1), batchHdl, callback);
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf,
-            c10::kBFloat16);
-    });
+                                    torch::Tensor &outDenseTensor) {
+    AT_DISPATCH_V2(
+        outDenseTensor.scalar_type(),
+        "readIntoDense",
+        AT_WRAP([&]() {
+            auto outDenseAcc =
+                outDenseTensor.packed_accessor64<scalar_t, 5, torch::RestrictPtrTraits>();
+            auto denseOriginsAcc =
+                denseOrigins.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
+            auto inGridDataAcc =
+                inGridData.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
+            auto callback = [=] __device__(
+                                int32_t bidx,
+                                int32_t lidx,
+                                int32_t vidx,
+                                int32_t cidx,
+                                GridBatchImpl::Accessor<nanovdb::ValueOnIndex> batchAcc) {
+                readIntoDenseVoxelCallback<scalar_t>(
+                    bidx, lidx, vidx, cidx, batchAcc, denseOriginsAcc, inGridDataAcc, outDenseAcc);
+            };
+            forEachVoxelCUDA<nanovdb::ValueOnIndex>(1024, inGridData.size(1), batchHdl, callback);
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf,
+        c10::kBFloat16);
 }
 
 template <>
@@ -136,25 +123,21 @@ void
 dispatchReadIntoDense<torch::kCPU>(const GridBatchImpl &gridHdl,
                                    const torch::Tensor &inGridData,
                                    const torch::Tensor &denseOrigins,
-                                   torch::Tensor &outDenseTensor,
-                                   bool ignoreMasked) {
+                                   torch::Tensor &outDenseTensor) {
     bool isContiguous = inGridData.is_contiguous() && outDenseTensor.is_contiguous();
 
-    FVDB_DISPATCH_GRID_TYPES(gridHdl, [&]() {
-        AT_DISPATCH_V2(outDenseTensor.scalar_type(),
-                       "readIntoDense",
-                       AT_WRAP([&]() {
-                           readIntoDenseCPU(gridHdl.hostAccessor<GridType>(),
-                                            inGridData.accessor<scalar_t, 2>(),
-                                            denseOrigins.accessor<int32_t, 2>(),
-                                            outDenseTensor.accessor<scalar_t, 5>(),
-                                            ignoreMasked,
-                                            isContiguous);
-                       }),
-                       AT_EXPAND(AT_FLOATING_TYPES),
-                       c10::kHalf,
-                       c10::kBFloat16);
-    });
+    AT_DISPATCH_V2(outDenseTensor.scalar_type(),
+                   "readIntoDense",
+                   AT_WRAP([&]() {
+                       readIntoDenseCPU(gridHdl.hostAccessor<nanovdb::ValueOnIndex>(),
+                                        inGridData.accessor<scalar_t, 2>(),
+                                        denseOrigins.accessor<int32_t, 2>(),
+                                        outDenseTensor.accessor<scalar_t, 5>(),
+                                        isContiguous);
+                   }),
+                   AT_EXPAND(AT_FLOATING_TYPES),
+                   c10::kHalf,
+                   c10::kBFloat16);
 }
 
 } // namespace ops

@@ -50,7 +50,7 @@ allocateHostGridMetadata(int64_t batchSize) {
 namespace fvdb {
 namespace detail {
 
-GridBatchImpl::GridBatchImpl(const torch::Device &device, bool isMutable) {
+GridBatchImpl::GridBatchImpl(const torch::Device &device) {
     auto deviceTensorOptions = torch::TensorOptions().device(device);
     // TODO (Francis): No list-of-lists support for now, so we just assign an empty list of indices
     mLeafBatchIndices = torch::empty({0}, deviceTensorOptions.dtype(fvdb::JIdxScalarType));
@@ -60,7 +60,6 @@ GridBatchImpl::GridBatchImpl(const torch::Device &device, bool isMutable) {
     auto gridHdl = createEmptyGrid(device);
     mGridHdl     = std::make_shared<nanovdb::GridHandle<TorchDeviceBuffer>>(std::move(gridHdl));
 
-    mBatchMetadata.mIsMutable    = isMutable;
     mBatchMetadata.mIsContiguous = true;
 }
 
@@ -155,7 +154,7 @@ template <typename Indexable>
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::indexInternal(const Indexable &idx, int64_t size) const {
     if (size == 0) {
-        return c10::make_intrusive<GridBatchImpl>(device(), isMutable());
+        return c10::make_intrusive<GridBatchImpl>(device());
     }
     TORCH_CHECK(size >= 0,
                 "Indexing with negative size is not supported (this should never happen)");
@@ -215,7 +214,6 @@ GridBatchImpl::indexInternal(const Indexable &idx, int64_t size) const {
     ret->mBatchMetadata.mMaxVoxels    = maxVoxels;
     ret->mBatchMetadata.mMaxLeafCount = maxLeafCount;
     ret->mBatchMetadata.mTotalBBox    = totalBbox;
-    ret->mBatchMetadata.mIsMutable    = isMutable();
 
     if (leafBatchIdxs.size() > 0) {
         ret->mLeafBatchIndices = torch::cat(leafBatchIdxs, 0);
@@ -243,7 +241,7 @@ GridBatchImpl::clone(const torch::Device &device, bool blocking) const {
     // If you're cloning an empty grid, just create a new empty grid on the right device and return
     // it
     if (batchSize() == 0) {
-        return c10::make_intrusive<GridBatchImpl>(device, isMutable());
+        return c10::make_intrusive<GridBatchImpl>(device);
     }
 
     // The guide buffer is a hack to perform the correct copy (i.e. host -> device / device -> host
@@ -616,11 +614,9 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
         }
 
         // Populate host and/or device metadata
-        const bool isGridMutable = gridHdl.gridType(0) == nanovdb::GridType::OnIndexMask;
         ops::dispatchPopulateGridMetadata<DeviceTag>(gridHdl,
                                                      voxelSizes,
                                                      voxelOrigins,
-                                                     isGridMutable,
                                                      mBatchOffsets,
                                                      mHostGridMetadata,
                                                      mDeviceGridMetadata,
@@ -751,7 +747,6 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
     TORCH_CHECK_VALUE(elements.size() > 0, "Must provide at least one grid for concatenate!")
 
     torch::Device device = elements[0]->device();
-    bool isMutable       = elements[0]->isMutable();
 
     std::vector<std::shared_ptr<nanovdb::GridHandle<TorchDeviceBuffer>>> handles;
     std::vector<std::vector<int64_t>> byteSizes;
@@ -769,8 +764,6 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
     for (size_t i = 0; i < elements.size(); i += 1) {
         TORCH_CHECK(elements[i]->device() == device,
                     "All grid batches must be on the same device!");
-        TORCH_CHECK(elements[i]->isMutable() == isMutable,
-                    "All grid batches must have the same mutability!");
 
         // Empty grids don't contribute to the concatenation
         if (elements[i]->batchSize() == 0) {
@@ -801,7 +794,7 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
         }
     }
     if (handles.size() == 0) {
-        return c10::make_intrusive<GridBatchImpl>(device, isMutable);
+        return c10::make_intrusive<GridBatchImpl>(device);
     }
 
     TorchDeviceBuffer buffer(totalByteSize, device);
@@ -920,65 +913,32 @@ GridBatchImpl::contiguous(c10::intrusive_ptr<GridBatchImpl> input) {
 }
 
 JaggedTensor
-GridBatchImpl::jaggedTensor(const torch::Tensor &data, bool ignoreDisabledVoxels) const {
+GridBatchImpl::jaggedTensor(const torch::Tensor &data) const {
     checkDevice(data);
     TORCH_CHECK(data.dim() >= 1, "Data have more than one dimensions");
-    if (ignoreDisabledVoxels || !isMutable()) {
-        TORCH_CHECK(data.size(0) == totalVoxels(), "Data size mismatch");
-    } else {
-        // TODO: (@fwilliams) check data size need to call totalActiveVoxels()
-    }
-    return JaggedTensor::from_data_offsets_and_list_ids(
-        data, voxelOffsets(ignoreDisabledVoxels), jlidx(ignoreDisabledVoxels));
-}
-
-int64_t
-GridBatchImpl::totalEnabledVoxels(bool ignoreDisabledVoxels) const {
-    if (!isMutable() || ignoreDisabledVoxels) {
-        return totalVoxels();
-    }
-    return FVDB_DISPATCH_KERNEL_DEVICE(
-        device(), [&]() { return ops::dispatchCountEnabledVoxels<DeviceTag>(*this, -1); });
+    TORCH_CHECK(data.size(0) == totalVoxels(), "Data size mismatch");
+    return JaggedTensor::from_data_offsets_and_list_ids(data, voxelOffsets(), jlidx());
 }
 
 torch::Tensor
-GridBatchImpl::jidx(bool ignoreDisabledVoxels) const {
+GridBatchImpl::jidx() const {
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         if (batchSize() == 1 || totalVoxels() == 0) {
             return torch::empty(
                 {0}, torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(device()));
         }
-        return ops::dispatchJIdxForGrid<DeviceTag>(*this, ignoreDisabledVoxels);
+        return ops::dispatchJIdxForGrid<DeviceTag>(*this);
     });
 }
 
 torch::Tensor
-GridBatchImpl::jlidx(bool ignoreDisabledVoxels) const {
+GridBatchImpl::jlidx() const {
     return mListIndices;
 }
 
 torch::Tensor
-GridBatchImpl::voxelOffsets(bool ignoreDisabledVoxels) const {
-    if (!isMutable() || ignoreDisabledVoxels) {
-        return mBatchOffsets;
-    } else {
-        // FIXME: This is slow for mutable grids
-        TORCH_CHECK(
-            isMutable(),
-            "This grid is not mutable, cannot get voxel offsets. This should never happen.");
-        torch::Tensor numEnabledPerGrid = torch::empty(
-            {batchSize() + 1},
-            torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(torch::kCPU));
-        auto acc = numEnabledPerGrid.accessor<int64_t, 1>();
-        acc[0]   = 0;
-        for (int i = 1; i < (batchSize() + 1); i += 1) {
-            acc[i] = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-                return ops::dispatchCountEnabledVoxels<DeviceTag>(*this, i - 1);
-            });
-        }
-        numEnabledPerGrid = numEnabledPerGrid.to(device());
-        return numEnabledPerGrid.cumsum(0, fvdb::JOffsetsScalarType);
-    }
+GridBatchImpl::voxelOffsets() const {
+    return mBatchOffsets;
 }
 
 torch::Tensor

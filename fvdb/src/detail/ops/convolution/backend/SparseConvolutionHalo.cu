@@ -16,14 +16,13 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename GridType>
 __global__
 __launch_bounds__(
     1024) // Hinting maximum threads per block during launch to optimize register usage.
     void stencilConvHaloKernel(int kM,
                                int kN,
                                int numLeaves,
-                               BatchGridAccessor<GridType> gridAcc,
+                               BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
                                TorchRAcc64<float, 2> inFeatures,
                                TorchRAcc64<float, 7> stencil,
                                TorchRAcc64<float, 2> outFeatures) {
@@ -36,7 +35,7 @@ __launch_bounds__(
     int nIdx    = (blockIdx.x / numLeaves) % kN;
     int mIdx    = blockIdx.x / numLeaves / kN;
 
-    using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+    using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
     // Constants: TensorCore GEMM shape MK x KN = MN
     static constexpr int M = 16;
@@ -57,7 +56,7 @@ __launch_bounds__(
     const int64_t localLeafIdx = leafIdx - gridAcc.leafOffset(batchIdx);
     const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
-    const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *deviceGrid = gridAcc.grid(batchIdx);
     const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
     const nanovdb::Coord origin = leaf.origin();
     auto deviceGridAcc          = deviceGrid->getAccessor();
@@ -74,7 +73,7 @@ __launch_bounds__(
 
         auto coord = origin.offsetBy(di, dj, dk);
 
-        if (deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+        if (deviceGridAcc.isActive(coord)) {
             auto offset = deviceGridAcc.getValue(coord) - 1 + baseOffset;
             for (int s = 0; s < Di; s++) {
                 int tDim = s + mIdx * Di;
@@ -184,7 +183,7 @@ __launch_bounds__(
 
         auto coord = origin.offsetBy(ti, tj, tk);
 
-        if (deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+        if (deviceGridAcc.isActive(coord)) {
             auto offset = deviceGridAcc.getValue(coord) - 1 + baseOffset;
             for (int s = 0; s < Do; s++) {
                 int tDim = s + nIdx * Do;
@@ -198,15 +197,15 @@ __launch_bounds__(
 #endif // __CUDA_ARCH__ >= 800
 }
 
-template <typename GridType>
 __global__
-__launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
-                                                            int kN,
-                                                            int numLeaves,
-                                                            BatchGridAccessor<GridType> gridAcc,
-                                                            TorchRAcc64<float, 2> inFeatures,
-                                                            TorchRAcc64<float, 7> stencil,
-                                                            TorchRAcc64<float, 2> outFeatures) {
+__launch_bounds__(256) void stencilConvHaloLargeDepthKernel(
+    int kM,
+    int kN,
+    int numLeaves,
+    BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
+    TorchRAcc64<float, 2> inFeatures,
+    TorchRAcc64<float, 7> stencil,
+    TorchRAcc64<float, 2> outFeatures) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
 #if __CUDA_ARCH__ >= 800
@@ -220,7 +219,7 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
     const int nIdx    = (restIdx / numLeaves) % kN;
     const int mIdx    = restIdx / numLeaves / kN;
 
-    using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+    using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
     // Constants: Input and output dimension multiples
     static constexpr int Di = 64;
@@ -230,7 +229,7 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
     const int64_t localLeafIdx = leafIdx - gridAcc.leafOffset(batchIdx);
     const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
-    const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *deviceGrid = gridAcc.grid(batchIdx);
     const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
     const nanovdb::Coord origin = leaf.origin();
     auto deviceGridAcc          = deviceGrid->getAccessor();
@@ -255,8 +254,7 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
     for (int jj = 0; jj < 4; ++jj) {
         for (int kk = 0; kk < 6; ++kk) {
             auto coord = origin.offsetBy(Bi + II - 1, Bj + jj - 1, Bk + kk - 1);
-            if (tDim < inFeatures.size(1) &&
-                deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+            if (tDim < inFeatures.size(1) && deviceGridAcc.isActive(coord)) {
                 auto offset                = deviceGridAcc.getValue(coord) - 1 + baseOffset;
                 sHaloBuffer[II][jj][kk][E] = inFeatures[offset][tDim];
             } else {
@@ -367,7 +365,7 @@ __launch_bounds__(256) void stencilConvHaloLargeDepthKernel(int kM,
             const auto coord =
                 origin.offsetBy(Bi + warpI + xOffset, Bj + warpJ + yOffset, Bk + warpK);
 
-            if (deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+            if (deviceGridAcc.isActive(coord)) {
                 auto offset = deviceGridAcc.getValue(coord) - 1 + baseOffset;
 
 #pragma unroll
@@ -426,31 +424,29 @@ dispatchSparseConvolutionHalo<torch::kCUDA>(const GridBatchImpl &batchHdl,
     paddedKernel = paddedKernel.permute({0, 1, 2, 3, 5, 4, 6}).contiguous();
 
     // Launch kernels for each M x N x leaf.
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        auto gridAccessor = batchHdl.deviceAccessor<GridType>();
+    auto gridAccessor = batchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
 
-        if (variant == 8) {
-            stencilConvHaloKernel<<<M * N * numLeaves, 1024>>>(
-                M,
-                N,
-                numLeaves,
-                gridAccessor,
-                inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
-                paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
-                outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
-        } else {
-            stencilConvHaloLargeDepthKernel<<<M * N * numLeaves * 32, 256>>>(
-                M,
-                N,
-                numLeaves,
-                gridAccessor,
-                inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
-                paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
-                outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
-        }
+    if (variant == 8) {
+        stencilConvHaloKernel<<<M * N * numLeaves, 1024>>>(
+            M,
+            N,
+            numLeaves,
+            gridAccessor,
+            inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
+            paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
+            outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
+    } else {
+        stencilConvHaloLargeDepthKernel<<<M * N * numLeaves * 32, 256>>>(
+            M,
+            N,
+            numLeaves,
+            gridAccessor,
+            inFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>(),
+            paddedKernel.packed_accessor64<float, 7, torch::RestrictPtrTraits>(),
+            outFeatures.packed_accessor64<float, 2, torch::RestrictPtrTraits>());
+    }
 
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    });
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return outFeatures;
 }

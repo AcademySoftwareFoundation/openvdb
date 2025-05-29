@@ -5,7 +5,6 @@
 #define FVDB_DETAIL_UTILS_UTILS_H
 
 #include "nanovdb/ActiveVoxelIterator.h"
-#include "nanovdb/CustomAccessors.h"
 #include "nanovdb/HDDAIterators.h"
 #include "nanovdb/Printing.h"
 #include "nanovdb/TorchNanoConversions.h"
@@ -29,20 +28,6 @@ template <typename T> struct RestrictPtrTraits {
 } // namespace torch
 #endif
 
-/// @brief Given a fvdb::GridBatchImpl, dispatch to the correct grid type.
-///        This macro calls the passed in function with the typedef GridType to the correct grid
-///        type. (i.e. ValueOnIndex or ValueOnIndexMask)
-#define FVDB_DISPATCH_GRID_TYPES(GRID_HDL, ...)         \
-    [&]() {                                             \
-        if ((GRID_HDL).isMutable()) {                   \
-            using GridType = nanovdb::ValueOnIndexMask; \
-            return __VA_ARGS__();                       \
-        } else {                                        \
-            using GridType = nanovdb::ValueOnIndex;     \
-            return __VA_ARGS__();                       \
-        }                                               \
-    }()
-
 /// @brief Given a torch::Device, define DeviceTag to torch::kCPU or torch::kCUDA.
 ///        This macro calls the passed in function with the typedef DeviceTag to the correct device
 ///        tag.
@@ -57,20 +42,6 @@ template <typename T> struct RestrictPtrTraits {
         } else {                                                           \
             TORCH_CHECK(false, "Only CUDA and CPU devices are supported"); \
         }                                                                  \
-    }()
-
-/// @brief Given a boolean for whether a grid is mutable, dispatch to the correct grid type.
-///        This macro calls the passed in function with the typedef GridType to the correct grid
-///        type. (i.e. ValueOnIndex or ValueOnIndexMask)
-#define FVDB_DISPATCH_GRID_TYPES_MUTABLE(IS_MUTABLE, ...) \
-    [&]() {                                               \
-        if (IS_MUTABLE) {                                 \
-            using GridType = nanovdb::ValueOnIndexMask;   \
-            return __VA_ARGS__();                         \
-        } else {                                          \
-            using GridType = nanovdb::ValueOnIndex;       \
-            return __VA_ARGS__();                         \
-        }                                                 \
     }()
 
 namespace fvdb {

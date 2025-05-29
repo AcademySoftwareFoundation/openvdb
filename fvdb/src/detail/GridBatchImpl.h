@@ -73,9 +73,6 @@ class GridBatchImpl : public torch::CustomClassHolder {
         // Bounding box enclosing all the grids in the batch
         nanovdb::CoordBBox mTotalBBox;
 
-        // Is this a mutable grid?
-        bool mIsMutable = false;
-
         // Is this grid contiguous
         bool mIsContiguous = true;
     };
@@ -260,7 +257,7 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     GridBatchImpl() = default;
 
-    GridBatchImpl(const torch::Device &device, bool isMutable);
+    GridBatchImpl(const torch::Device &device);
 
     GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
                   const std::vector<nanovdb::Vec3d> &voxelSizes,
@@ -279,11 +276,11 @@ class GridBatchImpl : public torch::CustomClassHolder {
     GridBatchImpl(GridBatchImpl &other)             = delete;
     GridBatchImpl &operator=(GridBatchImpl &other)  = delete;
 
-    torch::Tensor voxelOffsets(bool ignoreDisabledVoxels) const;
+    torch::Tensor voxelOffsets() const;
 
-    torch::Tensor jlidx(bool ignoreDisabledVoxels = true) const;
+    torch::Tensor jlidx() const;
 
-    torch::Tensor jidx(bool ignoreDisabledVoxels) const;
+    torch::Tensor jidx() const;
 
     int64_t
     totalLeaves() const {
@@ -294,8 +291,6 @@ class GridBatchImpl : public torch::CustomClassHolder {
     totalVoxels() const {
         return mBatchMetadata.mTotalVoxels;
     }
-
-    int64_t totalEnabledVoxels(bool ignoreDisabledVoxels) const;
 
     int64_t
     maxVoxelsPerGrid() const {
@@ -329,11 +324,6 @@ class GridBatchImpl : public torch::CustomClassHolder {
     nanovdb::GridHandle<TorchDeviceBuffer> &
     nanoGridHandleMut() const {
         return *mGridHdl;
-    }
-
-    bool
-    isMutable() const {
-        return mBatchMetadata.mIsMutable;
     }
 
     const c10::Device
@@ -459,7 +449,7 @@ class GridBatchImpl : public torch::CustomClassHolder {
                         ") as index grid but got " + t.device().str());
     }
 
-    JaggedTensor jaggedTensor(const torch::Tensor &data, bool ignoreDisabledVoxels) const;
+    JaggedTensor jaggedTensor(const torch::Tensor &data) const;
 
     void setGlobalPrimalTransform(const VoxelCoordTransform &transform);
     void setGlobalDualTransform(const VoxelCoordTransform &transform);

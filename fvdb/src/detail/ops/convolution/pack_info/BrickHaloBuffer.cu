@@ -44,11 +44,10 @@ get_active_mask(const ValueMask &valueMask, const cute::ArithmeticTuple<int, int
     return active_mask;
 }
 
-template <typename GridType>
 __global__
-__launch_bounds__(32) void mark_bricks(BatchGridAccessor<GridType> gridAcc,
+__launch_bounds__(32) void mark_bricks(BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
                                        TorchRAcc32<uint8_t, 1> brick_usage_flags) {
-    using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+    using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
     const auto brickId       = blockDim.x * blockIdx.x + threadIdx.x;
     const auto brickInLeafId = threadIdx.x;
@@ -57,7 +56,7 @@ __launch_bounds__(32) void mark_bricks(BatchGridAccessor<GridType> gridAcc,
     const int64_t batchIdx     = gridAcc.leafBatchIndex(leafIdx);
     const int64_t localLeafIdx = leafIdx - gridAcc.leafOffset(batchIdx);
 
-    const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *deviceGrid = gridAcc.grid(batchIdx);
     const LeafNodeType &leaf = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
 
     const auto &valueMask = leaf.valueMask();
@@ -78,16 +77,15 @@ offset_from_tiwid(int tiwid) {
     return cute::make_arithmetic_tuple(i, j, k);
 }
 
-template <typename GridType>
 __global__ __launch_bounds__(1024) void populate_halo_index_buffer(
-    BatchGridAccessor<GridType> gridAcc,
+    BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
     TorchRAcc32<uint8_t, 1> brick_usage_flags,
     TorchRAcc32<int, 1> brick_offsets,
     int *halo_index_buffer,
     int *output_index_buffer,
     bool benchmark) { // Use raw pointer and templated cute to accelerate pointer arithmetic
 
-    using LeafNodeType = typename nanovdb::NanoTree<GridType>::LeafNodeType;
+    using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
     const int leafIdx = blockIdx.x;
     const int tid     = threadIdx.x;
@@ -99,7 +97,7 @@ __global__ __launch_bounds__(1024) void populate_halo_index_buffer(
     const int64_t localLeafIdx = leafIdx - gridAcc.leafOffset(batchIdx);
     const int64_t baseOffset   = gridAcc.voxelOffset(batchIdx);
 
-    const nanovdb::NanoGrid<GridType> *deviceGrid = gridAcc.grid(batchIdx);
+    const nanovdb::OnIndexGrid *deviceGrid = gridAcc.grid(batchIdx);
     const LeafNodeType &leaf    = deviceGrid->tree().template getFirstNode<0>()[localLeafIdx];
     const nanovdb::Coord origin = leaf.origin();
     auto deviceGridAcc          = deviceGrid->getAccessor();
@@ -114,7 +112,7 @@ __global__ __launch_bounds__(1024) void populate_halo_index_buffer(
         auto coord = origin.offsetBy(di, dj, dk);
 
         // NOTE: Put 0 for inactive indices and shift feature by 1.
-        if (deviceGridAcc.template get<ActiveOrUnmasked<GridType>>(coord)) {
+        if (deviceGridAcc.isActive(coord)) {
             const int offset       = benchmark ? -1 : 0;
             sHaloBuffer[0][0][tid] = deviceGridAcc.getValue(coord) + baseOffset + offset;
         } else {
@@ -175,12 +173,10 @@ dispatchBrickHaloBuffer<torch::kCUDA>(const GridBatchImpl &batchHdl, bool benchm
     torch::Tensor brick_usage_flags =
         torch::empty({(int64_t)num_bricks}, torch::dtype(torch::kUInt8).device(batchHdl.device()));
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        auto batchAcc = gridBatchAccessor<torch::kCUDA, GridType>(batchHdl);
-        mark_bricks<GridType><<<num_leaf_nodes, 32>>>(
-            batchAcc, brick_usage_flags.packed_accessor32<uint8_t, 1, torch::RestrictPtrTraits>());
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    });
+    auto batchAcc = gridBatchAccessor<torch::kCUDA, nanovdb::ValueOnIndex>(batchHdl);
+    mark_bricks<<<num_leaf_nodes, 32>>>(
+        batchAcc, brick_usage_flags.packed_accessor32<uint8_t, 1, torch::RestrictPtrTraits>());
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     // (num_total_bricks,) the index of the brick in the halo buffer
     // values in non-occupied bricks are undefined!
@@ -197,17 +193,15 @@ dispatchBrickHaloBuffer<torch::kCUDA>(const GridBatchImpl &batchHdl, bool benchm
         torch::zeros({(int64_t)num_active_bricks_with_padding * size(brick_shape{})},
                      torch::dtype(torch::kInt32).device(batchHdl.device()));
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        auto batchAcc = gridBatchAccessor<torch::kCUDA, GridType>(batchHdl);
-        populate_halo_index_buffer<GridType><<<num_leaf_nodes, 1024>>>(
-            batchAcc,
-            brick_usage_flags.packed_accessor32<uint8_t, 1, torch::RestrictPtrTraits>(),
-            brick_offsets.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-            halo_index_buffer.data_ptr<int>(),
-            output_index_buffer.data_ptr<int>(),
-            benchmark);
-        C10_CUDA_KERNEL_LAUNCH_CHECK();
-    });
+    // auto batchAcc = gridBatchAccessor<torch::kCUDA, nanovdb::ValueOnIndex>(batchHdl);
+    populate_halo_index_buffer<<<num_leaf_nodes, 1024>>>(
+        batchAcc,
+        brick_usage_flags.packed_accessor32<uint8_t, 1, torch::RestrictPtrTraits>(),
+        brick_offsets.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
+        halo_index_buffer.data_ptr<int>(),
+        output_index_buffer.data_ptr<int>(),
+        benchmark);
+    C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     return {brick_offsets, halo_index_buffer, output_index_buffer};
 }

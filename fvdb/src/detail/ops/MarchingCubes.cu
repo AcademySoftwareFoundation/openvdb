@@ -90,21 +90,18 @@ fillVertList(nanovdb::math::Vec4<ScalarT> *vert_list,
         vert_list[11] = sdfInterp(points[3], points[7], sdf_vals[3], sdf_vals[7]);
 }
 
-template <typename ScalarType,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename ScalarType, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ void
 countVerticesCallback(int32_t batchIdx,
                       int32_t leafIdx,
                       int32_t voxelIdx,
                       int32_t channelIdx,
-                      BatchGridAccessor<GridType> batchAccessor,
+                      BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                       TensorAccessor<ScalarType, 1> sdf,
                       ScalarType level,
                       TensorAccessor<int64_t, 1> nVertices) {
-    const nanovdb::NanoGrid<GridType> *grid = batchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *grid = batchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(voxelIdx);
 
@@ -117,7 +114,7 @@ countVerticesCallback(int32_t batchIdx,
         nanovdb::Coord vCoord = ijk + nanovdb::Coord(marchingCubesCubeRelTable[i][0],
                                                      marchingCubesCubeRelTable[i][1],
                                                      marchingCubesCubeRelTable[i][2]);
-        if (gridAcc.template get<ActiveOrUnmasked<GridType>>(vCoord)) {
+        if (gridAcc.isActive(vCoord)) {
             sdfValues[i] =
                 sdf[batchAccessor.voxelOffset(batchIdx) + gridAcc.getValue(vCoord) - 1] - level;
         } else {
@@ -130,23 +127,20 @@ countVerticesCallback(int32_t batchIdx,
     nVertices[base] = marchingCubesNumVertsTable[cubeType];
 }
 
-template <typename ScalarType,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename ScalarType, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ void
 meshingCubeCallback(int32_t batchIdx,
                     int32_t leafIdx,
                     int32_t voxelIdx,
                     int32_t channelIdx,
-                    BatchGridAccessor<GridType> batchAccessor,
+                    BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                     TensorAccessor<ScalarType, 1> sdf,
                     ScalarType level,
                     TensorAccessor<int64_t, 1> countCsum,
                     TensorAccessor<ScalarType, 3> triangles,
                     TensorAccessor<int64_t, 3> vertIds) {
-    const nanovdb::NanoGrid<GridType> *grid = batchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *grid = batchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const nanovdb::Coord ijk      = leaf.offsetToGlobalCoord(voxelIdx);
     VoxelCoordTransform transform = batchAccessor.primalTransform(batchIdx);
@@ -163,7 +157,7 @@ meshingCubeCallback(int32_t batchIdx,
         nanovdb::Coord vCoord = ijk + nanovdb::Coord(marchingCubesCubeRelTable[i][0],
                                                      marchingCubesCubeRelTable[i][1],
                                                      marchingCubesCubeRelTable[i][2]);
-        if (gridAcc.template get<ActiveOrUnmasked<GridType>>(vCoord)) {
+        if (gridAcc.isActive(vCoord)) {
             pointIds[i]  = batchAccessor.voxelOffset(batchIdx) + gridAcc.getValue(vCoord) - 1;
             sdfValues[i] = sdf[pointIds[i]] - level;
             points[i]    = transform.applyInv(static_cast<ScalarType>(vCoord[0]),
@@ -220,51 +214,50 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
     torch::Tensor nVertices = torch::zeros({sdf.size(0)}, longOpts);
 
     // Count the number of vertices
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(sdf.scalar_type(),
-                       "countVertices",
-                       AT_WRAP([&] {
-                           auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
-                           auto nVerticesAcc = tensorAccessor<DeviceTag, int64_t, 1>(nVertices);
-                           if constexpr (DeviceTag == torch::kCUDA) {
-                               auto cb = [=] __device__(int32_t bidx,
-                                                        int32_t lidx,
-                                                        int32_t vidx,
-                                                        int32_t cidx,
-                                                        BatchGridAccessor<GridType> batchAcc) {
-                                   countVerticesCallback<scalar_t, GridType, TorchRAcc32>(
-                                       bidx,
-                                       lidx,
-                                       vidx,
-                                       cidx,
-                                       batchAcc,
-                                       sdfAcc,
-                                       static_cast<scalar_t>(level),
-                                       nVerticesAcc);
-                               };
-                               forEachVoxelCUDA<GridType>(128, 1, batchHdl, cb);
-                           } else {
-                               auto cb = [=](int32_t bidx,
-                                             int32_t lidx,
-                                             int32_t vidx,
-                                             int32_t cidx,
-                                             BatchGridAccessor<GridType> batchAcc) {
-                                   countVerticesCallback<scalar_t, GridType, TorchAcc>(
-                                       bidx,
-                                       lidx,
-                                       vidx,
-                                       cidx,
-                                       batchAcc,
-                                       sdfAcc,
-                                       static_cast<scalar_t>(level),
-                                       nVerticesAcc);
-                               };
-                               forEachVoxelCPU<GridType>(1, batchHdl, cb);
-                           }
-                       }),
-                       AT_EXPAND(AT_FLOATING_TYPES),
-                       c10::kHalf);
-    });
+
+    AT_DISPATCH_V2(
+        sdf.scalar_type(),
+        "countVertices",
+        AT_WRAP([&] {
+            // auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
+            auto nVerticesAcc = tensorAccessor<DeviceTag, int64_t, 1>(nVertices);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t lidx,
+                                         int32_t vidx,
+                                         int32_t cidx,
+                                         BatchGridAccessor<nanovdb::ValueOnIndex> batchAcc) {
+                    countVerticesCallback<scalar_t, TorchRAcc32>(bidx,
+                                                                 lidx,
+                                                                 vidx,
+                                                                 cidx,
+                                                                 batchAcc,
+                                                                 sdfAcc,
+                                                                 static_cast<scalar_t>(level),
+                                                                 nVerticesAcc);
+                };
+                forEachVoxelCUDA<nanovdb::ValueOnIndex>(128, 1, batchHdl, cb);
+            } else {
+                auto cb = [=](int32_t bidx,
+                              int32_t lidx,
+                              int32_t vidx,
+                              int32_t cidx,
+                              BatchGridAccessor<nanovdb::ValueOnIndex> batchAcc) {
+                    countVerticesCallback<scalar_t, TorchAcc>(bidx,
+                                                              lidx,
+                                                              vidx,
+                                                              cidx,
+                                                              batchAcc,
+                                                              sdfAcc,
+                                                              static_cast<scalar_t>(level),
+                                                              nVerticesAcc);
+                };
+                forEachVoxelCPU<nanovdb::ValueOnIndex>(1, batchHdl, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 
     // cumsum to determine starting position.
     torch::Tensor countCsum = torch::cumsum(nVertices, 0);
@@ -277,59 +270,56 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
     torch::Tensor vertIds   = torch::empty({nTriangles, 3, 3}, longOpts);
 
     if (nTriangles > 0) {
-        FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-            AT_DISPATCH_V2(sdf.scalar_type(),
-                           "meshingCubes",
-                           AT_WRAP([&] {
-                               auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
-                               auto countCsumAcc = tensorAccessor<DeviceTag, int64_t, 1>(countCsum);
-                               auto trianglesAcc =
-                                   tensorAccessor<DeviceTag, scalar_t, 3>(triangles);
-                               auto vertIdsAcc = tensorAccessor<DeviceTag, int64_t, 3>(vertIds);
+        AT_DISPATCH_V2(
+            sdf.scalar_type(),
+            "meshingCubes",
+            AT_WRAP([&] {
+                auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+                auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
+                auto countCsumAcc = tensorAccessor<DeviceTag, int64_t, 1>(countCsum);
+                auto trianglesAcc = tensorAccessor<DeviceTag, scalar_t, 3>(triangles);
+                auto vertIdsAcc   = tensorAccessor<DeviceTag, int64_t, 3>(vertIds);
 
-                               if constexpr (DeviceTag == torch::kCUDA) {
-                                   auto cb = [=] __device__(int32_t bidx,
-                                                            int32_t lidx,
-                                                            int32_t vidx,
-                                                            int32_t cidx,
-                                                            BatchGridAccessor<GridType> batchAcc) {
-                                       meshingCubeCallback<scalar_t, GridType, TorchRAcc32>(
-                                           bidx,
-                                           lidx,
-                                           vidx,
-                                           cidx,
-                                           batchAcc,
-                                           sdfAcc,
-                                           static_cast<scalar_t>(level),
-                                           countCsumAcc,
-                                           trianglesAcc,
-                                           vertIdsAcc);
-                                   };
-                                   forEachVoxelCUDA<GridType>(128, 1, batchHdl, cb);
-                               } else {
-                                   auto cb = [=](int32_t bidx,
-                                                 int32_t lidx,
-                                                 int32_t vidx,
-                                                 int32_t cidx,
-                                                 BatchGridAccessor<GridType> batchAcc) {
-                                       meshingCubeCallback<scalar_t, GridType, TorchAcc>(
-                                           bidx,
-                                           lidx,
-                                           vidx,
-                                           cidx,
-                                           batchAcc,
-                                           sdfAcc,
-                                           static_cast<scalar_t>(level),
-                                           countCsumAcc,
-                                           trianglesAcc,
-                                           vertIdsAcc);
-                                   };
-                                   forEachVoxelCPU<GridType>(1, batchHdl, cb);
-                               }
-                           }),
-                           AT_EXPAND(AT_FLOATING_TYPES),
-                           c10::kHalf);
-        });
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t bidx,
+                                             int32_t lidx,
+                                             int32_t vidx,
+                                             int32_t cidx,
+                                             BatchGridAccessor<nanovdb::ValueOnIndex> batchAcc) {
+                        meshingCubeCallback<scalar_t, TorchRAcc32>(bidx,
+                                                                   lidx,
+                                                                   vidx,
+                                                                   cidx,
+                                                                   batchAcc,
+                                                                   sdfAcc,
+                                                                   static_cast<scalar_t>(level),
+                                                                   countCsumAcc,
+                                                                   trianglesAcc,
+                                                                   vertIdsAcc);
+                    };
+                    forEachVoxelCUDA<nanovdb::ValueOnIndex>(128, 1, batchHdl, cb);
+                } else {
+                    auto cb = [=](int32_t bidx,
+                                  int32_t lidx,
+                                  int32_t vidx,
+                                  int32_t cidx,
+                                  BatchGridAccessor<nanovdb::ValueOnIndex> batchAcc) {
+                        meshingCubeCallback<scalar_t, TorchAcc>(bidx,
+                                                                lidx,
+                                                                vidx,
+                                                                cidx,
+                                                                batchAcc,
+                                                                sdfAcc,
+                                                                static_cast<scalar_t>(level),
+                                                                countCsumAcc,
+                                                                trianglesAcc,
+                                                                vertIdsAcc);
+                    };
+                    forEachVoxelCPU<nanovdb::ValueOnIndex>(1, batchHdl, cb);
+                }
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES),
+            c10::kHalf);
     }
 
     // Flatten

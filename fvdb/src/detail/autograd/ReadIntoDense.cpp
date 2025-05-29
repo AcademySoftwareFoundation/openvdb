@@ -63,7 +63,7 @@ ReadIntoDense::forward(ReadIntoDense::AutogradContext *ctx,
         {grid->batchSize(), gridSize[0], gridSize[1], gridSize[2], sparseDataReshape.size(1)},
         sparseData.options()); // [B, W, H, D, -1]
     FVDB_DISPATCH_KERNEL_DEVICE(grid->device(), [&]() {
-        ops::dispatchReadIntoDense<DeviceTag>(*grid, sparseDataReshape, denseOrigins, ret, false);
+        ops::dispatchReadIntoDense<DeviceTag>(*grid, sparseDataReshape, denseOrigins, ret);
     });
     torch::Tensor retReshape = ret.view(
         spliceShape({grid->batchSize(), gridSize[0], gridSize[1], gridSize[2]}, sparseData));
@@ -105,7 +105,7 @@ ReadIntoDense::backward(ReadIntoDense::AutogradContext *ctx,
     torch::Tensor ret = torch::zeros({firstDim, lastDim}, sparseDataOpts); // [N, -1]
 
     FVDB_DISPATCH_KERNEL_DEVICE(grid->device(), [&]() {
-        ops::dispatchReadFromDense<DeviceTag>(*grid, gradOutReshape, denseOrigins, ret, false);
+        ops::dispatchReadFromDense<DeviceTag>(*grid, gradOutReshape, denseOrigins, ret);
     });
 
     torch::Tensor retReshape = ret.view(finalShapeTensor); // [N, *]

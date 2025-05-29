@@ -19,10 +19,10 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename GridType, template <typename T, int> typename TensorAccessorT>
+template <template <typename T, int> typename TensorAccessorT>
 __hostdev__ void
 populateGridMetadataKernel(uint32_t numGrids,
-                           const nanovdb::NanoGrid<GridType> *grids,
+                           const nanovdb::OnIndexGrid *grids,
                            const nanovdb::Vec3d *voxelSizes,
                            const nanovdb::Vec3d *voxelOrigins,
                            TensorAccessorT<fvdb::JOffsetsType, 1> gridOffsets,
@@ -31,14 +31,12 @@ populateGridMetadataKernel(uint32_t numGrids,
     batchMetadata->mMaxVoxels    = 0;
     batchMetadata->mMaxLeafCount = 0;
 
-    batchMetadata->mIsMutable = nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value;
-
     nanovdb::Coord bbMin = nanovdb::Coord::max();
     nanovdb::Coord bbMax = nanovdb::Coord::min();
 
-    nanovdb::NanoGrid<GridType> *currentGrid = (nanovdb::NanoGrid<GridType> *)&grids[0];
-    uint32_t i                               = 0;
-    uint64_t byteCount                       = 0;
+    nanovdb::OnIndexGrid *currentGrid = (nanovdb::OnIndexGrid *)&grids[0];
+    uint32_t i                        = 0;
+    uint64_t byteCount                = 0;
 
     perGridMetadata[i].mCumVoxels = 0;
     perGridMetadata[i].mCumBytes  = 0;
@@ -73,7 +71,7 @@ populateGridMetadataKernel(uint32_t numGrids,
 
         bbMin       = bbMin.minComponent(currentGrid->tree().bbox().min());
         bbMax       = bbMax.maxComponent(currentGrid->tree().bbox().max());
-        currentGrid = (nanovdb::NanoGrid<GridType> *)(((uint8_t *)currentGrid) + byteCount);
+        currentGrid = (nanovdb::OnIndexGrid *)(((uint8_t *)currentGrid) + byteCount);
         i += 1;
     }
 
@@ -101,20 +99,18 @@ populateGridMetadataKernel(uint32_t numGrids,
     bbMin                     = bbMin.minComponent(currentGrid->tree().bbox().min());
     bbMax                     = bbMax.maxComponent(currentGrid->tree().bbox().max());
     batchMetadata->mTotalBBox = nanovdb::CoordBBox(bbMin, bbMax);
-
-    batchMetadata->mIsMutable = nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value;
 }
 
-template <typename GridType, template <typename T, int I> typename TensorAccessorT>
+template <template <typename T, int I> typename TensorAccessorT>
 __global__ void
 populateGridMetadataCUDA(uint32_t numGrids,
-                         const nanovdb::NanoGrid<GridType> *grids,
+                         const nanovdb::OnIndexGrid *grids,
                          const nanovdb::Vec3d *voxelSizes,
                          const nanovdb::Vec3d *voxelOrigins,
                          TensorAccessorT<fvdb::JOffsetsType, 1> outBatchOffsets,
                          GridBatchImpl::GridMetadata *perGridMetadata,
                          GridBatchImpl::GridBatchMetadata *batchMetadata) {
-    populateGridMetadataKernel<GridType, TensorAccessorT>(
+    populateGridMetadataKernel<TensorAccessorT>(
         numGrids, grids, voxelSizes, voxelOrigins, outBatchOffsets, perGridMetadata, batchMetadata);
 }
 
@@ -124,7 +120,6 @@ dispatchPopulateGridMetadata<torch::kCUDA>(
     const nanovdb::GridHandle<TorchDeviceBuffer> &gridHdl,
     const std::vector<nanovdb::Vec3d> &voxelSizes,
     const std::vector<nanovdb::Vec3d> &voxelOrigins,
-    const bool isMutable,
     torch::Tensor &outBatchOffsets,
     GridBatchImpl::GridMetadata *outPerGridMetadataHost,
     GridBatchImpl::GridMetadata *outPerGridMetadataDevice,
@@ -148,19 +143,17 @@ dispatchPopulateGridMetadata<torch::kCUDA>(
         torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(gridHdl.buffer().device()));
 
     // Read metadata into device buffers
-    FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-        TORCH_CHECK(gridHdl.deviceData() != nullptr, "GridHandle is empty");
-        const nanovdb::NanoGrid<GridType> *grids =
-            (nanovdb::NanoGrid<GridType> *)gridHdl.deviceData();
-        populateGridMetadataCUDA<GridType, TorchRAcc32><<<1, 1>>>(
-            gridHdl.gridCount(),
-            grids,
-            (const nanovdb::Vec3d *)deviceVoxSizesPtr,
-            (const nanovdb::Vec3d *)deviceVoxOriginsPtr,
-            outBatchOffsets.packed_accessor32<fvdb::JOffsetsType, 1, torch::RestrictPtrTraits>(),
-            outPerGridMetadataDevice,
-            outBatchMetadataDevice);
-    });
+    TORCH_CHECK(gridHdl.deviceData() != nullptr, "GridHandle is empty");
+    const nanovdb::OnIndexGrid *grids = (nanovdb::OnIndexGrid *)gridHdl.deviceData();
+    populateGridMetadataCUDA<TorchRAcc32><<<1, 1>>>(
+        gridHdl.gridCount(),
+        grids,
+        (const nanovdb::Vec3d *)deviceVoxSizesPtr,
+        (const nanovdb::Vec3d *)deviceVoxOriginsPtr,
+        outBatchOffsets.packed_accessor32<fvdb::JOffsetsType, 1, torch::RestrictPtrTraits>(),
+        outPerGridMetadataDevice,
+        outBatchMetadataDevice);
+
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 
     const size_t metaDataByteSize = sizeof(GridBatchImpl::GridMetadata) * gridHdl.gridCount();
@@ -178,7 +171,6 @@ dispatchPopulateGridMetadata<torch::kCPU>(
     const nanovdb::GridHandle<TorchDeviceBuffer> &gridHdl,
     const std::vector<nanovdb::Vec3d> &voxelSizes,
     const std::vector<nanovdb::Vec3d> &voxelOrigins,
-    const bool isMutable,
     torch::Tensor &outBatchOffsets,
     GridBatchImpl::GridMetadata *outPerGridMetadataHost,
     GridBatchImpl::GridMetadata *outPerGridMetadataDevice,
@@ -187,18 +179,15 @@ dispatchPopulateGridMetadata<torch::kCPU>(
     outBatchOffsets = torch::empty(
         {(fvdb::JOffsetsType)(voxelOrigins.size() + 1)},
         torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(gridHdl.buffer().device()));
-    FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-        TORCH_CHECK(gridHdl.data() != nullptr, "GridHandle is empty");
-        const nanovdb::NanoGrid<GridType> *grids = (nanovdb::NanoGrid<GridType> *)gridHdl.data();
-        populateGridMetadataKernel<GridType, TorchAcc>(
-            gridHdl.gridCount(),
-            grids,
-            voxelSizes.data(),
-            voxelOrigins.data(),
-            outBatchOffsets.accessor<fvdb::JOffsetsType, 1>(),
-            outPerGridMetadataHost,
-            outBatchMetadataHost);
-    });
+    TORCH_CHECK(gridHdl.data() != nullptr, "GridHandle is empty");
+    const nanovdb::OnIndexGrid *grids = (nanovdb::OnIndexGrid *)gridHdl.data();
+    populateGridMetadataKernel<TorchAcc>(gridHdl.gridCount(),
+                                         grids,
+                                         voxelSizes.data(),
+                                         voxelOrigins.data(),
+                                         outBatchOffsets.accessor<fvdb::JOffsetsType, 1>(),
+                                         outPerGridMetadataHost,
+                                         outBatchMetadataHost);
 }
 
 } // namespace ops

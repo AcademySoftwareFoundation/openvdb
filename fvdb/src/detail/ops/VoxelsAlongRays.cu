@@ -15,7 +15,6 @@ namespace ops {
 // Called for each ray
 template <bool returnIjk,
           typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -30,14 +29,14 @@ voxelsAlongRaysCallback(int32_t bidx,
                         TensorAccessor<fvdb::JLIdxType, 2> outJLIdx,             // [B*M, 2]
                         TensorAccessor<int32_t, 2> outVoxels,                    // [B*M*S, 3]
                         TensorAccessor<ScalarType, 2> outTimes,                  // [B*M*S, 2]
-                        GridBatchImpl::Accessor<GridType> batchAccessor,
+                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> batchAccessor,
                         int64_t maxVox,
                         ScalarType eps,
                         bool cumulative) {
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
-    const VoxelCoordTransform &transform       = batchAccessor.dualTransform(bidx);
-    const nanovdb::CoordBBox dualBbox          = batchAccessor.dualBbox(bidx);
-    auto primalAcc                             = gpuGrid->getAccessor();
+    const nanovdb::OnIndexGrid *gpuGrid  = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform = batchAccessor.dualTransform(bidx);
+    const nanovdb::CoordBBox dualBbox    = batchAccessor.dualBbox(bidx);
+    auto primalAcc                       = gpuGrid->getAccessor();
 
     const auto &rayO = rayOrigins.data()[rayIdx];
     const auto &rayD = rayDirections.data()[rayIdx];
@@ -113,7 +112,6 @@ voxelsAlongRaysCallback(int32_t bidx,
 }
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -124,13 +122,13 @@ countVoxelsAlongRaysCallback(int32_t bidx,
                              const JaggedAccessor<ScalarType, 2> rayOrigins,
                              const JaggedAccessor<ScalarType, 2> rayDirections,
                              TensorAccessor<int32_t, 1> outCounts,
-                             BatchGridAccessor<GridType> batchAccessor,
+                             BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor,
                              int64_t maxVox,
                              ScalarType eps) {
-    const nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
-    const VoxelCoordTransform &transform       = batchAccessor.dualTransform(bidx);
-    const nanovdb::CoordBBox dualBbox          = batchAccessor.dualBbox(bidx);
-    auto primalAcc                             = gpuGrid->getAccessor();
+    const nanovdb::OnIndexGrid *gpuGrid  = batchAccessor.grid(bidx);
+    const VoxelCoordTransform &transform = batchAccessor.dualTransform(bidx);
+    const nanovdb::CoordBBox dualBbox    = batchAccessor.dualBbox(bidx);
+    auto primalAcc                       = gpuGrid->getAccessor();
 
     const auto &rayO = rayOrigins.data()[eidx];
     const auto &rayD = rayDirections.data()[eidx];
@@ -205,187 +203,173 @@ VoxelsAlongRays(const GridBatchImpl &batchHdl,
     TORCH_CHECK_VALUE(rayOrigins.ldim() == 1, "Invalid list dimension for ray origins.");
     TORCH_CHECK_VALUE(rayDirections.ldim() == 1, "Invalid list dimension for ray directions.");
 
-    return FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() -> std::vector<JaggedTensor> {
-        return AT_DISPATCH_V2(
-            rayOrigins.scalar_type(),
-            "VoxelsAlongRays",
-            AT_WRAP([&]() -> std::vector<JaggedTensor> {
-                int64_t numThreads = 384;
-                if constexpr (nanovdb::util::is_same<scalar_t, double>::value ||
-                              nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value) {
-                    numThreads = 256;
-                }
-                const auto optsF =
-                    torch::TensorOptions().dtype(rayOrigins.dtype()).device(rayOrigins.device());
-                const auto optsI32 =
-                    torch::TensorOptions().dtype(torch::kInt32).device(rayOrigins.device());
-                const auto optsJIdx =
-                    torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(rayOrigins.device());
-                const auto optsJLIdx =
-                    torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(rayOrigins.device());
+    return AT_DISPATCH_V2(
+        rayOrigins.scalar_type(),
+        "VoxelsAlongRays",
+        AT_WRAP([&]() -> std::vector<JaggedTensor> {
+            int64_t numThreads = 384;
+            if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
+                numThreads = 256;
+            }
+            const auto optsF =
+                torch::TensorOptions().dtype(rayOrigins.dtype()).device(rayOrigins.device());
+            const auto optsI32 =
+                torch::TensorOptions().dtype(torch::kInt32).device(rayOrigins.device());
+            const auto optsJIdx =
+                torch::TensorOptions().dtype(fvdb::JIdxScalarType).device(rayOrigins.device());
+            const auto optsJOffsets =
+                torch::TensorOptions().dtype(fvdb::JOffsetsScalarType).device(rayOrigins.device());
+            const auto optsJLIdx =
+                torch::TensorOptions().dtype(fvdb::JLIdxScalarType).device(rayOrigins.device());
 
-                // Count number of voxels along each ray
-                torch::Tensor rayCounts = torch::zeros({rayOrigins.rsize(0) + 1}, optsI32); // [B*M]
-                auto outCountsAcc       = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
-                auto batchAcc           = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto rayDirectionsAcc   = jaggedAccessor<DeviceTag, scalar_t, 2>(rayDirections);
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb1 = [=] __device__(int32_t bidx,
-                                              int32_t eidx,
-                                              int32_t cidx,
-                                              JaggedRAcc32<scalar_t, 2> rOA) {
-                        countVoxelsAlongRaysCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
+            // Count number of voxels along each ray
+            torch::Tensor rayCounts = torch::zeros({rayOrigins.rsize(0) + 1}, optsI32); // [B*M]
+            auto outCountsAcc       = tensorAccessor<DeviceTag, int32_t, 1>(rayCounts);
+            auto batchAcc           = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto rayDirectionsAcc   = jaggedAccessor<DeviceTag, scalar_t, 2>(rayDirections);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb1 = [=] __device__(int32_t bidx,
+                                          int32_t eidx,
+                                          int32_t cidx,
+                                          JaggedRAcc32<scalar_t, 2> rOA) {
+                    countVoxelsAlongRaysCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, rOA, rayDirectionsAcc, outCountsAcc, batchAcc, maxVox, eps);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cb1);
+            } else {
+                auto cb1 =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> rOA) {
+                        countVoxelsAlongRaysCallback<scalar_t, JaggedAcc, TorchAcc>(
                             bidx, eidx, rOA, rayDirectionsAcc, outCountsAcc, batchAcc, maxVox, eps);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cb1);
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cb1);
+            }
+
+            // Compute joffsets for the output ray intersections
+            const torch::Tensor outJOffsets =
+                rayCounts.cumsum(0, fvdb::JOffsetsScalarType); // [B*M]
+            const fvdb::JOffsetsType totalIsects =
+                outJOffsets[outJOffsets.size(0) - 1].item<fvdb::JOffsetsType>();
+
+            // Allocate output JaggedTensor indexing data
+            torch::Tensor outJLidx =
+                torch::empty({outJOffsets.size(0) - 1, 2}, optsJLIdx);     // [total_rays, 2]
+            torch::Tensor outJIdx = torch::zeros({totalIsects}, optsJIdx); // [total_intersections]
+
+            // Allocate output jdata tensors
+            torch::Tensor outVoxels =
+                torch::zeros({totalIsects, returnIjk ? 3 : 1}, optsI32);    // [B*M*S, 3]
+            torch::Tensor outTimes = torch::zeros({totalIsects, 2}, optsF); // [B*M*S, 2]
+
+            // Compute output voxels and times
+            auto outJOffsetsAcc = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(outJOffsets);
+            auto outJIdxAcc     = tensorAccessor<DeviceTag, fvdb::JIdxType, 1>(outJIdx);
+            auto outJLIdxAcc    = tensorAccessor<DeviceTag, fvdb::JLIdxType, 2>(outJLidx);
+
+            auto outVoxelsAcc = tensorAccessor<DeviceTag, int32_t, 2>(outVoxels);
+            auto outTimesAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(outTimes);
+
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cbIjk = [=] __device__(int32_t bidx,
+                                            int32_t eidx,
+                                            int32_t cidx,
+                                            JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
+                    voxelsAlongRaysCallback<true, scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx,
+                        eidx,
+                        rayOriginsAcc,
+                        rayDirectionsAcc,
+                        outJOffsetsAcc,
+                        outJIdxAcc,
+                        outJLIdxAcc,
+                        outVoxelsAcc,
+                        outTimesAcc,
+                        batchAcc,
+                        maxVox,
+                        eps,
+                        cumulative);
+                };
+                auto cbIdx = [=] __device__(int32_t bidx,
+                                            int32_t eidx,
+                                            int32_t cidx,
+                                            JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
+                    voxelsAlongRaysCallback<false, scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx,
+                        eidx,
+                        rayOriginsAcc,
+                        rayDirectionsAcc,
+                        outJOffsetsAcc,
+                        outJIdxAcc,
+                        outJLIdxAcc,
+                        outVoxelsAcc,
+                        outTimesAcc,
+                        batchAcc,
+                        maxVox,
+                        eps,
+                        cumulative);
+                };
+
+                if (returnIjk) {
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cbIjk);
                 } else {
-                    auto cb1 = [=](int32_t bidx,
-                                   int32_t eidx,
-                                   int32_t cidx,
-                                   JaggedAcc<scalar_t, 2> rOA) {
-                        countVoxelsAlongRaysCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, rOA, rayDirectionsAcc, outCountsAcc, batchAcc, maxVox, eps);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cb1);
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayOrigins, cbIdx);
                 }
-
-                // Compute joffsets for the output ray intersections
-                const torch::Tensor outJOffsets =
-                    rayCounts.cumsum(0, fvdb::JOffsetsScalarType); // [B*M]
-                const fvdb::JOffsetsType totalIsects =
-                    outJOffsets[outJOffsets.size(0) - 1].item<fvdb::JOffsetsType>();
-
-                // Allocate output JaggedTensor indexing data
-                torch::Tensor outJLidx =
-                    torch::empty({outJOffsets.size(0) - 1, 2}, optsJLIdx); // [total_rays, 2]
-                torch::Tensor outJIdx =
-                    torch::zeros({totalIsects}, optsJIdx);                 // [total_intersections]
-
-                // Allocate output jdata tensors
-                torch::Tensor outVoxels =
-                    torch::zeros({totalIsects, returnIjk ? 3 : 1}, optsI32);    // [B*M*S, 3]
-                torch::Tensor outTimes = torch::zeros({totalIsects, 2}, optsF); // [B*M*S, 2]
-
-                // Compute output voxels and times
-                auto outJOffsetsAcc = tensorAccessor<DeviceTag, fvdb::JOffsetsType, 1>(outJOffsets);
-                auto outJIdxAcc     = tensorAccessor<DeviceTag, fvdb::JIdxType, 1>(outJIdx);
-                auto outJLIdxAcc    = tensorAccessor<DeviceTag, fvdb::JLIdxType, 2>(outJLidx);
-
-                auto outVoxelsAcc = tensorAccessor<DeviceTag, int32_t, 2>(outVoxels);
-                auto outTimesAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(outTimes);
-
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cbIjk = [=] __device__(int32_t bidx,
-                                                int32_t eidx,
-                                                int32_t cidx,
-                                                JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<true,
-                                                scalar_t,
-                                                GridType,
-                                                JaggedRAcc32,
-                                                TorchRAcc32>(bidx,
-                                                             eidx,
-                                                             rayOriginsAcc,
-                                                             rayDirectionsAcc,
-                                                             outJOffsetsAcc,
-                                                             outJIdxAcc,
-                                                             outJLIdxAcc,
-                                                             outVoxelsAcc,
-                                                             outTimesAcc,
-                                                             batchAcc,
-                                                             maxVox,
-                                                             eps,
-                                                             cumulative);
-                    };
-                    auto cbIdx = [=] __device__(int32_t bidx,
-                                                int32_t eidx,
-                                                int32_t cidx,
-                                                JaggedRAcc32<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<false,
-                                                scalar_t,
-                                                GridType,
-                                                JaggedRAcc32,
-                                                TorchRAcc32>(bidx,
-                                                             eidx,
-                                                             rayOriginsAcc,
-                                                             rayDirectionsAcc,
-                                                             outJOffsetsAcc,
-                                                             outJIdxAcc,
-                                                             outJLIdxAcc,
-                                                             outVoxelsAcc,
-                                                             outTimesAcc,
-                                                             batchAcc,
-                                                             maxVox,
-                                                             eps,
-                                                             cumulative);
-                    };
-
-                    if (returnIjk) {
-                        forEachJaggedElementChannelCUDA<scalar_t, 2>(
-                            numThreads, 1, rayOrigins, cbIjk);
-                    } else {
-                        forEachJaggedElementChannelCUDA<scalar_t, 2>(
-                            numThreads, 1, rayOrigins, cbIdx);
-                    }
+            } else {
+                auto cbIjk = [=](int32_t bidx,
+                                 int32_t eidx,
+                                 int32_t cidx,
+                                 JaggedAcc<scalar_t, 2> rayOriginsAcc) {
+                    voxelsAlongRaysCallback<true, scalar_t, JaggedAcc, TorchAcc>(bidx,
+                                                                                 eidx,
+                                                                                 rayOriginsAcc,
+                                                                                 rayDirectionsAcc,
+                                                                                 outJOffsetsAcc,
+                                                                                 outJIdxAcc,
+                                                                                 outJLIdxAcc,
+                                                                                 outVoxelsAcc,
+                                                                                 outTimesAcc,
+                                                                                 batchAcc,
+                                                                                 maxVox,
+                                                                                 eps,
+                                                                                 cumulative);
+                };
+                auto cbIdx = [=](int32_t bidx,
+                                 int32_t eidx,
+                                 int32_t cidx,
+                                 JaggedAcc<scalar_t, 2> rayOriginsAcc) {
+                    voxelsAlongRaysCallback<false, scalar_t, JaggedAcc, TorchAcc>(bidx,
+                                                                                  eidx,
+                                                                                  rayOriginsAcc,
+                                                                                  rayDirectionsAcc,
+                                                                                  outJOffsetsAcc,
+                                                                                  outJIdxAcc,
+                                                                                  outJLIdxAcc,
+                                                                                  outVoxelsAcc,
+                                                                                  outTimesAcc,
+                                                                                  batchAcc,
+                                                                                  maxVox,
+                                                                                  eps,
+                                                                                  cumulative);
+                };
+                if (returnIjk) {
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cbIjk);
                 } else {
-                    auto cbIjk = [=](int32_t bidx,
-                                     int32_t eidx,
-                                     int32_t cidx,
-                                     JaggedAcc<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<true, scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx,
-                            eidx,
-                            rayOriginsAcc,
-                            rayDirectionsAcc,
-                            outJOffsetsAcc,
-                            outJIdxAcc,
-                            outJLIdxAcc,
-                            outVoxelsAcc,
-                            outTimesAcc,
-                            batchAcc,
-                            maxVox,
-                            eps,
-                            cumulative);
-                    };
-                    auto cbIdx = [=](int32_t bidx,
-                                     int32_t eidx,
-                                     int32_t cidx,
-                                     JaggedAcc<scalar_t, 2> rayOriginsAcc) {
-                        voxelsAlongRaysCallback<false, scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx,
-                            eidx,
-                            rayOriginsAcc,
-                            rayDirectionsAcc,
-                            outJOffsetsAcc,
-                            outJIdxAcc,
-                            outJLIdxAcc,
-                            outVoxelsAcc,
-                            outTimesAcc,
-                            batchAcc,
-                            maxVox,
-                            eps,
-                            cumulative);
-                    };
-                    if (returnIjk) {
-                        forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cbIjk);
-                    } else {
-                        forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cbIdx);
-                    }
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayOrigins, cbIdx);
                 }
+            }
 
-                if (!returnIjk) {
-                    outVoxels = outVoxels.squeeze(-1);
-                }
+            if (!returnIjk) {
+                outVoxels = outVoxels.squeeze(-1);
+            }
 
-                const JaggedTensor retVox = JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
-                    outVoxels, outJOffsets, outJIdx, outJLidx, batchHdl.batchSize());
-                const JaggedTensor retTimes = retVox.jagged_like(outTimes);
+            const JaggedTensor retVox = JaggedTensor::from_jdata_joffsets_jidx_and_lidx_unsafe(
+                outVoxels, outJOffsets, outJIdx, outJLidx, batchHdl.batchSize());
+            const JaggedTensor retTimes = retVox.jagged_like(outTimes);
 
-                return {retVox, retTimes};
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf);
-    });
+            return {retVox, retTimes};
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf);
 }
 
 template <>

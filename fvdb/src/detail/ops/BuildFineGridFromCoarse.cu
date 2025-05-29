@@ -70,8 +70,8 @@ fineIjkForCoarseGridVoxelCallback(int32_t bidx,
                                   nanovdb::Coord upsamplingFactor,
                                   TorchRAcc64<int32_t, 2> outIJKData,
                                   TorchRAcc64<fvdb::JIdxType, 1> outIJKBIdx) {
-    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *gridPtr = batchAcc.grid(bidx);
-    const typename nanovdb::NanoGrid<nanovdb::ValueOnIndex>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *gridPtr = batchAcc.grid(bidx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         gridPtr->tree().template getFirstNode<0>()[lidx];
     const int64_t baseOffset     = batchAcc.voxelOffset(bidx);
     const int64_t totalPadAmount = upsamplingFactor[0] * upsamplingFactor[1] * upsamplingFactor[2];
@@ -134,7 +134,7 @@ fineIJKForCoarseGrid(const GridBatchImpl &batchHdl,
     }
 
     return JaggedTensor::from_data_offsets_and_list_ids(
-        outIJK, batchHdl.voxelOffsets(true) * totalPadAmount, batchHdl.jlidx(true));
+        outIJK, batchHdl.voxelOffsets() * totalPadAmount, batchHdl.jlidx());
 }
 
 template <>
@@ -167,7 +167,7 @@ dispatchBuildFineGridFromCoarse<torch::kCPU>(const GridBatchImpl &coarseBatchHdl
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(coarseGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < coarseGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *coarseGrid = coarseGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *coarseGrid = coarseGridHdl.template grid<GridType>(bidx);
         if (!coarseGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -178,7 +178,7 @@ dispatchBuildFineGridFromCoarse<torch::kCPU>(const GridBatchImpl &coarseBatchHdl
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
         const int64_t joffset = coarseBatchHdl.cumVoxels(bidx);
-        for (auto it = ActiveVoxelIterator<GridType, -1>(coarseTree); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator<-1>(coarseTree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk(it->first[0] * subdivisionFactor[0],
                                          it->first[1] * subdivisionFactor[1],
                                          it->first[2] * subdivisionFactor[2]);

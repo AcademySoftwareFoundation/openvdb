@@ -51,7 +51,7 @@ forEachLeafSingleGridCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> 
                                 const int32_t bidx,
                                 Func func,
                                 Args... args) {
-    const typename nanovdb::NanoGrid<GridType> *gpuGrid = batchAccessor.grid(bidx);
+    const typename nanovdb::OnIndexGrid *gpuGrid = batchAccessor.grid(bidx);
 
     const uint64_t leafChannelIdx = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     if (leafChannelIdx >= static_cast<uint64_t>(gpuGrid->tree().nodeCount(0)) * channelsPerLeaf) {
@@ -87,8 +87,8 @@ voxelMetaIndexCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> gridAcc
     const int64_t batchIdx = gridAccessor.leafBatchIndex(cumLeafIdx);
     const int64_t leafIdx  = cumLeafIdx - gridAccessor.leafOffset(batchIdx);
 
-    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *grid = gridAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
 
     if (leaf.isActive(leafVoxelIdx)) {
@@ -284,7 +284,7 @@ forEachLeafCUDA(const int64_t numThreads,
 /// @brief Run the given function on each leaf in the specified grid (at index batchIdx) in the
 /// batch in parallel on the GPU.
 ///        The callback has the form:
-///            void(const nanovdb::NanoGrid<GridType>*, int32_t lidx, int32_t cidx, Args...)
+///            void(const nanovdb::OnIndexGrid*, int32_t lidx, int32_t cidx, Args...)
 ///        Where:
 ///            - grid is a pointer to the batchIdx^th grid in the batch
 ///            - lidx is the index of the leaf within the batchIdx^th grid in the batch

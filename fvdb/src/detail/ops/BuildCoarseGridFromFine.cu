@@ -42,7 +42,7 @@ dispatchBuildCoarseGridFromFine<torch::kCPU>(const GridBatchImpl &fineBatchHdl,
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> batchHandles;
     batchHandles.reserve(fineGridHdl.gridCount());
     for (uint32_t bidx = 0; bidx < fineGridHdl.gridCount(); bidx += 1) {
-        const nanovdb::NanoGrid<GridType> *fineGrid = fineGridHdl.template grid<GridType>(bidx);
+        const nanovdb::OnIndexGrid *fineGrid = fineGridHdl.template grid<GridType>(bidx);
         if (!fineGrid) {
             throw std::runtime_error("Failed to get pointer to nanovdb index grid");
         }
@@ -52,7 +52,7 @@ dispatchBuildCoarseGridFromFine<torch::kCPU>(const GridBatchImpl &fineBatchHdl,
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        for (auto it = ActiveVoxelIterator<GridType>(fineTree); it.isValid(); it++) {
+        for (auto it = ActiveVoxelIterator(fineTree); it.isValid(); it++) {
             const nanovdb::Coord coarseIjk =
                 (it->first.asVec3d() / branchingFactor.asVec3d()).floor();
             proxyGridAccessor.setValue(coarseIjk, 1.0f);

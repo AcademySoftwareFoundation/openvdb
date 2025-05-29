@@ -1,7 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include <detail/ops/CountEnabledPerLeaf.cuh>
+#include <detail/GridBatchImpl.h>
+#include <detail/utils/AccessorHelpers.cuh>
+#include <detail/utils/ForEachCPU.h>
+#include <detail/utils/cuda/ForEachCUDA.cuh>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
@@ -10,38 +13,16 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-/// @brief Per-voxel callback for getting the enabled grid coordinates in a batch of grids
-template <typename GridType, template <typename T, int32_t D> typename TorchAccessor>
-__hostdev__ inline void
-enabledGridCoordsVoxelCallback(int64_t batchIdx,
-                               int64_t leafIdx,
-                               int64_t voxelIdx,
-                               GridBatchImpl::Accessor<GridType> gridAccessor,
-                               TorchAccessor<int64_t, 1> leafBaseOffset,
-                               TorchAccessor<int32_t, 2> outGridCoords) {
-    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
-        grid->tree().template getFirstNode<0>()[leafIdx];
-    const nanovdb::Coord &ijk = leaf.offsetToGlobalCoord(voxelIdx);
-    const int64_t outIdx =
-        leafBaseOffset[leafIdx] + leaf.template get<UnmaskedPerLeaf<GridType>>(voxelIdx);
-    if (leaf.template get<ActiveOrUnmasked<GridType>>(voxelIdx)) {
-        outGridCoords[outIdx][0] = ijk[0];
-        outGridCoords[outIdx][1] = ijk[1];
-        outGridCoords[outIdx][2] = ijk[2];
-    }
-}
-
 /// @brief Per-voxel callback which computes the active grid coordinates for a batch of grids
-template <typename GridType, template <typename T, int32_t D> typename TorchAccessor>
+template <template <typename T, int32_t D> typename TorchAccessor>
 __hostdev__ inline void
 activeGridCoordsVoxelCallback(int64_t batchIdx,
                               int64_t leafIdx,
                               int64_t voxelIdx,
-                              GridBatchImpl::Accessor<GridType> gridAccessor,
+                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> gridAccessor,
                               TorchAccessor<int32_t, 2> outGridCoords) {
-    const nanovdb::NanoGrid<GridType> *grid = gridAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
+    const nanovdb::OnIndexGrid *grid = gridAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
         grid->tree().template getFirstNode<0>()[leafIdx];
     const int64_t baseOffset = gridAccessor.voxelOffset(batchIdx);
 
@@ -54,50 +35,12 @@ activeGridCoordsVoxelCallback(int64_t batchIdx,
     }
 }
 
-/// @brief Get the enabled grid coordinates for a batch of grids (ignoring disabled voxels)
-/// @param gridBatch The batch of grids (must be mutable)
-/// @param outGridCoords Tensor which will contain the output grid coordinates
-template <c10::DeviceType DeviceTag>
-void
-GetEnabledGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords) {
-    using GridType = nanovdb::ValueOnIndexMask;
-
-    // Compute a prefix sum of the unmasked voxels per leaf
-    const torch::Tensor leafBaseOffset =
-        countEnabledPerLeafShiftedByOne<GridType, DeviceTag>(gridBatch).cumsum(0, torch::kInt64);
-
-    // Get the unmasked grid coordinates
-    auto leafBaseOffsetAcc = tensorAccessor<DeviceTag, int64_t, 1>(leafBaseOffset);
-    auto outCoordsAcc      = tensorAccessor<DeviceTag, int32_t, 2>(outGridCoords);
-    if constexpr (DeviceTag == torch::kCUDA) {
-        auto cb = [=] __device__(int64_t batchIdx,
-                                 int64_t leafIdx,
-                                 int64_t voxelIdx,
-                                 int64_t,
-                                 GridBatchImpl::Accessor<GridType> gridAccessor) {
-            enabledGridCoordsVoxelCallback<GridType, TorchRAcc32>(
-                batchIdx, leafIdx, voxelIdx, gridAccessor, leafBaseOffsetAcc, outCoordsAcc);
-        };
-        forEachVoxelCUDA<GridType>(1024, 1, gridBatch, cb);
-    } else {
-        auto cb = [=](int64_t batchIdx,
-                      int64_t leafIdx,
-                      int64_t voxelIdx,
-                      int64_t,
-                      GridBatchImpl::Accessor<GridType> gridAccessor) {
-            enabledGridCoordsVoxelCallback<GridType, TorchAcc>(
-                batchIdx, leafIdx, voxelIdx, gridAccessor, leafBaseOffsetAcc, outCoordsAcc);
-        };
-        forEachVoxelCPU<GridType>(1, gridBatch, cb);
-    }
-}
-
 /// @brief Get the active grid coordinates for a batch of grids (including disabled coordinates in
 /// mutable grids)
 /// @tparam GridType The type of the grid (one of ValueOnIndex, ValueOnIndexMask)
 /// @param gridBatch The batch of grids
 /// @param outGridCoords Tensor which will contain the output grid coordinates
-template <c10::DeviceType DeviceTag, typename GridType>
+template <c10::DeviceType DeviceTag>
 void
 GetActiveGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords) {
     auto outCoordsAcc = tensorAccessor<DeviceTag, int32_t, 2>(outGridCoords);
@@ -107,21 +50,21 @@ GetActiveGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords
                                  int64_t leafIdx,
                                  int64_t voxelIdx,
                                  int64_t,
-                                 GridBatchImpl::Accessor<GridType> gridAccessor) {
-            activeGridCoordsVoxelCallback<GridType, TorchRAcc32>(
+                                 GridBatchImpl::Accessor<nanovdb::ValueOnIndex> gridAccessor) {
+            activeGridCoordsVoxelCallback<TorchRAcc32>(
                 batchIdx, leafIdx, voxelIdx, gridAccessor, outCoordsAcc);
         };
-        forEachVoxelCUDA<GridType>(1024, 1, gridBatch, cb);
+        forEachVoxelCUDA<nanovdb::ValueOnIndex>(1024, 1, gridBatch, cb);
     } else {
         auto cb = [=](int64_t batchIdx,
                       int64_t leafIdx,
                       int64_t voxelIdx,
                       int64_t,
-                      GridBatchImpl::Accessor<GridType> gridAccessor) {
-            activeGridCoordsVoxelCallback<GridType, TorchAcc>(
+                      GridBatchImpl::Accessor<nanovdb::ValueOnIndex> gridAccessor) {
+            activeGridCoordsVoxelCallback<TorchAcc>(
                 batchIdx, leafIdx, voxelIdx, gridAccessor, outCoordsAcc);
         };
-        forEachVoxelCPU<GridType>(1, gridBatch, cb);
+        forEachVoxelCPU<nanovdb::ValueOnIndex>(1, gridBatch, cb);
     }
 }
 
@@ -134,33 +77,24 @@ GetActiveGridCoords(const GridBatchImpl &gridBatch, torch::Tensor &outGridCoords
 /// @return A JaggedTensor or shape [B, -1, 3] of active/enabled IJK coordinates
 template <c10::DeviceType DeviceTag>
 JaggedTensor
-ActiveGridCoords(const GridBatchImpl &gridBatch, bool ignoreDisabledVoxels) {
+ActiveGridCoords(const GridBatchImpl &gridBatch) {
     gridBatch.checkNonEmptyGrid();
     auto opts = torch::TensorOptions().dtype(torch::kInt32).device(gridBatch.device());
-    torch::Tensor outGridCoords =
-        torch::empty({gridBatch.totalEnabledVoxels(ignoreDisabledVoxels), 3}, opts);
-    FVDB_DISPATCH_GRID_TYPES(gridBatch, [&]() {
-        if (ignoreDisabledVoxels ||
-            nanovdb::util::is_same<GridType, nanovdb::ValueOnIndex>::value) {
-            GetActiveGridCoords<DeviceTag, GridType>(gridBatch, outGridCoords);
-        } else if (nanovdb::util::is_same<GridType, nanovdb::ValueOnIndexMask>::value) {
-            TORCH_CHECK(!ignoreDisabledVoxels, "This should never happen");
-            GetEnabledGridCoords<DeviceTag>(gridBatch, outGridCoords);
-        }
-    });
-    return gridBatch.jaggedTensor(outGridCoords, ignoreDisabledVoxels);
+    torch::Tensor outGridCoords = torch::empty({gridBatch.totalVoxels(), 3}, opts);
+    GetActiveGridCoords<DeviceTag>(gridBatch, outGridCoords);
+    return gridBatch.jaggedTensor(outGridCoords);
 }
 
 template <>
 JaggedTensor
-dispatchActiveGridCoords<torch::kCUDA>(const GridBatchImpl &gridBatch, bool ignoreMasked) {
-    return ActiveGridCoords<torch::kCUDA>(gridBatch, ignoreMasked);
+dispatchActiveGridCoords<torch::kCUDA>(const GridBatchImpl &gridBatch) {
+    return ActiveGridCoords<torch::kCUDA>(gridBatch);
 }
 
 template <>
 JaggedTensor
-dispatchActiveGridCoords<torch::kCPU>(const GridBatchImpl &gridBatch, bool ignoreMasked) {
-    return ActiveGridCoords<torch::kCPU>(gridBatch, ignoreMasked);
+dispatchActiveGridCoords<torch::kCPU>(const GridBatchImpl &gridBatch) {
+    return ActiveGridCoords<torch::kCPU>(gridBatch);
 }
 
 } // namespace ops

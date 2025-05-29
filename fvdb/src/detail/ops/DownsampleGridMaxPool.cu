@@ -12,24 +12,21 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename Dtype,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename Dtype, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
 maxPoolVoxelCallback(int32_t batchIdx,
                      int32_t leafIdx,
                      int32_t voxelIdx,
                      int32_t channelIdx,
-                     GridBatchImpl::Accessor<GridType> coarseBatchAccessor,
-                     GridBatchImpl::Accessor<GridType> fineBatchAccessor,
+                     GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor,
+                     GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor,
                      const TensorAccessor<Dtype, 2> fineData,
                      TensorAccessor<Dtype, 2> outCoarseData,
                      nanovdb::Coord poolingFactor,
                      nanovdb::Coord stride) {
-    const nanovdb::NanoGrid<GridType> *coarseGrid = coarseBatchAccessor.grid(batchIdx);
-    const nanovdb::NanoGrid<GridType> *fineGrid   = fineBatchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &coarseLeaf =
+    const nanovdb::OnIndexGrid *coarseGrid = coarseBatchAccessor.grid(batchIdx);
+    const nanovdb::OnIndexGrid *fineGrid   = fineBatchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &coarseLeaf =
         coarseGrid->tree().template getFirstNode<0>()[leafIdx];
     const auto fineGridAcc         = fineGrid->getAccessor();
     const int64_t coarseBaseOffset = coarseBatchAccessor.voxelOffset(batchIdx);
@@ -47,14 +44,14 @@ maxPoolVoxelCallback(int32_t batchIdx,
 
     // Note [JH]: Probing leaf first will get rid of the needs of query grid accessor all the time
     //   This would give us a minor speedup by removing the grid-accessor overhead.
-    // const typename nanovdb::NanoGrid<GridType>::LeafNodeType& fineLeaf =
-    //    *fineGrid->tree().root().probeLeaf(fineIjk0);
+    // const typename nanovdb::OnIndexGrid::LeafNodeType& fineLeaf = \
+        *fineGrid->tree().root().probeLeaf(fineIjk0);
 
     for (nanovdb::Coord::ValueType i = 0; i < poolingFactor[0]; i += 1) {
         for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
             for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
-                if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
+                if (!fineGridAcc.isActive(fineIjk)) {
                     continue;
                 }
                 const int64_t fineIndex =
@@ -67,25 +64,22 @@ maxPoolVoxelCallback(int32_t batchIdx,
     }
 }
 
-template <typename Dtype,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename Dtype, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
 maxPoolBackardVoxelCallback(int32_t batchIdx,
                             int32_t leafIdx,
                             int32_t voxelIdx,
                             int32_t channelIdx,
-                            GridBatchImpl::Accessor<GridType> coarseBatchAccessor,
-                            GridBatchImpl::Accessor<GridType> fineBatchAccessor,
+                            GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor,
+                            GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor,
                             const TensorAccessor<Dtype, 2> fineData,
                             const TensorAccessor<Dtype, 2> coarseGradOut,
                             TensorAccessor<Dtype, 2> outFineGradIn,
                             nanovdb::Coord poolingFactor,
                             nanovdb::Coord stride) {
-    const nanovdb::NanoGrid<GridType> *coarseGrid = coarseBatchAccessor.grid(batchIdx);
-    const nanovdb::NanoGrid<GridType> *fineGrid   = fineBatchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &coarseLeaf =
+    const nanovdb::OnIndexGrid *coarseGrid = coarseBatchAccessor.grid(batchIdx);
+    const nanovdb::OnIndexGrid *fineGrid   = fineBatchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &coarseLeaf =
         coarseGrid->tree().template getFirstNode<0>()[leafIdx];
     const auto fineGridAcc         = fineGrid->getAccessor();
     const int64_t coarseBaseOffset = coarseBatchAccessor.voxelOffset(batchIdx);
@@ -106,7 +100,7 @@ maxPoolBackardVoxelCallback(int32_t batchIdx,
         for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
             for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
-                if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
+                if (!fineGridAcc.isActive(fineIjk)) {
                     continue;
                 }
 
@@ -160,63 +154,60 @@ DownsampleGridMaxPool(const GridBatchImpl &fineBatchHdl,
     torch::Tensor fineDataReshape      = featureCoalescedView(fineData);
     torch::Tensor outCoarseDataReshape = featureCoalescedView(outCoarseData);
 
-    FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_V2(
-            fineData.scalar_type(),
-            "DownsampleGridMaxPool",
-            AT_WRAP([&]() {
-                auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
-                auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
-                auto outCoarseDataAcc =
-                    tensorAccessor<DeviceTag, scalar_t, 2>(outCoarseDataReshape);
+    AT_DISPATCH_V2(
+        fineData.scalar_type(),
+        "DownsampleGridMaxPool",
+        AT_WRAP([&]() {
+            auto fineBatchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(fineBatchHdl);
+            auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
+            auto outCoarseDataAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoarseDataReshape);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto maxPoolPerVoxel =
-                        [=] __device__(int32_t batchIdx,
-                                       int32_t leafIdx,
-                                       int32_t voxelIdx,
-                                       int32_t channelIdx,
-                                       GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            maxPoolVoxelCallback<scalar_t, GridType, TorchRAcc32>(
-                                batchIdx,
-                                leafIdx,
-                                voxelIdx,
-                                channelIdx,
-                                coarseBatchAccessor,
-                                fineBatchAcc,
-                                fineDataAcc,
-                                outCoarseDataAcc,
-                                poolingFactor,
-                                stride);
-                        };
-                    forEachVoxelCUDA<GridType>(
-                        384, outCoarseData.size(1), coarseBatchHdl, maxPoolPerVoxel);
-                } else {
-                    auto maxPoolPerVoxel =
-                        [=](int32_t batchIdx,
-                            int32_t leafIdx,
-                            int32_t voxelIdx,
-                            int32_t channelIdx,
-                            GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            maxPoolVoxelCallback<scalar_t, GridType, TorchAcc>(batchIdx,
-                                                                               leafIdx,
-                                                                               voxelIdx,
-                                                                               channelIdx,
-                                                                               coarseBatchAccessor,
-                                                                               fineBatchAcc,
-                                                                               fineDataAcc,
-                                                                               outCoarseDataAcc,
-                                                                               poolingFactor,
-                                                                               stride);
-                        };
-                    forEachVoxelCPU<GridType>(
-                        outCoarseData.size(1), coarseBatchHdl, maxPoolPerVoxel);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf,
-            c10::kBFloat16);
-    });
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto maxPoolPerVoxel =
+                    [=] __device__(
+                        int32_t batchIdx,
+                        int32_t leafIdx,
+                        int32_t voxelIdx,
+                        int32_t channelIdx,
+                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                        maxPoolVoxelCallback<scalar_t, TorchRAcc32>(batchIdx,
+                                                                    leafIdx,
+                                                                    voxelIdx,
+                                                                    channelIdx,
+                                                                    coarseBatchAccessor,
+                                                                    fineBatchAcc,
+                                                                    fineDataAcc,
+                                                                    outCoarseDataAcc,
+                                                                    poolingFactor,
+                                                                    stride);
+                    };
+                forEachVoxelCUDA<nanovdb::ValueOnIndex>(
+                    384, outCoarseData.size(1), coarseBatchHdl, maxPoolPerVoxel);
+            } else {
+                auto maxPoolPerVoxel =
+                    [=](int32_t batchIdx,
+                        int32_t leafIdx,
+                        int32_t voxelIdx,
+                        int32_t channelIdx,
+                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                        maxPoolVoxelCallback<scalar_t, TorchAcc>(batchIdx,
+                                                                 leafIdx,
+                                                                 voxelIdx,
+                                                                 channelIdx,
+                                                                 coarseBatchAccessor,
+                                                                 fineBatchAcc,
+                                                                 fineDataAcc,
+                                                                 outCoarseDataAcc,
+                                                                 poolingFactor,
+                                                                 stride);
+                    };
+                forEachVoxelCPU<nanovdb::ValueOnIndex>(
+                    outCoarseData.size(1), coarseBatchHdl, maxPoolPerVoxel);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf,
+        c10::kBFloat16);
 
     return outCoarseData;
 }
@@ -242,64 +233,60 @@ DownsampleGridMaxPoolBackward(const GridBatchImpl &coarseBatchHdl,
     torch::Tensor coarseGradOutReshape = featureCoalescedView(coarseGradOut);
     torch::Tensor outGradInReshape     = torch::zeros_like(fineDataReshape); // [#fin
 
-    FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_V2(
-            fineData.scalar_type(),
-            "DownsampleGridMaxPoolBackward",
-            AT_WRAP([&]() {
-                auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
-                auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
-                auto coarseGradOutAcc =
-                    tensorAccessor<DeviceTag, scalar_t, 2>(coarseGradOutReshape);
-                auto outFineGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradInReshape);
+    AT_DISPATCH_V2(
+        fineData.scalar_type(),
+        "DownsampleGridMaxPoolBackward",
+        AT_WRAP([&]() {
+            auto fineBatchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(fineBatchHdl);
+            auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
+            auto coarseGradOutAcc = tensorAccessor<DeviceTag, scalar_t, 2>(coarseGradOutReshape);
+            auto outFineGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradInReshape);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb =
-                        [=] __device__(int32_t batchIdx,
-                                       int32_t leafIdx,
-                                       int32_t voxelIdx,
-                                       int32_t channelIdx,
-                                       GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            maxPoolBackardVoxelCallback<scalar_t, GridType, TorchRAcc32>(
-                                batchIdx,
-                                leafIdx,
-                                voxelIdx,
-                                channelIdx,
-                                coarseBatchAccessor,
-                                fineBatchAcc,
-                                fineDataAcc,
-                                coarseGradOutAcc,
-                                outFineGradInAcc,
-                                poolingFactor,
-                                stride);
-                        };
-                    forEachVoxelCUDA<GridType>(384, fineData.size(1), coarseBatchHdl, cb);
-                } else {
-                    auto cb = [=](int32_t batchIdx,
-                                  int32_t leafIdx,
-                                  int32_t voxelIdx,
-                                  int32_t channelIdx,
-                                  GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                        maxPoolBackardVoxelCallback<scalar_t, GridType, TorchAcc>(
-                            batchIdx,
-                            leafIdx,
-                            voxelIdx,
-                            channelIdx,
-                            coarseBatchAccessor,
-                            fineBatchAcc,
-                            fineDataAcc,
-                            coarseGradOutAcc,
-                            outFineGradInAcc,
-                            poolingFactor,
-                            stride);
-                    };
-                    forEachVoxelCPU<GridType>(fineData.size(1), coarseBatchHdl, cb);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf,
-            c10::kBFloat16);
-    });
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(
+                              int32_t batchIdx,
+                              int32_t leafIdx,
+                              int32_t voxelIdx,
+                              int32_t channelIdx,
+                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                    maxPoolBackardVoxelCallback<scalar_t, TorchRAcc32>(batchIdx,
+                                                                       leafIdx,
+                                                                       voxelIdx,
+                                                                       channelIdx,
+                                                                       coarseBatchAccessor,
+                                                                       fineBatchAcc,
+                                                                       fineDataAcc,
+                                                                       coarseGradOutAcc,
+                                                                       outFineGradInAcc,
+                                                                       poolingFactor,
+                                                                       stride);
+                };
+                forEachVoxelCUDA<nanovdb::ValueOnIndex>(384, fineData.size(1), coarseBatchHdl, cb);
+            } else {
+                auto cb = [=](int32_t batchIdx,
+                              int32_t leafIdx,
+                              int32_t voxelIdx,
+                              int32_t channelIdx,
+                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                    maxPoolBackardVoxelCallback<scalar_t, TorchAcc>(batchIdx,
+                                                                    leafIdx,
+                                                                    voxelIdx,
+                                                                    channelIdx,
+                                                                    coarseBatchAccessor,
+                                                                    fineBatchAcc,
+                                                                    fineDataAcc,
+                                                                    coarseGradOutAcc,
+                                                                    outFineGradInAcc,
+                                                                    poolingFactor,
+                                                                    stride);
+                };
+                forEachVoxelCPU<nanovdb::ValueOnIndex>(fineData.size(1), coarseBatchHdl, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf,
+        c10::kBFloat16);
+
     return outGradInReshape.reshape(spliceShape({fineData.size(0)}, coarseGradOut));
 }
 

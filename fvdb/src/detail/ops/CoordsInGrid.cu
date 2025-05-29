@@ -12,7 +12,6 @@ namespace detail {
 namespace ops {
 
 template <typename ScalarType,
-          typename GridType,
           template <typename T, int32_t D>
           typename JaggedAccessor,
           template <typename T, int32_t D>
@@ -22,21 +21,19 @@ coordsInGridCallback(int32_t bidx,
                      int32_t eidx,
                      JaggedAccessor<ScalarType, 2> ijk,
                      TensorAccessor<bool, 1> outMask,
-                     BatchGridAccessor<GridType> batchAccessor,
-                     bool ignoreMasked) {
+                     BatchGridAccessor<nanovdb::ValueOnIndex> batchAccessor) {
     const auto *gpuGrid = batchAccessor.grid(bidx);
     auto primalAcc      = gpuGrid->getAccessor();
 
     const auto &ijkCoord = ijk.data()[eidx];
     const nanovdb::Coord vox(ijkCoord[0], ijkCoord[1], ijkCoord[2]);
-    const bool isActive = ignoreMasked ? primalAcc.isActive(vox)
-                                       : primalAcc.template get<ActiveOrUnmasked<GridType>>(vox);
+    const bool isActive = primalAcc.isActive(vox);
     outMask[eidx]       = isActive;
 }
 
 template <c10::DeviceType DeviceTag>
 JaggedTensor
-CoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool ignoreMasked) {
+CoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &ijk) {
     batchHdl.checkNonEmptyGrid();
     batchHdl.checkDevice(ijk);
     TORCH_CHECK_TYPE(!ijk.is_floating_point(), "ijk must have an integeral type");
@@ -51,53 +48,45 @@ CoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool ignore
     auto opts             = torch::TensorOptions().dtype(torch::kBool).device(ijk.device());
     torch::Tensor outMask = torch::empty({ijk.rsize(0)}, opts);
 
-    FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_V2(
-            ijk.scalar_type(),
-            "CoordsInGrid",
-            AT_WRAP([&]() {
-                auto batchAcc        = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx,
-                                             int32_t eidx,
-                                             int32_t cidx,
-                                             JaggedRAcc32<scalar_t, 2> ijkAcc) {
-                        coordsInGridCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                            bidx, eidx, ijkAcc, outMaskAccessor, batchAcc, ignoreMasked);
+    AT_DISPATCH_V2(
+        ijk.scalar_type(),
+        "CoordsInGrid",
+        AT_WRAP([&]() {
+            auto batchAcc        = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
+            auto outMaskAccessor = tensorAccessor<DeviceTag, bool, 1>(outMask);
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx,
+                                         int32_t eidx,
+                                         int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> ijkAcc) {
+                    coordsInGridCallback<scalar_t, JaggedRAcc32, TorchRAcc32>(
+                        bidx, eidx, ijkAcc, outMaskAccessor, batchAcc);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
+            } else {
+                auto cb =
+                    [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> ijkAcc) {
+                        coordsInGridCallback<scalar_t, JaggedAcc, TorchAcc>(
+                            bidx, eidx, ijkAcc, outMaskAccessor, batchAcc);
                     };
-                    forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
-                } else {
-                    auto cb = [=](int32_t bidx,
-                                  int32_t eidx,
-                                  int32_t cidx,
-                                  JaggedAcc<scalar_t, 2> ijkAcc) {
-                        coordsInGridCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                            bidx, eidx, ijkAcc, outMaskAccessor, batchAcc, ignoreMasked);
-                    };
-                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-                }
-            }),
-            AT_EXPAND(AT_INTEGRAL_TYPES));
-    });
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+            }
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 
     return ijk.jagged_like(outMask);
 }
 
 template <>
 JaggedTensor
-dispatchCoordsInGrid<torch::kCUDA>(const GridBatchImpl &batchHdl,
-                                   const JaggedTensor &coords,
-                                   bool ignoreMasked) {
-    return CoordsInGrid<torch::kCUDA>(batchHdl, coords, ignoreMasked);
+dispatchCoordsInGrid<torch::kCUDA>(const GridBatchImpl &batchHdl, const JaggedTensor &coords) {
+    return CoordsInGrid<torch::kCUDA>(batchHdl, coords);
 }
 
 template <>
 JaggedTensor
-dispatchCoordsInGrid<torch::kCPU>(const GridBatchImpl &batchHdl,
-                                  const JaggedTensor &coords,
-                                  bool ignoreMasked) {
-    return CoordsInGrid<torch::kCPU>(batchHdl, coords, ignoreMasked);
+dispatchCoordsInGrid<torch::kCPU>(const GridBatchImpl &batchHdl, const JaggedTensor &coords) {
+    return CoordsInGrid<torch::kCPU>(batchHdl, coords);
 }
 
 } // namespace ops

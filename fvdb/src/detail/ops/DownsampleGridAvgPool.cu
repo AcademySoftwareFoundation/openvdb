@@ -13,26 +13,23 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-template <typename Dtype,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename Dtype, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
 avgPoolVoxelCallback(int32_t batchIdx,
                      int32_t leafIdx,
                      int32_t voxelIdx,
                      int32_t channelIdx,
-                     GridBatchImpl::Accessor<GridType> coarseBatchAccessor,
-                     GridBatchImpl::Accessor<GridType> fineBatchAccessor,
+                     GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor,
+                     GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor,
                      const TensorAccessor<Dtype, 2> fineData,
                      TensorAccessor<Dtype, 2> outCoarseData,
                      nanovdb::Coord poolingFactor,
                      nanovdb::Coord stride,
                      Dtype avgFactor) {
-    using accscalar_t                             = at::acc_type<Dtype, true>;
-    const nanovdb::NanoGrid<GridType> *coarseGrid = coarseBatchAccessor.grid(batchIdx);
-    const nanovdb::NanoGrid<GridType> *fineGrid   = fineBatchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &coarseLeaf =
+    using accscalar_t                      = at::acc_type<Dtype, true>;
+    const nanovdb::OnIndexGrid *coarseGrid = coarseBatchAccessor.grid(batchIdx);
+    const nanovdb::OnIndexGrid *fineGrid   = fineBatchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &coarseLeaf =
         coarseGrid->tree().template getFirstNode<0>()[leafIdx];
     const auto fineGridAcc         = fineGrid->getAccessor();
     const int64_t coarseBaseOffset = coarseBatchAccessor.voxelOffset(batchIdx);
@@ -52,7 +49,7 @@ avgPoolVoxelCallback(int32_t batchIdx,
         for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
             for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
-                if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
+                if (!fineGridAcc.isActive(fineIjk)) {
                     continue;
                 }
                 const int64_t fineIndex =
@@ -65,26 +62,23 @@ avgPoolVoxelCallback(int32_t batchIdx,
     outCoarseData[coarseIndex][channelIdx] = static_cast<Dtype>(avgValue) * avgFactor;
 }
 
-template <typename Dtype,
-          typename GridType,
-          template <typename T, int32_t D>
-          typename TensorAccessor>
+template <typename Dtype, template <typename T, int32_t D> typename TensorAccessor>
 __hostdev__ inline void
 avgPoolBackardVoxelCallback(int32_t batchIdx,
                             int32_t leafIdx,
                             int32_t voxelIdx,
                             int32_t channelIdx,
-                            GridBatchImpl::Accessor<GridType> coarseBatchAccessor,
-                            GridBatchImpl::Accessor<GridType> fineBatchAccessor,
+                            GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor,
+                            GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor,
                             const TensorAccessor<Dtype, 2> fineData,
                             const TensorAccessor<Dtype, 2> coarseGradOut,
                             TensorAccessor<Dtype, 2> outFineGradIn,
                             nanovdb::Coord poolingFactor,
                             nanovdb::Coord stride,
                             Dtype avgFactor) {
-    const nanovdb::NanoGrid<GridType> *coarseGrid = coarseBatchAccessor.grid(batchIdx);
-    const nanovdb::NanoGrid<GridType> *fineGrid   = fineBatchAccessor.grid(batchIdx);
-    const typename nanovdb::NanoGrid<GridType>::LeafNodeType &coarseLeaf =
+    const nanovdb::OnIndexGrid *coarseGrid = coarseBatchAccessor.grid(batchIdx);
+    const nanovdb::OnIndexGrid *fineGrid   = fineBatchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid::LeafNodeType &coarseLeaf =
         coarseGrid->tree().template getFirstNode<0>()[leafIdx];
     const auto fineGridAcc         = fineGrid->getAccessor();
     const int64_t coarseBaseOffset = coarseBatchAccessor.voxelOffset(batchIdx);
@@ -102,7 +96,7 @@ avgPoolBackardVoxelCallback(int32_t batchIdx,
         for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {
             for (nanovdb::Coord::ValueType k = 0; k < poolingFactor[2]; k += 1) {
                 nanovdb::Coord fineIjk = fineIjk0 + nanovdb::Coord(i, j, k);
-                if (!fineGridAcc.template get<ActiveOrUnmasked<GridType>>(fineIjk)) {
+                if (!fineGridAcc.isActive(fineIjk)) {
                     continue;
                 }
                 const int64_t fineIndex =
@@ -148,66 +142,63 @@ DownsampleGridAvgPool(const GridBatchImpl &fineBatchHdl,
     torch::Tensor outCoarseDataReshape = featureCoalescedView(outCoarseData);
     double avgFactor = 1.0 / (poolingFactor[0] * poolingFactor[1] * poolingFactor[2]);
 
-    FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_V2(
-            fineData.scalar_type(),
-            "DownsampleGridAvgPool",
-            AT_WRAP([&]() {
-                auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
-                auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
-                auto outCoarseDataAcc =
-                    tensorAccessor<DeviceTag, scalar_t, 2>(outCoarseDataReshape);
+    AT_DISPATCH_V2(
+        fineData.scalar_type(),
+        "DownsampleGridAvgPool",
+        AT_WRAP([&]() {
+            auto fineBatchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(fineBatchHdl);
+            auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
+            auto outCoarseDataAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoarseDataReshape);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto avgPoolPerVoxel =
-                        [=] __device__(int32_t batchIdx,
-                                       int32_t leafIdx,
-                                       int32_t voxelIdx,
-                                       int32_t channelIdx,
-                                       GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            avgPoolVoxelCallback<scalar_t, GridType, TorchRAcc32>(
-                                batchIdx,
-                                leafIdx,
-                                voxelIdx,
-                                channelIdx,
-                                coarseBatchAccessor,
-                                fineBatchAcc,
-                                fineDataAcc,
-                                outCoarseDataAcc,
-                                poolingFactor,
-                                stride,
-                                static_cast<scalar_t>(avgFactor));
-                        };
-                    forEachVoxelCUDA<GridType>(
-                        384, outCoarseData.size(1), coarseBatchHdl, avgPoolPerVoxel);
-                } else {
-                    auto avgPoolPerVoxel =
-                        [=](int32_t batchIdx,
-                            int32_t leafIdx,
-                            int32_t voxelIdx,
-                            int32_t channelIdx,
-                            GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            avgPoolVoxelCallback<scalar_t, GridType, TorchAcc>(
-                                batchIdx,
-                                leafIdx,
-                                voxelIdx,
-                                channelIdx,
-                                coarseBatchAccessor,
-                                fineBatchAcc,
-                                fineDataAcc,
-                                outCoarseDataAcc,
-                                poolingFactor,
-                                stride,
-                                static_cast<scalar_t>(avgFactor));
-                        };
-                    forEachVoxelCPU<GridType>(
-                        outCoarseData.size(1), coarseBatchHdl, avgPoolPerVoxel);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf,
-            c10::kBFloat16);
-    });
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto avgPoolPerVoxel =
+                    [=] __device__(
+                        int32_t batchIdx,
+                        int32_t leafIdx,
+                        int32_t voxelIdx,
+                        int32_t channelIdx,
+                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                        avgPoolVoxelCallback<scalar_t, TorchRAcc32>(
+                            batchIdx,
+                            leafIdx,
+                            voxelIdx,
+                            channelIdx,
+                            coarseBatchAccessor,
+                            fineBatchAcc,
+                            fineDataAcc,
+                            outCoarseDataAcc,
+                            poolingFactor,
+                            stride,
+                            static_cast<scalar_t>(avgFactor));
+                    };
+                forEachVoxelCUDA<nanovdb::ValueOnIndex>(
+                    384, outCoarseData.size(1), coarseBatchHdl, avgPoolPerVoxel);
+            } else {
+                auto avgPoolPerVoxel =
+                    [=](int32_t batchIdx,
+                        int32_t leafIdx,
+                        int32_t voxelIdx,
+                        int32_t channelIdx,
+                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                        avgPoolVoxelCallback<scalar_t, TorchAcc>(batchIdx,
+                                                                 leafIdx,
+                                                                 voxelIdx,
+                                                                 channelIdx,
+                                                                 coarseBatchAccessor,
+                                                                 fineBatchAcc,
+                                                                 fineDataAcc,
+                                                                 outCoarseDataAcc,
+                                                                 poolingFactor,
+                                                                 stride,
+                                                                 static_cast<scalar_t>(avgFactor));
+                    };
+                forEachVoxelCPU<nanovdb::ValueOnIndex>(
+                    outCoarseData.size(1), coarseBatchHdl, avgPoolPerVoxel);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf,
+        c10::kBFloat16);
 
     return outCoarseData;
 }
@@ -235,66 +226,64 @@ DownsampleGridAvgPoolBackward(const GridBatchImpl &coarseBatchHdl,
     torch::Tensor outGradInReshape     = torch::zeros_like(fineDataReshape); // [#fin
     double avgFactor = 1.0 / (poolingFactor[0] * poolingFactor[1] * poolingFactor[2]);
 
-    FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_V2(
-            fineData.scalar_type(),
-            "DownsampleGridAvgPoolBackward",
-            AT_WRAP([&]() {
-                auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
-                auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
-                auto coarseGradOutAcc =
-                    tensorAccessor<DeviceTag, scalar_t, 2>(coarseGradOutReshape);
-                auto outFineGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradInReshape);
+    AT_DISPATCH_V2(
+        fineData.scalar_type(),
+        "DownsampleGridAvgPoolBackward",
+        AT_WRAP([&]() {
+            auto fineBatchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(fineBatchHdl);
+            auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
+            auto coarseGradOutAcc = tensorAccessor<DeviceTag, scalar_t, 2>(coarseGradOutReshape);
+            auto outFineGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradInReshape);
 
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb =
-                        [=] __device__(int32_t batchIdx,
-                                       int32_t leafIdx,
-                                       int32_t voxelIdx,
-                                       int32_t channelIdx,
-                                       GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                            avgPoolBackardVoxelCallback<scalar_t, GridType, TorchRAcc32>(
-                                batchIdx,
-                                leafIdx,
-                                voxelIdx,
-                                channelIdx,
-                                coarseBatchAccessor,
-                                fineBatchAcc,
-                                fineDataAcc,
-                                coarseGradOutAcc,
-                                outFineGradInAcc,
-                                poolingFactor,
-                                stride,
-                                static_cast<scalar_t>(avgFactor));
-                        };
-                    forEachVoxelCUDA<GridType>(384, fineData.size(1), coarseBatchHdl, cb);
-                } else {
-                    auto cb = [=](int32_t batchIdx,
-                                  int32_t leafIdx,
-                                  int32_t voxelIdx,
-                                  int32_t channelIdx,
-                                  GridBatchImpl::Accessor<GridType> coarseBatchAccessor) {
-                        avgPoolBackardVoxelCallback<scalar_t, GridType, TorchAcc>(
-                            batchIdx,
-                            leafIdx,
-                            voxelIdx,
-                            channelIdx,
-                            coarseBatchAccessor,
-                            fineBatchAcc,
-                            fineDataAcc,
-                            coarseGradOutAcc,
-                            outFineGradInAcc,
-                            poolingFactor,
-                            stride,
-                            static_cast<scalar_t>(avgFactor));
-                    };
-                    forEachVoxelCPU<GridType>(fineData.size(1), coarseBatchHdl, cb);
-                }
-            }),
-            AT_EXPAND(AT_FLOATING_TYPES),
-            c10::kHalf,
-            c10::kBFloat16);
-    });
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(
+                              int32_t batchIdx,
+                              int32_t leafIdx,
+                              int32_t voxelIdx,
+                              int32_t channelIdx,
+                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                    avgPoolBackardVoxelCallback<scalar_t, TorchRAcc32>(
+                        batchIdx,
+                        leafIdx,
+                        voxelIdx,
+                        channelIdx,
+                        coarseBatchAccessor,
+                        fineBatchAcc,
+                        fineDataAcc,
+                        coarseGradOutAcc,
+                        outFineGradInAcc,
+                        poolingFactor,
+                        stride,
+                        static_cast<scalar_t>(avgFactor));
+                };
+                forEachVoxelCUDA<nanovdb::ValueOnIndex>(384, fineData.size(1), coarseBatchHdl, cb);
+            } else {
+                auto cb = [=](int32_t batchIdx,
+                              int32_t leafIdx,
+                              int32_t voxelIdx,
+                              int32_t channelIdx,
+                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                    avgPoolBackardVoxelCallback<scalar_t, TorchAcc>(
+                        batchIdx,
+                        leafIdx,
+                        voxelIdx,
+                        channelIdx,
+                        coarseBatchAccessor,
+                        fineBatchAcc,
+                        fineDataAcc,
+                        coarseGradOutAcc,
+                        outFineGradInAcc,
+                        poolingFactor,
+                        stride,
+                        static_cast<scalar_t>(avgFactor));
+                };
+                forEachVoxelCPU<nanovdb::ValueOnIndex>(fineData.size(1), coarseBatchHdl, cb);
+            }
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES),
+        c10::kHalf,
+        c10::kBFloat16);
+
     return outGradInReshape.reshape(spliceShape({fineData.size(0)}, coarseGradOut));
 }
 

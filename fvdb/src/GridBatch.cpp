@@ -16,7 +16,7 @@ namespace fvdb {
 
 GridBatch::GridBatch(const torch::Device &device) {
     detail::RAIIDeviceGuard guard(device);
-    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device, false);
+    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device);
 }
 
 GridBatch::GridBatch(const std::string &device_string) {
@@ -25,7 +25,7 @@ GridBatch::GridBatch(const std::string &device_string) {
         device.set_index(c10::cuda::current_device());
     }
     detail::RAIIDeviceGuard guard(device);
-    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device, false);
+    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device);
 }
 
 GridBatch::GridBatch() {
@@ -64,8 +64,7 @@ GridBatch::max_pool(Vec3iOrScalar pool_factor,
     torch::Tensor pool_data = detail::autograd::MaxPoolGrid::apply(
         impl(), coarse_grid_impl, pool_factor_coord, stride_coord, data.jdata())[0];
 
-    return std::make_pair(coarse_grid_impl->jaggedTensor(pool_data, false),
-                          GridBatch(coarse_grid_impl));
+    return std::make_pair(coarse_grid_impl->jaggedTensor(pool_data), GridBatch(coarse_grid_impl));
 }
 
 std::pair<JaggedTensor, GridBatch>
@@ -99,8 +98,7 @@ GridBatch::avg_pool(Vec3iOrScalar pool_factor,
     torch::Tensor pool_data = detail::autograd::AvgPoolGrid::apply(
         impl(), coarse_grid_impl, pool_factor_coord, stride_coord, data.jdata())[0];
 
-    return std::make_pair(coarse_grid_impl->jaggedTensor(pool_data, false),
-                          GridBatch(coarse_grid_impl));
+    return std::make_pair(coarse_grid_impl->jaggedTensor(pool_data), GridBatch(coarse_grid_impl));
 }
 
 std::pair<JaggedTensor, GridBatch>
@@ -133,7 +131,7 @@ GridBatch::subdivide(Vec3iOrScalar subdiv_factor,
     torch::Tensor subdivData = detail::autograd::UpsampleGrid::apply(
         impl(), fineGrid, upsampleFactorCoord, data.jdata())[0];
 
-    return std::make_pair(fineGrid->jaggedTensor(subdivData, false), GridBatch(fineGrid));
+    return std::make_pair(fineGrid->jaggedTensor(subdivData), GridBatch(fineGrid));
 }
 
 JaggedTensor
@@ -141,7 +139,7 @@ GridBatch::read_from_dense(const torch::Tensor &dense_data, const Vec3iBatch &de
     detail::RAIIDeviceGuard guard(device());
     torch::Tensor retData =
         detail::autograd::ReadFromDense::apply(impl(), dense_data, dense_origins)[0];
-    return impl()->jaggedTensor(retData, false);
+    return impl()->jaggedTensor(retData);
 }
 
 torch::Tensor
@@ -171,7 +169,7 @@ GridBatch::fill_from_grid(const JaggedTensor &other_features,
     torch::Tensor retData = detail::autograd::FillFromGrid::apply(
         other_grid.impl(), impl(), other_features.jdata(), default_value)[0];
 
-    return impl()->jaggedTensor(retData, false);
+    return impl()->jaggedTensor(retData);
 }
 
 JaggedTensor
@@ -317,7 +315,7 @@ GridBatch::splat_trilinear(const JaggedTensor &points, const JaggedTensor &point
     if (grid_count() == 1) {
         return JaggedTensor(ret);
     } else {
-        return impl()->jaggedTensor(ret, true);
+        return impl()->jaggedTensor(ret);
     }
 }
 
@@ -339,7 +337,7 @@ GridBatch::splat_bezier(const JaggedTensor &points, const JaggedTensor &points_d
     if (grid_count() == 1) {
         return JaggedTensor(ret);
     } else {
-        return impl()->jaggedTensor(ret, true);
+        return impl()->jaggedTensor(ret);
     }
 }
 
@@ -784,11 +782,11 @@ GridBatch::clipped_grid(const Vec3iBatch &ijk_min, const Vec3iBatch &ijk_max) co
     detail::RAIIDeviceGuard guard(device());
     JaggedTensor activeVoxelMask = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchActiveVoxelsInBoundsMask<DeviceTag>(
-            *impl(), ijk_min, ijk_max, false);
+            *impl(), ijk_min, ijk_max);
     });
 
     JaggedTensor activeVoxelCoords = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl(), false);
+        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
 
     // active voxel coords masked by the voxels in bounds
@@ -815,16 +813,16 @@ GridBatch::clip(const JaggedTensor &features,
     TORCH_CHECK(features.rsize(0) == total_voxels(), "Value count of features does not match grid");
     TORCH_CHECK(features.num_outer_lists() == grid_count(),
                 "Batch size of features does not match grid.");
-    TORCH_CHECK(torch::equal(features.joffsets(), impl()->voxelOffsets(false)),
+    TORCH_CHECK(torch::equal(features.joffsets(), impl()->voxelOffsets()),
                 "Offsets of features does not match grid.");
 
     JaggedTensor activeVoxelMask = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchActiveVoxelsInBoundsMask<DeviceTag>(
-            *impl(), ijk_min, ijk_max, false);
+            *impl(), ijk_min, ijk_max);
     });
 
     JaggedTensor activeVoxelCoords = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl(), false);
+        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
 
     // active voxel coords masked by the voxels in bounds
@@ -1026,7 +1024,7 @@ GridBatch::segments_along_rays(const JaggedTensor &ray_origins,
         "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchSegmentsAlongRays<DeviceTag>(
-            *impl(), ray_origins, ray_directions, max_segments, eps, true);
+            *impl(), ray_origins, ray_directions, max_segments, eps);
     });
 }
 
@@ -1128,7 +1126,7 @@ GridBatch::points_in_active_voxel(const JaggedTensor &points) const {
         points.ldim(),
         "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchPointsInGrid<DeviceTag>(*impl(), points, true);
+        return fvdb::detail::ops::dispatchPointsInGrid<DeviceTag>(*impl(), points);
     });
 }
 
@@ -1144,7 +1142,7 @@ GridBatch::cubes_intersect_grid(const JaggedTensor &cube_centers,
         "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchCubesIntersectGrid<DeviceTag>(
-            *impl(), cube_centers, cube_min, cube_max, true);
+            *impl(), cube_centers, cube_min, cube_max);
     });
 }
 
@@ -1160,7 +1158,7 @@ GridBatch::cubes_in_grid(const JaggedTensor &cube_centers,
         "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchCubesInGrid<DeviceTag>(
-            *impl(), cube_centers, cube_min, cube_max, true);
+            *impl(), cube_centers, cube_min, cube_max);
     });
 }
 
@@ -1173,7 +1171,7 @@ GridBatch::coords_in_active_voxel(const JaggedTensor &ijk) const {
         ijk.ldim(),
         "list dimensions");
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
-        return fvdb::detail::ops::dispatchCoordsInGrid<DeviceTag>(*impl(), ijk, true);
+        return fvdb::detail::ops::dispatchCoordsInGrid<DeviceTag>(*impl(), ijk);
     });
 }
 
@@ -1207,7 +1205,7 @@ JaggedTensor
 GridBatch::ijk() const {
     detail::RAIIDeviceGuard guard(device());
     return FVDB_DISPATCH_KERNEL_DEVICE(this->device(), [&]() {
-        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl(), true);
+        return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
 }
 

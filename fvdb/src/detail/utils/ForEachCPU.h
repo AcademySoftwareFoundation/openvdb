@@ -57,7 +57,7 @@ forEachLeafCPU(int64_t channelsPerLeaf,
 /// @brief Run the given function on each leaf in the specified grid (at index batchIdx) in the
 /// batch on the CPU.
 ///        The callback has the form:
-///            void(const nanovdb::NanoGrid<GridType>*, int32_t lidx, int32_t cidx, Args...)
+///            void(const nanovdb::OnIndexGrid*, int32_t lidx, int32_t cidx, Args...)
 ///        Where:
 ///            - grid is a pointer to the batchIdx^th grid in the batch
 ///            - lidx is the index of the leaf within the batchIdx^th grid in the batch
@@ -85,7 +85,7 @@ forEachLeafInOneGridCPU(int64_t numChannels,
     TORCH_CHECK(batchIdx >= 0 && batchIdx < batchHdl.batchSize(), "Batch index out of range");
     auto batchAccessor = batchHdl.hostAccessor<GridType>();
 
-    const typename nanovdb::NanoGrid<GridType> *cpuGrid = batchAccessor.grid(batchIdx);
+    const typename nanovdb::OnIndexGrid *cpuGrid = batchAccessor.grid(batchIdx);
 
     for (uint64_t leafChannelIdx = 0;
          leafChannelIdx < static_cast<uint64_t>(cpuGrid->tree().nodeCount(0)) * numChannels;
@@ -134,9 +134,9 @@ forEachVoxelCPU(int64_t numChannels,
         static_cast<int64_t>(nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType::NUM_VALUES);
     auto batchAccessor = batchHdl.hostAccessor<GridType>();
     for (fvdb::JIdxType batchIdx = 0; batchIdx < batchAccessor.batchSize(); batchIdx += 1) {
-        const nanovdb::NanoGrid<GridType> *grid = batchAccessor.grid(batchIdx);
+        const nanovdb::OnIndexGrid *grid = batchAccessor.grid(batchIdx);
         for (int64_t leafIdx = 0; leafIdx < grid->tree().nodeCount(0); leafIdx += 1) {
-            const typename nanovdb::NanoGrid<GridType>::LeafNodeType &leaf =
+            const typename nanovdb::OnIndexGrid::LeafNodeType &leaf =
                 grid->tree().template getFirstNode<0>()[leafIdx];
             for (int64_t voxIdx = 0; voxIdx < VOXELS_PER_LEAF; voxIdx += 1) {
                 if (leaf.isActive(voxIdx)) {

@@ -355,7 +355,7 @@ nanovdbGridToFvdbGrid(const nanovdb::NanoGrid<SourceGridType> *sourceGrid) {
     torch::Tensor outData     = torch::empty({numVox, dim}, opts);
     auto outDataAcc           = outData.accessor<ScalarType, 2>();
     auto sourceGridAccessor   = sourceGrid->getAccessor();
-    for (auto it = ActiveVoxelIterator<TargetGridType, -1>(outGrid->tree()); it.isValid(); it++) {
+    for (auto it = ActiveVoxelIterator<-1>(outGrid->tree()); it.isValid(); it++) {
         valueSetter(outDataAcc, it->second, sourceGridAccessor.getValue(it->first));
     }
 

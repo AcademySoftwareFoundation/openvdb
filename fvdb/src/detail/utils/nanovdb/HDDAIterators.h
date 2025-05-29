@@ -4,8 +4,6 @@
 #ifndef FVDB_DETAIL_UTILS_NANOVDB_HDDAITERATORS_H
 #define FVDB_DETAIL_UTILS_NANOVDB_HDDAITERATORS_H
 
-#include "CustomAccessors.h"
-
 #include <nanovdb/math/HDDA.h>
 #include <nanovdb/math/Ray.h>
 
@@ -67,14 +65,13 @@ template <typename AccT, typename ScalarT> struct HDDASegmentIterator {
     }
 
     __hostdev__
-    HDDASegmentIterator(const RayT &rayVox, const AccT &acc, const bool ignoreMasked)
+    HDDASegmentIterator(const RayT &rayVox, const AccT &acc)
         : mAcc(acc) {
-        mIgnoreMasked = ignoreMasked;
-        mRay          = RayTInternal(nanovdb::math::Vec3<MathType>(rayVox.eye()),
+        mRay       = RayTInternal(nanovdb::math::Vec3<MathType>(rayVox.eye()),
                             nanovdb::math::Vec3<MathType>(rayVox.dir()),
                             static_cast<MathType>(rayVox.t0()),
                             static_cast<MathType>(rayVox.t1()));
-        CoordT ijk    = nanovdb::math::RoundDown<CoordT>(
+        CoordT ijk = nanovdb::math::RoundDown<CoordT>(
             rayVox(mRay.t0() + nanovdb::math::Delta<ScalarT>::value()));
         mHdda.init(mRay, mAcc.getDim(ijk, mRay));
         nextSegment(); // Move to first segment
@@ -106,9 +103,8 @@ template <typename AccT, typename ScalarT> struct HDDASegmentIterator {
                 mHdda.update(mRay, dim);
             }
 
-            const bool isActive =
-                mIgnoreMasked ? mAcc.isActive(mHdda.voxel())
-                              : mAcc.template get<fvdb::ActiveOrUnmasked<BuildT>>(mHdda.voxel());
+            const bool isActive = mAcc.isActive(mHdda.voxel());
+
             if (isActive) {               // We're inside an active region
                 if (!mTimespan.valid()) { // This is the first hit
                     mTimespan.t0 = mHdda.time();
@@ -132,7 +128,6 @@ template <typename AccT, typename ScalarT> struct HDDASegmentIterator {
     RayTInternal mRay;
     HDDAT mHdda;
     TimespanT mTimespan;
-    bool mIgnoreMasked;
 };
 
 template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
@@ -209,8 +204,7 @@ template <typename AccT, typename ScalarT> struct HDDAVoxelIterator {
                 mHdda.update(mRay, dim);
             }
             // NOTE: This will return true if a tile is active
-            if (mAcc.template get<fvdb::ActiveOrUnmasked<BuildT>>(
-                    mHdda.voxel())) { // We hit an active voxel, increment hdda and return
+            if (mAcc.isActive(mHdda.voxel())) { // We hit an active voxel, increment hdda and return
                 mData = {mHdda.voxel(), TimespanT(mHdda.time(), mHdda.next())};
                 mHdda.step();
                 return true;
