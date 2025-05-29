@@ -7,6 +7,7 @@
 #include <Config.h>
 #include <JaggedTensor.h>
 #include <detail/GridBatchImpl.h>
+#include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/NanoVDB.h>
