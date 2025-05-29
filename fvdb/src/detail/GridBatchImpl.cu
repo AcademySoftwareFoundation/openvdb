@@ -31,6 +31,20 @@ computeBatchOffsetsFromMetadata(
     }
 }
 
+// We use a helper with std::malloc rather than just using new because it makes
+// clangd not crash on this file.
+fvdb::detail::GridBatchImpl::GridMetadata *
+allocateHostGridMetadata(int64_t batchSize) {
+    using GridMetadata = fvdb::detail::GridBatchImpl::GridMetadata;
+    TORCH_CHECK(batchSize > 0, "Batch size must be greater than 0");
+    GridMetadata *ret =
+        reinterpret_cast<GridMetadata *>(std::malloc(sizeof(GridMetadata) * batchSize));
+    for (auto i = 0; i < batchSize; ++i) {
+        ret[i] = GridMetadata();
+    }
+    return ret;
+}
+
 } // namespace
 
 namespace fvdb {
@@ -89,7 +103,8 @@ GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 
 GridBatchImpl::~GridBatchImpl() {
     torch::Device device = mGridHdl->buffer().device();
-    freeHostGridMetadata();
+    std::free(mHostGridMetadata);
+    mHostGridMetadata = nullptr;
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
         c10::cuda::CUDACachingAllocator::raw_delete(mDeviceGridMetadata);
@@ -572,7 +587,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
     const torch::Device device = gridHdl.buffer().device();
 
     // Clear out old grid metadata
-    freeHostGridMetadata();
+    std::free(mHostGridMetadata);
     mHostGridMetadata = nullptr;
     if (mDeviceGridMetadata != nullptr) {
         c10::cuda::CUDAGuard deviceGuard(device);
