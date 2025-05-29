@@ -44,8 +44,8 @@ maxPoolVoxelCallback(int32_t batchIdx,
 
     // Note [JH]: Probing leaf first will get rid of the needs of query grid accessor all the time
     //   This would give us a minor speedup by removing the grid-accessor overhead.
-    // const typename nanovdb::OnIndexGrid::LeafNodeType& fineLeaf = \
-        *fineGrid->tree().root().probeLeaf(fineIjk0);
+    // const typename nanovdb::OnIndexGrid::LeafNodeType& fineLeaf =
+    // *fineGrid->tree().root().probeLeaf(fineIjk0);
 
     for (nanovdb::Coord::ValueType i = 0; i < poolingFactor[0]; i += 1) {
         for (nanovdb::Coord::ValueType j = 0; j < poolingFactor[1]; j += 1) {

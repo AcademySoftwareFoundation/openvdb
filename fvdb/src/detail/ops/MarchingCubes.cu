@@ -274,7 +274,6 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
             sdf.scalar_type(),
             "meshingCubes",
             AT_WRAP([&] {
-                auto batchAcc     = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndex>(batchHdl);
                 auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
                 auto countCsumAcc = tensorAccessor<DeviceTag, int64_t, 1>(countCsum);
                 auto trianglesAcc = tensorAccessor<DeviceTag, scalar_t, 3>(triangles);

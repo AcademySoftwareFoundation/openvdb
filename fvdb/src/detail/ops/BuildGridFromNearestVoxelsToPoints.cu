@@ -6,7 +6,6 @@
 #include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 

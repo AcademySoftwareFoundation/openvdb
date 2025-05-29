@@ -256,13 +256,13 @@ void DilateGrid<BuildT>::dilateRoot()
     // Keep a hashed list of root tiles to include; initialize with the ones in the source topology
     std::set<nanovdb::Coord> dilatedTileOrigins;
     std::vector<typename RootT::Tile> dilatedTiles;
-    for (int t = 0; t < srcRootAndUpper->tileCount(); t++) {
+    for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
         auto srcTile = srcRootAndUpper->tile(t);
         dilatedTiles.push_back(*srcTile);
         dilatedTileOrigins.insert(srcTile->origin()); }
 
     // For each original root tile, consider adding those tiles in its 26-connected neighborhood
-    for (int t = 0; t < srcRootAndUpper->tileCount(); t++) {
+    for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
         auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
         const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
 
@@ -284,7 +284,7 @@ void DilateGrid<BuildT>::dilateRoot()
     mDilatedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
     auto dilatedRootPtr = static_cast<RootT*>(mDilatedRoot.data());
     dilatedRootPtr->mTableSize = dilatedTiles.size();
-    for (int t = 0; t < dilatedTiles.size(); t++)
+    for (uint32_t t = 0; t < dilatedTiles.size(); t++)
         *dilatedRootPtr->tile(t) = dilatedTiles[t];
     mDilatedRoot.deviceUpload(device, mStream, false);
 }// DilateGrid<BuildT>::dilateRoot

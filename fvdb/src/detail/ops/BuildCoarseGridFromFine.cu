@@ -6,7 +6,6 @@
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/CreateNanoGrid.h>

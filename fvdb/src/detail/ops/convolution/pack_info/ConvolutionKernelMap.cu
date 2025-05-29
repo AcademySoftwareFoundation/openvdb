@@ -115,7 +115,6 @@ dispatchConvolutionKernelMap<torch::kCUDA>(const GridBatchImpl &sourceBatchHdl,
                                       (int)std::floor(-kernelSizeCoord.z() / 2.0 + 1)});
 
     auto sourceBatchAccessor = sourceBatchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
-    auto targetBatchAccessor = targetBatchHdl.deviceAccessor<nanovdb::ValueOnIndex>();
     auto kernelMapAcc        = kernelMap.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
 
     auto cb = [=] __device__(int32_t bidx,

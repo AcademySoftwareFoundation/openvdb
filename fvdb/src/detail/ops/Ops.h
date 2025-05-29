@@ -79,7 +79,7 @@ nanovdb::GridHandle<TorchDeviceBuffer> dispatchCreateNanoGridFromIJK(const Jagge
 
 template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer>
-dispatchCreateNanoGridFromDense(uint32_t batchSize,
+dispatchCreateNanoGridFromDense(int64_t batchSize,
                                 nanovdb::Coord origin,
                                 nanovdb::Coord size,
                                 torch::Device device,

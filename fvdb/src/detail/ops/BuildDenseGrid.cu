@@ -65,7 +65,7 @@ checkInputs(const torch::Device device,
 
 template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
-dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize,
+dispatchCreateNanoGridFromDense<torch::kCUDA>(int64_t batchSize,
                                               nanovdb::Coord ijkMin,
                                               nanovdb::Coord size,
                                               torch::Device device,
@@ -107,7 +107,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize,
 
     // Create a grid for each batch item and store the handles
     std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> handles;
-    for (int i = 0; i < batchSize; i += 1) {
+    for (int64_t i = 0; i < batchSize; i += 1) {
         const int64_t nVoxels = ijkData.size(0);
         handles.push_back(
             nVoxels == 0
@@ -129,7 +129,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize,
 
 template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
-dispatchCreateNanoGridFromDense<torch::kCPU>(uint32_t batchSize,
+dispatchCreateNanoGridFromDense<torch::kCPU>(int64_t batchSize,
                                              nanovdb::Coord ijkMin,
                                              nanovdb::Coord size,
                                              torch::Device device,
