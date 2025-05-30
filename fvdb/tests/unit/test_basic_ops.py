@@ -37,7 +37,6 @@ class TestBasicOps(unittest.TestCase):
         pass
 
     @parameterized.expand(["cpu", "cuda"])
-    @unittest.skip("Test fails with an illegal memory access")
     def test_dilate_grid(self, device):
         def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
             batch_size = len(npc)
