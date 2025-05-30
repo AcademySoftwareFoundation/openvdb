@@ -5,12 +5,12 @@
 
 #include <detail/GridBatchImpl.h>
 #include <detail/utils/AccessorHelpers.cuh>
-#include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/ForEachCUDA.cuh>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <detail/utils/cuda/Utils.cuh>
 
+#include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 
 #include <c10/cuda/CUDACachingAllocator.h>

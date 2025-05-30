@@ -20,7 +20,7 @@ namespace fvdb {
 
 struct GridBatch : torch::CustomClassHolder {
     // Set some speed limits so you don't shoot yourself in the foot
-    constexpr static int64_t MAX_GRIDS_PER_BATCH = 1024;
+    constexpr static int64_t MAX_GRIDS_PER_BATCH = detail::GridBatchImpl::MAX_GRIDS_PER_BATCH;
 
     explicit GridBatch(const torch::Device &device);
     explicit GridBatch(const std::string &device_string);

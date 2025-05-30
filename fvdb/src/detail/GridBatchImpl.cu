@@ -4,15 +4,14 @@
 #include "GridBatchImpl.h"
 
 #include <detail/ops/Ops.h>
-#include <detail/utils/CreateEmptyGrid.h>
+#include <detail/utils/nanovdb/CreateEmptyGridHandle.h>
 
 #include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/tools/CreateNanoGrid.h>
 
 #include <c10/core/DeviceType.h>
 #include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAGuard.h>
-
-#include <algorithm>
 
 namespace {
 
@@ -99,11 +98,16 @@ GridBatchImpl::GridBatchImpl(const torch::Device &device) {
     mBatchOffsets     = torch::zeros({1}, deviceTensorOptions.dtype(fvdb::JOffsetsScalarType));
     mListIndices      = torch::empty({0, 1}, deviceTensorOptions.dtype(fvdb::JLIdxScalarType));
 
-    auto gridHdl = createEmptyGrid(device);
+    auto gridHdl = createEmptyGridHandle(device);
     mGridHdl     = std::make_shared<nanovdb::GridHandle<TorchDeviceBuffer>>(std::move(gridHdl));
 
     mBatchMetadata.mIsContiguous = true;
 }
+
+GridBatchImpl::GridBatchImpl(const torch::Device &device,
+                             const nanovdb::Vec3d &voxelSize,
+                             const nanovdb::Vec3d &origin)
+    : GridBatchImpl(createEmptyGridHandle(device), {voxelSize}, {origin}) {}
 
 GridBatchImpl::GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
                              const std::vector<nanovdb::Vec3d> &voxelSizes,
@@ -1110,6 +1114,263 @@ template c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::indexInternal(const torch::TensorAccessor<int64_t, 1> &idx, int64_t size) const;
 template c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::indexInternal(const std::vector<int64_t> &idx, int64_t size) const;
+
+c10 ::intrusive_ptr<GridBatchImpl>
+createEmptyGrid(const torch::Device &device,
+                const nanovdb::Vec3d &voxelSize,
+                const nanovdb::Vec3d &origin) {
+    return c10::make_intrusive<GridBatchImpl>(device, voxelSize, origin);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromIjk(const JaggedTensor &ijk,
+                  const std::vector<nanovdb::Vec3d> &voxelSizes,
+                  const std::vector<nanovdb::Vec3d> &origins) {
+    detail::RAIIDeviceGuard guard(ijk.device());
+    TORCH_CHECK_VALUE(
+        ijk.ldim() == 1,
+        "Expected coords to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        ijk.ldim(),
+        "list dimensions");
+    TORCH_CHECK_TYPE(at::isIntegralType(ijk.scalar_type(), false), "ijk must have an integer type");
+    TORCH_CHECK_VALUE(ijk.rdim() == 2,
+                      std::string("Expected ijk to have 2 dimensions (shape (n, 3)) but got ") +
+                          std::to_string(ijk.rdim()) + " dimensions");
+    TORCH_CHECK_VALUE(ijk.rsize(1) == 3,
+                      "Expected 3 dimensional coords but got ijk.rshape[1] = " +
+                          std::to_string(ijk.rsize(1)));
+    TORCH_CHECK(ijk.num_tensors() == ijk.num_outer_lists(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+    TORCH_CHECK_VALUE(ijk.num_outer_lists() <= GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      "Cannot create a batch of grids with more than ",
+                      GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      " grids in it. ",
+                      "You passed in ",
+                      ijk.num_outer_lists(),
+                      " ijk sets.");
+
+    const int64_t numGrids = ijk.joffsets().size(0) - 1;
+    TORCH_CHECK(numGrids == ijk.num_outer_lists(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+
+    auto nanovdbGridHandle = FVDB_DISPATCH_KERNEL_DEVICE(
+        ijk.device(), [&]() { return detail::ops::dispatchCreateNanoGridFromIJK<DeviceTag>(ijk); });
+
+    return c10::make_intrusive<GridBatchImpl>(std::move(nanovdbGridHandle), voxelSizes, origins);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromPoints(const JaggedTensor &points,
+                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                     const std::vector<nanovdb::Vec3d> &origins) {
+    detail::RAIIDeviceGuard guard(points.device());
+    TORCH_CHECK_VALUE(
+        points.ldim() == 1,
+        "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        points.ldim(),
+        "list dimensions");
+    TORCH_CHECK_TYPE(points.is_floating_point(), "points must have a floating point type");
+    TORCH_CHECK_VALUE(points.rdim() == 2,
+                      std::string("Expected points to have 2 dimensions (shape (n, 3)) but got ") +
+                          std::to_string(points.rdim()) + " dimensions");
+    TORCH_CHECK_VALUE(points.rsize(1) == 3,
+                      "Expected 3 dimensional points but got points.rshape[1] = " +
+                          std::to_string(points.rsize(1)));
+    TORCH_CHECK(
+        points.num_tensors() == points.num_outer_lists(),
+        "If this happens, Francis' paranoia about tensors and points was justified. File a bug");
+    TORCH_CHECK_VALUE(points.num_outer_lists() <= GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      "Cannot create a grid with more than ",
+                      GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      " grids in a batch. ",
+                      "You passed in ",
+                      points.num_outer_lists(),
+                      " points sets.");
+
+    const int64_t numGrids = points.joffsets().size(0) - 1;
+    TORCH_CHECK(
+        numGrids == points.num_outer_lists(),
+        "If this happens, Francis' paranoia about grids and points was justified. File a bug");
+
+    std::vector<detail::VoxelCoordTransform> transforms;
+    transforms.reserve(numGrids);
+    for (int64_t i = 0; i < numGrids; i += 1) {
+        transforms.push_back(
+            detail::primalVoxelTransformForSizeAndOrigin(voxelSizes[i], origins[i]));
+    }
+
+    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(points.device(), [&]() {
+        return detail::ops::dispatchBuildGridFromPoints<DeviceTag>(points, transforms);
+    });
+
+    return c10::make_intrusive<detail::GridBatchImpl>(
+        std::move(pointGridBatchHdl), voxelSizes, origins);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromMesh(const JaggedTensor &meshVertices,
+                   const JaggedTensor &meshFaces,
+                   const std::vector<nanovdb::Vec3d> &voxelSizes,
+                   const std::vector<nanovdb::Vec3d> &origins) {
+    detail::RAIIDeviceGuard guard(meshVertices.device());
+    TORCH_CHECK_VALUE(
+        meshVertices.device() == meshFaces.device(),
+        "meshVertices and meshFaces must be on the same device, but got meshVertices.device() = ",
+        meshVertices.device(),
+        " and meshFaces.device() = ",
+        meshFaces.device());
+    TORCH_CHECK_VALUE(
+        meshVertices.ldim() == 1,
+        "Expected meshVertices to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        meshVertices.ldim(),
+        "list dimensions");
+    TORCH_CHECK_VALUE(
+        meshFaces.ldim() == 1,
+        "Expected meshFaces to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        meshFaces.ldim(),
+        "list dimensions");
+    TORCH_CHECK_TYPE(meshVertices.is_floating_point(),
+                     "meshVertices must have a floating point type");
+    TORCH_CHECK_VALUE(
+        meshVertices.rdim() == 2,
+        std::string("Expected meshVertices to have 2 dimensions (shape (n, 3)) but got ") +
+            std::to_string(meshVertices.rdim()) + " dimensions");
+    TORCH_CHECK_VALUE(meshVertices.rsize(1) == 3,
+                      "Expected 3 dimensional meshVertices but got meshVertices.rshape[1] = " +
+                          std::to_string(meshVertices.rsize(1)));
+
+    TORCH_CHECK_TYPE(!meshFaces.is_floating_point(), "meshFaces must have an integer type");
+    TORCH_CHECK_VALUE(
+        meshFaces.rdim() == 2,
+        std::string("Expected meshFaces to have 2 dimensions (shape (n, 3)) but got ") +
+            std::to_string(meshFaces.rdim()) + " dimensions");
+    TORCH_CHECK_VALUE(meshFaces.rsize(1) == 3,
+                      "Expected 3 dimensional meshFaces but got meshFaces.rshape[1] = " +
+                          std::to_string(meshFaces.rsize(1)));
+
+    TORCH_CHECK_VALUE(meshVertices.num_outer_lists() == meshFaces.num_outer_lists(),
+                      "Expected same number of vertex and face sets got len(meshVertices) = ",
+                      meshVertices.num_outer_lists(),
+                      " and len(meshFaces) = ",
+                      meshFaces.num_outer_lists());
+    const int64_t numGrids = meshVertices.joffsets().size(0) - 1;
+    TORCH_CHECK(numGrids == meshVertices.num_outer_lists(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+    TORCH_CHECK_VALUE(numGrids <= GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      "Cannot create a grid with more than ",
+                      GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      " grids in a batch. ",
+                      "You passed in ",
+                      numGrids,
+                      " mesh sets.");
+
+    std::vector<detail::VoxelCoordTransform> transforms;
+    transforms.reserve(numGrids);
+    for (int64_t i = 0; i < numGrids; i += 1) {
+        transforms.push_back(
+            detail::primalVoxelTransformForSizeAndOrigin(voxelSizes[i], origins[i]));
+    }
+
+    auto meshGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(meshVertices.device(), [&]() {
+        return detail::ops::dispatchBuildGridFromMesh<DeviceTag>(
+            meshVertices, meshFaces, transforms);
+    });
+    return c10::make_intrusive<detail::GridBatchImpl>(
+        std::move(meshGridBatchHdl), voxelSizes, origins);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+createDenseGrid(const int64_t numGrids,
+                const torch::Device &device,
+                const nanovdb::Coord &denseDims,
+                const nanovdb::Coord &ijkMin,
+                const std::vector<nanovdb::Vec3d> &voxelSizes,
+                const std::vector<nanovdb::Vec3d> &origins,
+                std::optional<torch::Tensor> mask) {
+    detail::RAIIDeviceGuard guard(device);
+    TORCH_CHECK_VALUE(numGrids >= 0, "numGrids must be non-negative");
+
+    if (mask.has_value()) {
+        TORCH_CHECK_VALUE(mask.value().dtype() == torch::kBool,
+                          "mask must be a boolean type or None");
+        TORCH_CHECK_VALUE(mask.value().dim() == 3, "mask must be 3 dimensional");
+        TORCH_CHECK_VALUE(mask.value().size(0) == denseDims[0],
+                          "mask must have shape (w, h, d) = denseDims");
+        TORCH_CHECK_VALUE(mask.value().size(1) == denseDims[1],
+                          "mask must have shape (w, h, d) = denseDims");
+        TORCH_CHECK_VALUE(mask.value().size(2) == denseDims[2],
+                          "mask must have shape (w, h, d) = denseDims");
+    }
+
+    TORCH_CHECK_VALUE(denseDims[0] >= 0 && denseDims[1] >= 0 && denseDims[2] >= 0,
+                      "denseDims must be non-negative");
+
+    TORCH_CHECK_VALUE(numGrids <= GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      "Cannot create a grid with more than ",
+                      GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      " grids in a batch. ",
+                      "You requested ",
+                      numGrids,
+                      " grids.");
+    TORCH_CHECK((size_t)numGrids == voxelSizes.size(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+    TORCH_CHECK((size_t)numGrids == origins.size(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+
+    auto denseGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device, [&]() {
+        return detail::ops::dispatchCreateNanoGridFromDense<DeviceTag>(
+            numGrids, ijkMin, denseDims, device, mask);
+    });
+    return c10::make_intrusive<detail::GridBatchImpl>(
+        std::move(denseGridBatchHdl), voxelSizes, origins);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromNearestVoxelsToPoints(const JaggedTensor &points,
+                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                    const std::vector<nanovdb::Vec3d> &origins) {
+    detail::RAIIDeviceGuard guard(points.device());
+    TORCH_CHECK_VALUE(
+        points.ldim() == 1,
+        "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+        points.ldim(),
+        "list dimensions");
+    TORCH_CHECK_TYPE(points.is_floating_point(), "points must have a floating point type");
+    TORCH_CHECK_VALUE(points.rdim() == 2,
+                      std::string("Expected points to have 2 dimensions (shape (n, 3)) but got ") +
+                          std::to_string(points.rdim()) + " dimensions");
+    TORCH_CHECK_VALUE(points.rsize(1) == 3,
+                      "Expected 3 dimensional points but got points.shape[1] = " +
+                          std::to_string(points.rsize(1)));
+    TORCH_CHECK(points.num_tensors() == points.num_outer_lists(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+    TORCH_CHECK_VALUE(points.num_outer_lists() <= GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      "Cannot create a grid with more than ",
+                      GridBatchImpl::MAX_GRIDS_PER_BATCH,
+                      " grids in a batch. ",
+                      "You passed in ",
+                      points.num_outer_lists(),
+                      " point sets.");
+
+    const int64_t numGrids = points.joffsets().size(0) - 1;
+    TORCH_CHECK(numGrids == points.num_outer_lists(),
+                "If this happens, Francis' paranoia was justified. File a bug");
+
+    std::vector<detail::VoxelCoordTransform> transforms;
+    transforms.reserve(numGrids);
+    for (int64_t i = 0; i < numGrids; i += 1) {
+        transforms.push_back(
+            detail::primalVoxelTransformForSizeAndOrigin(voxelSizes[i], origins[i]));
+    }
+
+    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(points.device(), [&]() {
+        return detail::ops::dispatchBuildGridFromNearestVoxelsToPoints<DeviceTag>(points,
+                                                                                  transforms);
+    });
+
+    return c10::make_intrusive<detail::GridBatchImpl>(
+        std::move(pointGridBatchHdl), voxelSizes, origins);
+}
 
 } // namespace detail
 } // namespace fvdb

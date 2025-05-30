@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_UTILS_CREATEEMPTYGRID_H
-#define FVDB_DETAIL_UTILS_CREATEEMPTYGRID_H
+#ifndef FVDB_DETAIL_UTILS_NANOVDB_CREATEEMPTYGRIDHANDLE_H
+#define FVDB_DETAIL_UTILS_NANOVDB_CREATEEMPTYGRIDHANDLE_H
 
 #include <detail/TorchDeviceBuffer.h>
 
@@ -14,7 +14,7 @@ namespace fvdb {
 namespace detail {
 
 inline nanovdb::GridHandle<TorchDeviceBuffer>
-createEmptyGrid(torch::Device device) {
+createEmptyGridHandle(torch::Device device) {
     using GridType         = nanovdb::ValueOnIndex;
     using ProxyGridT       = nanovdb::tools::build::Grid<float>;
     auto proxyGrid         = std::make_shared<ProxyGridT>(0.0f);
@@ -30,4 +30,4 @@ createEmptyGrid(torch::Device device) {
 } // namespace detail
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_UTILS_CREATEEMPTYGRID_H
+#endif // FVDB_DETAIL_UTILS_NANOVDB_CREATEEMPTYGRIDHANDLE_H

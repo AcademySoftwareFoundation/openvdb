@@ -25,6 +25,8 @@ namespace detail {
 
 class GridBatchImpl : public torch::CustomClassHolder {
   public:
+    static constexpr int64_t MAX_GRIDS_PER_BATCH = 1024; // Maximum number of grids in a batch
+
     // Metadata about a single grid in the batch
     struct GridMetadata {
         uint32_t version = 1;   // Version of this struct
@@ -260,6 +262,10 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     GridBatchImpl(const torch::Device &device);
 
+    GridBatchImpl(const torch::Device &device,
+                  const nanovdb::Vec3d &voxelSize,
+                  const nanovdb::Vec3d &origin);
+
     GridBatchImpl(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
                   const std::vector<nanovdb::Vec3d> &voxelSizes,
                   const std::vector<nanovdb::Vec3d> &voxelOrigins);
@@ -450,6 +456,20 @@ class GridBatchImpl : public torch::CustomClassHolder {
                         ") as index grid but got " + t.device().str());
     }
 
+    void
+    checkDevice(const std::optional<torch::Tensor> t) const {
+        if (t.has_value()) {
+            checkDevice(t.value());
+        }
+    }
+
+    void
+    checkDevice(const std::optional<JaggedTensor> t) const {
+        if (t.has_value()) {
+            checkDevice(t.value());
+        }
+    }
+
     JaggedTensor jaggedTensor(const torch::Tensor &data) const;
 
     void setGlobalPrimalTransform(const VoxelCoordTransform &transform);
@@ -500,6 +520,37 @@ class GridBatchImpl : public torch::CustomClassHolder {
 };
 
 template <typename GridType> using BatchGridAccessor = typename GridBatchImpl::Accessor<GridType>;
+
+c10::intrusive_ptr<GridBatchImpl> createEmptyGrid(const torch::Device &device,
+                                                  const nanovdb::Vec3d &voxelSize,
+                                                  const nanovdb::Vec3d &origin);
+
+c10::intrusive_ptr<GridBatchImpl> createGridFromIjk(const JaggedTensor &ijk,
+                                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                                    const std::vector<nanovdb::Vec3d> &origins);
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromPoints(const JaggedTensor &points,
+                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                     const std::vector<nanovdb::Vec3d> &origins);
+
+c10::intrusive_ptr<GridBatchImpl> createGridFromMesh(const JaggedTensor &meshVertices,
+                                                     const JaggedTensor &meshFaces,
+                                                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                                     const std::vector<nanovdb::Vec3d> &origins);
+
+c10::intrusive_ptr<GridBatchImpl>
+createGridFromNearestVoxelsToPoints(const JaggedTensor &points,
+                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                    const std::vector<nanovdb::Vec3d> &origins);
+
+c10::intrusive_ptr<GridBatchImpl> createDenseGrid(const int64_t numGrids,
+                                                  const torch::Device &device,
+                                                  const nanovdb::Coord &denseDims,
+                                                  const nanovdb::Coord &ijkMin,
+                                                  const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                                  const std::vector<nanovdb::Vec3d> &origins,
+                                                  std::optional<torch::Tensor> mask);
 
 } // namespace detail
 } // namespace fvdb

@@ -3,10 +3,10 @@
 //
 #include <detail/GridBatchImpl.h>
 #include <detail/utils/AccessorHelpers.cuh>
-#include <detail/utils/CreateEmptyGrid.h>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <detail/utils/cuda/Utils.cuh>
+#include <detail/utils/nanovdb/CreateEmptyGridHandle.h>
 
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 
@@ -111,7 +111,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(int64_t batchSize,
         const int64_t nVoxels = ijkData.size(0);
         handles.push_back(
             nVoxels == 0
-                ? createEmptyGrid(guide.device())
+                ? createEmptyGridHandle(guide.device())
                 : nanovdb::tools::cuda::voxelsToGrid<GridType, nanovdb::Coord *, TorchDeviceBuffer>(
                       (nanovdb::Coord *)ijkData.data_ptr(), nVoxels, 1.0, guide));
         C10_CUDA_KERNEL_LAUNCH_CHECK();
