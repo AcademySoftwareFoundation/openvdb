@@ -71,7 +71,7 @@ target_compile_options(_Cpp PRIVATE
     "-fvisibility=hidden"
     "-fvisibility-inlines-hidden"
     "-Wall"
-    # "-Werror"
+    "-Werror"
     "${TORCH_CXX_FLAGS}"
     >)
 
