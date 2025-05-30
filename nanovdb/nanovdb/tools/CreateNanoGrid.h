@@ -96,7 +96,7 @@
 #include <limits>
 #include <vector>
 #include <set>
-#include <cstring> // for memcpy
+#include <cstring> // for strncpy
 #include <type_traits>
 
 namespace nanovdb {// ============================================================================
@@ -1716,7 +1716,7 @@ void CreateNanoGrid<SrcGridT>::processGrid()
         dstGrid->mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
         char *blindData = util::PtrAdd<char>(mBufferPtr, mOffset.blind);
         for (const auto &b : mBlindMetaData) {
-            std::memcpy(metaData, b.metaData, sizeof(GridBlindMetaData));
+            *metaData = *b.metaData;
             metaData->setBlindData(blindData);// sets metaData.mOffset
             if (metaData->mDataClass == GridBlindDataClass::GridName) strcpy(blindData, mSrcNodeAcc.getName().c_str());
             ++metaData;
