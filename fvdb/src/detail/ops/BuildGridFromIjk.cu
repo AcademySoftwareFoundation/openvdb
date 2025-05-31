@@ -5,7 +5,6 @@
 #include <detail/utils/AccessorHelpers.cuh>
 #include <detail/utils/Utils.h>
 #include <detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <detail/utils/cuda/Utils.cuh>
 #include <detail/utils/nanovdb/CreateEmptyGridHandle.h>
 
 #define CCCL_INCLUSIVE_SUM_INIT_SUPPORTED (__CUDACC_VER_MAJOR__ >= 12 && __CUDACC_VER_MINOR__ >= 8)
