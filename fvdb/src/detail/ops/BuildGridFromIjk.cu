@@ -124,7 +124,7 @@ dispatchCreateNanoGridFromIJK<torch::kPrivateUse1>(const JaggedTensor &ijk) {
         const int64_t nVoxels  = ijkBOffset[i + 1] - startIdx;
 
         if (!nVoxels) {
-            auto handle = createEmptyGrid(ijk.device());
+            auto handle = createEmptyGridHandle(ijk.device());
             handles.emplace_back(std::move(handle));
         } else {
             int32_t *dataPtr = ijkData.data_ptr<int32_t>() + ijkData.stride(0) * startIdx;
