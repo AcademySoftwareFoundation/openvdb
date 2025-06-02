@@ -1153,7 +1153,7 @@ createGridFromIjk(const JaggedTensor &ijk,
     TORCH_CHECK(numGrids == ijk.num_outer_lists(),
                 "If this happens, Francis' paranoia was justified. File a bug");
 
-    auto nanovdbGridHandle = FVDB_DISPATCH_KERNEL_DEVICE(
+    auto nanovdbGridHandle = FVDB_DISPATCH_KERNEL(
         ijk.device(), [&]() { return detail::ops::dispatchCreateNanoGridFromIJK<DeviceTag>(ijk); });
 
     return c10::make_intrusive<GridBatchImpl>(std::move(nanovdbGridHandle), voxelSizes, origins);
@@ -1199,7 +1199,7 @@ createGridFromPoints(const JaggedTensor &points,
             detail::primalVoxelTransformForSizeAndOrigin(voxelSizes[i], origins[i]));
     }
 
-    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(points.device(), [&]() {
+    auto pointGridBatchHdl = FVDB_DISPATCH_KERNEL(points.device(), [&]() {
         return detail::ops::dispatchBuildGridFromPoints<DeviceTag>(points, transforms);
     });
 
