@@ -1116,16 +1116,16 @@ template c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::indexInternal(const std::vector<int64_t> &idx, int64_t size) const;
 
 c10 ::intrusive_ptr<GridBatchImpl>
-createEmptyGrid(const torch::Device &device,
-                const nanovdb::Vec3d &voxelSize,
-                const nanovdb::Vec3d &origin) {
+GridBatchImpl::createFromEmpty(const torch::Device &device,
+                               const nanovdb::Vec3d &voxelSize,
+                               const nanovdb::Vec3d &origin) {
     return c10::make_intrusive<GridBatchImpl>(device, voxelSize, origin);
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-createGridFromIjk(const JaggedTensor &ijk,
-                  const std::vector<nanovdb::Vec3d> &voxelSizes,
-                  const std::vector<nanovdb::Vec3d> &origins) {
+GridBatchImpl::createFromIjk(const JaggedTensor &ijk,
+                             const std::vector<nanovdb::Vec3d> &voxelSizes,
+                             const std::vector<nanovdb::Vec3d> &origins) {
     detail::RAIIDeviceGuard guard(ijk.device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
@@ -1160,9 +1160,9 @@ createGridFromIjk(const JaggedTensor &ijk,
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-createGridFromPoints(const JaggedTensor &points,
-                     const std::vector<nanovdb::Vec3d> &voxelSizes,
-                     const std::vector<nanovdb::Vec3d> &origins) {
+GridBatchImpl::createFromPoints(const JaggedTensor &points,
+                                const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                const std::vector<nanovdb::Vec3d> &origins) {
     detail::RAIIDeviceGuard guard(points.device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
@@ -1208,10 +1208,10 @@ createGridFromPoints(const JaggedTensor &points,
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-createGridFromMesh(const JaggedTensor &meshVertices,
-                   const JaggedTensor &meshFaces,
-                   const std::vector<nanovdb::Vec3d> &voxelSizes,
-                   const std::vector<nanovdb::Vec3d> &origins) {
+GridBatchImpl::createFromMesh(const JaggedTensor &meshVertices,
+                              const JaggedTensor &meshFaces,
+                              const std::vector<nanovdb::Vec3d> &voxelSizes,
+                              const std::vector<nanovdb::Vec3d> &origins) {
     detail::RAIIDeviceGuard guard(meshVertices.device());
     TORCH_CHECK_VALUE(
         meshVertices.device() == meshFaces.device(),
@@ -1280,13 +1280,13 @@ createGridFromMesh(const JaggedTensor &meshVertices,
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-createDenseGrid(const int64_t numGrids,
-                const torch::Device &device,
-                const nanovdb::Coord &denseDims,
-                const nanovdb::Coord &ijkMin,
-                const std::vector<nanovdb::Vec3d> &voxelSizes,
-                const std::vector<nanovdb::Vec3d> &origins,
-                std::optional<torch::Tensor> mask) {
+GridBatchImpl::dense(const int64_t numGrids,
+                     const torch::Device &device,
+                     const nanovdb::Coord &denseDims,
+                     const nanovdb::Coord &ijkMin,
+                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                     const std::vector<nanovdb::Vec3d> &origins,
+                     std::optional<torch::Tensor> mask) {
     detail::RAIIDeviceGuard guard(device);
     TORCH_CHECK_VALUE(numGrids >= 0, "numGrids must be non-negative");
 
@@ -1326,9 +1326,9 @@ createDenseGrid(const int64_t numGrids,
 }
 
 c10::intrusive_ptr<GridBatchImpl>
-createGridFromNearestVoxelsToPoints(const JaggedTensor &points,
-                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
-                                    const std::vector<nanovdb::Vec3d> &origins) {
+GridBatchImpl::createFromNeighborVoxelsToPoints(const JaggedTensor &points,
+                                                const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                                const std::vector<nanovdb::Vec3d> &origins) {
     detail::RAIIDeviceGuard guard(points.device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
@@ -1370,6 +1370,164 @@ createGridFromNearestVoxelsToPoints(const JaggedTensor &points,
 
     return c10::make_intrusive<detail::GridBatchImpl>(
         std::move(pointGridBatchHdl), voxelSizes, origins);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::coarsen(const nanovdb::Coord coarseningFactor) {
+    detail::RAIIDeviceGuard guard(device());
+    for (int i = 0; i < 3; i += 1) {
+        TORCH_CHECK_VALUE(coarseningFactor[i] > 0,
+                          "coarseningFactor must be strictly positive. Got [" +
+                              std::to_string(coarseningFactor[0]) + ", " +
+                              std::to_string(coarseningFactor[1]) + ", " +
+                              std::to_string(coarseningFactor[2]) + "]");
+    }
+
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+
+    auto coarseGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+        return detail::ops::dispatchBuildCoarseGridFromFine<DeviceTag>(*this, coarseningFactor);
+    });
+    auto ret =
+        c10::make_intrusive<detail::GridBatchImpl>(std::move(coarseGridBatchHdl), voxS, voxO);
+    ret->setCoarseTransformFromFineGrid(*this, coarseningFactor);
+    return ret;
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::upsample(const nanovdb::Coord upsampleFactor,
+                        const std::optional<JaggedTensor> mask) {
+    detail::RAIIDeviceGuard guard(device());
+    if (mask.has_value()) {
+        TORCH_CHECK_VALUE(
+            mask.value().ldim() == 1,
+            "Expected mask to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+            mask.value().ldim(),
+            "list dimensions");
+        TORCH_CHECK_VALUE(
+            mask.value().ldim() == 1,
+            "Expected subdiv_mask to have 1 list dimension, i.e. be a single list of coordinate values, but got",
+            mask.value().ldim(),
+            "list dimensions");
+        checkDevice(mask.value());
+        TORCH_CHECK(mask.value().jdata().sizes().size() == 1,
+                    "subdivision mask must have 1 dimension");
+        TORCH_CHECK(mask.value().jdata().size(0) == totalVoxels(),
+                    "subdivision mask must be either empty tensor or have one entry per voxel");
+        TORCH_CHECK(mask.value().scalar_type() == torch::kBool,
+                    "subdivision mask must be a boolean tensor");
+    }
+
+    for (int i = 0; i < 3; i += 1) {
+        TORCH_CHECK_VALUE(upsampleFactor[i] > 0,
+                          "subdiv_factor must be strictly positive. Got [" +
+                              std::to_string(upsampleFactor[0]) + ", " +
+                              std::to_string(upsampleFactor[1]) + ", " +
+                              std::to_string(upsampleFactor[2]) + "]");
+    }
+
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+    auto fineGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+        return detail::ops::dispatchBuildFineGridFromCoarse<DeviceTag>(*this, upsampleFactor, mask);
+    });
+    auto ret = c10::make_intrusive<detail::GridBatchImpl>(std::move(fineGridBatchHdl), voxS, voxO);
+    ret->setFineTransformFromCoarseGrid(*this, upsampleFactor);
+    return ret;
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::dual(const bool excludeBorder) {
+    detail::RAIIDeviceGuard guard(device());
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+
+    auto dualGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+        return detail::ops::dispatchBuildPaddedGrid<DeviceTag>(*this, 0, 1, excludeBorder);
+    });
+
+    auto ret = c10::make_intrusive<detail::GridBatchImpl>(std::move(dualGridBatchHdl), voxS, voxO);
+    ret->setPrimalTransformFromDualGrid(*this);
+    return ret;
+}
+
+std::tuple<c10::intrusive_ptr<GridBatchImpl>, JaggedTensor>
+GridBatchImpl::clipWithMask(const std::vector<nanovdb::Coord> &bboxMins,
+                            const std::vector<nanovdb::Coord> &bboxMaxs) {
+    detail::RAIIDeviceGuard guard(device());
+
+    JaggedTensor activeVoxelMask = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+        return fvdb::detail::ops::dispatchActiveVoxelsInBoundsMask<DeviceTag>(
+            *this, bboxMins, bboxMaxs);
+    });
+
+    JaggedTensor activeVoxelCoords = FVDB_DISPATCH_KERNEL_DEVICE(
+        device(), [&]() { return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*this); });
+
+    // active voxel coords masked by the voxels in bounds
+    JaggedTensor activeVoxelMaskCoords = activeVoxelCoords.rmask(activeVoxelMask.jdata());
+
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+    if (batchSize() == 0) {
+        return std::make_tuple(c10::make_intrusive<detail::GridBatchImpl>(device()),
+                               activeVoxelMask);
+    } else {
+        auto clippedGridPtr = GridBatchImpl::createFromIjk(activeVoxelMaskCoords, voxS, voxO);
+        return std::make_tuple(clippedGridPtr, activeVoxelMask);
+    }
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::clip(const std::vector<nanovdb::Coord> &ijkMin,
+                    const std::vector<nanovdb::Coord> &ijkMax) {
+    auto [clippedGridPtr, activeVoxelMask] = clipWithMask(ijkMin, ijkMax);
+    // We don't need the mask anymore, so we can just return the clipped grid
+    return clippedGridPtr;
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::dilate(const int dilationAmt) {
+    detail::RAIIDeviceGuard guard(device());
+    TORCH_CHECK_VALUE(dilationAmt > 0, "dilation must be strictly positive. Got ", dilationAmt);
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+    auto dilatedGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(
+        device(), [&]() { return detail::ops::dispatchDilateGrid<DeviceTag>(*this, dilationAmt); });
+    return c10::make_intrusive<detail::GridBatchImpl>(std::move(dilatedGridBatchHdl), voxS, voxO);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::convolutionOutput(const nanovdb::Coord kernelSize, const nanovdb::Coord stride) {
+    detail::RAIIDeviceGuard guard(device());
+    TORCH_CHECK_VALUE(nanovdb::Coord(0) < kernelSize, "kernel_size must be strictly positive.");
+    TORCH_CHECK_VALUE(nanovdb::Coord(0) < stride, "stride must be strictly positive.");
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+
+    auto convGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
+        return detail::ops::dispatchBuildGridForConv<DeviceTag>(*this, kernelSize, stride);
+    });
+    auto ret = c10::make_intrusive<detail::GridBatchImpl>(std::move(convGridBatchHdl), voxS, voxO);
+    // ret->setCoarseTransformFromFineGrid(*baseGrid, stride);
+    return ret;
 }
 
 } // namespace detail

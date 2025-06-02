@@ -128,8 +128,8 @@ JaggedTensor dispatchCoordsInGrid(const GridBatchImpl &batchHdl, const JaggedTen
 
 template <c10::DeviceType>
 JaggedTensor dispatchActiveVoxelsInBoundsMask(const GridBatchImpl &batchHdl,
-                                              const Vec3iBatch &ijkMin,
-                                              const Vec3iBatch &ijkMax);
+                                              const std::vector<nanovdb::Coord> &bboxMins,
+                                              const std::vector<nanovdb::Coord> &bboxMaxs);
 
 template <c10::DeviceType>
 std::vector<JaggedTensor> dispatchGridEdgeNetwork(const GridBatchImpl &gridHdl,

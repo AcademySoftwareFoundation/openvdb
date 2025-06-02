@@ -963,14 +963,6 @@ struct GridBatch : torch::CustomClassHolder {
     }
 
   private:
-    void buildCoarseFromFineGrid(const GridBatch &fineGrid, nanovdb::Coord branchFactor);
-
-    void buildFineFromCoarseGrid(const GridBatch &coarseGrid,
-                                 const std::optional<JaggedTensor> &subdivMask,
-                                 nanovdb::Coord subdivFactor);
-
-    void buildDualFromPrimalGrid(const GridBatch &primalGrid, bool excludeBorder = false);
-
     c10::intrusive_ptr<detail::GridBatchImpl> mImpl;
 };
 

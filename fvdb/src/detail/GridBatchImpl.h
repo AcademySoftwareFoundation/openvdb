@@ -513,6 +513,55 @@ class GridBatchImpl : public torch::CustomClassHolder {
     // Load a CPU int8 tensor into a grid batch handle
     static c10::intrusive_ptr<GridBatchImpl> deserialize(const torch::Tensor &serialized);
 
+    c10::intrusive_ptr<GridBatchImpl> coarsen(const nanovdb::Coord coarseningFactor);
+
+    c10::intrusive_ptr<GridBatchImpl> upsample(const nanovdb::Coord upsampleFactor,
+                                               const std::optional<JaggedTensor> mask);
+
+    c10::intrusive_ptr<GridBatchImpl> dual(const bool excludeBorder);
+
+    c10::intrusive_ptr<GridBatchImpl> clip(const std::vector<nanovdb::Coord> &ijkMin,
+                                           const std::vector<nanovdb::Coord> &ijkMax);
+
+    std::tuple<c10::intrusive_ptr<GridBatchImpl>, JaggedTensor>
+    clipWithMask(const std::vector<nanovdb::Coord> &ijkMin,
+                 const std::vector<nanovdb::Coord> &ijkMax);
+
+    c10::intrusive_ptr<GridBatchImpl> dilate(const int dilationAmt);
+
+    c10::intrusive_ptr<GridBatchImpl> convolutionOutput(const nanovdb::Coord kernelSize,
+                                                        const nanovdb::Coord stride);
+
+    static c10::intrusive_ptr<GridBatchImpl> createFromEmpty(const torch::Device &device,
+                                                             const nanovdb::Vec3d &voxelSize,
+                                                             const nanovdb::Vec3d &origin);
+    static c10::intrusive_ptr<GridBatchImpl>
+    createFromIjk(const JaggedTensor &ijk,
+                  const std::vector<nanovdb::Vec3d> &voxelSizes,
+                  const std::vector<nanovdb::Vec3d> &origins);
+    static c10::intrusive_ptr<GridBatchImpl>
+    createFromPoints(const JaggedTensor &points,
+                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                     const std::vector<nanovdb::Vec3d> &origins);
+
+    static c10::intrusive_ptr<GridBatchImpl>
+    createFromMesh(const JaggedTensor &meshVertices,
+                   const JaggedTensor &meshFaces,
+                   const std::vector<nanovdb::Vec3d> &voxelSizes,
+                   const std::vector<nanovdb::Vec3d> &origins);
+    static c10::intrusive_ptr<GridBatchImpl>
+    createFromNeighborVoxelsToPoints(const JaggedTensor &points,
+                                     const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                     const std::vector<nanovdb::Vec3d> &origins);
+
+    static c10::intrusive_ptr<GridBatchImpl> dense(const int64_t numGrids,
+                                                   const torch::Device &device,
+                                                   const nanovdb::Coord &denseDims,
+                                                   const nanovdb::Coord &ijkMin,
+                                                   const std::vector<nanovdb::Vec3d> &voxelSizes,
+                                                   const std::vector<nanovdb::Vec3d> &origins,
+                                                   std::optional<torch::Tensor> mask);
+
   private:
     // We're going to version serialization. These are v0
     torch::Tensor serializeV0() const;

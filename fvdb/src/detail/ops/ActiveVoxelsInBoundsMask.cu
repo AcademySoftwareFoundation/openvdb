@@ -79,19 +79,13 @@ GetActiveVoxelsInBoundsMask(const GridBatchImpl &gridBatch,
 template <c10::DeviceType DeviceTag>
 JaggedTensor
 ActiveVoxelsInBoundsMask(const GridBatchImpl &batchHdl,
-                         const Vec3iBatch &ijkMin,
-                         const Vec3iBatch &ijkMax) {
+                         const std::vector<nanovdb::Coord> &bboxMins,
+                         const std::vector<nanovdb::Coord> &bboxMaxs) {
     batchHdl.checkNonEmptyGrid();
 
     // output storage
     auto opts = torch::TensorOptions().dtype(torch::kBool).device(batchHdl.device());
     torch::Tensor outGridBoundsMask = torch::zeros({batchHdl.totalVoxels()}, opts);
-
-    // bbox to tensor storage
-    const std::vector<nanovdb::Coord> &bboxMins =
-        ijkMin.value(batchHdl.batchSize(), false, "ijk_min");
-    const std::vector<nanovdb::Coord> &bboxMaxs =
-        ijkMax.value(batchHdl.batchSize(), false, "ijk_max");
 
     torch::Tensor batchBboxes =
         torch::empty({batchHdl.batchSize(), 2, 3},
@@ -113,17 +107,17 @@ ActiveVoxelsInBoundsMask(const GridBatchImpl &batchHdl,
 template <>
 JaggedTensor
 dispatchActiveVoxelsInBoundsMask<torch::kCUDA>(const GridBatchImpl &batchHdl,
-                                               const Vec3iBatch &boundsMinIjk,
-                                               const Vec3iBatch &boundsMaxIjk) {
-    return ActiveVoxelsInBoundsMask<torch::kCUDA>(batchHdl, boundsMinIjk, boundsMaxIjk);
+                                               const std::vector<nanovdb::Coord> &bboxMins,
+                                               const std::vector<nanovdb::Coord> &bboxMaxs) {
+    return ActiveVoxelsInBoundsMask<torch::kCUDA>(batchHdl, bboxMins, bboxMaxs);
 }
 
 template <>
 JaggedTensor
 dispatchActiveVoxelsInBoundsMask<torch::kCPU>(const GridBatchImpl &batchHdl,
-                                              const Vec3iBatch &boundsMinIjk,
-                                              const Vec3iBatch &boundsMaxIjk) {
-    return ActiveVoxelsInBoundsMask<torch::kCPU>(batchHdl, boundsMinIjk, boundsMaxIjk);
+                                              const std::vector<nanovdb::Coord> &bboxMins,
+                                              const std::vector<nanovdb::Coord> &bboxMaxs) {
+    return ActiveVoxelsInBoundsMask<torch::kCPU>(batchHdl, bboxMins, bboxMaxs);
 }
 
 } // namespace ops
