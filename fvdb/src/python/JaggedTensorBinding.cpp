@@ -3,7 +3,7 @@
 //
 #include "TypeCasters.h"
 
-#include <FVDB.h>
+#include <fvdb/FVDB.h>
 
 #include <torch/extension.h>
 

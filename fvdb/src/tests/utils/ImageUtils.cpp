@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#include <tests/utils/ImageUtils.h>
+#include "ImageUtils.h"
 
 #include <torch/torch.h>
 

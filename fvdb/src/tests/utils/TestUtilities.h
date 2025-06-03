@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef FVDB_TESTS_UTILS_TESTUTILITIES_H
-#define FVDB_TESTS_UTILS_TESTUTILITIES_H
+#ifndef TESTS_UTILS_TESTUTILITIES_H
+#define TESTS_UTILS_TESTUTILITIES_H
 
 namespace fvdb::test {
 
@@ -20,4 +20,4 @@ printGreenOK() {
 
 } // namespace fvdb::test
 
-#endif // FVDB_TESTS_UTILS_TESTUTILITIES_H
+#endif // TESTS_UTILS_TESTUTILITIES_H

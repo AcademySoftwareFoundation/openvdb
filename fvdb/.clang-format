@@ -110,7 +110,7 @@ IncludeIsMainRegex: "$"
 IncludeCategories:
   - Regex:           '^"' # quoted includes
     Priority:        1
-  - Regex:           '^<(detail/|tests/|Types.h|JaggedTensor.h|GridBatch.h|SparseConvPackInfo.h|Config.h|FVDB.h|GaussianSplatting.h)' # fvdb includes
+  - Regex:           '^<fvdb/' # fvdb includes
     Priority:        2
   - Regex:           '^<nanovdb/' # nanovdb includes
     Priority:        3

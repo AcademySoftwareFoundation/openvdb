@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef FVDB_TESTS_UTILS_TILEBITMASK_H
-#define FVDB_TESTS_UTILS_TILEBITMASK_H
+#ifndef TESTS_UTILS_TILEBITMASK_H
+#define TESTS_UTILS_TILEBITMASK_H
 
 #include <climits>
 #include <cstdint>
@@ -118,4 +118,4 @@ template <typename T = std::uint64_t> class TileBitMask {
 };
 } // namespace fvdb::test
 
-#endif // FVDB_TESTS_UTILS_TILEBITMASK_H
+#endif // TESTS_UTILS_TILEBITMASK_H

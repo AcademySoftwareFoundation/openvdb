@@ -3,8 +3,8 @@
 //
 #include "TypeCasters.h"
 
-#include <FVDB.h>
-#include <GaussianSplatting.h>
+#include <fvdb/FVDB.h>
+#include <fvdb/GaussianSplatting.h>
 
 #include <torch/extension.h>
 

@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#include <detail/ops/Ops.h>
-#include <detail/ops/gsplat/GaussianSplatSparse.h>
+#include <fvdb/detail/ops/Ops.h>
+#include <fvdb/detail/ops/gsplat/GaussianSplatSparse.h>
 
 #include <torch/torch.h>
 

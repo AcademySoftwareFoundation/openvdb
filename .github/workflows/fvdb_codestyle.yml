@@ -61,7 +61,6 @@ jobs:
     - uses: swahtz/include-guards-check-action@master
       with:
         path: 'fvdb/src/'
-        pattern: 'FVDB_{path}'
 
   check-spdx-identifiers:
     name: Check SPDX identifiers

@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_PYTHON_TYPECASTERS_H
-#define FVDB_PYTHON_TYPECASTERS_H
+#ifndef PYTHON_TYPECASTERS_H
+#define PYTHON_TYPECASTERS_H
 
-#include <JaggedTensor.h>
-#include <Types.h>
+#include <fvdb/JaggedTensor.h>
+#include <fvdb/Types.h>
 
 #include <torch/extension.h>
 
@@ -280,4 +280,4 @@ INBOUND_TYPE_CASTER(fvdb::Vec3iBatch, loadVecBatch)
 } // namespace detail
 } // namespace pybind11
 
-#endif // FVDB_PYTHON_TYPECASTERS_H
+#endif // PYTHON_TYPECASTERS_H

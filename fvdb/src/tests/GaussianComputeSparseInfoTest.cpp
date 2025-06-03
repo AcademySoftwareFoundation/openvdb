@@ -5,7 +5,7 @@
 #include "utils/TestUtilities.h"
 #include "utils/TileBitMask.h"
 
-#include <detail/ops/gsplat/GaussianSplatSparse.h>
+#include <fvdb/detail/ops/gsplat/GaussianSplatSparse.h>
 
 #include <thrust/sort.h>
 

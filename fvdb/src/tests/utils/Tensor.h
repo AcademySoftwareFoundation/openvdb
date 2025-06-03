@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef FVDB_TESTS_UTILS_TENSOR_H
-#define FVDB_TESTS_UTILS_TENSOR_H
+#ifndef TESTS_UTILS_TENSOR_H
+#define TESTS_UTILS_TENSOR_H
 
 #include <torch/script.h>
 #include <torch/torch.h>
@@ -230,4 +230,4 @@ storeTensors(const std::string filePath,
 
 } // namespace fvdb::test
 
-#endif // FVDB_TESTS_UTILS_TENSOR_H
+#endif // TESTS_UTILS_TENSOR_H
