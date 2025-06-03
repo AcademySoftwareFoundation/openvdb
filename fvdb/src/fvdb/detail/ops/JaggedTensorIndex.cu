@@ -6,11 +6,6 @@
 #include <fvdb/detail/utils/Utils.h>
 #include <fvdb/detail/utils/cuda/Utils.cuh>
 
-#include <ATen/cuda/Atomic.cuh>
-
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-
 namespace fvdb {
 namespace detail {
 namespace ops {

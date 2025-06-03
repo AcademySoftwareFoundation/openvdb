@@ -14,8 +14,6 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAMathCompat.h>
 
-#include <thrust/device_vector.h>
-
 namespace fvdb {
 namespace detail {
 namespace ops {
