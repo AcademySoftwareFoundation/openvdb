@@ -345,4 +345,5 @@ bind_jagged_tensor(py::module &m) {
                 }
             }
         ));
+    py::implicitly_convertible<torch::Tensor, fvdb::JaggedTensor>();
 }

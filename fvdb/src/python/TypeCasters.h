@@ -17,31 +17,6 @@ namespace detail {
 
 const static inline pybind11::module TORCH_MODULE = py::module_::import("torch");
 
-template <> struct type_caster<fvdb::JaggedTensor> : public type_caster_base<fvdb::JaggedTensor> {
-    using base = type_caster_base<fvdb::JaggedTensor>;
-
-  public:
-    fvdb::JaggedTensor jag_value;
-
-    bool
-    load(handle src, bool convert) {
-        if (THPVariable_Check(src.ptr())) {
-            // TODO: (@fwilliams) Might need to reinterpret steal here?
-            torch::Tensor data = THPVariable_Unpack(src.ptr());
-            jag_value          = fvdb::JaggedTensor({data});
-            value              = &jag_value;
-            return true;
-        } else {
-            return base::load(src, convert);
-        }
-    }
-
-    static handle
-    cast(const fvdb::JaggedTensor &src, return_value_policy policy, handle parent) {
-        return base::cast(src, policy, parent);
-    }
-};
-
 // Already defined in upstream pytorch: https://github.com/pytorch/pytorch/pull/126865
 // (starting from version 2.4)
 #if (!defined(TORCH_VERSION_MAJOR) || (TORCH_VERSION_MAJOR < 2) || \
