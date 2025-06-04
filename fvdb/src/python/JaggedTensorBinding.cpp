@@ -2,25 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "TypeCasters.h"
-#include <FVDB.h>
+
+#include <fvdb/FVDB.h>
 
 #include <torch/extension.h>
 
 #include <pybind11/numpy.h>
+#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
+
+#include <optional>
 
 void
 bind_jagged_tensor(py::module &m) {
     py::class_<fvdb::JaggedTensor>(m, "JaggedTensor")
-        .def(py::init<std::vector<std::vector<torch::Tensor>>&>(), py::arg("tensor_list"))
-        .def(py::init<std::vector<torch::Tensor>&>(), py::arg("tensor_list"), R"_FVDB_(
-            Initialize JaggedTensor from a list of tensors.
-
-            Args:
-                tensor_list (list of torch.Tensor): Tensors in this list must have the same shape except for the first (jagged) dimension.
-
-            Returns:
-                jt (JaggedTensor): The concatenated JaggedTensor with the same order as the list.)_FVDB_")
         .def(py::init<torch::Tensor>(), py::arg("tensor"), R"_FVDB_(
             Initialize JaggedTensor from one single tensor.
 
@@ -29,6 +24,15 @@ bind_jagged_tensor(py::module &m) {
 
             Returns:
                 jt (JaggedTensor): The JaggedTensor of batch size 1 containing this single tensor.)_FVDB_")
+        .def(py::init<std::vector<torch::Tensor>&>(), py::arg("tensor_list"), R"_FVDB_(
+            Initialize JaggedTensor from a list of tensors.
+
+            Args:
+            tensor_list (list of torch.Tensor): Tensors in this list must have the same shape except for the first (jagged) dimension.
+
+            Returns:
+            jt (JaggedTensor): The concatenated JaggedTensor with the same order as the list.)_FVDB_")
+        .def(py::init<std::vector<std::vector<torch::Tensor>>&>(), py::arg("tensor_list"))
         .def_property("jdata", &fvdb::JaggedTensor::jdata, &fvdb::JaggedTensor::set_data, "The data of the JaggedTensor.")
         .def_property_readonly("jidx", [](const fvdb::JaggedTensor& self) {
             // FIXME: (@fwilliams) This is a bit ugly and the abstraction leaks
@@ -230,6 +234,8 @@ bind_jagged_tensor(py::module &m) {
 
         .def("jflatten", &fvdb::JaggedTensor::jflatten, py::arg("dim") = 0)
 
+        .def("jsqueeze", &fvdb::JaggedTensor::jsqueeze, py::arg("dim") = std::nullopt)
+
         .def("unbind", [](const fvdb::JaggedTensor& self) {
             if (self.ldim() == 1) {
                 return py::cast(self.unbind1());
@@ -339,4 +345,5 @@ bind_jagged_tensor(py::module &m) {
                 }
             }
         ));
+    py::implicitly_convertible<torch::Tensor, fvdb::JaggedTensor>();
 }

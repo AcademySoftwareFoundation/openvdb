@@ -11,7 +11,7 @@ import torch
 from parameterized import parameterized
 
 import fvdb
-from fvdb.utils.tests import get_fvdb_test_data_path, random_drop_points_if_mutable
+from fvdb.utils.tests import get_fvdb_test_data_path
 
 standard_dtypes_and_dims = [
     (torch.float16, 1),
@@ -50,7 +50,6 @@ all_names_compressed_devices_dtypes_and_dims = list(
         [True, False],  # Include names or not
         [True, False],  # Compressed
         ["cpu", "cuda"],  # Device
-        [True, False],  # Mutable
         all_dtypes_and_dims,
     )
 )
@@ -61,7 +60,7 @@ class TestIO(unittest.TestCase):
         pass
 
     @parameterized.expand(all_names_compressed_devices_dtypes_and_dims)
-    def test_save_and_load(self, batch_size, include_names, compressed, device, mutable, dtype_and_dim):
+    def test_save_and_load(self, batch_size, include_names, compressed, device, dtype_and_dim):
         dtype, dim = dtype_and_dim
         dim = [dim] if isinstance(dim, int) else list(dim)
         torch.manual_seed(0)
@@ -76,8 +75,7 @@ class TestIO(unittest.TestCase):
 
         sizes = [np.random.randint(100, 200) for _ in range(batch_size)]
         grid_ijk = fvdb.JaggedTensor([torch.randint(-512, 512, (sizes[i], 3)) for i in range(batch_size)]).to(device)
-        grid = fvdb.gridbatch_from_ijk(grid_ijk, mutable=mutable)
-        random_drop_points_if_mutable(grid, 0.5)
+        grid = fvdb.gridbatch_from_ijk(grid_ijk)
         sizes = [[int(grid.num_voxels[i].item())] + dim for i in range(batch_size)]
         data = fvdb.JaggedTensor([(torch.rand(*sizes[i], device=device) * 256).to(dtype) for i in range(batch_size)])
 
@@ -127,7 +125,6 @@ class TestIO(unittest.TestCase):
             else:
                 self.assertTrue(torch.all(grid.ijk.jdata == grid2.ijk.jdata))
                 self.assertTrue(torch.all(data.jdata == data2.jdata))
-                self.assertTrue(torch.all(grid.enabled_mask.jdata == grid2.enabled_mask.jdata))
 
     @parameterized.expand(itertools.product(["cuda", "cpu"], [1, 3]))
     def test_save_and_load_without_data(self, device, batch_size):

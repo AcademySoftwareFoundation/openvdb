@@ -8,21 +8,15 @@ import torch
 from parameterized import parameterized
 
 from fvdb import GridBatch
-from fvdb.utils.tests import gridbatch_from_dense_cube, random_drop_points_if_mutable
+from fvdb.utils.tests import gridbatch_from_dense_cube
 
 all_device_dtype_combos = [
-    ["cpu", torch.float16, False],
-    ["cuda", torch.float16, False],
-    ["cpu", torch.float32, False],
-    ["cuda", torch.float32, False],
-    ["cpu", torch.float64, False],
-    ["cuda", torch.float64, False],
-    ["cpu", torch.float16, True],
-    ["cuda", torch.float16, True],
-    ["cpu", torch.float32, True],
-    ["cuda", torch.float32, True],
-    ["cpu", torch.float64, True],
-    ["cuda", torch.float64, True],
+    ["cpu", torch.float16],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 all_device_combos = [
@@ -33,9 +27,9 @@ all_device_combos = [
 
 class TestUtils(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
-    def test_dense(self, device, dtype, mutable):
+    def test_dense(self, device, dtype):
         dense_vdb = gridbatch_from_dense_cube(
-            [10, 11, 12], (-2.0, -2.0, -2.0), (1.0, 1.0, 1.0), voxel_center=False, mutable=mutable, device=device
+            [10, 11, 12], (-2.0, -2.0, -2.0), (1.0, 1.0, 1.0), voxel_center=False, device=device
         )
         self.assertTrue(dense_vdb.total_voxels == 10 * 11 * 12)
 
@@ -55,16 +49,15 @@ class TestUtils(unittest.TestCase):
         self.assertTrue(torch.allclose(vdb_feature, vdb_feature2))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_from_dense(self, device, dtype, mutable):
+    def test_read_from_dense(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
-        random_drop_points_if_mutable(grid)
 
         dense_size = [np.random.randint(low=10, high=128) for _ in range(3)]
         random_grid = torch.randn(*dense_size, 4, device=device, dtype=dtype)
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
 
         for _ in range(10):
             dense_origin = (
@@ -98,16 +91,15 @@ class TestUtils(unittest.TestCase):
             self.assertTrue(torch.all(target_sparse == pred_sparse))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_from_dense_multidim(self, device, dtype, mutable):
+    def test_read_from_dense_multidim(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
-        random_drop_points_if_mutable(grid)
 
         dense_size = [np.random.randint(low=10, high=128) for _ in range(3)]
         random_grid = torch.randn(*dense_size, 4, 3, 2, device=device, dtype=dtype)
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
 
         for _ in range(10):
             dense_origin = (
@@ -141,12 +133,11 @@ class TestUtils(unittest.TestCase):
             self.assertTrue(torch.all(target_sparse == pred_sparse))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_read_from_dense_multidim_grad(self, device, dtype, mutable):
+    def test_read_from_dense_multidim_grad(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
-        random_drop_points_if_mutable(grid)
 
         dense_size = [np.random.randint(low=10, high=128) for _ in range(3)]
         random_grid = torch.randn(*dense_size, 4, 3, 2, device=device, dtype=dtype)
@@ -154,7 +145,7 @@ class TestUtils(unittest.TestCase):
         random_grid.requires_grad = True
         random_grid_copy.requires_grad = True
 
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
 
         for _ in range(10):
             dense_origin = (
@@ -196,15 +187,13 @@ class TestUtils(unittest.TestCase):
             self.assertTrue(torch.equal(random_grid.grad, random_grid_copy.grad))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_write_to_dense(self, device, dtype, mutable):
+    def test_write_to_dense(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
-        random_drop_points_if_mutable(grid)
-
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
         sparse_data = torch.randn((grid.total_voxels, 4), device=device, dtype=dtype)
 
         bbmin = ijk.min(0).values
@@ -230,22 +219,20 @@ class TestUtils(unittest.TestCase):
             )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
-            target_crop.view(-1, sparse_data.shape[-1])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
+            target_crop.view(-1, sparse_data.shape[-1])[idx] = sparse_data[keep_mask]
 
             pred_crop = grid.write_to_dense(sparse_data, crop_min, crop_size).squeeze(0)
 
             self.assertTrue(torch.all(pred_crop == target_crop))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_write_to_dense_multidim(self, device, dtype, mutable):
+    def test_write_to_dense_multidim(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
-        random_drop_points_if_mutable(grid)
-
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
         sparse_data = torch.randn((grid.total_voxels, 4, 3, 2), device=device, dtype=dtype)
 
         bbmin = ijk.min(0).values
@@ -271,22 +258,20 @@ class TestUtils(unittest.TestCase):
             )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
-            target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data[grid.enabled_mask.jdata][keep_mask]
+            target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data[keep_mask]
 
             pred_crop = grid.write_to_dense(sparse_data, crop_min, crop_size).squeeze(0)
 
             self.assertTrue(torch.all(pred_crop == target_crop))
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_write_to_dense_multidim_grad(self, device, dtype, mutable):
+    def test_write_to_dense_multidim_grad(self, device, dtype):
 
         random_points = torch.randn(100000, 3).to(device).to(dtype)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(random_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
-        random_drop_points_if_mutable(grid)
-
-        ijk = grid.ijk_enabled.jdata
+        ijk = grid.ijk.jdata
         sparse_data = torch.randn((grid.total_voxels, 4, 3, 2), device=device, dtype=dtype)
         sparse_data_copy = sparse_data.clone()
         sparse_data.requires_grad = True
@@ -315,7 +300,7 @@ class TestUtils(unittest.TestCase):
             )
             write_ijk = ijk_offset[keep_mask].contiguous()
             idx = write_ijk[:, 0] * crop_size[1] * crop_size[2] + write_ijk[:, 1] * crop_size[2] + write_ijk[:, 2]
-            target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data_copy[grid.enabled_mask.jdata][keep_mask]
+            target_crop.view(-1, *sparse_data.shape[1:])[idx] = sparse_data_copy[keep_mask]
 
             loss_copy = target_crop.sum()
             loss_copy.backward()

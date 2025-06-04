@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
-#ifndef FVDB_TESTS_UTILS_TENSOR_H
-#define FVDB_TESTS_UTILS_TENSOR_H
+#ifndef TESTS_UTILS_TENSOR_H
+#define TESTS_UTILS_TENSOR_H
 
 #include <torch/script.h>
 #include <torch/torch.h>
@@ -20,8 +20,10 @@ namespace fvdb::test {
 /// @param device The expected (torch) device of the tensor
 /// @return true if the tensor has the expected shape, type and device, false otherwise
 inline bool
-checkTensor(const torch::Tensor &tensor, const std::vector<int64_t> &shape,
-            const torch::ScalarType &type, const torch::Device &device = torch::kCPU) {
+checkTensor(const torch::Tensor &tensor,
+            const std::vector<int64_t> &shape,
+            const torch::ScalarType &type,
+            const torch::Device &device = torch::kCPU) {
 #if 0
     std::cout << "Tensor dimensions: " << tensor.dim() << std::endl;
     std::cout << "Expected shape: ";
@@ -39,7 +41,7 @@ checkTensor(const torch::Tensor &tensor, const std::vector<int64_t> &shape,
     std::cout << "Expected device: " << device << std::endl;
     std::cout << "Actual device: " << tensor.device() << std::endl;
 #endif
-    return tensor.dim() == shape.size() && tensor.sizes().vec() == shape &&
+    return tensor.dim() == static_cast<int64_t>(shape.size()) && tensor.sizes().vec() == shape &&
            tensor.scalar_type() == type && tensor.device() == device;
 }
 
@@ -173,7 +175,8 @@ storeTensorsDirect(const std::string &filePath, const std::vector<torch::Tensor>
 /// @param names The names of the tensors to store
 /// @throw c10::Error if the tensors are not stored successfully
 void
-storeTensorsModule(const std::string &filePath, const std::vector<torch::Tensor> &tensors,
+storeTensorsModule(const std::string &filePath,
+                   const std::vector<torch::Tensor> &tensors,
                    const std::vector<std::string> &names) {
     try {
 #if FVDB_TEST_PRINT_LOADSTORE_INFO
@@ -204,7 +207,8 @@ storeTensorsModule(const std::string &filePath, const std::vector<torch::Tensor>
 }
 
 void
-storeTensors(const std::string filePath, const std::vector<torch::Tensor> &tensors,
+storeTensors(const std::string filePath,
+             const std::vector<torch::Tensor> &tensors,
              const std::vector<std::string> &names) {
     try {
         storeTensorsModule(filePath, tensors, names);
@@ -226,4 +230,4 @@ storeTensors(const std::string filePath, const std::vector<torch::Tensor> &tenso
 
 } // namespace fvdb::test
 
-#endif // FVDB_TESTS_UTILS_TENSOR_H
+#endif // TESTS_UTILS_TENSOR_H

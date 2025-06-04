@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_PYTHON_TYPECASTERS_H
-#define FVDB_PYTHON_TYPECASTERS_H
+#ifndef PYTHON_TYPECASTERS_H
+#define PYTHON_TYPECASTERS_H
 
-#include <JaggedTensor.h>
-#include <Types.h>
+#include <fvdb/JaggedTensor.h>
+#include <fvdb/Types.h>
 
 #include <torch/extension.h>
 
@@ -16,31 +16,6 @@ namespace pybind11 {
 namespace detail {
 
 const static inline pybind11::module TORCH_MODULE = py::module_::import("torch");
-
-template <> struct type_caster<fvdb::JaggedTensor> : public type_caster_base<fvdb::JaggedTensor> {
-    using base = type_caster_base<fvdb::JaggedTensor>;
-
-  public:
-    fvdb::JaggedTensor jag_value;
-
-    bool
-    load(handle src, bool convert) {
-        if (THPVariable_Check(src.ptr())) {
-            // TODO: (@fwilliams) Might need to reinterpret steal here?
-            torch::Tensor data = THPVariable_Unpack(src.ptr());
-            jag_value          = fvdb::JaggedTensor({ data });
-            value              = &jag_value;
-            return true;
-        } else {
-            return base::load(src, convert);
-        }
-    }
-
-    static handle
-    cast(const fvdb::JaggedTensor &src, return_value_policy policy, handle parent) {
-        return base::cast(src, policy, parent);
-    }
-};
 
 // Already defined in upstream pytorch: https://github.com/pytorch/pytorch/pull/126865
 // (starting from version 2.4)
@@ -85,7 +60,7 @@ struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::Jagg
         }
         if (py::isinstance<py::slice>(src)) {
             py::ssize_t start, stop, step;
-            py::slice   slice = src.cast<py::slice>();
+            py::slice slice = src.cast<py::slice>();
             PySlice_Unpack(slice.ptr(), &start, &stop, &step);
 
             // FIXME: (@fwilliams) -- This is a bit weird. Ideally we want the same behavior as
@@ -156,9 +131,7 @@ struct type_caster<fvdb::NanoVDBFileGridIdentifier>
             } catch (pybind11::cast_error &e) {
                 try {
                     id_value = src.cast<std::vector<std::string>>();
-                } catch (pybind11::cast_error &e) {
-                    return false;
-                }
+                } catch (pybind11::cast_error &e) { return false; }
             }
             value = &id_value;
             return true;
@@ -282,4 +255,4 @@ INBOUND_TYPE_CASTER(fvdb::Vec3iBatch, loadVecBatch)
 } // namespace detail
 } // namespace pybind11
 
-#endif // FVDB_PYTHON_TYPECASTERS_H
+#endif // PYTHON_TYPECASTERS_H

@@ -14,28 +14,19 @@ import torchsparse_20.nn.functional as spF
 from parameterized import parameterized
 
 from fvdb import ConvPackBackend, GridBatch, JaggedTensor
-from fvdb.utils.tests import expand_tests, random_drop_points_if_mutable
+from fvdb.utils.tests import expand_tests
 
 all_device_dtype_combos = [
-    ["cuda", torch.bfloat16, False, "gather_scatter"],
-    ["cuda", torch.float16, False, "gather_scatter"],
-    ["cpu", torch.float32, False, "gather_scatter"],
-    ["cuda", torch.float32, False, "gather_scatter"],
-    ["cpu", torch.float64, False, "gather_scatter"],
-    ["cuda", torch.float64, False, "gather_scatter"],
-    ["cuda", torch.float16, False, "igemm"],
-    ["cuda", torch.float32, False, "igemm"],
-    ["cuda", torch.float16, False, "igemm_sorted"],
-    ["cuda", torch.float32, False, "igemm_sorted"],
-    ["cuda", torch.float16, True, "gather_scatter"],
-    ["cpu", torch.float32, True, "gather_scatter"],
-    ["cuda", torch.float32, True, "gather_scatter"],
-    ["cuda", torch.float16, True, "igemm"],
-    ["cuda", torch.float32, True, "igemm"],
-    ["cuda", torch.float16, True, "igemm_sorted"],
-    ["cuda", torch.float32, True, "igemm_sorted"],
-    ["cpu", torch.float64, True, "gather_scatter"],
-    ["cuda", torch.float64, True, "gather_scatter"],
+    ["cuda", torch.bfloat16, "gather_scatter"],
+    ["cuda", torch.float16, "gather_scatter"],
+    ["cpu", torch.float32, "gather_scatter"],
+    ["cuda", torch.float32, "gather_scatter"],
+    ["cpu", torch.float64, "gather_scatter"],
+    ["cuda", torch.float64, "gather_scatter"],
+    ["cuda", torch.float16, "igemm"],
+    ["cuda", torch.float32, "igemm"],
+    ["cuda", torch.float16, "igemm_sorted"],
+    ["cuda", torch.float32, "igemm_sorted"],
 ]
 
 
@@ -63,9 +54,9 @@ def build_spconv(grid, kernel_size, stride, backend):
 
 class TestConv(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
-    def test_conv_vs_torch_dense_simple(self, device, dtype, mutable, backend):
+    def test_conv_vs_torch_dense_simple(self, device, dtype, backend):
         torch.random.manual_seed(0)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, (1, 1, 1))
 
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -355,17 +346,16 @@ class TestConv(unittest.TestCase):
                 [torch.bfloat16, torch.float16, torch.float32, torch.float64],
                 [2, 3, 4, 5, 6],
                 [1, 2, 4],
-                [False, True],
                 ["gather_scatter", "igemm", "igemm_sorted"],
             )
         )
     )
-    def test_torch_sparse_conv(self, device, dtype, kernel_size, stride, mutable, backend):
+    def test_torch_sparse_conv(self, device, dtype, kernel_size, stride, backend):
         if device == "cpu" and dtype == torch.bfloat16:
             return
 
         torch.random.manual_seed(0)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, (32, 32, 32))
         tol = {}
         tol_grad = {}
@@ -450,17 +440,16 @@ class TestConv(unittest.TestCase):
                 [torch.float16, torch.float32, torch.float64],
                 [(3, 3, 3), (1, 3, 1), (1, 3, 3), (4, 1, 4), (5, 3, 1)],
                 [(1, 1, 1), (2, 2, 2), (3, 3, 3), (1, 2, 1), (1, 3, 2)],
-                [False, True],
                 ["gather_scatter", "igemm", "igemm_sorted"],
             )
         )
     )
-    def test_torch_sparse_aniso_conv(self, device, dtype, kernel_size: tuple, stride: tuple, mutable, backend):
+    def test_torch_sparse_aniso_conv(self, device, dtype, kernel_size: tuple, stride: tuple, backend):
         if (device == "cpu" or backend == "gather_scatter") and dtype == torch.float16:
             return
 
         torch.random.manual_seed(0)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, (32,) * 3)
         tol = {}
         tol_grad = {}
@@ -564,12 +553,12 @@ class TestConv(unittest.TestCase):
             for l, kernel_size, stride in itertools.product(all_device_dtype_combos, [2, 3, 4, 5, 6], [1])
         ]
     )
-    def test_torch_transposed_sparse_conv(self, device, dtype, mutable, backend, kernel_size, stride):
+    def test_torch_transposed_sparse_conv(self, device, dtype, backend, kernel_size, stride):
         if (device == "cpu" or backend == "gather_scatter") and dtype == torch.float16:
             return
 
         torch.random.manual_seed(0)
-        source_grid = GridBatch(mutable=mutable, device=device)
+        source_grid = GridBatch(device=device)
         source_grid.set_from_dense_grid(1, (32, 32, 32))
         tol = {}
         tol_grad = {}
@@ -656,15 +645,14 @@ class TestConv(unittest.TestCase):
         torch.backends.cudnn.allow_tf32 = True
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_error_inputs(self, device, dtype, mutable, backend):
+    def test_error_inputs(self, device, dtype, backend):
 
         torch.random.manual_seed(0)
 
-        grid = GridBatch(mutable=mutable).to(device)
+        grid = GridBatch().to(device)
         grid.set_from_points(
             torch.randn(1000, 3, device=device, dtype=torch.float), voxel_sizes=0.025, origins=[0.0, 0.0, 0.0]
         )
-        random_drop_points_if_mutable(grid)
 
         def do_conv(feats, kernels):
             kmap, _, symbol = build_spconv(grid, kernels.shape[-1], 1, backend)

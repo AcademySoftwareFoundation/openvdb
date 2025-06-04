@@ -18,16 +18,11 @@ from fvdb import GridBatch
 from fvdb.utils.tests import expand_tests
 
 all_device_dtype_combos = [
-    ["cuda", torch.float16, False],
-    ["cpu", torch.float32, False],
-    ["cuda", torch.float32, False],
-    ["cpu", torch.float64, False],
-    ["cuda", torch.float64, False],
-    ["cuda", torch.float16, True],
-    ["cpu", torch.float32, True],
-    ["cuda", torch.float32, True],
-    ["cpu", torch.float64, True],
-    ["cuda", torch.float64, True],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 
@@ -152,11 +147,11 @@ class TestNN(unittest.TestCase):
         pass
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_group_norm(self, device, dtype, mutable):
+    def test_group_norm(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
 
@@ -195,11 +190,11 @@ class TestNN(unittest.TestCase):
                     self.assertTrue(torch.mean(our_gn_grad - torch_gn_grad) < 1e-3)
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_max_pool(self, device, dtype, mutable):
+    def test_max_pool(self, device, dtype):
         vox_size = 0.05
         vox_origin = (0.0, 0.0, 0.0)
         gsize = int(1 / vox_size)
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_dense_grid(1, [20, 20, 20], voxel_sizes=vox_size, origins=vox_origin)
         assert grid.total_voxels == 20**3
         grid_vals = torch.randn(grid.total_voxels, 3).to(device).to(dtype)
@@ -351,7 +346,7 @@ class TestNN(unittest.TestCase):
         torch.backends.cudnn.allow_tf32 = True
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_conv_loop(self, device, dtype, mutable):
+    def test_conv_loop(self, device, dtype):
         # NOTE: This test is to test for a problem experienced in issue #287
         #       which was caused by problems with our python bindings + typecasters
         #       the indication that this test is working is that it doesn't segfault
@@ -361,7 +356,7 @@ class TestNN(unittest.TestCase):
             pts = torch.empty((10_000, 3), device=device).normal_()
             coords = torch.floor(pts / 0.01).to(torch.int32)
 
-            grid = GridBatch(mutable=mutable, device=device)
+            grid = GridBatch(device=device)
             grid.set_from_ijk(coords)
 
             feature = torch.empty((grid.total_voxels, 4), device=device, dtype=dtype).normal_()
