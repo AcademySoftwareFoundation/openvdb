@@ -634,6 +634,11 @@ GridBatch::dilated_grid(const int dilation) const {
     return GridBatch(impl()->dilate(dilation));
 }
 
+GridBatch
+GridBatch::merged_grid(const GridBatch &other) const {
+    return GridBatch(impl()->merge(other.impl()));
+}
+
 std::vector<JaggedTensor>
 GridBatch::voxels_along_rays(const JaggedTensor &ray_origins,
                              const JaggedTensor &ray_directions,

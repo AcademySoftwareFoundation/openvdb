@@ -528,6 +528,8 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     c10::intrusive_ptr<GridBatchImpl> dilate(const int dilationAmt);
 
+    c10::intrusive_ptr<GridBatchImpl> merge(c10::intrusive_ptr<GridBatchImpl> other);
+
     c10::intrusive_ptr<GridBatchImpl> convolutionOutput(const nanovdb::Coord kernelSize,
                                                         const nanovdb::Coord stride);
 

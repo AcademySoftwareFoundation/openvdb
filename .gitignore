@@ -1,3 +1,4 @@
 /build/*
 **/src/benchmarks/build/*
+nanovdb/nanovdb/build/*
 .DS_Store

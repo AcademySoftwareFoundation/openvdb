@@ -50,6 +50,10 @@ nanovdb::GridHandle<TorchDeviceBuffer> dispatchDilateGrid(const GridBatchImpl &g
                                                           const int dilation);
 
 template <c10::DeviceType>
+nanovdb::GridHandle<TorchDeviceBuffer> dispatchMergeGrids(const GridBatchImpl &gridBatch1,
+                                                          const GridBatchImpl &gridBatch2);
+
+template <c10::DeviceType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchBuildCoarseGridFromFine(const GridBatchImpl &fineGridBatch,
                                 const nanovdb::Coord branchingFactor);

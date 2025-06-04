@@ -318,6 +318,48 @@ struct DilateInternalNodesFunctor
 
 };
 
+template<class BuildT>
+struct MergeInternalNodesFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 64;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    void __device__
+    operator()(
+        NanoGrid<BuildT> *srcGrid,
+        NanoRoot<BuildT> *mergedRoot,
+        void *upperMasks_,
+        void *lowerMasks_)
+    {
+        int tID = threadIdx.x;
+        int lowerID = blockIdx.x;
+
+        using UpperMaskArrayT = Mask<5>*;
+        using LowerMaskArrayT = Mask<4>(*)[Mask<5>::SIZE];
+        auto upperMasks = static_cast<UpperMaskArrayT>(upperMasks_);
+        auto lowerMasks = static_cast<LowerMaskArrayT>(lowerMasks_);
+
+        using LowerMaskT = Mask<4>;
+        const auto& srcTree = srcGrid->tree();
+        const auto& lower = srcTree.template getFirstNode<1>()[lowerID];
+        auto& valueMask = const_cast<LowerMaskT&>(lower.childMask());
+
+        auto mergedTile = mergedRoot->probeTile(lower.origin());
+        uint64_t tileIndex =
+            util::PtrDiff(mergedTile, mergedRoot->tile(0))
+            / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid this?
+        auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(lower.origin());
+
+        auto& outputUpperMask = upperMasks[tileIndex];
+        auto& outputLowerMask = lowerMasks[tileIndex][upperChildIndex];
+        outputLowerMask.words()[tID] |= valueMask.words()[tID];
+        if (tID == 0)
+            outputUpperMask.setOnAtomic(upperChildIndex);
+        __syncthreads();
+    }
+
+};
+
 struct EnumerateNodesFunctor
 {
     static constexpr int MaxThreadsPerBlock = 256;
@@ -380,7 +422,7 @@ struct ProcessLowerNodesFunctor
         uint32_t *lowerParents,
         uint32_t *leafParents)
     {
-        int dilatedTileID = blockIdx.x;
+        int dilatedTileID = blockIdx.x; // TODO: Rename this so it is not specific to dilation
         int upperID = upperOffsets[dilatedTileID];
         int sliceID = blockIdx.y;
         int threadInWarpID = threadIdx.x & 0x1f;
@@ -598,6 +640,37 @@ struct DilateLeafNodesFunctor<BuildT, NN_FACE_EDGE_VERTEX>
                     dilatedWords[i] = originalWords[i-1][0][0] | originalWords[i][0][0] | originalWords[i+1][0][0];
             }
         return;
+    }
+
+};
+
+template<class BuildT>
+struct MergeLeafNodesFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 128;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+    static constexpr int SlicesPerLowerNode = 8;
+    static constexpr int LeafNodesPerSlice = 4096 / SlicesPerLowerNode;
+
+    __device__
+    void operator()(NanoGrid<BuildT> *srcGrid, NanoGrid<BuildT> *dstGrid )
+    {
+        int tID = threadIdx.x;
+        int lowerID = blockIdx.x;
+        int sliceID = blockIdx.y;
+
+        const auto& srcTree = srcGrid->tree();
+        const auto& dstTree = dstGrid->tree();
+        const auto& srcLower = srcTree.template getFirstNode<1>()[lowerID];
+
+        for ( std::size_t jj = sliceID*LeafNodesPerSlice; jj < (sliceID+1)*LeafNodesPerSlice; jj += MaxThreadsPerBlock )
+            if ( srcLower.childMask().isOn(jj+tID) ) {
+                auto& srcLeaf = *srcLower.data()->getChild(jj+tID);
+                const auto leafOrigin = srcLeaf.origin();
+                auto dstLeafPtr = dstTree.root().probeLeaf(leafOrigin);
+                auto& dstMask = const_cast<Mask<3>&>(dstLeafPtr->valueMask());
+                for (uint32_t w = 0; w < nanovdb::Mask<3>::WORD_COUNT; w++)
+                    dstMask.words()[w] |= srcLeaf.valueMask().words()[w]; }
     }
 
 };

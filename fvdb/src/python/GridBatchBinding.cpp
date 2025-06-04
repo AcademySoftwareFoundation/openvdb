@@ -456,6 +456,18 @@ bind_grid_batch(py::module &m) {
                 Returns:
                     dilated_grid (GridBatch): A GridBatch representing the dilated version of this grid batch.
              )_FVDB_")
+        .def("merged_grid",
+             &fvdb::GridBatch::merged_grid,
+             py::arg("other"),
+             R"_FVDB_(
+                Return a batch of grids representing the merged version of this batch with another
+
+                Args:
+                    other (GridBatch): Second GridBatch to merge with this
+
+                Returns:
+                    merged_grid (GridBatch): A GridBatch representing the merged version of this one and the one provided as argument
+             )_FVDB_")
 
         // Clipping to a bounding box
         .def("clip",

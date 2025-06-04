@@ -110,6 +110,7 @@ nanovdb_example(NAME "ex_collide_level_set")
 nanovdb_example(NAME "ex_raytrace_fog_volume")
 nanovdb_example(NAME "ex_raytrace_level_set")
 nanovdb_example(NAME "ex_dilate_nanovdb_cuda" OPENVDB)
+nanovdb_example(NAME "ex_merge_nanovdb_cuda" OPENVDB)
 
 if(CUDAToolkit_FOUND)
   nanovdb_example(NAME "ex_make_mgpu_nanovdb") # requires cuRAND

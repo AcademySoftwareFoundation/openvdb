@@ -5,19 +5,19 @@ import itertools
 import pickle
 import unittest
 
+import fvdb.nn as fvnn
 import numpy as np
 import torch
-from parameterized import parameterized
-
-import fvdb
-import fvdb.nn as fvnn
-from fvdb import GridBatch, JaggedTensor, gridbatch_from_ijk
 from fvdb.utils.tests import (
     dtype_to_atol,
     expand_tests,
     make_dense_grid_and_point_data,
     make_gridbatch_and_point_data,
 )
+from parameterized import parameterized
+
+import fvdb
+from fvdb import GridBatch, JaggedTensor, gridbatch_from_ijk
 
 all_device_dtype_combos = [
     ["cuda", torch.float16],
@@ -74,6 +74,42 @@ class TestBasicOps(unittest.TestCase):
         expected_grid = gridbatch_from_ijk(expected_ijk, voxel_sizes=grid_batch.voxel_sizes, origins=grid_batch.origins)
 
         self.assertTrue(torch.equal(dilated_grid_batch.ijk.jdata, expected_grid.ijk.jdata))
+
+    @parameterized.expand(["cpu", "cuda"])
+    def test_merge_grids(self, device):
+        def get_point_list(npc: list, device: torch.device | str) -> list[torch.Tensor]:
+            batch_size = len(npc)
+            plist = []
+            for i in range(batch_size):
+                ni = npc[i]
+                plist.append(torch.randn((ni, 3), dtype=torch.float32, device=device, requires_grad=False))
+            return plist
+
+        batch_size = 2
+        vxl_size = 0.4
+        npc = torch.randint(low=0, high=1000, size=(batch_size,), device=device).tolist()
+        plist = get_point_list(npc, device)
+        pc_jagged = fvdb.JaggedTensor(plist)
+        grid_batch1 = fvdb.gridbatch_from_points(pc_jagged, voxel_sizes=[[vxl_size] * 3] * batch_size)
+        npc = torch.randint(low=0, high=1000, size=(batch_size,), device=device).tolist()
+        plist = get_point_list(npc, device)
+        pc_jagged = fvdb.JaggedTensor(plist)
+        grid_batch2 = fvdb.gridbatch_from_points(pc_jagged, voxel_sizes=[[vxl_size] * 3] * batch_size)
+
+        merged_grid_batch = grid_batch1.merged_grid(grid_batch2)
+        expected_ijk = []
+        for i in range(batch_size):
+            ijk1_i = grid_batch1.ijk[i].jdata
+            ijk2_i = grid_batch2.ijk[i].jdata
+            ijk_union = torch.cat([ijk1_i, ijk2_i])
+            expected_ijk.append(ijk_union)
+        expected_ijk = fvdb.JaggedTensor(expected_ijk)
+
+        expected_grid = gridbatch_from_ijk(
+            expected_ijk, voxel_sizes=grid_batch1.voxel_sizes, origins=grid_batch1.origins
+        )
+
+        self.assertTrue(torch.equal(merged_grid_batch.ijk.jdata, expected_grid.ijk.jdata))
 
     @parameterized.expand(all_device_dtype_combos)
     def test_subdivide_1x_with_mask(self, device, dtype):

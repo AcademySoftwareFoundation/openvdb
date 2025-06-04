@@ -702,6 +702,12 @@ struct GridBatch : torch::CustomClassHolder {
     /// @return A GridBatch representing the dilated version of this batch of grids.
     GridBatch dilated_grid(const int dilation) const;
 
+    /// @brief Return a batch of grids representing the merged version of this batch of grids with a
+    /// second batch of grids
+    /// @param other The second grid batch to merge into this one
+    /// @return A GridBatch representing the union of both grid batches
+    GridBatch merged_grid(const GridBatch &other) const;
+
     /// @brief Return a batch of grids representing the clipped version of this batch of grids and
     /// corresponding features.
     /// @param features A JaggedTensor of shape [B, -1, *] containing features associated with this

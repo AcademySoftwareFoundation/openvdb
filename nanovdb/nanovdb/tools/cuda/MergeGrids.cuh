@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file nanovdb/tools/cuda/DilateGrid.cuh
+    \file nanovdb/tools/cuda/MergeGrids.cuh
 
     \authors Efty Sifakis
 
-    \brief Morphological dilation of NanoVDB indexGrids on the device
+    \brief Morphological union of NanoVDB indexGrids on the device
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED
+#define NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -31,7 +31,7 @@ namespace nanovdb {
 namespace tools::cuda {
 
 template <typename BuildT>
-class DilateGrid
+class MergeGrids
 {
     static_assert(nanovdb::BuildTraits<BuildT>::is_index);// For now, only indexGrids supported
 
@@ -60,15 +60,19 @@ public:
     };// Data
 
     /// @brief Constructor
-    /// @param deviceGrid source device grid to be dilated
+    /// @param d_srcGrid1 first source device grid to be merged
+    /// @param d_srcGrid2 second source device grid to be merged
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    DilateGrid(GridT* d_srcGrid, cudaStream_t stream = 0)
+    MergeGrids(GridT* d_srcGrid1, GridT* d_srcGrid2, cudaStream_t stream = 0)
         : mStream(stream), mTimer(stream)
     {
         mData = nanovdb::cuda::DeviceBuffer::create(sizeof(Data));
-        mDeviceSrcGrid = d_srcGrid;
+        mDeviceSrcGrid1 = d_srcGrid1;
+        mDeviceSrcGrid2 = d_srcGrid2;
         // TODO: Should this be moved in one of the process functions?
-        cudaCheck(cudaMemcpy(&mSrcTreeData, util::PtrAdd(mDeviceSrcGrid, GridT::memUsage()),
+        cudaCheck(cudaMemcpy(&mSrcTreeData1, util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage()),
+            TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
+        cudaCheck(cudaMemcpy(&mSrcTreeData2, util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage()),
             TreeT::memUsage(), cudaMemcpyDeviceToHost));// copy TreeData from GPU -> CPU
     }
 
@@ -80,11 +84,7 @@ public:
     /// @param mode Mode of checksum computation
     void setChecksum(CheckMode mode = CheckMode::Disable){mChecksum = mode;}
 
-    /// @brief Set type of dilation operation
-    /// @param op: NN_FACE=face neighbors, NN_FACE_EDGE=face and edge neibhros, NN_FACE_EDGE_VERTEX=26-connected neighbors
-    void setOperation(morphology::NearestNeighbors op) { mOp = op; }
-
-    /// @brief Creates a handle to the dilated grid
+    /// @brief Creates a handle to the merged grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param buffer optional buffer (currently ignored)
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
@@ -92,11 +92,11 @@ public:
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
-    void dilateRoot();
+    void mergeRoot();
 
     void allocateInternalMaskBuffers();
 
-    void dilateInternalNodes();
+    void mergeInternalNodes();
 
     void countNodes();
 
@@ -106,7 +106,7 @@ public:
 
     void processLowerNodes();
 
-    void dilateLeafNodes();
+    void mergeLeafNodes();
 
     void processBBox();
 
@@ -119,10 +119,12 @@ private:
     cudaStream_t                 mStream{0};
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
+    GridT                        *mDeviceSrcGrid1;
+    GridT                        *mDeviceSrcGrid2;
     GridT                        *mDeviceSrcGrid;
-    morphology::NearestNeighbors mOp{morphology::NN_FACE_EDGE_VERTEX};
-    TreeData                     mSrcTreeData;
-    nanovdb::cuda::DeviceBuffer  mDilatedRoot;
+    TreeData                     mSrcTreeData1;
+    TreeData                     mSrcTreeData2;
+    nanovdb::cuda::DeviceBuffer  mMergedRoot;
     nanovdb::cuda::DeviceBuffer  mUpperMasks;
     nanovdb::cuda::DeviceBuffer  mLowerMasks;
     nanovdb::cuda::DeviceBuffer  mUpperOffsets;
@@ -135,9 +137,10 @@ private:
     CheckMode                    mChecksum{CheckMode::Disable};
 
 public:
-    GridT* deviceSrcGrid()   { return mDeviceSrcGrid; }
-    auto deviceDilatedRoot() { return static_cast<RootT*>(mDilatedRoot.deviceData()); }
-    auto hostDilatedRoot()   { return static_cast<RootT*>(mDilatedRoot.data()); }
+    GridT* deviceSrcGrid1()   { return mDeviceSrcGrid1; }
+    GridT* deviceSrcGrid2()   { return mDeviceSrcGrid2; }
+    auto deviceMergedRoot() { return static_cast<RootT*>(mMergedRoot.deviceData()); }
+    auto hostMergedRoot()   { return static_cast<RootT*>(mMergedRoot.data()); }
     void* deviceUpperMasks() { return mUpperMasks.deviceData(); }
     void* deviceLowerMasks() { return mLowerMasks.deviceData(); }
     Data* data()             { return static_cast<Data*>(mData.data()); }
@@ -149,7 +152,7 @@ public:
     // TODO: make private
     template<typename BufferT>
     BufferT getBuffer(const BufferT &buffer);
-};// tools::cuda::DilateGrid<BuildT>
+};// tools::cuda::MergeGrids<BuildT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -173,45 +176,45 @@ public:
 template<typename BuildT>
 template<typename BufferT>
 GridHandle<BufferT>
-DilateGrid<BuildT>::getHandle(const BufferT &pool)
+MergeGrids<BuildT>::getHandle(const BufferT &pool)
 {
-    // Speculatively dilate root node
-    if (mVerbose==1) mTimer.start("\nDilating root node");
-    dilateRoot();
+    // Merge root nodes
+    if (mVerbose==1) mTimer.start("\nMerging root nodes");
+    mergeRoot();
 
-    // Allocate memory for dilated upper/lower masks
+    // Allocate memory for merged upper/lower masks
     if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
     allocateInternalMaskBuffers();
 
-    // Dilate masks of upper/lower nodes
-    if (mVerbose==1) mTimer.restart("Dilate internal nodes");
-    dilateInternalNodes();
+    // Merge masks of upper/lower nodes
+    if (mVerbose==1) mTimer.restart("Merge internal nodes");
+    mergeInternalNodes();
 
     // Enumerate tree nodes
-    if (mVerbose==1) mTimer.restart("Count dilated tree nodes");
+    if (mVerbose==1) mTimer.restart("Count merged tree nodes");
     countNodes();
 
     cudaStreamSynchronize(mStream);
 
-    // Allocate new device grid buffer for dilated result
-    if (mVerbose==1) mTimer.restart("Allocating dilated grid buffer");
+    // Allocate new device grid buffer for merged result
+    if (mVerbose==1) mTimer.restart("Allocating merged grid buffer");
     auto buffer = getBuffer(pool);
 
-    // Process GridData/TreeData/RootData of dilated result
+    // Process GridData/TreeData/RootData of merged result
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
     processGridTreeRoot();
 
-    // Process upper nodes of dilated result
+    // Process upper nodes of merged result
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
     processUpperNodes();
 
-    // Process lower nodes of dilated result
+    // Process lower nodes of merged result
     if (mVerbose==1) mTimer.restart("Processing lower nodes");
     processLowerNodes();
 
-    // Dilate leaf node active masks into new topology
-    if (mVerbose==1) mTimer.restart("Dilating leaf nodes");
-    dilateLeafNodes();
+    // Merge leaf node active masks into new topology
+    if (mVerbose==1) mTimer.restart("Merging leaf nodes");
+    mergeLeafNodes();
 
     // Process bounding boxes
     if (mVerbose==1) mTimer.restart("Processing bounding boxes");
@@ -225,129 +228,106 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// DilateGrid<BuildT>::getHandle
+}// MergeGrids<BuildT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void DilateGrid<BuildT>::dilateRoot()
+void MergeGrids<BuildT>::mergeRoot()
 {
-    // This method conservatively and speculatively dilates the root tiles, to accommodate
-    // any new root nodes that might be introduced by the dilation operation.
-    // The index-space bounding box of each tile is examined, and if it is within a 1-pixel of
-    // intersecting any of the 26-connected neighboring root tiles, those are preemptively
-    // introduced into the root topology.
-    // (As of the present implementation this presumes a maximum of 1-voxel radius in dilation)
-    // Root tiles that were preemptively introduced, but end up having no active contents will
-    // be pruned in later stages of processing.
+    // Creates a new merged tree root with the merged tiles of the two input root topologies
 
     int device = 0;
     cudaGetDevice(&device);
 
-    // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
-    // TODO: Consider avoiding to copy the entire set of upper nodes
-    auto deviceSrcRoot = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
-    uint64_t rootAndUpperSize = mSrcTreeData.mNodeOffset[1] - mSrcTreeData.mNodeOffset[3];
-    auto srcRootAndUpperBuffer = nanovdb::HostBuffer::create(rootAndUpperSize);
-    cudaCheck(cudaMemcpy(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost));
-    auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
+    // Make a host copy of the source root topology RootNode for both inputs
 
-    // Keep a hashed list of root tiles to include; initialize with the ones in the source topology
-    std::set<nanovdb::Coord> dilatedTileOrigins;
-    std::vector<typename RootT::Tile> dilatedTiles;
-    for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
-        auto srcTile = srcRootAndUpper->tile(t);
-        dilatedTiles.push_back(*srcTile);
-        dilatedTileOrigins.insert(srcTile->origin()); }
+    auto deviceSrcRoot1 = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid1, GridT::memUsage() + mSrcTreeData1.mNodeOffset[3]));
+    auto deviceSrcRoot2 = static_cast<RootT*>(util::PtrAdd(mDeviceSrcGrid2, GridT::memUsage() + mSrcTreeData2.mNodeOffset[3]));
+    uint64_t rootSize1 = mSrcTreeData1.mNodeOffset[2] - mSrcTreeData1.mNodeOffset[3];
+    uint64_t rootSize2 = mSrcTreeData2.mNodeOffset[2] - mSrcTreeData2.mNodeOffset[3];
+    auto srcRootBuffer1 = nanovdb::HostBuffer::create(rootSize1);
+    auto srcRootBuffer2 = nanovdb::HostBuffer::create(rootSize2);
+    cudaCheck(cudaMemcpy(srcRootBuffer1.data(), deviceSrcRoot1, rootSize1, cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(srcRootBuffer2.data(), deviceSrcRoot2, rootSize2, cudaMemcpyDeviceToHost));
+    auto srcRoot1 = static_cast<RootT*>(srcRootBuffer1.data());
+    auto srcRoot2 = static_cast<RootT*>(srcRootBuffer2.data());
 
-    // For each original root tile, consider adding those tiles in its 26-connected neighborhood
-    for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
-        auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
-        const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
+    // Merge tiles of two sources in a sorted container
 
-        static constexpr int32_t rootTileDim = UpperT::DIM; // 4096
-        for (int di = -rootTileDim; di <= rootTileDim; di += rootTileDim)
-        for (int dj = -rootTileDim; dj <= rootTileDim; dj += rootTileDim)
-        for (int dk = -rootTileDim; dk <= rootTileDim; dk += rootTileDim) {
-            nanovdb::CoordBBox testBBox = nanovdb::CoordBBox::createCube(srcUpper->origin().offsetBy(di,dj,dk), rootTileDim);
-            if (testBBox.hasOverlap(dilatedBBox) & (dilatedTileOrigins.count(testBBox.min()) == 0)) {
-                typename RootT::Tile neighborTile{RootT::CoordToKey(testBBox.min())}; // Only the key value is needed; child pointer & value will be unused
-                dilatedTiles.push_back(neighborTile);
-                dilatedTileOrigins.insert(testBBox.min());
-            }
-        }
-    }
+    std::set<nanovdb::Coord> mergedTileOrigins;
+    for (uint32_t t = 0; t < srcRoot1->tileCount(); t++) {
+        auto origin = srcRoot1->tile(t)->origin();
+        if (!mergedTileOrigins.count(origin)) mergedTileOrigins.insert(origin); }
+    for (uint32_t t = 0; t < srcRoot2->tileCount(); t++) {
+        auto origin = srcRoot2->tile(t)->origin();
+        if (!mergedTileOrigins.count(origin)) mergedTileOrigins.insert(origin); }
+    std::vector<typename RootT::Tile> mergedTiles;
+    mergedTiles.reserve(mergedTileOrigins.size());
+    for (const auto& origin: mergedTileOrigins) {
+        typename RootT::Tile tile{RootT::CoordToKey(origin)};
+        mergedTiles.push_back(tile); }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
-    mDilatedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto dilatedRootPtr = static_cast<RootT*>(mDilatedRoot.data());
-    dilatedRootPtr->mTableSize = dilatedTiles.size();
-    for (uint32_t t = 0; t < dilatedTiles.size(); t++)
-        *dilatedRootPtr->tile(t) = dilatedTiles[t];
-    mDilatedRoot.deviceUpload(device, mStream, false);
-}// DilateGrid<BuildT>::dilateRoot
+    uint64_t rootSize = RootT::memUsage(mergedTiles.size());
+    mMergedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
+    auto mergedRootPtr = static_cast<RootT*>(mMergedRoot.data());
+    mergedRootPtr->mTableSize = mergedTiles.size();
+    for (std::size_t t = 0; t < mergedTiles.size(); t++)
+        *mergedRootPtr->tile(t) = mergedTiles[t];
+    mMergedRoot.deviceUpload(device, mStream, false);
+}// MergeGrids<BuildT>::mergeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void DilateGrid<BuildT>::allocateInternalMaskBuffers()
+void MergeGrids<BuildT>::allocateInternalMaskBuffers()
 {
     // Allocate (and zero-fill) buffers large enough to hold:
-    // (a) The serialized masks of all upper nodes, for all tiles in the dilated root node, and
+    // (a) The serialized masks of all upper nodes, for all tiles in the merged root node, and
     // (b) The serialized masks of all densified lower nodes, as if every upper node had a full set of 32^3 lower children
     int device = 0;
     cudaGetDevice(&device);
-    uint64_t upperSize = hostDilatedRoot()->tileCount() * sizeof(Mask<5>);
-    uint64_t lowerSize = hostDilatedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
+    uint64_t upperSize = hostMergedRoot()->tileCount() * sizeof(Mask<5>);
+    uint64_t lowerSize = hostMergedRoot()->tileCount() * Mask<5>::SIZE * sizeof(Mask<4>);
     mUpperMasks = nanovdb::cuda::DeviceBuffer::create(upperSize, nullptr, device, mStream);
     if (mUpperMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer on device");
     cudaCheck(cudaMemsetAsync(mUpperMasks.deviceData(), 0, upperSize, mStream));
     mLowerMasks = nanovdb::cuda::DeviceBuffer::create( lowerSize, nullptr, device, mStream );
     if (mLowerMasks.deviceData() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer on device");
     cudaCheck(cudaMemsetAsync(mLowerMasks.deviceData(), 0, lowerSize, mStream));
-}// DilateGrid<BuildT>::allocateInternalMaskBuffers
+}// MergeGrids<BuildT>::allocateInternalMaskBuffers
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void DilateGrid<BuildT>::dilateInternalNodes()
+void MergeGrids<BuildT>::mergeInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the dilation operation
-    // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
-    // as if every upper node had a full set of 32^3 lower children
-    if (mOp == morphology::NN_FACE) {
-        using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
-    else if (mOp == morphology::NN_FACE_EDGE) {
-        using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
-    else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-        using Op = morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
-        util::cuda::operatorKernel<Op>
-            <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid(), deviceDilatedRoot(), deviceUpperMasks(), deviceLowerMasks()); }
-}// DilateGrid<BuildT>::dilateInternalNodes
+    // Merges the masks of upper and lower nodes from both input topologies into the
+    // densified, pre-allocated mask arrays of the merged result
+    using Op = morphology::cuda::MergeInternalNodesFunctor<BuildT>;
+    util::cuda::operatorKernel<Op>
+        <<<mSrcTreeData1.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
+        (deviceSrcGrid1(), deviceMergedRoot(), deviceUpperMasks(), deviceLowerMasks());
+    util::cuda::operatorKernel<Op>
+        <<<mSrcTreeData2.mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
+        (deviceSrcGrid2(), deviceMergedRoot(), deviceUpperMasks(), deviceLowerMasks());
+}// MergeGrids<BuildT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT>
-void DilateGrid<BuildT>::countNodes()
+void MergeGrids<BuildT>::countNodes()
 {
     // Computes prefix sums of (a) non-empty lower nodes, (b) counts of their leaf children,
-    // and (c) count of the speculatively dilated root tiles that have actually been used.
-    // These are used to reconstruct child offsets for the internal nodes of the dilated tree,
-    // as well as the tile table at the root.
-    auto dilatedTileCount = hostDilatedRoot()->tileCount();
-    std::size_t size = dilatedTileCount*Mask<5>::SIZE;
+    // and (c) count of the merged root tiles. These are used to reconstruct child offsets
+    // for the internal nodes of the merged tree, as well as the tile table at the root.
+    auto mergedTileCount = hostMergedRoot()->tileCount();
+    std::size_t size = mergedTileCount*Mask<5>::SIZE;
 
     int device = 0;
     cudaGetDevice(&device);
-    nanovdb::cuda::DeviceBuffer upperCountsBuffer = nanovdb::cuda::DeviceBuffer::create(dilatedTileCount*sizeof(uint32_t), nullptr, device, mStream);
+    nanovdb::cuda::DeviceBuffer upperCountsBuffer = nanovdb::cuda::DeviceBuffer::create(mergedTileCount*sizeof(uint32_t), nullptr, device, mStream);
     nanovdb::cuda::DeviceBuffer lowerCountsBuffer = nanovdb::cuda::DeviceBuffer::create(size*sizeof(uint32_t), nullptr, device, mStream);
     nanovdb::cuda::DeviceBuffer leafCountsBuffer = nanovdb::cuda::DeviceBuffer::create(size*sizeof(uint32_t), nullptr, device, mStream);
 
@@ -357,10 +337,10 @@ void DilateGrid<BuildT>::countNodes()
 
     using Op = morphology::cuda::EnumerateNodesFunctor;
     util::cuda::operatorKernel<Op>
-        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>
+        <<<dim3(mergedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>
         (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
 
-    mUpperOffsets = nanovdb::cuda::DeviceBuffer::create((dilatedTileCount+1)*sizeof(uint32_t), nullptr, device, mStream);
+    mUpperOffsets = nanovdb::cuda::DeviceBuffer::create((mergedTileCount+1)*sizeof(uint32_t), nullptr, device, mStream);
     mLowerOffsets = nanovdb::cuda::DeviceBuffer::create((size+1)*sizeof(uint32_t), nullptr, device, mStream);
     mLeafOffsets = nanovdb::cuda::DeviceBuffer::create((size+1)*sizeof(uint32_t), nullptr, device, mStream);
 
@@ -378,8 +358,8 @@ void DilateGrid<BuildT>::countNodes()
         size);
     cudaCheck(cudaMemcpyAsync(&data()->nodeCount[0], static_cast<uint32_t*>(mLeafOffsets.deviceData())+size, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
 
-    util::cuda::lambdaKernel<<<numBlocks(dilatedTileCount), mNumThreads, 0, mStream>>>(
-        dilatedTileCount,
+    util::cuda::lambdaKernel<<<numBlocks(mergedTileCount), mNumThreads, 0, mStream>>>(
+        mergedTileCount,
         [] __device__(size_t tileID, CountType lowerOffsets, uint32_t* upperCounts)
             { upperCounts[tileID] = (lowerOffsets[tileID+1][0] > lowerOffsets[tileID][0]) ? 1 : 0; },
         static_cast<CountType>(mLowerOffsets.deviceData()),
@@ -389,17 +369,17 @@ void DilateGrid<BuildT>::countNodes()
     CALL_CUBS(DeviceScan::InclusiveSum,
         static_cast<uint32_t*>(upperCountsBuffer.deviceData()),
         static_cast<uint32_t*>(mUpperOffsets.deviceData())+1,
-        dilatedTileCount);
-    cudaCheck(cudaMemcpyAsync(&data()->nodeCount[2], static_cast<uint32_t*>(mUpperOffsets.deviceData())+dilatedTileCount, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-}// DilateGrid<BuildT>::countNodes
+        mergedTileCount);
+    cudaCheck(cudaMemcpyAsync(&data()->nodeCount[2], static_cast<uint32_t*>(mUpperOffsets.deviceData())+mergedTileCount, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+}// MergeGrids<BuildT>::countNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
 template <typename BufferT>
-BufferT DilateGrid<BuildT>::getBuffer(const BufferT &pool)
+BufferT MergeGrids<BuildT>::getBuffer(const BufferT &pool)
 {
-    // Allocates a device buffer for the destination (dilated) grid, once the topology/size of the tree is known
+    // Allocates a device buffer for the destination (merged) grid, once the topology/size of the tree is known
     data()->grid  = 0;// grid is always stored at the start of the buffer!
     data()->tree  = NanoGrid<BuildT>::memUsage();// grid ends and tree begins
     data()->root  = data()->tree  + NanoTree<BuildT>::memUsage(); // tree ends and root node begins
@@ -419,7 +399,7 @@ BufferT DilateGrid<BuildT>::getBuffer(const BufferT &pool)
     mData.deviceUpload(device, mStream, false);
 
     return buffer;
-}// DilateGrid<BuildT>::getBuffer
+}// MergeGrids<BuildT>::getBuffer
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -427,7 +407,7 @@ template <typename BuildT>
 struct BuildGridTreeRootFunctor
 {
     __device__
-    void operator()(size_t, typename DilateGrid<BuildT>::Data *d_data) {
+    void operator()(size_t, typename MergeGrids<BuildT>::Data *d_data) {
 
         // process Root
         auto &root = d_data->getRoot();
@@ -435,7 +415,7 @@ struct BuildGridTreeRootFunctor
         root.mBackground = NanoRoot<BuildT>::ValueType(0);// background_value
         root.mMinimum = root.mMaximum = NanoRoot<BuildT>::ValueType(0);
         root.mAverage = root.mStdDevi = NanoRoot<BuildT>::FloatType(0);
-        root.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel dilation
+        root.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel merging
 
         // process Tree
         auto &tree = d_data->getTree();
@@ -446,7 +426,7 @@ struct BuildGridTreeRootFunctor
         tree.mNodeCount[2] = d_data->nodeCount[2];
         tree.mNodeCount[1] = d_data->nodeCount[1];
         tree.mNodeCount[0] = d_data->nodeCount[0];
-        tree.mVoxelCount = 0; // Actual voxel count will only be known once leaf masks have been dilated
+        tree.mVoxelCount = 0; // Actual voxel count will only be known once leaf masks have been merged
         // TODO: Does this need to be updated later?
         tree.mTileCount[2] = tree.mTileCount[1] =  tree.mTileCount[0] = 0;
 
@@ -458,14 +438,15 @@ struct BuildGridTreeRootFunctor
 };
 
 template <typename BuildT>
-void DilateGrid<BuildT>::processGridTreeRoot()
+void MergeGrids<BuildT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // TODO: Check for instances where extra processing is needed
-    cudaCheck(cudaMemcpyAsync(&data()->getGrid(), deviceSrcGrid()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+    // TODO: check that the second grid input has consistent GridData, too
+    cudaCheck(cudaMemcpyAsync(&data()->getGrid(), deviceSrcGrid1()->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, BuildGridTreeRootFunctor<BuildT>(), deviceData());
     cudaCheckError();
-}// DilateGrid<BuildT>::processGridTreeRoot
+}// MergeGrids<BuildT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -473,15 +454,15 @@ template <typename BuildT>
 struct BuildUpperNodesFunctor
 {
     __device__
-    void operator()(size_t dilatedTileID, typename DilateGrid<BuildT>::Data *d_data, NanoRoot<BuildT> *d_dilatedRoot) {
-        uint32_t tileID = d_data->d_upperOffsets[dilatedTileID];
-        if (tileID != d_data->d_upperOffsets[dilatedTileID+1]) // if the offsets are the same, this was a speculatively dilated tile which was not necessary
+    void operator()(size_t mergedTileID, typename MergeGrids<BuildT>::Data *d_data, NanoRoot<BuildT> *d_mergedRoot) {
+        uint32_t tileID = d_data->d_upperOffsets[mergedTileID];
+        if (tileID != d_data->d_upperOffsets[mergedTileID+1]) // TODO: This should always succeed, if the inputs were properly pruned
         {
             auto &root  = d_data->getRoot();
             auto &dstUpper = d_data->getUpper(tileID);
-            auto &dilatedTile = *d_dilatedRoot->tile(dilatedTileID);
-            root.tile(tileID)->setChild( dilatedTile.origin(), &dstUpper, &root );
-            dstUpper.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel dilation
+            auto &mergedTile = *d_mergedRoot->tile(mergedTileID);
+            root.tile(tileID)->setChild( mergedTile.origin(), &dstUpper, &root );
+            dstUpper.mBBox = CoordBBox(); // To be further updated after the leaf-level voxel merging
             // TODO: Is this accurate? Any other flags that should be set?
             dstUpper.mFlags = (uint64_t)GridFlags::HasBBox;
         }
@@ -489,25 +470,25 @@ struct BuildUpperNodesFunctor
 };
 
 template <typename BuildT>
-inline void DilateGrid<BuildT>::processUpperNodes()
+inline void MergeGrids<BuildT>::processUpperNodes()
 {
     // Connect all newly allocated upper nodes to their respective tiles
     // Also fill in any necessary part of the preamble (in InternalData) of upper nodes
-    auto dilatedTileCount = hostDilatedRoot()->tileCount();
+    auto mergedTileCount = hostMergedRoot()->tileCount();
 
-    util::cuda::lambdaKernel<<<numBlocks(dilatedTileCount), mNumThreads, 0, mStream>>>(
-        dilatedTileCount, BuildUpperNodesFunctor<BuildT>(), deviceData(), deviceDilatedRoot());
+    util::cuda::lambdaKernel<<<numBlocks(mergedTileCount), mNumThreads, 0, mStream>>>(
+        mergedTileCount, BuildUpperNodesFunctor<BuildT>(), deviceData(), deviceMergedRoot());
     cudaCheckError();
-}// DilateGrid<BuildT>::processUpperNodes
+}// MergeGrids<BuildT>::processUpperNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template <typename BuildT>
-inline void DilateGrid<BuildT>::processLowerNodes()
+inline void MergeGrids<BuildT>::processLowerNodes()
 {
     // Fill out the contents of all newly allocated lower nodes (using the densified upper/lower mask arrays)
     // Also fill in the preamble (most of LeafData) for their leaf children
-    auto dilatedTileCount = hostDilatedRoot()->tileCount();
+    auto mergedTileCount = hostMergedRoot()->tileCount();
     using CountType = uint32_t (*)[Mask<5>::SIZE];
  
     int device = 0;
@@ -519,7 +500,7 @@ inline void DilateGrid<BuildT>::processLowerNodes()
 
     using Op = morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
     util::cuda::operatorKernel<Op>
-        <<<dim3(dilatedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>(
+        <<<dim3(mergedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>(
             deviceUpperMasks(),
             deviceLowerMasks(),
             static_cast<uint32_t*>(mUpperOffsets.deviceData()),
@@ -530,12 +511,12 @@ inline void DilateGrid<BuildT>::processLowerNodes()
             static_cast<uint32_t*>(mLeafParents.deviceData())
         );
     cudaCheckError();
-    mDilatedRoot.clear(mStream);
+    mMergedRoot.clear(mStream);
     mUpperMasks.clear(mStream);
     mLowerMasks.clear(mStream);
     mLowerOffsets.clear(mStream);
     mLeafOffsets.clear(mStream);
-}// DilateGrid<BuildT>::processLowerNodes
+}// MergeGrids<BuildT>::processLowerNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -543,7 +524,7 @@ template <typename BuildT>
 struct UpdateLeafVoxelCountsAndPrefixSumFunctor
 {
     __device__
-    void operator()(size_t leafID, typename DilateGrid<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
+    void operator()(size_t leafID, typename MergeGrids<BuildT>::Data *d_data, uint64_t *d_voxelCounts) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         const uint64_t *w = leaf.mValueMask.words();
         uint64_t prefixSum = 0, sum = util::countOn(*w++);
@@ -560,28 +541,21 @@ template <typename BuildT>
 struct UpdateLeafVoxelOffsetsFunctor
 {
     __device__
-    void operator()(size_t leafID, typename DilateGrid<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
+    void operator()(size_t leafID, typename MergeGrids<BuildT>::Data *d_data, uint64_t *d_voxelOffsets) {
         auto &leaf = d_data->getGrid().tree().template getFirstNode<0>()[leafID];
         leaf.mOffset = d_voxelOffsets[leafID]+1; }
 };
 
 template<typename BuildT>
-void DilateGrid<BuildT>::dilateLeafNodes()
+void MergeGrids<BuildT>::mergeLeafNodes()
 {
-    // Dilates the active masks of the source grid (as indicated at the leaf level), into a new grid that
-    // has been already topologically dilated to include all necessary leaf nodes.
-    if (mOp == morphology::NN_FACE) {
-        using Op = morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
-        nanovdb::util::cuda::operatorKernel<Op>
-            <<<dim3(data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-            (deviceSrcGrid(), static_cast<GridT*>(data()->d_bufferPtr)); }
-    else if (mOp == morphology::NN_FACE_EDGE)
-        throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
-    else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-        using Op = morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
-        nanovdb::util::cuda::operatorKernel<Op>
-            <<<dim3(data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
-            (deviceSrcGrid(), static_cast<GridT*>(data()->d_bufferPtr)); }
+    using Op = morphology::cuda::MergeLeafNodesFunctor<BuildT>;
+    nanovdb::util::cuda::operatorKernel<Op>
+        <<<dim3(mSrcTreeData1.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
+        (deviceSrcGrid1(), static_cast<GridT*>(data()->d_bufferPtr));
+    nanovdb::util::cuda::operatorKernel<Op>
+        <<<dim3(mSrcTreeData2.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
+        (deviceSrcGrid2(), static_cast<GridT*>(data()->d_bufferPtr));
 
     int device = 0;
     cudaGetDevice(&device);
@@ -604,7 +578,7 @@ template <typename BuildT>
 struct UpdateAndPropagateLeafBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename DilateGrid<BuildT>::Data *d_data, const uint32_t* leafParents) {
+    void operator()(size_t tid, typename MergeGrids<BuildT>::Data *d_data, const uint32_t* leafParents) {
         auto &lower = d_data->getLower(leafParents[tid]);
         auto &leaf = d_data->getLeaf(tid);
         leaf.updateBBox();
@@ -616,7 +590,7 @@ template <typename BuildT>
 struct PropagateLowerBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename DilateGrid<BuildT>::Data *d_data, const uint32_t* lowerParents) {
+    void operator()(size_t tid, typename MergeGrids<BuildT>::Data *d_data, const uint32_t* lowerParents) {
         auto &upper = d_data->getUpper(lowerParents[tid]);
         auto &lower = d_data->getLower(tid);
         upper.mBBox.expandAtomic(lower.bbox()); }
@@ -626,7 +600,7 @@ template <typename BuildT>
 struct PropagateUpperBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename DilateGrid<BuildT>::Data *d_data) {
+    void operator()(size_t tid, typename MergeGrids<BuildT>::Data *d_data) {
         d_data->getRoot().mBBox.expandAtomic(d_data->getUpper(tid).bbox());
     }
 };
@@ -635,7 +609,7 @@ template <typename BuildT>
 struct UpdateRootWorldBBoxFunctor
 {
     __device__
-    void operator()(size_t tid, typename DilateGrid<BuildT>::Data *d_data) {
+    void operator()(size_t tid, typename MergeGrids<BuildT>::Data *d_data) {
         // TODO: check that the correct semantics are followed in this transformation
         auto BBox = d_data->getRoot().mBBox;
         BBox.max() += 1;
@@ -644,7 +618,7 @@ struct UpdateRootWorldBBoxFunctor
 };
 
 template <typename BuildT>
-inline void DilateGrid<BuildT>::processBBox()
+inline void MergeGrids<BuildT>::processBBox()
 {
     // TODO: Do we need a special case when flags indicates no bounding box?
 
@@ -667,7 +641,7 @@ inline void DilateGrid<BuildT>::processBBox()
     // update the world-bbox in the root node
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, UpdateRootWorldBBoxFunctor<BuildT>(), deviceData());
     cudaCheckError();
-}// DilateGrid<BuildT>::processBBox
+}// MergeGrids<BuildT>::processBBox
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -675,7 +649,7 @@ template <typename BuildT>
 struct PostProcessGridTreeFunctor
 {
     __device__
-    void operator()(size_t tid, typename DilateGrid<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
+    void operator()(size_t tid, typename MergeGrids<BuildT>::Data *d_data, uint64_t* d_voxelOffsets) {
         auto& grid = d_data->getGrid();
         auto& tree = grid.tree();
         auto leafCount = tree.mNodeCount[0];
@@ -688,7 +662,7 @@ struct PostProcessGridTreeFunctor
 };
 
 template <typename BuildT>
-inline void DilateGrid<BuildT>::postProcessGridTree()
+inline void MergeGrids<BuildT>::postProcessGridTree()
 {
     // Finish updates to GridData/TreeData and (optionally) update checksum
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, PostProcessGridTreeFunctor<BuildT>(), deviceData(), static_cast<uint64_t*>(mVoxelOffsets.deviceData()));
@@ -696,10 +670,10 @@ inline void DilateGrid<BuildT>::postProcessGridTree()
     mVoxelOffsets.clear(mStream);
 
     tools::cuda::updateChecksum((GridData*)data()->d_bufferPtr, mChecksum, mStream);
-}// DilateGrid<BuildT>::postProcessGridTree
+}// MergeGrids<BuildT>::postProcessGridTree
 
 }// namespace tools::cuda
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NVIDIA_TOOLS_CUDA_MERGEGRIDS_CUH_HAS_BEEN_INCLUDED

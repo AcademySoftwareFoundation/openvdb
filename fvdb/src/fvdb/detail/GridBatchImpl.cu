@@ -1511,6 +1511,23 @@ GridBatchImpl::dilate(const int dilationAmt) {
 }
 
 c10::intrusive_ptr<GridBatchImpl>
+GridBatchImpl::merge(c10::intrusive_ptr<GridBatchImpl> other) {
+    detail::RAIIDeviceGuard guard(device());
+    TORCH_CHECK_VALUE(this->batchSize() == other->batchSize(),
+                      "GridBatches to merge should have same batch size");
+    TORCH_CHECK_VALUE(this->device() == other->device(),
+                      "GridBatches to merge should be on same device/host");
+    if (batchSize() == 0) {
+        return c10::make_intrusive<detail::GridBatchImpl>(device());
+    }
+    std::vector<nanovdb::Vec3d> voxS, voxO;
+    gridVoxelSizesAndOrigins(voxS, voxO);
+    auto mergedGridBatchHdl = FVDB_DISPATCH_KERNEL_DEVICE(
+        device(), [&]() { return detail::ops::dispatchMergeGrids<DeviceTag>(*this, *other); });
+    return c10::make_intrusive<detail::GridBatchImpl>(std::move(mergedGridBatchHdl), voxS, voxO);
+}
+
+c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::convolutionOutput(const nanovdb::Coord kernelSize, const nanovdb::Coord stride) {
     detail::RAIIDeviceGuard guard(device());
     TORCH_CHECK_VALUE(nanovdb::Coord(0) < kernelSize, "kernel_size must be strictly positive.");

@@ -57,6 +57,7 @@ set(FVDB_CU_FILES
     fvdb/detail/ops/BuildGridFromMesh.cu
     fvdb/detail/ops/BuildFineGridFromCoarse.cu
     fvdb/detail/ops/BuildDilatedGrid.cu
+    fvdb/detail/ops/BuildMergedGrids.cu
     fvdb/detail/ops/BuildDenseGrid.cu
     fvdb/detail/ops/BuildCoarseGridFromFine.cu
     fvdb/detail/ops/BuildGridFromIjk.cu
