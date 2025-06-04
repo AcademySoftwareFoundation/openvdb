@@ -571,37 +571,6 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
 template <typename GridType> using BatchGridAccessor = typename GridBatchImpl::Accessor<GridType>;
 
-c10::intrusive_ptr<GridBatchImpl> createEmptyGrid(const torch::Device &device,
-                                                  const nanovdb::Vec3d &voxelSize,
-                                                  const nanovdb::Vec3d &origin);
-
-c10::intrusive_ptr<GridBatchImpl> createGridFromIjk(const JaggedTensor &ijk,
-                                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
-                                                    const std::vector<nanovdb::Vec3d> &origins);
-
-c10::intrusive_ptr<GridBatchImpl>
-createGridFromPoints(const JaggedTensor &points,
-                     const std::vector<nanovdb::Vec3d> &voxelSizes,
-                     const std::vector<nanovdb::Vec3d> &origins);
-
-c10::intrusive_ptr<GridBatchImpl> createGridFromMesh(const JaggedTensor &meshVertices,
-                                                     const JaggedTensor &meshFaces,
-                                                     const std::vector<nanovdb::Vec3d> &voxelSizes,
-                                                     const std::vector<nanovdb::Vec3d> &origins);
-
-c10::intrusive_ptr<GridBatchImpl>
-createGridFromNearestVoxelsToPoints(const JaggedTensor &points,
-                                    const std::vector<nanovdb::Vec3d> &voxelSizes,
-                                    const std::vector<nanovdb::Vec3d> &origins);
-
-c10::intrusive_ptr<GridBatchImpl> createDenseGrid(const int64_t numGrids,
-                                                  const torch::Device &device,
-                                                  const nanovdb::Coord &denseDims,
-                                                  const nanovdb::Coord &ijkMin,
-                                                  const std::vector<nanovdb::Vec3d> &voxelSizes,
-                                                  const std::vector<nanovdb::Vec3d> &origins,
-                                                  std::optional<torch::Tensor> mask);
-
 } // namespace detail
 } // namespace fvdb
 
