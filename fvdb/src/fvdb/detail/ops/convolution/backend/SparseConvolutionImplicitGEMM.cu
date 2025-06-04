@@ -119,15 +119,15 @@ __pack_bfloat162(const __nv_bfloat16 x, const __nv_bfloat16 y) {
 
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_bf16bf16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode0_bf16bf16f32(int M,
-                                                                   int K_original,
-                                                                   int N,
-                                                                   int kernel_volume,
-                                                                   __nv_bfloat16 *__restrict__ A,
-                                                                   __nv_bfloat16 *__restrict__ B,
-                                                                   int *__restrict__ out_in_map,
-                                                                   __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting1_mode0_bf16bf16f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             __nv_bfloat16 *__restrict__ A,
+                                             __nv_bfloat16 *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             __nv_bfloat16 *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     const int K_tile  = 16; // min(16, K_original);
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
@@ -395,15 +395,15 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode0_bf16bf16f32(int M,
 
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32(int M,
-                                                                 int K_original,
-                                                                 int N,
-                                                                 int kernel_volume,
-                                                                 half *__restrict__ A,
-                                                                 half *__restrict__ B,
-                                                                 int *__restrict__ out_in_map,
-                                                                 half *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting1_mode0_f16f16f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           half *__restrict__ A,
+                                           half *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           half *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     const int K_tile  = 16; // min(16, K_original);
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
@@ -731,15 +731,15 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f16f16f32(int M,
 }
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_bf16bf16f32
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode0_bf16bf16f32(int M,
-                                                                   int K_original,
-                                                                   int N,
-                                                                   int kernel_volume,
-                                                                   __nv_bfloat16 *__restrict__ A,
-                                                                   __nv_bfloat16 *__restrict__ B,
-                                                                   int *__restrict__ out_in_map,
-                                                                   __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting2_mode0_bf16bf16f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             __nv_bfloat16 *__restrict__ A,
+                                             __nv_bfloat16 *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             __nv_bfloat16 *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     int K_implicit = K_original * kernel_volume;
     float C_warp[32];
@@ -931,15 +931,15 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode0_bf16bf16f32(int M,
 }
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_f16f16f32
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32(int M,
-                                                                 int K_original,
-                                                                 int N,
-                                                                 int kernel_volume,
-                                                                 half *__restrict__ A,
-                                                                 half *__restrict__ B,
-                                                                 int *__restrict__ out_in_map,
-                                                                 half *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting2_mode0_f16f16f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           half *__restrict__ A,
+                                           half *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           half *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     int K_implicit = K_original * kernel_volume;
     float C_warp[32];
@@ -1193,15 +1193,15 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f16f16f32(int M,
 }
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_f16f16f32
-__global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f32(int M,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  half *__restrict__ A,
-                                                                  half *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  half *__restrict__ C) {
+__global__ void __launch_bounds__(128)
+conv_forward_cuda_setting3_mode0_f16f16f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           half *__restrict__ A,
+                                           half *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           half *__restrict__ C) {
     int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ half A_shared[5120];
@@ -1469,15 +1469,15 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode0_f16f16f32(int M,
 }
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_bf16bf16f32
-__global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode0_bf16bf16f32(int M,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    __nv_bfloat16 *__restrict__ A,
-                                                                    __nv_bfloat16 *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(128)
+conv_forward_cuda_setting3_mode0_bf16bf16f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             __nv_bfloat16 *__restrict__ A,
+                                             __nv_bfloat16 *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             __nv_bfloat16 *__restrict__ C) {
     int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ __nv_bfloat16 A_shared[5120];
@@ -1682,15 +1682,15 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode0_bf16bf16f32(int M,
 
 // conv_forward_cuda_m128n16k16_m64n16k16_m16n16k16_tf32tf32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode0_tf32tf32f32(int M,
-                                                                   int K_original,
-                                                                   int N,
-                                                                   int kernel_volume,
-                                                                   float *__restrict__ A,
-                                                                   float *__restrict__ B,
-                                                                   int *__restrict__ out_in_map,
-                                                                   float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting1_mode0_tf32tf32f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             float *__restrict__ A,
+                                             float *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             float *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     const int K_tile  = 16; // min(16, K_original);
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
@@ -1961,15 +1961,15 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode0_tf32tf32f32(int M,
 }
 
 // conv_forward_cuda_m128n16k32_m64n16k32_m16n16k16_tf32tf32f32
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode0_tf32tf32f32(int M,
-                                                                   int K_original,
-                                                                   int N,
-                                                                   int kernel_volume,
-                                                                   float *__restrict__ A,
-                                                                   float *__restrict__ B,
-                                                                   int *__restrict__ out_in_map,
-                                                                   float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting2_mode0_tf32tf32f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             float *__restrict__ A,
+                                             float *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             float *__restrict__ C) {
     // warning: kernel could not work with K_original < 32!
     int K_implicit = K_original * kernel_volume;
     float C_warp[32];
@@ -2169,15 +2169,15 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode0_tf32tf32f32(int M,
 }
 
 // conv_forward_cuda_m128n64k32_m64n32k32_m16n16k16_tf32tf32f32
-__global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32f32(int M,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    float *__restrict__ A,
-                                                                    float *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    float *__restrict__ C) {
+__global__ void __launch_bounds__(128)
+conv_forward_cuda_setting3_mode0_tf32tf32f32(int M,
+                                             int K_original,
+                                             int N,
+                                             int kernel_volume,
+                                             float *__restrict__ A,
+                                             float *__restrict__ B,
+                                             int *__restrict__ out_in_map,
+                                             float *__restrict__ C) {
     int K_implicit = K_original * kernel_volume;
     float C_warp[64];
     __shared__ float A_shared[5120];
@@ -2388,15 +2388,15 @@ __launch_bounds__(128) conv_forward_cuda_setting3_mode0_tf32tf32f32(int M,
 
 // conv_forward_cuda_m128n16k16_f32f32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32(int M,
-                                                                 int K_original,
-                                                                 int N,
-                                                                 int kernel_volume,
-                                                                 float *__restrict__ A,
-                                                                 float *__restrict__ B,
-                                                                 int *__restrict__ out_in_map,
-                                                                 float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting1_mode0_f32f32f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           float *__restrict__ A,
+                                           float *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           float *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
     int K_implicit    = K_tile_padded * kernel_volume;
@@ -2548,15 +2548,15 @@ __launch_bounds__(64) conv_forward_cuda_setting1_mode0_f32f32f32(int M,
 }
 
 // conv_forward_cuda_m128n16k32_f32f32f32
-__global__ void
-__launch_bounds__(64) conv_forward_cuda_setting2_mode0_f32f32f32(int M,
-                                                                 int K_original,
-                                                                 int N,
-                                                                 int kernel_volume,
-                                                                 float *__restrict__ A,
-                                                                 float *__restrict__ B,
-                                                                 int *__restrict__ out_in_map,
-                                                                 float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_forward_cuda_setting2_mode0_f32f32f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           float *__restrict__ A,
+                                           float *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           float *__restrict__ C) {
     float C_local[32];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[512];
@@ -2649,15 +2649,15 @@ __launch_bounds__(64) conv_forward_cuda_setting2_mode0_f32f32f32(int M,
 }
 
 // conv_forward_cuda_m128n64k32_f32f32f32
-__global__ void
-__launch_bounds__(128) conv_forward_cuda_setting3_mode0_f32f32f32(int M,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  float *__restrict__ A,
-                                                                  float *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  float *__restrict__ C) {
+__global__ void __launch_bounds__(128)
+conv_forward_cuda_setting3_mode0_f32f32f32(int M,
+                                           int K_original,
+                                           int N,
+                                           int kernel_volume,
+                                           float *__restrict__ A,
+                                           float *__restrict__ B,
+                                           int *__restrict__ out_in_map,
+                                           float *__restrict__ C) {
     float C_local[64];
     __shared__ float A_shared[4096];
     __shared__ float B_shared[2048];

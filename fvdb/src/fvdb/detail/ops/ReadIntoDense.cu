@@ -102,12 +102,12 @@ dispatchReadIntoDense<torch::kCUDA>(const GridBatchImpl &batchHdl,
                 denseOrigins.packed_accessor64<int32_t, 2, torch::RestrictPtrTraits>();
             auto inGridDataAcc =
                 inGridData.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
-            auto callback = [=] __device__(
-                                int32_t bidx,
-                                int32_t lidx,
-                                int32_t vidx,
-                                int32_t cidx,
-                                GridBatchImpl::Accessor<nanovdb::ValueOnIndex> batchAcc) {
+            auto callback = [=] __device__(int32_t bidx,
+                                           int32_t lidx,
+                                           int32_t vidx,
+                                           int32_t cidx,
+                                           GridBatchImpl::Accessor<nanovdb::ValueOnIndex>
+                                               batchAcc) {
                 readIntoDenseVoxelCallback<scalar_t>(
                     bidx, lidx, vidx, cidx, batchAcc, denseOriginsAcc, inGridDataAcc, outDenseAcc);
             };

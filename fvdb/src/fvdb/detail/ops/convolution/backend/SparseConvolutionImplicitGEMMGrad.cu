@@ -114,16 +114,16 @@ __pack_bfloat162(const __nv_bfloat16 x, const __nv_bfloat16 y) {
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_bf16bf16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    __nv_bfloat16 *__restrict__ A,
-                                                                    __nv_bfloat16 *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              __nv_bfloat16 *__restrict__ A,
+                                              __nv_bfloat16 *__restrict__ B,
+                                              int *__restrict__ out_in_map,
+                                              __nv_bfloat16 *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
@@ -507,16 +507,16 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_bf16bf16f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  half *__restrict__ A,
-                                                                  half *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  half *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            half *__restrict__ A,
+                                            half *__restrict__ B,
+                                            int *__restrict__ out_in_map,
+                                            half *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
@@ -1026,16 +1026,16 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f16f16f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_bf16bf16f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    __nv_bfloat16 *__restrict__ A,
-                                                                    __nv_bfloat16 *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              __nv_bfloat16 *__restrict__ A,
+                                              __nv_bfloat16 *__restrict__ B,
+                                              int *__restrict__ out_in_map,
+                                              __nv_bfloat16 *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
@@ -1372,16 +1372,16 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_bf16bf16f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_f16f16f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  half *__restrict__ A,
-                                                                  half *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  half *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            half *__restrict__ A,
+                                            half *__restrict__ B,
+                                            int *__restrict__ out_in_map,
+                                            half *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
@@ -1855,16 +1855,16 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_f16f16f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_tf32tf32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    float *__restrict__ A,
-                                                                    float *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    float *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              float *__restrict__ A,
+                                              float *__restrict__ B,
+                                              int *__restrict__ out_in_map,
+                                              float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16 / 1;
     // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
@@ -2272,16 +2272,16 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_tf32tf32f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_tf32tf32f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    float *__restrict__ A,
-                                                                    float *__restrict__ B,
-                                                                    int *__restrict__ out_in_map,
-                                                                    float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              float *__restrict__ A,
+                                              float *__restrict__ B,
+                                              int *__restrict__ out_in_map,
+                                              float *__restrict__ C) {
     int j_factors1 = N / 16 / 4;
     int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
@@ -2645,16 +2645,16 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode0_tf32tf32f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_f32f32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  float *__restrict__ A,
-                                                                  float *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  float *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            float *__restrict__ A,
+                                            float *__restrict__ B,
+                                            int *__restrict__ out_in_map,
+                                            float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16;
     // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
@@ -2843,16 +2843,16 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode0_f32f32f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_f32f32f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode0_f32f32f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  float *__restrict__ A,
-                                                                  float *__restrict__ B,
-                                                                  int *__restrict__ out_in_map,
-                                                                  float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode0_f32f32f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            float *__restrict__ A,
+                                            float *__restrict__ B,
+                                            int *__restrict__ out_in_map,
+                                            float *__restrict__ C) {
     int j_factors1 = (N + 63) / 64;
     // int blockIdx_x = 0;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);

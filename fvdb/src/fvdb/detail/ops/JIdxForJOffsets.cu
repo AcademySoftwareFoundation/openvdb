@@ -63,11 +63,11 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
 }
 
 template <int blockSize>
-__global__ void
-__launch_bounds__(blockSize) jIdxFill(fvdb::JOffsetsType start,
-                                      fvdb::JOffsetsType end,
-                                      fvdb::JIdxType i,
-                                      TorchRAcc32<fvdb::JIdxType, 1> outJIdx) {
+__global__ void __launch_bounds__(blockSize)
+jIdxFill(fvdb::JOffsetsType start,
+         fvdb::JOffsetsType end,
+         fvdb::JIdxType i,
+         TorchRAcc32<fvdb::JIdxType, 1> outJIdx) {
     for (int64_t idx = start + blockIdx.x * blockDim.x + threadIdx.x; idx < end;
          idx += blockDim.x * gridDim.x) {
         outJIdx[idx] = i;

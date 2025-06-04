@@ -17,15 +17,15 @@ namespace detail {
 namespace ops {
 
 __global__
-__launch_bounds__(
-    1024) // Hinting maximum threads per block during launch to optimize register usage.
-    void stencilConvHaloKernel(int kM,
-                               int kN,
-                               int numLeaves,
-                               BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
-                               TorchRAcc64<float, 2> inFeatures,
-                               TorchRAcc64<float, 7> stencil,
-                               TorchRAcc64<float, 2> outFeatures) {
+// Hinting maximum threads per block during launch to optimize register usage.
+__launch_bounds__(1024) void
+stencilConvHaloKernel(int kM,
+                      int kN,
+                      int numLeaves,
+                      BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
+                      TorchRAcc64<float, 2> inFeatures,
+                      TorchRAcc64<float, 7> stencil,
+                      TorchRAcc64<float, 2> outFeatures) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
 #if __CUDA_ARCH__ >= 800
@@ -197,15 +197,14 @@ __launch_bounds__(
 #endif // __CUDA_ARCH__ >= 800
 }
 
-__global__
-__launch_bounds__(256) void stencilConvHaloLargeDepthKernel(
-    int kM,
-    int kN,
-    int numLeaves,
-    BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
-    TorchRAcc64<float, 2> inFeatures,
-    TorchRAcc64<float, 7> stencil,
-    TorchRAcc64<float, 2> outFeatures) {
+__global__ __launch_bounds__(256) void
+stencilConvHaloLargeDepthKernel(int kM,
+                                int kN,
+                                int numLeaves,
+                                BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
+                                TorchRAcc64<float, 2> inFeatures,
+                                TorchRAcc64<float, 7> stencil,
+                                TorchRAcc64<float, 2> outFeatures) {
 // While 700 (Volta) already supports TensorCore, it does not support TF32.
 // 800 (Ampere) supports both TensorCore and TF32.
 #if __CUDA_ARCH__ >= 800

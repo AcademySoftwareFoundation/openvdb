@@ -143,13 +143,12 @@ UpsampleGridNearest(const GridBatchImpl &coarseBatchAccessor,
                 tensorAccessor<DeviceTag, scalar_t, 2, int64_t>(outFineDataReshape);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto callback =
-                    [=] __device__(
-                        int32_t batchIdx,
-                        int32_t leafIdx,
-                        int32_t voxelIdx,
-                        int32_t channelIdx,
-                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor) {
+                auto callback = [=]
+                    __device__(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t voxelIdx,
+                               int32_t channelIdx,
+                               GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor) {
                         upsampleNearestVoxelCallback<scalar_t, TorchRAcc64>(batchIdx,
                                                                             leafIdx,
                                                                             voxelIdx,
@@ -216,13 +215,12 @@ UpsampleGridNearestBackward(const GridBatchImpl &fineBatchAccessor,
                 tensorAccessor<DeviceTag, scalar_t, 2, int64_t>(outGradInReshape);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto callback =
-                    [=] __device__(
-                        int32_t batchIdx,
-                        int32_t leafIdx,
-                        int32_t voxelIdx,
-                        int32_t channelIdx,
-                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor) {
+                auto callback = [=]
+                    __device__(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t voxelIdx,
+                               int32_t channelIdx,
+                               GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fineBatchAccessor) {
                         upsampleNearestBackwardsVoxelCallback<scalar_t, DeviceTag, TorchRAcc64>(
                             batchIdx,
                             leafIdx,

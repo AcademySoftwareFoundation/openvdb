@@ -6,7 +6,7 @@
 
 #include <ATen/cuda/Atomic.cuh>
 
-constexpr int NUM_THREADS = 1024;
+constexpr int NUM_THREADS = 256;
 
 namespace fvdb {
 namespace detail {
@@ -133,7 +133,7 @@ evalShFunction(const int64_t degree,                      // degree of SH to be 
 // Evalute Spherical Harmonic functions at the given directions, assuming a uniform minibatch
 // of C cameras, each with N gaussians, and K SH coefficients per gaussian.
 template <typename T>
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 computeSh(
     const int64_t C,
     const int64_t N,

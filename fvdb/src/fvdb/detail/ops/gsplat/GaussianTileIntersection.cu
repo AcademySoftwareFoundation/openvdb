@@ -12,7 +12,7 @@
 
 namespace {
 
-#define NUM_THREADS 1024
+#define NUM_THREADS 256
 
 #define CUB_WRAPPER(func, ...)                                                    \
     do {                                                                          \
@@ -34,7 +34,7 @@ namespace {
 // The output is a set of counts of the number of tiles each Gaussian intersects.
 //
 template <typename T, typename CountT>
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 count_tiles_per_gaussian(const uint32_t total_gaussians,
                          const uint32_t num_gaussians_per_camera,
                          const uint32_t tile_size,
@@ -149,7 +149,7 @@ decode_cam_tile_key(int64_t packed_cam_tile_depth_key, int32_t tile_id_bits) {
 // The value is the index of the Gaussian in the input arrays.
 //
 template <typename T>
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 compute_gaussian_tile_intersections(
     const uint32_t num_cameras,
     const uint32_t num_gaussians_per_camera,
@@ -226,7 +226,7 @@ compute_gaussian_tile_intersections(
     }
 }
 
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 compute_tile_offsets_sparse(
     const uint32_t num_intersections,
     const uint32_t num_tiles,
@@ -280,7 +280,7 @@ compute_tile_offsets_sparse(
 // encoded as an offset into the sorted intersection array.
 // i.e. gaussians[out_offsets[c, i, j]:out_offsets[c, i, j+1]] are the Gaussians that
 // intersect tile (i, j) in camera c.
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 compute_tile_offsets(const uint32_t num_intersections,
                      const uint32_t num_cameras,
                      const uint32_t num_tiles,

@@ -114,21 +114,21 @@ __pack_half2(const half x, const half y) {
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_bf16bf16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode1_bf16bf16f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    int split_mask_len,
-                                                                    int reduced_mask_len,
-                                                                    int reorder_loc_len,
-                                                                    __nv_bfloat16 *__restrict__ A,
-                                                                    __nv_bfloat16 *__restrict__ B,
-                                                                    int *__restrict__ reduced_mask,
-                                                                    int *__restrict__ out_in_map,
-                                                                    int *__restrict__ reorder_loc,
-                                                                    __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode1_bf16bf16f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              int split_mask_len,
+                                              int reduced_mask_len,
+                                              int reorder_loc_len,
+                                              __nv_bfloat16 *__restrict__ A,
+                                              __nv_bfloat16 *__restrict__ B,
+                                              int *__restrict__ reduced_mask,
+                                              int *__restrict__ out_in_map,
+                                              int *__restrict__ reorder_loc,
+                                              __nv_bfloat16 *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
@@ -490,21 +490,21 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode1_bf16bf16f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_f16f16f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode1_f16f16f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  int split_mask_len,
-                                                                  int reduced_mask_len,
-                                                                  int reorder_loc_len,
-                                                                  half *__restrict__ A,
-                                                                  half *__restrict__ B,
-                                                                  int *__restrict__ reduced_mask,
-                                                                  int *__restrict__ out_in_map,
-                                                                  int *__restrict__ reorder_loc,
-                                                                  half *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode1_f16f16f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            int split_mask_len,
+                                            int reduced_mask_len,
+                                            int reorder_loc_len,
+                                            half *__restrict__ A,
+                                            half *__restrict__ B,
+                                            int *__restrict__ reduced_mask,
+                                            int *__restrict__ out_in_map,
+                                            int *__restrict__ reorder_loc,
+                                            half *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
@@ -992,21 +992,21 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode1_f16f16f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_bf16bf16f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode1_bf16bf16f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    int split_mask_len,
-                                                                    int reduced_mask_len,
-                                                                    int reorder_loc_len,
-                                                                    __nv_bfloat16 *__restrict__ A,
-                                                                    __nv_bfloat16 *__restrict__ B,
-                                                                    int *__restrict__ reduced_mask,
-                                                                    int *__restrict__ out_in_map,
-                                                                    int *__restrict__ reorder_loc,
-                                                                    __nv_bfloat16 *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode1_bf16bf16f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              int split_mask_len,
+                                              int reduced_mask_len,
+                                              int reorder_loc_len,
+                                              __nv_bfloat16 *__restrict__ A,
+                                              __nv_bfloat16 *__restrict__ B,
+                                              int *__restrict__ reduced_mask,
+                                              int *__restrict__ out_in_map,
+                                              int *__restrict__ reorder_loc,
+                                              __nv_bfloat16 *__restrict__ C) {
     float C_warp[32];
     __shared__ __nv_bfloat16 A_shared[2560];
     __shared__ __nv_bfloat16 B_shared[4608];
@@ -1354,21 +1354,21 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode1_bf16bf16f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_f16f16f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode1_f16f16f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  int split_mask_len,
-                                                                  int reduced_mask_len,
-                                                                  int reorder_loc_len,
-                                                                  half *__restrict__ A,
-                                                                  half *__restrict__ B,
-                                                                  int *__restrict__ reduced_mask,
-                                                                  int *__restrict__ out_in_map,
-                                                                  int *__restrict__ reorder_loc,
-                                                                  half *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode1_f16f16f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            int split_mask_len,
+                                            int reduced_mask_len,
+                                            int reorder_loc_len,
+                                            half *__restrict__ A,
+                                            half *__restrict__ B,
+                                            int *__restrict__ reduced_mask,
+                                            int *__restrict__ out_in_map,
+                                            int *__restrict__ reorder_loc,
+                                            half *__restrict__ C) {
     float C_warp[32];
     __shared__ half A_shared[2560];
     __shared__ half B_shared[4608];
@@ -1853,21 +1853,21 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode1_f16f16f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_m16n16k64_m16n16k16_tf32tf32f32
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode1_tf32tf32f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    int split_mask_len,
-                                                                    int reduced_mask_len,
-                                                                    int reorder_loc_len,
-                                                                    float *__restrict__ A,
-                                                                    float *__restrict__ B,
-                                                                    int *__restrict__ reduced_mask,
-                                                                    int *__restrict__ out_in_map,
-                                                                    int *__restrict__ reorder_loc,
-                                                                    float *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode1_tf32tf32f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              int split_mask_len,
+                                              int reduced_mask_len,
+                                              int reorder_loc_len,
+                                              float *__restrict__ A,
+                                              float *__restrict__ B,
+                                              int *__restrict__ reduced_mask,
+                                              int *__restrict__ out_in_map,
+                                              int *__restrict__ reorder_loc,
+                                              float *__restrict__ C) {
     const int K_tile  = 16;
     int K_tile_padded = K_tile * ((K_original + K_tile - 1) / K_tile);
 
@@ -2258,21 +2258,21 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode1_tf32tf32f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_m32n32k64_m16n16k16_tf32tf32f32
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode1_tf32tf32f32(int M_fwd,
-                                                                    int K_original,
-                                                                    int N,
-                                                                    int kernel_volume,
-                                                                    int split_k_iters,
-                                                                    int split_mask_len,
-                                                                    int reduced_mask_len,
-                                                                    int reorder_loc_len,
-                                                                    float *__restrict__ A,
-                                                                    float *__restrict__ B,
-                                                                    int *__restrict__ reduced_mask,
-                                                                    int *__restrict__ out_in_map,
-                                                                    int *__restrict__ reorder_loc,
-                                                                    float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode1_tf32tf32f32(int M_fwd,
+                                              int K_original,
+                                              int N,
+                                              int kernel_volume,
+                                              int split_k_iters,
+                                              int split_mask_len,
+                                              int reduced_mask_len,
+                                              int reorder_loc_len,
+                                              float *__restrict__ A,
+                                              float *__restrict__ B,
+                                              int *__restrict__ reduced_mask,
+                                              int *__restrict__ out_in_map,
+                                              int *__restrict__ reorder_loc,
+                                              float *__restrict__ C) {
     float C_warp[32];
     __shared__ float A_shared[2560];
     __shared__ float B_shared[4608];
@@ -2647,21 +2647,21 @@ __launch_bounds__(64) conv_backward_cuda_setting2_mode1_tf32tf32f32(int M_fwd,
 
 // conv_backward_cuda_m16n16k64_f32f32f32_sort
 template <int K_ld_factor, int N_ld_factor, bool K_ld_check, bool N_ld_check>
-__global__ void
-__launch_bounds__(32) conv_backward_cuda_setting1_mode1_f32f32f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  int split_mask_len,
-                                                                  int reduced_mask_len,
-                                                                  int reorder_loc_len,
-                                                                  float *__restrict__ A,
-                                                                  float *__restrict__ B,
-                                                                  int *__restrict__ reduced_mask,
-                                                                  int *__restrict__ out_in_map,
-                                                                  int *__restrict__ reorder_loc,
-                                                                  float *__restrict__ C) {
+__global__ void __launch_bounds__(32)
+conv_backward_cuda_setting1_mode1_f32f32f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            int split_mask_len,
+                                            int reduced_mask_len,
+                                            int reorder_loc_len,
+                                            float *__restrict__ A,
+                                            float *__restrict__ B,
+                                            int *__restrict__ reduced_mask,
+                                            int *__restrict__ out_in_map,
+                                            int *__restrict__ reorder_loc,
+                                            float *__restrict__ C) {
     int j_factors1 = (N + 15) / 16;
     int blockIdx_y = blockIdx.x % ((K_original + 15) / 16 * kernel_volume * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original + 15) / 16 * kernel_volume * j_factors1);
@@ -2861,21 +2861,21 @@ __launch_bounds__(32) conv_backward_cuda_setting1_mode1_f32f32f32(int M_fwd,
 }
 
 // conv_backward_cuda_m32n64k64_f32f32f32_sort
-__global__ void
-__launch_bounds__(64) conv_backward_cuda_setting2_mode1_f32f32f32(int M_fwd,
-                                                                  int K_original,
-                                                                  int N,
-                                                                  int kernel_volume,
-                                                                  int split_k_iters,
-                                                                  int split_mask_len,
-                                                                  int reduced_mask_len,
-                                                                  int reorder_loc_len,
-                                                                  float *__restrict__ A,
-                                                                  float *__restrict__ B,
-                                                                  int *__restrict__ reduced_mask,
-                                                                  int *__restrict__ out_in_map,
-                                                                  int *__restrict__ reorder_loc,
-                                                                  float *__restrict__ C) {
+__global__ void __launch_bounds__(64)
+conv_backward_cuda_setting2_mode1_f32f32f32(int M_fwd,
+                                            int K_original,
+                                            int N,
+                                            int kernel_volume,
+                                            int split_k_iters,
+                                            int split_mask_len,
+                                            int reduced_mask_len,
+                                            int reorder_loc_len,
+                                            float *__restrict__ A,
+                                            float *__restrict__ B,
+                                            int *__restrict__ reduced_mask,
+                                            int *__restrict__ out_in_map,
+                                            int *__restrict__ reorder_loc,
+                                            float *__restrict__ C) {
     int j_factors1 = (N + 63) / 64;
     int blockIdx_y = blockIdx.x % ((K_original * kernel_volume + 31) / 32 * j_factors1);
     int blockIdx_z = blockIdx.x / ((K_original * kernel_volume + 31) / 32 * j_factors1);

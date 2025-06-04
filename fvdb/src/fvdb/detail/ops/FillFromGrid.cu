@@ -99,12 +99,12 @@ dispatchFillFromGrid<torch::kCUDA>(const GridBatchImpl &fromGrid,
             auto toFeaturesAcc =
                 toFeatures.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>();
             auto toGridAcc = toGrid.deviceAccessor<nanovdb::ValueOnIndex>();
-            auto callback  = [=] __device__(
-                                int64_t bidx,
-                                int64_t lidx,
-                                int64_t vidx,
-                                int64_t cidx,
-                                GridBatchImpl::Accessor<nanovdb::ValueOnIndex> fromGridAcc) {
+            auto callback  = [=] __device__(int64_t bidx,
+                                           int64_t lidx,
+                                           int64_t vidx,
+                                           int64_t cidx,
+                                           GridBatchImpl::Accessor<nanovdb::ValueOnIndex>
+                                               fromGridAcc) {
                 fillToGridVoxelCallback<scalar_t>(
                     bidx, lidx, vidx, cidx, fromGridAcc, toGridAcc, fromFeaturesAcc, toFeaturesAcc);
             };

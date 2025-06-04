@@ -222,15 +222,14 @@ struct GradStencilFunctor {
     } // operator()
 };
 
-__global__
-__launch_bounds__(GradStencilFunctor::MaxThreadsPerBlock) void stencilConvHaloGradKernel(
-    int kM,
-    int kN,
-    int numLeaves,
-    BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
-    TorchRAcc64<float, 2> inFeatures,
-    TorchRAcc64<float, 2> gradOutFeatures,
-    TorchRAcc64<float, 5> gradStencil) {
+__global__ __launch_bounds__(GradStencilFunctor::MaxThreadsPerBlock) void
+stencilConvHaloGradKernel(int kM,
+                          int kN,
+                          int numLeaves,
+                          BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
+                          TorchRAcc64<float, 2> inFeatures,
+                          TorchRAcc64<float, 2> gradOutFeatures,
+                          TorchRAcc64<float, 5> gradStencil) {
     extern __shared__ char smemBuffer[];
     GradStencilFunctor()(
         kM, kN, numLeaves, gridAcc, inFeatures, gradOutFeatures, gradStencil, smemBuffer);

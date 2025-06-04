@@ -116,8 +116,8 @@ JaggedArgsort(const JaggedTensor &jt) {
         AT_WRAP([&]() {
             auto dataAcc = tensorAccessor<DeviceTag, scalar_t, 1>(data);
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb =
-                    [=] __device__(int32_t ridx, int32_t cidx, TorchRAcc32<int64_t, 2> offsetAcc) {
+                auto cb = [=]
+                    __device__(int32_t ridx, int32_t cidx, TorchRAcc32<int64_t, 2> offsetAcc) {
                         qsortCallback<scalar_t, TorchRAcc32>(
                             ridx, offsetAcc, dataAcc, idxAccessor, stackAccessor);
                     };

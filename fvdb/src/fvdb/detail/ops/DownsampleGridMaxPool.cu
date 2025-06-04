@@ -163,13 +163,12 @@ DownsampleGridMaxPool(const GridBatchImpl &fineBatchHdl,
             auto outCoarseDataAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outCoarseDataReshape);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto maxPoolPerVoxel =
-                    [=] __device__(
-                        int32_t batchIdx,
-                        int32_t leafIdx,
-                        int32_t voxelIdx,
-                        int32_t channelIdx,
-                        GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                auto maxPoolPerVoxel = [=]
+                    __device__(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t voxelIdx,
+                               int32_t channelIdx,
+                               GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
                         maxPoolVoxelCallback<scalar_t, TorchRAcc32>(batchIdx,
                                                                     leafIdx,
                                                                     voxelIdx,
@@ -243,24 +242,24 @@ DownsampleGridMaxPoolBackward(const GridBatchImpl &coarseBatchHdl,
             auto outFineGradInAcc = tensorAccessor<DeviceTag, scalar_t, 2>(outGradInReshape);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(
-                              int32_t batchIdx,
-                              int32_t leafIdx,
-                              int32_t voxelIdx,
-                              int32_t channelIdx,
-                              GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
-                    maxPoolBackardVoxelCallback<scalar_t, TorchRAcc32>(batchIdx,
-                                                                       leafIdx,
-                                                                       voxelIdx,
-                                                                       channelIdx,
-                                                                       coarseBatchAccessor,
-                                                                       fineBatchAcc,
-                                                                       fineDataAcc,
-                                                                       coarseGradOutAcc,
-                                                                       outFineGradInAcc,
-                                                                       poolingFactor,
-                                                                       stride);
-                };
+                auto cb = [=]
+                    __device__(int32_t batchIdx,
+                               int32_t leafIdx,
+                               int32_t voxelIdx,
+                               int32_t channelIdx,
+                               GridBatchImpl::Accessor<nanovdb::ValueOnIndex> coarseBatchAccessor) {
+                        maxPoolBackardVoxelCallback<scalar_t, TorchRAcc32>(batchIdx,
+                                                                           leafIdx,
+                                                                           voxelIdx,
+                                                                           channelIdx,
+                                                                           coarseBatchAccessor,
+                                                                           fineBatchAcc,
+                                                                           fineDataAcc,
+                                                                           coarseGradOutAcc,
+                                                                           outFineGradInAcc,
+                                                                           poolingFactor,
+                                                                           stride);
+                    };
                 forEachVoxelCUDA<nanovdb::ValueOnIndex>(384, fineData.size(1), coarseBatchHdl, cb);
             } else {
                 auto cb = [=](int32_t batchIdx,

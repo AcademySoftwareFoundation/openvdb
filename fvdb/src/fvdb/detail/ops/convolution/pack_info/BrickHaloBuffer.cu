@@ -43,9 +43,9 @@ get_active_mask(const ValueMask &valueMask, const cute::ArithmeticTuple<int, int
     return active_mask;
 }
 
-__global__
-__launch_bounds__(32) void mark_bricks(BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
-                                       TorchRAcc32<uint8_t, 1> brick_usage_flags) {
+__global__ __launch_bounds__(32) void
+mark_bricks(BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
+            TorchRAcc32<uint8_t, 1> brick_usage_flags) {
     using LeafNodeType = typename nanovdb::NanoTree<nanovdb::ValueOnIndex>::LeafNodeType;
 
     const auto brickId       = blockDim.x * blockIdx.x + threadIdx.x;
@@ -76,7 +76,8 @@ offset_from_tiwid(int tiwid) {
     return cute::make_arithmetic_tuple(i, j, k);
 }
 
-__global__ __launch_bounds__(1024) void populate_halo_index_buffer(
+__global__ __launch_bounds__(1024) void
+populate_halo_index_buffer(
     BatchGridAccessor<nanovdb::ValueOnIndex> gridAcc,
     TorchRAcc32<uint8_t, 1> brick_usage_flags,
     TorchRAcc32<int, 1> brick_offsets,

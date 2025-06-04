@@ -165,13 +165,12 @@ forEachVoxelCUDAKernel(fvdb::detail::GridBatchImpl::Accessor<GridType> grid,
 }
 
 template <int32_t NDIMS, typename ScalarT, typename Func, typename... Args>
-__global__ void
-__launch_bounds__(1024)
-    forEachJaggedElementChannelCUDAKernel(JaggedRAcc32<ScalarT, NDIMS> jaggedAcc,
-                                          const bool returnIfOutOfRange,
-                                          const int64_t channelsPerElement,
-                                          Func func,
-                                          Args... args) {
+__global__ void __launch_bounds__(1024)
+forEachJaggedElementChannelCUDAKernel(JaggedRAcc32<ScalarT, NDIMS> jaggedAcc,
+                                      const bool returnIfOutOfRange,
+                                      const int64_t channelsPerElement,
+                                      Func func,
+                                      Args... args) {
     const uint64_t idx        = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
     const int64_t numElements = jaggedAcc.elementCount();
     if (idx >= static_cast<uint64_t>(numElements) * channelsPerElement) {

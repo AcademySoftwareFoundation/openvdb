@@ -79,6 +79,15 @@ Cpp11BracedListStyle: true
 # BreakAfterReturnType: AllDefinitions
 AlwaysBreakAfterDefinitionReturnType: All
 
+AttributeMacros:
+  - __host__
+  - __device__
+  - __hostdev__
+  - __global__
+  - __forceinline__
+  - __shared__
+  - __launch_bounds__
+
 # Alignment
 AlignConsecutiveAssignments: true
 AlignConsecutiveBitFields: true

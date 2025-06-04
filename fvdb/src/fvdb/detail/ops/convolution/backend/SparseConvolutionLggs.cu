@@ -237,14 +237,14 @@ struct ConvolutionFunctorV1 {
 
 template <class Operator>
 __global__
-__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor) void kernel_entrypoint(
-    float *deviceInputTensor,
-    float *deviceOutputTensor,
-    float *deviceStencil,
-    int numVoxels,
-    int32_t *deviceSpokeIndicesFlattenedOffset,
-    int32_t *deviceSpokeInputGlobalIndicesFlattenedData,
-    int32_t *deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor) void
+kernel_entrypoint(float *deviceInputTensor,
+                  float *deviceOutputTensor,
+                  float *deviceStencil,
+                  int numVoxels,
+                  int32_t *deviceSpokeIndicesFlattenedOffset,
+                  int32_t *deviceSpokeInputGlobalIndicesFlattenedData,
+                  int32_t *deviceSpokeOutputLocalOffsetsRelativeToBlockFlattenedData) {
     extern __shared__ char smem_buf[];
     Operator op;
     op(deviceInputTensor,

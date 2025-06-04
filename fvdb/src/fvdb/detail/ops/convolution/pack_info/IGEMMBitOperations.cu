@@ -35,12 +35,12 @@ bitmaskFromOutInMapCallback(TorchRAcc32<int, 2> outInMap,
     bitmask[splitMaskIter][idx] = curBitmask;
 }
 
-__global__ void
-__launch_bounds__(128) reorderOutInMapCallback(TorchRAcc32<int, 2> outInMap,
-                                               TorchRAcc32<int, 2> reorderLoc,
-                                               TorchRAcc32<int, 2> reorderOutInMap,
-                                               int kernelVolume,
-                                               int splitMaskLen) {
+__global__ void __launch_bounds__(128)
+reorderOutInMapCallback(TorchRAcc32<int, 2> outInMap,
+                        TorchRAcc32<int, 2> reorderLoc,
+                        TorchRAcc32<int, 2> reorderOutInMap,
+                        int kernelVolume,
+                        int splitMaskLen) {
     int tidx          = blockIdx.x * blockDim.x + threadIdx.x;
     int idx           = tidx / kernelVolume;
     int splitMaskIter = tidx % kernelVolume;
@@ -51,10 +51,10 @@ __launch_bounds__(128) reorderOutInMapCallback(TorchRAcc32<int, 2> outInMap,
     reorderOutInMap[idx][splitMaskIter] = outInMap[inputRowIdx][splitMaskIter];
 }
 
-__global__ void
-__launch_bounds__(128) reduceMaskCallback(TorchRAcc32<int, 2> bitmask,
-                                          int reduceTile,
-                                          TorchRAcc32<int, 2> reducedBitmask) {
+__global__ void __launch_bounds__(128)
+reduceMaskCallback(TorchRAcc32<int, 2> bitmask,
+                   int reduceTile,
+                   TorchRAcc32<int, 2> reducedBitmask) {
     int splitMaskIter = blockIdx.y;
     int threadSize    = reduceTile / 4;
     int laneIdx       = threadIdx.x & 31;

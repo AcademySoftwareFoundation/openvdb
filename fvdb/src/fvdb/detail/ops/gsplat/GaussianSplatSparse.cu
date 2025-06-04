@@ -99,13 +99,13 @@ namespace fvdb::detail::ops {
 
 // Compute tile mask and tile ids for each pixel coordinate
 template <typename CoordType>
-__global__ void
-__launch_bounds__(256) computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
-                                       const int32_t tileSideLength,
-                                       const int32_t numTilesW,
-                                       const int32_t numTilesH,
-                                       fvdb::TorchRAcc32<bool, 1> outTileMask,
-                                       fvdb::TorchRAcc32<int64_t, 1> outTileIds) {
+__global__ void __launch_bounds__(256)
+computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
+                const int32_t tileSideLength,
+                const int32_t numTilesW,
+                const int32_t numTilesH,
+                fvdb::TorchRAcc32<bool, 1> outTileMask,
+                fvdb::TorchRAcc32<int64_t, 1> outTileIds) {
     for (auto pixelId = blockIdx.x * blockDim.x + threadIdx.x; pixelId < pixelCoords.elementCount();
          pixelId += blockDim.x * gridDim.x) {
         auto const batchId = pixelCoords.batchIdx(pixelId);
@@ -139,8 +139,8 @@ __launch_bounds__(256) computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pi
 // threads in a block are not actually sharing anything in shared memory. I guess
 // shared is just scratchpad here?
 template <typename CoordType>
-__global__ void
-__launch_bounds__(256) computePerTileBitMask(
+__global__ void __launch_bounds__(256)
+computePerTileBitMask(
     const int64_t numUniqueTiles,
     const int32_t numWordsPerTile,
     const int32_t numTilesW,

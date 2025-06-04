@@ -134,8 +134,8 @@ JaggedReduce(const torch::Tensor &jdataRaw,
             auto outAccessor = tensorAccessor<DeviceTag, scalar_t, 2>(out);
 
             if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb =
-                    [=] __device__(int32_t ridx, int32_t cidx, TorchRAcc32<scalar_t, 2> dataAcc) {
+                auto cb = [=]
+                    __device__(int32_t ridx, int32_t cidx, TorchRAcc32<scalar_t, 2> dataAcc) {
                         jaggedReduceDeviceCallback<scalar_t, TorchRAcc32, REDUCE>(
                             ridx, cidx, dataAcc, jidxAccessor, outAccessor);
                     };
@@ -155,8 +155,9 @@ JaggedReduce(const torch::Tensor &jdataRaw,
 
                 auto argOutAccessor = tensorAccessor<DeviceTag, int64_t, 2>(argOut.value());
                 if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(
-                                  int32_t ridx, int32_t cidx, TorchRAcc32<scalar_t, 2> dataAcc) {
+                    auto cb = [=] __device__(int32_t ridx,
+                                             int32_t cidx,
+                                             TorchRAcc32<scalar_t, 2> dataAcc) {
                         jaggedArgReduceCallback<scalar_t, TorchRAcc32, DeviceTag>(ridx,
                                                                                   cidx,
                                                                                   dataAcc,

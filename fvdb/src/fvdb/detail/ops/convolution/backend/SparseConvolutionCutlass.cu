@@ -489,11 +489,8 @@ template <typename IntDi, typename IntDo> struct KernelFunctorV1 {
 
 template <class Operator, class FilterTensor, class ActivationTensor, class OutputTensor>
 __global__
-__launch_bounds__(
-    Operator::MaxThreadsPerBlock,
-    Operator::MinBlocksPerMultiprocessor) void kernel_entrypoint(FilterTensor mFlt,
-                                                                 ActivationTensor mAct,
-                                                                 OutputTensor mOut) {
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor) void
+kernel_entrypoint(FilterTensor mFlt, ActivationTensor mAct, OutputTensor mOut) {
     extern __shared__ char smem_buf[];
     Operator op;
     op(mFlt, mAct, mOut, smem_buf);
