@@ -21,11 +21,11 @@
     "C_Cpp.autoAddFileAssociations": false,
 
     "[cpp]": {
-        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+        "editor.defaultFormatter": "seaube.clangformat",
         "editor.formatOnSave": true
     },
     "[cuda-cpp]": {
-        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+        "editor.defaultFormatter": "seaube.clangformat",
         "editor.formatOnSave": true
     },
     "[python]": {
@@ -54,4 +54,5 @@
     "json.format.keepLines": true,
 
     "clangd.path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clangd",
+    "clangFormat.executable.linux": "${env:CONDA_PREFIX}/envs/fvdb/bin/clang-format",
 }
