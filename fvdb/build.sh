@@ -1,11 +1,30 @@
 #!/bin/bash
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
-#
-# get the build type from the command line
-BUILD_TYPE=${1:-install}
 
-# Function to calculate and set the optimal number of parallel build jobs
+usage() {
+  echo "Usage: $0 [-h|--help] [build_type] [options...]"
+  echo ""
+  echo "Builds or tests FVDB."
+  echo ""
+  echo "Arguments:"
+  echo "  build_type     Specifies the build operation. Can be one of:"
+  echo "                   install    - Build and install the package (default)."
+  echo "                   wheel      - Build the Python wheel."
+  echo "                   ctest      - Run tests (requires tests to be built)."
+  echo ""
+  echo "Options:"
+  echo "  -h, --help     Display this help message and exit."
+  echo ""
+  echo "Build Modifiers (for 'install' and 'wheel' build types, typically passed after build_type):"
+  echo "  gtests         Enable building tests (sets FVDB_BUILD_TESTS=ON)."
+  echo "  benchmarks     Enable building benchmarks (sets FVDB_BUILD_BENCHMARKS=ON)."
+  echo "  verbose        Enable verbose build output for pip and CMake."
+  echo ""
+  echo "  Any modifier arguments not matching above are passed through to pip."
+  exit 0
+}
+
 setup_parallel_build_jobs() {
   # Calculate the optimal number of parallel build jobs based on available RAM
   RAM_GB=$(free -g | awk '/^Mem:/{print $4}')
@@ -42,29 +61,48 @@ setup_parallel_build_jobs() {
   fi
 }
 
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+fi
 
-## Build the project
+# Determine BUILD_TYPE from the first positional argument, default to 'install'.
+# Handle shifting of arguments appropriately.
+_first_arg_val="$1"
+BUILD_TYPE="install" # Default build type
 
-# Ensure that the build is done with the conda environment
-# Get any additional command line arguments after $1
-shift
+if [[ -n "$_first_arg_val" ]]; then
+  if [[ "$_first_arg_val" == "install" || "$_first_arg_val" == "wheel" || "$_first_arg_val" == "ctest" ]]; then
+    BUILD_TYPE="$_first_arg_val"
+    shift # Consume the build_type argument
+  else
+    # _first_arg_val is not a recognized build type. Print usage and exit.
+    echo "Error: Argument '$_first_arg_val' is not a recognized build_type."
+    usage # This will also exit
+  fi
+fi
 
 CONFIG_SETTINGS=""
 PASS_THROUGH_ARGS=""
 
 while (( "$#" )); do
+  is_config_arg_handled=false
   if [[ "$BUILD_TYPE" == "install" || "$BUILD_TYPE" == "wheel" ]]; then
     if [[ "$1" == "gtests" ]]; then
       echo "Detected 'gtests' flag for $BUILD_TYPE build. Enabling FVDB_BUILD_TESTS."
       CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_TESTS=ON"
+      is_config_arg_handled=true
     elif [[ "$1" == "benchmarks" ]]; then
       echo "Detected 'benchmarks' flag for $BUILD_TYPE build. Enabling FVDB_BUILD_BENCHMARKS."
       CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_BENCHMARKS=ON"
-    else
-      # Append other arguments, handling potential spaces safely
-      PASS_THROUGH_ARGS+=" $(printf "%q" "$1")"
+      is_config_arg_handled=true
+    elif [[ "$1" == "verbose" ]]; then
+      echo "Enabling verbose build"
+      CONFIG_SETTINGS+=" -v -C build.verbose=true"
+      is_config_arg_handled=true
     fi
-  else
+  fi
+
+  if ! $is_config_arg_handled; then
     # Append other arguments, handling potential spaces safely
     PASS_THROUGH_ARGS+=" $(printf "%q" "$1")"
   fi
