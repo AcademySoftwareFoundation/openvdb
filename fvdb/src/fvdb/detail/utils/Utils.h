@@ -16,7 +16,8 @@
 #include <c10/util/Half.h>
 #include <torch/extension.h>
 
-#include <iostream> // for std::ostream
+#include <iostream>
+#include <memory>
 #include <type_traits>
 
 // A bunch of things defined to make intellisense work with nvcc
@@ -289,26 +290,24 @@ StringToTorchScalarType(std::string dtypeStr) {
 struct RAIIDeviceGuard {
     RAIIDeviceGuard(const torch::Device &device) {
         if (device.is_cuda()) {
-            mGuard = new c10::cuda::CUDAGuard(device.index());
+            mGuard = std::make_unique<c10::cuda::CUDAGuard>(device.index());
         }
     }
 
     RAIIDeviceGuard(const torch::Device &device1, const torch::Device &device2) {
         if (device1.is_cuda()) {
-            mGuard = new c10::cuda::CUDAGuard(device1.index());
+            mGuard = std::make_unique<c10::cuda::CUDAGuard>(device1.index());
         } else if (device2.is_cuda()) {
-            mGuard = new c10::cuda::CUDAGuard(device2.index());
+            mGuard = std::make_unique<c10::cuda::CUDAGuard>(device2.index());
         }
     }
 
-    RAIIDeviceGuard(const RAIIDeviceGuard &) = delete;
-
+    RAIIDeviceGuard(const RAIIDeviceGuard &)            = delete;
     RAIIDeviceGuard &operator=(const RAIIDeviceGuard &) = delete;
-
-    ~RAIIDeviceGuard() { delete mGuard; }
+    ~RAIIDeviceGuard()                                  = default;
 
   private:
-    c10::cuda::CUDAGuard *mGuard = nullptr;
+    std::unique_ptr<c10::cuda::CUDAGuard> mGuard;
 };
 
 } // namespace detail
