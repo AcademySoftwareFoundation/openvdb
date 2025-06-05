@@ -85,7 +85,8 @@ def make_grid_from_points(pts: torch.Tensor, padding, vox_size, vox_origin) -> G
     logging.info("Building GridBatch from points...")
     start = timeit.default_timer()
     grid = GridBatch(device=pts.device)
-    grid.set_from_points(pts, [-padding] * 3, [padding] * 3, voxel_sizes=vox_size, origins=vox_origin)
+    grid.set_from_points(pts, voxel_sizes=vox_size, origins=vox_origin)
+    grid = grid.dilated_grid(padding)
     torch.cuda.synchronize()
     logging.info(f"Done in {timeit.default_timer() - start}s")
     logging.info(f"GridBatch has {grid.total_voxels} voxels")
@@ -152,7 +153,13 @@ def load_mesh(
     for a in attrs:
         if a is None:
             raise ValueError(f"Failed to load mesh {data_path}, missing attributes")
-    attrs = [torch.from_numpy(a[::skip_every]).to(device).to(dtype) for a in attrs]
+    if mode == "vf":
+        attrs = [
+            torch.from_numpy(attrs[0][::skip_every]).to(device).to(dtype),
+            torch.from_numpy(attrs[1][::skip_every]).to(device),
+        ]
+    else:
+        attrs = [torch.from_numpy(a[::skip_every]).to(device).to(dtype) for a in attrs]
     logging.info(f"Done in {timeit.default_timer() - start}s")
 
     return attrs

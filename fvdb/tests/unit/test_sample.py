@@ -12,20 +12,14 @@ from fvdb.utils.tests import (
     gridbatch_from_dense_cube,
     make_dense_grid_and_point_data,
     make_gridbatch_and_point_data,
-    random_drop_points_if_mutable,
 )
 
 all_device_dtype_combos = [
-    ["cuda", torch.float16, False],
-    ["cpu", torch.float32, False],
-    ["cuda", torch.float32, False],
-    ["cpu", torch.float64, False],
-    ["cuda", torch.float64, False],
-    ["cuda", torch.float16, True],
-    ["cpu", torch.float32, True],
-    ["cuda", torch.float32, True],
-    ["cpu", torch.float64, True],
-    ["cuda", torch.float64, True],
+    ["cuda", torch.float16],
+    ["cpu", torch.float32],
+    ["cuda", torch.float32],
+    ["cpu", torch.float64],
+    ["cuda", torch.float64],
 ]
 
 
@@ -71,7 +65,7 @@ def sample_trilinear_naive(pts, corner_feats, grid):
     unique_ijk, ijk_idx = torch.unique(nearest_ijk.reshape(-1, 3), dim=0, return_inverse=True)
     corner_feats_indices = grid.ijk_to_index(nearest_ijk.reshape(-1, 3)).jdata.reshape(-1, 8)
     sel_corner_feats = corner_feats[corner_feats_indices]
-    sel_corner_feats[~grid.coords_in_active_voxel(nearest_ijk.reshape(-1, 3), False).jdata.reshape(-1, 8)] = 0.0
+    sel_corner_feats[~grid.coords_in_active_voxel(nearest_ijk.reshape(-1, 3)).jdata.reshape(-1, 8)] = 0.0
     uvws = torch.abs(grid_pts.unsqueeze(1) - nearest_ijk.to(pts.dtype))
 
     trilinear_weights = torch.prod(1.0 - uvws, dim=-1)
@@ -106,7 +100,7 @@ def sample_bezier_naive(pts, corner_feats, grid):
     unique_ijk, ijk_idx = torch.unique(nearest_ijk.reshape(-1, 3), dim=0, return_inverse=True)
     corner_feats_indices = grid.ijk_to_index(nearest_ijk.reshape(-1, 3)).jdata.reshape(-1, 27)
     sel_corner_feats = corner_feats[corner_feats_indices]
-    sel_corner_feats[~grid.coords_in_active_voxel(nearest_ijk.reshape(-1, 3), False).jdata.reshape(-1, 27)] = 0.0
+    sel_corner_feats[~grid.coords_in_active_voxel(nearest_ijk.reshape(-1, 3)).jdata.reshape(-1, 27)] = 0.0
     bz_dir = _bezier(nearest_ijk.to(pts.dtype) - grid_pts.unsqueeze(1))
     bz_weights = torch.prod(bz_dir, dim=-1)
     interpolated_feats = bz_weights.unsqueeze(-1) * sel_corner_feats.to(pts.dtype)
@@ -148,7 +142,7 @@ def splat_trilinear_naive(pts, feats, grid):
     sum_interpolated_feats = torch.zeros((unique_ijk.shape[0], feats_dim), device=device, dtype=pts.dtype)
     sum_interpolated_feats.index_add_(0, ijk_idx, interpolated_feats.reshape(-1, feats_dim))
     output = torch.zeros((grid.ijk.jdata.shape[0], feats_dim), device=device, dtype=dtype)
-    mask = grid.coords_in_active_voxel(unique_ijk, False).jdata
+    mask = grid.coords_in_active_voxel(unique_ijk).jdata
     sum_interpolated_feats = sum_interpolated_feats[mask]
     valid_ijk = grid.ijk_to_index(unique_ijk[mask]).jdata
     output[valid_ijk] = sum_interpolated_feats.to(dtype)
@@ -177,7 +171,7 @@ def splat_bezier_naive(pts, feats, grid):
     sum_interpolated_feats = torch.zeros((unique_ijk.shape[0], feats_dim), device=device, dtype=pts.dtype)
     sum_interpolated_feats.index_add_(0, ijk_idx, interpolated_feats.reshape(-1, feats_dim))
     output = torch.zeros((grid.ijk.jdata.shape[0], feats_dim), device=device, dtype=dtype)
-    mask = grid.coords_in_active_voxel(unique_ijk, False).jdata
+    mask = grid.coords_in_active_voxel(unique_ijk).jdata
     sum_interpolated_feats = sum_interpolated_feats[mask]
     valid_ijk = grid.ijk_to_index(unique_ijk[mask]).jdata
     output[valid_ijk] = sum_interpolated_feats.to(dtype)
@@ -186,7 +180,7 @@ def splat_bezier_naive(pts, feats, grid):
 
 class TestSample(unittest.TestCase):
     @parameterized.expand(all_device_dtype_combos)
-    def test_trilinear_dense_vs_pytorch(self, device, dtype, mutable):
+    def test_trilinear_dense_vs_pytorch(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-2
             rtol = 1e-2
@@ -196,7 +190,7 @@ class TestSample(unittest.TestCase):
         else:
             atol = 1e-5
             rtol = 1e-8
-        fvdb, fvdb_d, p = make_dense_grid_and_point_data(7, device, dtype, mutable=mutable)
+        fvdb, fvdb_d, p = make_dense_grid_and_point_data(7, device, dtype)
 
         # Primal
         primal_features = torch.rand((fvdb.total_voxels, 4), device=device, dtype=dtype)
@@ -235,7 +229,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_upsample_dense_vs_pytorch(self, device, dtype, mutable):
+    def test_upsample_dense_vs_pytorch(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-2
             rtol = 1e-2
@@ -245,7 +239,7 @@ class TestSample(unittest.TestCase):
 
         nvox = 7
         scale = 2
-        fvdb = gridbatch_from_dense_cube([nvox] * 3, device=device, mutable=mutable)
+        fvdb = gridbatch_from_dense_cube([nvox] * 3, device=device)
 
         small_features = torch.rand((1, nvox, nvox, nvox), device=device, dtype=dtype)
         small_features.requires_grad = True
@@ -291,7 +285,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_trilinear_sparse_vs_brute(self, device, dtype, mutable):
+    def test_trilinear_sparse_vs_brute(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-3
             rtol = 1e-3
@@ -299,9 +293,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -340,7 +332,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_trilinear_with_grad_sparse_vs_brute(self, device, dtype, mutable):
+    def test_trilinear_with_grad_sparse_vs_brute(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-3
             rtol = 1e-3
@@ -348,9 +340,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -395,7 +385,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_trilinear_sparse_onbound_vs_brute(self, device, dtype, mutable):
+    def test_trilinear_sparse_onbound_vs_brute(self, device, dtype):
         if dtype == torch.half:
             f_atol = 1e-2
             f_rtol = 1e-2
@@ -407,9 +397,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True)
 
         p.requires_grad = True
         # Primal
@@ -457,7 +445,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_trilinear_with_grad_sparse_onbound_vs_brute(self, device, dtype, mutable):
+    def test_trilinear_with_grad_sparse_onbound_vs_brute(self, device, dtype):
         if dtype == torch.half:
             f_atol = 1e-2
             f_rtol = 1e-2
@@ -469,9 +457,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True)
 
         p.requires_grad = True
         # Primal
@@ -521,7 +507,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_bezier_sparse_vs_brute(self, device, dtype, mutable):
+    def test_bezier_sparse_vs_brute(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-1
             rtol = 1e-2
@@ -529,9 +515,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -573,7 +557,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_bezier_with_grad_sparse_vs_brute(self, device, dtype, mutable):
+    def test_bezier_with_grad_sparse_vs_brute(self, device, dtype):
         if dtype == torch.half:
             atol = 1e-1
             rtol = 1e-2
@@ -581,9 +565,7 @@ class TestSample(unittest.TestCase):
             atol = 1e-5
             rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, mutable=mutable)
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -627,7 +609,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_bezier_sparse_onbound_vs_brute(self, device, dtype, mutable):
+    def test_bezier_sparse_onbound_vs_brute(self, device, dtype):
         if dtype == torch.half:
             f_atol = 1e-2
             f_rtol = 1e-2
@@ -639,11 +621,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(
-            device, dtype, include_boundary_points=True, mutable=mutable, expand=1
-        )
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, expand=1)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -689,7 +667,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_bezier_with_grad_sparse_onbound_vs_brute(self, device, dtype, mutable):
+    def test_bezier_with_grad_sparse_onbound_vs_brute(self, device, dtype):
         if dtype == torch.half:
             f_atol = 1e-2
             f_rtol = 1e-2
@@ -701,11 +679,7 @@ class TestSample(unittest.TestCase):
             g_atol = 1e-5
             g_rtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(
-            device, dtype, include_boundary_points=True, mutable=mutable, expand=1
-        )
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, expand=1)
 
         # Primal
         primal_features = torch.rand((grid.total_voxels, 4), device=device, dtype=dtype)
@@ -753,7 +727,7 @@ class TestSample(unittest.TestCase):
         )
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_splat_trilinear_vs_brute(self, device, dtype, mutable):
+    def test_splat_trilinear_vs_brute(self, device, dtype):
         if dtype == torch.half:
             fatol = 1e-3
             frtol = 1e-4
@@ -765,11 +739,7 @@ class TestSample(unittest.TestCase):
             gatol = 1e-5
             grtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(
-            device, dtype, include_boundary_points=True, mutable=mutable, expand=1
-        )
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, expand=1)
 
         points_data = torch.randn(p.shape[0], 7, device=device, dtype=dtype, requires_grad=True)
 
@@ -788,7 +758,7 @@ class TestSample(unittest.TestCase):
         self.assertTrue(torch.allclose(gv, gp, atol=gatol, rtol=grtol), f"Max error is {torch.max(torch.abs(gv - gp))}")
 
     @parameterized.expand(all_device_dtype_combos)
-    def test_splat_bezier_vs_brute(self, device, dtype, mutable):
+    def test_splat_bezier_vs_brute(self, device, dtype):
         if dtype == torch.half:
             fatol = 1e-3
             frtol = 1e-3
@@ -800,11 +770,7 @@ class TestSample(unittest.TestCase):
             gatol = 1e-5
             grtol = 1e-8
 
-        grid, grid_d, p = make_gridbatch_and_point_data(
-            device, dtype, include_boundary_points=True, mutable=mutable, expand=1
-        )
-        random_drop_points_if_mutable(grid)
-        random_drop_points_if_mutable(grid_d)
+        grid, grid_d, p = make_gridbatch_and_point_data(device, dtype, include_boundary_points=True, expand=1)
 
         points_data = torch.randn(p.shape[0], 7, device=device, dtype=dtype, requires_grad=True)
 

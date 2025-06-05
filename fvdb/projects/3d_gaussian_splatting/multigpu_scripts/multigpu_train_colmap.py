@@ -6,13 +6,27 @@ import os
 import subprocess
 from functools import partial
 from multiprocessing import Pool
+from typing import Optional
 
 import tyro
 
 
 # TODO allow user to config other training args
 def run_cluster(
-    cluster_id, data_path, factor, devices_per_cluster, max_steps, num_clusters, geo_normalize, results_path
+    cluster_id,
+    data_path,
+    factor,
+    devices_per_cluster,
+    max_steps,
+    num_clusters,
+    geo_normalize,
+    results_path,
+    pose_opt,
+    pose_opt_lr=None,
+    pose_opt_reg=None,
+    pose_opt_lr_decay=None,
+    pose_opt_stop_iter=None,
+    pose_opt_init_std=None,
 ):
     """
     Run train_colmap.py for specified cluster.
@@ -25,6 +39,12 @@ def run_cluster(
         num_clusters: total number of clusters, used to generate final output path
         geo_normalize: set if colmap run is in ECEF geo coordinates
         results_path: root directory to save results to
+        pose_opt: whether to enable pose optimization
+        pose_opt_lr: learning rate for pose optimization
+        pose_opt_reg: regularization weight for pose optimization
+        pose_opt_lr_decay: learning rate decay factor for pose optimization
+        pose_opt_stop_iter: stop iter for pose optimization
+        pose_opt_init_std: standard deviation for the normal distribution used for camera pose optimization's random initialization
     Returns:
         dictionary of splats after removal of gaussians outside bounds
     """
@@ -60,6 +80,24 @@ def run_cluster(
         "--results_path",
         os.path.join(results_path, f"{cluster_id_str}_cluster/"),
     ]
+
+    # Add pose optimization flag
+    if pose_opt:
+        args.append("--cfg.pose-opt")
+        # if pose_opt_lr and pose_opt_reg were given add them
+        if pose_opt_lr is not None:
+            args.append(f"--cfg.pose_opt_lr={pose_opt_lr}")
+        if pose_opt_reg is not None:
+            args.append(f"--cfg.pose_opt_reg={pose_opt_reg}")
+        if pose_opt_lr_decay is not None:
+            args.append(f"--cfg.pose_opt_lr_decay={pose_opt_lr_decay}")
+        if pose_opt_stop_iter is not None:
+            args.append(f"--cfg.pose_opt_stop_iter={pose_opt_stop_iter}")
+        if pose_opt_init_std is not None:
+            args.append(f"--cfg.pose_opt_init_std={pose_opt_init_std}")
+    else:
+        args.append("--cfg.no-pose-opt")
+
     if geo_normalize:
         args.append("--normalize_ecef2enu")
 
@@ -77,6 +115,12 @@ def main(
     results_path: str,
     devices: list[str],
     geo_normalize: bool = False,
+    pose_opt: bool = False,
+    pose_opt_lr: Optional[float] = 1e-5,
+    pose_opt_reg: Optional[float] = 1e-6,
+    pose_opt_lr_decay: Optional[float] = 1.0,
+    pose_opt_stop_iter: Optional[int] = None,
+    pose_opt_init_std: Optional[float] = 1e-04,
 ):
     """
     Script to run multiple training jobs across multiple gpus. Assuming that the clusters were generated
@@ -89,6 +133,13 @@ def main(
         data_path: path to colmap run
         results_path: root path to place results in for each cluster run
         devices: list of gpu devices to run across (eg: cuda:0 cuda:1)
+        geo_normalize: whether to use ECEF to ENU normalization
+        pose_opt: Flag to enable camera pose optimization.
+        pose_opt_lr: Learning rate for camera pose optimization.
+        pose_opt_reg: Weight for regularization of camera pose optimization.
+        pose_opt_lr_decay: Learning rate decay factor for camera pose optimization (will decay to this fraction of initial lr)
+        pose_opt_stop_iter: When to stop optimizing camera postions. Default matches max training steps.
+        pose_opt_init_std: Standard deviation for the normal distribution used for camera pose optimization's random initialization
     """
     clusters = list(range(num_clusters))
     ngpus = len(devices)
@@ -104,6 +155,12 @@ def main(
         num_clusters=num_clusters,
         geo_normalize=geo_normalize,
         results_path=results_path,
+        pose_opt=pose_opt,
+        pose_opt_lr=pose_opt_lr,
+        pose_opt_reg=pose_opt_reg,
+        pose_opt_lr_decay=pose_opt_lr_decay,
+        pose_opt_stop_iter=pose_opt_stop_iter,
+        pose_opt_init_std=pose_opt_init_std,
     )
 
     pool = Pool(ngpus)

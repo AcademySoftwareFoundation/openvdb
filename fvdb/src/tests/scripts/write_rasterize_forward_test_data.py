@@ -36,10 +36,10 @@ width = data["width"].item()
 height = data["height"].item()
 
 sh_degree = 3
-sh_coeffs = torch.zeros(((sh_degree + 1) ** 2, means.shape[0], 3), device=device)
-sh_coeffs[0, :, :] = rgb_to_sh(colors)
-sh_0 = sh_coeffs[0, :, :].unsqueeze(0).clone()
-sh_n = sh_coeffs[1:, :, :].clone()
+sh_coeffs = torch.zeros((means.shape[0], (sh_degree + 1) ** 2, 3), device=device)
+sh_coeffs[:, 0, :] = rgb_to_sh(colors)
+sh_0 = sh_coeffs[:, 0:1, :].clone()
+sh_n = sh_coeffs[:, 1:, :].clone()
 
 gs3d = GaussianSplat3d(
     means=means,

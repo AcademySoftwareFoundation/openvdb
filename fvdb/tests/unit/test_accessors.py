@@ -28,7 +28,7 @@ class TestAccessors(unittest.TestCase):
         )
 
         sparse_points = torch.tensor([[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device)
-        grid = GridBatch(mutable=True, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(sparse_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
         grid.read_from_dense(dense_grid, dense_origin)
@@ -38,7 +38,7 @@ class TestAccessors(unittest.TestCase):
         dense_origin = torch.tensor([0, 0, 0]).to(torch.long).to(device)
 
         zero_points = torch.tensor([[0, 0, 0], [1, 1, 1]], dtype=torch.float16, device=device)
-        grid = GridBatch(mutable=True, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_points(zero_points, voxel_sizes=0.1, origins=[0.0] * 3)
 
         sparse_data = torch.tensor([[0], [0]], dtype=torch.float16, device=device)

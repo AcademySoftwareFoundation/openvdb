@@ -53,12 +53,12 @@ CONFIG_SETTINGS=""
 PASS_THROUGH_ARGS=""
 
 while (( "$#" )); do
-  if [[ "$BUILD_TYPE" == "install" ]]; then
+  if [[ "$BUILD_TYPE" == "install" || "$BUILD_TYPE" == "wheel" ]]; then
     if [[ "$1" == "gtests" ]]; then
-      echo "Detected 'gtests' flag for install build. Enabling FVDB_BUILD_TESTS."
+      echo "Detected 'gtests' flag for $BUILD_TYPE build. Enabling FVDB_BUILD_TESTS."
       CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_TESTS=ON"
     elif [[ "$1" == "benchmarks" ]]; then
-      echo "Detected 'benchmarks' flag for install build. Enabling FVDB_BUILD_BENCHMARKS."
+      echo "Detected 'benchmarks' flag for $BUILD_TYPE build. Enabling FVDB_BUILD_BENCHMARKS."
       CONFIG_SETTINGS+=" --config-settings=cmake.define.FVDB_BUILD_BENCHMARKS=ON"
     else
       # Append other arguments, handling potential spaces safely
@@ -72,7 +72,7 @@ while (( "$#" )); do
 done
 
 # Construct PIP_ARGS with potential CMake args and other pass-through args
-export PIP_ARGS="-v --no-build-isolation$CONFIG_SETTINGS$PASS_THROUGH_ARGS"
+export PIP_ARGS="--no-build-isolation$CONFIG_SETTINGS$PASS_THROUGH_ARGS"
 
 if [ "$BUILD_TYPE" != "ctest" ]; then
     setup_parallel_build_jobs

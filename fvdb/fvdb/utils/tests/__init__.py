@@ -17,7 +17,6 @@ from .grid_utils import (
     gridbatch_from_dense_cube,
     make_dense_grid_and_point_data,
     make_gridbatch_and_point_data,
-    random_drop_points_if_mutable,
 )
 
 git_tag_for_data = "main"
@@ -147,7 +146,6 @@ __all__ = [
     "set_testing_git_tag",
     "get_fvdb_test_data_path",
     "gridbatch_from_dense_cube",
-    "random_drop_points_if_mutable",
     "make_dense_grid_and_point_data",
     "make_gridbatch_and_point_data",
     "dtype_to_atol",
