@@ -14,15 +14,6 @@ GridBatch::GridBatch(const torch::Device &device) {
     mImpl = c10::make_intrusive<detail::GridBatchImpl>(device);
 }
 
-GridBatch::GridBatch(const std::string &device_string) {
-    torch::Device device(device_string);
-    if (device.is_cuda() && !device.has_index()) {
-        device.set_index(c10::cuda::current_device());
-    }
-    detail::RAIIDeviceGuard guard(device);
-    mImpl = c10::make_intrusive<detail::GridBatchImpl>(device);
-}
-
 GridBatch::GridBatch() {
     mImpl = detail::GridBatchImpl::createFromEmpty(
         torch::kCPU, nanovdb::Vec3d(1.0), nanovdb::Vec3d(0.0));

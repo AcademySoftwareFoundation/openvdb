@@ -14,7 +14,10 @@ void
 bind_grid_batch(py::module &m) {
     py::class_<fvdb::GridBatch>(m, "GridBatch", "A batch of sparse VDB grids.")
         .def(py::init<const torch::Device &>(), py::arg("device") = torch::kCPU)
-        .def(py::init<const std::string &>(), py::arg("device") = "cpu")
+        .def(py::init([](const std::string &device) {
+                 return fvdb::GridBatch(fvdb::parseDeviceString(device));
+             }),
+             py::arg("device") = "cpu")
 
         // Properties
         .def_property_readonly("total_voxels",
@@ -718,9 +721,12 @@ bind_grid_batch(py::module &m) {
         .def("to",
              py::overload_cast<const torch::Device &>(&fvdb::GridBatch::to, py::const_),
              py::arg("to_device"))
-        .def("to",
-             py::overload_cast<const std::string &>(&fvdb::GridBatch::to, py::const_),
-             py::arg("to_device"))
+        .def(
+            "to",
+            [](const fvdb::GridBatch &self, const std::string &to_device) {
+                return self.to(fvdb::parseDeviceString(to_device));
+            },
+            py::arg("to_device"))
         .def("to",
              py::overload_cast<const torch::Tensor &>(&fvdb::GridBatch::to, py::const_),
              py::arg("to_tensor"))

@@ -10,6 +10,15 @@
 
 namespace fvdb {
 
+torch::Device
+parseDeviceString(const std::string &string) {
+    torch::Device device(string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
+    return device;
+}
+
 std::vector<torch::Tensor>
 volumeRender(const torch::Tensor &sigmas,
              const torch::Tensor &rgbs,
@@ -123,22 +132,23 @@ save(const std::string &path,
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 load(const std::string &path,
-     NanoVDBFileGridIdentifier gridIdentifier,
+     const std::vector<uint64_t> &indices,
      const torch::Device &device,
      bool verbose) {
-    return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
+    return detail::io::loadNVDB(path, indices, device, verbose);
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 load(const std::string &path,
-     NanoVDBFileGridIdentifier gridIdentifier,
-     const std::string &device_string,
+     const std::vector<std::string> &names,
+     const torch::Device &device,
      bool verbose) {
-    torch::Device device(device_string);
-    if (device.is_cuda() && !device.has_index()) {
-        device.set_index(c10::cuda::current_device());
-    }
-    return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
+    return detail::io::loadNVDB(path, names, device, verbose);
+}
+
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+load(const std::string &path, const torch::Device &device, bool verbose) {
+    return detail::io::loadNVDB(path, device, verbose);
 }
 
 GridBatch
@@ -179,21 +189,6 @@ gridbatch_from_dense(const int64_t numGrids,
     auto ret = GridBatch(device);
     ret.set_from_dense_grid(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask);
     return ret;
-}
-
-GridBatch
-gridbatch_from_dense(const int64_t numGrids,
-                     const Vec3i &denseDims,
-                     const Vec3i &ijkMin,
-                     const Vec3dBatchOrScalar &voxel_sizes,
-                     const Vec3dBatch &origins,
-                     std::optional<torch::Tensor> mask,
-                     const std::string &device_string) {
-    torch::Device device(device_string);
-    if (device.is_cuda() && !device.has_index()) {
-        device.set_index(c10::cuda::current_device());
-    }
-    return gridbatch_from_dense(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask, device);
 }
 
 GridBatch

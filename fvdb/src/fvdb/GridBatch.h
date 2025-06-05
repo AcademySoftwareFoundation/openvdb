@@ -22,7 +22,6 @@ struct GridBatch : torch::CustomClassHolder {
     constexpr static int64_t MAX_GRIDS_PER_BATCH = detail::GridBatchImpl::MAX_GRIDS_PER_BATCH;
 
     explicit GridBatch(const torch::Device &device);
-    explicit GridBatch(const std::string &device_string);
     explicit GridBatch();
 
     GridBatch(c10::intrusive_ptr<detail::GridBatchImpl> gridHdl) : mImpl(gridHdl) {}
@@ -763,21 +762,6 @@ struct GridBatch : torch::CustomClassHolder {
         } else {
             return GridBatch(impl()->clone(to_device));
         }
-    }
-
-    /// @brief Return a grid batch on the specified device. If the passed in device is the same as
-    /// this grid batch's
-    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
-    ///        returned on the specified device.
-    /// @param to_device The device to return the grid batch on
-    /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const std::string &to_device_string) const {
-        torch::Device to_device(to_device_string);
-        if (to_device.is_cuda() && !to_device.has_index()) {
-            to_device.set_index(c10::cuda::current_device());
-        }
-        return to(to_device);
     }
 
     /// @brief Return a grid batch on the same device as the specified grid batch. If the passed in

@@ -46,47 +46,6 @@ template <> struct type_caster<torch::ScalarType> : public type_caster_base<torc
 };
 #endif
 
-template <>
-struct type_caster<fvdb::NanoVDBFileGridIdentifier>
-    : public type_caster_base<fvdb::NanoVDBFileGridIdentifier> {
-    using base = type_caster_base<fvdb::NanoVDBFileGridIdentifier>;
-
-  public:
-    fvdb::NanoVDBFileGridIdentifier id_value;
-
-    bool
-    load(handle src, bool convert) {
-        if (src.is_none()) {
-            value = &id_value;
-            return true;
-        }
-
-        if (base::load(src, convert)) {
-            return true;
-        } else if (py::isinstance<py::int_>(src)) {
-            id_value = src.cast<uint64_t>();
-            value    = &id_value;
-            return true;
-        } else if (py::isinstance<py::str>(src)) {
-            id_value = src.cast<std::string>();
-            value    = &id_value;
-            return true;
-        } else if (py::isinstance<py::list>(src)) {
-            try {
-                id_value = src.cast<std::vector<uint64_t>>();
-            } catch (pybind11::cast_error &e) {
-                try {
-                    id_value = src.cast<std::vector<std::string>>();
-                } catch (pybind11::cast_error &e) { return false; }
-            }
-            value = &id_value;
-            return true;
-        }
-
-        return false;
-    }
-};
-
 template <typename CoordRetT>
 bool
 loadCoordType(handle src, bool convert, CoordRetT &outValue, void **outPtr) {

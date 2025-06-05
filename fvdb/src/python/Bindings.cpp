@@ -80,7 +80,6 @@ bind_jt_build_functions(py::module &m){
     __FVDB__BUILDER(jones, "jones")
     __FVDB__BUILDER(jones, "jempty")
     // clang-format on
-
 }
 #undef __FVDB__BUILDER_INNER
 #undef __FVDB__BUILDER
@@ -95,7 +94,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     py::class_<fvdb::Vec3dBatch>(m, "Vec3dBatch");
     py::class_<fvdb::Vec3dBatchOrScalar>(m, "Vec3dBatchOrScalar");
     py::class_<fvdb::Vec3iBatch>(m, "Vec3iBatch");
-    py::class_<fvdb::NanoVDBFileGridIdentifier>(m, "NanoVDBFileGridIdentifier");
 
     bind_grid_batch(m);
     bind_jagged_tensor(m);
@@ -172,13 +170,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("voxel_sizes") = 1.0,
           py::arg("origins")     = torch::zeros({3}));
     m.def("gridbatch_from_dense",
-          static_cast<fvdb::GridBatch (*)(const int64_t,
-                                          const fvdb::Vec3i &,
-                                          const fvdb::Vec3i &,
-                                          const fvdb::Vec3dBatchOrScalar &,
-                                          const fvdb::Vec3dBatch &,
-                                          typename std::optional<torch::Tensor> mask,
-                                          const torch::Device &)>(&fvdb::gridbatch_from_dense),
+          &fvdb::gridbatch_from_dense,
           py::arg("num_grids"),
           py::arg("dense_dims"),
           py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
@@ -187,21 +179,30 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
           py::arg("mask")        = nullptr,
           py::arg("device")      = "cpu");
 
-    m.def("gridbatch_from_dense",
-          static_cast<fvdb::GridBatch (*)(const int64_t,
-                                          const fvdb::Vec3i &,
-                                          const fvdb::Vec3i &,
-                                          const fvdb::Vec3dBatchOrScalar &,
-                                          const fvdb::Vec3dBatch &,
-                                          typename std::optional<torch::Tensor> mask,
-                                          const std::string &)>(&fvdb::gridbatch_from_dense),
-          py::arg("num_grids"),
-          py::arg("dense_dims"),
-          py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
-          py::arg("voxel_sizes") = 1.0,
-          py::arg("origins")     = torch::zeros({3}),
-          py::arg("mask")        = nullptr,
-          py::arg("device")      = "cpu");
+    m.def(
+        "gridbatch_from_dense",
+        [](const int64_t numGrids,
+           const fvdb::Vec3i &denseDims,
+           const fvdb::Vec3i &ijkMin,
+           const fvdb::Vec3dBatchOrScalar &voxel_sizes,
+           const fvdb::Vec3dBatch &origins,
+           std::optional<torch::Tensor> mask,
+           const std::string &device) {
+            return fvdb::gridbatch_from_dense(numGrids,
+                                              denseDims,
+                                              ijkMin,
+                                              voxel_sizes,
+                                              origins,
+                                              mask,
+                                              fvdb::parseDeviceString(device));
+        },
+        py::arg("num_grids"),
+        py::arg("dense_dims"),
+        py::arg("ijk_min")     = torch::zeros(3, torch::kInt32),
+        py::arg("voxel_sizes") = 1.0,
+        py::arg("origins")     = torch::zeros({3}),
+        py::arg("mask")        = nullptr,
+        py::arg("device")      = "cpu");
 
     m.def("gridbatch_from_mesh",
           &fvdb::gridbatch_from_mesh,
@@ -213,22 +214,109 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     // Loading and saving grids
     m.def("load",
           py::overload_cast<const std::string &,
-                            fvdb::NanoVDBFileGridIdentifier,
+                            const std::vector<uint64_t> &,
                             const torch::Device &,
                             bool>(&fvdb::load),
           py::arg("path"),
-          py::arg("grid_id") = py::none(),
+          py::arg("indices"),
           py::arg("device")  = torch::kCPU,
           py::arg("verbose") = false);
+    m.def(
+        "load",
+        [](const std::string &path, uint64_t index, const torch::Device &device, bool verbose) {
+            std::vector<uint64_t> indices{index};
+            return fvdb::load(path, indices, device, verbose);
+        },
+        py::arg("path"),
+        py::arg("index"),
+        py::arg("device")  = torch::kCPU,
+        py::arg("verbose") = false);
     m.def("load",
           py::overload_cast<const std::string &,
-                            fvdb::NanoVDBFileGridIdentifier,
-                            const std::string &,
+                            const std::vector<std::string> &,
+                            const torch::Device &,
                             bool>(&fvdb::load),
           py::arg("path"),
-          py::arg("grid_id") = py::none(),
-          py::arg("device")  = "cpu",
+          py::arg("names"),
+          py::arg("device")  = torch::kCPU,
           py::arg("verbose") = false);
+    m.def(
+        "load",
+        [](const std::string &path,
+           const std::string &name,
+           const torch::Device &device,
+           bool verbose) {
+            std::vector<std::string> names{name};
+            return fvdb::load(path, names, device, verbose);
+        },
+        py::arg("path"),
+        py::arg("name"),
+        py::arg("device")  = torch::kCPU,
+        py::arg("verbose") = false);
+    m.def("load",
+          py::overload_cast<const std::string &, const torch::Device &, bool>(&fvdb::load),
+          py::arg("path"),
+          py::arg("device")  = torch::kCPU,
+          py::arg("verbose") = false);
+
+    m.def(
+        "load",
+        [](const std::string &path,
+           const std::vector<uint64_t> &indices,
+           const std::string &device,
+           bool verbose) {
+            return fvdb::load(path, indices, fvdb::parseDeviceString(device), verbose);
+        },
+        py::arg("path"),
+        py::arg("indices"),
+        py::arg("device")  = "cpu",
+        py::arg("verbose") = false);
+    m.def(
+        "load",
+        [](const std::string &path, uint64_t index, const std::string &device, bool verbose) {
+            std::vector<uint64_t> indices{index};
+            return fvdb::load(path, indices, fvdb::parseDeviceString(device), verbose);
+        },
+        py::arg("path"),
+        py::arg("index"),
+        py::arg("device")  = torch::kCPU,
+        py::arg("verbose") = false);
+
+    m.def(
+        "load",
+        [](const std::string &path,
+           const std::vector<std::string> &names,
+           const std::string &device,
+           bool verbose) {
+            return fvdb::load(path, names, fvdb::parseDeviceString(device), verbose);
+        },
+        py::arg("path"),
+        py::arg("names"),
+        py::arg("device")  = "cpu",
+        py::arg("verbose") = false);
+    m.def(
+        "load",
+        [](const std::string &path,
+           const std::string &name,
+           const std::string &device,
+           bool verbose) {
+            std::vector<std::string> names{name};
+            return fvdb::load(path, names, fvdb::parseDeviceString(device), verbose);
+        },
+        py::arg("path"),
+        py::arg("name"),
+        py::arg("device")  = torch::kCPU,
+        py::arg("verbose") = false);
+
+    m.def(
+        "load",
+        [](const std::string &path, const std::string &device, bool verbose) {
+            return fvdb::load(path, fvdb::parseDeviceString(device), verbose);
+        },
+        py::arg("path"),
+        py::arg("device")  = "cpu",
+        py::arg("verbose") = false);
+
     m.def("save",
           py::overload_cast<const std::string &,
                             const fvdb::GridBatch &,
@@ -356,12 +444,13 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
              py::arg("input"),
              py::arg("weights"),
              py::arg("backend") = fvdb::ConvPackBackend::GATHER_SCATTER)
-        .def("to",
-             py::overload_cast<const torch::Device &>(&fvdb::SparseConvPackInfo::to, py::const_),
-             py::arg("to_device"))
-        .def("to",
-             py::overload_cast<const std::string &>(&fvdb::SparseConvPackInfo::to, py::const_),
-             py::arg("to_device"))
+        .def("to", &fvdb::SparseConvPackInfo::to, py::arg("to_device"))
+        .def(
+            "to",
+            [](const fvdb::SparseConvPackInfo &self, const std::string &to_device) {
+                return self.to(fvdb::parseDeviceString(to_device));
+            },
+            py::arg("to_device"))
         .def("cuda", &fvdb::SparseConvPackInfo::cuda)
         .def("cpu", &fvdb::SparseConvPackInfo::cpu);
 }
