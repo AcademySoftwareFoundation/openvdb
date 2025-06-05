@@ -6,7 +6,6 @@
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/tools/CreateNanoGrid.h>

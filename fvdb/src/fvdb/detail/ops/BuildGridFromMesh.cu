@@ -4,7 +4,6 @@
 #include <fvdb/detail/GridBatchImpl.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
 
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>

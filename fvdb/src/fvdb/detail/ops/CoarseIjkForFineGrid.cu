@@ -4,7 +4,6 @@
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/ForEachCPU.h>
 #include <fvdb/detail/utils/cuda/ForEachCUDA.cuh>
-#include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
 
 #include <nanovdb/NanoVDB.h>
 
