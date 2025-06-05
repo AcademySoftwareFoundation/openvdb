@@ -582,38 +582,34 @@ JaggedTensor::rmask(const torch::Tensor &mask) const {
 }
 
 JaggedTensor
-JaggedTensor::index(JaggedTensorIndex idx) const {
-    if (idx.is_integer()) {
-        return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
-            return detail::ops::dispatchJaggedTensorIndexInt<DeviceTag>(*this, idx.integer());
-        });
-    } else if (idx.is_slice()) {
-        int64_t start = idx.slice().start().as_int_unchecked();
-        int64_t end   = idx.slice().stop().as_int_unchecked();
-        int64_t step  = idx.slice().step().as_int_unchecked();
-        TORCH_CHECK_VALUE(step >= 1, "step in slice must be >= 1");
+JaggedTensor::index(int64_t index) const {
+    return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
+        return detail::ops::dispatchJaggedTensorIndexInt<DeviceTag>(*this, index);
+    });
+}
 
-        // Deal with symbolic int
-        if (start >= at::indexing::INDEX_MAX) {
-            start = mNumOuterLists;
-        }
-        if (end <= at::indexing::INDEX_MIN) {
-            end = 0;
-        }
+JaggedTensor
+JaggedTensor::index(int64_t start, int64_t stop, int64_t step) const {
+    TORCH_CHECK_VALUE(step >= 1, "step in slice must be >= 1");
 
-        return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
-            return detail::ops::dispatchJaggedTensorIndexSlice<DeviceTag>(*this, start, end, step);
-        });
-    } else if (idx.is_ellipsis()) {
-        return *this;
-    } else if (idx.is_jagged_tensor()) {
-        const JaggedTensor &jtIndices = idx.jagged_tensor();
-        return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
-            return detail::ops::dispatchJaggedTensorIndexJaggedTensor<DeviceTag>(*this, jtIndices);
-        });
-    } else {
-        TORCH_CHECK_VALUE(false, "Unsupported indexing operation");
+    // Deal with symbolic int
+    if (start >= at::indexing::INDEX_MAX) {
+        start = mNumOuterLists;
     }
+    if (stop <= at::indexing::INDEX_MIN) {
+        stop = 0;
+    }
+
+    return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
+        return detail::ops::dispatchJaggedTensorIndexSlice<DeviceTag>(*this, start, stop, step);
+    });
+}
+
+JaggedTensor
+JaggedTensor::index(const JaggedTensor &indices) const {
+    return FVDB_DISPATCH_KERNEL_DEVICE(mData.device(), [&]() {
+        return detail::ops::dispatchJaggedTensorIndexJaggedTensor<DeviceTag>(*this, indices);
+    });
 }
 
 JaggedTensor

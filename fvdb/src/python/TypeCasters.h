@@ -4,7 +4,6 @@
 #ifndef PYTHON_TYPECASTERS_H
 #define PYTHON_TYPECASTERS_H
 
-#include <fvdb/JaggedTensor.h>
 #include <fvdb/Types.h>
 
 #include <torch/extension.h>
@@ -46,59 +45,6 @@ template <> struct type_caster<torch::ScalarType> : public type_caster_base<torc
     }
 };
 #endif
-
-template <>
-struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::JaggedTensorIndex> {
-    fvdb::JaggedTensorIndex idx_value = c10::nullopt;
-
-    bool
-    load(handle src, bool convert) {
-        if (py::isinstance<py::ellipsis>(src)) {
-            idx_value = at::indexing::Ellipsis;
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::slice>(src)) {
-            py::ssize_t start, stop, step;
-            py::slice slice = src.cast<py::slice>();
-            PySlice_Unpack(slice.ptr(), &start, &stop, &step);
-
-            // FIXME: (@fwilliams) -- This is a bit weird. Ideally we want the same behavior as
-            // Pyslice_ComputeEx
-            //                        but we don't know the size apriori here. In any case, we only
-            //                        use this for JaggedTensor which doesn't support negative step
-            //                        sizes anyway.
-            if (step < 0) {
-                if (start >= PY_SSIZE_T_MAX) {
-                    start = -1;
-                }
-
-                if (stop <= PY_SSIZE_T_MIN) {
-                    stop = 0;
-                }
-            }
-            idx_value = at::indexing::Slice(start, stop, step);
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::int_>(src)) {
-            idx_value = src.cast<int64_t>();
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::none>(src)) {
-            idx_value = at::indexing::None;
-            value     = &idx_value;
-            return true;
-        }
-        if (pybind11::isinstance<fvdb::JaggedTensor>(src)) {
-            idx_value = src.cast<fvdb::JaggedTensor>();
-            value     = &idx_value;
-            return true;
-        }
-        return false;
-    }
-};
 
 template <>
 struct type_caster<fvdb::NanoVDBFileGridIdentifier>

@@ -85,7 +85,19 @@ bind_jagged_tensor(py::module &m) {
         .def_property_readonly("is_cuda", &fvdb::JaggedTensor::is_cuda, "Whether the JaggedTensor is on a CUDA device.")
         .def_property_readonly("is_cpu", &fvdb::JaggedTensor::is_cpu, "Whether the JaggedTensor is on a CPU device.")
 
-        .def("__getitem__", &fvdb::JaggedTensor::index)
+        .def("__getitem__", py::overload_cast<int64_t>(&fvdb::JaggedTensor::index, py::const_))
+        .def("__getitem__", py::overload_cast<const fvdb::JaggedTensor&>(&fvdb::JaggedTensor::index, py::const_))
+        .def("__getitem__", [](const fvdb::JaggedTensor& self, const py::slice& slice) {
+            py::ssize_t start = 0, stop = 0, step = 0, slicelength = 0;
+            if (!slice.compute(self.num_outer_lists(), &start, &stop, &step, &slicelength)) {
+                throw py::error_already_set();
+            }
+            int istart = static_cast<int>(start);
+            int istop = static_cast<int>(stop);
+            int istep = static_cast<int>(step);
+            return self.index(istart, istop, istep);
+        })
+        .def("__getitem__", [](const fvdb::JaggedTensor& self, const py::ellipsis& ellipsis) { return self; })
         .def("__len__", &fvdb::JaggedTensor::num_outer_lists)
 
         .def("__neg__", [](const fvdb::JaggedTensor& self) { return -self; }, py::is_operator())

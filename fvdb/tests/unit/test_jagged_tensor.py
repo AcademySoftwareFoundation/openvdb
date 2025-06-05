@@ -690,7 +690,7 @@ class TestJaggedTensor(unittest.TestCase):
         with self.assertRaises(ValueError):
             print(gridbatch.ijk[9:8:-1])
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             print(gridbatch.ijk[None])
 
         with self.assertRaises(ValueError):
@@ -2082,7 +2082,7 @@ class TestJaggedTensor(unittest.TestCase):
 
         # Errors:
         # Wrong type
-        with self.assertRaises(TypeError):
+        with self.assertRaises(IndexError):
             _ = jt1[torch.randint(0, 10, (11,)).to(device)]
         # Wrong dtype
         idx = self.mklol(5, 2, 3, device, torch.float32)[0]
