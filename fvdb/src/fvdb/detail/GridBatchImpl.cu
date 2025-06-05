@@ -91,7 +91,7 @@ namespace fvdb {
 namespace detail {
 
 GridBatchImpl::GridBatchImpl(const torch::Device &device) {
-    detail::RAIIDeviceGuard guard(device);
+    c10::DeviceGuard guard(device);
     auto deviceTensorOptions = torch::TensorOptions().device(device);
     // TODO (Francis): No list-of-lists support for now, so we just assign an empty list of indices
     mLeafBatchIndices = torch::empty({0}, deviceTensorOptions.dtype(fvdb::JIdxScalarType));
@@ -483,7 +483,7 @@ GridBatchImpl::gridToWorldMatrixPerGrid() const {
 
 torch::Tensor
 GridBatchImpl::worldToGridMatrixPerGrid() const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     std::vector<torch::Tensor> retTorch;
     for (int64_t bi = 0; bi < batchSize(); ++bi) {
         retTorch.emplace_back(worldToGridMatrixAt(bi));
@@ -682,7 +682,7 @@ GridBatchImpl::setGlobalDualTransform(const VoxelCoordTransform &transform) {
 
 void
 GridBatchImpl::setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize) {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK(batchSize() > 0, "Cannot set global voxel size on an empty batch of grids");
 
     for (int64_t i = 0; i < batchSize(); i++) {
@@ -701,7 +701,7 @@ GridBatchImpl::setGlobalVoxelSize(const nanovdb::Vec3d &voxelSize) {
 
 void
 GridBatchImpl::setGlobalVoxelOrigin(const nanovdb::Vec3d &voxelOrigin) {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK(batchSize() > 0, "Cannot set global voxel origin on an empty batch of grids");
 
     for (int64_t i = 0; i < batchSize(); i++) {
@@ -912,7 +912,7 @@ GridBatchImpl::setGrid(nanovdb::GridHandle<TorchDeviceBuffer> &&gridHdl,
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::index(int64_t bi) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     bi = negativeToPositiveIndexWithRangecheck(bi);
 
     return index(bi, bi + 1, 1);
@@ -920,7 +920,7 @@ GridBatchImpl::index(int64_t bi) const {
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::index(const torch::Tensor &indices) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_INDEX(indices.dim() == 1, "indices must be a 1D tensor");
     TORCH_CHECK_INDEX(!indices.is_floating_point(), "indices must be an integer tensor");
 
@@ -944,13 +944,13 @@ GridBatchImpl::index(const torch::Tensor &indices) const {
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::index(const std::vector<int64_t> &indices) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     return indexInternal(indices, indices.size());
 }
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::index(const std::vector<bool> &indices) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     std::vector<int64_t> indicesInt;
     indicesInt.reserve(indices.size());
     for (size_t i = 0; i < indices.size(); i += 1) {
@@ -964,7 +964,7 @@ GridBatchImpl::index(const std::vector<bool> &indices) const {
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::index(ssize_t start, ssize_t stop, ssize_t step) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     struct RangeAccessor {
         ssize_t mStart;
         ssize_t mStop;
@@ -1118,7 +1118,7 @@ GridBatchImpl::concatenate(const std::vector<c10::intrusive_ptr<GridBatchImpl>> 
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::contiguous(c10::intrusive_ptr<GridBatchImpl> input) {
-    RAIIDeviceGuard guard(input->device());
+    c10::DeviceGuard guard(input->device());
     if (input->isContiguous()) {
         return input;
     }
@@ -1179,7 +1179,7 @@ GridBatchImpl::contiguous(c10::intrusive_ptr<GridBatchImpl> input) {
 
 JaggedTensor
 GridBatchImpl::jaggedTensor(const torch::Tensor &data) const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     checkDevice(data);
     TORCH_CHECK(data.dim() >= 1, "Data have more than one dimensions");
     TORCH_CHECK(data.size(0) == totalVoxels(), "Data size mismatch");
@@ -1188,7 +1188,7 @@ GridBatchImpl::jaggedTensor(const torch::Tensor &data) const {
 
 torch::Tensor
 GridBatchImpl::jidx() const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         if (batchSize() == 1 || totalVoxels() == 0) {
             return torch::empty(
@@ -1210,13 +1210,13 @@ GridBatchImpl::voxelOffsets() const {
 
 torch::Tensor
 GridBatchImpl::serialize() const {
-    RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     return serializeV0();
 }
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::deserialize(const torch::Tensor &serialized) {
-    RAIIDeviceGuard guard(serialized.device());
+    c10::DeviceGuard guard(serialized.device());
     return deserializeV0(serialized);
 }
 
@@ -1340,7 +1340,7 @@ c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::createFromIjk(const JaggedTensor &ijk,
                              const std::vector<nanovdb::Vec3d> &voxelSizes,
                              const std::vector<nanovdb::Vec3d> &origins) {
-    detail::RAIIDeviceGuard guard(ijk.device());
+    c10::DeviceGuard guard(ijk.device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected coords to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -1377,7 +1377,7 @@ c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::createFromPoints(const JaggedTensor &points,
                                 const std::vector<nanovdb::Vec3d> &voxelSizes,
                                 const std::vector<nanovdb::Vec3d> &origins) {
-    detail::RAIIDeviceGuard guard(points.device());
+    c10::DeviceGuard guard(points.device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -1426,7 +1426,7 @@ GridBatchImpl::createFromMesh(const JaggedTensor &meshVertices,
                               const JaggedTensor &meshFaces,
                               const std::vector<nanovdb::Vec3d> &voxelSizes,
                               const std::vector<nanovdb::Vec3d> &origins) {
-    detail::RAIIDeviceGuard guard(meshVertices.device());
+    c10::DeviceGuard guard(meshVertices.device());
     TORCH_CHECK_VALUE(
         meshVertices.device() == meshFaces.device(),
         "meshVertices and meshFaces must be on the same device, but got meshVertices.device() = ",
@@ -1501,7 +1501,7 @@ GridBatchImpl::dense(const int64_t numGrids,
                      const std::vector<nanovdb::Vec3d> &voxelSizes,
                      const std::vector<nanovdb::Vec3d> &origins,
                      std::optional<torch::Tensor> mask) {
-    detail::RAIIDeviceGuard guard(device);
+    c10::DeviceGuard guard(device);
     TORCH_CHECK_VALUE(numGrids >= 0, "numGrids must be non-negative");
 
     if (mask.has_value()) {
@@ -1543,7 +1543,7 @@ c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::createFromNeighborVoxelsToPoints(const JaggedTensor &points,
                                                 const std::vector<nanovdb::Vec3d> &voxelSizes,
                                                 const std::vector<nanovdb::Vec3d> &origins) {
-    detail::RAIIDeviceGuard guard(points.device());
+    c10::DeviceGuard guard(points.device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -1588,7 +1588,7 @@ GridBatchImpl::createFromNeighborVoxelsToPoints(const JaggedTensor &points,
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::coarsen(const nanovdb::Coord coarseningFactor) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     for (int i = 0; i < 3; i += 1) {
         TORCH_CHECK_VALUE(coarseningFactor[i] > 0,
                           "coarseningFactor must be strictly positive. Got [" +
@@ -1615,7 +1615,7 @@ GridBatchImpl::coarsen(const nanovdb::Coord coarseningFactor) {
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::upsample(const nanovdb::Coord upsampleFactor,
                         const std::optional<JaggedTensor> mask) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     if (mask.has_value()) {
         TORCH_CHECK_VALUE(
             mask.value().ldim() == 1,
@@ -1660,7 +1660,7 @@ GridBatchImpl::upsample(const nanovdb::Coord upsampleFactor,
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::dual(const bool excludeBorder) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     if (batchSize() == 0) {
         return c10::make_intrusive<detail::GridBatchImpl>(device());
     }
@@ -1679,7 +1679,7 @@ GridBatchImpl::dual(const bool excludeBorder) {
 std::tuple<c10::intrusive_ptr<GridBatchImpl>, JaggedTensor>
 GridBatchImpl::clipWithMask(const std::vector<nanovdb::Coord> &bboxMins,
                             const std::vector<nanovdb::Coord> &bboxMaxs) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
 
     JaggedTensor activeVoxelMask = FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchActiveVoxelsInBoundsMask<DeviceTag>(
@@ -1713,7 +1713,7 @@ GridBatchImpl::clip(const std::vector<nanovdb::Coord> &ijkMin,
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::dilate(const int dilationAmt) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(dilationAmt > 0, "dilation must be strictly positive. Got ", dilationAmt);
     if (batchSize() == 0) {
         return c10::make_intrusive<detail::GridBatchImpl>(device());
@@ -1727,7 +1727,7 @@ GridBatchImpl::dilate(const int dilationAmt) {
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::merge(c10::intrusive_ptr<GridBatchImpl> other) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(this->batchSize() == other->batchSize(),
                       "GridBatches to merge should have same batch size");
     TORCH_CHECK_VALUE(this->device() == other->device(),
@@ -1744,7 +1744,7 @@ GridBatchImpl::merge(c10::intrusive_ptr<GridBatchImpl> other) {
 
 c10::intrusive_ptr<GridBatchImpl>
 GridBatchImpl::convolutionOutput(const nanovdb::Coord kernelSize, const nanovdb::Coord stride) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(nanovdb::Coord(0) < kernelSize, "kernel_size must be strictly positive.");
     TORCH_CHECK_VALUE(nanovdb::Coord(0) < stride, "stride must be strictly positive.");
     if (batchSize() == 0) {

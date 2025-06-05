@@ -24,7 +24,7 @@ GridBatch::max_pool(Vec3iOrScalar pool_factor,
                     const JaggedTensor &data,
                     Vec3iOrScalar stride,
                     std::optional<GridBatch> coarse_grid) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
         "Expected data to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -58,7 +58,7 @@ GridBatch::avg_pool(Vec3iOrScalar pool_factor,
                     const JaggedTensor &data,
                     Vec3iOrScalar stride,
                     std::optional<GridBatch> coarse_grid) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
         "Expected data to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -92,7 +92,7 @@ GridBatch::subdivide(Vec3iOrScalar subdiv_factor,
                      const JaggedTensor &data,
                      const std::optional<JaggedTensor> mask,
                      std::optional<GridBatch> fine_grid) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         data.ldim() == 1,
         "Expected data to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -122,7 +122,7 @@ GridBatch::subdivide(Vec3iOrScalar subdiv_factor,
 
 JaggedTensor
 GridBatch::read_from_dense(const torch::Tensor &dense_data, const Vec3iBatch &dense_origins) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     torch::Tensor retData =
         detail::autograd::ReadFromDense::apply(impl(), dense_data, dense_origins)[0];
     return impl()->jaggedTensor(retData);
@@ -132,7 +132,7 @@ torch::Tensor
 GridBatch::write_to_dense(const JaggedTensor &sparse_data,
                           const std::optional<Vec3iBatch> &min_coord,
                           const std::optional<Vec3i> &grid_size) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         sparse_data.ldim() == 1,
         "Expected sparse_data to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -146,7 +146,7 @@ JaggedTensor
 GridBatch::fill_from_grid(const JaggedTensor &other_features,
                           const GridBatch &other_grid,
                           float default_value) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         other_features.ldim() == 1,
         "Expected features to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -160,7 +160,7 @@ GridBatch::fill_from_grid(const JaggedTensor &other_features,
 
 JaggedTensor
 GridBatch::grid_to_world(const JaggedTensor &ijk) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -174,7 +174,7 @@ GridBatch::grid_to_world(const JaggedTensor &ijk) const {
 
 JaggedTensor
 GridBatch::world_to_grid(const JaggedTensor &points) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -188,7 +188,7 @@ GridBatch::world_to_grid(const JaggedTensor &points) const {
 
 JaggedTensor
 GridBatch::sample_trilinear(const JaggedTensor &points, const JaggedTensor &voxel_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -207,7 +207,7 @@ GridBatch::sample_trilinear(const JaggedTensor &points, const JaggedTensor &voxe
 std::vector<JaggedTensor>
 GridBatch::sample_trilinear_with_grad(const JaggedTensor &points,
                                       const JaggedTensor &voxel_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -226,7 +226,7 @@ GridBatch::sample_trilinear_with_grad(const JaggedTensor &points,
 
 JaggedTensor
 GridBatch::sample_bezier(const JaggedTensor &points, const JaggedTensor &voxel_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -245,7 +245,7 @@ GridBatch::sample_bezier(const JaggedTensor &points, const JaggedTensor &voxel_d
 std::vector<JaggedTensor>
 GridBatch::sample_bezier_with_grad(const JaggedTensor &points,
                                    const JaggedTensor &voxel_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -263,7 +263,7 @@ GridBatch::sample_bezier_with_grad(const JaggedTensor &points,
 
 JaggedTensor
 GridBatch::splat_trilinear(const JaggedTensor &points, const JaggedTensor &points_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -285,7 +285,7 @@ GridBatch::splat_trilinear(const JaggedTensor &points, const JaggedTensor &point
 
 JaggedTensor
 GridBatch::splat_bezier(const JaggedTensor &points, const JaggedTensor &points_data) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -310,7 +310,7 @@ GridBatch::set_from_mesh(const JaggedTensor &mesh_vertices,
                          const JaggedTensor &mesh_faces,
                          const Vec3dBatchOrScalar &voxel_sizes,
                          const Vec3dBatch &origins) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     impl()->checkDevice(mesh_vertices);
     impl()->checkDevice(mesh_faces);
     const int64_t numGrids = mesh_vertices.joffsets().size(0) - 1;
@@ -326,7 +326,7 @@ void
 GridBatch::set_from_points(const JaggedTensor &points,
                            const Vec3dBatchOrScalar &voxel_sizes,
                            const Vec3dBatch &origins) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     impl()->checkDevice(points);
     const int64_t numGrids = points.joffsets().size(0) - 1;
     const std::vector<nanovdb::Vec3d> voxSizesVec =
@@ -340,7 +340,7 @@ void
 GridBatch::set_from_nearest_voxels_to_points(const JaggedTensor &points,
                                              const Vec3dBatchOrScalar &voxel_sizes,
                                              const Vec3dBatch &origins) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     impl()->checkDevice(points);
     const int64_t numGrids = points.joffsets().size(0) - 1;
     const std::vector<nanovdb::Vec3d> voxSizesVec =
@@ -355,7 +355,7 @@ void
 GridBatch::set_from_ijk(const JaggedTensor &coords,
                         const Vec3dBatchOrScalar &voxel_sizes,
                         const Vec3dBatch &origins) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     impl()->checkDevice(coords);
     const int64_t numGrids = coords.joffsets().size(0) - 1;
     const std::vector<nanovdb::Vec3d> voxSizesVec =
@@ -372,7 +372,7 @@ GridBatch::set_from_dense_grid(const int64_t num_grids,
                                const Vec3dBatchOrScalar &voxel_sizes,
                                const Vec3dBatch &origins,
                                std::optional<torch::Tensor> mask) {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     const nanovdb::Coord &denseDims = dense_dims.value();
     const nanovdb::Coord &ijkMin    = ijk_min.value();
     impl()->checkDevice(mask);
@@ -415,7 +415,7 @@ std::pair<JaggedTensor, GridBatch>
 GridBatch::clip(const JaggedTensor &features,
                 const Vec3iBatch &ijk_min,
                 const Vec3iBatch &ijk_max) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         features.ldim() == 1,
         "Expected features to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -444,7 +444,7 @@ GridBatch::clip(const JaggedTensor &features,
 
 std::vector<JaggedTensor>
 GridBatch::marching_cubes(const JaggedTensor &field, double level) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         field.ldim() == 1,
         "Expected field to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -473,7 +473,7 @@ JaggedTensor
 GridBatch::sparse_conv_halo(const JaggedTensor &input,
                             const torch::Tensor &weight,
                             int variant) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         input.ldim() == 1,
         "Expected input to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -510,7 +510,7 @@ GridBatch::voxels_along_rays(const JaggedTensor &ray_origins,
                              double eps,
                              bool return_ijk,
                              bool cumulative) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ray_origins.ldim() == 1,
         "Expected ray_origins to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -532,7 +532,7 @@ GridBatch::segments_along_rays(const JaggedTensor &ray_origins,
                                const JaggedTensor &ray_directions,
                                int64_t max_segments,
                                double eps) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ray_origins.ldim() == 1,
         "Expected ray_origins to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -554,7 +554,7 @@ GridBatch::ray_implicit_intersection(const JaggedTensor &ray_origins,
                                      const JaggedTensor &ray_directions,
                                      const JaggedTensor &gridScalars,
                                      double eps) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ray_origins.ldim() == 1,
         "Expected ray_origins to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -586,7 +586,7 @@ GridBatch::uniform_ray_samples(const JaggedTensor &ray_origins,
                                bool include_end_segments,
                                bool return_midpoint,
                                double eps) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ray_origins.ldim() == 1,
         "Expected ray_origins to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -623,7 +623,7 @@ GridBatch::uniform_ray_samples(const JaggedTensor &ray_origins,
 
 JaggedTensor
 GridBatch::neighbor_indexes(const JaggedTensor &ijk, int32_t extent, int32_t bitshift) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -640,7 +640,7 @@ GridBatch::neighbor_indexes(const JaggedTensor &ijk, int32_t extent, int32_t bit
 
 JaggedTensor
 GridBatch::points_in_active_voxel(const JaggedTensor &points) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         points.ldim() == 1,
         "Expected points to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -655,7 +655,7 @@ JaggedTensor
 GridBatch::cubes_intersect_grid(const JaggedTensor &cube_centers,
                                 const Vec3dOrScalar &cube_min,
                                 const Vec3dOrScalar &cube_max) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         cube_centers.ldim() == 1,
         "Expected cube_centers to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -671,7 +671,7 @@ JaggedTensor
 GridBatch::cubes_in_grid(const JaggedTensor &cube_centers,
                          const Vec3dOrScalar &cube_min,
                          const Vec3dOrScalar &cube_max) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         cube_centers.ldim() == 1,
         "Expected cube_centers to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -685,7 +685,7 @@ GridBatch::cubes_in_grid(const JaggedTensor &cube_centers,
 
 JaggedTensor
 GridBatch::coords_in_active_voxel(const JaggedTensor &ijk) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -698,7 +698,7 @@ GridBatch::coords_in_active_voxel(const JaggedTensor &ijk) const {
 
 JaggedTensor
 GridBatch::ijk_to_index(const JaggedTensor &ijk, bool cumulative) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -711,7 +711,7 @@ GridBatch::ijk_to_index(const JaggedTensor &ijk, bool cumulative) const {
 
 JaggedTensor
 GridBatch::ijk_to_inv_index(const JaggedTensor &ijk, bool cumulative) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     TORCH_CHECK_VALUE(
         ijk.ldim() == 1,
         "Expected ijk to have 1 list dimension, i.e. be a single list of coordinate values, but got",
@@ -724,7 +724,7 @@ GridBatch::ijk_to_inv_index(const JaggedTensor &ijk, bool cumulative) const {
 
 JaggedTensor
 GridBatch::ijk() const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     return FVDB_DISPATCH_KERNEL(this->device(), [&]() {
         return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
@@ -732,7 +732,7 @@ GridBatch::ijk() const {
 
 std::vector<JaggedTensor>
 GridBatch::viz_edge_network(bool returnVoxelCoordinates) const {
-    detail::RAIIDeviceGuard guard(device());
+    c10::DeviceGuard guard(device());
     return FVDB_DISPATCH_KERNEL_DEVICE(device(), [&]() {
         return fvdb::detail::ops::dispatchGridEdgeNetwork<DeviceTag>(*impl(),
                                                                      returnVoxelCoordinates);
