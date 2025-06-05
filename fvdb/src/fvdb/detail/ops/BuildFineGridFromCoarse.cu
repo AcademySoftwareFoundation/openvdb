@@ -174,7 +174,7 @@ dispatchBuildFineGridFromCoarse<torch::kCPU>(const GridBatchImpl &coarseBatchHdl
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        const int64_t joffset = coarseBatchHdl.cumVoxels(bidx);
+        const int64_t joffset = coarseBatchHdl.cumVoxelsAt(bidx);
         for (auto it = ActiveVoxelIterator<-1>(coarseTree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk(it->first[0] * subdivisionFactor[0],
                                          it->first[1] * subdivisionFactor[1],

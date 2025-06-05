@@ -319,7 +319,7 @@ forEachLeafInOneGridCUDA(const at::cuda::CUDAStream &stream,
     TORCH_CHECK(batchHdl.device().has_index(), "Grid batch device must have an index");
     c10::cuda::CUDAGuard deviceGuard(batchHdl.device());
     TORCH_CHECK(batchIdx >= 0 && batchIdx < batchHdl.batchSize(), "Batch index out of range");
-    const int64_t numBlocks = GET_BLOCKS(batchHdl.numLeaves(batchIdx) * numChannels, numThreads);
+    const int64_t numBlocks = GET_BLOCKS(batchHdl.numLeavesAt(batchIdx) * numChannels, numThreads);
     TORCH_INTERNAL_ASSERT(numBlocks < (int64_t)(4294967295), "Too many blocks");
     if (numBlocks > 0) {
         if (sharedMemBytes > 0) {

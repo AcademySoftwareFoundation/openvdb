@@ -11,7 +11,6 @@
 namespace fvdb {
 
 GridBatch::GridBatch(const torch::Device &device) {
-    detail::RAIIDeviceGuard guard(device);
     mImpl = c10::make_intrusive<detail::GridBatchImpl>(device);
 }
 
@@ -196,28 +195,6 @@ GridBatch::world_to_grid(const JaggedTensor &points) const {
     return points.jagged_like(ret);
 }
 
-torch::Tensor
-GridBatch::grid_to_world_matrices(const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    std::vector<torch::Tensor> retTorch;
-    for (int64_t bi = 0; bi < grid_count(); ++bi) {
-        retTorch.emplace_back(impl()->gridToWorldMatrix(bi));
-    }
-
-    return torch::stack(retTorch, 0).toType(dtype);
-}
-
-torch::Tensor
-GridBatch::world_to_grid_matrices(const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    std::vector<torch::Tensor> retTorch;
-    for (int64_t bi = 0; bi < grid_count(); ++bi) {
-        retTorch.emplace_back(impl()->worldToGridMatrix(bi));
-    }
-
-    return torch::stack(retTorch, 0).toType(dtype);
-}
-
 JaggedTensor
 GridBatch::sample_trilinear(const JaggedTensor &points, const JaggedTensor &voxel_data) const {
     detail::RAIIDeviceGuard guard(device());
@@ -335,110 +312,6 @@ GridBatch::splat_bezier(const JaggedTensor &points, const JaggedTensor &points_d
     } else {
         return impl()->jaggedTensor(ret);
     }
-}
-
-torch::Tensor
-GridBatch::voxel_size_at(int64_t bi, const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch =
-        torch::empty({3}, torch::TensorOptions().device(this->device()).dtype(dtype));
-    const nanovdb::Vec3d &voxSize = impl()->voxelSize(bi);
-    retTorch[0]                   = voxSize[0];
-    retTorch[1]                   = voxSize[1];
-    retTorch[2]                   = voxSize[2];
-    return retTorch;
-}
-
-torch::Tensor
-GridBatch::voxel_sizes(const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch =
-        torch::empty({grid_count(), 3}, torch::TensorOptions().device(this->device()).dtype(dtype));
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        const nanovdb::Vec3d voxSize = impl()->voxelSize(bi);
-        retTorch[bi][0]              = voxSize[0];
-        retTorch[bi][1]              = voxSize[1];
-        retTorch[bi][2]              = voxSize[2];
-    }
-    return retTorch;
-}
-
-torch::Tensor
-GridBatch::origin_at(int64_t bi, const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    const nanovdb::Vec3d &voxelOrigin = impl()->voxelOrigin(bi);
-    torch::Tensor retTorch =
-        torch::empty({3}, torch::TensorOptions().device(this->device()).dtype(dtype));
-    retTorch[0] = voxelOrigin[0];
-    retTorch[1] = voxelOrigin[1];
-    retTorch[2] = voxelOrigin[2];
-    return retTorch;
-}
-
-torch::Tensor
-GridBatch::origins(const torch::Dtype &dtype) const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch =
-        torch::empty({grid_count(), 3}, torch::TensorOptions().device(this->device()).dtype(dtype));
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        const nanovdb::Vec3d &voxOrigin = impl()->voxelOrigin(bi);
-        retTorch[bi][0]                 = voxOrigin[0];
-        retTorch[bi][1]                 = voxOrigin[1];
-        retTorch[bi][2]                 = voxOrigin[2];
-    }
-    return retTorch;
-}
-
-torch::Tensor
-GridBatch::num_voxels() const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch = torch::empty(
-        {grid_count()}, torch::TensorOptions().device(torch::kCPU).dtype(torch::kInt64));
-    auto acc = retTorch.accessor<int64_t, 1>();
-
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        acc[bi] = num_voxels_at(bi);
-    }
-    return retTorch.to(device());
-}
-
-torch::Tensor
-GridBatch::cum_voxels() const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch = torch::empty(
-        {grid_count()}, torch::TensorOptions().device(torch::kCPU).dtype(torch::kInt64));
-    auto acc = retTorch.accessor<int64_t, 1>();
-
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        acc[bi] = cum_voxels_at(bi);
-    }
-    return retTorch.to(device());
-}
-
-torch::Tensor
-GridBatch::num_bytes() const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch = torch::empty(
-        {grid_count()}, torch::TensorOptions().device(torch::kCPU).dtype(torch::kInt64));
-    auto acc = retTorch.accessor<int64_t, 1>();
-
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        acc[bi] = impl()->numBytes(bi);
-    }
-    return retTorch.to(device());
-}
-
-torch::Tensor
-GridBatch::num_leaf_nodes() const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor retTorch = torch::empty(
-        {grid_count()}, torch::TensorOptions().device(torch::kCPU).dtype(torch::kInt64));
-    auto acc = retTorch.accessor<int64_t, 1>();
-
-    for (int64_t bi = 0; bi < grid_count(); bi += 1) {
-        acc[bi] = impl()->numLeaves(bi);
-    }
-    return retTorch.to(device());
 }
 
 void
@@ -864,81 +737,6 @@ GridBatch::ijk() const {
     return FVDB_DISPATCH_KERNEL(this->device(), [&]() {
         return fvdb::detail::ops::dispatchActiveGridCoords<DeviceTag>(*impl());
     });
-}
-
-const torch::Tensor
-GridBatch::bbox() const {
-    detail::RAIIDeviceGuard guard(device());
-    const int64_t bs = grid_count();
-    torch::Tensor ret =
-        torch::zeros({bs, 2, 3}, torch::TensorOptions().device(device()).dtype(torch::kInt32));
-    for (int64_t i = 0; i < bs; ++i) {
-        const nanovdb::CoordBBox &bbox = impl()->bbox(i);
-        ret[i][0][0]                   = bbox.min()[0];
-        ret[i][0][1]                   = bbox.min()[1];
-        ret[i][0][2]                   = bbox.min()[2];
-        ret[i][1][0]                   = bbox.max()[0];
-        ret[i][1][1]                   = bbox.max()[1];
-        ret[i][1][2]                   = bbox.max()[2];
-    }
-    return ret;
-}
-
-const torch::Tensor
-GridBatch::bbox_at(int64_t bi) const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor ret =
-        torch::zeros({2, 3}, torch::TensorOptions().device(device()).dtype(torch::kInt32));
-    const nanovdb::CoordBBox &bbox = impl()->bbox(bi);
-    ret[0][0]                      = bbox.min()[0];
-    ret[0][1]                      = bbox.min()[1];
-    ret[0][2]                      = bbox.min()[2];
-    ret[1][0]                      = bbox.max()[0];
-    ret[1][1]                      = bbox.max()[1];
-    ret[1][2]                      = bbox.max()[2];
-    return ret;
-}
-
-const torch::Tensor
-GridBatch::dual_bbox() const {
-    detail::RAIIDeviceGuard guard(device());
-    const int64_t bs = grid_count();
-    torch::Tensor ret =
-        torch::zeros({bs, 2, 3}, torch::TensorOptions().device(device()).dtype(torch::kInt32));
-    for (int64_t i = 0; i < bs; ++i) {
-        const nanovdb::CoordBBox &bbox = impl()->dualBbox(i);
-        ret[i][0][0]                   = bbox.min()[0];
-        ret[i][0][1]                   = bbox.min()[1];
-        ret[i][0][2]                   = bbox.min()[2];
-        ret[i][1][0]                   = bbox.max()[0];
-        ret[i][1][1]                   = bbox.max()[1];
-        ret[i][1][2]                   = bbox.max()[2];
-    }
-    return ret;
-}
-
-const torch::Tensor
-GridBatch::dual_bbox_at(int64_t bi) const {
-    detail::RAIIDeviceGuard guard(device());
-    torch::Tensor ret =
-        torch::zeros({2, 3}, torch::TensorOptions().device(device()).dtype(torch::kInt32));
-    const nanovdb::CoordBBox &bbox = impl()->dualBbox(bi);
-    ret[0][0]                      = bbox.min()[0];
-    ret[0][1]                      = bbox.min()[1];
-    ret[0][2]                      = bbox.min()[2];
-    ret[1][0]                      = bbox.max()[0];
-    ret[1][1]                      = bbox.max()[1];
-    ret[1][2]                      = bbox.max()[2];
-    return ret;
-}
-
-const torch::Tensor
-GridBatch::total_bbox() const {
-    detail::RAIIDeviceGuard guard(device());
-    const nanovdb::CoordBBox &bbox = impl()->totalBBox();
-    return torch::tensor({{bbox.min()[0], bbox.min()[1], bbox.min()[2]},
-                          {bbox.max()[0], bbox.max()[1], bbox.max()[2]}},
-                         torch::TensorOptions().device(device()).dtype(torch::kInt32));
 }
 
 std::vector<JaggedTensor>
