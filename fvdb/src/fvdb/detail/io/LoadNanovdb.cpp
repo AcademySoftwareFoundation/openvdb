@@ -593,8 +593,7 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
                       fvdb::GridBatch::MAX_GRIDS_PER_BATCH,
                       " grids.");
     nanovdb::GridHandle<TorchDeviceBuffer> resCpu = nanovdb::mergeGrids(grids);
-    c10::intrusive_ptr<GridBatchImpl> ret =
-        c10::make_intrusive<GridBatchImpl>(std::move(resCpu), voxSizes, voxOrigins);
+    GridBatch ret(std::move(resCpu), voxSizes, voxOrigins);
 
     // Merge loaded data Tensors into a JaggedTensor
     JaggedTensor dataJagged(data);
@@ -602,13 +601,13 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
     // Transfer the grid handle to the device the user requested
     if (maybeDevice.has_value()) {
         torch::Device toDevice = maybeDevice.value();
-        if (toDevice != ret->device()) {
-            ret        = ret->clone(toDevice);
+        if (toDevice != ret.device()) {
+            ret        = ret.to(toDevice);
             dataJagged = dataJagged.to(toDevice);
         }
     }
 
-    return std::make_tuple(GridBatch(ret), dataJagged, names);
+    return std::make_tuple(ret, dataJagged, names);
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>

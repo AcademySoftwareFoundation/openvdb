@@ -92,11 +92,7 @@ to_nanovdb(const GridBatch &gridBatch,
 
 GridBatch
 jcat(const std::vector<GridBatch> &vec) {
-    std::vector<c10::intrusive_ptr<detail::GridBatchImpl>> vecHdls;
-    std::transform(vec.begin(), vec.end(), std::back_inserter(vecHdls), [](const GridBatch &grid) {
-        return grid.impl();
-    });
-    return GridBatch(detail::GridBatchImpl::concatenate(vecHdls));
+    return GridBatch::concatenate(vec);
 }
 
 JaggedTensor

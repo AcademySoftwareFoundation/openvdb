@@ -718,24 +718,31 @@ bind_grid_batch(py::module &m) {
         .def("world_to_grid", &fvdb::GridBatch::world_to_grid, py::arg("points"))
 
         // To device
-        .def("to",
-             py::overload_cast<const torch::Device &>(&fvdb::GridBatch::to, py::const_),
-             py::arg("to_device"))
+        .def("to", &fvdb::GridBatch::to, py::arg("to_device"))
         .def(
             "to",
             [](const fvdb::GridBatch &self, const std::string &to_device) {
                 return self.to(fvdb::parseDeviceString(to_device));
             },
             py::arg("to_device"))
-        .def("to",
-             py::overload_cast<const torch::Tensor &>(&fvdb::GridBatch::to, py::const_),
-             py::arg("to_tensor"))
-        .def("to",
-             py::overload_cast<const fvdb::JaggedTensor &>(&fvdb::GridBatch::to, py::const_),
-             py::arg("to_jtensor"))
-        .def("to",
-             py::overload_cast<const fvdb::GridBatch &>(&fvdb::GridBatch::to, py::const_),
-             py::arg("to_grid"))
+        .def(
+            "to",
+            [](const fvdb::GridBatch &self, const torch::Tensor &to_tensor) {
+                return self.to(to_tensor.device());
+            },
+            py::arg("to_tensor"))
+        .def(
+            "to",
+            [](const fvdb::GridBatch &self, const fvdb::JaggedTensor &to_jtensor) {
+                return self.to(to_jtensor.device());
+            },
+            py::arg("to_jtensor"))
+        .def(
+            "to",
+            [](const fvdb::GridBatch &self, const fvdb::GridBatch &to_grid) {
+                return self.to(to_grid.device());
+            },
+            py::arg("to_grid"))
 
         .def("cpu", [](const fvdb::GridBatch &self) { return self.to(torch::kCPU); })
         .def("cuda", [](const fvdb::GridBatch &self) { return self.to(torch::kCUDA); })
