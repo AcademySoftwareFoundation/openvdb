@@ -12,6 +12,7 @@ usage() {
   echo "                   install    - Build and install the package (default)."
   echo "                   wheel      - Build the Python wheel."
   echo "                   ctest      - Run tests (requires tests to be built)."
+  echo "                   debug      - Build in debug mode with full debug symbols and no optimizations."
   echo ""
   echo "Options:"
   echo "  -h, --help     Display this help message and exit."
@@ -98,6 +99,10 @@ while (( "$#" )); do
     elif [[ "$1" == "verbose" ]]; then
       echo "Enabling verbose build"
       CONFIG_SETTINGS+=" -v -C build.verbose=true"
+      is_config_arg_handled=true
+    elif [[ "$1" == "debug" ]]; then
+      echo "Enabling debug build"
+      CONFIG_SETTINGS+=" --config-settings=cmake.build-type=debug"
       is_config_arg_handled=true
     fi
   fi
