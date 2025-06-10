@@ -16,6 +16,7 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_test_data.cmake)
 # --- Define Test Utilities Library ---
 add_library(fvdb_test_utils STATIC
   utils/ImageUtils.cpp
+  utils/Tensor.cpp
 )
 
 set_target_properties(fvdb_test_utils
