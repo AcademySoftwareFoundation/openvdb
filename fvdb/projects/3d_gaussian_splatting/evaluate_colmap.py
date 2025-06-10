@@ -6,8 +6,7 @@ from typing import Optional, Union
 
 import torch
 import tyro
-
-from .train_colmap import Config, Runner
+from train_colmap import Config, Runner
 
 
 def evaluate(

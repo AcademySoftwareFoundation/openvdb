@@ -21,6 +21,7 @@ import tyro
 import viser
 import yaml
 from datasets import ColmapDataset
+from fvdb.optim import GaussianSplatOptimizer
 from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
@@ -29,7 +30,6 @@ from utils import CameraOptModule, gaussian_means_outside_bbox
 from viz import CameraState, Viewer
 
 from fvdb import GaussianSplat3d
-from fvdb.optim import GaussianSplatOptimizer
 
 
 @dataclass
@@ -519,6 +519,15 @@ class Runner:
                     position=cam_to_world[:3, 3],
                     axes_length=axes_length,  # Scaled based on scene size
                     axes_radius=axes_radius,  # Scaled based on scene size
+                )
+                K = data["K"].cpu().numpy()
+                H, W = data["image"].shape[:2]
+                fy = K[1, 1]
+                frustum = self.server.scene.add_camera_frustum(
+                    f"camera_{i}/frustum",
+                    fov=2 * np.arctan2(H / 2, fy),
+                    aspect=W / H,
+                    image=data["image"],
                 )
                 self.camera_frames.append(frame)
 
