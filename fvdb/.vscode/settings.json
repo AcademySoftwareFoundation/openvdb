@@ -54,5 +54,5 @@
     "json.format.keepLines": true,
 
     "clangd.path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clangd",
-    "clangFormat.executable.linux": "${env:CONDA_PREFIX}/envs/fvdb/bin/clang-format",
+    "clangFormat.executable.linux": "${env.CONDA_PREFIX}/envs/fvdb/bin/clang-format",
 }
