@@ -69,6 +69,15 @@ projected_gaussians = gs3d.project_gaussians_for_images(
     antialias=True,
 )
 
+print("Width: ", width)
+print("Height: ", height)
+print("Width in tiles: ", width / 16)
+print("Height in tiles: ", height / 16)
+print("Num cameras: ", num_cameras)
+print("Tile offsets shape: ", projected_gaussians.tile_offsets.shape)
+print("Tile gaussian ids shape: ", projected_gaussians.tile_gaussian_ids.shape)
+
+image_dims = torch.tensor([width, height], device=device, dtype=torch.int32)
 
 projected_data_to_save = {
     "means2d": projected_gaussians.means2d,
@@ -77,6 +86,7 @@ projected_data_to_save = {
     "opacities": projected_gaussians.opacities,
     "tile_offsets": projected_gaussians.tile_offsets,
     "tile_gaussian_ids": projected_gaussians.tile_gaussian_ids,
+    "image_dims": image_dims,
 }
 
 
@@ -88,7 +98,7 @@ def save_test_data(data):
                 setattr(self, key, my_values[key])
 
     container = torch.jit.script(Container(data))
-    container.save("gsplat_rasterization_input_data.pt")
+    container.save("rasterize_forward_inputs_3cams.pt")
 
 
 save_test_data(projected_data_to_save)

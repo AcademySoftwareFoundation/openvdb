@@ -34,9 +34,10 @@ struct GaussianRasterizeForwardTestFixture : public ::testing::Test {
         opacities                         = inputs[3].cuda();
         tileOffsets                       = inputs[4].cuda();
         tileGaussianIds                   = inputs[5].cuda();
+        imageDims                         = inputs[6];
 
-        imageWidth   = 647;
-        imageHeight  = 420;
+        imageWidth   = imageDims[0].item<int32_t>();
+        imageHeight  = imageDims[1].item<int32_t>();
         imageOriginW = 0;
         imageOriginH = 0;
         tileSize     = 16;
@@ -106,13 +107,19 @@ struct GaussianRasterizeForwardTestFixture : public ::testing::Test {
         opacities              = opacities.to(device);
         tileOffsets            = tileOffsets.to(device);
         tileGaussianIds        = tileGaussianIds.to(device);
+        imageDims              = imageDims.to(device);
         expectedRenderedColors = expectedRenderedColors.to(device);
         expectedRenderedAlphas = expectedRenderedAlphas.to(device);
         expectedLastIds        = expectedLastIds.to(device);
     }
 
-    const std::vector<std::string> inputNames = {
-        "means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids"};
+    const std::vector<std::string> inputNames  = {"means2d",
+                                                  "conics",
+                                                  "colors",
+                                                  "opacities",
+                                                  "tile_offsets",
+                                                  "tile_gaussian_ids",
+                                                  "image_dims"};
     const std::vector<std::string> outputNames = {"rendered_colors", "rendered_alphas", "last_ids"};
 
     // Input tensors
@@ -122,6 +129,7 @@ struct GaussianRasterizeForwardTestFixture : public ::testing::Test {
     torch::Tensor opacities;       // [C, N] or [nnz]
     torch::Tensor tileOffsets;     // [C, tileHeight, tileWidth]
     torch::Tensor tileGaussianIds; // [nIsects]
+    torch::Tensor imageDims;       // [2]
 
     // Expected output tensors
     torch::Tensor expectedRenderedColors; // [C, imageHeight, imageWidth, D]
@@ -173,8 +181,8 @@ TEST_F(GaussianRasterizeForwardTestFixture, DISABLED_GenerateOutputData) {
                                                                               conics,
                                                                               colors_64,
                                                                               opacities,
-                                                                              imageWidth,
-                                                                              imageHeight,
+                                                                              imageWidth / 2,
+                                                                              imageHeight / 2,
                                                                               imageOriginW,
                                                                               imageOriginH,
                                                                               tileSize,
