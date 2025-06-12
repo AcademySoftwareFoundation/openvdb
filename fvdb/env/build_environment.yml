@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - blas=*=mkl
   - ca-certificates
   - certifi
   - cmake
