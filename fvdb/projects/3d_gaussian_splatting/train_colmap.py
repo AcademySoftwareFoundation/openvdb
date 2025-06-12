@@ -486,7 +486,38 @@ class Runner:
         # Viewer
         if not self.disable_viewer:
             self.server = viser.ViserServer(port=8080, verbose=False)
-            self.server.scene.set_up_direction("-z")
+
+            # Set default up axis
+            self.current_up_axis = "+z"
+            self.server.scene.set_up_direction(self.current_up_axis)
+
+            # Store per-client up axis dropdowns
+            self.client_up_axis_dropdowns = {}
+
+            # Add client connect handler for per-client GUI elements
+            @self.server.on_client_connect
+            def _(client: viser.ClientHandle) -> None:
+                # Create per-client up axis dropdown
+                up_axis_dropdown = client.gui.add_dropdown(
+                    "Up Axis",
+                    options=["+x", "-x", "+y", "-y", "+z", "-z"],
+                    initial_value=self.current_up_axis,
+                )
+
+                # Store the dropdown for this client
+                self.client_up_axis_dropdowns[client.client_id] = up_axis_dropdown
+
+                # Add callback for up axis changes for this specific client
+                @up_axis_dropdown.on_update
+                def _on_up_axis_change(event) -> None:
+                    self.viewer.set_up_axis(client.client_id, event.target.value)
+
+            # Add client disconnect handler to clean up
+            @self.server.on_client_disconnect
+            def _(client: viser.ClientHandle) -> None:
+                if client.client_id in self.client_up_axis_dropdowns:
+                    del self.client_up_axis_dropdowns[client.client_id]
+
             self.viewer = Viewer(
                 server=self.server,
                 render_fn=self._viewer_render_fn,
