@@ -4,6 +4,7 @@
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/ops/gsplat/GaussianUtils.cuh>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <optional>
 
@@ -227,7 +228,7 @@ template <typename T, bool Ortho> struct ProjectionForward {
 };
 
 template <typename T, bool Ortho>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 projectionForwardKernel(ProjectionForward<T, Ortho> projectionForward) {
     projectionForward.loadCamerasIntoSharedMemory();
     __syncthreads();
@@ -279,8 +280,7 @@ dispatchGaussianProjectionForward<torch::kCUDA>(
 
     using scalar_t = float;
 
-    const size_t NUM_THREADS    = 256;
-    const size_t NUM_BLOCKS     = C * N / NUM_THREADS + 1;
+    const size_t NUM_BLOCKS     = GET_BLOCKS(C * N, DEFAULT_BLOCK_DIM);
     const size_t SHARD_MEM_SIZE = C * (9 + 9 + 3) * sizeof(scalar_t);
 
     if (ortho) {
@@ -302,7 +302,7 @@ dispatchGaussianProjectionForward<torch::kCUDA>(
                                                             outConics,
                                                             outCompensations);
         projectionForwardKernel<scalar_t, true>
-            <<<NUM_BLOCKS, NUM_THREADS, SHARD_MEM_SIZE, stream>>>(projectionForward);
+            <<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, SHARD_MEM_SIZE, stream>>>(projectionForward);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     } else {
         ProjectionForward<scalar_t, false> projectionForward(imageWidth,
@@ -323,7 +323,7 @@ dispatchGaussianProjectionForward<torch::kCUDA>(
                                                              outConics,
                                                              outCompensations);
         projectionForwardKernel<scalar_t, false>
-            <<<NUM_BLOCKS, NUM_THREADS, SHARD_MEM_SIZE, stream>>>(projectionForward);
+            <<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, SHARD_MEM_SIZE, stream>>>(projectionForward);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }
     return std::make_tuple(outRadii, outMeans2d, outDepths, outConics, outCompensations);

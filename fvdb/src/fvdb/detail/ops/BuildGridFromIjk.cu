@@ -4,7 +4,6 @@
 #include <fvdb/detail/GridBatchImpl.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
 #include <fvdb/detail/utils/nanovdb/CreateEmptyGridHandle.h>
 
 #define CCCL_INCLUSIVE_SUM_INIT_SUPPORTED (__CUDACC_VER_MAJOR__ >= 12 && __CUDACC_VER_MINOR__ >= 8)

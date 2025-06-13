@@ -14,8 +14,6 @@
 
 namespace fvdb {
 
-struct JaggedTensorIndex;
-
 using JIdxType     = int32_t;
 using JOffsetsType = int64_t;
 using JLIdxType    = int32_t;
@@ -352,7 +350,9 @@ class JaggedTensor : public torch::CustomClassHolder {
     ///       5. Indexing with ellipses jt[...] is a no-op
     /// @param idx The index to use to index this JaggedTensor
     /// @return A JaggedTensor containing the indexed data
-    JaggedTensor index(JaggedTensorIndex idx) const;
+    JaggedTensor index(int64_t index) const;
+    JaggedTensor index(int64_t start, int64_t stop, int64_t step) const;
+    JaggedTensor index(const JaggedTensor &indices) const;
 
     /// @brief Reshape this JaggedTensor to have a new list structure. The provided lshape should be
     /// compatible with
@@ -718,99 +718,6 @@ class JaggedTensor : public torch::CustomClassHolder {
     bool requires_grad() const;
     JaggedTensor detach() const;
     JaggedTensor clone() const;
-};
-
-struct JaggedTensorIndex {
-    JaggedTensorIndex(std::nullopt_t) : mType(JaggedTensorIndexType::None) {}
-    JaggedTensorIndex(int64_t integer) : mType(JaggedTensorIndexType::Integer), mInteger(integer) {}
-    JaggedTensorIndex(torch::indexing::EllipsisIndexType)
-        : mType(JaggedTensorIndexType::Ellipsis) {}
-    JaggedTensorIndex(at::Tensor tensor) : mType(JaggedTensorIndexType::Tensor), mTensor(tensor) {}
-    JaggedTensorIndex(torch::indexing::Slice slice)
-        : mType(JaggedTensorIndexType::Slice), mSlice(slice) {}
-    JaggedTensorIndex(fvdb::JaggedTensor jaggedTensor)
-        : mType(JaggedTensorIndexType::JaggedTensor), mJaggedTensor(jaggedTensor) {}
-
-    template <class T, class = typename std::enable_if<std::is_same<bool, T>::value>::type>
-    JaggedTensorIndex(T boolean) : mType(JaggedTensorIndexType::Boolean), mBoolean(boolean) {}
-
-    inline bool
-    is_none() const {
-        return mType == JaggedTensorIndexType::None;
-    }
-
-    inline bool
-    is_ellipsis() const {
-        return mType == JaggedTensorIndexType::Ellipsis;
-    }
-
-    inline bool
-    is_integer() const {
-        return mType == JaggedTensorIndexType::Integer;
-    }
-
-    inline bool
-    is_boolean() const {
-        return mType == JaggedTensorIndexType::Boolean;
-    }
-
-    inline bool
-    is_slice() const {
-        return mType == JaggedTensorIndexType::Slice;
-    }
-
-    inline bool
-    is_tensor() const {
-        return mType == JaggedTensorIndexType::Tensor;
-    }
-
-    inline bool
-    is_jagged_tensor() const {
-        return mType == JaggedTensorIndexType::JaggedTensor;
-    }
-
-    inline int64_t
-    integer() const {
-        return mInteger;
-    }
-
-    inline bool
-    boolean() const {
-        return mBoolean;
-    }
-
-    inline const torch::indexing::Slice &
-    slice() const {
-        return mSlice;
-    }
-
-    inline const torch::Tensor &
-    tensor() const {
-        return mTensor;
-    }
-
-    inline const fvdb::JaggedTensor &
-    jagged_tensor() const {
-        return mJaggedTensor;
-    }
-
-  private:
-    enum class JaggedTensorIndexType {
-        None,
-        Ellipsis,
-        Integer,
-        Slice,
-        Tensor,
-        Boolean,
-        JaggedTensor
-    };
-    JaggedTensorIndexType mType;
-
-    torch::Tensor mTensor;
-    int64_t mInteger;
-    torch::indexing::Slice mSlice;
-    bool mBoolean;
-    fvdb::JaggedTensor mJaggedTensor;
 };
 
 } // namespace fvdb

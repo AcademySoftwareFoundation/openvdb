@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <c10/cuda/CUDAException.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -217,7 +217,7 @@ volumeRenderBackwardCPU(const TorchAcc<scalar_t, 1> dLdOpacity,     // [B*R]
 }
 
 template <typename scalar_t>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 volumeRender(const TorchRAcc32<scalar_t, 1> sigmas,
              const TorchRAcc32<scalar_t, 2> rgbs,
              const TorchRAcc32<scalar_t, 1> deltas,
@@ -250,7 +250,7 @@ volumeRender(const TorchRAcc32<scalar_t, 1> sigmas,
 }
 
 template <typename scalar_t>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 volumeRenderBackward(const TorchRAcc32<scalar_t, 1> dLdOpacity,
                      const TorchRAcc32<scalar_t, 1> dLdDepth,
                      const TorchRAcc32<scalar_t, 2> dLdRgb,
@@ -330,14 +330,13 @@ dispatchVolumeRender<torch::kCUDA>(
     // auto total_samples = torch::zeros({numRays},
     // torch::dtype(torch::kLong).device(sigmas.device()));
 
-    const int64_t NUM_THREADS = 1024;
-    const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
+    const int64_t NUM_BLOCKS = GET_BLOCKS(numRays, DEFAULT_BLOCK_DIM);
 
     AT_DISPATCH_V2(
         sigmas.scalar_type(),
         "volumeRender",
         AT_WRAP([&] {
-            volumeRender<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
+            volumeRender<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM>>>(
                 sigmas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 rgbs.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
                 deltas.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
@@ -406,14 +405,13 @@ dispatchVolumeRenderBackward<torch::kCUDA>(const torch::Tensor dLdOpacity,
 
     torch::Tensor dLdWs_times_ws = (dLdWs * ws); // auxiliary input
 
-    const int64_t NUM_THREADS = 1024;
-    const int64_t NUM_BLOCKS  = GET_BLOCKS(numRays, NUM_THREADS);
+    const int64_t NUM_BLOCKS = GET_BLOCKS(numRays, DEFAULT_BLOCK_DIM);
 
     AT_DISPATCH_V2(
         sigmas.scalar_type(),
         "volumeRenderBackward",
         AT_WRAP([&] {
-            volumeRenderBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS>>>(
+            volumeRenderBackward<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM>>>(
                 dLdOpacity.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 dLdDepth.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),
                 // dLdDepthSq.packed_accessor32<scalar_t, 1, torch::RestrictPtrTraits>(),

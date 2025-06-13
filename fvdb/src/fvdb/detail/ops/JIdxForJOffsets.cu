@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <c10/cuda/CUDAException.h>
 
@@ -10,7 +10,8 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-__global__ void
+template <int blockSize>
+__global__ __launch_bounds__(blockSize) void
 jIdxForJOffsets(TorchRAcc32<fvdb::JOffsetsType, 1> offsets,
                 TorchRAcc32<fvdb::JIdxType, 1> outJIdx) {
     const int64_t idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -53,9 +54,8 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
     }
     torch::Tensor retJIdx = torch::empty({numElements}, options);
 
-    const int NUM_THREADS = 1024;
-    const int NUM_BLOCKS  = GET_BLOCKS(numElements, NUM_THREADS);
-    jIdxForJOffsets<<<NUM_BLOCKS, NUM_THREADS>>>(
+    const int NUM_BLOCKS = GET_BLOCKS(numElements, DEFAULT_BLOCK_DIM);
+    jIdxForJOffsets<DEFAULT_BLOCK_DIM><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM>>>(
         joffsets.packed_accessor32<fvdb::JOffsetsType, 1, torch::RestrictPtrTraits>(),
         retJIdx.packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>());
     C10_CUDA_KERNEL_LAUNCH_CHECK();
@@ -63,7 +63,7 @@ dispatchJIdxForJOffsets<torch::kCUDA>(torch::Tensor joffsets, int64_t numElement
 }
 
 template <int blockSize>
-__global__ void __launch_bounds__(blockSize)
+__global__ __launch_bounds__(blockSize) void
 jIdxFill(fvdb::JOffsetsType start,
          fvdb::JOffsetsType end,
          fvdb::JIdxType i,
@@ -85,8 +85,6 @@ dispatchJIdxForJOffsets<torch::kPrivateUse1>(torch::Tensor joffsets, int64_t num
     }
     torch::Tensor retJIdx = torch::empty({numElements}, options);
 
-    constexpr int NUM_THREADS = 512;
-
     for (const auto deviceId: c10::irange(c10::cuda::device_count())) {
         C10_CUDA_CHECK(cudaSetDevice(deviceId));
         cudaStream_t stream = c10::cuda::getCurrentCUDAStream(deviceId).stream();
@@ -100,8 +98,8 @@ dispatchJIdxForJOffsets<torch::kPrivateUse1>(torch::Tensor joffsets, int64_t num
             auto start = joffsets[i].item<fvdb::JOffsetsType>();
             auto end   = joffsets[i + 1].item<fvdb::JOffsetsType>();
             if (start < end) {
-                const int numBlocks = GET_BLOCKS(end - start, NUM_THREADS);
-                jIdxFill<NUM_THREADS><<<numBlocks, NUM_THREADS, 0, stream>>>(
+                const int numBlocks = GET_BLOCKS(end - start, DEFAULT_BLOCK_DIM);
+                jIdxFill<DEFAULT_BLOCK_DIM><<<numBlocks, DEFAULT_BLOCK_DIM, 0, stream>>>(
                     start,
                     end,
                     static_cast<fvdb::JIdxType>(i),

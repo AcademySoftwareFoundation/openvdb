@@ -38,11 +38,11 @@ def save_tensors_torchscript(tensor_list, filepath, tensor_names=None):
                 self.register_buffer(name, tensor)
 
         def forward(self):
-            # Create a NamedTuple dynamically based on tensor names
-            from collections import namedtuple
-
-            OutputTuple = namedtuple("OutputTuple", self.tensor_names)
-            return OutputTuple(*(getattr(self, name) for name in self.tensor_names))
+            # This forward method is not strictly necessary for accessing the tensors,
+            # which are stored as named buffers. Returning None ensures that
+            # loading scripts will fall back to iterating over named_buffers(),
+            # which is a more reliable way to get named tensors.
+            return None
 
         def get_tensor_names(self):
             # Helper method to expose tensor names
@@ -51,8 +51,16 @@ def save_tensors_torchscript(tensor_list, filepath, tensor_names=None):
     # Use descriptive names if not provided
     if tensor_names is None:
         # Default names for input tensors
-        if len(tensor_list) == 6:  # Input tensors
-            tensor_names = ["means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids"]
+        if len(tensor_list) == 7:  # Input tensors
+            tensor_names = [
+                "means2d",
+                "conics",
+                "colors",
+                "opacities",
+                "tile_offsets",
+                "tile_gaussian_ids",
+                "image_dims",
+            ]
         elif len(tensor_list) == 3:  # Output tensors
             tensor_names = ["rendered_colors", "rendered_alphas", "last_ids"]
 
@@ -66,9 +74,9 @@ def save_tensors_torchscript(tensor_list, filepath, tensor_names=None):
         print(f"  - {name}: shape={tensor.shape}, dtype={tensor.dtype}, device={tensor.device}")
 
     try:
-        # Trace the module instead of scripting for better compatibility
-        example_inputs = ()  # forward takes no inputs
-        scripted_module = torch.jit.trace(container, example_inputs)
+        # Script the module to handle the None return from forward().
+        # This is more robust than tracing for modules with control flow.
+        scripted_module = torch.jit.script(container)
 
         # Save the module
         torch.jit.save(scripted_module, filepath)
@@ -101,8 +109,8 @@ def save_tensors_torchscript(tensor_list, filepath, tensor_names=None):
 def generate_gaussian_splat_dataset(
     out_dir,
     batch_size=1,
-    image_width=1297,
-    image_height=840,
+    image_width=648,
+    image_height=420,
     origin_w=0,
     origin_h=0,
     tile_size=16,
@@ -224,10 +232,13 @@ def generate_gaussian_splat_dataset(
 
     print(f"Generated {total_intersections} gaussian-tile intersections")
 
+    # Create a tensor for image dimensions to be stored alongside other tensors
+    image_dims = torch.tensor([image_width, image_height], dtype=torch.int32, device=device)
+
     # Save the input tensors using TorchScript format
-    inputs = [means2d, conics, colors, opacities, tile_offsets, tile_gaussian_ids]
-    input_names = ["means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids"]
-    inputs_path = os.path.join(out_dir, "gaussian_splat_input.pt")
+    inputs = [means2d, conics, colors, opacities, tile_offsets, tile_gaussian_ids, image_dims]
+    input_names = ["means2d", "conics", "colors", "opacities", "tile_offsets", "tile_gaussian_ids", "image_dims"]
+    inputs_path = os.path.join(out_dir, "rasterize_forward_inputs.pt")
     print(f"Saving inputs to {inputs_path}")
     save_tensors_torchscript(inputs, inputs_path, input_names)
 
@@ -239,8 +250,8 @@ def main():
     parser = argparse.ArgumentParser(description="Generate gaussian splat dataset for testing")
     parser.add_argument("--out-dir", type=str, default="./data", help="Output directory for the dataset")
     parser.add_argument("--batch-size", type=int, default=1, help="Number of batches (usually cameras)")
-    parser.add_argument("--image-width", type=int, default=1297, help="Width of the image in pixels")
-    parser.add_argument("--image-height", type=int, default=840, help="Height of the image in pixels")
+    parser.add_argument("--image-width", type=int, default=648, help="Width of the image in pixels")
+    parser.add_argument("--image-height", type=int, default=420, help="Height of the image in pixels")
     parser.add_argument("--num-gaussians", type=int, default=500, help="Number of gaussian splats to generate")
     parser.add_argument("--tile-size", type=int, default=16, help="Size of the tiles for rasterization")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")

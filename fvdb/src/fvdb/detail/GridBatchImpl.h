@@ -11,6 +11,7 @@
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/NanoVDB.h>
 
+#include <ATen/core/TensorBody.h>
 #include <torch/all.h>
 
 #include <vector>
@@ -310,6 +311,10 @@ class GridBatchImpl : public torch::CustomClassHolder {
 
     int64_t
     batchSize() const {
+        TORCH_CHECK(mBatchSize <= MAX_GRIDS_PER_BATCH,
+                    "Cannot have more than ",
+                    MAX_GRIDS_PER_BATCH,
+                    " grids in a batch");
         return mBatchSize;
     }
 
@@ -342,47 +347,59 @@ class GridBatchImpl : public torch::CustomClassHolder {
         return mGridHdl->buffer().isEmpty();
     }
 
+    torch::Tensor numLeavesPerGridTensor() const;
+
+    torch::Tensor numVoxelsPerGridTensor() const;
+
+    torch::Tensor cumVoxelsPerGridTensor() const;
+
+    torch::Tensor numBytesPerGridTensor() const;
+
     uint32_t
-    numLeaves(int64_t bi) const {
+    numLeavesAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mNumLeaves;
     }
 
     int64_t
-    numVoxels(int64_t bi) const {
+    numVoxelsAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mNumVoxels;
     }
 
     int64_t
-    cumVoxels(int64_t bi) const {
+    cumVoxelsAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mCumVoxels;
     }
 
     uint64_t
-    numBytes(int64_t bi) const {
+    numBytesAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mNumBytes;
     }
 
     uint64_t
-    cumBytes(int64_t bi) const {
+    cumBytesAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mCumBytes;
     }
 
     const VoxelCoordTransform &
-    primalTransform(int64_t bi) const {
+    primalTransformAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mPrimalTransform;
     }
 
     const VoxelCoordTransform &
-    dualTransform(int64_t bi) const {
+    dualTransformAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mDualTransform;
     }
+
+    const std::vector<VoxelCoordTransform> primalTransforms() const;
+
+    const std::vector<VoxelCoordTransform> dualTransforms() const;
 
     void
     gridVoxelSizesAndOrigins(std::vector<nanovdb::Vec3d> &outVoxelSizes,
@@ -401,35 +418,57 @@ class GridBatchImpl : public torch::CustomClassHolder {
     }
 
     const nanovdb::CoordBBox &
-    bbox(int64_t bi) const {
+    bboxAt(int64_t bi) const {
         checkNonEmptyGrid();
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mBBox;
     }
 
+    const torch::Tensor bboxAtTensor(int64_t bi) const;
+
+    const torch::Tensor bboxPerGridTensor() const;
+
+    const torch::Tensor dualBBoxAtTensor(int64_t bi) const;
+
+    const torch::Tensor dualBBoxPerGridTensor() const;
+
+    const torch::Tensor totalBBoxTensor() const;
+
     const nanovdb::CoordBBox
-    dualBbox(int64_t bi) const {
+    dualBBoxAt(int64_t bi) const {
         bi                          = negativeToPositiveIndexWithRangecheck(bi);
-        nanovdb::CoordBBox dualBbox = bbox(bi);
+        nanovdb::CoordBBox dualBbox = bboxAt(bi);
         dualBbox.mCoord[1] += nanovdb::Coord(1, 1, 1);
         return dualBbox;
     }
 
     const nanovdb::Vec3d &
-    voxelSize(int64_t bi) const {
+    voxelSizeAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].mVoxelSize;
     }
 
     const nanovdb::Vec3d
-    voxelOrigin(int64_t bi) const {
+    voxelOriginAt(int64_t bi) const {
         bi = negativeToPositiveIndexWithRangecheck(bi);
         return mHostGridMetadata[bi].voxelOrigin();
     }
 
-    torch::Tensor worldToGridMatrix(int64_t bi) const;
+    const torch::Tensor voxelSizeAtTensor(int64_t bi) const;
 
-    torch::Tensor gridToWorldMatrix(int64_t bi) const;
+    const torch::Tensor voxelOriginAtTensor(int64_t bi) const;
+
+    const torch::Tensor voxelSizesTensor() const;
+
+    const torch::Tensor voxelOriginsTensor() const;
+
+    torch::Tensor worldToGridMatrixAt(int64_t bi) const;
+
+    torch::Tensor gridToWorldMatrixAt(int64_t bi) const;
+
+    torch::Tensor gridToWorldMatrixPerGrid() const;
+
+    torch::Tensor worldToGridMatrixPerGrid() const;
 
     c10::intrusive_ptr<GridBatchImpl> clone(const torch::Device &device,
                                             bool blocking = false) const;

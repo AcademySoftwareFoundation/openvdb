@@ -86,7 +86,7 @@ dispatchMergeGrids<torch::kCPU>(const GridBatchImpl &gridBatch1, const GridBatch
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        const int64_t joffset = gridBatch1.cumVoxels(bidx);
+        const int64_t joffset = gridBatch1.cumVoxelsAt(bidx);
         for (auto it = ActiveVoxelIterator<-1>(tree1); it.isValid(); it++) {
             proxyGridAccessor.setValue(it->first, 1);
         }

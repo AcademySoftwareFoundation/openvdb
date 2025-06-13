@@ -129,15 +129,6 @@ class SparseConvPackInfo : torch::CustomClassHolder {
     }
 
     SparseConvPackInfo
-    to(const std::string &device_string) const {
-        torch::Device device(device_string);
-        if (device.is_cuda() && !device.has_index()) {
-            device.set_index(c10::cuda::current_device());
-        }
-        return to(device);
-    }
-
-    SparseConvPackInfo
     cuda() const {
         return to(torch::kCUDA);
     }

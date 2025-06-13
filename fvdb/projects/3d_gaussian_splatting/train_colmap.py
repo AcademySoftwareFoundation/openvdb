@@ -21,6 +21,7 @@ import tyro
 import viser
 import yaml
 from datasets import ColmapDataset
+from fvdb.optim import GaussianSplatOptimizer
 from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
@@ -29,7 +30,6 @@ from utils import CameraOptModule, gaussian_means_outside_bbox
 from viz import CameraState, Viewer
 
 from fvdb import GaussianSplat3d
-from fvdb.optim import GaussianSplatOptimizer
 
 
 @dataclass
@@ -486,7 +486,38 @@ class Runner:
         # Viewer
         if not self.disable_viewer:
             self.server = viser.ViserServer(port=8080, verbose=False)
-            self.server.scene.set_up_direction("-z")
+
+            # Set default up axis
+            self.current_up_axis = "+z"
+            self.server.scene.set_up_direction(self.current_up_axis)
+
+            # Store per-client up axis dropdowns
+            self.client_up_axis_dropdowns = {}
+
+            # Add client connect handler for per-client GUI elements
+            @self.server.on_client_connect
+            def _(client: viser.ClientHandle) -> None:
+                # Create per-client up axis dropdown
+                up_axis_dropdown = client.gui.add_dropdown(
+                    "Up Axis",
+                    options=["+x", "-x", "+y", "-y", "+z", "-z"],
+                    initial_value=self.current_up_axis,
+                )
+
+                # Store the dropdown for this client
+                self.client_up_axis_dropdowns[client.client_id] = up_axis_dropdown
+
+                # Add callback for up axis changes for this specific client
+                @up_axis_dropdown.on_update
+                def _on_up_axis_change(event) -> None:
+                    self.viewer.set_up_axis(client.client_id, event.target.value)
+
+            # Add client disconnect handler to clean up
+            @self.server.on_client_disconnect
+            def _(client: viser.ClientHandle) -> None:
+                if client.client_id in self.client_up_axis_dropdowns:
+                    del self.client_up_axis_dropdowns[client.client_id]
+
             self.viewer = Viewer(
                 server=self.server,
                 render_fn=self._viewer_render_fn,
@@ -519,6 +550,15 @@ class Runner:
                     position=cam_to_world[:3, 3],
                     axes_length=axes_length,  # Scaled based on scene size
                     axes_radius=axes_radius,  # Scaled based on scene size
+                )
+                K = data["K"].cpu().numpy()
+                H, W = data["image"].shape[:2]
+                fy = K[1, 1]
+                frustum = self.server.scene.add_camera_frustum(
+                    f"camera_{i}/frustum",
+                    fov=2 * np.arctan2(H / 2, fy),
+                    aspect=W / H,
+                    image=data["image"],
                 )
                 self.camera_frames.append(frame)
 

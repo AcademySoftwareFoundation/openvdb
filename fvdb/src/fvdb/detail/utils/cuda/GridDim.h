@@ -1,14 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
-#define FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
+#ifndef FVDB_DETAIL_UTILS_CUDA_GRIDDIM_H
+#define FVDB_DETAIL_UTILS_CUDA_GRIDDIM_H
 
 #include <c10/util/Exception.h>
 
 #include <limits>
 
 namespace fvdb {
+
+/// @brief Setting for the default number of threads per block for CUDA kernels
+constexpr int DEFAULT_BLOCK_DIM = 256;
 
 /// @brief Get the number of blocks for a CUDA kernel launch given the number of elements and the
 /// maximum number of threads per block
@@ -32,4 +35,4 @@ GET_BLOCKS(const int64_t N, const int64_t maxThreadsPerBlock) {
 
 } // namespace fvdb
 
-#endif // FVDB_DETAIL_UTILS_CUDA_UTILS_CUH
+#endif // FVDB_DETAIL_UTILS_CUDA_GRIDDIM_H

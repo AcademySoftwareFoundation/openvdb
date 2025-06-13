@@ -10,6 +10,8 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAMathCompat.h>
 
+constexpr int NUM_THREADS = 1;
+
 namespace fvdb {
 namespace detail {
 namespace ops {
@@ -97,7 +99,7 @@ populateGridMetadataKernel(uint32_t numGrids,
 }
 
 template <template <typename T, int I> typename TensorAccessorT>
-__global__ void
+__global__ __launch_bounds__(NUM_THREADS) void
 populateGridMetadataCUDA(uint32_t numGrids,
                          const nanovdb::OnIndexGrid *grids,
                          const nanovdb::Vec3d *voxelSizes,
@@ -140,7 +142,7 @@ dispatchPopulateGridMetadata<torch::kCUDA>(
     // Read metadata into device buffers
     TORCH_CHECK(gridHdl.deviceData() != nullptr, "GridHandle is empty");
     const nanovdb::OnIndexGrid *grids = (nanovdb::OnIndexGrid *)gridHdl.deviceData();
-    populateGridMetadataCUDA<TorchRAcc32><<<1, 1>>>(
+    populateGridMetadataCUDA<TorchRAcc32><<<1, NUM_THREADS>>>(
         gridHdl.gridCount(),
         grids,
         (const nanovdb::Vec3d *)deviceVoxSizesPtr,
