@@ -4997,7 +4997,7 @@ TEST_F(TestNanoVDB, PNanoVDB_Basic)
     EXPECT_EQ((int)nanovdb::GridType::IndexMask,   PNANOVDB_GRID_TYPE_INDEXMASK);
     EXPECT_EQ((int)nanovdb::GridType::OnIndexMask, PNANOVDB_GRID_TYPE_ONINDEXMASK);
     EXPECT_EQ((int)nanovdb::GridType::PointIndex, PNANOVDB_GRID_TYPE_POINTINDEX);
-    EXPECT_EQ((int)nanovdb::GridType::End,     PNANOVDB_GRID_TYPE_END);
+    EXPECT_EQ((int)nanovdb::GridType::End,     PNANOVDB_GRID_TYPE_NODE2);
 
     EXPECT_EQ((int)nanovdb::GridClass::Unknown,    PNANOVDB_GRID_CLASS_UNKNOWN);
     EXPECT_EQ((int)nanovdb::GridClass::LevelSet,   PNANOVDB_GRID_CLASS_LEVEL_SET);
@@ -5285,9 +5285,9 @@ TYPED_TEST(TestOffsets, PNanoVDB)
     EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mNodeCount[0]), PNANOVDB_TREE_OFF_NODE_COUNT_LEAF);
     EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mNodeCount[1]), PNANOVDB_TREE_OFF_NODE_COUNT_LOWER);
     EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mNodeCount[2]), PNANOVDB_TREE_OFF_NODE_COUNT_UPPER);
-    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[0]), PNANOVDB_TREE_OFF_TILE_COUNT_LEAF);
-    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[1]), PNANOVDB_TREE_OFF_TILE_COUNT_LOWER);
-    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[2]), PNANOVDB_TREE_OFF_TILE_COUNT_UPPER);
+    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[0]), PNANOVDB_TREE_OFF_TILE_COUNT_LOWER);
+    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[1]), PNANOVDB_TREE_OFF_TILE_COUNT_UPPER);
+    EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mTileCount[2]), PNANOVDB_TREE_OFF_TILE_COUNT_ROOT);
     EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mVoxelCount), PNANOVDB_TREE_OFF_VOXEL_COUNT);
 
     EXPECT_EQ((int)sizeof(pnanovdb_tree_t), PNANOVDB_TREE_SIZE);
@@ -5298,9 +5298,9 @@ TYPED_TEST(TestOffsets, PNanoVDB)
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, node_count_leaf), PNANOVDB_TREE_OFF_NODE_COUNT_LEAF);
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, node_count_lower), PNANOVDB_TREE_OFF_NODE_COUNT_LOWER);
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, node_count_upper), PNANOVDB_TREE_OFF_NODE_COUNT_UPPER);
-    EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, tile_count_leaf), PNANOVDB_TREE_OFF_TILE_COUNT_LEAF);
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, tile_count_lower), PNANOVDB_TREE_OFF_TILE_COUNT_LOWER);
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, tile_count_upper), PNANOVDB_TREE_OFF_TILE_COUNT_UPPER);
+    EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, tile_count_root), PNANOVDB_TREE_OFF_TILE_COUNT_ROOT);
     EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, voxel_count), PNANOVDB_TREE_OFF_VOXEL_COUNT);
 
     // background value can start at pad1
