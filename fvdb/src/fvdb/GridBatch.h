@@ -12,8 +12,7 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/io/IO.h>
 
-#include <torch/custom_class.h>
-#include <torch/script.h>
+#include <ATen/core/ivalue.h>
 
 namespace fvdb {
 
@@ -21,35 +20,25 @@ struct GridBatch : torch::CustomClassHolder {
     // Set some speed limits so you don't shoot yourself in the foot
     constexpr static int64_t MAX_GRIDS_PER_BATCH = detail::GridBatchImpl::MAX_GRIDS_PER_BATCH;
 
-    explicit GridBatch(const torch::Device &device);
-    explicit GridBatch(const std::string &device_string);
     explicit GridBatch();
-
-    GridBatch(c10::intrusive_ptr<detail::GridBatchImpl> gridHdl) : mImpl(gridHdl) {}
+    explicit GridBatch(const torch::Device &device);
+    GridBatch(nanovdb::GridHandle<detail::TorchDeviceBuffer> &&gridHdl,
+              const std::vector<nanovdb::Vec3d> &voxelSizes,
+              const std::vector<nanovdb::Vec3d> &voxelOrigins);
 
     /// @brief Return true if this is a contiguous view of the grid batch
     /// @return true if this is a contiguous view of the grid batch
-    bool
-    is_contiguous() const {
-        return impl()->isContiguous();
-    }
+    bool is_contiguous() const;
 
     /// @brief Return a contiguous copy of this grid batch. If the grid batch is already contiguous,
     ///        then return a reference to this
     /// @return A contiguous copy of this grid batch
-    GridBatch
-    contiguous() const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(detail::GridBatchImpl::contiguous(impl()));
-    }
+    GridBatch contiguous() const;
 
     /// @brief Check if two GridBatches refer to the same underlying NanoVDB grid
     /// @param other Another GridBatch to compare with
     /// @return true if the two GridBatches refer to the same underlying NanoVDB grid
-    bool
-    is_same(const GridBatch &other) const {
-        return impl() == other.impl();
-    }
+    bool is_same(const GridBatch &other) const;
 
     /// @brief Get the voxel size of the bi^th grid in the batch and return is a tensor of type
     /// dtype
@@ -79,41 +68,21 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Get the number of grids indexed by this batch
     /// @return The number of grids indexed by this batch
-    int64_t
-    grid_count() const {
-        detail::RAIIDeviceGuard guard(device());
-        TORCH_CHECK(impl()->batchSize() <= MAX_GRIDS_PER_BATCH,
-                    "Cannot have more than ",
-                    MAX_GRIDS_PER_BATCH,
-                    " grids in a batch");
-        return impl()->batchSize();
-    }
+    int64_t grid_count() const;
 
     /// @brief Get the total number of voxels indexed by this batch of grids
     /// @return The total number of voxels indexed by this batch of grids
-    int64_t
-    total_voxels() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->totalVoxels();
-    }
+    int64_t total_voxels() const;
 
     /// @brief Get the number of voxels indexed by the bi^th grid in the batch
     /// @param bi The batch index of the grid for which to get the number of voxels
     /// @return The number of voxels indexed by the bi^th grid in the batch
-    int64_t
-    num_voxels_at(int64_t bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->numVoxels(bi);
-    }
+    int64_t num_voxels_at(int64_t bi) const;
 
     /// @brief Get the cumulative number of voxels indexed by the first bi+1 grids
     /// @param bi The batch index
     /// @return The cumulative number of voxels indexed by the first bi+1 grids
-    int64_t
-    cum_voxels_at(int64_t bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->cumVoxels(bi);
-    }
+    int64_t cum_voxels_at(int64_t bi) const;
 
     /// @brief Get the number of voxels per grid indexed by this batch of grids
     /// @return An integer tensor containing the number of voxels per grid indexed by this batch
@@ -127,11 +96,7 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Get the total number of bytes required to store all grids indexed by this batch
     /// @return The total number of bytes required to store all grids indexed by this batch
-    int64_t
-    total_bytes() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->totalBytes();
-    }
+    int64_t total_bytes() const;
 
     /// @brief Get the number of bytes required to store each grid
     /// @return An integer tensor containing the number of bytes required to store each grid
@@ -139,11 +104,7 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Get the total number of leaf nodes indexed by this batch of grids
     /// @return The total number of leaf nodes indexed by this batch of grids
-    int64_t
-    total_leaf_nodes() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->totalLeaves();
-    }
+    int64_t total_leaf_nodes() const;
 
     /// @brief Get the number of leaf nodes in each grid
     /// @return An integer tensor containing the number of leaf nodes in each grid
@@ -154,116 +115,53 @@ struct GridBatch : torch::CustomClassHolder {
     /// first voxel
     ///         and the [bi, 1]^th entry is the offset one past the last voxel indexed by the bi^th
     ///         grid in the batch
-    torch::Tensor
-    joffsets() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->voxelOffsets();
-    }
+    torch::Tensor joffsets() const;
 
     /// @brief Get the list indices for theis batch of grids
     /// @return A tensor of shape [total_grids, ldim] where the [i]^th entry is the list index of
     /// the i^th grid
-    torch::Tensor
-    jlidx() const {
-        detail::RAIIDeviceGuard guard(device());
-        const torch::Tensor ret = impl()->jlidx();
-        if (ret.numel() == 0) {
-            return torch::arange(
-                {grid_count()},
-                torch::TensorOptions().device(device()).dtype(fvdb::JLIdxScalarType));
-        } else {
-            return ret;
-        }
-    }
+    torch::Tensor jlidx() const;
 
     /// @brief Get the batch index for each voxel indexed by this batch of grids
     /// @return An integer tensor of shape [total_voxels,] where the [i]^th entry is the batch index
     /// of the i^th voxel
-    torch::Tensor
-    jidx() const {
-        detail::RAIIDeviceGuard guard(device());
-        const torch::Tensor ret = impl()->jidx();
-        if (grid_count() == 1 && ret.numel() == 0) {
-            return torch::zeros(
-                {total_voxels()},
-                torch::TensorOptions().device(device()).dtype(fvdb::JIdxScalarType));
-        } else {
-            return ret;
-        }
-    }
+    torch::Tensor jidx() const;
 
     /// @brief Set the voxel size of all grids indexed by this batch to the specified value
     /// @param voxel_size A 3D (shape [3,]) tensor specifying the voxel size to set for each grid
-    inline void
-    set_global_voxel_size(const Vec3dOrScalar &voxel_size) {
-        detail::RAIIDeviceGuard guard(device());
-        impl()->setGlobalVoxelSize(voxel_size.value());
-    }
+    void set_global_voxel_size(const Vec3dOrScalar &voxel_size);
 
     /// @brief Set the voxel origin of all grids indexed by this batch to the specified value
     /// @param origin A 3D (shape [3,]) tensor specifying the voxel origin to set for each grid
-    inline void
-    set_global_origin(const Vec3d &origin) {
-        detail::RAIIDeviceGuard guard(device());
-        impl()->setGlobalVoxelOrigin(origin.value());
-    }
+    void set_global_origin(const Vec3d &origin);
 
     /// @brief Get the device on which this grid is stored
     /// @return The device on which this grid is stored
-    inline c10::Device
-    device() const {
-        return impl()->device();
-    }
+    c10::Device device() const;
 
     /// @brief Get the primal transforms of the grids in this batch (i.e. world to primal grid
     /// coordinates)
     /// @return A std::vector<VoxelCoordTransform> containing the primal transforms of the grids in
     /// this batch
-    inline const std::vector<detail::VoxelCoordTransform>
-    primal_transforms() const {
-        detail::RAIIDeviceGuard guard(device());
-        std::vector<detail::VoxelCoordTransform> transforms;
-        transforms.reserve(grid_count());
-        for (int64_t bi = 0; bi < grid_count(); ++bi) {
-            transforms.push_back(primal_transform_at(bi));
-        }
-        return transforms;
-    }
+    const std::vector<detail::VoxelCoordTransform> primal_transforms() const;
 
     /// @brief Get the dual transforms of the grids in this batch (i.e. world to dual grid
     /// coordinates)
     /// @return A std::vector<detail::VoxelCoordTransform> containing the dual transforms of the
     /// grids in this batch
-    inline const std::vector<detail::VoxelCoordTransform>
-    dual_transforms() const {
-        detail::RAIIDeviceGuard guard(device());
-        std::vector<detail::VoxelCoordTransform> transforms;
-        transforms.reserve(grid_count());
-        for (int64_t bi = 0; bi < grid_count(); ++bi) {
-            transforms.push_back(dual_transform_at(bi));
-        }
-        return transforms;
-    }
+    const std::vector<detail::VoxelCoordTransform> dual_transforms() const;
 
     /// @brief Get the primal transform of the bi^th grid in the batch (i.e. world to primal grid
     /// coordinates)
     /// @param bi The index of the grid in the batch for which to get the primal transform
     /// @return The primal transform of the bi^th grid in the batch
-    inline const fvdb::detail::VoxelCoordTransform
-    primal_transform_at(int64_t bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->primalTransform(bi);
-    }
+    const fvdb::detail::VoxelCoordTransform primal_transform_at(int64_t bi) const;
 
     /// @brief Get the dual transform of the bi^th grid in the batch (i.e. world to dual grid
     /// coordinates)
     /// @param bi The index of the grid in the batch for which to get the dual transform
     /// @return The dual transform of the bi^th grid in the batch
-    inline const fvdb::detail::VoxelCoordTransform
-    dual_transform_at(int64_t bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->dualTransform(bi);
-    }
+    const fvdb::detail::VoxelCoordTransform dual_transform_at(int64_t bi) const;
 
     /// @brief Get the bounding box (in voxel coordinates) for each grid in the batch
     /// @return A tensor bboxes of shape [B, 2, 3] where
@@ -741,123 +639,44 @@ struct GridBatch : torch::CustomClassHolder {
     ///        returned on the specified device.
     /// @param to_device The device to return the grid batch on
     /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const torch::Device &to_device) const {
-        if (to_device == device()) {
-            return GridBatch(impl());
-        } else {
-            return GridBatch(impl()->clone(to_device));
-        }
-    }
-
-    /// @brief Return a grid batch on the specified device. If the passed in device is the same as
-    /// this grid batch's
-    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
-    ///        returned on the specified device.
-    /// @param to_device The device to return the grid batch on
-    /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const std::string &to_device_string) const {
-        torch::Device to_device(to_device_string);
-        if (to_device.is_cuda() && !to_device.has_index()) {
-            to_device.set_index(c10::cuda::current_device());
-        }
-        return to(to_device);
-    }
-
-    /// @brief Return a grid batch on the same device as the specified grid batch. If the passed in
-    /// grid has the same device as this grid batch's
-    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
-    ///        returned on the specified device.
-    /// @param to_grid The grid batch used to specify which device to return the grid batch on
-    /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const GridBatch &to_grid) const {
-        return this->to(to_grid.device());
-    }
-
-    /// @brief Return a grid batch on the same device as the specified tensor. If the passed in
-    /// tensor has the same device as this grid batch's
-    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
-    ///        returned on the specified device.
-    /// @param to_tensor The tensor used to specify which device to return the grid batch on
-    /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const torch::Tensor &to_tensor) const {
-        return this->to(to_tensor.device());
-    }
-
-    /// @brief Return a grid batch on the same device as the specified JaggedTensor. If the passed
-    /// in JaggedTensor has the same device as this grid batch's
-    ///        device, then this grid batch is returned. Otherwise, a copy of this grid batch is
-    ///        returned on the specified device.
-    /// @param to_jtensor The JaggedTensor used to specify which device to return the grid batch on
-    /// @return A GridBatch representing this grid batch on the specified device
-    GridBatch
-    to(const JaggedTensor &to_jtensor) const {
-        return this->to(to_jtensor.device());
-    }
+    GridBatch to(const torch::Device &to_device) const;
 
     /// @brief Return a view of this grid batch containing the grid at the specified index i.e.
     /// grid_batch[bi]
     /// @param bi The index to get a view on
     /// @return A GridBatch representing the grid at the specified index
-    GridBatch
-    index(int64_t bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(impl()->index(bi));
-    }
+    GridBatch index(int64_t bi) const;
 
     /// @brief Return a slice view of this grid batch i.e. grid_batch[start:stop:step]
     /// @param start The start index of the slice
     /// @param stop The stop index of the slice
     /// @param step The step of the slice
     /// @return A GridBatch representing the slice of this grid batch
-    GridBatch
-    index(size_t start, size_t stop, size_t step) const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(impl()->index(start, stop, step));
-    }
+    GridBatch index(size_t start, size_t stop, size_t step) const;
 
     /// @brief Return a view of this grid batch at the specified indices i.e. grid_batch[[i1, i2,
     /// ...]]
     /// @param bi A list of integers representing the indices to get a view on
     /// @return The grid batch vieweed at the specified indices
-    GridBatch
-    index(const std::vector<int64_t> &bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(impl()->index(bi));
-    }
+    GridBatch index(const std::vector<int64_t> &bi) const;
 
     /// @brief Return a view of this grid batch at indices specified by the given mask i.e.
     /// grid_batch[mask]
     /// @param bi A list of integers representing the indices to get a view on
     /// @return The grid batch vieweed at the specified indices
-    GridBatch
-    index(const std::vector<bool> &bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(impl()->index(bi));
-    }
+    GridBatch index(const std::vector<bool> &bi) const;
 
     /// @brief Return a view of this grid batch at the specified indices (or mask if bi is a bool
     /// tensor) i.e. grid_batch[[i1, i2, ...]]
     /// @param bi A list of integers representing the indices to get a view on
     /// @return The grid batch vieweed at the specified indices
-    GridBatch
-    index(const torch::Tensor &bi) const {
-        detail::RAIIDeviceGuard guard(device());
-        return GridBatch(impl()->index(bi));
-    }
+    GridBatch index(const torch::Tensor &bi) const;
 
     /// @brief Return a JaggedTensor whose joffsets and jidx match this grid batch's
     /// @param data The data to use for the JaggedTensor (first dimension must match the total
     /// number of voxels in the grid batch)
     /// @return A JaggedTensor corresponding to the voxel grid of this grid batch
-    JaggedTensor
-    jagged_like(const torch::Tensor &data) const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->jaggedTensor(data);
-    }
+    JaggedTensor jagged_like(const torch::Tensor &data) const;
 
     /// @brief Populate the grid batch with voxels that intersect a triangle mesh
     /// @param vertices A JaggedTensor of shape [B, -1, 3] containing one vertex set per grid to
@@ -933,39 +752,30 @@ struct GridBatch : torch::CustomClassHolder {
 
     /// @brief Serialize this grid batch to a torch tensor of bytes (dtype = int8)
     /// @return A serialized grid batch encoded as a torch::Tensor of type int8
-    torch::Tensor
-    serialize() const {
-        detail::RAIIDeviceGuard guard(device());
-        return impl()->serialize();
-    }
+    torch::Tensor serialize() const;
 
     /// @brief Deserialize an int8 tensor (returned by serialize()) into a grid batch
     /// @param data A tensor enccoding a serialized grid batch as an int8 tensor
     /// @return The deserializes grid batch
-    static GridBatch
-    deserialize(const torch::Tensor &data) {
-        detail::RAIIDeviceGuard guard(data.device());
-        return GridBatch(detail::GridBatchImpl::deserialize(data));
-    }
+    static GridBatch deserialize(const torch::Tensor &data);
 
     /// @brief Return an integer representing the actual data
     /// @return the value
-    int64_t
-    address() const {
-        return reinterpret_cast<int64_t>(impl().get());
-    }
+    int64_t address() const;
 
     /// @brief Get the underlying nanovdb::GridHandle for the grid batch
     /// @return The underlying nanovdb::GridHandle for the grid batch
-    const nanovdb::GridHandle<detail::TorchDeviceBuffer> &
-    nanovdb_grid_handle() const {
-        return impl()->nanoGridHandle();
-    }
+    const nanovdb::GridHandle<detail::TorchDeviceBuffer> &nanovdb_grid_handle() const;
 
-    inline const c10::intrusive_ptr<detail::GridBatchImpl>
-    impl() const {
-        return mImpl;
-    }
+    static GridBatch concatenate(const std::vector<GridBatch> &vec);
+
+    static void computeConvolutionKernelMap(const GridBatch &source,
+                                            const GridBatch &target,
+                                            torch::Tensor &kernelMap,
+                                            const Vec3iOrScalar &kernelSize,
+                                            const Vec3iOrScalar &stride);
+
+    std::vector<torch::Tensor> computeBrickHaloBuffer(bool benchmark) const;
 
   private:
     c10::intrusive_ptr<detail::GridBatchImpl> mImpl;

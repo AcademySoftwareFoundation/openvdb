@@ -5,17 +5,16 @@
 #include <fvdb/detail/ops/gsplat/GaussianMacros.cuh>
 #include <fvdb/detail/ops/gsplat/GaussianUtils.cuh>
 #include <fvdb/detail/ops/gsplat/GaussianWarpUtils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <ATen/cuda/Atomic.cuh>
-
-constexpr int NUM_THREADS = 256;
 
 namespace fvdb {
 namespace detail {
 namespace ops {
 
 template <typename T, bool Ortho>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 jaggedProjectionForwardKernel(const uint32_t B,
                               const int64_t N,
                               const int64_t *__restrict__ gSizes,       // [B]
@@ -218,7 +217,7 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
     if (N) {
         if (ortho) {
             jaggedProjectionForwardKernel<float, true>
-                <<<(N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                <<<GET_BLOCKS(N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
                     B,
                     N,
                     gSizes.data_ptr<int64_t>(),
@@ -245,7 +244,7 @@ dispatchGaussianProjectionJaggedForward<torch::kCUDA>(
                     calc_compensations ? compensations.data_ptr<float>() : nullptr);
         } else {
             jaggedProjectionForwardKernel<float, false>
-                <<<(N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                <<<GET_BLOCKS(N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
                     B,
                     N,
                     gSizes.data_ptr<int64_t>(),

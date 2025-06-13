@@ -58,10 +58,7 @@ SparseConvPackInfo::buildGatherScatter(bool use_me) {
                     -1,
                     torch::TensorOptions().dtype(torch::kInt32).device(mTargetGrid.device()));
 
-    FVDB_DISPATCH_KERNEL_DEVICE(mSourceGrid.device(), [&]() {
-        detail::ops::dispatchConvolutionKernelMap<DeviceTag>(
-            *mSourceGrid.impl(), *mTargetGrid.impl(), kmap, mKernelSize, mStride);
-    });
+    GridBatch::computeConvolutionKernelMap(mSourceGrid, mTargetGrid, kmap, mKernelSize, mStride);
     kmap                  = kmap.t();
     torch::Tensor kmask   = kmap != -1;
     torch::Tensor nbsizes = torch::sum(kmask, -1);
@@ -97,11 +94,9 @@ SparseConvPackInfo::buildImplicitGEMM(
                     torch::TensorOptions().dtype(torch::kInt32).device(mTargetGrid.device()));
     mIGEMMUseTF32 = use_tf32;
 
-    // Note: This could also be converted from GSNeighbourMap if exists
-    FVDB_DISPATCH_KERNEL_DEVICE(mSourceGrid.device(), [&]() {
-        detail::ops::dispatchConvolutionKernelMap<DeviceTag>(
-            *mSourceGrid.impl(), *mTargetGrid.impl(), mIGEMMOutInMap.value(), mKernelSize, mStride);
-    });
+    // // Note: This could also be converted from GSNeighbourMap if exists
+    GridBatch::computeConvolutionKernelMap(
+        mSourceGrid, mTargetGrid, mIGEMMOutInMap.value(), mKernelSize, mStride);
 
     if (sorted) {
         TORCH_CHECK(mSourceGrid.device().is_cuda(),
@@ -199,9 +194,7 @@ SparseConvPackInfo::buildCutlass(bool benchmark) {
                     "Cutlass is already built with different benchmark flag");
         return;
     }
-    std::vector<torch::Tensor> res = FVDB_DISPATCH_KERNEL_DEVICE(mSourceGrid.device(), [&]() {
-        return detail::ops::dispatchBrickHaloBuffer<DeviceTag>(*mSourceGrid.impl(), benchmark);
-    });
+    std::vector<torch::Tensor> res = mSourceGrid.computeBrickHaloBuffer(benchmark);
     mCUTLASSHaloIndexBuffer        = res[1];
     mCUTLASSOutputIndexBuffer      = res[2];
     mCUTLASSBenchmark              = benchmark;
@@ -218,11 +211,8 @@ SparseConvPackInfo::buildLGGS() {
                     -1,
                     torch::TensorOptions().dtype(torch::kInt32).device(mTargetGrid.device()));
 
-    FVDB_DISPATCH_KERNEL_DEVICE(mSourceGrid.device(), [&]() {
-        detail::ops::dispatchConvolutionKernelMap<DeviceTag>(
-            *mSourceGrid.impl(), *mTargetGrid.impl(), outInMap, mKernelSize, mStride);
-    });
-
+    GridBatch::computeConvolutionKernelMap(
+        mSourceGrid, mTargetGrid, outInMap, mKernelSize, mStride);
     outInMap              = outInMap.view({-1, 64, 27}).transpose(1, 2); // [#blocks, 27, 64]
     torch::Tensor mapMask = outInMap != -1;
     torch::Tensor mapNNZ  = torch::nonzero(mapMask);
@@ -253,12 +243,12 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
         auto ret = detail::autograd::SparseConvolutionKernelMap::apply(
             input.jdata(), weights, *this, false /* transposed */)[0];
 
-        return mTargetGrid.impl()->jaggedTensor(ret);
+        return mTargetGrid.jagged_like(ret);
     } else if (backend == ConvPackBackend::IGEMM) {
         auto ret = detail::autograd::SparseConvolutionImplicitGEMM::apply(
             input.jdata(), weights, *this, false /* transposed */)[0];
 
-        return mTargetGrid.impl()->jaggedTensor(ret);
+        return mTargetGrid.jagged_like(ret);
     } else if (backend == ConvPackBackend::CUTLASS) {
         // Re-shape kernel from [Do, Di, D, H, W] to [Do, D, H, W, Di].
         TORCH_CHECK(mCUTLASSHaloIndexBuffer.has_value() && mCUTLASSOutputIndexBuffer.has_value(),
@@ -272,7 +262,7 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
                 mCUTLASSOutputIndexBuffer.value(),
                 mCUTLASSBenchmark);
         });
-        return mTargetGrid.impl()->jaggedTensor(out);
+        return mTargetGrid.jagged_like(out);
     } else if (backend == ConvPackBackend::LGGS) {
         TORCH_CHECK(mLGGSSpokeIndicesFlattenedOffset.has_value() &&
                         mLGGSSpokeInputGlobalIndicesFlattenedData.has_value() &&
@@ -291,7 +281,7 @@ SparseConvPackInfo::sparseConv3d(const JaggedTensor &input,
                     mLGGSSpokeInputGlobalIndicesFlattenedData.value(),
                     mLGGSSpokeOutputLocalOffsetsRelativeToBlockFlattenedData.value());
             });
-        return mTargetGrid.impl()->jaggedTensor(out);
+        return mTargetGrid.jagged_like(out);
 
     } else {
         TORCH_CHECK(false, "Unknown backend");
@@ -311,12 +301,12 @@ SparseConvPackInfo::sparseTransposeConv3d(const JaggedTensor &input,
         auto ret = detail::autograd::SparseConvolutionKernelMap::apply(
             input.jdata(), weights, *this, true /* transposed */)[0];
 
-        return mSourceGrid.impl()->jaggedTensor(ret);
+        return mSourceGrid.jagged_like(ret);
     } else if (backend == ConvPackBackend::IGEMM) {
         auto ret = detail::autograd::SparseConvolutionImplicitGEMM::apply(
             input.jdata(), weights, *this, true /* transposed */)[0];
 
-        return mSourceGrid.impl()->jaggedTensor(ret);
+        return mSourceGrid.jagged_like(ret);
     } else if (backend == ConvPackBackend::CUTLASS) {
         TORCH_CHECK(false, "Cutlass does not support transpose convolution yet");
     } else {

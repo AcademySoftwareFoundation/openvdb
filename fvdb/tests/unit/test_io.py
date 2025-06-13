@@ -266,10 +266,10 @@ class TestIO(unittest.TestCase):
                 fvdb.save(temp.name, grid, compressed=True, names=[f"a_{i}" for i in range(batch_size)])
 
                 with self.assertRaises(IndexError):
-                    fvdb.load(temp.name, device=device, grid_id=["a_0", "b", "a_1", "a_0"])
+                    fvdb.load(temp.name, device=device, names=["a_0", "b", "a_1", "a_0"])
 
                 with self.assertRaises(IndexError):
-                    fvdb.load(temp.name, device=device, grid_id="c")
+                    fvdb.load(temp.name, device=device, name="c")
 
     @parameterized.expand(["cpu", "cuda"])
     def test_one_voxel_grids(self, device):

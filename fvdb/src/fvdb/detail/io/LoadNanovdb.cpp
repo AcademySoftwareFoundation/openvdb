@@ -593,8 +593,7 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
                       fvdb::GridBatch::MAX_GRIDS_PER_BATCH,
                       " grids.");
     nanovdb::GridHandle<TorchDeviceBuffer> resCpu = nanovdb::mergeGrids(grids);
-    c10::intrusive_ptr<GridBatchImpl> ret =
-        c10::make_intrusive<GridBatchImpl>(std::move(resCpu), voxSizes, voxOrigins);
+    GridBatch ret(std::move(resCpu), voxSizes, voxOrigins);
 
     // Merge loaded data Tensors into a JaggedTensor
     JaggedTensor dataJagged(data);
@@ -602,46 +601,52 @@ fromNVDB(const std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> &handles,
     // Transfer the grid handle to the device the user requested
     if (maybeDevice.has_value()) {
         torch::Device toDevice = maybeDevice.value();
-        if (toDevice != ret->device()) {
-            ret        = ret->clone(toDevice);
+        if (toDevice != ret.device()) {
+            ret        = ret.to(toDevice);
             dataJagged = dataJagged.to(toDevice);
         }
     }
 
-    return std::make_tuple(GridBatch(ret), dataJagged, names);
+    return std::make_tuple(ret, dataJagged, names);
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 loadNVDB(const std::string &path,
-         const NanoVDBFileGridIdentifier &gridIdentifier,
+         const std::vector<uint64_t> &indices,
          const torch::Device &device,
          bool verbose) {
-    // Load a std::vector of grid handles each containing a one grid to load
-    // If the user specified specific indices or names of grid to load, use that as a filter
     std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> sourceHandles;
-    if (gridIdentifier.specifiesIndices()) {
-        for (uint64_t index: gridIdentifier.indicesValue()) {
-            try {
-                sourceHandles.emplace_back(
-                    nanovdb::io::readGrid<nanovdb::HostBuffer>(path, index, verbose));
-            } catch (std::runtime_error &e) {
-                TORCH_CHECK_INDEX(false, "Grid id ", index, " is out of range.");
-            }
+    for (uint64_t index: indices) {
+        try {
+            sourceHandles.emplace_back(
+                nanovdb::io::readGrid<nanovdb::HostBuffer>(path, index, verbose));
+        } catch (std::runtime_error &e) {
+            TORCH_CHECK_INDEX(false, "Grid id ", index, " is out of range.");
         }
-    } else if (gridIdentifier.specifiesNames()) {
-        for (const std::string &name: gridIdentifier.namesValue()) {
-            try {
-                sourceHandles.emplace_back(
-                    nanovdb::io::readGrid<nanovdb::HostBuffer>(path, name, verbose));
-            } catch (std::runtime_error &e) {
-                TORCH_CHECK_INDEX(
-                    false, "Grid with name '", name, "' not found in file '", path, "'.");
-            }
-        }
-    } else {
-        sourceHandles = nanovdb::io::readGrids<nanovdb::HostBuffer, std::vector>(path, verbose);
     }
+    return fromNVDB(sourceHandles, device);
+}
 
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+loadNVDB(const std::string &path,
+         const std::vector<std::string> &names,
+         const torch::Device &device,
+         bool verbose) {
+    std::vector<nanovdb::GridHandle<nanovdb::HostBuffer>> sourceHandles;
+    for (const std::string &name: names) {
+        try {
+            sourceHandles.emplace_back(
+                nanovdb::io::readGrid<nanovdb::HostBuffer>(path, name, verbose));
+        } catch (std::runtime_error &e) {
+            TORCH_CHECK_INDEX(false, "Grid with name '", name, "' not found in file '", path, "'.");
+        }
+    }
+    return fromNVDB(sourceHandles, device);
+}
+
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+loadNVDB(const std::string &path, const torch::Device &device, bool verbose) {
+    auto sourceHandles = nanovdb::io::readGrids<nanovdb::HostBuffer, std::vector>(path, verbose);
     return fromNVDB(sourceHandles, device);
 }
 

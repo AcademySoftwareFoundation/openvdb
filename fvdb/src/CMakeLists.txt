@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.25 FATAL_ERROR)
 
 project(fvdb LANGUAGES CXX CUDA)
 
-# ## Get dependencies
+# Get dependencies
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cpm.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_nvtx.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_torch.cmake)
@@ -14,17 +14,24 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cutlass.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_cudnn_frontend.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_blosc.cmake)
 
-# ## Build options
+# Build options
 option(FVDB_BUILD_TESTS "Configure CMake to build tests" ON)
 option(FVDB_BUILD_BENCHMARKS "Configure CMake to build (google & nvbench) benchmarks" OFF)
 
 message(STATUS "FVDB: Configure CMake to build tests: ${FVDB_BUILD_TESTS}")
 message(STATUS "FVDB: Configure CMake to build (google & nvbench) benchmarks: ${FVDB_BUILD_BENCHMARKS}")
 
-# ## Generate compile_commands.json
+# Generate compile_commands.json
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# ## Source files
+# Symlink the latest compile_commands.json from the build dir to the source dir for clangd
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_BINARY_DIR}/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/compile_commands.json
+)
+
+# Source files
 set(FVDB_CPP_FILES
     fvdb/Config.cpp
     fvdb/FVDB.cpp
@@ -129,10 +136,10 @@ set(FVDB_CU_FILES
     fvdb/detail/ops/jagged/JaggedReduce.cu
     fvdb/detail/GridBatchImpl.cu)
 
-# ## Build library
+# Build library
 add_library(fvdb SHARED ${FVDB_CPP_FILES} ${FVDB_CU_FILES})
 
-# ## Target properties
+# Target properties
 set_target_properties(
     fvdb
     PROPERTIES BUILD_RPATH "\$ORIGIN"
@@ -189,7 +196,7 @@ target_compile_options(fvdb PRIVATE
 target_link_libraries(fvdb PRIVATE
     ${TORCH_LIBRARIES} ${Python3_LIBRARIES} tinyply cudnn_frontend cudnn cutlass blosc::blosc)
 
-# ## Install rules
+# Install rules
 install(TARGETS fvdb
     EXPORT fvdb-targets
     LIBRARY DESTINATION lib)
@@ -205,7 +212,7 @@ if(FVDB_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# ## Add benchmarks
+# Add benchmarks
 if(FVDB_BUILD_BENCHMARKS)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/get_google_benchmark.cmake)
     add_subdirectory(benchmarks)

@@ -7,7 +7,7 @@
 #include <fvdb/Config.h>
 #include <fvdb/JaggedTensor.h>
 #include <fvdb/detail/GridBatchImpl.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <nanovdb/NanoVDB.h>
 

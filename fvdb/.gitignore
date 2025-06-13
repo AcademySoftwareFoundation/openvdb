@@ -1,6 +1,9 @@
 # Generated version file
 fvdb/version.py
 
+# Generated compile_commands.json symlink
+compile_commands.json
+
 # Build files
 /build/*
 /src/benchmarks/build/*

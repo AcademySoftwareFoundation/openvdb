@@ -78,7 +78,7 @@ dispatchDilateGrid<torch::kCPU>(const GridBatchImpl &gridBatch, const int dilati
         auto proxyGrid         = std::make_shared<ProxyGridT>(-1.0f);
         auto proxyGridAccessor = proxyGrid->getWriteAccessor();
 
-        const int64_t joffset = gridBatch.cumVoxels(bidx);
+        const int64_t joffset = gridBatch.cumVoxelsAt(bidx);
         for (auto it = ActiveVoxelIterator<-1>(tree); it.isValid(); it++) {
             const nanovdb::Coord baseIjk = it->first;
 

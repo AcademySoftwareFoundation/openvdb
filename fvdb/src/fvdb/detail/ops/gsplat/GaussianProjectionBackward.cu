@@ -5,14 +5,13 @@
 #include <fvdb/detail/ops/gsplat/GaussianMacros.cuh>
 #include <fvdb/detail/ops/gsplat/GaussianUtils.cuh>
 #include <fvdb/detail/ops/gsplat/GaussianWarpUtils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <nanovdb/math/Math.h>
 
 #include <ATen/cuda/Atomic.cuh>
 
 #include <cooperative_groups.h>
-
-constexpr int NUM_THREADS = 256;
 
 namespace fvdb {
 namespace detail {
@@ -21,7 +20,7 @@ namespace ops {
 namespace cg = cooperative_groups;
 
 template <typename T, bool TRACK_MAX_RADII>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeGradientState(const uint32_t C,
                      const uint32_t N,
                      const int32_t imageWidth,
@@ -65,7 +64,7 @@ computeGradientState(const uint32_t C,
 }
 
 template <typename T, bool Ortho>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 projectionBackwardKernel(
     // fwd inputs
     const uint32_t C,
@@ -352,7 +351,7 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
     if (C && N) {
         if (ortho) {
             projectionBackwardKernel<float, true>
-                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                <<<GET_BLOCKS(C * N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
                     C,
                     N,
                     means.data_ptr<float>(),
@@ -380,7 +379,7 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
                                                    : nullptr);
         } else {
             projectionBackwardKernel<float, false>
-                <<<(C * N + NUM_THREADS - 1) / NUM_THREADS, NUM_THREADS, 0, stream>>>(
+                <<<GET_BLOCKS(C * N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
                     C,
                     N,
                     means.data_ptr<float>(),
@@ -413,37 +412,32 @@ dispatchGaussianProjectionBackward<torch::kCUDA>(
             float *outNormalizeddLossdMeans2dNormAccumPtr =
                 outNormalizeddLossdMeans2dNormAccum.value().data_ptr<float>();
             int32_t *outGradientStepCountsPtr = outGradientStepCounts.value().data_ptr<int32_t>();
-            constexpr size_t NUM_GRAD_STATE_THREADS = 1024;
             if (outNormalizedMaxRadiiAccum.has_value()) {
                 int32_t *outNormalizedMaxRadiiAccumPtr =
                     outNormalizedMaxRadiiAccum.value().data_ptr<int32_t>();
                 computeGradientState<float, true>
-                    <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
-                       NUM_GRAD_STATE_THREADS,
-                       0,
-                       stream>>>(C,
-                                 N,
-                                 imageWidth,
-                                 imageHeight,
-                                 radii.data_ptr<int32_t>(),
-                                 dLossDMeans2d.data_ptr<float>(),
-                                 outNormalizeddLossdMeans2dNormAccumPtr,
-                                 outNormalizedMaxRadiiAccumPtr,
-                                 outGradientStepCountsPtr);
+                    <<<GET_BLOCKS(N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
+                        C,
+                        N,
+                        imageWidth,
+                        imageHeight,
+                        radii.data_ptr<int32_t>(),
+                        dLossDMeans2d.data_ptr<float>(),
+                        outNormalizeddLossdMeans2dNormAccumPtr,
+                        outNormalizedMaxRadiiAccumPtr,
+                        outGradientStepCountsPtr);
             } else {
                 computeGradientState<float, false>
-                    <<<(N + NUM_GRAD_STATE_THREADS - 1) / NUM_GRAD_STATE_THREADS,
-                       NUM_GRAD_STATE_THREADS,
-                       0,
-                       stream>>>(C,
-                                 N,
-                                 imageWidth,
-                                 imageHeight,
-                                 radii.data_ptr<int32_t>(),
-                                 dLossDMeans2d.data_ptr<float>(),
-                                 outNormalizeddLossdMeans2dNormAccumPtr,
-                                 nullptr,
-                                 outGradientStepCountsPtr);
+                    <<<GET_BLOCKS(N, DEFAULT_BLOCK_DIM), DEFAULT_BLOCK_DIM, 0, stream>>>(
+                        C,
+                        N,
+                        imageWidth,
+                        imageHeight,
+                        radii.data_ptr<int32_t>(),
+                        dLossDMeans2d.data_ptr<float>(),
+                        outNormalizeddLossdMeans2dNormAccumPtr,
+                        nullptr,
+                        outGradientStepCountsPtr);
             }
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }

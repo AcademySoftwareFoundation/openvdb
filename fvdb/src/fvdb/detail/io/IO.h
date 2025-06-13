@@ -28,11 +28,23 @@ toNVDB(const GridBatch &gridBatch,
        const std::optional<JaggedTensor> maybeData = std::nullopt,
        const std::vector<std::string> &names       = {});
 
+/// @brief Load a vector of grid handles matching the user-specified indices
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
 loadNVDB(const std::string &path,
-         const fvdb::NanoVDBFileGridIdentifier &gridIdentifier,
+         const std::vector<uint64_t> &indices,
          const torch::Device &device,
          bool verbose);
+
+/// @brief Load a vector of grid handles matching the user-specified names
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+loadNVDB(const std::string &path,
+         const std::vector<std::string> &names,
+         const torch::Device &device,
+         bool verbose);
+
+/// @brief Load a vector of grid handles
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+loadNVDB(const std::string &path, const torch::Device &device, bool verbose);
 
 void saveNVDB(const std::string &path,
               const GridBatch &gridBatch,

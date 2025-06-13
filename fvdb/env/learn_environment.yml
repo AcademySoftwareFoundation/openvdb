@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - blas=*=mkl
   - python=3.11
   - pytorch-gpu=2.4.1[build=cuda120*]
   - cuda-version=12.0

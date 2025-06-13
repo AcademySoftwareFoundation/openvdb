@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - blas=*=mkl
   - ca-certificates
   - certifi
   - clang=18
@@ -64,13 +65,12 @@ dependencies:
   - utm
   - pyproj
   - open3d
+  - viser
+  - srt
   - pip:
     - point-cloud-utils
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu120/torchsparse-2.1.0-cp311-cp311-linux_x86_64.whl
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu120/torchsparse_20-2.0.0b0-cp311-cp311-linux_x86_64.whl
     - https://nksr.s3.ap-northeast-1.amazonaws.com/dev-whls/pt24cu120/torch_scatter-2.1.2-cp311-cp311-linux_x86_64.whl
-    ## 3dgs
-    - viser
-    - srt
     ## 3dgs tests
     - oiio-static-python

@@ -4,10 +4,10 @@
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/ops/gsplat/GaussianVectorTypes.cuh>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <ATen/cuda/Atomic.cuh>
-
-constexpr int NUM_THREADS = 1024;
+#include <ATen/cuda/CUDAGeneratorImpl.h>
 
 namespace fvdb {
 namespace detail {
@@ -276,7 +276,7 @@ evalShFunctionVJP(const int64_t degree,                     // degree of SH to b
 } // namespace
 
 template <typename T>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeShBackward(
     const int64_t C,
     const int64_t N,
@@ -333,7 +333,7 @@ computeShBackward(
 }
 
 template <typename T>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeShDiffuseOnlyBackward(
     const int64_t C,
     const int64_t N,
@@ -402,7 +402,7 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
     const int64_t C           = numCameras;
     const int64_t D           = dLossDRenderQuantities.size(2);
     const int64_t TOTAL_ELEMS = C * N * D;
-    const int64_t NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
+    const int64_t NUM_BLOCKS  = GET_BLOCKS(TOTAL_ELEMS, DEFAULT_BLOCK_DIM);
 
     // If you are using degree > 0, then we are going to use the directions tensor which means
     // we need to check it has the right shape
@@ -434,7 +434,7 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
             return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
         }
 
-        computeShBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+        computeShBackward<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
             C,
             N,
             K,
@@ -458,7 +458,7 @@ dispatchSphericalHarmonicsBackward<torch::kCUDA>(
             return std::make_tuple(dLossDSh0Coeffs, dLossDShNCoeffs, dLossDViewDirs);
         }
 
-        computeShDiffuseOnlyBackward<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+        computeShDiffuseOnlyBackward<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
             C,
             N,
             D,
