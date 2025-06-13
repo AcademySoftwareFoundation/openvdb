@@ -4,14 +4,14 @@
 #include <fvdb/Config.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 namespace fvdb {
 namespace detail {
 namespace ops {
 
 // This kernel computes the offsets for an integer indexing operation
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 getJOffsetsIndexMask(const int64_t idxVal,
                      const TorchRAcc32<JLIdxType, 2> jlidx,
                      const TorchRAcc32<JOffsetsType, 1> inJoffsets,
@@ -46,7 +46,7 @@ getJOffsetsIndexMask(const int64_t idxVal,
 }
 
 // Computes a mask for the data tensor for a slice operation
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 makeDataSliceMask(const int64_t start,
                   const int64_t end,
                   const int64_t step,
@@ -196,9 +196,10 @@ jaggedTensorIndexJaggedTensorImpl(const JaggedTensor &jt, const JaggedTensor &jt
                 "calculateIndexShiftForEachElement",
                 AT_WRAP([&] {
                     const int64_t MAX_BLOCKS = 4194302; // floor((2^32 - 1) / 1024)
-                    const int64_t numBlocks  = GET_BLOCKS(jtIndices.jdata().size(0), 1024);
+                    const int64_t numBlocks =
+                        GET_BLOCKS(jtIndices.jdata().size(0), DEFAULT_BLOCK_DIM);
                     TORCH_INTERNAL_ASSERT(numBlocks < MAX_BLOCKS, "Too many blocks");
-                    calculateIndexShiftForEachElement<scalar_t><<<numBlocks, 1024>>>(
+                    calculateIndexShiftForEachElement<scalar_t><<<numBlocks, DEFAULT_BLOCK_DIM>>>(
                         jt.joffsets()
                             .packed_accessor64<JOffsetsType, 1, torch::RestrictPtrTraits>(),
                         jtIndices.jidx().packed_accessor64<JIdxType, 1, torch::RestrictPtrTraits>(),
@@ -288,29 +289,29 @@ jaggedTensorIndexSliceCuda(const JaggedTensor &jt, int64_t start, int64_t end, i
 
     auto callKernel = [=]() {
         const int64_t MAX_BLOCKS    = 4194302; // floor((2^32 - 1) / 1024)
-        const int64_t numBlocksData = GET_BLOCKS(jt.jdata().size(0), 1024);
+        const int64_t numBlocksData = GET_BLOCKS(jt.jdata().size(0), DEFAULT_BLOCK_DIM);
         TORCH_INTERNAL_ASSERT(numBlocksData < MAX_BLOCKS, "Too many blocks");
-        makeDataSliceMask<<<numBlocksData, 1024>>>(start,
-                                                   end,
-                                                   step,
-                                                   jidxAcc,
-                                                   jlidxAcc,
-                                                   dataMaskAcc,
-                                                   jt.ldim() == 1,
-                                                   jt.num_tensors() == 1);
+        makeDataSliceMask<<<numBlocksData, DEFAULT_BLOCK_DIM>>>(start,
+                                                                end,
+                                                                step,
+                                                                jidxAcc,
+                                                                jlidxAcc,
+                                                                dataMaskAcc,
+                                                                jt.ldim() == 1,
+                                                                jt.num_tensors() == 1);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
 
-        const int numBlocksOffsets = GET_BLOCKS(jt.joffsets().size(0) - 1, 1024);
+        const int numBlocksOffsets = GET_BLOCKS(jt.joffsets().size(0) - 1, DEFAULT_BLOCK_DIM);
         TORCH_INTERNAL_ASSERT(numBlocksOffsets < MAX_BLOCKS, "Too many blocks");
-        makeOffsetsSliceMask<<<numBlocksOffsets, 1024>>>(start,
-                                                         end,
-                                                         step,
-                                                         joffsetsAcc,
-                                                         jlidxAcc,
-                                                         offsetsMaskAcc,
-                                                         outJOffsetsAcc,
-                                                         outJLIdxAcc,
-                                                         jt.ldim() == 1);
+        makeOffsetsSliceMask<<<numBlocksOffsets, DEFAULT_BLOCK_DIM>>>(start,
+                                                                      end,
+                                                                      step,
+                                                                      joffsetsAcc,
+                                                                      jlidxAcc,
+                                                                      offsetsMaskAcc,
+                                                                      outJOffsetsAcc,
+                                                                      outJLIdxAcc,
+                                                                      jt.ldim() == 1);
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     };
     callKernel();
@@ -564,9 +565,9 @@ jaggedTensorIndexIntCuda(const JaggedTensor &jt, int64_t idxVal) {
         offsetsAndRange.packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>();
 
     const int64_t MAX_BLOCKS = 4194302; // floor((2^32 - 1) / 1024)
-    const int64_t numBlocks  = GET_BLOCKS(joffsets.size(0), 1024);
+    const int64_t numBlocks  = GET_BLOCKS(joffsets.size(0), DEFAULT_BLOCK_DIM);
     TORCH_INTERNAL_ASSERT(numBlocks < MAX_BLOCKS, "Too many blocks");
-    getJOffsetsIndexMask<<<numBlocks, 1024>>>(
+    getJOffsetsIndexMask<<<numBlocks, DEFAULT_BLOCK_DIM>>>(
         idxVal, inJLidxAcc, inJOffsetsAcc, offsetsAndRangeAcc);
     C10_CUDA_KERNEL_LAUNCH_CHECK();
 

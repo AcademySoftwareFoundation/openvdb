@@ -3,10 +3,9 @@
 //
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/ops/gsplat/GaussianVectorTypes.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <ATen/cuda/Atomic.cuh>
-
-constexpr int NUM_THREADS = 256;
 
 namespace fvdb {
 namespace detail {
@@ -133,7 +132,7 @@ evalShFunction(const int64_t degree,                      // degree of SH to be 
 // Evalute Spherical Harmonic functions at the given directions, assuming a uniform minibatch
 // of C cameras, each with N gaussians, and K SH coefficients per gaussian.
 template <typename T>
-__global__ __launch_bounds__(NUM_THREADS) void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeSh(
     const int64_t C,
     const int64_t N,
@@ -168,7 +167,7 @@ computeSh(
 }
 
 template <typename T>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeShDiffuseOnly(const int64_t C,
                      const int64_t N,
                      const int64_t D,
@@ -240,7 +239,7 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t shDegreeToUse,
     const int64_t C        = numCameras;
     const int64_t D        = sh0Coeffs.size(2);
     const auto TOTAL_ELEMS = C * N * D;
-    const auto NUM_BLOCKS  = (TOTAL_ELEMS + NUM_THREADS - 1) / NUM_THREADS;
+    const auto NUM_BLOCKS  = GET_BLOCKS(TOTAL_ELEMS, DEFAULT_BLOCK_DIM);
 
     // If you are using degree > 0, then we are going to use the directions tensor which means
     // we need to check it has the right shape
@@ -263,7 +262,7 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t shDegreeToUse,
     const int *radiiPtr            = hasRadii ? radii.data_ptr<int>() : nullptr;
     torch::Tensor renderQuantities = torch::empty({int64_t(C), N, D}, sh0Coeffs.options());
     if (hasShNCoeffs && shDegreeToUse > 0) {
-        computeSh<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+        computeSh<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
             C,
             N,
             D,
@@ -275,7 +274,7 @@ dispatchSphericalHarmonicsForward<torch::kCUDA>(const int64_t shDegreeToUse,
             renderQuantities.data_ptr<scalar_t>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     } else {
-        computeShDiffuseOnly<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+        computeShDiffuseOnly<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
             C,
             N,
             D,

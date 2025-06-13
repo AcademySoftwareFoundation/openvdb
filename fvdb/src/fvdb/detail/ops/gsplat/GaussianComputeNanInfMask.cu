@@ -3,13 +3,14 @@
 
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 namespace fvdb {
 namespace detail {
 namespace ops {
 
 template <typename T>
-__global__ void __launch_bounds__(256)
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeNanInfMaskKernel(fvdb::TorchRAcc64<T, 2> means,          // [N, 3]
                         fvdb::TorchRAcc64<T, 2> quats,          // [N, 4]
                         fvdb::TorchRAcc64<T, 2> logScales,      // [N, 3]
@@ -100,14 +101,13 @@ dispatchGaussianNanInfMask<torch::kCUDA>(const fvdb::JaggedTensor &means,
     auto outValid =
         torch::empty({N}, torch::TensorOptions().dtype(torch::kBool).device(means.device()));
 
-    const size_t NUM_THREADS = 256;
-    const size_t NUM_BLOCKS  = (N + NUM_THREADS - 1) / NUM_THREADS;
+    const size_t NUM_BLOCKS = GET_BLOCKS(N, DEFAULT_BLOCK_DIM);
 
     AT_DISPATCH_V2(
         means.scalar_type(),
         "computeNanInfMaskKernel",
         AT_WRAP([&] {
-            computeNanInfMaskKernel<scalar_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+            computeNanInfMaskKernel<scalar_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
                 means.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                 quats.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                 logScales.jdata().packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),

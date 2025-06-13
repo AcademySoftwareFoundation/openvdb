@@ -4,8 +4,8 @@
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/cuda/ForEachCUDA.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 #include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
 
 #include <c10/cuda/CUDACachingAllocator.h>
 
@@ -76,7 +76,7 @@ template <typename ScalarF,
           typename ScalarI,
           template <typename T, int32_t D>
           typename TensorAccessor>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 generateSurfaceSamples(const VoxelCoordTransform *transforms,
                        const JaggedRAcc32<ScalarF, 2> vertices,
                        const JaggedRAcc32<ScalarI, 2> triangles,
@@ -242,8 +242,7 @@ dispatchIJKForMesh<torch::kCUDA>(const JaggedTensor &meshVertices,
                     const int64_t totalSurfaceSamples = samplesPerTriCumSum[-1].item<int64_t>();
 
                     // Now write out the surface samples
-                    const int64_t threadsPerBlock = 1024;
-                    const int64_t numBlocks = GET_BLOCKS(totalSurfaceSamples, threadsPerBlock);
+                    const int64_t numBlocks = GET_BLOCKS(totalSurfaceSamples, DEFAULT_BLOCK_DIM);
                     torch::Tensor outIJK    = torch::empty({totalSurfaceSamples, 3}, optsI32);
                     torch::Tensor outJidx   = torch::empty({totalSurfaceSamples}, optsJIdx);
 
@@ -254,12 +253,12 @@ dispatchIJKForMesh<torch::kCUDA>(const JaggedTensor &meshVertices,
                             outJidx
                                 .packed_accessor64<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
                         generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc64>
-                            <<<numBlocks, threadsPerBlock>>>(transformDevPtr,
-                                                             verticesAcc,
-                                                             facesAcc,
-                                                             samplesPerTriCumSumAcc,
-                                                             outIJKAcc,
-                                                             outJidxKAcc);
+                            <<<numBlocks, DEFAULT_BLOCK_DIM>>>(transformDevPtr,
+                                                               verticesAcc,
+                                                               facesAcc,
+                                                               samplesPerTriCumSumAcc,
+                                                               outIJKAcc,
+                                                               outJidxKAcc);
                     } else {
                         auto outIJKAcc =
                             outIJK.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>();
@@ -267,12 +266,12 @@ dispatchIJKForMesh<torch::kCUDA>(const JaggedTensor &meshVertices,
                             outJidx
                                 .packed_accessor32<fvdb::JIdxType, 1, torch::RestrictPtrTraits>();
                         generateSurfaceSamples<scalar_f, scalar_i, TorchRAcc32>
-                            <<<numBlocks, threadsPerBlock>>>(transformDevPtr,
-                                                             verticesAcc,
-                                                             facesAcc,
-                                                             samplesPerTriCumSumAcc,
-                                                             outIJKAcc,
-                                                             outJidxKAcc);
+                            <<<numBlocks, DEFAULT_BLOCK_DIM>>>(transformDevPtr,
+                                                               verticesAcc,
+                                                               facesAcc,
+                                                               samplesPerTriCumSumAcc,
+                                                               outIJKAcc,
+                                                               outJidxKAcc);
                     }
                     C10_CUDA_KERNEL_LAUNCH_CHECK();
 

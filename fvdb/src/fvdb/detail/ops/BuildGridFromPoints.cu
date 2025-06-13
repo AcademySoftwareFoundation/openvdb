@@ -6,8 +6,8 @@
 #include <fvdb/detail/utils/Utils.h>
 #include <fvdb/detail/utils/cuda/ForEachCUDA.cuh>
 #include <fvdb/detail/utils/cuda/ForEachPrivateUse1.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 #include <fvdb/detail/utils/cuda/RAIIRawDeviceBuffer.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/tools/CreateNanoGrid.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>

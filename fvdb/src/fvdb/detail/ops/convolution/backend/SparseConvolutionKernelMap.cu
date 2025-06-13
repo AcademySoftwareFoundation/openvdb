@@ -3,20 +3,20 @@
 //
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/ops/convolution/backend/ConvOps.h>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <torch/extension.h>
 
 #include <algorithm>
-#include <chrono>
 
 namespace fvdb {
 namespace detail {
 namespace ops {
 
 template <typename scalar_t>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 gatherKernel(const int n_k,
              const int n_in,
              const int c,
@@ -36,7 +36,7 @@ gatherKernel(const int n_k,
 }
 
 template <typename scalar_t>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 scatterKernel(const int n_in,
               const int n_out,
               const int c,
@@ -219,14 +219,14 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat,
                        "convolution_forward_cuda",
                        AT_WRAP([&] {
                            gatherKernel<scalar_t>
-                               <<<ceil((double)(n_active_feats * n_in_channels) / 256), 256>>>(
-                                   n_active_feats,
-                                   n_in_feats,
-                                   n_in_channels,
-                                   in_feat.data_ptr<scalar_t>(),
-                                   in_buffer_activated.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset,
-                                   transpose);
+                               <<<GET_BLOCKS(n_active_feats * n_in_channels, DEFAULT_BLOCK_DIM),
+                                  DEFAULT_BLOCK_DIM>>>(n_active_feats,
+                                                       n_in_feats,
+                                                       n_in_channels,
+                                                       in_feat.data_ptr<scalar_t>(),
+                                                       in_buffer_activated.data_ptr<scalar_t>(),
+                                                       neighbor_map.data_ptr<int>() + cur_offset,
+                                                       transpose);
                        }),
                        AT_EXPAND(AT_FLOATING_TYPES),
                        c10::kHalf,
@@ -241,14 +241,14 @@ dispatchSparseConvolutionKernelMap<torch::kCUDA>(at::Tensor in_feat,
                        "convolution_forward_cuda",
                        AT_WRAP([&] {
                            scatterKernel<scalar_t>
-                               <<<ceil((double)(n_active_feats * n_out_channels) / 256), 256>>>(
-                                   n_active_feats,
-                                   n_out_feats,
-                                   n_out_channels,
-                                   out_buffer_activated.data_ptr<scalar_t>(),
-                                   out_feat.data_ptr<scalar_t>(),
-                                   neighbor_map.data_ptr<int>() + cur_offset,
-                                   transpose);
+                               <<<GET_BLOCKS(n_active_feats * n_out_channels, DEFAULT_BLOCK_DIM),
+                                  DEFAULT_BLOCK_DIM>>>(n_active_feats,
+                                                       n_out_feats,
+                                                       n_out_channels,
+                                                       out_buffer_activated.data_ptr<scalar_t>(),
+                                                       out_feat.data_ptr<scalar_t>(),
+                                                       neighbor_map.data_ptr<int>() + cur_offset,
+                                                       transpose);
                        }),
                        AT_EXPAND(AT_FLOATING_TYPES),
                        c10::kHalf,

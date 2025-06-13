@@ -4,7 +4,7 @@
 #include <fvdb/detail/GridBatchImpl.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 #include <fvdb/detail/utils/nanovdb/CreateEmptyGridHandle.h>
 
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
@@ -17,7 +17,7 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 ijkForDense(nanovdb::Coord ijkMin, nanovdb::Coord size, TorchRAcc32<int32_t, 2> outIJKAccessor) {
     const int32_t w = size[0], h = size[1], d = size[2];
     const uint64_t tid = (static_cast<uint64_t>(blockIdx.x) * blockDim.x) +
@@ -76,14 +76,13 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(int64_t batchSize,
 
     const int64_t gridVolume = static_cast<int64_t>(size[0]) * size[1] * size[2];
 
-    constexpr int NUM_THREADS = 1024;
-    const int64_t NUM_BLOCKS  = GET_BLOCKS(gridVolume, NUM_THREADS);
+    const int64_t NUM_BLOCKS = GET_BLOCKS(gridVolume, DEFAULT_BLOCK_DIM);
 
     const torch::TensorOptions opts = torch::TensorOptions().dtype(torch::kInt32).device(device);
     torch::Tensor ijkData           = torch::empty({gridVolume, 3}, opts);
 
     if (NUM_BLOCKS > 0) {
-        ijkForDense<<<NUM_BLOCKS, NUM_THREADS>>>(
+        ijkForDense<<<NUM_BLOCKS, DEFAULT_BLOCK_DIM>>>(
             ijkMin, size, ijkData.packed_accessor32<int32_t, 2, torch::RestrictPtrTraits>());
         C10_CUDA_KERNEL_LAUNCH_CHECK();
     }

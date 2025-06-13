@@ -4,7 +4,7 @@
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
 #include <fvdb/detail/utils/Utils.h>
-#include <fvdb/detail/utils/cuda/Utils.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -13,7 +13,7 @@ namespace fvdb {
 namespace detail {
 namespace ops {
 
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeTensorSizes(const JOffsetsType *__restrict__ const *__restrict__ offsets,
                    const size_t numOffsets,
                    TorchRAcc32<JOffsetsType, 1> outTensorSizes) {
@@ -37,7 +37,7 @@ computeTensorSizes(const JOffsetsType *__restrict__ const *__restrict__ offsets,
 }
 
 template <typename IdxT>
-__global__ void
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeIndexPutArg(
     const size_t jti,
     const JOffsetsType *__restrict__ const *__restrict__ offsets,
@@ -116,10 +116,8 @@ dispatchJCat0<torch::kCUDA>(const std::vector<JaggedTensor> &vec) {
     torch::Tensor outJOffsets =
         torch::empty({vec[0].joffsets().size(0)},
                      torch::TensorOptions().dtype(JOffsetsScalarType).device(torch::kCUDA));
-    const int64_t numThreadsCalcTensorSizes = 1024;
-    const int64_t numBlocksCalcTensorSizes =
-        GET_BLOCKS(outJOffsets.size(0), numThreadsCalcTensorSizes);
-    computeTensorSizes<<<numBlocksCalcTensorSizes, numThreadsCalcTensorSizes>>>(
+    const int64_t numBlocksCalcTensorSizes = GET_BLOCKS(outJOffsets.size(0), DEFAULT_BLOCK_DIM);
+    computeTensorSizes<<<numBlocksCalcTensorSizes, DEFAULT_BLOCK_DIM>>>(
         thrust::raw_pointer_cast(offsets_d.data()),
         offsets_d.size(),
         outJOffsets.packed_accessor32<JOffsetsType, 1, torch::RestrictPtrTraits>());
@@ -150,11 +148,10 @@ dispatchJCat0<torch::kCUDA>(const std::vector<JaggedTensor> &vec) {
             selectIndices.scalar_type(),
             "computeIndexPutArg",
             AT_WRAP([&] {
-                const int64_t numElements                  = jt.jdata().size(0);
-                const int64_t numThreadsComputeIndexPutArg = 1024;
+                const int64_t numElements = jt.jdata().size(0);
                 const int64_t numBlocksComputeIndexPutArg =
-                    GET_BLOCKS(numElements, numThreadsComputeIndexPutArg);
-                computeIndexPutArg<<<numBlocksComputeIndexPutArg, numThreadsComputeIndexPutArg>>>(
+                    GET_BLOCKS(numElements, DEFAULT_BLOCK_DIM);
+                computeIndexPutArg<<<numBlocksComputeIndexPutArg, DEFAULT_BLOCK_DIM>>>(
                     jti,
                     thrust::raw_pointer_cast(offsets_d.data()),
                     offsets_d.size(),

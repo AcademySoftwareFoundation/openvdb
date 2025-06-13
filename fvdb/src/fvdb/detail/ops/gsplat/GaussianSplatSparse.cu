@@ -3,6 +3,7 @@
 //
 #include <fvdb/detail/ops/Ops.h>
 #include <fvdb/detail/utils/AccessorHelpers.cuh>
+#include <fvdb/detail/utils/cuda/GridDim.h>
 
 #include <ATen/Dispatch_v2.h>
 
@@ -99,7 +100,7 @@ namespace fvdb::detail::ops {
 
 // Compute tile mask and tile ids for each pixel coordinate
 template <typename CoordType>
-__global__ void __launch_bounds__(256)
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
                 const int32_t tileSideLength,
                 const int32_t numTilesW,
@@ -139,7 +140,7 @@ computeTileMask(const fvdb::JaggedRAcc32<CoordType, 2> pixelCoords,
 // threads in a block are not actually sharing anything in shared memory. I guess
 // shared is just scratchpad here?
 template <typename CoordType>
-__global__ void __launch_bounds__(256)
+__global__ __launch_bounds__(DEFAULT_BLOCK_DIM) void
 computePerTileBitMask(
     const int64_t numUniqueTiles,
     const int32_t numWordsPerTile,
@@ -251,9 +252,8 @@ computeSparseInfo(const int32_t tileSideLength,
 
     // TODO we do not output tileMask currently, but we should
     AT_DISPATCH_INDEX_TYPES(pixelsToRender.scalar_type(), "computeTileMask", [&]() {
-        const int32_t NUM_THREADS = 256;
-        const int32_t NUM_BLOCKS  = (numPixels + NUM_THREADS - 1) / NUM_THREADS;
-        computeTileMask<index_t><<<NUM_BLOCKS, NUM_THREADS, 0, stream>>>(
+        const int32_t NUM_BLOCKS = GET_BLOCKS(numPixels, DEFAULT_BLOCK_DIM);
+        computeTileMask<index_t><<<NUM_BLOCKS, DEFAULT_BLOCK_DIM, 0, stream>>>(
             pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
             tileSideLength,
             numTilesW,
@@ -315,22 +315,22 @@ computeSparseInfo(const int32_t tileSideLength,
 
     // TODO: Check available shared memory and adjust block size accordingly
     AT_DISPATCH_INDEX_TYPES(pixelsToRender.scalar_type(), "computePerTileBitMask", [&]() {
-        const uint32_t NUM_THREADS2 = 256;
-        const uint32_t NUM_BLOCKS2  = (numUniqueTiles + NUM_THREADS2 - 1) / NUM_THREADS2;
-        computePerTileBitMask<index_t><<<NUM_BLOCKS2,
-                                         NUM_THREADS2,
-                                         NUM_THREADS2 * numWordsPerTileBitmask * sizeof(uint64_t),
-                                         stream>>>(
-            numUniqueTiles,
-            numWordsPerTileBitmask,
-            numTilesW,
-            numTilesH,
-            tileSideLength,
-            uniqueTileIds.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>(),
-            numPixelsPerTile.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
-            unsortPerPixelTileIds.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
-            pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
-            tileBitMask.packed_accessor32<uint64_t, 2, torch::RestrictPtrTraits>());
+        const uint32_t NUM_BLOCKS = GET_BLOCKS(numUniqueTiles, DEFAULT_BLOCK_DIM);
+        computePerTileBitMask<index_t>
+            <<<NUM_BLOCKS,
+               DEFAULT_BLOCK_DIM,
+               DEFAULT_BLOCK_DIM * numWordsPerTileBitmask * sizeof(uint64_t),
+               stream>>>(
+                numUniqueTiles,
+                numWordsPerTileBitmask,
+                numTilesW,
+                numTilesH,
+                tileSideLength,
+                uniqueTileIds.packed_accessor32<int32_t, 1, torch::RestrictPtrTraits>(),
+                numPixelsPerTile.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
+                unsortPerPixelTileIds.packed_accessor32<int64_t, 1, torch::RestrictPtrTraits>(),
+                pixelsToRender.packed_accessor32<index_t, 2, torch::RestrictPtrTraits>(),
+                tileBitMask.packed_accessor32<uint64_t, 2, torch::RestrictPtrTraits>());
         C10_CUDA_KERNEL_LAUNCH_CHECK(); // TODO use our own error management
     });
 
