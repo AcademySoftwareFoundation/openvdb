@@ -463,8 +463,7 @@ launchRasterizeForwardKernel(
     //   - vec2t    xy;          -- 8 bytes for float32
     //   - scalar_t opacity;     -- 4 bytes for float32
     //   - vec3t    conic;       -- 12 bytes for float32
-    const uint32_t sharedMem =
-        tileSize * tileSize * (sizeof(int32_t) + sizeof(vec2t) + sizeof(float) + sizeof(vec3t));
+    const uint32_t sharedMem = tileSize * tileSize * sizeof(Gaussian2D<ScalarType>);
 
     // TODO: an optimization can be done by passing the actual number of
     // channels into the kernel functions and avoid necessary global memory
