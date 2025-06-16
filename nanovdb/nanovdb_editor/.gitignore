@@ -1,0 +1,12 @@
+.env*
+*.ini
+**/data/*
+pymodule/nanovdb_editor/lib
+pymodule/nanovdb_editor/shaders
+
+# Python build artifacts
+__pycache__
+_skbuild/
+*.egg-info/
+dist/
+build/
