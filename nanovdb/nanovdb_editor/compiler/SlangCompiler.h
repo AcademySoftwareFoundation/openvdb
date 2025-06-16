@@ -12,6 +12,7 @@
 #pragma once
 
 #include "CompiledShader.h"
+#include "TrackedFileSystem.h"
 #include "nanovdb_editor/putil/Compiler.h"
 
 #define SLANG_PRELUDE_NAMESPACE CPPPrelude
@@ -93,6 +94,7 @@ namespace pnanovdb_compiler
         bool hasSlangLlvm_ = false;
         std::map<uint64_t, Slang::ComPtr<ISlangSharedLibrary>> sharedLibraries_;
         DiagnosticCallback diagnosticCallback_ = nullptr;
+        TrackedFileSystem fileSystem_;
     };
 
     PNANOVDB_CAST_PAIR(pnanovdb_compiler_instance_t, SlangCompiler)

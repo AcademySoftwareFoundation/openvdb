@@ -102,6 +102,24 @@ namespace pnanovdb_shader
             return false;
         }
 
+        for (const auto& includedFile : shader.includedFiles)
+        {
+            std::string includeFilePath = getShaderFilePath(std::get<0>(includedFile).c_str());
+            std::ifstream includeFile(includeFilePath, std::ios::in);
+            if (!includeFile)
+            {
+                printf("Error: Shader source file '%s' is missing included file '%s'\n", filePath.c_str(), includeFilePath.c_str());
+                return false;
+            }
+            std::string includeCode((std::istreambuf_iterator<char>(includeFile)), std::istreambuf_iterator<char>());
+            includeFile.close();
+            if (getHash(includeCode.c_str()) != std::get<1>(includedFile))
+            {
+                // included file has changed
+                return false;
+            }
+        }
+
         if ((*settings)->compile_target == PNANOVDB_COMPILE_TARGET_UNKNOWN)
         {
             // this was triggered with empty settings, check source changes and load settings from existing cache

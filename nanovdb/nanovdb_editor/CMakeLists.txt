@@ -508,6 +508,10 @@ target_compile_definitions(pnanovdbeditor PRIVATE
   TEST_NODE2
 )
 
+target_compile_definitions(pnanovdbeditor PRIVATE
+  COMPILED_SHADERS_DIR=${COMPILED_SHADERS_DIR}
+)
+
 if (NANOVDB_EDITOR_USE_GUI)
   target_compile_definitions(pnanovdbeditor PRIVATE
     USE_IMGUI_INSTANCE

@@ -254,6 +254,7 @@ namespace pnanovdb_shader
         bool isHlsl = false;
         std::vector<std::string> intermediateFiles;
         std::vector<std::string> intermediateFileNames;
+        std::vector<std::tuple<std::string, size_t>> includedFiles;
 
         friend void to_json(nlohmann::ordered_json& json, const ShaderDesc& shaderDesc)
         {
@@ -303,6 +304,7 @@ namespace pnanovdb_shader
             json["timestamp"] = shaderDesc.timestamp;
             json["hash"] = shaderDesc.hash;
             json["filePath"] = shaderDesc.filePath;
+            json["includedFiles"] = shaderDesc.includedFiles;
             json["isMatrixLayoutRowMajor"] = shaderDesc.isRowMajor;
             json["intermediateFileNames"] = shaderDesc.intermediateFileNames;
         }
@@ -330,6 +332,10 @@ namespace pnanovdb_shader
                 printf("Error: Shader binary file '%s' could not be opened\n", shaderFilePath.c_str());
             }
             shaderDesc.intermediateFileNames = json.value("intermediateFileNames", shaderDesc.intermediateFileNames);
+            if (json.contains("includedFiles"))
+            {
+                shaderDesc.includedFiles = json["includedFiles"].get<std::vector<std::tuple<std::string, size_t>>>();
+            }
         }
     };
 
@@ -380,6 +386,11 @@ namespace pnanovdb_shader
         {
             computeShader.timestamp = getTimestamp();
             computeShader.hash = getHash(code);
+        }
+
+        void addInclude(const std::string& filepath, const char* code)
+        {
+            computeShader.includedFiles.emplace_back(filepath, getHash(code));
         }
 
         friend void to_json(nlohmann::ordered_json& json, const ShaderData& shader)

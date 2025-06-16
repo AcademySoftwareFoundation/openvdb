@@ -453,6 +453,22 @@ static void showWindows(Instance* ptr, float delta_time)
             {
                 ptr->compiler_settings.compile_target = (pnanovdb_compile_target_type_t)(compile_target);
             }
+            if (ImGui::Button("Clear Shader Cache"))
+            {
+                const char* compiledShadersDir = PNANOVDB_REFLECT_XSTR(COMPILED_SHADERS_DIR);
+                if (compiledShadersDir)
+                {
+                    std::filesystem::path shaderDir(compiledShadersDir);
+                    if (std::filesystem::exists(shaderDir) && std::filesystem::is_directory(shaderDir))
+                    {
+                        for (const auto& entry : std::filesystem::directory_iterator(shaderDir))
+                        {
+                            std::filesystem::remove_all(entry.path());
+                        }
+                        pnanovdb_editor::Console::getInstance().addLog("Shader cache cleared");
+                    }
+                }
+            }
 
             ImGui::End();
         }

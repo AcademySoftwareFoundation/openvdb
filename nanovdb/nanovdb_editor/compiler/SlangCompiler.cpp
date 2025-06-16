@@ -311,6 +311,8 @@ bool SlangCompiler::compile(const pnanovdb_compiler_settings_t* settings, const 
         return false;
     }
 
+    request->setFileSystem(&fileSystem_);
+
     int targetIndex = 0;
 
     if (settings->compile_target == PNANOVDB_COMPILE_TARGET_CPU)
@@ -371,6 +373,20 @@ bool SlangCompiler::compile(const pnanovdb_compiler_settings_t* settings, const 
         request->Release();
         slangSession->Release();
         return false;
+    }
+
+    const auto trackedFiles = fileSystem_.getTrackedFiles();
+    fileSystem_.clearTrackedFiles();
+
+    for (const auto& file : trackedFiles)
+    {
+        if (file.length() > 6 && file.substr(file.length() - 6) == ".slang")
+        {
+            std::ifstream includeFile(file);
+            std::string includeCode((std::istreambuf_iterator<char>(includeFile)), std::istreambuf_iterator<char>());
+            includeFile.close();
+            shader_->addInclude(pnanovdb_shader::resolveSymlink(file).string(), includeCode.c_str());
+        }
     }
 
     // Use layout to get user parameters
