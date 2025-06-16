@@ -617,7 +617,7 @@ PNANOVDB_FORCE_INLINE void pnanovdb_node2_generate_sphere(
     pnanovdb_gridblindmetadata_set_value_size(buf, metadata, 4u);
     pnanovdb_gridblindmetadata_set_semantic(buf, metadata, 0u);
     pnanovdb_gridblindmetadata_set_data_class(buf, metadata, 0u);
-    pnanovdb_gridblindmetadata_set_data_type(buf, metadata, PNANOVDB_GRID_TYPE_FLOAT);
+    pnanovdb_gridblindmetadata_set_data_type(buf, metadata, PNANOVDB_GRID_TYPE_RGBA8);
     pnanovdb_gridblindmetadata_set_name(buf, metadata, 0u, 0u);
 
     // write root bbox

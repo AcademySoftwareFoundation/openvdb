@@ -83,7 +83,7 @@ void main(uint3 group_idx : SV_GroupID, uint3 thread_idx : SV_GroupThreadID)
             pnanovdb_gridblindmetadata_set_value_size(buf, metadata_values, 4u);
             pnanovdb_gridblindmetadata_set_semantic(buf, metadata_values, 0u);
             pnanovdb_gridblindmetadata_set_data_class(buf, metadata_values, 0u);
-            pnanovdb_gridblindmetadata_set_data_type(buf, metadata_values, PNANOVDB_GRID_TYPE_FLOAT);
+            pnanovdb_gridblindmetadata_set_data_type(buf, metadata_values, PNANOVDB_GRID_TYPE_RGBA8);
             pnanovdb_gridblindmetadata_set_name(buf, metadata_values, 0u, 0u);
 
             // link headers to grid

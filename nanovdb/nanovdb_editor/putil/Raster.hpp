@@ -15,7 +15,7 @@
 #include "nanovdb_editor/putil/WorkerThread.hpp"
 #include "nanovdb_editor/putil/FileFormat.h"
 
-#define PNANOVDB_RASTER_TEST_CONVERT 0
+#define PNANOVDB_RASTER_TEST_CONVERT 1
 #if PNANOVDB_RASTER_TEST_CONVERT
 #include "nanovdb/putil/Convert.h"
 #endif

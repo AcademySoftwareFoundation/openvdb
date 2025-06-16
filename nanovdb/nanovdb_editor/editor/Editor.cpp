@@ -41,25 +41,16 @@ namespace pnanovdb_editor
 {
 enum class ViewportShader : int
 {
-    Editor,
-    EditorNode2,
-    EditorNode2Rgba
+    Editor
 };
 
 static const char* s_viewport_shaders[] = {
-    "editor/editor.slang",
-    "editor/editor2.slang",
-    "editor/editor2_rgba.slang"
+    "editor/editor.slang"
 };
 
 // default shader used for the NanoVDB viewer
-#ifdef TEST_NODE2
-    static const char* s_default_shader = s_viewport_shaders[(int)ViewportShader::EditorNode2];
-#else
-    static const char* s_default_shader = s_viewport_shaders[(int)ViewportShader::Editor];
-#endif
-
-static const char* s_raster_shader = s_viewport_shaders[(int)ViewportShader::EditorNode2Rgba];
+static const char* s_default_shader = s_viewport_shaders[(int)ViewportShader::Editor];
+static const char* s_raster_shader = s_viewport_shaders[(int)ViewportShader::Editor];
 
 // mirrored from shader
 struct EditorParams
