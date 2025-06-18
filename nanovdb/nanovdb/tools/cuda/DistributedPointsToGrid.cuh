@@ -488,9 +488,9 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
     std::vector<std::thread> threads;
     const size_t log2DeviceCount = log2(mDeviceMesh.deviceCount());
-    for (auto deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
+    for (size_t deviceExponent = 0; deviceExponent < log2DeviceCount; ++deviceExponent) {
         const size_t deviceGroupCount = mDeviceMesh.deviceCount() >> deviceExponent;
-        for (int deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
+        for (size_t deviceGroupId = 0; deviceGroupId < deviceGroupCount; deviceGroupId += 2) {
             threads.emplace_back([&, deviceGroupId]() {
                 const int leftDeviceGroupId = deviceGroupId;
                 const int rightDeviceGroupId = deviceGroupId + 1;
@@ -619,7 +619,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             mRightIntervals[deviceId] = 0;
         }
 
-        if (deviceId < mDeviceMesh.deviceCount() - 1) {
+        if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1)) {
             cudaStreamWaitEvent(stream, sortEvents[deviceId + 1]);
             EqualityIndicator<uint64_t> indicator(deviceInputKeys + deviceStripeCount);
             CUB_LAUNCH(DeviceReduce::TransformReduce, mTempDevicePools[deviceId], stream, deviceInputKeys, mLeftIntervals + deviceId, deviceStripeCount, ::cuda::std::plus(), indicator, 0);
@@ -640,7 +640,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             kernels::rightRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId - 1, mRightIntervals + deviceId, mStripeCounts + deviceId, mStripeOffsets + deviceId);
         }
 
-        if (deviceId < mDeviceMesh.deviceCount() - 1)
+        if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
         {
             cudaStreamWaitEvent(stream, transformReduceEvents[deviceId + 1]);
             kernels::leftRebalanceKernel<<<1, 1, 0, stream>>>(mLeftIntervals + deviceId, mRightIntervals + deviceId + 1, mStripeCounts + deviceId, mStripeOffsets + deviceId);
@@ -679,7 +679,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
     }
 
     // For each tile in parallel, we construct another set of keys for the lower nodes, leaf nodes, and voxels within that tile followed by a radix sort of these keys.
-    for (int deviceId = 0, id = 0; deviceId < mDeviceMesh.deviceCount(); ++deviceId) {
+    for (int deviceId = 0, id = 0; deviceId < static_cast<int>(mDeviceMesh.deviceCount()); ++deviceId) {
         auto stream = mDeviceMesh[deviceId].stream;
         cudaCheck(cudaSetDevice(deviceId));
 
@@ -741,7 +741,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
 
             cudaCheck(cudaEventSynchronize(voxelCountEvents[deviceId]));
             uint32_t deviceNumItems = mVoxelCounts[deviceId];
-            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
                 ++deviceNumItems;
 
             if (deviceId == 0) {
@@ -769,7 +769,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
             // Required for the host to pass the correct value of counts[deviceId]
             cudaCheck(cudaEventSynchronize(leafCountEvents[deviceId]));
             uint32_t deviceNumItems = leafCountIterator[deviceId];
-            if (deviceId < (mDeviceMesh.deviceCount() - 1))
+            if (deviceId < static_cast<int>(mDeviceMesh.deviceCount() - 1))
                 ++deviceNumItems;
 
             if (deviceId == 0) {

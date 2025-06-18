@@ -2,25 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "TypeCasters.h"
-#include <FVDB.h>
+
+#include <fvdb/FVDB.h>
 
 #include <torch/extension.h>
 
 #include <pybind11/numpy.h>
+#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
+
+#include <optional>
 
 void
 bind_jagged_tensor(py::module &m) {
     py::class_<fvdb::JaggedTensor>(m, "JaggedTensor")
-        .def(py::init<std::vector<std::vector<torch::Tensor>>&>(), py::arg("tensor_list"))
-        .def(py::init<std::vector<torch::Tensor>&>(), py::arg("tensor_list"), R"_FVDB_(
-            Initialize JaggedTensor from a list of tensors.
-
-            Args:
-                tensor_list (list of torch.Tensor): Tensors in this list must have the same shape except for the first (jagged) dimension.
-
-            Returns:
-                jt (JaggedTensor): The concatenated JaggedTensor with the same order as the list.)_FVDB_")
         .def(py::init<torch::Tensor>(), py::arg("tensor"), R"_FVDB_(
             Initialize JaggedTensor from one single tensor.
 
@@ -29,6 +24,15 @@ bind_jagged_tensor(py::module &m) {
 
             Returns:
                 jt (JaggedTensor): The JaggedTensor of batch size 1 containing this single tensor.)_FVDB_")
+        .def(py::init<std::vector<torch::Tensor>&>(), py::arg("tensor_list"), R"_FVDB_(
+            Initialize JaggedTensor from a list of tensors.
+
+            Args:
+            tensor_list (list of torch.Tensor): Tensors in this list must have the same shape except for the first (jagged) dimension.
+
+            Returns:
+            jt (JaggedTensor): The concatenated JaggedTensor with the same order as the list.)_FVDB_")
+        .def(py::init<std::vector<std::vector<torch::Tensor>>&>(), py::arg("tensor_list"))
         .def_property("jdata", &fvdb::JaggedTensor::jdata, &fvdb::JaggedTensor::set_data, "The data of the JaggedTensor.")
         .def_property_readonly("jidx", [](const fvdb::JaggedTensor& self) {
             // FIXME: (@fwilliams) This is a bit ugly and the abstraction leaks
@@ -81,7 +85,19 @@ bind_jagged_tensor(py::module &m) {
         .def_property_readonly("is_cuda", &fvdb::JaggedTensor::is_cuda, "Whether the JaggedTensor is on a CUDA device.")
         .def_property_readonly("is_cpu", &fvdb::JaggedTensor::is_cpu, "Whether the JaggedTensor is on a CPU device.")
 
-        .def("__getitem__", &fvdb::JaggedTensor::index)
+        .def("__getitem__", py::overload_cast<int64_t>(&fvdb::JaggedTensor::index, py::const_))
+        .def("__getitem__", py::overload_cast<const fvdb::JaggedTensor&>(&fvdb::JaggedTensor::index, py::const_))
+        .def("__getitem__", [](const fvdb::JaggedTensor& self, const py::slice& slice) {
+            py::ssize_t start = 0, stop = 0, step = 0, slicelength = 0;
+            if (!slice.compute(self.num_outer_lists(), &start, &stop, &step, &slicelength)) {
+                throw py::error_already_set();
+            }
+            int istart = static_cast<int>(start);
+            int istop = static_cast<int>(stop);
+            int istep = static_cast<int>(step);
+            return self.index(istart, istop, istep);
+        })
+        .def("__getitem__", [](const fvdb::JaggedTensor& self, const py::ellipsis& ellipsis) { return self; })
         .def("__len__", &fvdb::JaggedTensor::num_outer_lists)
 
         .def("__neg__", [](const fvdb::JaggedTensor& self) { return -self; }, py::is_operator())
@@ -198,20 +214,12 @@ bind_jagged_tensor(py::module &m) {
 
         .def("to", [](fvdb::JaggedTensor& self, const torch::Device& device) { return self.to(device, self.scalar_type()); })
         .def("to", [](fvdb::JaggedTensor& self, const std::string& device_string) {
-            torch::Device device(device_string);
-            if (device.is_cuda() && !device.has_index()) {
-                device.set_index(c10::cuda::current_device());
-            }
-            return self.to(device, self.scalar_type());
+            return self.to(fvdb::parseDeviceString(device_string), self.scalar_type());
         })
         .def("to", [](fvdb::JaggedTensor& self, torch::ScalarType dtype) { return self.to(self.device(), dtype); })
         .def("to", [](const fvdb::JaggedTensor& self, const torch::Device& device) { return self.to(device); }, py::arg("device"))
         .def("to", [](const fvdb::JaggedTensor& self, const std::string& device_string) {
-            torch::Device device(device_string);
-            if (device.is_cuda() && !device.has_index()) {
-                device.set_index(c10::cuda::current_device());
-            }
-            return self.to(device);
+            return self.to(fvdb::parseDeviceString(device_string));
         }, py::arg("device"))
 
         .def("type", [](const fvdb::JaggedTensor& self, torch::ScalarType dtype) { return self.to(dtype); })
@@ -229,6 +237,8 @@ bind_jagged_tensor(py::module &m) {
         .def("jreshape_as", &fvdb::JaggedTensor::jreshape_as, py::arg("other"))
 
         .def("jflatten", &fvdb::JaggedTensor::jflatten, py::arg("dim") = 0)
+
+        .def("jsqueeze", &fvdb::JaggedTensor::jsqueeze, py::arg("dim") = std::nullopt)
 
         .def("unbind", [](const fvdb::JaggedTensor& self) {
             if (self.ldim() == 1) {
@@ -339,4 +349,5 @@ bind_jagged_tensor(py::module &m) {
                 }
             }
         ));
+    py::implicitly_convertible<torch::Tensor, fvdb::JaggedTensor>();
 }

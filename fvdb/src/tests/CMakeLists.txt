@@ -16,11 +16,12 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/../cmake/get_test_data.cmake)
 # --- Define Test Utilities Library ---
 add_library(fvdb_test_utils STATIC
   utils/ImageUtils.cpp
+  utils/Tensor.cpp
 )
 
 set_target_properties(fvdb_test_utils
   PROPERTIES
-  CXX_STANDARD 17
+  CXX_STANDARD 20
   CXX_STANDARD_REQUIRED ON
 )
 
@@ -55,9 +56,9 @@ function(ConfigureTest CMAKE_TEST_NAME)
 
   set_target_properties(
     ${CMAKE_TEST_NAME}_obj
-    PROPERTIES CXX_STANDARD 17
+    PROPERTIES CXX_STANDARD 20
                CXX_STANDARD_REQUIRED ON
-               CUDA_STANDARD 17
+               CUDA_STANDARD 20
                CUDA_STANDARD_REQUIRED ON
   )
 
@@ -73,7 +74,17 @@ function(ConfigureTest CMAKE_TEST_NAME)
 
   target_compile_options(${CMAKE_TEST_NAME}_obj PRIVATE
     $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CUDA>>:-G -Xcompiler=-O0>
-    $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CXX>>:-O0>)
+    $<$<AND:$<CONFIG:DEBUG>,$<COMPILE_LANGUAGE:CXX>>:-O0>
+    $<$<COMPILE_LANGUAGE:CXX>:
+    "-Wall"
+    "-Werror"
+    >
+    $<$<COMPILE_LANGUAGE:CUDA>:
+    "--extended-lambda"
+    "-Xfatbin=-compress-all"
+    "-Werror=all-warnings"
+    "Xcompiler=-Wall,-Werror"
+    >)
 
   target_compile_definitions(${CMAKE_TEST_NAME}_obj PRIVATE
     "FVDB_EXTERNAL_TEST_DATA_PATH=\"${FVDB_TEST_DATA_DIR}\"")

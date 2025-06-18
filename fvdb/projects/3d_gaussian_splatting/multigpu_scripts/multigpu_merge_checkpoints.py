@@ -64,15 +64,16 @@ def main(ckpt_num: str, num_clusters: int, bounds_dir: str, results_dir: str, ds
 
     checkpoint = torch.load(checkpoint_paths[0], map_location="cuda")
     splats = checkpoint["splats"]
-    splats = apply_bounds(splats, bounds_per_cluster[0])
+    # commenting out due to mrge issues
+    # splats = apply_bounds(splats, bounds_per_cluster[0])
     checkpoint_paths.pop(0)
     bounds_per_cluster.pop(0)
 
     for cluster_index, fpath in enumerate(checkpoint_paths):
-
         curr_ckpt = torch.load(fpath, map_location="cuda")
         curr_splats = curr_ckpt["splats"]
-        curr_splats = apply_bounds(curr_splats, bounds_per_cluster[cluster_index])
+        # commenting out due to mrge issues
+        # curr_splats = apply_bounds(curr_splats, bounds_per_cluster[cluster_index])
 
         splats["means"] = torch.concatenate([splats["means"], curr_splats["means"]], dim=0)
 

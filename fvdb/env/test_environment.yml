@@ -3,6 +3,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+  - blas=*=mkl
   - ca-certificates
   - certifi
   - cuda-version=12.0

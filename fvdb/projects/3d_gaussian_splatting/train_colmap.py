@@ -21,15 +21,15 @@ import tyro
 import viser
 import yaml
 from datasets import ColmapDataset
+from fvdb.optim import GaussianSplatOptimizer
 from sklearn.neighbors import NearestNeighbors
 from torch.utils.tensorboard import SummaryWriter
 from torchmetrics.image import PeakSignalNoiseRatio, StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
-from utils import gaussian_means_outside_bbox
+from utils import CameraOptModule, gaussian_means_outside_bbox
 from viz import CameraState, Viewer
 
 from fvdb import GaussianSplat3d
-from fvdb.optim import GaussianSplatOptimizer
 
 
 @dataclass
@@ -99,6 +99,23 @@ class Config:
     # When to stop using the 2d projected scale for refinement (default of 0 is to never use it)
     refine_using_scale2d_stop_iter: int = 0
 
+    # Flag to enable camera pose optimization.
+    pose_opt: bool = False
+    # Learning rate for camera pose optimization.
+    pose_opt_lr: float = 1e-5
+
+    # Weight for regularization of camera pose optimization.
+    pose_opt_reg: float = 1e-6
+
+    # Learning rate decay factor for camera pose optimization (will decay to this fraction of initial lr)
+    pose_opt_lr_decay: float = 1.0
+
+    # When to stop optimizing camera postions. Default matches max training steps.
+    pose_opt_stop_iter: int = max_steps
+
+    # Standard devation for the normal distribution used for camera pose optimization's random iniitilaization
+    pose_opt_init_std: float = 1e-4
+
 
 def crop_image_batch(image: torch.Tensor, mask: Optional[torch.Tensor], ncrops: int):
     """
@@ -161,14 +178,77 @@ class Runner:
             "optimizer": self.optimizer.state_dict(),
             "config": vars(self.cfg),
         }
+
+        # pose optimization
+        if self.cfg.pose_opt:
+            data["pose_adjust"] = self.pose_adjust.state_dict()
+            data["pose_optimizer"] = self.pose_optimizer.state_dict()
+
         torch.save(data, f"{self.checkpoint_dir}/ckpt_{step:04d}.pt")
         self.model.save_ply(f"{self.checkpoint_dir}/ckpt_{step:04d}.ply")
+
+    # pose optimization
+    def _matrix_to_quaternion(self, R):
+        """Convert rotation matrix to quaternion."""
+        # Ensure R is a proper rotation matrix
+        U, _, Vt = np.linalg.svd(R)
+        R = U @ Vt
+        if np.linalg.det(R) < 0:
+            R = -R
+
+        # Convert to quaternion
+        q = np.zeros(4)
+        tr = np.trace(R)
+        if tr > 0:
+            S = np.sqrt(tr + 1.0) * 2
+            q[0] = 0.25 * S
+            q[1] = (R[2, 1] - R[1, 2]) / S
+            q[2] = (R[0, 2] - R[2, 0]) / S
+            q[3] = (R[1, 0] - R[0, 1]) / S
+        elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
+            S = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2
+            q[0] = (R[2, 1] - R[1, 2]) / S
+            q[1] = 0.25 * S
+            q[2] = (R[0, 1] + R[1, 0]) / S
+            q[3] = (R[0, 2] + R[2, 0]) / S
+        elif R[1, 1] > R[2, 2]:
+            S = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2
+            q[0] = (R[0, 2] - R[2, 0]) / S
+            q[1] = (R[0, 1] + R[1, 0]) / S
+            q[2] = 0.25 * S
+            q[3] = (R[1, 2] + R[2, 1]) / S
+        else:
+            S = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2
+            q[0] = (R[1, 0] - R[0, 1]) / S
+            q[1] = (R[0, 2] + R[2, 0]) / S
+            q[2] = (R[1, 2] + R[2, 1]) / S
+            q[3] = 0.25 * S
+        return q
+
+    def update_poses_for_visualization(self, cam_to_world_mats: torch.Tensor, image_ids: torch.Tensor):
+        """
+        Update camera poses for visualization in the viewer.
+
+        Args:
+            cam_to_world_mats: Updated camera-to-world matrices from pose optimization
+            image_ids: Batch of camera indices that were updated
+        """
+
+        for i, frame in enumerate(self.camera_frames):
+            if i in image_ids:
+                idx = (image_ids == i).nonzero().item()
+                cam_to_world = cam_to_world_mats[idx].detach().cpu().numpy()
+                frame.wxyz = self._matrix_to_quaternion(cam_to_world[:3, :3])
+                frame.position = cam_to_world[:3, 3]
 
     def load_checkpoint(self, checkpoint_path: str, load_optimizer: bool = True):
         checkpoint = torch.load(checkpoint_path)
         self.model.load_state_dict(checkpoint["splats"])
         if load_optimizer:
             self.optimizer.load_state_dict(checkpoint["optimizer"])
+            ##pose optimization
+            if self.cfg.pose_opt and "pose_optimizer" in checkpoint:
+                self.pose_optimizers[0].load_state_dict(checkpoint["pose_optimizer"])
         self.config = Config(*checkpoint["config"])
 
         if not self.disable_viewer:
@@ -371,6 +451,27 @@ class Runner:
             self.model, scene_scale=scene_scale, mean_lr_decay_exponent=0.01 ** (1.0 / cfg.max_steps)
         )
 
+        # camera position optimizer
+        self.pose_optimizer = None
+        if self.cfg.pose_opt:
+            self.pose_adjust = CameraOptModule(len(self.trainset)).to(self.device)
+            # Initialize with small random values instead of zeros
+            self.pose_adjust.random_init(std=cfg.pose_opt_init_std)  # Small initial values to start with
+            # Increase learning rate for pose optimization and add gradient clipping
+            self.pose_optimizer = torch.optim.Adam(
+                self.pose_adjust.parameters(),
+                lr=self.cfg.pose_opt_lr * 100.0,
+                weight_decay=self.cfg.pose_opt_reg,
+            )
+
+            # Add gradient clipping
+            torch.nn.utils.clip_grad_norm_(self.pose_adjust.parameters(), max_norm=1.0)
+
+            # Add learning rate scheduler for pose optimization
+            self.pose_scheduler = torch.optim.lr_scheduler.ExponentialLR(
+                self.pose_optimizer, gamma=self.cfg.pose_opt_lr_decay ** (1.0 / self.cfg.max_steps)
+            )
+
         # Losses & Metrics.
         self.ssim = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
         self.psnr = PeakSignalNoiseRatio(data_range=1.0).to(device)
@@ -385,12 +486,81 @@ class Runner:
         # Viewer
         if not self.disable_viewer:
             self.server = viser.ViserServer(port=8080, verbose=False)
-            self.server.scene.set_up_direction("-z")
+
+            # Set default up axis
+            self.current_up_axis = "+z"
+            self.server.scene.set_up_direction(self.current_up_axis)
+
+            # Store per-client up axis dropdowns
+            self.client_up_axis_dropdowns = {}
+
+            # Add client connect handler for per-client GUI elements
+            @self.server.on_client_connect
+            def _(client: viser.ClientHandle) -> None:
+                # Create per-client up axis dropdown
+                up_axis_dropdown = client.gui.add_dropdown(
+                    "Up Axis",
+                    options=["+x", "-x", "+y", "-y", "+z", "-z"],
+                    initial_value=self.current_up_axis,
+                )
+
+                # Store the dropdown for this client
+                self.client_up_axis_dropdowns[client.client_id] = up_axis_dropdown
+
+                # Add callback for up axis changes for this specific client
+                @up_axis_dropdown.on_update
+                def _on_up_axis_change(event) -> None:
+                    self.viewer.set_up_axis(client.client_id, event.target.value)
+
+            # Add client disconnect handler to clean up
+            @self.server.on_client_disconnect
+            def _(client: viser.ClientHandle) -> None:
+                if client.client_id in self.client_up_axis_dropdowns:
+                    del self.client_up_axis_dropdowns[client.client_id]
+
             self.viewer = Viewer(
                 server=self.server,
                 render_fn=self._viewer_render_fn,
                 mode="training",
             )
+            # Add camera frames to the viewer
+            self.camera_frames = []
+            self.camera_labels = []
+
+            # Calculate scene scale from camera positions
+            camera_positions = []
+            for i, data in enumerate(self.trainset):
+                cam_to_world = data["camtoworld"].cpu().numpy()
+                camera_positions.append(cam_to_world[:3, 3])
+            camera_positions = np.array(camera_positions)
+
+            # Calculate scene bounds and scale
+            scene_center = np.mean(camera_positions, axis=0)
+            scene_radius = np.max(np.linalg.norm(camera_positions - scene_center, axis=1))
+            # Scale factors for axes - adjust these multipliers to change relative size
+            axes_length = scene_radius * 0.05  # 5% of scene radius
+            axes_radius = axes_length * 0.1  # 10% of axes length
+
+            for i, data in enumerate(self.trainset):
+                cam_to_world = data["camtoworld"].cpu().numpy()
+                # Create a frame for each camera with scaled axes
+                frame = self.server.scene.add_frame(
+                    f"camera_{i}",
+                    wxyz=self._matrix_to_quaternion(cam_to_world[:3, :3]),
+                    position=cam_to_world[:3, 3],
+                    axes_length=axes_length,  # Scaled based on scene size
+                    axes_radius=axes_radius,  # Scaled based on scene size
+                )
+                K = data["K"].cpu().numpy()
+                H, W = data["image"].shape[:2]
+                fy = K[1, 1]
+                frustum = self.server.scene.add_camera_frustum(
+                    f"camera_{i}/frustum",
+                    fov=2 * np.arctan2(H / 2, fy),
+                    aspect=W / H,
+                    image=data["image"],
+                )
+                self.camera_frames.append(frame)
 
     def train(self, start_step: int = 0):
         # We keep cycling through every image in a random order until we reach
@@ -426,7 +596,20 @@ class Runner:
                 tic = time.time()
 
             minibatch = next(trainloader)
+            cam_to_world_mats = minibatch["camtoworld"].to(self.device)  # [B, 4, 4]
             world_to_cam_mats = minibatch["worldtocam"].to(self.device)  # [B, 4, 4]
+
+            # CAMERA pose optimization
+            image_ids = minibatch["image_id"].to(self.device)  # [B]
+            if self.cfg.pose_opt and step < self.cfg.pose_opt_stop_iter:
+                # Update camera frames in viewer
+                cam_to_world_mats = self.pose_adjust(cam_to_world_mats, image_ids)
+
+                if not self.disable_viewer:
+                    self.update_poses_for_visualization(cam_to_world_mats, image_ids)
+            else:
+                # After pose_opt_stop_iter, use original camera poses
+                cam_to_world_mats = minibatch["camtoworld"].to(self.device)
             projection_mats = minibatch["K"].to(self.device)  # [B, 3, 3]
             image = minibatch["image"]  # [B, H, W, 3]
             mask = minibatch["mask"] if "mask" in minibatch else None
@@ -497,7 +680,11 @@ class Runner:
                     loss = loss + self.cfg.opacity_reg * torch.abs(self.model.opacities).mean()
                 if self.cfg.scale_reg > 0.0:
                     loss = loss + self.cfg.scale_reg * torch.abs(self.model.scales).mean()
-
+                    # Add pose regularization to encourage small pose changes
+                if self.cfg.pose_opt and step < self.cfg.pose_opt_stop_iter:
+                    pose_params = self.pose_adjust.pose_embeddings(image_ids)
+                    pose_reg = torch.mean(torch.abs(pose_params))
+                    loss = loss + self.cfg.pose_opt_reg * pose_reg
                 # If we're splitting into crops, accumulate gradients
                 loss.backward(retain_graph=not is_last)
 
@@ -510,6 +697,13 @@ class Runner:
                 self.writer.add_scalar("train/ssimloss", ssimloss.item(), step)
                 self.writer.add_scalar("train/num_GS", self.model.num_gaussians, step)
                 self.writer.add_scalar("train/mem", mem, step)
+                # Log pose optimization metrics
+                if self.cfg.pose_opt:
+                    pose_params = self.pose_adjust.pose_embeddings(image_ids)
+                    pose_reg = torch.mean(torch.abs(pose_params))
+                    # Log individual components of pose parameters
+                    self.writer.add_scalar("train/pose_reg_loss", pose_reg.item(), step)
+                    self.writer.add_scalar("train/pose_total_loss", (self.cfg.pose_opt_reg * pose_reg).item(), step)
                 if self.log_images_to_tensorboard:
                     canvas = torch.cat([pixels, colors], dim=2).detach().cpu().numpy()
                     canvas = canvas.reshape(-1, *canvas.shape[2:])
@@ -551,6 +745,14 @@ class Runner:
                 self.optimizer.reset_opacities()
             self.optimizer.step()
             self.optimizer.zero_grad(set_to_none=True)
+            # pose optimization
+            if self.cfg.pose_opt and step < self.cfg.pose_opt_stop_iter:
+                self.pose_optimizer.step()
+                self.pose_optimizer.zero_grad(set_to_none=True)
+                # Step the scheduler
+                self.pose_scheduler.step()
+
+            # After optimizer step, check if poses were updated
 
             # Run evaluation every eval_steps
             if step in [i - 1 for i in self.cfg.eval_steps]:

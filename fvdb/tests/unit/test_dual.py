@@ -10,8 +10,8 @@ from parameterized import parameterized
 from fvdb import GridBatch
 
 all_device_combos = [
-    ["cpu", False],
-    ["cuda", False],
+    ["cpu"],
+    ["cuda"],
 ]
 
 
@@ -20,7 +20,7 @@ class TestBasicOps(unittest.TestCase):
         pass
 
     @parameterized.expand(all_device_combos)
-    def test_world_to_dual(self, device, mutable):
+    def test_world_to_dual(self, device):
         torch.manual_seed(42)
         np.random.seed(42)
 
@@ -60,7 +60,7 @@ class TestBasicOps(unittest.TestCase):
             ],
             dim=0,
         )
-        grid = GridBatch(mutable=mutable, device=device)
+        grid = GridBatch(device=device)
         grid.set_from_ijk(ijk)
 
         _grid = grid.dual_grid(exclude_border=True)

@@ -1,11 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#ifndef FVDB_PYTHON_TYPECASTERS_H
-#define FVDB_PYTHON_TYPECASTERS_H
+#ifndef PYTHON_TYPECASTERS_H
+#define PYTHON_TYPECASTERS_H
 
-#include <JaggedTensor.h>
-#include <Types.h>
+#include <fvdb/Types.h>
 
 #include <torch/extension.h>
 
@@ -16,31 +15,6 @@ namespace pybind11 {
 namespace detail {
 
 const static inline pybind11::module TORCH_MODULE = py::module_::import("torch");
-
-template <> struct type_caster<fvdb::JaggedTensor> : public type_caster_base<fvdb::JaggedTensor> {
-    using base = type_caster_base<fvdb::JaggedTensor>;
-
-  public:
-    fvdb::JaggedTensor jag_value;
-
-    bool
-    load(handle src, bool convert) {
-        if (THPVariable_Check(src.ptr())) {
-            // TODO: (@fwilliams) Might need to reinterpret steal here?
-            torch::Tensor data = THPVariable_Unpack(src.ptr());
-            jag_value          = fvdb::JaggedTensor({ data });
-            value              = &jag_value;
-            return true;
-        } else {
-            return base::load(src, convert);
-        }
-    }
-
-    static handle
-    cast(const fvdb::JaggedTensor &src, return_value_policy policy, handle parent) {
-        return base::cast(src, policy, parent);
-    }
-};
 
 // Already defined in upstream pytorch: https://github.com/pytorch/pytorch/pull/126865
 // (starting from version 2.4)
@@ -71,102 +45,6 @@ template <> struct type_caster<torch::ScalarType> : public type_caster_base<torc
     }
 };
 #endif
-
-template <>
-struct type_caster<fvdb::JaggedTensorIndex> : public type_caster_base<fvdb::JaggedTensorIndex> {
-    fvdb::JaggedTensorIndex idx_value = c10::nullopt;
-
-    bool
-    load(handle src, bool convert) {
-        if (py::isinstance<py::ellipsis>(src)) {
-            idx_value = at::indexing::Ellipsis;
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::slice>(src)) {
-            py::ssize_t start, stop, step;
-            py::slice   slice = src.cast<py::slice>();
-            PySlice_Unpack(slice.ptr(), &start, &stop, &step);
-
-            // FIXME: (@fwilliams) -- This is a bit weird. Ideally we want the same behavior as
-            // Pyslice_ComputeEx
-            //                        but we don't know the size apriori here. In any case, we only
-            //                        use this for JaggedTensor which doesn't support negative step
-            //                        sizes anyway.
-            if (step < 0) {
-                if (start >= PY_SSIZE_T_MAX) {
-                    start = -1;
-                }
-
-                if (stop <= PY_SSIZE_T_MIN) {
-                    stop = 0;
-                }
-            }
-            idx_value = at::indexing::Slice(start, stop, step);
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::int_>(src)) {
-            idx_value = src.cast<int64_t>();
-            value     = &idx_value;
-            return true;
-        }
-        if (py::isinstance<py::none>(src)) {
-            idx_value = at::indexing::None;
-            value     = &idx_value;
-            return true;
-        }
-        if (pybind11::isinstance<fvdb::JaggedTensor>(src)) {
-            idx_value = src.cast<fvdb::JaggedTensor>();
-            value     = &idx_value;
-            return true;
-        }
-        return false;
-    }
-};
-
-template <>
-struct type_caster<fvdb::NanoVDBFileGridIdentifier>
-    : public type_caster_base<fvdb::NanoVDBFileGridIdentifier> {
-    using base = type_caster_base<fvdb::NanoVDBFileGridIdentifier>;
-
-  public:
-    fvdb::NanoVDBFileGridIdentifier id_value;
-
-    bool
-    load(handle src, bool convert) {
-        if (src.is_none()) {
-            value = &id_value;
-            return true;
-        }
-
-        if (base::load(src, convert)) {
-            return true;
-        } else if (py::isinstance<py::int_>(src)) {
-            id_value = src.cast<uint64_t>();
-            value    = &id_value;
-            return true;
-        } else if (py::isinstance<py::str>(src)) {
-            id_value = src.cast<std::string>();
-            value    = &id_value;
-            return true;
-        } else if (py::isinstance<py::list>(src)) {
-            try {
-                id_value = src.cast<std::vector<uint64_t>>();
-            } catch (pybind11::cast_error &e) {
-                try {
-                    id_value = src.cast<std::vector<std::string>>();
-                } catch (pybind11::cast_error &e) {
-                    return false;
-                }
-            }
-            value = &id_value;
-            return true;
-        }
-
-        return false;
-    }
-};
 
 template <typename CoordRetT>
 bool
@@ -282,4 +160,4 @@ INBOUND_TYPE_CASTER(fvdb::Vec3iBatch, loadVecBatch)
 } // namespace detail
 } // namespace pybind11
 
-#endif // FVDB_PYTHON_TYPECASTERS_H
+#endif // PYTHON_TYPECASTERS_H

@@ -5,7 +5,8 @@
     // List of extensions which should be recommended for users of this workspace.
     "recommendations": [
         "llvm-vs-code-extensions.vscode-clangd",
-        "ms-vscode.cpptools-extension-pack"
+        "ms-vscode.cpptools-extension-pack",
+        "Seaube.clangformat"
     ],
     // List of extensions recommended by VS Code that should not be recommended for users of this workspace.
     "unwantedRecommendations": [

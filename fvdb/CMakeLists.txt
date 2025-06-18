@@ -67,9 +67,11 @@ target_link_libraries(_Cpp PRIVATE
 
 target_compile_options(_Cpp PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:
-    "-Wno-unused-variable"
+    #"-Wno-unused-variable"
     "-fvisibility=hidden"
     "-fvisibility-inlines-hidden"
+    "-Wall"
+    "-Werror"
     "${TORCH_CXX_FLAGS}"
     >)
 

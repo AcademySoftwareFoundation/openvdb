@@ -18,7 +18,6 @@ def gridbatch_from_dense_cube(
     cube_min: Vec3d = (0.0, 0.0, 0.0),
     cube_max: Vec3d = (1.0, 1.0, 1.0),
     voxel_center: bool = False,
-    mutable: bool = False,
     device: Union[torch.device, str] = "cpu",
 ) -> GridBatch:
     def _coord3d_to_tensor(coord: Vec3, dtype: torch.dtype = torch.float64) -> torch.Tensor:
@@ -56,24 +55,14 @@ def gridbatch_from_dense_cube(
         voxel_size = (cube_max - cube_min) / resolution.to(torch.float64)
         origin = cube_min + 0.5 * voxel_size
 
-    return gridbatch_from_dense(
-        1, resolution, voxel_sizes=voxel_size, origins=origin, device=str(device), mutable=mutable
-    )
+    return gridbatch_from_dense(1, resolution, voxel_sizes=voxel_size, origins=origin, device=str(device))
 
 
-def random_drop_points_if_mutable(grid: GridBatch, drop_pct: float = 0.5):
-    if grid.mutable:
-        all_ijk = grid.ijk.jdata
-        drop_mask = torch.rand(grid.total_voxels, device=grid.device) < drop_pct
-        drop_ijk = all_ijk[drop_mask]
-        grid.disable_ijk(drop_ijk)
-
-
-def make_dense_grid_and_point_data(nvox, device, dtype, mutable):
+def make_dense_grid_and_point_data(nvox, device, dtype):
     grid_origin = (0.0, 0.0, 0.0)
     voxel_size = 1.0 / (np.floor(0.5 * nvox) + 0.5)
 
-    fvdb = GridBatch(mutable=mutable, device=device)
+    fvdb = GridBatch(device=device)
 
     target_vox = int(2 * np.floor(0.5 * nvox) + 1) ** 3
     target_corners = int(2 * np.floor(0.5 * nvox) + 2) ** 3
@@ -83,7 +72,7 @@ def make_dense_grid_and_point_data(nvox, device, dtype, mutable):
     while not fvdb.total_voxels == target_vox:
         p = (2.0 * torch.rand(10 * p.shape[0], 3) - 1.0).to(device)
         p = torch.clip(p, -1.0 + 0.25 * voxel_size, 1.0 - 0.25 * voxel_size).to(dtype)
-        fvdb.set_from_points(p, [0, 0, 0], [0, 0, 0], voxel_size, grid_origin)
+        fvdb.set_from_points(p, voxel_size, grid_origin)
     # print(fvdb.total_voxels, int(2 * np.floor(0.5 * nvox) + 1) ** 3)
     # print(fvdb.num_corners(), int(2 * np.floor(0.5 * nvox) + 2) ** 3)
 
@@ -96,13 +85,12 @@ def make_dense_grid_and_point_data(nvox, device, dtype, mutable):
     return fvdb, fvdb_d, p
 
 
-def make_gridbatch_and_point_data(
-    device, dtype, include_boundary_points: bool = False, expand: int = 10, mutable: bool = False
-):
+def make_gridbatch_and_point_data(device, dtype, include_boundary_points: bool = False, expand: int = 10):
     p = torch.randn((100, 3), device=device, dtype=dtype)
     vox_size = 0.05
-    grid = GridBatch(mutable=mutable, device=device)
-    grid.set_from_points(p, [-1, -1, -1], [1, 1, 1], vox_size, [0.0] * 3)
+    grid = GridBatch(device=device)
+    grid.set_from_points(p, vox_size, [0.0] * 3)
+    grid = grid.dilated_grid(1)
     grid_d = grid.dual_grid()
 
     if not include_boundary_points:

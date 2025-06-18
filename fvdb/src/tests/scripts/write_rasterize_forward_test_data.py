@@ -36,10 +36,10 @@ width = data["width"].item()
 height = data["height"].item()
 
 sh_degree = 3
-sh_coeffs = torch.zeros(((sh_degree + 1) ** 2, means.shape[0], 3), device=device)
-sh_coeffs[0, :, :] = rgb_to_sh(colors)
-sh_0 = sh_coeffs[0, :, :].unsqueeze(0).clone()
-sh_n = sh_coeffs[1:, :, :].clone()
+sh_coeffs = torch.zeros((means.shape[0], (sh_degree + 1) ** 2, 3), device=device)
+sh_coeffs[:, 0, :] = rgb_to_sh(colors)
+sh_0 = sh_coeffs[:, 0:1, :].clone()
+sh_n = sh_coeffs[:, 1:, :].clone()
 
 gs3d = GaussianSplat3d(
     means=means,
@@ -69,6 +69,15 @@ projected_gaussians = gs3d.project_gaussians_for_images(
     antialias=True,
 )
 
+print("Width: ", width)
+print("Height: ", height)
+print("Width in tiles: ", width / 16)
+print("Height in tiles: ", height / 16)
+print("Num cameras: ", num_cameras)
+print("Tile offsets shape: ", projected_gaussians.tile_offsets.shape)
+print("Tile gaussian ids shape: ", projected_gaussians.tile_gaussian_ids.shape)
+
+image_dims = torch.tensor([width, height], device=device, dtype=torch.int32)
 
 projected_data_to_save = {
     "means2d": projected_gaussians.means2d,
@@ -77,6 +86,7 @@ projected_data_to_save = {
     "opacities": projected_gaussians.opacities,
     "tile_offsets": projected_gaussians.tile_offsets,
     "tile_gaussian_ids": projected_gaussians.tile_gaussian_ids,
+    "image_dims": image_dims,
 }
 
 
@@ -88,7 +98,7 @@ def save_test_data(data):
                 setattr(self, key, my_values[key])
 
     container = torch.jit.script(Container(data))
-    container.save("gsplat_rasterization_input_data.pt")
+    container.save("rasterize_forward_inputs_3cams.pt")
 
 
 save_test_data(projected_data_to_save)

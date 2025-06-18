@@ -5,7 +5,8 @@
 1. Setup the environment:
 
     ```bash
-    conda env create -f ../../../env/learn_environment.yml
+    conda env create -f ./3dgs_environment.yml
+    conda activate fvdb_3dgs
     ```
 
 2. Download the example data

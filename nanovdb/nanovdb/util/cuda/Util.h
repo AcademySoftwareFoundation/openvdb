@@ -222,6 +222,35 @@ __global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func fu
     func(tid + offset, args...);
 }// util::cuda::offsetLambdaKernel
 
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernel(
+    Args... args)
+{
+    Operator op;
+    op( args... );
+}
+
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernelDynamic(Args... args)
+{
+    extern __shared__ char smem_buf[];
+    Operator op;
+    op( args..., smem_buf );
+}
+
+template<class Operator, typename... Args>
+void dynamicSharedMemoryLauncher(const size_t numItems, const size_t smem_size, Args... args)
+{
+    cudaCheck(cudaFuncSetAttribute(operatorKernelDynamic<Operator, Args...>,
+        cudaFuncAttributeMaxDynamicSharedMemorySize,smem_size));
+    operatorKernelDynamic<Operator>
+        <<<numItems, Operator::MaxThreadsPerBlock, smem_size>>>( args ... );
+}
+
 #endif// __CUDACC__
 
 }// namespace util::cuda ============================================================

@@ -121,6 +121,9 @@ class Renderer(threading.Thread):
             self._may_interrupt_render = True
         self._render_event.set()
 
+    def set_up_axis(self, up_axis: Literal["+x", "+y", "+z", "-x", "-y", "-z"]):
+        self.client.scene.set_up_direction(up_axis)
+
     def run(self):
         while self.running:
             while not self.is_prepared_fn():
@@ -321,6 +324,9 @@ class Viewer(object):
             aspect=camera.aspect,
             c2w=c2w,
         )
+
+    def set_up_axis(self, client_id: int, up_axis: Literal["+x", "+y", "+z", "-x", "-y", "-z"]):
+        self._renderers[client_id].set_up_axis(up_axis)
 
     def update(self, step: int, num_train_rays_per_step: int):
         if self.mode == "rendering":
