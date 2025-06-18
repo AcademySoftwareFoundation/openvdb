@@ -176,16 +176,25 @@ template<typename SrcBuildT, typename DstBuildT>
 __global__ void processRootTilesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor *nodeAcc,
                                        const typename BuildToValueMap<DstBuildT>::type *srcValues)
 {
-    const auto tid = blockIdx.x;
+    const auto tileID = blockIdx.x, tileCount = nodeAcc->nodeCount[3];// note: tileID != childID!
+    NANOVDB_ASSERT(tileID < tileCount);
 
-    // Process children and tiles
-    const auto &srcTile = *nodeAcc->srcRoot().tile(tid);
-    auto &dstTile = *nodeAcc->template dstRoot<DstBuildT>().tile(tid);
+    // Process child nodes and tiles of the root node
+    const auto &srcTile = *nodeAcc->srcRoot().tile(tileID);
+    auto &dstTile = *nodeAcc->template dstRoot<DstBuildT>().tile(tileID);
     dstTile.key   = srcTile.key;
     if (srcTile.child) {
-        dstTile.child = sizeof(NanoRoot<DstBuildT>) + sizeof(NanoRoot<DstBuildT>::Tile)*((srcTile.child - sizeof(NanoRoot<SrcBuildT>))/sizeof(NanoRoot<SrcBuildT>::Tile));
-        dstTile.value = srcValues[0];// set to background
-        dstTile.state = false;
+        // |<--NanoRoot-->|<--Tile[0]...Tile[tileCount-1]-->|<--Child[0]...child[childID-1]-->|
+        // |<-------------------- offset -------------------|
+        // |<-------------------------------- Tile::child ------------------------------------|
+        //                                                  |<------ Tile::child-offset ----->|
+        //                                                  |<--- childID x sizeof(ChildT) -->|
+        uint64_t offset = sizeof(NanoRoot<SrcBuildT>) + tileCount*sizeof(NanoRoot<SrcBuildT>::Tile);//  source offset
+        const uint64_t childID = (srcTile.child - offset)/sizeof(NanoRoot<SrcBuildT>::ChildNodeType);// derived from source offset
+        offset          = sizeof(NanoRoot<DstBuildT>) + tileCount*sizeof(NanoRoot<DstBuildT>::Tile);//  destination offset
+        dstTile.child   = offset + childID*sizeof(NanoRoot<DstBuildT>::ChildNodeType);
+        dstTile.value   = srcValues[0];// set to background
+        dstTile.state   = false;
     } else {
         dstTile.child = 0;// i.e. no child node
         dstTile.value = srcValues[srcTile.value];
@@ -224,7 +233,6 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if (srcGrid.hasStdDeviation()) dstNode.mStdDevi = srcValues[srcNode.mStdDevi];
         }
     }
-    const uint64_t nodeSkip = nodeAcc->nodeCount[LEVEL] - blockIdx.x, srcOff = sizeof(SrcNodeT)*nodeSkip, dstOff = sizeof(DstNodeT)*nodeSkip;// offset to first node of child type
     const int off = blockDim.x*blockDim.y*threadIdx.x + blockDim.x*threadIdx.y;
     for (int threadIdx_z=0; threadIdx_z<blockDim.x; ++threadIdx_z) {
         const int i = off + threadIdx_z;
@@ -232,6 +240,7 @@ __global__ void processNodesKernel(typename IndexToGrid<SrcBuildT>::NodeAccessor
             if constexpr(sizeof(SrcNodeT)==sizeof(DstNodeT) && sizeof(SrcChildT)==sizeof(DstChildT)) {
                 dstNode.mTable[i].child = srcNode.mTable[i].child;
             } else {
+                const uint64_t nodeSkip = nodeAcc->nodeCount[LEVEL] - blockIdx.x, srcOff = sizeof(SrcNodeT)*nodeSkip, dstOff = sizeof(DstNodeT)*nodeSkip;// offset to first node of child type
                 const uint64_t childID = (srcNode.mTable[i].child - srcOff)/sizeof(SrcChildT);
                 dstNode.mTable[i].child = dstOff + childID*sizeof(DstChildT);
             }
@@ -359,7 +368,9 @@ inline BufferT IndexToGrid<SrcBuildT>::getBuffer(const BufferT &pool)
     mNodeAcc.meta  = mNodeAcc.node[0]  + NanoLeaf<DstBuildT>::DataType::memUsage()*mNodeAcc.nodeCount[0];// leaf nodes end and blind meta data begins
     mNodeAcc.blind = mNodeAcc.meta  + 0*sizeof(GridBlindMetaData); // meta data ends and blind data begins
     mNodeAcc.size  = mNodeAcc.blind;// end of buffer
-    auto buffer = BufferT::create(mNodeAcc.size, &pool, false, mStream);
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    auto buffer = BufferT::create(mNodeAcc.size, &pool, device, mStream);
     mNodeAcc.d_dstPtr = buffer.deviceData();
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
 

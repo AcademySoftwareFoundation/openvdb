@@ -1,0 +1,25 @@
+version: '3'
+services:
+  fvdb-dev:
+    build:
+      context: ../
+      dockerfile: fvdb/Dockerfile
+      args:
+        MODE: dev
+    volumes:
+      - ../:/openvdb
+    # Uncomment and adjust the following as needed
+    # ports:
+    #   - "8888:8888"  # Example for Jupyter notebook
+    entrypoint: /bin/bash
+    stdin_open: true
+    tty: true
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

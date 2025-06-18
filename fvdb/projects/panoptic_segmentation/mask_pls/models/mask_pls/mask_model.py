@@ -10,7 +10,7 @@ import torch.nn
 import fvdb
 import fvdb.nn
 
-from .backbone import MaskPLSEncoderDecoder, fVDBSyncBatchNorm
+from .backbone import MaskPLSEncoderDecoder
 from .blocks import MLP
 from .decoder import MaskedTransformerDecoder
 from .utils import pad_batch
@@ -45,8 +45,7 @@ class MaskPLS(torch.nn.Module):
         self.decoder_input_mode = decoder_input_mode
         self.segmentation_only = segmentation_only
 
-        backbone = MaskPLSEncoderDecoder(output_feature_levels=[3])
-        self.backbone = fVDBSyncBatchNorm.convert_sync_batchnorm(backbone)
+        self.backbone = MaskPLSEncoderDecoder(output_feature_levels=[3])
 
         self.sem_head = (
             fvdb.nn.Linear(self.backbone.channels[-1], num_classes)

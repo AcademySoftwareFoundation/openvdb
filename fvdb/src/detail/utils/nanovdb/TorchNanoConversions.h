@@ -5,6 +5,7 @@
 #define FVDB_DETAIL_UTILS_NANOVDB_TORCHNANOCONVERSIONS_H
 
 #include <nanovdb/NanoVDB.h>
+
 #include <torch/torch.h>
 
 namespace fvdb {

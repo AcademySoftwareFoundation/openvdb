@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
-
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -18,8 +17,8 @@ template <typename GridType>
 nanovdb::GridHandle<TorchDeviceBuffer>
 buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &jaggedPoints,
                                       const std::vector<VoxelCoordTransform> &txs) {
-    return AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        jaggedPoints.scalar_type(), "buildNearestNeighborGridFromPoints", [&]() {
+    return AT_DISPATCH_V2(
+        jaggedPoints.scalar_type(), "buildNearestNeighborGridFromPoints", AT_WRAP([&]() {
             using ScalarT    = scalar_t;
             using MathT      = typename at::opmath_type<ScalarT>;
             using Vec3T      = typename nanovdb::math::Vec3<MathT>;
@@ -72,7 +71,7 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &ja
                 proxyGridAccessor.merge();
                 auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
                     *proxyGrid, 0u, false, false);
-                ret.buffer().setDevice(torch::kCPU, true);
+                ret.buffer().to(torch::kCPU);
                 batchHandles.push_back(std::move(ret));
             }
 
@@ -81,7 +80,8 @@ buildNearestNeighborGridFromPointsCPU(const JaggedTensor                     &ja
             } else {
                 return nanovdb::mergeGrids(batchHandles);
             }
-        });
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 nanovdb::GridHandle<TorchDeviceBuffer>

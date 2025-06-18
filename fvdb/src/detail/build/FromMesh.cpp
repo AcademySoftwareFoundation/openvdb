@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
-
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -77,7 +76,7 @@ buildGridFromMeshCPU(const JaggedTensor &vertices, const JaggedTensor &triangles
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
@@ -96,10 +95,11 @@ buildGridFromMesh(bool isMutable, const JaggedTensor meshVertices, const JaggedT
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
     } else {
         return FVDB_DISPATCH_GRID_TYPES_MUTABLE(isMutable, [&]() {
-            return AT_DISPATCH_FLOATING_TYPES(
-                meshVertices.scalar_type(), "buildGridFromMeshCPU", [&]() {
+            return AT_DISPATCH_V2(
+                meshVertices.scalar_type(), "buildGridFromMeshCPU", AT_WRAP([&]() {
                     return buildGridFromMeshCPU<GridType, scalar_t>(meshVertices, meshFaces, tx);
-                });
+                }),
+                AT_EXPAND(AT_FLOATING_TYPES));
         });
     }
 }

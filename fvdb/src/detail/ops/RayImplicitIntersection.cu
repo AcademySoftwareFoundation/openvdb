@@ -131,33 +131,35 @@ RayImplicitIntersection(const GridBatchImpl &batchHdl, const JaggedTensor &rayO,
     torch::Tensor outTimes = torch::empty({ rayO.rsize(0) }, optsF);
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES(rayO.scalar_type(), "RayImplicitIntersection", [&]() {
-            int64_t numThreads = 256 + 128;
-            if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
-                numThreads = 256;
-            }
+        AT_DISPATCH_V2(
+            rayO.scalar_type(), "RayImplicitIntersection", AT_WRAP([&]() {
+                int64_t numThreads = 256 + 128;
+                if constexpr (nanovdb::util::is_same<scalar_t, double>::value) {
+                    numThreads = 256;
+                }
 
-            auto batchAcc       = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-            auto rayDAcc        = jaggedAccessor<DeviceTag, scalar_t, 2>(rayD);
-            auto gridScalarsAcc = jaggedAccessor<DeviceTag, scalar_t, 1>(gridScalars);
-            auto outTimesAcc    = tensorAccessor<DeviceTag, scalar_t, 1>(outTimes);
+                auto batchAcc       = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                auto rayDAcc        = jaggedAccessor<DeviceTag, scalar_t, 2>(rayD);
+                auto gridScalarsAcc = jaggedAccessor<DeviceTag, scalar_t, 1>(gridScalars);
+                auto outTimesAcc    = tensorAccessor<DeviceTag, scalar_t, 1>(outTimes);
 
-            if constexpr (DeviceTag == torch::kCUDA) {
-                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                         JaggedRAcc32<scalar_t, 2> rOA) {
-                    rayImplicitCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
-                        bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
-                };
-                forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayO, cb);
-            } else {
-                auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
-                              JaggedAcc<scalar_t, 2> rOA) {
-                    rayImplicitCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
-                        bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
-                };
-                forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayO, cb);
-            }
-        });
+                if constexpr (DeviceTag == torch::kCUDA) {
+                    auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                             JaggedRAcc32<scalar_t, 2> rOA) {
+                        rayImplicitCallback<scalar_t, GridType, JaggedRAcc32, TorchRAcc32>(
+                            bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
+                    };
+                    forEachJaggedElementChannelCUDA<scalar_t, 2>(numThreads, 1, rayO, cb);
+                } else {
+                    auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx,
+                                  JaggedAcc<scalar_t, 2> rOA) {
+                        rayImplicitCallback<scalar_t, GridType, JaggedAcc, TorchAcc>(
+                            bidx, eidx, rOA, rayDAcc, gridScalarsAcc, batchAcc, outTimesAcc, eps);
+                    };
+                    forEachJaggedElementChannelCPU<scalar_t, 2>(1, rayO, cb);
+                }
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES));
     });
 
     return rayO.jagged_like(outTimes);

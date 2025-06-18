@@ -12,6 +12,7 @@
 
 #include <nanovdb/NanoVDB.h>
 
+#include <ATen/Dispatch_v2.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/util/Half.h>
 #include <torch/extension.h>
@@ -95,16 +96,18 @@ struct is_floating_point_or_half
 /// @return An std::vector<int64_t> with the same values as the input tensor
 inline std::vector<int64_t>
 intTensor1DToStdVector(torch::Tensor shapeTensor) {
-    return AT_DISPATCH_INTEGRAL_TYPES(shapeTensor.scalar_type(), "tensorToShape", [&]() {
-        TORCH_CHECK(shapeTensor.dim() == 1, "shapeTensor must be a 1D tensor");
-        TORCH_CHECK(!shapeTensor.is_floating_point(), "shapeTensor must be an integer tensor");
-        auto                 acc = shapeTensor.accessor<scalar_t, 1>();
-        std::vector<int64_t> outShape(acc.size(0));
-        for (int64_t i = 0; i < acc.size(0); i += 1) {
-            outShape[i] = (int64_t)acc[i];
-        }
-        return outShape;
-    });
+    return AT_DISPATCH_V2(
+        shapeTensor.scalar_type(), "tensorToShape", AT_WRAP([&]() {
+            TORCH_CHECK(shapeTensor.dim() == 1, "shapeTensor must be a 1D tensor");
+            TORCH_CHECK(!shapeTensor.is_floating_point(), "shapeTensor must be an integer tensor");
+            auto                 acc = shapeTensor.accessor<scalar_t, 1>();
+            std::vector<int64_t> outShape(acc.size(0));
+            for (int64_t i = 0; i < acc.size(0); i += 1) {
+                outShape[i] = (int64_t)acc[i];
+            }
+            return outShape;
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 }
 
 /// @brief Return an std::vector<int64_t> representing the shape of a tensor which is forned by
@@ -297,13 +300,13 @@ StringToTorchScalarType(std::string dtypeStr) {
 }
 
 struct RAIIDeviceGuard {
-    RAIIDeviceGuard(torch::Device device) {
+    RAIIDeviceGuard(const torch::Device &device) {
         if (device.is_cuda()) {
             mGuard = new c10::cuda::CUDAGuard(device.index());
         }
     }
 
-    RAIIDeviceGuard(torch::Device device1, torch::Device device2) {
+    RAIIDeviceGuard(const torch::Device &device1, const torch::Device &device2) {
         if (device1.is_cuda()) {
             mGuard = new c10::cuda::CUDAGuard(device1.index());
         } else if (device2.is_cuda()) {
@@ -320,6 +323,17 @@ struct RAIIDeviceGuard {
   private:
     c10::cuda::CUDAGuard *mGuard = nullptr;
 };
+
+/// @brief Get a uint8_t pointer to the data of a tensor
+/// @param tensor The tensor to get the pointer to
+/// @return A uint8_t pointer to the data of the tensor
+inline uint8_t *
+tensorBytePointer(const torch::Tensor &tensor) {
+    return AT_DISPATCH_V2(tensor.scalar_type(), "tensorBytePointer", AT_WRAP([&]() {
+                              return reinterpret_cast<uint8_t *>(tensor.data_ptr<scalar_t>());
+                          }),
+                          AT_ALL_TYPES);
+}
 
 } // namespace detail
 } // namespace fvdb

@@ -3,8 +3,10 @@
 #
 import functools
 import itertools
+import os
 import unittest
-from typing import List
+from collections.abc import MutableMapping
+from typing import List, NamedTuple
 
 import torch
 import torch.nn as nn
@@ -369,6 +371,105 @@ class TestNN(unittest.TestCase):
             model = fvnn.SparseConv3d(in_channels=4, out_channels=32).to(device=device, dtype=dtype)
 
             model(example_inputs)
+
+
+class RunningStatistics(NamedTuple):
+    mean: torch.Tensor
+    var: torch.Tensor
+
+
+def _sync_bn_setup(rank: int, world_size: int) -> None:
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
+    torch.distributed.init_process_group("gloo", rank=rank, world_size=world_size)
+
+
+def _sync_bn_cleanup() -> None:
+    torch.distributed.destroy_process_group()
+
+
+def _run_syncbn_test(rank: int, world_size: int, return_dict: MutableMapping[int, RunningStatistics]) -> None:
+    _sync_bn_setup(rank, world_size)
+
+    # The number of jagged tensors changin with rank makes it extremely unlikely the running stats
+    # for layers will ever be equal across all ranks.
+    num_features = 2
+    points = fvdb.JaggedTensor([torch.randn(num_features, 3, device="cuda") for _ in range(rank + 1)])
+
+    grid = fvdb.gridbatch_from_points(points)
+    channels = 8
+    features = grid.jagged_like(torch.randn(grid.ijk.jdata.shape[0], channels, device="cuda"))
+    input_tensor = fvdb.nn.VDBTensor(grid, features)
+
+    layer = fvdb.nn.SyncBatchNorm(channels, device="cuda")
+    layer(input_tensor)
+
+    # A true SyncBatch norm will ensure batch statistics are always syncronized.
+    # Only cpu tensors can be passed between different processes.
+    return_dict[rank] = RunningStatistics(
+        mean=layer.running_mean.cpu().detach().clone(),
+        var=layer.running_var.cpu().detach().clone(),
+    )
+
+    _sync_bn_cleanup()
+
+
+@unittest.skipUnless(torch.cuda.is_available(), "SyncBatchNorm is only supported on CUDA backends.")
+class TestSyncBatchNorm(unittest.TestCase):
+
+    def setUp(self):
+        self.original_start_method = torch.multiprocessing.get_start_method(allow_none=True)
+        torch.multiprocessing.set_start_method("spawn", force=True)
+
+    def tearDown(self):
+        torch.multiprocessing.set_start_method(self.original_start_method, force=True)
+
+    def test_running_stats_are_synchronized(self) -> None:
+        """Validates the running statistics are properly synchronized across ranks."""
+
+        manager = torch.multiprocessing.Manager()
+        return_dict = manager.dict()
+
+        world_size = 2
+        torch.multiprocessing.spawn(
+            _run_syncbn_test,
+            args=(world_size, return_dict),
+            nprocs=world_size,
+            join=True,
+        )
+
+        # Verify outputs are similar across all processes
+        means = [stats.mean for stats in return_dict.values()]
+        vars = [stats.var for stats in return_dict.values()]
+
+        for mean, var in zip(means[1:], vars[1:], strict=True):
+            # The value really needs to be the same
+            torch.testing.assert_close(mean, means[0], rtol=0, atol=0)
+            torch.testing.assert_close(var, vars[0], rtol=0, atol=0)
+
+    def test_convert_sync_batchnorm(self) -> None:
+
+        channels = 8
+        network = torch.nn.Sequential(
+            *[
+                torch.nn.Sequential(
+                    fvdb.nn.SparseConv3d(channels, channels),
+                    fvdb.nn.BatchNorm(channels),
+                    fvdb.nn.ReLU(inplace=True),
+                )
+                for _ in range(2)
+            ]
+        )
+
+        network = fvdb.nn.SyncBatchNorm.convert_sync_batchnorm(network)
+
+        num_sync_bn = 0
+        for module in network.modules():
+            self.assertNotIsInstance(module, fvdb.nn.BatchNorm)
+            if isinstance(module, fvdb.nn.SyncBatchNorm):
+                num_sync_bn += 1
+
+        self.assertEqual(num_sync_bn, 2)
 
 
 if __name__ == "__main__":

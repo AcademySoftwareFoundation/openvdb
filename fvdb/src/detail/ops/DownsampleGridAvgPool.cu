@@ -131,9 +131,8 @@ DownsampleGridAvgPool(const GridBatchImpl &fineBatchHdl, const GridBatchImpl &co
     double        avgFactor = 1.0 / (poolingFactor[0] * poolingFactor[1] * poolingFactor[2]);
 
     FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, fineData.scalar_type(),
-            "DownsampleGridAvgPool", [&]() {
+        AT_DISPATCH_V2(
+            fineData.scalar_type(), "DownsampleGridAvgPool", AT_WRAP([&]() {
                 auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
                 auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
                 auto outCoarseDataAcc =
@@ -163,7 +162,8 @@ DownsampleGridAvgPool(const GridBatchImpl &fineBatchHdl, const GridBatchImpl &co
                     forEachVoxelCPU<GridType>(outCoarseData.size(1), coarseBatchHdl,
                                               avgPoolPerVoxel);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 
     return outCoarseData;
@@ -191,9 +191,8 @@ DownsampleGridAvgPoolBackward(const GridBatchImpl &coarseBatchHdl,
     double        avgFactor = 1.0 / (poolingFactor[0] * poolingFactor[1] * poolingFactor[2]);
 
     FVDB_DISPATCH_GRID_TYPES(fineBatchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, fineData.scalar_type(),
-            "DownsampleGridAvgPoolBackward", [&]() {
+        AT_DISPATCH_V2(
+            fineData.scalar_type(), "DownsampleGridAvgPoolBackward", AT_WRAP([&]() {
                 auto fineBatchAcc = gridBatchAccessor<DeviceTag, GridType>(fineBatchHdl);
                 auto fineDataAcc  = tensorAccessor<DeviceTag, scalar_t, 2>(fineDataReshape);
                 auto coarseGradOutAcc =
@@ -222,7 +221,8 @@ DownsampleGridAvgPoolBackward(const GridBatchImpl &coarseBatchHdl,
                     };
                     forEachVoxelCPU<GridType>(fineData.size(1), coarseBatchHdl, cb);
                 }
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
     return outGradInReshape.reshape(spliceShape({ fineData.size(0) }, coarseGradOut));
 }

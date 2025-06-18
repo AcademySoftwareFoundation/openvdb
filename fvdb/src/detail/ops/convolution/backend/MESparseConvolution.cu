@@ -4,6 +4,7 @@
 #ifndef GPU_CONVOLUTION
 #define GPU_CONVOLUTION
 
+#include <ATen/Dispatch_v2.h>
 #include <ATen/OpMathType.h>
 #include <ATen/cuda/Atomic.cuh>
 #include <ATen/cuda/CUDAContext.h>
@@ -670,8 +671,8 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
     int          out_nchannel = kernel.size(-1);
     cudaStream_t stream       = at::cuda::getCurrentCUDAStream().stream();
 
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-        in_feat.scalar_type(), "convolution_backward_cuda", ([&] {
+    AT_DISPATCH_V2(
+        in_feat.scalar_type(), "convolution_backward_cuda", AT_WRAP([&] {
             // using scalar_t = float;
             using Dtype = scalar_t;
             using Itype = uint32_t;
@@ -839,7 +840,8 @@ dispatchMESparseConvolutionKernelMapGrad(at::Tensor in_feat, at::Tensor grad_in_
                 }
                 CUDA_CHECK(cudaStreamSynchronize(stream));
             }
-        }));
+        }),
+        AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
 }
 
 } // namespace ops

@@ -10,7 +10,6 @@ import numpy
 import torch
 
 Numeric = Union[int, float]
-TorchDeviceOrString = Union[torch.device, str]
 
 Vec3i = Union[torch.Tensor, numpy.ndarray, List[int], Tuple[int, int, int], torch.Size]
 Vec3d = Union[torch.Tensor, numpy.ndarray, List[float], Tuple[float, float, float]]

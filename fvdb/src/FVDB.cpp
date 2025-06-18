@@ -3,13 +3,11 @@
 //
 #include "FVDB.h"
 
-#include "detail/autograd/Autograd.h"
-#include "detail/io/IO.h"
-#include "detail/ops/jagged/JaggedOps.h"
+#include <detail/autograd/Autograd.h>
+#include <detail/io/IO.h>
+#include <detail/ops/jagged/JaggedOps.h>
 
 #include <ATen/cuda/CUDAContext.h>
-
-#include <execution>
 
 namespace fvdb {
 
@@ -73,9 +71,9 @@ from_nanovdb(nanovdb::GridHandle<nanovdb::HostBuffer> &handle) {
 }
 
 nanovdb::GridHandle<nanovdb::HostBuffer>
-to_nanovdb(const GridBatch &gridBatch, const torch::optional<JaggedTensor> maybeData,
-           const torch::optional<StringOrListOfStrings> maybeNames) {
-    return detail::io::toNVDB(gridBatch, maybeData, maybeNames);
+to_nanovdb(const GridBatch &gridBatch, const std::optional<JaggedTensor> maybeData,
+           const std::vector<std::string> &names) {
+    return detail::io::toNVDB(gridBatch, maybeData, names);
 }
 
 GridBatch
@@ -87,20 +85,43 @@ jcat(const std::vector<GridBatch> &vec) {
 }
 
 JaggedTensor
-jcat(const std::vector<JaggedTensor> &vec, torch::optional<int64_t> dim) {
+jcat(const std::vector<JaggedTensor> &vec, std::optional<int64_t> dim) {
     return JaggedTensor::jcat(vec, dim);
 }
 
 void
 save(const std::string &path, const GridBatch &gridBatch,
-     const torch::optional<JaggedTensor>          maybeData,
-     const torch::optional<StringOrListOfStrings> maybeNames, bool compressed, bool verbose) {
-    detail::io::saveNVDB(path, gridBatch, maybeData, maybeNames, compressed, verbose);
+     const std::optional<JaggedTensor> maybeData, const std::vector<std::string> &names,
+     bool compressed, bool verbose) {
+    detail::io::saveNVDB(path, gridBatch, maybeData, names, compressed, verbose);
+}
+
+void
+save(const std::string &path, const GridBatch &gridBatch,
+     const std::optional<JaggedTensor> maybeData, const std::string &name, bool compressed,
+     bool verbose) {
+    if (name.empty()) {
+        detail::io::saveNVDB(path, gridBatch, maybeData, {}, compressed, verbose);
+    } else {
+        std::vector<std::string> names(gridBatch.grid_count());
+        std::fill(names.begin(), names.end(), name);
+        detail::io::saveNVDB(path, gridBatch, maybeData, names, compressed, verbose);
+    }
 }
 
 std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
-load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, TorchDeviceOrString device,
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier, const torch::Device &device,
      bool verbose) {
+    return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
+}
+
+std::tuple<GridBatch, JaggedTensor, std::vector<std::string>>
+load(const std::string &path, NanoVDBFileGridIdentifier gridIdentifier,
+     const std::string &device_string, bool verbose) {
+    torch::Device device(device_string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
     return detail::io::loadNVDB(path, gridIdentifier, device, verbose);
 }
 
@@ -134,11 +155,24 @@ gridbatch_from_nearest_voxels_to_points(const JaggedTensor       &points,
 GridBatch
 gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
                      const Vec3dBatchOrScalar &voxel_sizes, const Vec3dBatch &origins,
-                     torch::optional<torch::Tensor> mask, TorchDeviceOrString device,
+                     std::optional<torch::Tensor> mask, const torch::Device &device,
                      bool is_mutable) {
     auto ret = GridBatch(device, is_mutable);
     ret.set_from_dense_grid(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask);
     return ret;
+}
+
+GridBatch
+gridbatch_from_dense(const int64_t numGrids, const Vec3i &denseDims, const Vec3i &ijkMin,
+                     const Vec3dBatchOrScalar &voxel_sizes, const Vec3dBatch &origins,
+                     std::optional<torch::Tensor> mask, const std::string &device_string,
+                     bool is_mutable) {
+    torch::Device device(device_string);
+    if (device.is_cuda() && !device.has_index()) {
+        device.set_index(c10::cuda::current_device());
+    }
+    return gridbatch_from_dense(numGrids, denseDims, ijkMin, voxel_sizes, origins, mask, device,
+                                is_mutable);
 }
 
 GridBatch
@@ -152,7 +186,7 @@ gridbatch_from_mesh(const JaggedTensor &vertices, const JaggedTensor &faces,
 
 std::vector<int64_t>
 jdataShape1(const std::vector<int64_t> &lsizes, const std::vector<int64_t> &rsizes) {
-    const int64_t totalElements = std::reduce(std::execution::par, lsizes.begin(), lsizes.end());
+    const int64_t        totalElements = std::reduce(lsizes.begin(), lsizes.end());
     std::vector<int64_t> shape;
     shape.reserve(rsizes.size() + 1);
     shape.push_back(totalElements);
@@ -167,13 +201,12 @@ jdataShape2(const std::vector<std::vector<int64_t>> &lsizes, const std::vector<i
     elementCountsPerList.reserve(lsizes.size());
     tensorCountsPerList.reserve(lsizes.size());
     for (const auto &l: lsizes) {
-        elementCountsPerList.push_back(std::reduce(std::execution::par, l.begin(), l.end()));
+        elementCountsPerList.push_back(std::reduce(l.begin(), l.end()));
         tensorCountsPerList.push_back(l.size());
     }
-    const int64_t totalSize =
-        std::reduce(std::execution::par, elementCountsPerList.begin(), elementCountsPerList.end());
+    const int64_t totalSize = std::reduce(elementCountsPerList.begin(), elementCountsPerList.end());
     const int64_t totalTensors =
-        std::reduce(std::execution::par, tensorCountsPerList.begin(), tensorCountsPerList.end());
+        std::reduce(tensorCountsPerList.begin(), tensorCountsPerList.end());
     std::vector<int64_t> shape;
     shape.reserve(rsizes.size() + 1);
     shape.push_back(totalSize);

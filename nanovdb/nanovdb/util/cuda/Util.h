@@ -109,6 +109,44 @@ inline cudaError_t freeAsync(void* d_ptr, cudaStream_t stream){return cudaFreeAs
 
 #endif
 
+/// @brief Returns the device ID associated with the specified pointer
+/// @note  If @c ptr points to host memory (only) the return ID is either cudaInvalidDeviceId = -2 or cudaCpuDeviceId = -1
+inline int ptrToDevice(void *ptr)
+{
+    cudaPointerAttributes ptrAtt;
+    cudaCheck(cudaPointerGetAttributes(&ptrAtt, ptr));
+    return ptrAtt.device;
+}
+
+/// @brief Returns the ID of the current device
+inline int currentDevice()
+{
+    int current = 0;
+    cudaCheck(cudaGetDevice(&current));
+    return current;
+}
+
+/// @brief Returns the number of devices with compute capability greater or equal to 1.0 that are available for execution
+inline int deviceCount()
+{
+    int deviceCount = 0;
+    cudaCheck(cudaGetDeviceCount(&deviceCount));
+    return deviceCount;
+}
+
+/// @brief Print information about a specific device
+/// @param device device ID for which information will be printed
+/// @param preMsg optional message printed before the device information
+/// @param file   Optional file stream to print to, e.g. stderr or stdout
+inline void printDevInfo(int device, const char *preMsg = nullptr, std::FILE* file = stderr)
+{
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+    if (preMsg) fprintf(file, "%s ", preMsg);
+    fprintf(file,"GPU #%d, named \"%s\", compute capability %d.%d, %zu GB of VRAM\n",
+            device, prop.name, prop.major, prop.minor, prop.totalGlobalMem >> 30);
+}
+
 /// @brief Simple (naive) implementation of a unique device pointer
 ///        using stream ordered memory allocation and deallocation.
 /// @tparam T Type of the device pointer
@@ -172,6 +210,17 @@ __global__ void lambdaKernel(const size_t numItems, Func func, Args... args)
     if (tid >= numItems) return;
     func(tid, args...);
 }// util::cuda::lambdaKernel
+
+/// @brief Cuda kernel that launches device lambda functions with a tid offset
+/// @param numItems Problem size
+/// @param offset Offset for thread id
+template<typename Func, typename... Args>
+__global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func func, Args... args)
+{
+    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= numItems) return;
+    func(tid + offset, args...);
+}// util::cuda::offsetLambdaKernel
 
 #endif// __CUDACC__
 

@@ -41,3 +41,6 @@ CHANGES                                                     @kmuseth @apradhana 
 /openvdb_houdini/openvdb_houdini/PointUtils.*               @danrbailey @idclip
 /openvdb_houdini/openvdb_houdini/*_OpenVDB_Points_*         @danrbailey @idclip
 /openvdb_houdini/openvdb_houdini/GR_PrimVDBPoints.*         @danrbailey @idclip
+
+# fVDB
+/fvdb/                                                      @NVIDIA-Omniverse/fvdb-dev

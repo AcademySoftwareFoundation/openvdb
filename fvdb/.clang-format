@@ -74,13 +74,23 @@ BreakConstructorInitializersBeforeComma: false
 BreakInheritanceList: BeforeColon
 BreakStringLiterals: false
 Cpp11BracedListStyle: false
-IncludeBlocks: Preserve
+IncludeBlocks: Regroup
 IncludeIsMainRegex: "$"
 IncludeCategories:
-  - Regex: '^<.*\.(h|cuh)>'
-    Priority: 1
-  - Regex: ".*"
-    Priority: 2
+  - Regex:           '^"' # quoted includes
+    Priority:        1
+  - Regex:           '^<(detail/|Types.h|JaggedTensor.h|GridBatch.h|SparseConvPackInfo.h|Config.h|FVDB.h|GaussianSplatting.h)' # fvdb includes
+    Priority:        1
+  - Regex:           '^<nanovdb/' # nanovdb includes
+    Priority:        2
+  - Regex:           '^<(torch|c10|THC|ATen)/' # torch includes
+    Priority:        3
+  - Regex:           '^<(cooperative_groups|cuco|cuda.h|cuda_|device_types|math_constants|nvtx3|cute)' # CUDA includes
+    Priority:        4
+  - Regex:           '^<.*\..*' # other system includes (e.g. with a '.')
+    Priority:        5
+  - Regex:           '^<[^.]+' # STL includes (no '.')
+    Priority:        6
 IncludeIsMainSourceRegex: "$"
 IndentPPDirectives: None
 IndentWrappedFunctionNames: false

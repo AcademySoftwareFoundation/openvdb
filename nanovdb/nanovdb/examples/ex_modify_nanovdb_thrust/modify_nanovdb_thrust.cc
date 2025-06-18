@@ -16,7 +16,7 @@ int main()
         auto handle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DeviceBuffer>(100.0f);
         using GridT = nanovdb::FloatGrid;
 
-        handle.deviceUpload(0, false); // Copy the NanoVDB grid to the GPU asynchronously
+        handle.deviceUpload(nullptr, false); // Copy the NanoVDB grid to the GPU asynchronously
 
         const GridT* grid = handle.grid<float>(); // get a (raw) const pointer to a NanoVDB grid of value type float on the CPU
         GridT* deviceGrid = handle.deviceGrid<float>(); // get a (raw) pointer to a NanoVDB grid of value type float on the GPU
@@ -32,7 +32,7 @@ int main()
 
         scaleActiveVoxels(deviceGrid, grid->tree().nodeCount(0), 2.0f);
 
-        handle.deviceDownload(0, true); // Copy the NanoVDB grid to the CPU synchronously
+        handle.deviceDownload(nullptr, true); // Copy the NanoVDB grid to the CPU synchronously
 
         std::cout << "Value after scaling  = " << grid->tree().getValue(nanovdb::Coord(101,0,0)) << std::endl;
     }

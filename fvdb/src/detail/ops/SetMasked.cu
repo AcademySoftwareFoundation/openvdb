@@ -46,24 +46,26 @@ SetMaskedIjk(const GridBatchImpl &batchHdl, const JaggedTensor &ijk, bool masked
     }
     TORCH_CHECK(ijk.rsize(0) > 0, "Empty tensor (ijk)");
 
-    AT_DISPATCH_INTEGRAL_TYPES(ijk.scalar_type(), "SetMaskedIjk", [&]() {
-        auto batchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndexMask>(batchHdl);
+    AT_DISPATCH_V2(
+        ijk.scalar_type(), "SetMaskedIjk", AT_WRAP([&]() {
+            auto batchAcc = gridBatchAccessor<DeviceTag, nanovdb::ValueOnIndexMask>(batchHdl);
 
-        if constexpr (DeviceTag == torch::kCUDA) {
-            auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
-                                     JaggedRAcc32<scalar_t, 2> cA) {
-                setMaskedIjkCallback<scalar_t, DeviceTag, JaggedRAcc32>(bidx, eidx, cA, batchAcc,
-                                                                        maskedState);
-            };
-            forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
-        } else {
-            auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> cA) {
-                setMaskedIjkCallback<scalar_t, DeviceTag, JaggedAcc>(bidx, eidx, cA, batchAcc,
-                                                                     maskedState);
-            };
-            forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
-        }
-    });
+            if constexpr (DeviceTag == torch::kCUDA) {
+                auto cb = [=] __device__(int32_t bidx, int32_t eidx, int32_t cidx,
+                                         JaggedRAcc32<scalar_t, 2> cA) {
+                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedRAcc32>(bidx, eidx, cA,
+                                                                            batchAcc, maskedState);
+                };
+                forEachJaggedElementChannelCUDA<scalar_t, 2>(1024, 1, ijk, cb);
+            } else {
+                auto cb = [=](int32_t bidx, int32_t eidx, int32_t cidx, JaggedAcc<scalar_t, 2> cA) {
+                    setMaskedIjkCallback<scalar_t, DeviceTag, JaggedAcc>(bidx, eidx, cA, batchAcc,
+                                                                         maskedState);
+                };
+                forEachJaggedElementChannelCPU<scalar_t, 2>(1, ijk, cb);
+            }
+        }),
+        AT_EXPAND(AT_INTEGRAL_TYPES));
 }
 
 template <>

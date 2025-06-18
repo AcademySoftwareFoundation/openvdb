@@ -86,6 +86,35 @@ class TestJaggedTensor(unittest.TestCase):
             assert False, "jagged tensor ldim should be 1 or 2"
 
     @parameterized.expand(all_device_dtype_combos)
+    def test_jcat_along_dim_0_with_one_tensor(self, device, dtype):
+        batch_size = 1
+
+        # Make a point cloud with a random number of points
+        def get_pc(num_pc_list: list):
+            pc_list = []
+            for num_pc in num_pc_list:
+                pc_list.append(torch.rand((num_pc, 3)).to(device))
+            return pc_list
+
+        num_pc_list = torch.randint(low=50, high=1000, size=(batch_size,), device=device).cpu().tolist()
+
+        pc1_tensor_list = get_pc(num_pc_list)
+        pc2_tensor_list = get_pc(num_pc_list)
+
+        pc1_jagged = fvdb.JaggedTensor(pc1_tensor_list)
+        pc2_jagged = fvdb.JaggedTensor(pc2_tensor_list)
+
+        cat_dim = 0
+        concat_tensor_list = [
+            torch.cat([pc1_tensor_list[i], pc2_tensor_list[i]], dim=cat_dim) for i in range(batch_size)
+        ]
+
+        jagged_from_concat_list = fvdb.JaggedTensor(concat_tensor_list)
+        jcat_result = fvdb.jcat([pc1_jagged, pc2_jagged], dim=cat_dim)
+
+        self.assertTrue(torch.equal(jagged_from_concat_list.jdata, jcat_result.jdata))
+
+    @parameterized.expand(all_device_dtype_combos)
     def test_pickle(self, device, dtype):
         jt, _ = self.mklol(7, 4, 8, device, dtype)
         with tempfile.NamedTemporaryFile() as tmp:

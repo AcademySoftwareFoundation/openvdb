@@ -14,9 +14,9 @@ namespace autograd {
 
 ReadIntoDense::variable_list
 ReadIntoDense::forward(ReadIntoDense::AutogradContext *ctx, c10::intrusive_ptr<GridBatchImpl> grid,
-                       ReadIntoDense::Variable            sparseData,
-                       const torch::optional<Vec3iBatch> &maybeMinCoord,
-                       const torch::optional<Vec3i>      &maybeGridSize) {
+                       ReadIntoDense::Variable          sparseData,
+                       const std::optional<Vec3iBatch> &maybeMinCoord,
+                       const std::optional<Vec3i>      &maybeGridSize) {
     TORCH_CHECK_VALUE(sparseData.dim() > 1, "sparse_data must have shape [num_voxels, *]");
     TORCH_CHECK_VALUE(sparseData.size(0) == grid->totalVoxels(),
                       "sparseData must have shape (num_voxels, *) where num_voxels = " +

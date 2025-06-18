@@ -90,9 +90,8 @@ dispatchReadFromDense<torch::kCUDA>(const GridBatchImpl &batchHdl,
                                     const torch::Tensor &denseOrigins,
                                     torch::Tensor &outSparseTensor, bool ignoreMasked) {
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, inDenseTensor.scalar_type(),
-            "readFromDense", [&]() {
+        AT_DISPATCH_V2(
+            inDenseTensor.scalar_type(), "readFromDense", AT_WRAP([&]() {
                 auto inDenseAcc =
                     inDenseTensor.packed_accessor64<scalar_t, 5, torch::RestrictPtrTraits>();
                 auto denseOriginsAcc =
@@ -107,7 +106,8 @@ dispatchReadFromDense<torch::kCUDA>(const GridBatchImpl &batchHdl,
                                                                    outSparseAcc, ignoreMasked);
                 };
                 forEachVoxelCUDA<GridType>(1024, outSparseTensor.size(1), batchHdl, callback);
-            });
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 }
 
@@ -119,14 +119,14 @@ dispatchReadFromDense<torch::kCPU>(const GridBatchImpl &gridHdl, const torch::Te
     bool isContiguous = inDenseTensor.is_contiguous() && outSparseTensor.is_contiguous();
 
     FVDB_DISPATCH_GRID_TYPES(gridHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND2(
-            at::ScalarType::Half, at::ScalarType::BFloat16, inDenseTensor.scalar_type(),
-            "readFromDense", [&]() {
-                readFromDenseCPU(
-                    gridHdl.hostAccessor<GridType>(), inDenseTensor.accessor<scalar_t, 5>(),
-                    denseOrigins.accessor<int32_t, 2>(), outSparseTensor.accessor<scalar_t, 2>(),
-                    ignoreMasked, isContiguous);
-            });
+        AT_DISPATCH_V2(inDenseTensor.scalar_type(), "readFromDense", AT_WRAP([&]() {
+                           readFromDenseCPU(gridHdl.hostAccessor<GridType>(),
+                                            inDenseTensor.accessor<scalar_t, 5>(),
+                                            denseOrigins.accessor<int32_t, 2>(),
+                                            outSparseTensor.accessor<scalar_t, 2>(), ignoreMasked,
+                                            isContiguous);
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf, c10::kBFloat16);
     });
 }
 

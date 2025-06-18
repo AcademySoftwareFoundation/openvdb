@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
-
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -44,7 +43,7 @@ buildCoarseGridFromFineGridCPU(const GridBatchImpl &fineBatchHdl,
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
@@ -110,7 +109,6 @@ buildConvGridFromGridCPU(const GridBatchImpl &baseBatchHdl, const nanovdb::Coord
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
         batchHandles.push_back(std::move(ret));
     }
 

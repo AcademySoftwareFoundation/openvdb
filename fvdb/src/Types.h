@@ -4,7 +4,7 @@
 #ifndef FVDB_TYPES_H
 #define FVDB_TYPES_H
 
-#include "detail/TypesImpl.h"
+#include <detail/TypesImpl.h>
 
 #include <nanovdb/NanoVDB.h>
 
@@ -39,47 +39,6 @@ using Vec3dBatch =
     detail::Vec3BatchImpl<nanovdb::Vec3d, false /*AllowScalar*/, true /*AllowBroadcast*/>;
 using Vec3iBatch =
     detail::Vec3BatchImpl<nanovdb::Coord, false /*AllowScalar*/, true /*AllowBroadcast*/>;
-
-/// @brief A class that can be constructed from a torch::Device or a string.
-///        Calling value() returns a torch::device
-class TorchDeviceOrString {
-    torch::Device mValue;
-    void
-    setIndex() {
-        if (mValue.is_cuda() && !mValue.has_index()) {
-            mValue.set_index(c10::cuda::current_device());
-        }
-    }
-
-  public:
-    TorchDeviceOrString() : mValue(torch::kCPU) { setIndex(); }
-    TorchDeviceOrString(torch::Device device) : mValue(device) { setIndex(); }
-    TorchDeviceOrString(c10::DeviceType deviceType) : mValue(deviceType) { setIndex(); }
-    TorchDeviceOrString(std::string &str) : mValue(str) { setIndex(); }
-
-    const torch::Device &
-    value() const {
-        return mValue;
-    }
-};
-
-/// @brief A class that con be constructed from a string or a list of strings but always returns a
-/// list of strings
-///        Used to enable broadcasting for arguments that specify a single value or a list of values
-///        for a whole batch
-class StringOrListOfStrings {
-    std::vector<std::string> mValue;
-
-  public:
-    StringOrListOfStrings() : mValue() {}
-    StringOrListOfStrings(std::string str) : mValue({ str }) {}
-    StringOrListOfStrings(std::vector<std::string> str) : mValue(str) {}
-
-    const std::vector<std::string> &
-    value() const {
-        return mValue;
-    }
-};
 
 /// @brief A class representing a set of unique IDs for a nanovdb grid (used to specify which grids
 /// to load

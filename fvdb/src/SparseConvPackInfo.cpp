@@ -3,14 +3,14 @@
 //
 #include "SparseConvPackInfo.h"
 
-#include "detail/autograd/Autograd.h"
-#include "detail/ops/Ops.h"
-#include "detail/ops/convolution/pack_info/PackInfoOps.h"
+#include <detail/autograd/Autograd.h>
+#include <detail/ops/Ops.h>
+#include <detail/ops/convolution/pack_info/PackInfoOps.h>
 
 namespace fvdb {
 
 SparseConvPackInfo::SparseConvPackInfo(Vec3iOrScalar kernelsize, Vec3iOrScalar stride,
-                                       GridBatch srcGrid, torch::optional<GridBatch> maybeTarget) {
+                                       GridBatch srcGrid, std::optional<GridBatch> maybeTarget) {
     TORCH_CHECK(Vec3iOrScalar(0).value() < kernelsize.value(),
                 "Expect kernel size to be larger than {0,0,0}, but got " + kernelsize.toString() +
                     ".");

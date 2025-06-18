@@ -1,6 +1,7 @@
 # Copyright Contributors to the OpenVDB Project
 # SPDX-License-Identifier: Apache-2.0
 #
+
 import logging
 import os
 
@@ -54,7 +55,7 @@ def main():
     torch.random.manual_seed(5)
     logging.basicConfig(level=logging.INFO)
     logging.addLevelName(logging.INFO, "\033[1;32m%s\033[1;0m" % logging.getLevelName(logging.INFO))
-    device = torch.device("cuda")
+    device = torch.device("cuda", torch.cuda.current_device())
     dtype = torch.float32
     vox_size = 0.005
     vox_origin = np.zeros(3)

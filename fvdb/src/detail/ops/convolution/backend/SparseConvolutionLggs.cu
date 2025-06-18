@@ -2,17 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
-
 #include <detail/utils/cuda/Utils.cuh>
 
 #include <c10/cuda/CUDAException.h>
 
-// NOTE: Getting an error about duplicate definitions of `copy_if` if cute/tenosr.hpp is included
-// after other cute headers
-#include <cute/tensor.hpp>
-
+#include <cute/algorithm/copy.hpp>
 #include <cute/atom/copy_atom.hpp>
 #include <cute/atom/mma_atom.hpp>
+#include <cute/tensor.hpp>
 
 namespace fvdb {
 namespace detail {

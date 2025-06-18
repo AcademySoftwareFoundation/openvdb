@@ -61,8 +61,8 @@ SplatIntoGridTrilinear(const GridBatchImpl &batchHdl, const JaggedTensor &points
     torch::Tensor outGridDataReshape = featureCoalescedView(outGridData);    // [N, -1]
 
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            points.scalar_type(), "SplatIntoGridTrilinear", ([&] {
+        AT_DISPATCH_V2(
+            points.scalar_type(), "SplatIntoGridTrilinear", AT_WRAP([&] {
                 torch::Tensor _outGridData;
                 if (points.scalar_type() == at::kHalf) {
                     _outGridData = torch::zeros_like(outGridData,
@@ -98,7 +98,8 @@ SplatIntoGridTrilinear(const GridBatchImpl &batchHdl, const JaggedTensor &points
                 if (points.scalar_type() == at::kHalf) {
                     outGridData.copy_(_outGridData);
                 }
-            }));
+            }),
+            AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
     return outGridData;
 }

@@ -4,11 +4,10 @@
 #include "JaggedTensor.h"
 
 #include "Config.h"
-
-#include "detail/autograd/JaggedReduce.h"
-#include "detail/ops/Ops.h"
-#include "detail/ops/jagged/JaggedOps.h"
-#include "detail/utils/Utils.h"
+#include <detail/autograd/JaggedReduce.h>
+#include <detail/ops/Ops.h>
+#include <detail/ops/jagged/JaggedOps.h>
+#include <detail/utils/Utils.h>
 
 namespace fvdb {
 

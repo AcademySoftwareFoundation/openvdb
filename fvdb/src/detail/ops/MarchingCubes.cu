@@ -200,29 +200,30 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
 
     // Count the number of vertices
     FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-        AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-            sdf.scalar_type(), "countVertices", ([&] {
-                auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
-                auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
-                auto nVerticesAcc = tensorAccessor<DeviceTag, int64_t, 1>(nVertices);
-                if constexpr (DeviceTag == torch::kCUDA) {
-                    auto cb = [=] __device__(int32_t bidx, int32_t lidx, int32_t vidx, int32_t cidx,
+        AT_DISPATCH_V2(sdf.scalar_type(), "countVertices", AT_WRAP([&] {
+                           auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
+                           auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
+                           auto nVerticesAcc = tensorAccessor<DeviceTag, int64_t, 1>(nVertices);
+                           if constexpr (DeviceTag == torch::kCUDA) {
+                               auto cb = [=] __device__(int32_t bidx, int32_t lidx, int32_t vidx,
+                                                        int32_t                     cidx,
+                                                        BatchGridAccessor<GridType> batchAcc) {
+                                   countVerticesCallback<scalar_t, GridType, TorchRAcc32>(
+                                       bidx, lidx, vidx, cidx, batchAcc, sdfAcc,
+                                       static_cast<scalar_t>(level), nVerticesAcc);
+                               };
+                               forEachVoxelCUDA<GridType>(128, 1, batchHdl, cb);
+                           } else {
+                               auto cb = [=](int32_t bidx, int32_t lidx, int32_t vidx, int32_t cidx,
                                              BatchGridAccessor<GridType> batchAcc) {
-                        countVerticesCallback<scalar_t, GridType, TorchRAcc32>(
-                            bidx, lidx, vidx, cidx, batchAcc, sdfAcc, static_cast<scalar_t>(level),
-                            nVerticesAcc);
-                    };
-                    forEachVoxelCUDA<GridType>(128, 1, batchHdl, cb);
-                } else {
-                    auto cb = [=](int32_t bidx, int32_t lidx, int32_t vidx, int32_t cidx,
-                                  BatchGridAccessor<GridType> batchAcc) {
-                        countVerticesCallback<scalar_t, GridType, TorchAcc>(
-                            bidx, lidx, vidx, cidx, batchAcc, sdfAcc, static_cast<scalar_t>(level),
-                            nVerticesAcc);
-                    };
-                    forEachVoxelCPU<GridType>(1, batchHdl, cb);
-                }
-            }));
+                                   countVerticesCallback<scalar_t, GridType, TorchAcc>(
+                                       bidx, lidx, vidx, cidx, batchAcc, sdfAcc,
+                                       static_cast<scalar_t>(level), nVerticesAcc);
+                               };
+                               forEachVoxelCPU<GridType>(1, batchHdl, cb);
+                           }
+                       }),
+                       AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
     });
 
     // cumsum to determine starting position.
@@ -237,8 +238,8 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
 
     if (nTriangles > 0) {
         FVDB_DISPATCH_GRID_TYPES(batchHdl, [&]() {
-            AT_DISPATCH_FLOATING_TYPES_AND_HALF(
-                sdf.scalar_type(), "meshingCubes", ([&] {
+            AT_DISPATCH_V2(
+                sdf.scalar_type(), "meshingCubes", AT_WRAP([&] {
                     auto batchAcc     = gridBatchAccessor<DeviceTag, GridType>(batchHdl);
                     auto sdfAcc       = tensorAccessor<DeviceTag, scalar_t, 1>(sdf);
                     auto countCsumAcc = tensorAccessor<DeviceTag, int64_t, 1>(countCsum);
@@ -265,7 +266,8 @@ MarchingCubes(const GridBatchImpl &batchHdl, const torch::Tensor &sdf, double le
                         };
                         forEachVoxelCPU<GridType>(1, batchHdl, cb);
                     }
-                }));
+                }),
+                AT_EXPAND(AT_FLOATING_TYPES), c10::kHalf);
         });
     }
 

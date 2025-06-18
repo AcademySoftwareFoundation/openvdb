@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "Build.h"
-
 #include <detail/ops/Ops.h>
 #include <detail/utils/Utils.h>
 
@@ -56,7 +55,7 @@ buildPaddedGridFromGridWithoutBorderCPU(const GridBatchImpl &baseBatchHdl, int B
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
@@ -101,7 +100,7 @@ buildPaddedGridFromGridCPU(const GridBatchImpl &baseBatchHdl, int BMIN, int BMAX
         proxyGridAccessor.merge();
         auto ret = nanovdb::tools::createNanoGrid<ProxyGridT, GridType, TorchDeviceBuffer>(
             *proxyGrid, 0u, false, false);
-        ret.buffer().setDevice(torch::kCPU, true);
+        ret.buffer().to(torch::kCPU);
         batchHandles.push_back(std::move(ret));
     }
 
@@ -119,10 +118,10 @@ buildPaddedGridFromGrid(bool isMutable, const GridBatchImpl &baseBatchHdl, int b
         JaggedTensor coords;
         if (excludeBorder) {
             coords = ops::dispatchPaddedIJKForGridWithoutBorder<torch::kCUDA>(
-                baseBatchHdl, nanovdb::Coord(bmin), nanovdb::Coord(bmax));
+                baseBatchHdl, nanovdb::CoordBBox(nanovdb::Coord(bmin), nanovdb::Coord(bmax)));
         } else {
-            coords = ops::dispatchPaddedIJKForGrid<torch::kCUDA>(baseBatchHdl, nanovdb::Coord(bmin),
-                                                                 nanovdb::Coord(bmax));
+            coords = ops::dispatchPaddedIJKForGrid<torch::kCUDA>(
+                baseBatchHdl, nanovdb::CoordBBox(nanovdb::Coord(bmin), nanovdb::Coord(bmax)));
         }
         return ops::dispatchCreateNanoGridFromIJK<torch::kCUDA>(coords, isMutable);
     } else {

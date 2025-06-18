@@ -1,3 +1,5 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: Apache-2.0
 #ifndef NANOVDB_PYGRIDHANDLE_HAS_BEEN_INCLUDED
 #define NANOVDB_PYGRIDHANDLE_HAS_BEEN_INCLUDED
 
@@ -15,7 +17,7 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
     return nb::class_<nanovdb::GridHandle<BufferT>>(m, name)
         .def(nb::init<>())
         .def("reset", &nanovdb::GridHandle<BufferT>::reset)
-        .def("size", &nanovdb::GridHandle<BufferT>::size)
+        .def("size", &nanovdb::GridHandle<BufferT>::bufferSize)
         .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
         .def("empty", &nanovdb::GridHandle<BufferT>::empty)
         .def(

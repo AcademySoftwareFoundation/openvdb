@@ -105,11 +105,14 @@
         "cerrno": "cpp",
         "queue": "cpp",
         "execution": "cpp",
-        "__config": "cpp"
+        "__config": "cpp",
+        "any": "cpp",
+        "span": "cpp",
+        "csignal": "cpp"
     },
     "files.trimTrailingWhitespace": true,
     "editor.rulers": [ 100 ],
-    "C_Cpp.intelliSenseEngine": "default",
+    "C_Cpp.intelliSenseEngine": "disabled",
     "C_Cpp.enhancedColorization": "enabled",
     "C_Cpp.errorSquiggles": "enabledIfIncludesResolve",
     "C_Cpp.autocomplete": "default",
@@ -120,11 +123,11 @@
     "cmake.configureOnOpen": false,
     "C_Cpp.default.compilerPath": "${env:CONDA_PREFIX}/envs/fvdb/bin/x86_64-conda-linux-gnu-c++",
     "[cpp]": {
-        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
         "editor.formatOnSave": true
     },
     "[cuda-cpp]": {
-        "editor.defaultFormatter": "ms-vscode.cpptools",
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
         "editor.formatOnSave": true
     },
     "[python]": {
@@ -154,4 +157,6 @@
     "json.format.keepLines": true,
     "C_Cpp.formatting": "clangFormat",
     "C_Cpp.clang_format_path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clang-format-18",
+    "files.insertFinalNewline": true,
+    "clangd.path": "${env:CONDA_PREFIX}/envs/fvdb/bin/clangd",
 }

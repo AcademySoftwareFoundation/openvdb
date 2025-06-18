@@ -1,11 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 //
-#include <detail/utils/Utils.h>
-#include <detail/utils/cuda/Utils.cuh>
-
 #include <detail/GridBatchImpl.h>
 #include <detail/build/Build.h>
+#include <detail/utils/Utils.h>
+#include <detail/utils/cuda/Utils.cuh>
 
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 
@@ -133,32 +132,6 @@ ijkForDense(nanovdb::Coord origin, nanovdb::Coord size, TorchRAcc32<int32_t, 2> 
     outIJKAccessor[tid][2] = zi + origin[2];
 }
 
-struct NanoVDBGridBuilderTorchAllocator {
-    std::set<void *> mAllocatedData;
-
-    cudaError_t
-    DeviceAllocate(void **ptr, size_t size, cudaStream_t stream) {
-        *ptr = c10::cuda::CUDACachingAllocator::raw_alloc_with_stream(size, stream);
-        mAllocatedData.insert(*ptr);
-        return (cudaError_t)CUDA_SUCCESS;
-    }
-
-    cudaError_t
-    DeviceFree(void *ptr) {
-        c10::cuda::CUDACachingAllocator::raw_delete(ptr);
-        mAllocatedData.erase(ptr);
-        return (cudaError_t)CUDA_SUCCESS;
-    }
-
-    void
-    FreeAllCached() {
-        for (void *ptr: mAllocatedData) {
-            c10::cuda::CUDACachingAllocator::raw_delete(ptr);
-        }
-        mAllocatedData.clear();
-    }
-};
-
 template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromIJK<torch::kCUDA>(const JaggedTensor &ijk, bool isMutable) {
@@ -176,7 +149,7 @@ dispatchCreateNanoGridFromIJK<torch::kCUDA>(const JaggedTensor &ijk, bool isMuta
         // function. We can't pass in a device directly but we can pass in a buffer which gets
         // passed to TorchDeviceBuffer::create. The guide buffer holds the device and effectively
         // passes it to the created buffer.
-        TorchDeviceBuffer guide(0, nullptr, false, ijk.device().index());
+        TorchDeviceBuffer guide(0, ijk.device());
 
         // FIXME: This is slow because we have to copy this data to the host and then build the
         // grids. Ideally we want to do this in a single invocation.
@@ -195,12 +168,11 @@ dispatchCreateNanoGridFromIJK<torch::kCUDA>(const JaggedTensor &ijk, bool isMuta
             // torch::Tensor ijkDataSlice = ijkData.narrow(0, startIdx, nVoxels);
             const int32_t *dataPtr = ijkData.data_ptr<int32_t>() + 3 * startIdx;
 
-            handles.push_back(
-                nVoxels == 0 ? build::buildEmptyGrid(guide.device(), isMutable)
-                             : nanovdb::tools::cuda::voxelsToGrid<GridType, nanovdb::Coord *,
-                                                                  TorchDeviceBuffer,
-                                                                  NanoVDBGridBuilderTorchAllocator>(
-                                   (nanovdb::Coord *)dataPtr, nVoxels, 1.0, guide));
+            handles.push_back(nVoxels == 0
+                                  ? build::buildEmptyGrid(guide.device(), isMutable)
+                                  : nanovdb::tools::cuda::voxelsToGrid<GridType, nanovdb::Coord *,
+                                                                       TorchDeviceBuffer>(
+                                        (nanovdb::Coord *)dataPtr, nVoxels, 1.0, guide));
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
 
@@ -221,8 +193,8 @@ template <>
 nanovdb::GridHandle<TorchDeviceBuffer>
 dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord origin,
                                               nanovdb::Coord size, bool isMutable,
-                                              torch::Device                         device,
-                                              const torch::optional<torch::Tensor> &maybeMask) {
+                                              torch::Device                       device,
+                                              const std::optional<torch::Tensor> &maybeMask) {
     TORCH_CHECK(device.is_cuda(), "device must be cuda");
     TORCH_CHECK(device.has_index(), "device must have index");
 
@@ -253,7 +225,7 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord
         // function. We can't pass in a device directly but we can pass in a buffer which gets
         // passed to TorchDeviceBuffer::create. The guide buffer holds the device and effectively
         // passes it to the created buffer.
-        TorchDeviceBuffer guide(0, nullptr, false, device.index());
+        TorchDeviceBuffer guide(0, device);
 
         TORCH_CHECK(ijkData.is_contiguous(), "ijkData must be contiguous");
 
@@ -261,12 +233,11 @@ dispatchCreateNanoGridFromDense<torch::kCUDA>(uint32_t batchSize, nanovdb::Coord
         std::vector<nanovdb::GridHandle<TorchDeviceBuffer>> handles;
         for (int i = 0; i < batchSize; i += 1) {
             const int64_t nVoxels = ijkData.size(0);
-            handles.push_back(
-                nVoxels == 0 ? build::buildEmptyGrid(guide.device(), isMutable)
-                             : nanovdb::tools::cuda::voxelsToGrid<GridType, nanovdb::Coord *,
-                                                                  TorchDeviceBuffer,
-                                                                  NanoVDBGridBuilderTorchAllocator>(
-                                   (nanovdb::Coord *)ijkData.data_ptr(), nVoxels, 1.0, guide));
+            handles.push_back(nVoxels == 0
+                                  ? build::buildEmptyGrid(guide.device(), isMutable)
+                                  : nanovdb::tools::cuda::voxelsToGrid<GridType, nanovdb::Coord *,
+                                                                       TorchDeviceBuffer>(
+                                        (nanovdb::Coord *)ijkData.data_ptr(), nVoxels, 1.0, guide));
             C10_CUDA_KERNEL_LAUNCH_CHECK();
         }
 

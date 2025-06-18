@@ -1,7 +1,9 @@
 pip >= 23.3.1
-setuptools >= 68.2.2
+scikit_build_core
 wheel
 GitPython
 ninja
-requests
+nvidia-cudnn-cu12
 tqdm
+numpy
+torch

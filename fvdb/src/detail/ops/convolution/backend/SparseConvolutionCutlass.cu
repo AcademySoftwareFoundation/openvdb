@@ -2,18 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
-
 #include <detail/utils/cuda/Utils.cuh>
-
-// NOTE: Getting an error about duplicate definitions of `copy_if` if cute/tenosr.hpp is included
-// after other cute headers
-#include <cute/tensor.hpp>
-
-#include <cute/atom/copy_atom.hpp>
-#include <cute/atom/mma_atom.hpp>
 
 #include <THC/THCAtomics.cuh>
 #include <c10/cuda/CUDAException.h>
+
+#include <cute/algorithm/copy.hpp>
+#include <cute/atom/copy_atom.hpp>
+#include <cute/atom/mma_atom.hpp>
+#include <cute/tensor.hpp>
 
 #include <algorithm>
 
@@ -585,7 +582,8 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
 
     cute::Tensor gOutput_mn = zipped_divide(
         mOutputScatter, typename KernelFunctor::TilerOut{});           // ((BLK_M, BLK_N), (m', n'))
-    dim3             lauch_grid{ size<1, 1>(gOutput_mn), size<1, 0>(gOutput_mn), 1 };
+    dim3             launch_grid{ static_cast<unsigned int>(size<1, 1>(gOutput_mn)),
+                      static_cast<unsigned int>(size<1, 0>(gOutput_mn)), 1u };
     constexpr size_t smem_size = sizeof(typename KernelFunctor::SharedStorage);
 
 #if 0
@@ -636,8 +634,8 @@ stencilConvolveLauncher(size_t num_bricks, uint32_t *halo_index_buffer, float *i
     // cudaEventRecord(start);
     kernel_entrypoint<KernelFunctor, decltype(mFilter), decltype(mXformedActGather),
                       decltype(mOutputScatter)>
-        <<<lauch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(mFilter, mXformedActGather,
-                                                                       mOutputScatter);
+        <<<launch_grid, KernelFunctor::MaxThreadsPerBlock, smem_size>>>(mFilter, mXformedActGather,
+                                                                        mOutputScatter);
     // cudaEventRecord(stop);
     // cudaEventSynchronize(stop);
     // float milliseconds = 0;

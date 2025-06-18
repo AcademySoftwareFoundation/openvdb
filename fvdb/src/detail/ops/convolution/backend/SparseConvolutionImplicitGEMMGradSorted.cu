@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "ConvOps.h"
-
 #include <detail/ops/Ops.h>
 
-#include <cuda_fp16.h>
 #include <torch/extension.h>
+
+#include <cuda_fp16.h>
 
 namespace fvdb {
 namespace detail {

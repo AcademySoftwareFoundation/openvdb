@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 #include "TypeCasters.h"
-
 #include <FVDB.h>
 
 #include <torch/extension.h>
@@ -13,7 +12,9 @@
 void
 bind_grid_batch(py::module &m) {
     py::class_<fvdb::GridBatch>(m, "GridBatch", "A batch of sparse VDB grids.")
-        .def(py::init<fvdb::TorchDeviceOrString, bool>(), py::arg("device") = "cpu",
+        .def(py::init<const torch::Device &, bool>(), py::arg("device") = torch::kCPU,
+             py::arg("mutable") = false)
+        .def(py::init<const std::string &, bool>(), py::arg("device") = "cpu",
              py::arg("mutable") = false)
 
         // Properties
@@ -615,8 +616,10 @@ bind_grid_batch(py::module &m) {
         .def("world_to_grid", &fvdb::GridBatch::world_to_grid, py::arg("points"))
 
         // To device
-        .def("to", py::overload_cast<fvdb::TorchDeviceOrString>(&fvdb::GridBatch::to, py::const_),
-             py::arg("device"))
+        .def("to", py::overload_cast<const torch::Device &>(&fvdb::GridBatch::to, py::const_),
+             py::arg("to_device"))
+        .def("to", py::overload_cast<const std::string &>(&fvdb::GridBatch::to, py::const_),
+             py::arg("to_device"))
         .def("to", py::overload_cast<const torch::Tensor &>(&fvdb::GridBatch::to, py::const_),
              py::arg("to_tensor"))
         .def("to", py::overload_cast<const fvdb::JaggedTensor &>(&fvdb::GridBatch::to, py::const_),
@@ -640,7 +643,7 @@ bind_grid_batch(py::module &m) {
         .def(
             "sparse_conv_kernel_map",
             [](fvdb::GridBatch &self, fvdb::Vec3iOrScalar kernelSize, fvdb::Vec3iOrScalar stride,
-               torch::optional<fvdb::GridBatch> targetGrid) {
+               std::optional<fvdb::GridBatch> targetGrid) {
                 auto ret = fvdb::SparseConvPackInfo(kernelSize, stride, self, targetGrid);
                 return std::make_tuple(ret, ret.targetGrid());
             },

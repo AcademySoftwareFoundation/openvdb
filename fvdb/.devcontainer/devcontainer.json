@@ -1,0 +1,41 @@
+// File location: openvdb/fvdb/.devcontainer/devcontainer.json
+{
+    // A friendly name for the container configuration shown in VS Code
+    "name": "FVDB Development Environment",
+
+    // Tells VS Code to use Docker Compose to define and run the environment.
+    // The path is relative to this devcontainer.json file.
+    "dockerComposeFile": [
+        "../docker-compose.yml" // Points to openvdb/fvdb/docker-compose.yml
+    ],
+
+    // The name of the specific service within the docker-compose.yml file
+    // that VS Code should connect to.
+    "service": "fvdb-dev",
+
+    // Specifies the default directory VS Code should open *inside* the container.
+    // Since the docker-compose.yml mounts the host's `openvdb/` directory to `/openvdb`
+    // in the container, the fvdb code resides at `/openvdb/fvdb`.
+    "workspaceFolder": "/openvdb/fvdb",
+
+    // Extensions to install inside the container's VS Code server
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python", // Python language support
+                "ms-vscode.cpptools", // C/C++ language support
+                "ms-vscode.cmake-tools", // CMake integration
+                "ms-azuretools.vscode-docker" // Docker integration (useful for managing containers)
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/opt/conda/envs/fvdb/bin/python"
+            }
+        }
+    },
+
+    // Optional: What to do when the VS Code window is closed.
+    // "stopCompose" will stop the container(s) defined in the compose file.
+    // "none" would leave them running.
+    "shutdownAction": "stopCompose"
+}
+

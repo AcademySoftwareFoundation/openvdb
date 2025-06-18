@@ -42,8 +42,8 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
                                              const BufferT& buffer = BufferT());
 
 struct NodeManagerData
-{// 48B = 6*8B
-    uint64_t        mMagic;// 8B
+{// 40B = 5*8B
+    __hostdev__ NodeManagerData(void *grid) : mPadding{0}, mGrid(grid), mPtr{0,0,0}{}
     union {int64_t  mPadding; uint8_t mLinear;};// 8B of which 1B is used for a binary flag
     void           *mGrid;//  8B pointer to either host or device grid
     union {int64_t *mPtr[3], mOff[3];};// 24B, use mOff if mLinear!=0
@@ -288,11 +288,7 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
     auto *data = reinterpret_cast<NodeManagerData*>(handle.data());
     NANOVDB_ASSERT(data && isAligned(data));
     NANOVDB_ASSERT(toGridType<BuildT>() == grid.gridType());
-#ifdef NANOVDB_USE_NEW_MAGIC_NUMBERS
-    *data = NodeManagerData{NANOVDB_MAGIC_NODE, {0u}, (void*)&grid, {{0u,0u,0u}}};
-#else
-    *data = NodeManagerData{NANOVDB_MAGIC_NUMB, {0u}, (void*)&grid, {{0u,0u,0u}}};
-#endif
+    *data = NodeManagerData((void*)&grid);
 
     if (NodeManager<BuildT>::isLinear(grid)) {
         data->mLinear = uint8_t(1u);
@@ -316,7 +312,7 @@ NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
     }
 
     return handle;// // is converted to r-value so return value is move constructed!
-}
+}// createNodeManager
 
 } // namespace nanovdb
 
