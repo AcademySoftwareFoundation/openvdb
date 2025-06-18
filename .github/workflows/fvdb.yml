@@ -33,7 +33,7 @@ jobs:
 
   linux_gpu:
     name: 'ci-openvdb 2024'
-    # Don't run on OCIO forks
+    # Don't run on forks
     if: github.repository == 'AcademySoftwareFoundation/openvdb'
     # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
     # AWS CodeBuild project.
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
           aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
