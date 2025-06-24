@@ -1,9 +1,13 @@
-name: fVDB Unit Tests
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+# GitHub Actions workflow file
+# https://help.github.com/en/actions/reference/workflow-syntax-for-github-actions
+
+name: fVDB Codebuild
 
 on:
-  push:
-    branches:
-      - "pull-request/[0-9]+"
+  pull_request:
     paths-ignore:
         - 'CHANGES'
         - 'CODEOWNERS'
@@ -22,522 +26,93 @@ on:
         - 'fvdb/notebooks/**'
         - 'fvdb/scripts/**'
 
-# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 permissions:
-  contents: write
-  deployments: write
-  pull-requests: read
-  issues: read
+  contents: read
+  id-token: write
 
 jobs:
-  fvdb-build:
-    if: ${{ !startsWith(github.event.pull_request.title, 'Draft:') }}
-    name: fVDB Build
-    runs-on:
-      - self-hosted
-    container:
-      image: aswf/ci-openvdb:2024
-      env:
-        PYTHONPATH: ""
-        CPM_SOURCE_CACHE: "/__w/cpm_cache"
-      options: --rm
-    defaults:
-      run:
-        shell: bash -el {0}
+  # ---------------------------------------------------------------------------
+  # Linux GPU (AWS CodeBuild)
+  # ---------------------------------------------------------------------------
+
+  linux_gpu:
+    name: 'ci-openvdb 2024'
+    # Don't run on forks
+    if: github.repository == 'AcademySoftwareFoundation/openvdb'
+    # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
+    # AWS CodeBuild project.
+    # TODO: Add support for dynamic GH Action defined CodeBuild
+    #       container choice.
+    runs-on: ubuntu-latest
     steps:
-      ### Get the PR branch and apply changes to the target branch
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for all branches
-      - name: Determine the target branch of the PR
+      - name: Verify AWS Credentials Set
         run: |
-          echo "Fetching pull request metadata..."
-          # Install GitHub CLI and jq
-          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-          yum install -y gh
-          which jq || yum install -y jq
-          # Extract PR number from branch name if it follows pattern "pull-request/123"
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Branch name: $BRANCH_NAME"
+          if [ -z "${{ secrets.CODEBUILD_ID }}" ] || [ -z "${{ secrets.CODEBUILD_SECRET }}" ]; then
+            echo "Error: AWS credentials secrets not properly configured"
+            echo "Please ensure CODEBUILD_ID and CODEBUILD_SECRET are set in organization secrets"
+            exit 1
+          fi
+          echo "AWS credentials secrets are configured"
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
+          aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
+          aws-region: us-west-2
+      - name: Verify AWS Authentication
+        run: |
+          echo "Testing AWS authentication..."
+          aws sts get-caller-identity || {
+            echo "Error: AWS authentication failed"
+            exit 1
+          }
+          echo "AWS authentication successful"
+      - name: CodeBuild Monitoring URLs
+        run: |
+          echo "🚀 Starting CodeBuild job..."
+          echo "Project: OpenVDB"
+          echo ""
+          echo "📊 Monitor the build progress at:"
 
-          # Setup GitHub CLI authentication
-          echo "${{ github.token }}" | gh auth login --with-token
+          # Check if public builds are enabled by looking for the public project URL
+          PUBLIC_URL=$(aws codebuild batch-get-projects --names OpenVDB --query 'projects[0].publicProjectUrl' --output text 2>/dev/null || echo "None")
 
-          # Get default branch from repository
-          echo "Getting default branch from repository..."
-          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
-          echo "Repository default branch is: $DEFAULT_BRANCH"
+          if [ "$PUBLIC_URL" != "None" ] && [ "$PUBLIC_URL" != "null" ]; then
+            echo "📖 Public Build Results (no sign-in required):"
+            echo "   $PUBLIC_URL"
+            echo ""
+          fi
 
-          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
-            PR_NUMBER=${BASH_REMATCH[1]}
-            echo "Found PR number from branch name: $PR_NUMBER"
-
-            echo "Using gh CLI to get PR details..."
-            # Get PR info using GitHub CLI and extract the base branch
-            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
-            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
-
-            echo "Target branch is $TARGET_BRANCH"
-
-            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
-              echo "Could not determine target branch, using default branch"
-              TARGET_BRANCH="$DEFAULT_BRANCH"
-            fi
+          echo "🔒 AWS Console (requires sign-in):"
+          echo "   Project: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/history"
+          echo ""
+          echo "ℹ️  Individual build URLs will be available once the job starts..."
+      - name: Run CodeBuild
+        id: codebuild
+        uses: aws-actions/aws-codebuild-run-build@v1
+        with:
+          project-name: OpenVDB
+          buildspec-override: ci/buildspec.yml
+      - name: CodeBuild Results
+        if: always()
+        run: |
+          echo "📋 CodeBuild Results:"
+          echo "Build ID: ${{ steps.codebuild.outputs.aws-build-id }}"
+          echo "Build Status: ${{ steps.codebuild.outputs.aws-build-status }}"
+          echo ""
+          echo "🔗 Detailed Build Links:"
+          if [ -n "$CODEBUILD_PUBLIC_BUILD_URL" ]; then
+            echo "📖 Public Build Details: $CODEBUILD_PUBLIC_BUILD_URL"
+          fi
+          echo "🔒 AWS Console Build Details: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/build/${{ steps.codebuild.outputs.aws-build-id }}/"
+          echo ""
+          if [ "${{ steps.codebuild.outputs.aws-build-status }}" != "SUCCEEDED" ]; then
+            echo "❌ Build failed! Check the build logs at the links above for detailed error information."
+            echo "Common issues to check:"
+            echo "- Build environment configuration"
+            echo "- Source code compilation errors"
+            echo "- Missing dependencies"
+            echo "- Buildspec.yml configuration"
           else
-            echo "Branch doesn't match the expected pattern, using default branch"
-            TARGET_BRANCH="$DEFAULT_BRANCH"
+            echo "✅ Build succeeded!"
           fi
-
-          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
-          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
-      - name: Set up Git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Merge pushed branch into target branch
-        run: |
-          if [ -z "$TARGET_BRANCH" ]; then
-            echo "No pull request metadata found. Skipping merge."
-            exit 0
-          fi
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin $TARGET_BRANCH
-          git checkout $TARGET_BRANCH
-          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
-        env:
-          GITHUB_REF: ${{ github.ref }}
-      #### End of git merge
-
-      - name: Set up fvdb_build Conda env
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          conda-remove-defaults: "true"
-          activate-environment: fvdb_build
-          environment-file: fvdb/env/build_environment.yml
-
-      - name: Buid fvdb
-        run: |
-          cd fvdb;
-          TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX" conda run --no-capture-output -n fvdb_build ./build.sh wheel verbose gtests benchmarks
-
-      - name: Upload wheel
-        uses: actions/upload-artifact@v4
-        with:
-            name: fvdb-test-package
-            path: fvdb/dist/*.whl
-            retention-days: 2
-
-      #NOTE: This tar step is here because directly uploading the build directory
-      #      wasn't working due to losing executable permissions on the files.
-      - name: Tar build directory
-        run: tar -cvf fvdb-gtest.tar fvdb/build/
-
-      - name: Upload gtests
-        uses: actions/upload-artifact@v4
-        with:
-            name: fvdb-gtest
-            path: fvdb-gtest.tar
-            retention-days: 2
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
-          echo "Cleanup completed"
-
-  fvdb-gtests:
-    needs: [fvdb-build]
-    name: fVDB GTests
-    runs-on:
-      - self-hosted
-    container:
-      image: aswf/ci-openvdb:2024
-      env:
-        PYTHONPATH: ""
-        CPM_SOURCE_CACHE: "/__w/cpm_cache"
-      options: --rm
-    defaults:
-      run:
-        shell: bash -el {0}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up fvdb_test Conda env
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          conda-remove-defaults: "true"
-          activate-environment: fvdb_test
-          environment-file: fvdb/env/test_environment.yml
-
-      - name: Download gtests
-        uses: actions/download-artifact@v4
-        with:
-            name: fvdb-gtest
-            path: .
-
-      - name: Extract tar
-        run: |
-            tar -xvf fvdb-gtest.tar
-
-      - name: Run tests
-        run: |
-            conda activate fvdb_test
-            export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$CONDA_PREFIX/lib
-            cd fvdb
-            ./build.sh ctest
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
-          echo "Cleanup completed"
-
-
-  fvdb-unit-test:
-    needs: [fvdb-build]
-    name: fVDB PyTests
-    runs-on:
-      - self-hosted
-    container:
-      image: aswf/ci-openvdb:2024
-      env:
-        PYTHONPATH: ""
-      options: --rm
-    defaults:
-      run:
-        shell: bash -el {0}
-    steps:
-      ### Get the PR branch and apply changes to the target branch
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for all branches
-      - name: Determine the target branch of the PR
-        run: |
-          echo "Fetching pull request metadata..."
-          # Install GitHub CLI and jq
-          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-          yum install -y gh
-          which jq || yum install -y jq
-          # Extract PR number from branch name if it follows pattern "pull-request/123"
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Branch name: $BRANCH_NAME"
-
-          # Setup GitHub CLI authentication
-          echo "${{ github.token }}" | gh auth login --with-token
-
-          # Get default branch from repository
-          echo "Getting default branch from repository..."
-          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
-          echo "Repository default branch is: $DEFAULT_BRANCH"
-
-          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
-            PR_NUMBER=${BASH_REMATCH[1]}
-            echo "Found PR number from branch name: $PR_NUMBER"
-
-            echo "Using gh CLI to get PR details..."
-            # Get PR info using GitHub CLI and extract the base branch
-            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
-            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
-
-            echo "Target branch is $TARGET_BRANCH"
-
-            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
-              echo "Could not determine target branch, using default branch"
-              TARGET_BRANCH="$DEFAULT_BRANCH"
-            fi
-          else
-            echo "Branch doesn't match the expected pattern, using default branch"
-            TARGET_BRANCH="$DEFAULT_BRANCH"
-          fi
-
-          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
-          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
-      - name: Set up Git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Merge pushed branch into target branch
-        run: |
-          if [ -z "$TARGET_BRANCH" ]; then
-            echo "No pull request metadata found. Skipping merge."
-            exit 0
-          fi
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin $TARGET_BRANCH
-          git checkout $TARGET_BRANCH
-          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
-        env:
-          GITHUB_REF: ${{ github.ref }}
-      #### End of git merge
-
-      - name: Set up fvdb_test Conda env
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          conda-remove-defaults: "true"
-          activate-environment: fvdb_test
-          environment-file: fvdb/env/test_environment.yml
-
-      - name: Download package
-        uses: actions/download-artifact@v4
-        with:
-            name: fvdb-test-package
-            path: ./dist
-
-      - name: Install package
-        run: |
-            conda activate fvdb_test
-            pip install ./dist/*.whl
-
-      - name: Run tests
-        run: |
-            cd fvdb/tests;
-            pytest -v unit
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
-          echo "Cleanup completed"
-
-  fvdb-docs-test:
-    needs: [fvdb-build]
-    name: fVDB Documentation Tests
-    runs-on:
-      - self-hosted
-    container:
-      image: aswf/ci-openvdb:2024
-      env:
-        PYTHONPATH: ""
-      options: --rm
-    defaults:
-      run:
-        shell: bash -el {0}
-    steps:
-      ### Get the PR branch and apply changes to the target branch
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for all branches
-      - name: Determine the target branch of the PR
-        run: |
-          echo "Fetching pull request metadata..."
-          # Install GitHub CLI and jq
-          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-          yum install -y gh
-          which jq || yum install -y jq
-          # Extract PR number from branch name if it follows pattern "pull-request/123"
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Branch name: $BRANCH_NAME"
-
-          # Setup GitHub CLI authentication
-          echo "${{ github.token }}" | gh auth login --with-token
-
-          # Get default branch from repository
-          echo "Getting default branch from repository..."
-          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
-          echo "Repository default branch is: $DEFAULT_BRANCH"
-
-          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
-            PR_NUMBER=${BASH_REMATCH[1]}
-            echo "Found PR number from branch name: $PR_NUMBER"
-
-            echo "Using gh CLI to get PR details..."
-            # Get PR info using GitHub CLI and extract the base branch
-            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
-            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
-
-            echo "Target branch is $TARGET_BRANCH"
-
-            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
-              echo "Could not determine target branch, using default branch"
-              TARGET_BRANCH="$DEFAULT_BRANCH"
-            fi
-          else
-            echo "Branch doesn't match the expected pattern, using default branch"
-            TARGET_BRANCH="$DEFAULT_BRANCH"
-          fi
-
-          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
-          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
-      - name: Set up Git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Merge pushed branch into target branch
-        run: |
-          if [ -z "$TARGET_BRANCH" ]; then
-            echo "No pull request metadata found. Skipping merge."
-            exit 0
-          fi
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin $TARGET_BRANCH
-          git checkout $TARGET_BRANCH
-          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
-        env:
-          GITHUB_REF: ${{ github.ref }}
-      #### End of git merge
-
-      - name: Set up fvdb_test Conda env
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          conda-remove-defaults: "true"
-          activate-environment: fvdb_test
-          environment-file: fvdb/env/test_environment.yml
-
-      - name: Download package
-        uses: actions/download-artifact@v4
-        with:
-            name: fvdb-test-package
-            path: ./dist
-
-      - name: Install package
-        run: |
-            conda activate fvdb_test
-            pip install ./dist/*.whl
-
-      - name: Run tests
-        run: |
-            pytest --markdown-docs fvdb/docs
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
-          echo "Cleanup completed"
-
-  fvdb-benchmarks:
-    needs: [fvdb-build]
-    name: fVDB Continuous Benchmarking
-    runs-on:
-      - self-hosted
-    container:
-      image: aswf/ci-openvdb:2024
-      env:
-        PYTHONPATH: ""
-      options: --rm
-    defaults:
-      run:
-        shell: bash -el {0}
-    steps:
-      ### Get the PR branch and apply changes to the target branch
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Fetch all history for all branches
-      - name: Determine the target branch of the PR
-        run: |
-          echo "Fetching pull request metadata..."
-          # Install GitHub CLI and jq
-          dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-          yum install -y gh
-          which jq || yum install -y jq
-          # Extract PR number from branch name if it follows pattern "pull-request/123"
-          BRANCH_NAME=${GITHUB_REF#refs/heads/}
-          echo "Branch name: $BRANCH_NAME"
-
-          # Setup GitHub CLI authentication
-          echo "${{ github.token }}" | gh auth login --with-token
-
-          # Get default branch from repository
-          echo "Getting default branch from repository..."
-          DEFAULT_BRANCH=$(gh repo view ${{ github.repository }} --json defaultBranchRef --jq '.defaultBranchRef.name' 2>/dev/null || echo 'develop')
-          echo "Repository default branch is: $DEFAULT_BRANCH"
-
-          if [[ $BRANCH_NAME =~ pull-request/([0-9]+) ]]; then
-            PR_NUMBER=${BASH_REMATCH[1]}
-            echo "Found PR number from branch name: $PR_NUMBER"
-
-            echo "Using gh CLI to get PR details..."
-            # Get PR info using GitHub CLI and extract the base branch
-            PR_INFO=$(gh pr view $PR_NUMBER --json baseRefName --repo ${{ github.repository }} 2>/dev/null || echo '{"baseRefName":"'$DEFAULT_BRANCH'"}')
-            TARGET_BRANCH=$(echo "$PR_INFO" | jq -r '.baseRefName')
-
-            echo "Target branch is $TARGET_BRANCH"
-
-            if [ -z "$TARGET_BRANCH" ] || [ "$TARGET_BRANCH" = "null" ]; then
-              echo "Could not determine target branch, using default branch"
-              TARGET_BRANCH="$DEFAULT_BRANCH"
-            fi
-          else
-            echo "Branch doesn't match the expected pattern, using default branch"
-            TARGET_BRANCH="$DEFAULT_BRANCH"
-          fi
-
-          echo "Final TARGET_BRANCH=$TARGET_BRANCH"
-          echo "TARGET_BRANCH=$TARGET_BRANCH" >> $GITHUB_ENV
-      - name: Set up Git user
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Merge pushed branch into target branch
-        run: |
-          if [ -z "$TARGET_BRANCH" ]; then
-            echo "No pull request metadata found. Skipping merge."
-            exit 0
-          fi
-          git config --global --add safe.directory "$(pwd)"
-          git fetch origin $TARGET_BRANCH
-          git checkout $TARGET_BRANCH
-          git merge $GITHUB_REF --no-ff --message "Merging $GITHUB_REF into $TARGET_BRANCH"
-        env:
-          GITHUB_REF: ${{ github.ref }}
-      #### End of git merge
-
-      - name: Set up fvdb_test Conda env
-        uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          conda-remove-defaults: "true"
-          activate-environment: fvdb_test
-          environment-file: fvdb/env/test_environment.yml
-
-      - name: Download package
-        uses: actions/download-artifact@v4
-        with:
-            name: fvdb-test-package
-            path: ./dist
-
-      - name: Install package
-        run: |
-            conda activate fvdb_test
-            pip install ./dist/*.whl
-
-      - name: Disable git ownership verification
-        run: |
-          git config --global --add safe.directory "$(pwd)"
-
-      - name: Run benchmarks
-        run: |
-          cd fvdb/tests;
-          pytest benchmark --benchmark-json benchmark/output.json
-
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
-        with:
-            name: Python Benchmark with pytest-benchmark
-            tool: 'pytest'
-            output-file-path: fvdb/tests/benchmark/output.json
-            # Use personal access token instead of GITHUB_TOKEN due to https://github.community/t/github-action-not-triggering-gh-pages-upon-push/16096
-            github-token: ${{ secrets.GITHUB_TOKEN }}
-            auto-push: true
-            # Show alert with commit comment on detecting possible performance regression
-            alert-threshold: '200%'
-            comment-on-alert: true
-            fail-on-alert: true
-            alert-comment-cc-users: '@swahtz'
-
-      - name: Cleanup
-        if: always()
-        run: |
-          echo "Cleaning up /__w/_temp directory"
-          sudo rm -rf /__w/_temp/*
-          echo "Cleanup completed"
