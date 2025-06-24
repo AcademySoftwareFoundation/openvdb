@@ -16,39 +16,62 @@ phases:
       - bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
       - eval "$($HOME/miniforge3/bin/conda shell.bash hook)"
       - conda init
-      # Create and activate build environment
+      - source ~/.bashrc || true
+
+      # Create build environment
       - conda env create -f fvdb/env/build_environment.yml -n fvdb_build
-      - conda activate fvdb_build
+      - echo "Build environment created successfully"
+
       # Create test environment
       - conda env create -f fvdb/env/test_environment.yml -n fvdb_test
+      - echo "Test environment created successfully"
 
   pre_build:
     commands:
-      - echo "Starting build phase"
+      - echo "Starting pre_build phase"
       - git config --global --add safe.directory "$(pwd)"
+
+      # Verify environments exist
+      - conda env list
+      - echo "Pre-build phase completed"
 
   build:
     commands:
-      # Build fvdb wheel
+      - echo "Starting build phase"
+
+      # Build fvdb wheel using conda run (this ensures proper environment activation)
       - cd fvdb
       - export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
+      - echo "Building wheel with conda run..."
       - conda run --no-capture-output -n fvdb_build ./build.sh wheel verbose gtests benchmarks
+
+      # Verify wheel was created
+      - ls -la dist/
+      - echo "Wheel build completed"
+
+      # Move back to root directory
       - cd ..
 
-      # Install package in test environment
-      - conda activate fvdb_test
-      - pip install ./dist/*.whl
+      # Install package in test environment using conda run
+      - echo "Installing wheel in test environment..."
+      - conda run --no-capture-output -n fvdb_test pip install ./fvdb/dist/*.whl
+      - echo "Package installation completed"
 
   post_build:
     commands:
-      # Run unit tests
+      - echo "Starting post_build phase"
+
+      # Run unit tests using conda run
+      - echo "Running unit tests..."
       - cd fvdb/tests
-      - pytest -v unit
+      - conda run --no-capture-output -n fvdb_test pytest -v unit
 
-      # Run documentation tests
+      # Run documentation tests using conda run
+      - echo "Running documentation tests..."
       - cd ..
-      - pytest --markdown-docs docs
+      - conda run --no-capture-output -n fvdb_test pytest --markdown-docs docs
 
+      - echo "All tests completed successfully"
 
 artifacts:
   files:
