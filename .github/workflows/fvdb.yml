@@ -67,6 +67,26 @@ jobs:
             exit 1
           }
           echo "AWS authentication successful"
+      - name: CodeBuild Monitoring URLs
+        run: |
+          echo "🚀 Starting CodeBuild job..."
+          echo "Project: OpenVDB"
+          echo ""
+          echo "📊 Monitor the build progress at:"
+
+          # Check if public builds are enabled by looking for the public project URL
+          PUBLIC_URL=$(aws codebuild batch-get-projects --names OpenVDB --query 'projects[0].publicProjectUrl' --output text 2>/dev/null || echo "None")
+
+          if [ "$PUBLIC_URL" != "None" ] && [ "$PUBLIC_URL" != "null" ]; then
+            echo "📖 Public Build Results (no sign-in required):"
+            echo "   $PUBLIC_URL"
+            echo ""
+          fi
+
+          echo "🔒 AWS Console (requires sign-in):"
+          echo "   Project: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/history"
+          echo ""
+          echo "ℹ️  Individual build URLs will be available once the job starts..."
       - name: Run CodeBuild
         id: codebuild
         uses: aws-actions/aws-codebuild-run-build@v1
@@ -76,19 +96,15 @@ jobs:
       - name: CodeBuild Results
         if: always()
         run: |
-          echo "CodeBuild Project: OpenVDB"
+          echo "📋 CodeBuild Results:"
           echo "Build ID: ${{ steps.codebuild.outputs.aws-build-id }}"
           echo "Build Status: ${{ steps.codebuild.outputs.aws-build-status }}"
           echo ""
-          echo "🔗 Build Links:"
+          echo "🔗 Detailed Build Links:"
           if [ -n "$CODEBUILD_PUBLIC_BUILD_URL" ]; then
-            echo "📖 Public Build Results (no sign-in required): $CODEBUILD_PUBLIC_BUILD_URL"
-          else
-            echo "ℹ️  Public builds not enabled - configure 'Visibility: PUBLIC_READ' in CodeBuild project"
+            echo "📖 Public Build Details: $CODEBUILD_PUBLIC_BUILD_URL"
           fi
-          echo "🔒 AWS Console (requires sign-in):"
-          echo "   Project History: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/history"
-          echo "   This Build: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/build/${{ steps.codebuild.outputs.aws-build-id }}/"
+          echo "🔒 AWS Console Build Details: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/build/${{ steps.codebuild.outputs.aws-build-id }}/"
           echo ""
           if [ "${{ steps.codebuild.outputs.aws-build-status }}" != "SUCCEEDED" ]; then
             echo "❌ Build failed! Check the build logs at the links above for detailed error information."

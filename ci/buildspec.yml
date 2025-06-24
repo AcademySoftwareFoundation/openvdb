@@ -32,13 +32,12 @@ phases:
       # Build fvdb wheel
       - cd fvdb
       - export TORCH_CUDA_ARCH_LIST="7.0;7.5;8.0;8.6+PTX"
-      - export MAX_JOBS=$(($(nproc) < $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}') ? $(nproc) : $(free -g | awk '/^Mem:/{jobs=int($4/2.5); if(jobs<1) jobs=1; print jobs}')))
-      - conda run -n fvdb_build python setup.py bdist_wheel --dist-dir=dist
+      - conda run --no-capture-output -n fvdb_build ./build.sh wheel verbose gtests benchmarks
       - cd ..
 
       # Install package in test environment
       - conda activate fvdb_test
-      - pip install ./fvdb/dist/*.whl
+      - pip install ./dist/*.whl
 
   post_build:
     commands:
