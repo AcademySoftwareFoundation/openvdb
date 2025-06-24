@@ -38,13 +38,20 @@ jobs:
   linux_gpu:
     name: 'ci-openvdb 2024'
     # Don't run on forks
-    if: github.repository == 'AcademySoftwareFoundation/openvdb'
+    if: github.repository == 'AcademySoftwareFoundation/openvdb' && github.event.pull_request.head.repo.full_name == github.repository
     # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
     # AWS CodeBuild project.
     # TODO: Add support for dynamic GH Action defined CodeBuild
     #       container choice.
     runs-on: ubuntu-latest
     steps:
+      - name: Verify AWS Credentials Set
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "Error: AWS credentials not properly configured"
+            exit 1
+          fi
+          echo "AWS credentials configured"
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
