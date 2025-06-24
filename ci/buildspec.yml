@@ -3,8 +3,8 @@ version: 0.2
 env:
   variables:
     PYTHONPATH: ""
-  secrets-manager:
-    GITHUB_TOKEN: "github-token:token"
+  # secrets-manager:
+  #   GITHUB_TOKEN: "github-token:token"
 
 phases:
   install:
