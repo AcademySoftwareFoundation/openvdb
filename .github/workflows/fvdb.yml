@@ -68,7 +68,35 @@ jobs:
           }
           echo "AWS authentication successful"
       - name: Run CodeBuild
+        id: codebuild
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
           project-name: OpenVDB
           buildspec-override: ci/buildspec.yml
+      - name: CodeBuild Results
+        if: always()
+        run: |
+          echo "CodeBuild Project: OpenVDB"
+          echo "Build ID: ${{ steps.codebuild.outputs.aws-build-id }}"
+          echo "Build Status: ${{ steps.codebuild.outputs.aws-build-status }}"
+          echo ""
+          echo "🔗 Build Links:"
+          if [ -n "$CODEBUILD_PUBLIC_BUILD_URL" ]; then
+            echo "📖 Public Build Results (no sign-in required): $CODEBUILD_PUBLIC_BUILD_URL"
+          else
+            echo "ℹ️  Public builds not enabled - configure 'Visibility: PUBLIC_READ' in CodeBuild project"
+          fi
+          echo "🔒 AWS Console (requires sign-in):"
+          echo "   Project History: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/history"
+          echo "   This Build: https://console.aws.amazon.com/codesuite/codebuild/projects/OpenVDB/build/${{ steps.codebuild.outputs.aws-build-id }}/"
+          echo ""
+          if [ "${{ steps.codebuild.outputs.aws-build-status }}" != "SUCCEEDED" ]; then
+            echo "❌ Build failed! Check the build logs at the links above for detailed error information."
+            echo "Common issues to check:"
+            echo "- Build environment configuration"
+            echo "- Source code compilation errors"
+            echo "- Missing dependencies"
+            echo "- Buildspec.yml configuration"
+          else
+            echo "✅ Build succeeded!"
+          fi
