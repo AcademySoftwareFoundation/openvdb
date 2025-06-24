@@ -26,6 +26,10 @@ on:
         - 'fvdb/notebooks/**'
         - 'fvdb/scripts/**'
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # ---------------------------------------------------------------------------
   # Linux GPU (AWS CodeBuild)
