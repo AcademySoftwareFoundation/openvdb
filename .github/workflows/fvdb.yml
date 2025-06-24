@@ -38,7 +38,7 @@ jobs:
   linux_gpu:
     name: 'ci-openvdb 2024'
     # Don't run on forks
-    if: github.repository == 'AcademySoftwareFoundation/openvdb' && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.repository == 'AcademySoftwareFoundation/openvdb'
     # GH-hosted VM. The build runs in CentOS 7 'container' hard-coded in
     # AWS CodeBuild project.
     # TODO: Add support for dynamic GH Action defined CodeBuild
