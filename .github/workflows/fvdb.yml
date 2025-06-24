@@ -47,17 +47,26 @@ jobs:
     steps:
       - name: Verify AWS Credentials Set
         run: |
-          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "Error: AWS credentials not properly configured"
+          if [ -z "${{ secrets.CODEBUILD_ID }}" ] || [ -z "${{ secrets.CODEBUILD_SECRET }}" ]; then
+            echo "Error: AWS credentials secrets not properly configured"
+            echo "Please ensure CODEBUILD_ID and CODEBUILD_SECRET are set in organization secrets"
             exit 1
           fi
-          echo "AWS credentials configured"
+          echo "AWS credentials secrets are configured"
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.CODEBUILD_ID }}
           aws-secret-access-key: ${{ secrets.CODEBUILD_SECRET }}
           aws-region: us-west-2
+      - name: Verify AWS Authentication
+        run: |
+          echo "Testing AWS authentication..."
+          aws sts get-caller-identity || {
+            echo "Error: AWS authentication failed"
+            exit 1
+          }
+          echo "AWS authentication successful"
       - name: Run CodeBuild
         uses: aws-actions/aws-codebuild-run-build@v1
         with:
