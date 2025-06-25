@@ -260,7 +260,7 @@ void testConvolution()
             timers[device] = new nanovdb::util::cuda::Timer(stream);
 
             void* stencilDevicePtr;
-            cudaCheck(cudaMallocAsync(&stencilDevicePtr, sizeof(float) * Do * 27 * Di, stream));
+            cudaCheck(nanovdb::util::cuda::mallocAsync(&stencilDevicePtr, sizeof(float) * Do * 27 * Di, stream));
             cudaCheck(cudaMemcpyAsync(stencilDevicePtr, stencilHostPtr, sizeof(float) * Do * 27 * Di, cudaMemcpyHostToDevice, stream));
 
             size_t deviceLeafNodeCount = (leafNodeCount + deviceCount - 1) / deviceCount;
@@ -280,7 +280,8 @@ void testConvolution()
             stencilConvolve_v7<<<deviceLeafNodeCount * 2 * 4 * 4, blockDim, 0, stream>>>(
                 deviceIndexGrid, deviceLeafNodeOffset, inputBuffer.data<float>(), nullptr, nullptr, stencilPtr, outputBuffer.data<float>(), nullptr);
             timers[device]->record();
-            cudaCheck(cudaFree(stencilDevicePtr));
+            cudaCheck(nanovdb::util::cuda::freeAsync(stencilDevicePtr, stream));
+            cudaCheck(cudaStreamSynchronize(stream));
         }, node.id, node.stream);
     });
     std::for_each(threads.begin(), threads.end(), [](std::thread& t) { t.join(); });
