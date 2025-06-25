@@ -303,7 +303,7 @@ inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
         cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
         checkPtr(mCpuData, "cuda::DeviceBuffer::init: failed to allocate host buffer");
     } else {
-        cudaCheck(cudaMallocAsync(mGpuData+device, size, stream)); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(util::cuda::mallocAsync(mGpuData+device, size, stream)); // un-managed memory on the device, always 32B aligned!
         checkPtr(mGpuData[device], "cuda::DeviceBuffer::init: failed to allocate device buffer");
     }
     mSize = size;
@@ -316,7 +316,7 @@ inline void DeviceBuffer::deviceUpload(int device, cudaStream_t stream, bool syn
     checkPtr(mCpuData, "uninitialized cpu source data");
     if (mGpuData[device] == nullptr) {
         if (mManaged==0) throw std::runtime_error("DeviceBuffer::deviceUpload called on externally managed memory that wasn\'t allocated.");
-        cudaCheck(cudaMallocAsync(mGpuData+device, mSize, stream)); // un-managed memory on the device, always 32B aligned!
+        cudaCheck(util::cuda::mallocAsync(mGpuData+device, mSize, stream)); // un-managed memory on the device, always 32B aligned!
     }
     checkPtr(mGpuData[device], "uninitialized gpu destination data");
     cudaCheck(cudaMemcpyAsync(mGpuData[device], mCpuData, mSize, cudaMemcpyHostToDevice, stream));
@@ -354,7 +354,7 @@ inline void DeviceBuffer::clear(cudaStream_t stream)
 {
     if (mManaged!=0) {// free all the managed data buffers
         cudaCheck(cudaFreeHost(mCpuData));
-        for (int i=0; i<mDeviceCount; ++i) cudaCheck(cudaFreeAsync(mGpuData[i], stream));
+        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], stream));
     }
     delete [] mGpuData;
     mCpuData = mGpuData = nullptr;

@@ -398,14 +398,14 @@ private:
         template <typename T>
         static T* alloc(size_t count, cudaStream_t stream) {
             T* d_ptr = nullptr;
-            cudaCheck(cudaMallocAsync((void**)&d_ptr, sizeof(T)*count, stream));
+            cudaCheck(util::cuda::mallocAsync((void**)&d_ptr, sizeof(T)*count, stream));
             return d_ptr;
         }
 
         template <typename T>
         static T* alloc(cudaStream_t stream) {return Allocator::template alloc<T>(1, stream);}
 
-        static void free(void *d_ptr, cudaStream_t stream) {cudaCheck(cudaFreeAsync(d_ptr, stream));}
+        static void free(void *d_ptr, cudaStream_t stream) {cudaCheck(util::cuda::freeAsync(d_ptr, stream));}
     };
     nanovdb::cuda::TempDevicePool mTempDevicePool;
 

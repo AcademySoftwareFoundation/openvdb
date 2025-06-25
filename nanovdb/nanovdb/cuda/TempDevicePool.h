@@ -31,8 +31,8 @@ public:
 
     void reallocate(cudaStream_t stream) {
         if (!mData || mRequestedSize > mSize) {
-            cudaFreeAsync(mData, stream);
-            cudaMallocAsync(&mData, mRequestedSize, stream);
+            util::cuda::freeAsync(mData, stream);
+            util::cuda::mallocAsync(&mData, mRequestedSize, stream);
             mSize = mRequestedSize;
         }
     }
