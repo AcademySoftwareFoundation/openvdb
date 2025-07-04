@@ -229,7 +229,7 @@ protected:
             // Unlike other value iterators, cache the buffer data as part of
             // the iterators members to avoid the cost of going through the
             // leaf buffer atomic/checking API
-            , mData(parent->buffer().data()) {}
+            , mData([&]() { OPENVDB_ASSERT(parent); return parent->buffer().data(); }()) {}
 
         ValueT& getItem(Index pos) const { return mData[pos]; }
         ValueT& getValue() const { return this->getItem(this->pos()); }
