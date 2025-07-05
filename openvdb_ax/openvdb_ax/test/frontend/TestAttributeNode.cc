@@ -8,7 +8,7 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -49,34 +49,27 @@ static const unittest_util::CodeTests tests =
 
 }
 
-class TestAttributeNode : public CppUnit::TestCase
+class TestAttributeNode : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestAttributeNode);
-    CPPUNIT_TEST(testSyntax);
-    CPPUNIT_TEST(testASTNode);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSyntax() { TEST_SYNTAX_PASSES(tests); }
-    void testASTNode();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeNode);
+TEST_F(TestAttributeNode, testSyntax)
+{
+    TEST_SYNTAX_PASSES(tests);
+}
 
-void TestAttributeNode::testASTNode()
+TEST_F(TestAttributeNode, testASTNode)
 {
     for (const auto& test : tests) {
         const std::string& code = test.first;
         const Node* expected = test.second.get();
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("No AST returned", code), static_cast<bool>(tree));
+        ASSERT_TRUE(static_cast<bool>(tree)) << ERROR_MSG("No AST returned", code);
 
         // get the first statement
         const Node* result = tree->child(0)->child(0);
-        CPPUNIT_ASSERT(result);
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid AST node", code),
-            Node::AttributeNode == result->nodetype());
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(Node::AttributeNode == result->nodetype()) << ERROR_MSG("Invalid AST node", code);
 
         std::vector<const Node*> resultList, expectedList;
         linearize(*result, resultList);
@@ -88,7 +81,7 @@ void TestAttributeNode::testASTNode()
             openvdb::ax::ast::print(*expected, true, os);
             os << "Result:\n";
             openvdb::ax::ast::print(*result, true, os);
-            CPPUNIT_FAIL(ERROR_MSG("Mismatching Trees for Attribute code", code) + os.str());
+            FAIL() << ERROR_MSG("Mismatching Trees for Attribute code", code) + os.str();
         }
     }
 }

@@ -8,7 +8,7 @@
 
 #include "../util.h"
 
-#include <cppunit/extensions/HelperMacros.h>
+#include <gtest/gtest.h>
 
 #include <string>
 
@@ -111,34 +111,27 @@ static const unittest_util::CodeTests tests =
 
 }
 
-class TestFunctionCallNode : public CppUnit::TestCase
+class TestFunctionCallNode : public ::testing::Test
 {
-public:
-
-    CPPUNIT_TEST_SUITE(TestFunctionCallNode);
-    CPPUNIT_TEST(testSyntax);
-    CPPUNIT_TEST(testASTNode);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testSyntax() { TEST_SYNTAX_PASSES(tests); }
-    void testASTNode();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestFunctionCallNode);
+TEST_F(TestFunctionCallNode, testSyntax)
+{
+    TEST_SYNTAX_PASSES(tests);
+}
 
-void TestFunctionCallNode::testASTNode()
+TEST_F(TestFunctionCallNode, testASTNode)
 {
     for (const auto& test : tests) {
         const std::string& code = test.first;
         const Node* expected = test.second.get();
         const Tree::ConstPtr tree = parse(code.c_str());
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("No AST returned", code), static_cast<bool>(tree));
+        ASSERT_TRUE(static_cast<bool>(tree)) << ERROR_MSG("No AST returned", code);
 
         // get the first statement
         const Node* result = tree->child(0)->child(0);
-        CPPUNIT_ASSERT(result);
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Invalid AST node", code),
-            Node::FunctionCallNode == result->nodetype());
+        ASSERT_TRUE(result);
+        ASSERT_TRUE(Node::FunctionCallNode == result->nodetype()) << ERROR_MSG("Invalid AST node", code);
 
         std::vector<const Node*> resultList, expectedList;
         linearize(*result, resultList);
@@ -150,7 +143,7 @@ void TestFunctionCallNode::testASTNode()
             openvdb::ax::ast::print(*expected, true, os);
             os << "Result:\n";
             openvdb::ax::ast::print(*result, true, os);
-            CPPUNIT_FAIL(ERROR_MSG("Mismatching Trees for Function Call code", code) + os.str());
+            FAIL() << ERROR_MSG("Mismatching Trees for Function Call code", code) + os.str();
         }
     }
 }
