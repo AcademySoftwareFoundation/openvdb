@@ -1968,7 +1968,7 @@ void Grid<BuildT>::operator()(const Func& func, const CoordBBox& bbox, ValueType
                 NANOVDB_ASSERT(leaf == nullptr);
             }
         }// loop over sub-part of leafBBox
-        if (leaf) delete leaf;
+        delete leaf;
     });
 
     // Prune leaf and tile nodes
