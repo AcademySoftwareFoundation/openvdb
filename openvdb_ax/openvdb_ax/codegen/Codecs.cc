@@ -31,40 +31,39 @@ using namespace codegen;
 inline FunctionGroup::UniquePtr axtrncdecode()
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Value* out = args[0];
-        llvm::Value* in = args[1];
-        llvm::Type* type = in->getType()->getPointerElementType();
+        Value out = args[0];
+        Value in = args[1];
 
-        if (type->isIntegerTy() || type->isFloatingPointTy())
+        if (in.IsScalar())
         {
-            in = ir_load(B, in);
-            const bool intconversion = type->isIntegerTy();
-            OPENVDB_ASSERT(intconversion || type->isHalfTy());
-            llvm::Value* result = intconversion ?
-                arithmeticConversion(in, B.getInt32Ty(), B) :
-                arithmeticConversion(in, B.getFloatTy(), B);
-            B.CreateStore(result, out);
+            OPENVDB_ASSERT(in.IsInteger() || in.GetUnderlyingType()->isHalfTy());
+            in = in.Load(B);
+            Value result = in.IsInteger() ?
+                in.CastToPrecision(B, B.getInt32Ty()) :
+                in.CastToPrecision(B, B.getFloatTy());
+            out.Assign(B, result);
         }
         else {
-            std::vector<llvm::Value*> outelem, inelem;
-            arrayUnpack(out, outelem, B, /*load*/false);
-            arrayUnpack(in, inelem, B, /*load*/true);
+            std::vector<Value> outelem, inelem;
+            out.ArrayToScalars(B, outelem, /*load*/false);
+            in.ArrayToScalars(B, inelem, /*load*/true);
             OPENVDB_ASSERT(outelem.size() == inelem.size());
-            const bool intconversion = inelem.front()->getType()->isIntegerTy();
-            OPENVDB_ASSERT(intconversion || inelem.front()->getType()->isHalfTy());
 
-            if (intconversion) arithmeticConversion(inelem, B.getInt32Ty(), B);
-            else               arithmeticConversion(inelem, B.getFloatTy(), B);
+            OPENVDB_ASSERT(inelem.front().IsInteger() ||
+                inelem.front().GetUnderlyingType()->isHalfTy());
+
+            llvm::Type* precision = inelem.front().IsInteger() ? B.getInt32Ty() : B.getFloatTy();
+            for (auto& elem : inelem) elem = elem.CastToPrecision(B, precision);
 
             for (size_t i = 0; i < inelem.size(); ++i) {
-                B.CreateStore(inelem[i], outelem[i]);
+                outelem[i].Assign(B, inelem[i]);
             }
         }
-        return nullptr;
+        return Value::Invalid();
     };
 
     return FunctionBuilder("__trncdecode")
@@ -83,40 +82,40 @@ inline FunctionGroup::UniquePtr axtrncdecode()
 inline FunctionGroup::UniquePtr axtrncencode()
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Value* out = args[0];
-        llvm::Value* in = args[1];
-        llvm::Type* type = in->getType()->getPointerElementType();
+        Value out = args[0];
+        Value in = args[1];
 
-        if (type->isIntegerTy() || type->isFloatingPointTy())
+        if (in.IsScalar())
         {
-            in = ir_load(B, in);
-            const bool intconversion = in->getType()->isIntegerTy();
-            OPENVDB_ASSERT(intconversion || in->getType()->isFloatTy());
-            llvm::Value* result = intconversion ?
-                arithmeticConversion(in, B.getInt16Ty(), B) :
-                arithmeticConversion(in, B.getHalfTy(), B);
-            B.CreateStore(result, out);
+            OPENVDB_ASSERT(in.IsInteger() || in.GetUnderlyingType()->isFloatTy());
+            in = in.Load(B);
+            Value result = in.IsInteger() ?
+                in.CastToPrecision(B, B.getInt16Ty()) :
+                in.CastToPrecision(B, B.getHalfTy());
+            out.Assign(B, result);
         }
         else {
-            std::vector<llvm::Value*> outelem, inelem;
-            arrayUnpack(out, outelem, B, /*load*/false);
-            arrayUnpack(in, inelem, B, /*load*/true);
-            OPENVDB_ASSERT(outelem.size() == inelem.size());
-            const bool intconversion = inelem.front()->getType()->isIntegerTy();
-            OPENVDB_ASSERT(intconversion || inelem.front()->getType()->isFloatTy());
+            std::vector<Value> outelem, inelem;
+            out.ArrayToScalars(B, outelem, /*load*/false);
+            in.ArrayToScalars(B, inelem, /*load*/true);
 
-            if (intconversion) arithmeticConversion(inelem, B.getInt16Ty(), B);
-            else               arithmeticConversion(inelem, B.getHalfTy(), B);
+            OPENVDB_ASSERT(outelem.size() == inelem.size());
+
+            OPENVDB_ASSERT(inelem.front().IsInteger() ||
+                inelem.front().GetUnderlyingType()->isFloatTy());
+
+            llvm::Type* precision = inelem.front().IsInteger() ? B.getInt16Ty() : B.getHalfTy();
+            for (auto& elem : inelem) elem = elem.CastToPrecision(B, precision);
 
             for (size_t i = 0; i < inelem.size(); ++i) {
-                B.CreateStore(inelem[i], outelem[i]);
+                outelem[i].Assign(B, inelem[i]);
             }
         }
-        return nullptr;
+        return Value::Invalid();
     };
 
     return FunctionBuilder("__trncencode")
@@ -135,48 +134,50 @@ inline FunctionGroup::UniquePtr axtrncencode()
 inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPositionRange)
 {
     auto generate =
-        [IsPositionRange](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [IsPositionRange](
+            const NativeArguments& args,
+            llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Value* out = args[0]; // out
-        llvm::Value* in = args[1]; // in
-        llvm::Type* type = in->getType()->getPointerElementType();
+        Value out = args[0];
+        Value in = args[1];
+        llvm::Type* intype = in.GetUnderlyingScalarType();
+        OPENVDB_ASSERT(intype->isIntegerTy(8) || intype->isIntegerTy(16));
 
-        llvm::Value* offset = LLVMType<float>::get(B.getContext(), 0.5f);
+        Value offset(LLVMType<float>::get(B.getContext(), 0.5f));
 
-        if (type->isIntegerTy())
+        if (in.IsInteger())
         {
-            in = ir_load(B, in);
-            OPENVDB_ASSERT(type->isIntegerTy(8) || type->isIntegerTy(16));
-            llvm::Value* s = B.CreateUIToFP(in, B.getFloatTy());
-            llvm::Value* d = type->isIntegerTy(8) ?
+            in = in.Load(B);
+
+
+            llvm::Value* s = B.CreateUIToFP(in.GetValue(), B.getFloatTy());
+            llvm::Value* d = intype->isIntegerTy(8) ?
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint8_t>::max())) :
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint16_t>::max()));
             llvm::Value* result = B.CreateFDiv(s, d);
-            if (IsPositionRange) result = B.CreateFSub(result, offset);
-            B.CreateStore(result, out);
+            if (IsPositionRange) result = B.CreateFSub(result, offset.GetValue());
+            B.CreateStore(result, out.GetValue());
         }
         else {
-            std::vector<llvm::Value*> outelem, inelem;
-            arrayUnpack(out, outelem, B, /*load*/false);
-            arrayUnpack(in, inelem, B, /*load*/true);
+            std::vector<Value> outelem, inelem;
+            out.ArrayToScalars(B, outelem, /*load*/false);
+            in.ArrayToScalars(B, inelem, /*load*/true);
             OPENVDB_ASSERT(inelem.size() >= 3);
             OPENVDB_ASSERT(outelem.size() == inelem.size());
-            OPENVDB_ASSERT(inelem.front()->getType()->isIntegerTy(8) || inelem.front()->getType()->isIntegerTy(16));
 
-            llvm::Value* d = inelem.front()->getType()->isIntegerTy(8) ?
+            llvm::Value* d = intype->isIntegerTy(8) ?
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint8_t>::max())) :
                 LLVMType<float>::get(B.getContext(), float(std::numeric_limits<uint16_t>::max()));
 
             for (size_t i = 0; i < inelem.size(); ++i) {
-                llvm::Value* result = B.CreateUIToFP(inelem[i], B.getFloatTy());
+                llvm::Value* result = B.CreateUIToFP(inelem[i].GetValue(), B.getFloatTy());
                 result = B.CreateFDiv(result, d);
-                if (IsPositionRange) result = B.CreateFSub(result, offset);
-                B.CreateStore(result, outelem[i]);
+                if (IsPositionRange) result = B.CreateFSub(result, offset.GetValue());
+                B.CreateStore(result, outelem[i].GetValue());
             }
         }
-        return nullptr;
+        return Value::Invalid();
     };
 
     if (OneByte) {
@@ -196,25 +197,27 @@ inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPo
 inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPositionRange)
 {
     auto generate =
-        [IsPositionRange](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [IsPositionRange](
+            const NativeArguments& args,
+            llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
+        Value out = args[0];
+        Value in = args[1];
+
         llvm::LLVMContext& C = B.getContext();
         llvm::Function* base = B.GetInsertBlock()->getParent();
-        llvm::Value* u = args[0]; // out
-        llvm::Value* s = args[1]; // in
-        s = ir_load(B, s);
+        in = in.Load(B);
 
-        llvm::Value* offset = LLVMType<float>::get(B.getContext(), 0.5f);
-        if (IsPositionRange) s = B.CreateFAdd(s, offset);
+        Value offset(LLVMType<float>::get(B.getContext(), 0.5f));
+        if (IsPositionRange) in = in.Add(B, offset);
 
-        const bool ftx8 = u->getType()->getPointerElementType()->isIntegerTy(8);
+        const bool ftx8 = args[0].GetUnderlyingType()->isIntegerTy(8);
 
         llvm::BasicBlock* lt0 = llvm::BasicBlock::Create(C, "lt0", base);
         llvm::BasicBlock* els = llvm::BasicBlock::Create(C, "else", base);
         llvm::BasicBlock* fin = llvm::BasicBlock::Create(C, "finish", base);
-        llvm::Value* r1 = binaryOperator(LLVMType<float>::get(C, 0.0f), s, ast::tokens::MORETHAN, B);
+        llvm::Value* r1 = binaryOperator(LLVMType<float>::get(C, 0.0f), in.GetValue(), ast::tokens::MORETHAN, B);
         B.CreateCondBr(r1, lt0, els);
 
         B.SetInsertPoint(lt0);
@@ -222,7 +225,7 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
             llvm::Value* d = ftx8 ?
                 LLVMType<uint8_t>::get(C, std::numeric_limits<uint8_t>::min()) :
                 LLVMType<uint16_t>::get(C, std::numeric_limits<uint16_t>::min());
-            B.CreateStore(d, u);
+            B.CreateStore(d, out.GetValue());
             B.CreateBr(fin);
         }
 
@@ -230,14 +233,14 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
         {
             llvm::BasicBlock* lte1 = llvm::BasicBlock::Create(C, "lte1", base);
             llvm::BasicBlock* post = llvm::BasicBlock::Create(C, "post", base);
-            r1 = binaryOperator(LLVMType<float>::get(C, 1.0f), s, ast::tokens::LESSTHANOREQUAL, B);
+            r1 = binaryOperator(LLVMType<float>::get(C, 1.0f), in.GetValue(), ast::tokens::LESSTHANOREQUAL, B);
             B.CreateCondBr(r1, lte1, post);
             B.SetInsertPoint(lte1);
             {
                 llvm::Value* d = ftx8 ?
                     LLVMType<uint8_t>::get(C, std::numeric_limits<uint8_t>::max()) :
                     LLVMType<uint16_t>::get(C, std::numeric_limits<uint16_t>::max());
-                B.CreateStore(d, u);
+                B.CreateStore(d, out.GetValue());
                 B.CreateBr(fin);
             }
 
@@ -246,34 +249,39 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
                 llvm::Value* d = ftx8 ?
                     LLVMType<float>::get(C, float(std::numeric_limits<uint8_t>::max())) :
                     LLVMType<float>::get(C, float(std::numeric_limits<uint16_t>::max()));
-                d = binaryOperator(s, d, ast::tokens::MULTIPLY, B);
-                d = B.CreateFPToUI(d, u->getType()->getPointerElementType());
-                B.CreateStore(d, u);
+                d = binaryOperator(in.GetValue(), d, ast::tokens::MULTIPLY, B);
+                d = B.CreateFPToUI(d, args[0].GetUnderlyingType());
+                B.CreateStore(d, out.GetValue());
                 B.CreateBr(fin);
             }
         }
 
         B.SetInsertPoint(fin);
-        return B.CreateRetVoid();
+        return Value::Invalid();
     };
 
     auto generate_vec =
-        [OneByte, IsPositionRange](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [OneByte, IsPositionRange](
+            const NativeArguments& args,
+            llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        std::vector<llvm::Value*> out, in;
-        arrayUnpack(args[0], out, B, /*load*/false);
-        arrayUnpack(args[1], in, B, /*load*/false);
+
+        std::vector<Value> out, in;
+        args[0].ArrayToScalars(B, out, /*load*/false);
+        args[1].ArrayToScalars(B, in,  /*load*/false);
         OPENVDB_ASSERT(in.size() >= 3);
         OPENVDB_ASSERT(out.size() == in.size());
 
         auto F = axfxptencode(OneByte, IsPositionRange);
-        for (size_t i = 0; i < in.size(); ++i) {
-            F->execute({out[i], in[i]}, B);
+        for (size_t i = 0; i < in.size(); ++i)
+        {
+            Arguments fxptencodeargs;
+            fxptencodeargs.AddArg(out[i]);
+            fxptencodeargs.AddArg(in[i]);
+            F->execute(fxptencodeargs, B);
         }
-
-        return nullptr;
+        return Value::Invalid();
     };
 
     if (OneByte) {
@@ -383,14 +391,15 @@ const CodecTypeMap& getCodecTypeMap()
 
 llvm::Type* Codec::findReturnTypeFromArg(const codegen::FunctionGroup* const group, llvm::Type* arg) const
 {
+    OPENVDB_ASSERT(!arg->isPointerTy());
     const auto& functions = group->list();
-    std::vector<llvm::Type*> types;
+    codegen::ArgInfoVector types;
     for (const auto& F : functions) {
         types.clear();
         F->types(types, arg->getContext());
         OPENVDB_ASSERT(types.size() == 2);
-        if (types[1] != arg) continue;
-        return types[0];
+        if (types[1].GetUnderlyingType() != arg) continue;
+        return types[0].GetUnderlyingType();
     }
     // no supported conversion
     return nullptr;

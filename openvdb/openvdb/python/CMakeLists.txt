@@ -15,6 +15,8 @@ include(GNUInstallDirs)
 ###### OpenVDB Python Options
 
 option(USE_NUMPY "Build the python library with numpy support." OFF)
+option(OPENVDB_PYTHON_USE_AX [=[
+Build the python library with AX support. Defaults to ON when OpenVDB AX is enabled."]=] ${USE_AX})
 option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
@@ -39,7 +41,15 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-if(USE_AX)
+if(OPENVDB_PYTHON_USE_AX)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    get_property(OPENVDB_LLVM_VERSION_MAJOR GLOBAL PROPERTY "OPENVDB_LLVM_VERSION_MAJOR")
+    if(OPENVDB_LLVM_VERSION_MAJOR VERSION_EQUAL 17)
+      message(FATAL_ERROR "LLVM version 17.X, used with OpenVDB AX, is incompatible "
+        "with the OpenVDB python plugin. Use any version of LLVM 18+")
+    endif()
+  endif()
+
   # Link the python module against openvdb_ax
   if(NOT OPENVDB_BUILD_AX)
     find_package(OpenVDB REQUIRED openvdb_ax)
@@ -69,7 +79,7 @@ endif()
 if(USE_NUMPY)
   target_compile_definitions(openvdb_python PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
-if(USE_AX)
+if(OPENVDB_PYTHON_USE_AX)
   target_link_libraries(openvdb_python PUBLIC ${OPENVDB_AX_LIB})
   target_compile_definitions(openvdb_python PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
@@ -95,7 +105,7 @@ if(OPENVDB_BUILD_PYTHON_UNITTESTS)
     WORKING_DIRECTORY "${OPENVDB_PYTHON_WORKING_DIR}")
 
   set(OPENVDB_PYTHON_TEST_ENV "")
-  if(USE_AX)
+  if(OPENVDB_PYTHON_USE_AX)
     list(APPEND OPENVDB_PYTHON_TEST_ENV "OPENVDB_TEST_PYTHON_AX=1")
   endif()
 

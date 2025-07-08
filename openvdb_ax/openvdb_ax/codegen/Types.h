@@ -41,6 +41,18 @@ template <> struct int_t<16> { using type = int16_t; };
 template <> struct int_t<32> { using type = int32_t; };
 template <> struct int_t<64> { using type = int64_t; };
 
+template <typename T> struct RemoveAllPtrTypes { using Type = T; };
+template <typename T> struct RemoveAllPtrTypes<T*> { using Type = typename RemoveAllPtrTypes<T>::Type; };
+template <typename T> struct RemoveAllPtrTypes<T* const> { using Type = typename RemoveAllPtrTypes<T>::Type; };
+template <typename T> struct RemoveAllPtrTypes<T* volatile> { using Type = typename RemoveAllPtrTypes<T>::Type; };
+template <typename T> struct RemoveAllPtrTypes<T* const volatile> { using Type = typename RemoveAllPtrTypes<T>::Type; };
+
+template <typename T> struct CountNPtrs { static constexpr uint8_t value = 0; };
+template <typename T> struct CountNPtrs<T*> { static constexpr uint8_t value = 1 + CountNPtrs<T>::value; };
+template <typename T> struct CountNPtrs<T* const> { static constexpr uint8_t value = 1 + CountNPtrs<T>::value; };
+template <typename T> struct CountNPtrs<T* volatile> { static constexpr uint8_t value = 1 + CountNPtrs<T>::value; };
+template <typename T> struct CountNPtrs<T* const volatile> { static constexpr uint8_t value = 1 + CountNPtrs<T>::value; };
+
 /// @brief LLVM type mapping from pod types
 /// @note  LLVM Types do not store information about the value sign, only meta
 ///        information about the primitive type (i.e. float, int, pointer) and
@@ -60,6 +72,8 @@ struct LLVMType
     static_assert(!std::is_class<T>::value,
         "Object types/arguments are not supported for automatic "
         "LLVM Type conversion.");
+
+    static const bool CXXUTypeIsNativeType = true;
 
     /// @brief  Return an LLVM type which represents T
     /// @param C  The LLVMContext to request the Type from.
@@ -102,13 +116,15 @@ struct LLVMType
         llvm::Type* type = LLVMType<T>::get(C);
         llvm::Constant* constant = nullptr;
 
-        if (std::is_floating_point<T>::value) {
+        if constexpr (std::is_floating_point<T>::value)
+        {
             OPENVDB_ASSERT(llvm::ConstantFP::isValueValidForType(type,
                 llvm::APFloat(static_cast<typename std::conditional
                     <std::is_floating_point<T>::value, T, double>::type>(V))));
             constant = llvm::ConstantFP::get(type, static_cast<double>(V));
         }
-        else if (std::is_integral<T>::value) {
+        else if constexpr(std::is_integral<T>::value)
+        {
             const constexpr bool isSigned = std::is_signed<T>::value;
             OPENVDB_ASSERT((isSigned && llvm::ConstantInt::isValueValidForType(type, static_cast<int64_t>(V))) ||
                    (!isSigned && llvm::ConstantInt::isValueValidForType(type, static_cast<uint64_t>(V))));
@@ -134,6 +150,8 @@ struct LLVMType
 template <typename T, size_t S>
 struct LLVMType<T[S]>
 {
+    static const bool CXXUTypeIsNativeType = true;
+
     static_assert(S != 0,
         "Zero size array types are not supported for automatic LLVM "
         "Type conversion");
@@ -157,15 +175,19 @@ struct LLVMType<T[S]>
 template <typename T>
 struct LLVMType<T*>
 {
+    static const bool CXXUTypeIsNativeType = LLVMType<T>::CXXUTypeIsNativeType;
+
     static inline llvm::PointerType*
     get(llvm::LLVMContext& C) {
-        return LLVMType<T>::get(C)->getPointerTo(0);
+        return llvm::PointerType::get(LLVMType<T>::get(C), 0);
     }
 };
 
 template <>
 struct LLVMType<char> : public LLVMType<uint8_t>
 {
+    static const bool CXXUTypeIsNativeType = true;
+
     static_assert(std::is_same<uint8_t, unsigned char>::value,
         "This library requires std::uint8_t to be implemented as unsigned char.");
 };
@@ -173,6 +195,8 @@ struct LLVMType<char> : public LLVMType<uint8_t>
 template <>
 struct LLVMType<codegen::String>
 {
+    static const bool CXXUTypeIsNativeType = true;
+
     static inline llvm::StructType*
     get(llvm::LLVMContext& C) {
         const std::vector<llvm::Type*> types {
@@ -193,6 +217,8 @@ struct LLVMType<codegen::String>
 template <>
 struct LLVMType<void>
 {
+    static const bool CXXUTypeIsNativeType = false;
+
     static inline llvm::Type*
     get(llvm::LLVMContext& C) {
         return llvm::Type::getVoidTy(C);
@@ -201,10 +227,13 @@ struct LLVMType<void>
 
 /// @note void* implemented as signed int8_t* to match clang IR generation
 template <> struct LLVMType<void*> : public LLVMType<int8_t*> {};
+
 template <> struct LLVMType<openvdb::math::half>
 {
     // @note LLVM has a special representation of half types. Don't alias to
     //   uint16_t as we want type->isFloatingPointTy() to still return true.
+
+    static const bool CXXUTypeIsNativeType = true;
 
     static inline llvm::Type* get(llvm::LLVMContext& C) { return llvm::Type::getHalfTy(C); }
     static inline llvm::Constant* get(llvm::LLVMContext& C, const openvdb::math::half V)
@@ -247,6 +276,8 @@ struct AliasTypeMap
         "T1 in instantiation of an AliasTypeMap does not have a standard layout. "
         "This will most likely cause undefined behaviour when attempting to map "
         "T1->T2.");
+
+    static const bool CXXUTypeIsNativeType = LLVMTypeT::CXXUTypeIsNativeType;
 
     static inline llvm::Type*
     get(llvm::LLVMContext& C) {
@@ -364,6 +395,7 @@ OPENVDB_AX_API llvm::Type* llvmTypeFromToken(const ast::tokens::CoreType& type, 
 /// @brief  Return a corresponding AX token which represents the given LLVM Type.
 /// @note   If the type does not exist in AX, ast::tokens::UNKNOWN is returned.
 ///         Must not be a nullptr.
+/// @warning  From LLVM 16+, the input type must not be a pointer type
 /// @param type  a valid LLVM Type
 ///
 OPENVDB_AX_API ast::tokens::CoreType tokenFromLLVMType(const llvm::Type* type);

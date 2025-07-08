@@ -12,16 +12,19 @@
 #include "openvdb_ax/codegen/Functions.h"
 #include "openvdb_ax/codegen/PointComputeGenerator.h"
 #include "openvdb_ax/codegen/VolumeComputeGenerator.h"
+#include "openvdb_ax/codegen/VolumeKernelFunctions.h"
 #include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/Assert.h>
 
+#include <llvm/Config/llvm-config.h>
+
+# if LLVM_VERSION_MAJOR <= 15
 #include <llvm/ADT/Optional.h>
 #include <llvm/ADT/Triple.h>
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/Analysis/TargetTransformInfo.h>
-#include <llvm/Config/llvm-config.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/LLVMContext.h>
@@ -38,20 +41,27 @@
 #include <llvm/Support/SourceMgr.h> // SMDiagnostic
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
-
-// @note  As of adding support for LLVM 5.0 we not longer explicitly
-// perform standard compiler passes (-std-compile-opts) based on the changes
-// to the opt binary in the llvm codebase (tools/opt.cpp). We also no
-// longer explicitly perform:
-//  - llvm::createStripSymbolsPass()
-// And have never performed any specific target machine analysis passes
-//
-// @todo  Properly identify the IPO passes that we would benefit from using
-// as well as what user controls would otherwise be appropriate
-
 #include <llvm/Transforms/IPO.h> // Inter-procedural optimization passes
 #include <llvm/Transforms/IPO/AlwaysInliner.h>
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#else // LLVM_VERSION_MAJOR > 15
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm/ExecutionEngine/JITSymbol.h>
+#if LLVM_VERSION_MAJOR < 17
+// for DynamicLibrarySearchGenerator
+#include <llvm/ExecutionEngine/Orc/ExecutionUtils.h>
+#endif
+#include <llvm/IR/LegacyPassManager.h>
+#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Mangler.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/PassManager.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/TargetParser/Host.h>
+#include <llvm/Support/raw_os_ostream.h>
+#include <llvm/Target/TargetMachine.h>
+#endif
 
 #include <unordered_map>
 
@@ -63,6 +73,20 @@ namespace ax {
 
 namespace
 {
+
+bool verify(const llvm::Module& module, Logger& logger)
+{
+    std::ostringstream os;
+    llvm::raw_os_ostream out(os);
+    if (llvm::verifyModule(module, &out)) {
+        out.flush();
+        logger.error("Fatal AX Compiler error; the generated IR was invalid:\n" + os.str());
+        return false;
+    }
+    return true;
+}
+
+#if LLVM_VERSION_MAJOR <= 15
 
 /// @brief  Initialize a target machine for the host platform. Returns a nullptr
 ///         if a target could not be created.
@@ -98,7 +122,7 @@ initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
             .create());
 
     if (!EE) {
-        logger.error("Fatal AX Compiler error; the LLVM Execution engine could "
+        logger.error("Fatal AX Compiler error; the LLVM Execution Engine could "
             "not be initialized:\n" + error);
         return nullptr;
     }
@@ -111,8 +135,6 @@ initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
 
     return EE;
 }
-
-#ifndef USE_NEW_PASS_MANAGER
 
 #if LLVM_VERSION_MAJOR < 15
 void addStandardLinkPasses(llvm::legacy::PassManagerBase& passes)
@@ -258,61 +280,6 @@ void LLVMoptimise(llvm::Module& module,
     LLVMoptimise(module, optLevel, sizeLevel, TM);
 }
 
-#else
-
-void LLVMoptimise(llvm::Module& module,
-                  const LLVM_OPTIMIZATION_LEVEL optLevel,
-                  llvm::TargetMachine* TM)
-{
-    // use the PassBuilder for optimisation pass management
-    // see llvm's llvm/Passes/PassBuilder.h, tools/opt/NewPMDriver.cpp
-    // and clang's CodeGen/BackEndUtil.cpp for more info/examples
-    llvm::PassBuilder PB(TM);
-
-    llvm::LoopAnalysisManager LAM;
-    llvm::FunctionAnalysisManager FAM;
-    llvm::CGSCCAnalysisManager cGSCCAM;
-    llvm::ModuleAnalysisManager MAM;
-
-    // register all of the analysis passes available by default
-    PB.registerModuleAnalyses(MAM);
-    PB.registerCGSCCAnalyses(cGSCCAM);
-    PB.registerFunctionAnalyses(FAM);
-    PB.registerLoopAnalyses(LAM);
-
-    // the analysis managers above are interdependent so
-    // register dependent managers with each other via proxies
-    PB.crossRegisterProxies(LAM, FAM, cGSCCAM, MAM);
-
-    // the PassBuilder does not produce -O0 pipelines, so do that ourselves
-    if (optLevel == LLVM_OPTIMIZATION_LEVEL::O0) {
-        // matching clang -O0, only add inliner pass
-        // ref: clang CodeGen/BackEndUtil.cpp EmitAssemblyWithNewPassManager
-        llvm::ModulePassManager MPM;
-        MPM.addPass(llvm::AlwaysInlinerPass());
-        MPM.run(module, MAM);
-    }
-    else {
-        // create a clang-like optimisation pipeline for -O1, 2,  s, z, 3
-        llvm::ModulePassManager MPM =
-            PB.buildPerModuleDefaultPipeline(optLevel);
-        MPM.run(*module, MAM);
-    }
-}
-#endif
-
-bool verify(const llvm::Module& module, Logger& logger)
-{
-    std::ostringstream os;
-    llvm::raw_os_ostream out(os);
-    if (llvm::verifyModule(module, &out)) {
-        out.flush();
-        logger.error("Fatal AX Compiler error; the generated IR was invalid:\n" + os.str());
-        return false;
-    }
-    return true;
-}
-
 void optimise(llvm::Module& module,
         const CompilerOptions::OptLevel optLevel,
         llvm::TargetMachine* TM)
@@ -346,6 +313,8 @@ void optimise(llvm::Module& module,
         default             : {}
     }
 }
+
+
 
 bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
                                llvm::ExecutionEngine& engine,
@@ -405,7 +374,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
             const codegen::CFunctionBase* binding =
                 dynamic_cast<const codegen::CFunctionBase*>(decl.get());
             if (!binding) {
-#ifndef NDEBUG
+#ifdef OPENVDB_ENABLE_ASSERTS
                 // some internally supported LLVm symbols (malloc, free, etc) are
                 // not prefixed with ax. and we don't generated a function body
                 if (llvmFunction->getName().startswith("ax.")) {
@@ -435,7 +404,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
         }
     }
 
-#ifndef NDEBUG
+#ifdef OPENVDB_ENABLE_ASSERTS
     // Loop through all functions and check to see if they have valid engine mappings.
     // This can occur if lazy functions don't initialize their dependencies properly.
     // @todo  Really we should just loop through the module functions to begin with
@@ -457,6 +426,176 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
 
     return count == logger.errors();
 }
+
+
+#else // LLVM_VERSION_MAJOR > 15
+
+inline std::unique_ptr<llvm::orc::LLJIT>
+initializeExecutionEngine(Logger& logger)
+{
+    auto LLJIT = llvm::orc::LLJITBuilder().create();
+    if (!LLJIT) {
+        logger.error("Fatal AX Compiler error; the LLVM Execution Engine could "
+            "not be initialized\n");
+        llvm::logAllUnhandledErrors(LLJIT.takeError(), llvm::errs());
+        return nullptr;
+    }
+    return std::move(*LLJIT);
+}
+
+void LLVMoptimise(llvm::Module& M, const llvm::OptimizationLevel opt)
+{
+    // Create the analysis managers.
+    // These must be declared in this order so that they are destroyed in the
+    // correct order due to inter-analysis-manager references.
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
+
+    // Create the new pass manager builder.
+    // Take a look at the PassBuilder constructor parameters for more
+    // customization, e.g. specifying a TargetMachine or various debugging
+    // options.
+    llvm::PassBuilder PB;
+
+    // Register all the basic analyses with the managers.
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    llvm::ModulePassManager MPM = PB.buildPerModuleDefaultPipeline(opt);
+
+    // Optimize the IR!
+    MPM.run(M, MAM);
+}
+
+void optimise(llvm::Module& module, const CompilerOptions::OptLevel optLevel)
+{
+    switch (optLevel) {
+        case CompilerOptions::OptLevel::O0 : {
+            LLVMoptimise(module, llvm::OptimizationLevel::O0);
+            break;
+        }
+        case CompilerOptions::OptLevel::O1 : {
+            LLVMoptimise(module, llvm::OptimizationLevel::O1);
+            break;
+        }
+        case CompilerOptions::OptLevel::O2 : {
+            LLVMoptimise(module, llvm::OptimizationLevel::O2);
+            break;
+        }
+        case CompilerOptions::OptLevel::Os : {
+            LLVMoptimise(module, llvm::OptimizationLevel::Os);
+            break;
+        }
+        case CompilerOptions::OptLevel::Oz : {
+            LLVMoptimise(module, llvm::OptimizationLevel::Oz);
+            break;
+        }
+        case CompilerOptions::OptLevel::O3 : {
+            LLVMoptimise(module, llvm::OptimizationLevel::O3);
+            break;
+        }
+        case CompilerOptions::OptLevel::NONE :
+        default             : {}
+    }
+}
+
+bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
+                               llvm::orc::LLJIT& EE,
+                               llvm::Module& module,
+                               Logger& logger)
+{
+    const size_t count = logger.errors();
+
+    llvm::orc::SymbolMap Symbols;
+
+    for (const auto& iter : registry.map()) {
+        const codegen::FunctionGroup* const function = iter.second.function();
+        if (!function) continue;
+
+        const codegen::FunctionGroup::FunctionList& list = function->list();
+        for (const codegen::Function::Ptr& decl : list) {
+
+            // llvmFunction may not exists if compiled without mLazyFunctions
+            const llvm::Function* llvmFunction = module.getFunction(decl->symbol());
+
+            // if the function has an entry block, it's not a C binding - this is a
+            // quick check to improve performance (so we don't call virtual methods
+            // for every function)
+            if (!llvmFunction) continue;
+            if (llvmFunction->size() > 0) continue;
+
+            const codegen::CFunctionBase* binding =
+                dynamic_cast<const codegen::CFunctionBase*>(decl.get());
+            if (!binding) {
+#ifdef OPENVDB_ENABLE_ASSERTS
+                // some internally supported LLVm symbols (malloc, free, etc) are
+                // not prefixed with ax. and we don't generated a function body
+                if (llvmFunction->getName().starts_with("ax.")) {
+                    OPENVDB_LOG_WARN("Function with symbol \"" << decl->symbol() << "\" has "
+                        "no function body and is not a C binding.");
+                }
+#endif
+                continue;
+            }
+
+            const uint64_t address = binding->address();
+            if (address == 0) {
+                logger.error("Fatal AX Compiler error; No available mapping for C Binding "
+                    "with symbol \"" + std::string(decl->symbol()) + "\"");
+                continue;
+            }
+
+            // Constuct a llvm::orc::ExecutorSymbolDef in the symbol map
+            const auto result =
+                Symbols.try_emplace(EE.mangleAndIntern(llvmFunction->getName()),
+#if LLVM_VERSION_MAJOR >= 17
+                    llvm::orc::ExecutorAddr(address),
+#else
+                    llvm::JITTargetAddress(address),
+#endif
+                    llvm::JITSymbolFlags::Exported);
+
+            if (!result.second) {
+                logger.error("Fatal AX Compiler error; multiple functions are using the "
+                    "same symbol \"" + std::string(decl->symbol()) + "\".");
+            }
+        }
+    }
+
+    auto Err = EE.getMainJITDylib().define(llvm::orc::absoluteSymbols(Symbols));
+    if (Err) {
+        logger.error("Fatal AX Compiler error; the LLVM Execution Engine could "
+            "not be initialized\n");
+        llvm::logAllUnhandledErrors(std::move(Err), llvm::errs());
+        return false;
+    }
+
+#ifdef OPENVDB_ENABLE_ASSERTS
+    // Loop through all functions and check to see if they have valid engine mappings.
+    // This can occur if lazy functions don't initialize their dependencies properly.
+    // @todo  Really we should just loop through the module functions to begin with
+    //  to init engine mappings - it would probably be faster but we'd have to do
+    //  some string manipulation and it would assume function names have been set up
+    //  correctly
+    const auto& list = module.getFunctionList();
+    for (const auto& F : list) {
+        if (F.size() > 0) continue;
+        // Some LLVM functions may also not be defined at this stage which is expected
+        if (!F.getName().starts_with("ax.")) continue;
+        auto EntrySym = EE.lookup(F.getName());
+        OPENVDB_ASSERT(bool(EntrySym));
+        OPENVDB_ASSERT_MESSAGE(EntrySym->getValue() != 0, "Unbound function!");
+    }
+#endif
+
+    return count == logger.errors();
+}
+#endif
 
 bool verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
 {
@@ -506,7 +645,7 @@ bool verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
 }
 
 inline void
-registerAccesses(const codegen::SymbolTable& globals, const AttributeRegistry& registry)
+registerAccesses(const codegen::SymbolTable<llvm::Value*>& globals, const AttributeRegistry& registry)
 {
     std::string name, type;
 
@@ -553,7 +692,7 @@ initializeMetadataPtr(CustomData& data,
 }
 
 inline bool
-registerExternalGlobals(const codegen::SymbolTable& globals,
+registerExternalGlobals(const codegen::SymbolTable<llvm::Value*>& globals,
             CustomData::Ptr& dataPtr,
             llvm::LLVMContext& C,
             Logger& logger)
@@ -654,18 +793,15 @@ struct PointDefaultModifier :
 /////////////////////////////////////////////////////////////////////////////
 
 Compiler::Compiler(const CompilerOptions& options)
-    : mContext()
-    , mCompilerOptions(options)
+    : mCompilerOptions(options)
     , mFunctionRegistry()
 {
-    mContext.reset(new llvm::LLVMContext);
-#if LLVM_VERSION_MAJOR >= 15
-    // This will not work from LLVM 16. We'll need to fix this
-    // https://llvm.org/docs/OpaquePointers.html
-    mContext->setOpaquePointers(false);
-#endif
     mFunctionRegistry = codegen::createDefaultRegistry(&options.mFunctionOptions);
 }
+
+Compiler::~Compiler() = default;
+Compiler::Compiler(Compiler&&) = default;
+Compiler& Compiler::operator=(Compiler&&) = default;
 
 Compiler::UniquePtr Compiler::create(const CompilerOptions &options)
 {
@@ -678,6 +814,7 @@ void Compiler::setFunctionRegistry(std::unique_ptr<codegen::FunctionRegistry>&& 
     mFunctionRegistry = std::move(functionRegistry);
 }
 
+#if LLVM_VERSION_MAJOR <= 15
 template <typename ExeT, typename GenT>
 inline typename ExeT::Ptr
 Compiler::compile(const ast::Tree& tree,
@@ -692,10 +829,17 @@ Compiler::compile(const ast::Tree& tree,
         return nullptr;
     }
 
+    std::shared_ptr<llvm::LLVMContext> ctx(new llvm::LLVMContext);
+#if LLVM_VERSION_MAJOR == 15
+    // This will not work from LLVM 16.
+    // https://llvm.org/docs/OpaquePointers.html
+    ctx->setOpaquePointers(false);
+#endif
+
     // initialize the module and execution engine - the latter isn't needed
     // for IR generation but we leave the creation of the TM to the EE.
 
-    std::unique_ptr<llvm::Module> M(new llvm::Module(moduleName, *mContext));
+    std::unique_ptr<llvm::Module> M(new llvm::Module(moduleName, *ctx));
     llvm::Module* module = M.get();
     std::unique_ptr<llvm::ExecutionEngine> EE = initializeExecutionEngine(std::move(M), logger);
     if (!EE) return nullptr;
@@ -713,7 +857,7 @@ Compiler::compile(const ast::Tree& tree,
 
     registerAccesses(codeGenerator.globals(), *attributes);
 
-    if (!registerExternalGlobals(codeGenerator.globals(), data, *mContext, logger)) {
+    if (!registerExternalGlobals(codeGenerator.globals(), data, *ctx, logger)) {
         return nullptr;
     }
 
@@ -758,13 +902,135 @@ Compiler::compile(const ast::Tree& tree,
     }
 
     // create final executable object
-    return typename ExeT::Ptr(new ExeT(mContext,
+    // @note relies on friend access so can't use make_shared
+    return typename ExeT::Ptr(new ExeT(ctx,
         std::move(EE),
         attributes,
         data,
         functionMap,
         tree));
 }
+
+#else
+
+template <typename ExeT, typename GenT>
+inline typename ExeT::Ptr
+Compiler::compile(const ast::Tree& tree,
+        const std::string& moduleName,
+        const std::vector<std::string>& functions,
+        CustomData::Ptr data,
+        Logger& logger)
+{
+    // @todo  Not technically necessary for volumes but does the
+    //   executer/bindings handle this?
+    if (!verifyTypedAccesses(tree, logger)) {
+        return nullptr;
+    }
+
+    llvm::orc::ThreadSafeModule module = [&moduleName]() {
+        llvm::orc::ThreadSafeContext C(std::make_unique<llvm::LLVMContext>());
+        auto M = std::make_unique<llvm::Module>(moduleName, *(C.getContext()));
+        return llvm::orc::ThreadSafeModule(std::move(M), std::move(C));
+    }();
+
+    llvm::Module& M = *(module.getModuleUnlocked());
+    llvm::LLVMContext& C = *(module.getContext().getContext());
+
+    GenT codeGenerator(M, mCompilerOptions.mFunctionOptions, *mFunctionRegistry, logger);
+    AttributeRegistry::Ptr attributes = codeGenerator.generate(tree);
+
+    // if there has been a compilation error through user error, exit
+    if (!attributes) {
+        OPENVDB_ASSERT(logger.hasError());
+        return nullptr;
+    }
+
+    // map accesses (always do this prior to optimising as globals may be removed)
+
+    registerAccesses(codeGenerator.globals(), *attributes);
+
+    if (!registerExternalGlobals(codeGenerator.globals(), data, C, logger)) {
+        return nullptr;
+    }
+
+    // optimise and verify
+
+    if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
+    optimise(M, mCompilerOptions.mOptLevel);
+    if (mCompilerOptions.mOptLevel != CompilerOptions::OptLevel::NONE) {
+        if (mCompilerOptions.mVerify && !verify(M, logger)) return nullptr;
+    }
+
+    // @todo re-constant fold!! although constant folding will work with constant
+    //       expressions prior to optimisation, expressions like "int a = 1; cosh(a);"
+    //       will still keep a call to cosh. This is because the current AX folding
+    //       only checks for an immediate constant expression and for C bindings,
+    //       like cosh, llvm its unable to optimise the call out (as it isn't aware
+    //       of the function body). What llvm can do, however, is change this example
+    //       into "cosh(1)" which we can then handle.
+
+    // map functions
+
+    std::shared_ptr<llvm::orc::LLJIT> EE = initializeExecutionEngine(logger);
+    if (!EE) return nullptr;
+
+#if LLVM_VERSION_MAJOR < 17
+    // LLVM 17 and 18 introduced several improvements to the ORC JIT
+    // infrastructure, including:
+    //
+    //   - Better default symbol resolution: LLVM 17+ improved how it
+    //     automatically resolves symbols from the host process.
+    //   - Enhanced support for DynamicLibrarySearchGenerator: This makes it
+    //     easier to import symbols from the host's dynamic libraries (like
+    //     libc).
+    //   - More robust LLJITBuilder defaults: Later versions configure the JIT
+    //     environment more intelligently, reducing the need for manual symbol
+    //     injection.
+    //
+    // Before this, we need to add a host generator ourselves for things like
+    // malloc, free, memcpy
+    {
+        auto Generator = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+            EE->getDataLayout().getGlobalPrefix());
+        EE->getMainJITDylib().addGenerator(std::move(*Generator));
+    }
+#endif
+
+    if (!initializeGlobalFunctions(*mFunctionRegistry, *EE, M, logger)) {
+        return nullptr;
+    }
+
+    if (auto Err = EE->addIRModule(std::move(module))) {
+        logger.error("Fatal AX Compiler error; the LLVM Execution Engine could "
+            "not be initialized\n");
+        llvm::logAllUnhandledErrors(std::move(Err), llvm::errs());
+        return nullptr;
+    }
+
+    // get the built function pointers
+
+    std::unordered_map<std::string, uint64_t> functionMap;
+
+    for (const std::string& name : functions) {
+        auto EntrySym = EE->lookup(name);
+        if (!EntrySym) {
+            logger.error("Fatal AX Compiler error; Unable to compile compute "
+                "function \"" + name + "\"");
+            return nullptr;
+        }
+        functionMap[name] = EntrySym->getValue();
+    }
+
+    // create final executable object
+    // @note relies on friend access so can't use make_shared
+    return typename ExeT::Ptr(new ExeT(
+        std::move(EE),
+        std::move(attributes),
+        std::move(data),
+        std::move(functionMap),
+        tree));
+}
+#endif
 
 template<>
 OPENVDB_AX_API PointExecutable::Ptr

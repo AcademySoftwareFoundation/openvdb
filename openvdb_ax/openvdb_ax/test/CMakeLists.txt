@@ -122,6 +122,7 @@ add_executable(vdb_ax_test ${TEST_SOURCE_FILES})
 #  of fused instructions in tests where it matters.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   set_source_files_properties(
+      integration/TestAssign.cc
       integration/TestBinary.cc
       integration/TestStandardFunctions.cc
     PROPERTIES
@@ -133,6 +134,26 @@ target_include_directories(vdb_ax_test PRIVATE ../ .)
 
 if(OPENVDB_AX_TEST_PROFILE)
   target_compile_definitions(vdb_ax_test PRIVATE "-DPROFILE")
+endif()
+
+# If we're not building with asserts, determine if LLVM has asserts on. If it
+# doesn't we enable some extra tests
+if(NOT OPENVDB_ENABLE_ASSERTS)
+  get_filename_component(LLVM_ROOT "${LLVM_DIR}" DIRECTORY)
+  get_filename_component(LLVM_ROOT "${LLVM_ROOT}" DIRECTORY)
+  get_filename_component(LLVM_ROOT "${LLVM_ROOT}" DIRECTORY)
+  find_program(LLVM_CONFIG_EXECUTABLE llvm-config PATHS ${LLVM_ROOT}/bin)
+  if(LLVM_CONFIG_EXECUTABLE)
+    execute_process(
+      COMMAND ${LLVM_CONFIG_EXECUTABLE} --assertion-mode
+      OUTPUT_VARIABLE LLVM_HAS_ASSERTIONS
+      ERROR_QUIET # If we error for any reason, don't enable the tests
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    if(LLVM_HAS_ASSERTIONS STREQUAL "OFF")
+      # Enable the tests which would assert in LLVM
+      target_compile_definitions(vdb_ax_test PRIVATE "-DOPENVDB_AX_NO_LLVM_ASSERTS")
+    endif()
+  endif()
 endif()
 
 add_test(NAME vdb_ax_unit_test COMMAND vdb_ax_test -v WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../)
