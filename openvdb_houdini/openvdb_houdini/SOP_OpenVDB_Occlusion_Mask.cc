@@ -79,7 +79,11 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
         .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
+#if SYS_VERSION_MAJOR_INT >= 21
+        .setSpareData(&PRM_SpareData::anyCameraPath)
+#else
         .setSpareData(&PRM_SpareData::objCameraPath)
+#endif
         .setTooltip("Reference camera path")
         .setDocumentation("The path to the camera (e.g., `/obj/cam1`)"));
 
@@ -408,6 +412,35 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
         cameraPath.harden();
 
         if (cameraPath.isstring()) {
+#if SYS_VERSION_MAJOR_INT >= 21
+            UT_Matrix4D	     cameratosop;
+            OBJ_CameraParms  cameraParms;
+            OBJ_Node        *meobj = cookparms()->getNode()
+                                ? cookparms()->getNode()->getCreator()->castToOBJNode()
+                                : nullptr;
+            UT_StringHolder  errstr;
+
+            OP_Node::getCameraInfoAndRelativeTransform(
+                cameraPath,
+                meobj ? meobj->getFullPath() : UT_StringHolder::theEmptyString,
+                cookparms()->getCwd(),
+                false, // get_inverse_xform
+                context,
+                cookparms()->depnode(),
+                cameraParms,
+                cameratosop,
+                errstr);
+            if (errstr.isstring())
+                throw std::runtime_error{"camera \"" + cameraPath.toStdString() + "\" was not found"};
+
+            const float nearPlane = static_cast<float>(cameraParms.mynear);
+            const float farPlane = static_cast<float>(nearPlane + evalFloat("depth", 0, time));
+            const float voxelDepthSize = static_cast<float>(evalFloat("voxeldepthsize", 0, time));
+            const int voxelCount = static_cast<int>(evalInt("voxelcount", 0, time));
+
+            mFrustum = hvdb::frustumTransformFromCamera(cameraParms, cameratosop,
+                0, nearPlane, farPlane, voxelDepthSize, voxelCount);
+#else
             OBJ_Node* camobj = cookparms()->getCwd()->findOBJNode(cameraPath);
             OP_Node* self = cookparms()->getCwd();
 
@@ -432,6 +465,7 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
 
             mFrustum = hvdb::frustumTransformFromCamera(*self, context, *cam,
                 0, nearPlane, farPlane, voxelDepthSize, voxelCount);
+#endif
         } else {
             addError(SOP_MESSAGE, "No camera referenced.");
             return error();

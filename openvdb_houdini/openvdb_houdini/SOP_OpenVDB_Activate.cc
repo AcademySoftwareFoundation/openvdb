@@ -60,8 +60,8 @@ enum OPERATION_NAMES
 class SOP_VDBActivate : public hvdb::SOP_NodeVDB
 {
 public:
-    const char  *inputLabel(unsigned idx) const override;
-    int          isRefInput(unsigned i) const override;
+    const char  *inputLabel(OP_InputIdx idx) const override;
+    int          isRefInput(OP_InputIdx i) const override;
 
     bool         updateParmsFlags() override;
 
@@ -218,10 +218,10 @@ an inclusive range, so includes the maximum voxel.)"));
     support operation or setting of values.
 */
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Expand Voxels")
-                .setDefault(PRMoneDefaults)
+              .setDefault(PRMoneDefaults)
               .setRange(PRM_RANGE_UI, -5, PRM_RANGE_UI, 5)
               .setTooltip("Expand the active area by at least the specified number of voxels.")
-                .setDocumentation(
+              .setDocumentation(
 R"(Expand the active area by at least the specified number of voxels.  Does not support
 operation or setting of values.)"));
 

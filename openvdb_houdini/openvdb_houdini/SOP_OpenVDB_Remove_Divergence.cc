@@ -54,7 +54,11 @@ struct SOP_OpenVDB_Remove_Divergence: public hvdb::SOP_NodeVDB
     SOP_OpenVDB_Remove_Divergence(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned input) const override { return (input > 0); }
+    int isRefInput(OP_InputIdx input) const override
+    {
+        UT_ASSERT(input >= 0);
+        return (input > 0);
+    }
 
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
 

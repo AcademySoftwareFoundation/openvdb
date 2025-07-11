@@ -25,6 +25,7 @@
 #include <GU/GU_PackedGeometry.h>
 #include <GU/GU_PackedFragment.h>
 #include <GU/GU_PrimPacked.h>
+#include <SYS/SYS_Compiler.h>
 
 #include <stdexcept>
 #include <string>
@@ -76,7 +77,11 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned i) const override { return (i == 1); }
+    int isRefInput(OP_InputIdx i) const override
+    {
+        UT_ASSERT(i >= 0);
+        return (i == 1);
+    }
 
     static OUTPUT_NAME_MODE getOutputNameMode(const std::string& modeName);
 
@@ -727,7 +732,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 
                 for (const PointDataGrid::ConstPtr &grid : pointGrids) {
 
-                    assert(i < pointNames.size());
+                    UT_ASSERT(i < pointNames.size());
                     const std::string gridName = pointNames[i++];
 
                     GU_Detail geo;
@@ -896,7 +901,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
                     }
 
                     const int16_t width(hvdb::attributeTupleSize(attribute));
-                    assert(width > 0);
+                    UT_ASSERT(width > 0);
 
                     const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
 
@@ -993,7 +998,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
                     }
 
                     const int16_t width(hvdb::attributeTupleSize(attribute));
-                    assert(width > 0);
+                    UT_ASSERT(width > 0);
 
                     const GA_TypeInfo typeInfo(attribute->getOptions().typeInfo());
 
