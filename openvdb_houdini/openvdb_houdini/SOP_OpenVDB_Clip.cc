@@ -114,7 +114,11 @@ Mask VDB:\n\
 
     parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
         .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
+#if SYS_VERSION_MAJOR_INT >= 21
+        .setSpareData(&PRM_SpareData::anyCameraPath)
+#else
         .setSpareData(&PRM_SpareData::objCameraPath)
+#endif
         .setTooltip("Specify the path to a reference camera")
         .setDocumentation(
             "The path to the camera whose frustum is to be used as a clipping region"
@@ -442,7 +446,7 @@ SOP_OpenVDB_Clip::Cache::getFrustum(OP_Context& context)
     }
 
 #if SYS_VERSION_MAJOR_INT >= 21
-    UT_Matrix4D	     cameratosop;
+    UT_Matrix4D      cameratosop;
     OBJ_Node        *meobj = cookparms()->getNode()
                         ? cookparms()->getNode()->getCreator()->castToOBJNode()
                         : nullptr;

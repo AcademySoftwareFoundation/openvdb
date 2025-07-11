@@ -413,7 +413,7 @@ SOP_OpenVDB_Occlusion_Mask::Cache::cookVDBSop(OP_Context& context)
 
         if (cameraPath.isstring()) {
 #if SYS_VERSION_MAJOR_INT >= 21
-            UT_Matrix4D	     cameratosop;
+            UT_Matrix4D      cameratosop;
             OBJ_CameraParms  cameraParms;
             OBJ_Node        *meobj = cookparms()->getNode()
                                 ? cookparms()->getNode()->getCreator()->castToOBJNode()
