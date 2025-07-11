@@ -46,8 +46,8 @@ class Interrupter;
 OPENVDB_HOUDINI_API
 void
 drawFrustum(GU_Detail&, const openvdb::math::Transform&,
-    const UT_Vector3* boxColor, const UT_Vector3* tickColor,
-    bool shaded, bool drawTicks = true);
+    const UT_Vector3* boxColor, const UT_Vector3* tickColor, bool shaded,
+    bool drawTicks = true, const openvdb::Vec4d& padding = openvdb::Vec4d::zero());
 
 
 /// Construct a frustum transform from a Houdini camera.
