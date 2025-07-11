@@ -115,7 +115,7 @@ public:
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned) const override { return true; }
+    int isRefInput(OP_InputIdx) const override { return true; }
 
     int updateNearFar(float time);
     int updateFarPlane(float time);
@@ -313,7 +313,11 @@ newSopOperator(OP_OperatorTable *table)
     parms.add(hutil::ParmFactory(PRM_STRING, "camera", "Camera")
         .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
         .setCallbackFunc(&updateNearFarCallback)
+#if SYS_VERSION_MAJOR_INT >= 21
+        .setSpareData(&PRM_SpareData::anyCameraPath)
+#else
         .setSpareData(&PRM_SpareData::objCameraPath)
+#endif
         .setTooltip("The path to the reference camera object (e.g., \"/obj/cam1\")")
         .setDocumentation(
             "For a frustum transform, the path to the reference camera object"
@@ -868,6 +872,38 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
             return error();
         }
 
+#if SYS_VERSION_MAJOR_INT >= 21
+        UT_Matrix4D      cameratosop;
+        OBJ_CameraParms  cameraParms;
+        OBJ_Node        *meobj = getCreator()->castToOBJNode();
+        UT_StringHolder  errstr;
+
+        OP_Node::getCameraInfoAndRelativeTransform(
+            cameraPath,
+            meobj ? meobj->getFullPath() : UT_StringHolder::theEmptyString,
+            this,
+            false, // get_inverse_xform
+            context,
+            &dataMicroNode(),
+            cameraParms,
+            cameratosop,
+            errstr);
+        if (errstr.isstring())
+        {
+            addError(SOP_MESSAGE, "Camera not found");
+            return error();
+        }
+
+        const float
+            offset = static_cast<float>(evalFloat("cameraOffset", 0, time)),
+            nearPlane = static_cast<float>(evalFloat("nearPlane", 0, time)),
+            farPlane = static_cast<float>(evalFloat("farPlane", 0, time)),
+            voxelDepthSize = static_cast<float>(evalFloat("voxelDepthSize", 0, time));
+        const int voxelCount = static_cast<int>(evalInt("voxelCount", 0, time));
+
+        transform = hvdb::frustumTransformFromCamera(cameraParms, cameratosop,
+            offset, nearPlane, farPlane, voxelDepthSize, voxelCount);
+#else
         OBJ_Node *camobj = findOBJNode(cameraPath.c_str());
         if (!camobj) {
             addError(SOP_MESSAGE, "Camera not found");
@@ -892,6 +928,7 @@ SOP_OpenVDB_Create::buildTransform(OP_Context& context, openvdb::math::Transform
 
         transform = hvdb::frustumTransformFromCamera(*this, context, *cam,
             offset, nearPlane, farPlane, voxelDepthSize, voxelCount);
+#endif
 
         if (bool(evalInt("previewFrustum", 0, time))) {
             UT_Vector3 boxColor(0.6f, 0.6f, 0.6f);

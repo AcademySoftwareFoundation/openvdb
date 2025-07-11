@@ -601,7 +601,11 @@ struct SOP_OpenVDB_Rasterize_Frustum: public hvdb::SOP_NodeVDB
     SOP_OpenVDB_Rasterize_Frustum(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
-    int isRefInput(unsigned i) const override { return i > 0; }
+    int isRefInput(OP_InputIdx i) const override
+    {
+        UT_ASSERT(i >= 0);
+        return i > 0;
+    }
 
 protected:
     OP_ERROR cookVDBSop(OP_Context&) override;
