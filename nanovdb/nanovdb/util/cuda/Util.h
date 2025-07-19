@@ -222,6 +222,17 @@ __global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func fu
     func(tid + offset, args...);
 }// util::cuda::offsetLambdaKernel
 
+/// @brief Cuda kernel that launches device operator functors with arbitrary arguments
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernel(
+    Args... args)
+{
+    Operator op;
+    op( args... );
+}
+
 #endif// __CUDACC__
 
 }// namespace util::cuda ============================================================
