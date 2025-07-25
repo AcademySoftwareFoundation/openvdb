@@ -168,18 +168,7 @@ public:
     DeviceBuffer& operator=(const DeviceBuffer&) = delete;
 
     /// @brief Move copy assignment operation
-    DeviceBuffer& operator=(DeviceBuffer&& other) noexcept
-    {
-        mSize    = other.mSize;
-        mCpuData = other.mCpuData;
-        delete [] mGpuData;
-        mGpuData = other.mGpuData;
-        mDeviceCount = other.mDeviceCount;
-        mManaged = other.mManaged;
-        other.mCpuData = other.mGpuData = nullptr;
-        other.mSize = other.mDeviceCount = other.mManaged = 0;
-        return *this;
-    }
+    DeviceBuffer& operator=(DeviceBuffer&& other) noexcept;
 
     ///////////////////////////////////////////////////////////////////////
 
@@ -293,6 +282,26 @@ public:
 
 // --------------------------> Implementations below <------------------------------------
 
+inline DeviceBuffer& DeviceBuffer::operator=(DeviceBuffer&& other) noexcept
+{
+    if (mManaged) {// first free all the managed data buffers
+        cudaCheck(cudaFreeHost(mCpuData));
+        for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], 0));
+    }
+    delete [] mGpuData;
+    mSize    = other.mSize;
+    mCpuData = other.mCpuData;
+    mGpuData = other.mGpuData;
+    mDeviceCount = other.mDeviceCount;
+    mManaged = other.mManaged;
+    other.mCpuData = nullptr;
+    other.mGpuData = nullptr;
+    other.mSize = 0;
+    other.mDeviceCount = 0;
+    other.mManaged = 0;
+    return *this;
+}
+
 inline void DeviceBuffer::init(uint64_t size, int device, cudaStream_t stream)
 {
     if (size==0) return;
@@ -352,13 +361,16 @@ inline void DeviceBuffer::deviceDownload(void* stream, bool sync)
 
 inline void DeviceBuffer::clear(cudaStream_t stream)
 {
-    if (mManaged!=0) {// free all the managed data buffers
+    if (mManaged) {// free all the managed data buffers
         cudaCheck(cudaFreeHost(mCpuData));
         for (int i=0; i<mDeviceCount; ++i) cudaCheck(util::cuda::freeAsync(mGpuData[i], stream));
     }
     delete [] mGpuData;
-    mCpuData = mGpuData = nullptr;
-    mSize = mDeviceCount = mManaged = 0;
+    mCpuData = nullptr;
+    mGpuData = nullptr;
+    mSize = 0;
+    mDeviceCount = 0;
+    mManaged = 0;
 } // DeviceBuffer::clear
 
 }// namespace cuda
