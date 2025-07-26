@@ -55,6 +55,44 @@ void device2host(size_t count)
     float *array = reinterpret_cast<float*>(buffer.data());
     for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i));
 }// device2host
+void host2device(size_t count)
+{
+    const size_t size = count * sizeof(float);
+    auto hostBuffer = nanovdb::HostBuffer(size);
+    for (size_t i=0; i<count; ++i) *hostBuffer.data<float>(i) = float(i);
+
+    int dev;
+    cudaError_t err = cudaGetDevice(&dev);
+    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
+
+    auto devBuffer = nanovdb::cuda::DeviceBuffer::create(hostBuffer, dev);// on device only
+    EXPECT_EQ(size, devBuffer.size());
+    EXPECT_FALSE(devBuffer.data());
+    EXPECT_TRUE(devBuffer.deviceData());
+    float *d_array = reinterpret_cast<float*>(devBuffer.deviceData());
+    constexpr unsigned int num_threads = 256;
+    unsigned int num_blocks = num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
+
+    bool *test, *d_test;
+    cudaCheck(cudaMallocHost((void**)&test, sizeof(bool)));
+    cudaCheck(cudaMalloc((void**)&d_test, sizeof(bool)));
+    *test = true;
+    cudaCheck(cudaMemcpyAsync(d_test, test, sizeof(bool), cudaMemcpyHostToDevice));// on host only
+
+    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {
+        if (d_array[i] != float(i)) *d_test = false;
+        d_array[i] = float(i) + 1.0f;
+    });
+    cudaCheck(cudaMemcpy(test, d_test, sizeof(bool), cudaMemcpyDeviceToHost));
+    EXPECT_TRUE(*test);
+    cudaCheck(cudaFreeHost(test));
+    cudaCheck(cudaFree(d_test));
+    devBuffer.deviceDownload();// copy device -> host
+    EXPECT_EQ(size, devBuffer.size());
+    EXPECT_TRUE(devBuffer.data());
+    EXPECT_TRUE(devBuffer.deviceData());
+    for (size_t i=0; i<count; ++i) EXPECT_EQ(*hostBuffer.data<float>(i) + 1.0f, *devBuffer.data<float>(i));
+}// host2device
 // used for testing cuda::DeviceBuffer
 void host2device2host(size_t count)
 {
@@ -156,6 +194,7 @@ TEST(TestNanoVDBCUDA, CudaDeviceBuffer)
         EXPECT_FALSE(buffer.empty());
     }
     nanovdb::test::device2host(1000);
+    nanovdb::test::host2device(1000);
     nanovdb::test::host2device2host(1000);
 }
 
@@ -3594,4 +3633,40 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
     cudaCheck(cudaFree(deviceJumpMap));
 }// VoxelBlockManager_ValueOnIndex
 
+TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
+{
+    using namespace nanovdb;
+    using BufferT = nanovdb::cuda::DeviceBuffer;
+    auto hostHandle = tools::createLevelSetSphere<float>(100, Vec3d(0),1,3, Vec3d(0), "test");
+
+    int dev;
+    cudaError_t err = cudaGetDevice(&dev);
+    EXPECT_EQ(err, cudaSuccess);
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreate(&stream));
+
+    {// longer version
+        auto devBuffer = BufferT::create(hostHandle.buffer(), dev, stream);
+        EXPECT_EQ(hostHandle.bufferSize(), devBuffer.size());
+        auto devHandle = GridHandle<BufferT>(std::move(devBuffer));
+
+        // testing
+        EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
+        EXPECT_EQ(devBuffer.size(), 0);
+        devHandle.deviceDownload(stream);
+        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
+            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
+        }
+    }
+    {// compact version
+        auto devHandle = GridHandle<BufferT>(BufferT::create(hostHandle.buffer(), dev, stream));
+
+        // testing
+        EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
+        devHandle.deviceDownload(stream);
+        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
+            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
+        }
+    }
+}
 

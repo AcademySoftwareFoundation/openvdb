@@ -127,6 +127,20 @@ public:
         other.mSize = other.mDeviceCount = other.mManaged = 0;
     }
 
+    /// @brief Copy-constructor from a HostBuffer
+    /// @param buffer host buffer from which to copy data
+    /// @param device id of the device on which to initialize the buffer
+    /// @param stream cuda stream
+    DeviceBuffer(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0)
+        : DeviceBuffer(buffer.size(), device, stream)
+    {
+        if (mCpuData) {
+            cudaCheck(cudaMemcpy(mCpuData, buffer.data(), mSize, cudaMemcpyHostToHost));
+        } else if (mGpuData[device]) {
+            cudaCheck(cudaMemcpyAsync(mGpuData[device], buffer.data(), mSize, cudaMemcpyHostToDevice, stream));
+        }
+    }
+
      /// @brief Destructor frees memory on both the host and device
     ~DeviceBuffer() { this->clear(); };
 
@@ -153,6 +167,12 @@ public:
     /// @param list list of device IDs and device memory pointers
     static DeviceBuffer create(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return DeviceBuffer(size, cpuData, list);}
 
+    /// @brief  Static factory method that returns an instance of this buffer constructed from a HostBuffer
+    /// @param buffer host buffer from which to copy data
+    /// @param device id of the device on which to initialize the buffer
+    /// @param stream cuda stream
+    static DeviceBuffer create(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return DeviceBuffer(buffer, device, stream);}
+
     ///////////////////////////////////////////////////////////////////////
 
     /// @{
@@ -160,6 +180,7 @@ public:
     static PtrT createPtr(uint64_t size, const DeviceBuffer* = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DeviceBuffer>(size, device, stream);}
     static PtrT createPtr(uint64_t size, void* cpuData, void* gpuData) {return std::make_shared<DeviceBuffer>(size, cpuData, gpuData);}
     static PtrT createPtr(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return std::make_shared<DeviceBuffer>(size, cpuData, list);}
+    static PtrT createPtr(const HostBuffer& buffer, int device = cudaCpuDeviceId, cudaStream_t stream = 0) {return std::make_shared<DeviceBuffer>(buffer, device, stream);}
     /// @}
 
     ///////////////////////////////////////////////////////////////////////
@@ -179,7 +200,7 @@ public:
     /// @brief Returns an offset pointer of a specific type from the allocated host memory
     /// @tparam T Type of the pointer returned
     /// @param count Numbers of elements of @c parameter type T to skip
-    /// @warning assumes that this instance is not empty!
+    /// @warning might return NULL
     template <typename T>
     T* data(ptrdiff_t count = 0, int device = cudaCpuDeviceId) const
     {

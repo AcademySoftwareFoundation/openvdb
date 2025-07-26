@@ -192,6 +192,13 @@ public:
     void* data() { return mData; }
     //@}
 
+    /// @brief Returns an offset pointer of a specific type from the allocated host memory
+    /// @tparam T Type of the pointer returned
+    /// @param count Numbers of elements of @c parameter type T to skip
+    /// @warning might return NULL
+    template <typename T>
+    T* data(ptrdiff_t count = 0) const {return mData ? reinterpret_cast<T*>(mData) + count : nullptr;}
+
     //@{
     /// @brief Returns the size in bytes associated with this buffer.
     uint64_t bufferSize() const { return mSize; }
