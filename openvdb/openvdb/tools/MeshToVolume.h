@@ -3659,7 +3659,7 @@ meshToVolume(
 
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
+inline typename std::enable_if<openvdb::is_floating_point<typename GridType::ValueType>::value,
     typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter& interrupter,
@@ -3732,7 +3732,7 @@ doMeshConversion(
 /// @internal This overload is enabled only for grids that do not have a scalar,
 /// floating-point ValueType.
 template<typename GridType, typename Interrupter>
-inline typename std::enable_if<!std::is_floating_point<typename GridType::ValueType>::value,
+inline typename std::enable_if<!openvdb::is_floating_point<typename GridType::ValueType>::value,
     typename GridType::Ptr>::type
 doMeshConversion(
     Interrupter&,
