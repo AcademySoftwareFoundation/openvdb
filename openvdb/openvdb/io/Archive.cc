@@ -495,6 +495,9 @@ public:
     boost::interprocess::mapped_region mRegion;
     bool mAutoDelete;
     Notifier mNotifier;
+#if OPENVDB_ABI_VERSION_NUMBER <= 12
+    mutable std::atomic<Index64> mLastWriteTime;
+#endif
 
 private:
     Impl(const Impl&); // not copyable
