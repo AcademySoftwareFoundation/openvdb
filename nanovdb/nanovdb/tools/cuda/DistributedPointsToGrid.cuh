@@ -11,12 +11,12 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/DeviceMesh.h>
-#include <nanovdb/cuda/TempDevicePool.h>
+#include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/UnifiedBuffer.h>
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/util/cuda/Util.h>
@@ -279,7 +279,7 @@ private:
 
     PointType mPointType;
     std::string mGridName;
-    typename PointsToGrid<BuildT>::Data *mData;
+    PointsToGridData<BuildT> *mData;
     CheckMode mChecksum{CheckMode::Disable};
 
     size_t* mStripeCounts;
@@ -304,7 +304,7 @@ DistributedPointsToGrid<BuildT>::DistributedPointsToGrid(const nanovdb::cuda::De
 {
     mTempDevicePools = new nanovdb::cuda::TempDevicePool[mDeviceMesh.deviceCount()];
 
-    cudaCheck(cudaMallocManaged(&mData, sizeof(typename PointsToGrid<BuildT>::Data)));
+    cudaCheck(cudaMallocManaged(&mData, sizeof(PointsToGridData<BuildT>)));
     mData->flags.initMask({GridFlags::HasBBox, GridFlags::IsBreadthFirst});
     mData->map = map;
 
@@ -1106,4 +1106,4 @@ inline void DistributedPointsToGrid<BuildT>::processBBox()
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_DISTRIBUTEDPOINTSTOGRID_CUH_HAS_BEEN_INCLUDED
