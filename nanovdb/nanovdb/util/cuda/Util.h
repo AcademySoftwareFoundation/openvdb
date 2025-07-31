@@ -233,6 +233,46 @@ void operatorKernel(
     op( args... );
 }
 
+/// @brief Cuda kernel that launches device operator functors with arbitrary arguments, using dynamic shared memory
+template<class Operator, typename... Args>
+__global__
+__launch_bounds__(Operator::MaxThreadsPerBlock, Operator::MinBlocksPerMultiprocessor)
+void operatorKernelDynamic(Args... args)
+{
+    extern __shared__ char smem_buf[];
+    Operator op;
+    op( args..., smem_buf );
+}
+
+/// @brief Wrapper for launching a device operator that leverages dynamic shared memory, with a specified size
+/// @code
+/// struct MyFunctor
+/// {
+///     // These are passed to __launch_bounds__
+///     static constexpr int MaxThreadsPerBlock = <nThreads>
+///     static constexpr int MinBlocksPerMultiprocessor = 1;
+///
+///     struct SharedStorage {
+///         // Include whatever is needed in smem
+///     };
+///
+///     __device__
+///     void operator()(Args ... myArgs, char smem_buf[])
+///     { ... }
+/// };
+///
+/// dynamicSharedMemoryLauncher<MyFunctor>(nBlocks, sizeof(typename MyFunctor::SharedStorage), myArgs...);
+/// // smem_buff of size sizeof(MyFunctor::SharedStorage) will be automatically passed along
+/// @endcode
+template<class Operator, typename... Args>
+void dynamicSharedMemoryLauncher(const size_t numItems, const size_t smem_size, cudaStream_t stream, Args... args)
+{
+    cudaCheck(cudaFuncSetAttribute(operatorKernelDynamic<Operator, Args...>,
+        cudaFuncAttributeMaxDynamicSharedMemorySize,smem_size));
+    operatorKernelDynamic<Operator>
+        <<<numItems, Operator::MaxThreadsPerBlock, smem_size, stream>>>( args ... );
+}
+
 #endif// __CUDACC__
 
 }// namespace util::cuda ============================================================
