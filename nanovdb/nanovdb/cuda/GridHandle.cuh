@@ -61,6 +61,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullp
         updateGridCount<<<1, 1, 0, stream>>>(dst, 0u, 1u, d_dirty);
         cudaCheckError();
         cudaCheck(cudaMemcpyAsync(&dirty, d_dirty, sizeof(bool), cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaStreamSynchronize(stream));
         if (dirty) tools::cuda::updateChecksum(dst, CheckMode::Partial, stream);
         handles[n] = nanovdb::GridHandle<BufferT>(std::move(buffer));
         ptr = util::PtrAdd(ptr, handle.gridSize(n));
@@ -93,6 +94,7 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* oth
             updateGridCount<<<1, 1, 0, stream>>>(data, counter++, gridCount, d_dirty);
             cudaCheckError();
             cudaCheck(cudaMemcpyAsync(&dirty, d_dirty, sizeof(bool), cudaMemcpyDeviceToHost, stream));
+            cudaCheck(cudaStreamSynchronize(stream));
             if (dirty) tools::cuda::updateChecksum(data, CheckMode::Partial, stream);
             dst = util::PtrAdd(dst, h.gridSize(n));
             src = util::PtrAdd(src, h.gridSize(n));

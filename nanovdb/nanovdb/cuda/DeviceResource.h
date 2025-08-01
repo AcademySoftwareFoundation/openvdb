@@ -5,6 +5,7 @@
 #define NANOVDB_CUDA_DEVICERESOURCE_H_HAS_BEEN_INCLUDED
 
 #include <cuda_runtime_api.h>
+#include <nanovdb/util/cuda/Util.h>
 
 namespace nanovdb {
 
