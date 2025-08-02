@@ -173,7 +173,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     const ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
     timer.stop();
 
-    CPPUNIT_ASSERT_MESSAGE(syntaxTree, "Invalid AX passed to testFunctionOptions.");
+    CPPUNIT_ASSERT_MESSAGE("Invalid AX passed to testFunctionOptions.", syntaxTree);
 
     // @warning  the first execution can take longer due to some llvm startup
     //           so if you're profiling a single function be aware of this.
@@ -182,8 +182,9 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     auto profile = [&syntaxTree, &timer, &data]
         (const openvdb::ax::CompilerOptions& opts,
         std::vector<openvdb::points::PointDataGrid::Ptr>& points,
-        openvdb::GridPtrVec& volumes,
-        const bool doubleCompile = true)
+        openvdb::GridPtrVec& sparsevols,
+        openvdb::GridPtrVec& densevols,
+        const bool doubleCompile = true) // warmup if true
     {
         if (!points.empty())
         {
@@ -202,19 +203,36 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
             }
         }
 
-        if (!volumes.empty())
+        if (!sparsevols.empty())
         {
             openvdb::ax::Compiler compiler(opts);
             if (doubleCompile) {
                 compiler.compile<VolumeExecutable>(*syntaxTree, data);
             }
             {
-                timer.start("    Volumes/Compilation ");
+                timer.start("    Sparse Volumes/Compilation ");
                 VolumeExecutable::Ptr executable =
                     compiler.compile<VolumeExecutable>(*syntaxTree, data);
                 timer.stop();
-                timer.start("    Volumes/Execution   ");
-                executable->execute(volumes);
+                timer.start("    Sparse Volumes/Execution   ");
+                executable->execute(sparsevols);
+                timer.stop();
+            }
+        }
+
+        if (!densevols.empty())
+        {
+            openvdb::ax::Compiler compiler(opts);
+            if (doubleCompile) {
+                compiler.compile<VolumeExecutable>(*syntaxTree, data);
+            }
+            {
+                timer.start("    Dense Volumes/Compilation ");
+                VolumeExecutable::Ptr executable =
+                    compiler.compile<VolumeExecutable>(*syntaxTree, data);
+                timer.stop();
+                timer.start("    Dense Volumes/Execution   ");
+                executable->execute(densevols);
                 timer.stop();
             }
         }
@@ -226,7 +244,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     opts.mFunctionOptions.mPrioritiseIR = false;
 #ifdef PROFILE
     std::cerr << "  C Bindings" << std::endl;
-    profile(opts, harness.mInputPointGrids, harness.mInputVolumeGrids);
+    profile(opts, harness.mInputPointGrids, harness.mInputSparseVolumeGrids, harness.mInputDenseVolumeGrids);
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;
@@ -242,7 +260,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     opts.mFunctionOptions.mPrioritiseIR = true;
 #ifdef PROFILE
     std::cerr << "  IR Functions " << std::endl;
-    profile(opts, harness.mInputPointGrids, harness.mInputVolumeGrids);
+    profile(opts, harness.mInputPointGrids, harness.mInputSparseVolumeGrids, harness.mInputDenseVolumeGrids);
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;
@@ -258,7 +276,7 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
     opts.mFunctionOptions.mPrioritiseIR = false;
 #ifdef PROFILE
     std::cerr << "  C Folding   " << std::endl;
-    profile(opts, harness.mInputPointGrids, harness.mInputVolumeGrids);
+    profile(opts, harness.mInputPointGrids, harness.mInputSparseVolumeGrids, harness.mInputDenseVolumeGrids);
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;

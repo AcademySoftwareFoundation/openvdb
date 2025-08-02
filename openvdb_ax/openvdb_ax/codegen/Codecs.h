@@ -47,7 +47,7 @@ public:
     : mEncoder(std::move(encoder))
     , mDecoder(std::move(decoder))
     , mFlag(flag) {
-#ifndef NDEBUG
+#ifdef OPENVDB_ENABLE_ASSERTS
         OPENVDB_ASSERT(!mEncoder->list().empty());
         OPENVDB_ASSERT(!mDecoder->list().empty());
         OPENVDB_ASSERT(mEncoder->list().size() == mDecoder->list().size());
@@ -71,8 +71,8 @@ public:
         // For each encoder function in this codec, find the one which
         // one takes the provided "in" decoded type and return the type
         // of that function return signature
-        llvm::Type* ret = findReturnTypeFromArg(this->encoder(), type->getPointerTo());
-        return ret ? ret->getPointerElementType() : nullptr;
+        llvm::Type* ret = findReturnTypeFromArg(this->encoder(), type);
+        return ret;
     }
 
     /// @brief  Given a llvm type, return a compatible llvm type which
@@ -87,9 +87,8 @@ public:
         // For each decoder function in this codec, find the one which
         // one takes the provided "in" encoded type and return the type
         // of that function return signature
-        if (!in->isPointerTy()) in = in->getPointerTo();
         llvm::Type* ret = findReturnTypeFromArg(this->decoder(), in);
-        return ret ? ret->getPointerElementType() : nullptr;
+        return ret;
     }
 
     const codegen::FunctionGroup* encoder() const { return mEncoder.get(); }

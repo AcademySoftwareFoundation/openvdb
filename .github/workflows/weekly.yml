@@ -295,8 +295,8 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2023-clang15', cxx: 'clang++', build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
-          - { image: '2023-clang15', cxx: 'g++',     build: 'Release', components: 'core,bin,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19', cxx: 'clang++', build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
+          - { image: '2025-clang19', cxx: 'g++',     build: 'Release', components: 'core,axcore,axbin,axtest', cmake: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -378,7 +378,7 @@ jobs:
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
     runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'windows-2022-8c-32g-300h') || 'windows-latest' }}
-    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    name: ${{ matrix.config.vc }}-${{ matrix.config.crt }}-${{ matrix.config.build }}-llvm${{ matrix.config.llvm }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       # Export this with '' avoid bash treating \ as escape
@@ -392,17 +392,22 @@ jobs:
           # @todo  We don't currently run the axtests with shared builds of ax
           # due to symbol issues using LLVM as a static lib (which is the only
           # option on Windows).
-          - { vc: 'x64-windows',        crt: 'MD',  components: 'core,bin,axcore,axbin,python', build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
-          - { vc: 'x64-windows-static', crt: 'MT',  components: 'core,bin,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', crt: 'MTd', components: 'core,bin,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          # @note  currently only test static builds with MT as building LLVM as
+          # a shared lib on windows is a bit dicey
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm: '18.1.0', crt: 'MultiThreadedDebug', components: 'core,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        llvm: '18.1.0', crt: 'MultiThreadedDLL',   components: 'core,axcore,axbin',        build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
+          - { vc: 'x64-windows-static', llvm: '15.0.0', crt: 'MultiThreaded',      components: 'core,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: llvm
-      run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm }} ${{ matrix.config.crt }}
     - name: install
       shell: powershell
-      run: .\ci\install_windows.ps1
+      run: |
+        vcpkg update
+        vcpkg install tbb cppunit
     - name: build
       run: >
         ./ci/build.sh -v
@@ -410,10 +415,13 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
+        -DOPENVDB_USE_DELAYED_LOADING=OFF
+        -DUSE_BLOSC=OFF \
+        -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
         -DMSVC_COMPRESS_PDB=ON
-        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+        -DOPENVDB_AX_TEST_CMD_DOWNLOADS=OFF
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DLLVM_DIR=\"${HOME}\\llvm_install\\lib\\cmake\\llvm\"
         -DCMAKE_INSTALL_PREFIX=\"${VDB_INSTALL_PREFIX}\"

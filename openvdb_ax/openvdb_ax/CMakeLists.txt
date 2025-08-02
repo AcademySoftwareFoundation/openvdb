@@ -22,13 +22,8 @@ option(OPENVDB_AX_STATIC "Build statically linked version of the ax library." ON
 option(OPENVDB_BUILD_AX_GRAMMAR [=[
 Rebuild the AX grammar using flex/bison. This only necessary if you are
 altering the frontend AX language, typically only a developer option. ]=] OFF)
-option(USE_NEW_PASS_MANAGER [=[
-Enable the new Optimization Pass Manager. This is a developer option.]=] OFF)
 
-mark_as_advanced(
-  USE_NEW_PASS_MANAGER
-  OPENVDB_BUILD_AX_GRAMMAR
-)
+mark_as_advanced(OPENVDB_BUILD_AX_GRAMMAR)
 
 #########################################################################
 
@@ -107,17 +102,19 @@ find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
 
 if(found_LLVM)
   set(LLVM_LIBS "LLVM")
-else()
+elseif(LLVM_PACKAGE_VERSION VERSION_LESS 16)
+  # Builds against LLVM 15 and earlier use MCJIT
   llvm_map_components_to_libnames(_llvm_libs
     native core executionengine support mcjit passes)
   set(LLVM_LIBS "${_llvm_libs}")
+else()
+  # Builds against LLVM 16 and later use LLJIT/ORC
+  llvm_map_components_to_libnames(_llvm_libs
+    native core executionengine support orcjit orcshared orctargetprocess passes)
+  set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
-if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 16.0.0)
-  # https://llvm.org/docs/OpaquePointers.html
-  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 16 due to \
-    opaque pointer changes in LLVM. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
-endif()
+set_property(GLOBAL PROPERTY OPENVDB_LLVM_VERSION_MAJOR "${LLVM_VERSION_MAJOR}")
 
 if(MINIMUM_LLVM_VERSION)
   if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
@@ -151,8 +148,10 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   codegen/StandardFunctions.cc
   codegen/StringFunctions.cc
   codegen/Types.cc
+  codegen/Value.cc
   codegen/VolumeComputeGenerator.cc
   codegen/VolumeFunctions.cc
+  codegen/VolumeKernelFunctions.cc
   compiler/Compiler.cc
   compiler/Logger.cc
   compiler/PointExecutable.cc
@@ -193,7 +192,9 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
   codegen/SymbolTable.h
   codegen/Types.h
   codegen/Utils.h
+  codegen/Value.h
   codegen/VolumeComputeGenerator.h
+  codegen/VolumeKernelFunctions.h
   math/OpenSimplexNoise.h
   util/x86.h
 )
@@ -267,6 +268,11 @@ if(NOT LLVM_ENABLE_RTTI)
     "$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-sanitize=vptr>")
 endif()
 
+# Spurious errors from GCC
+list(APPEND OPENVDB_AX_PUBLIC_OPTIONS
+  "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,12.3.0>>:-Wno-error=array-bounds>"
+  "$<$<AND:$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,11.2.0>>:-Wno-error=stringop-overflow>")
+
 if(WIN32)
   # Silence deprecation warnings coming from MSVC/LLVM about deriving from std::iterator
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
@@ -274,10 +280,6 @@ if(WIN32)
 endif()
 
 list(APPEND OPENVDB_AX_PRIVATE_DEFINES "-DOPENVDB_AX_PRIVATE")
-
-if(USE_NEW_PASS_MANAGER)
-  list(APPEND OPENVDB_AX_PRIVATE_DEFINES -DUSE_NEW_PASS_MANAGER)
-endif()
 
 ##########################################################################
 
@@ -311,11 +313,8 @@ if(OPENVDB_AX_STATIC)
   endif()
 
   target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
-
-  # @todo fix opaque pointer requirements
-  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
-    target_compile_options(openvdb_ax_static PUBLIC "-Wno-error=deprecated-declarations")
-  endif()
+  target_compile_options(openvdb_ax_static PUBLIC
+    "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wno-error=deprecated-declarations>")
 endif()
 
 # Configure shared build
@@ -348,10 +347,8 @@ if(OPENVDB_AX_SHARED)
     )
 
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
-  # @todo fix opaque pointer requirements
-  if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
-    target_compile_options(openvdb_ax_shared PUBLIC "-Wno-error=deprecated-declarations")
-  endif()
+  target_compile_options(openvdb_ax_shared PUBLIC
+    "$<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:-Wno-error=deprecated-declarations>")
 endif()
 
 install(FILES ax.h Exceptions.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb_ax/)

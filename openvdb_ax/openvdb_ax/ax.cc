@@ -9,12 +9,17 @@
 
 #include <openvdb/util/Assert.h>
 
+#include <llvm/Config/llvm-config.h> // version numbers
+
+#if LLVM_VERSION_MAJOR <= 15
 #include <llvm/InitializePasses.h>
 #include <llvm/PassRegistry.h>
-#include <llvm/Config/llvm-config.h> // version numbers
+#endif
 #include <llvm/Support/TargetSelect.h> // InitializeNativeTarget
 #include <llvm/Support/ManagedStatic.h> // llvm_shutdown
+#if LLVM_VERSION_MAJOR <= 15
 #include <llvm/ExecutionEngine/MCJIT.h> // LLVMLinkInMCJIT
+#endif
 
 #include <mutex>
 
@@ -144,6 +149,8 @@ void initialize()
             "Failed to initialize LLVM target for JIT");
     }
 
+    // ORC/New pass manager in use when using LLVM >= 16 in AX
+#if LLVM_VERSION_MAJOR <= 15
     // required on some systems
     LLVMLinkInMCJIT();
 
@@ -176,6 +183,7 @@ void initialize()
     llvm::initializeGlobalISel(registry);
     llvm::initializeTarget(registry);
     llvm::initializeCodeGen(registry);
+#endif
 
     sIsInitialized = true;
 }

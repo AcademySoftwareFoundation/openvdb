@@ -1,0 +1,24 @@
+OpenVDB AX:
+ - Improvements:
+   - Added support for LLVM versions greater than 15. Upgraded CI to test with
+     LLVM versions 16, 17, 18, 19 and 20.
+   - As of this release, LLVM 15 is the minimum required version for OpenVDB AX.
+     Note that there is an issue with LLVM 17 symbols which makes it incompatible
+     with the OpenVDB Python plugin. AS such, LLVM version 18 and greater are
+     the recommended LLVM versions to use, with LLVM 18 being the new future
+     minimum version.
+   - Significant performance improvement to the compilation of AX kernels when
+     using LLVM 18 and greater.
+   - Significant backend refactoring to AX IR generation to support newer 
+     versions of LLVM. In particular, parts of the codegen::Function and 
+     codegen::FunctionBuilder API require new usage from LLVM 16 due to
+     the LLVM opaque pointer changes. If you're not using the OpenVDB AX
+     Function codegen API then no client changes should be necessary.
+
+ - Fixes:
+  - Fixed a case of undefined behaviour when explicitly casting variables to
+    the same type as their storage type e.g:
+      double a; double b = double(a);
+  - Fixed an AX compiler error which would produce invalid IR when using 64bit
+    integer variables for matrix array offsetting e.g:
+       int64 a = 0; mat4f b = 1; float c = b[a,a];

@@ -50,6 +50,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestPointExecutable);
 void
 TestPointExecutable::testConstructionDestruction()
 {
+#if LLVM_VERSION_MAJOR <= 15
     // Test the building and teardown of executable objects. This is primarily to test
     // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
     // in the correct order (ExecutionEngine, then Context) otherwise LLVM will crash
@@ -94,6 +95,7 @@ TestPointExecutable::testConstructionDestruction()
 
     CPPUNIT_ASSERT_EQUAL(0, int(wE.use_count()));
     CPPUNIT_ASSERT_EQUAL(0, int(wC.use_count()));
+#endif
 }
 
 void

@@ -22,13 +22,6 @@
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
-
-// Note: As of LLVM 5.0, the llvm::Type::dump() method isn't being
-// picked up correctly by the linker. dump() is internally implemented
-// using Type::print(llvm::errs()) which is being used in place. See:
-//
-// https://stackoverflow.com/questions/43723127/llvm-5-0-makefile-undefined-reference-fail
-//
 #include <llvm/Support/raw_ostream.h> // llvm::errs()
 
 namespace openvdb {
@@ -47,67 +40,20 @@ using CastFunction = std::function<llvm::Value*
 using BinaryFunction = std::function<llvm::Value*
     (llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>;
 
-
-/// @todo   Should really provide a standard interface for all these and avoid
-///   using the IR builder directly.
-
-/// @brief  Alias around IR load inst.
-inline auto ir_load(llvm::IRBuilder<>& B, llvm::Value* ptr, const char* Name = "")
+inline bool AssertOpaquePtrs([[maybe_unused]]llvm::Value* opaque, [[maybe_unused]]llvm::Type* type)
 {
-    OPENVDB_ASSERT(ptr);
-    OPENVDB_ASSERT(ptr->getType()->isPointerTy());
-#if LLVM_VERSION_MAJOR <= 7
-    return B.CreateLoad(ptr, Name);
-#else
-    return B.CreateLoad(ptr->getType()->getPointerElementType(), ptr, Name);
+#if LLVM_VERSION_MAJOR <= 15
+    if (opaque->getType()->getPointerElementType() != type) {
+#ifdef OPENVDB_ENABLE_ASSERTS
+        llvm::errs() << "Opaque ptr check failed:\n";
+        llvm::errs() << "Input Value: "; opaque->print(llvm::errs()); llvm::errs() << "\n";
+        llvm::errs() << "Input Ptr Type: "; opaque->getType()->getPointerElementType()->print(llvm::errs()); llvm::errs() << "\n";
+        llvm::errs() << "Type: "; type->print(llvm::errs()); llvm::errs() << "\n";
 #endif
-}
-
-/// @brief  Alias around IR gep inst.
-inline auto ir_gep(llvm::IRBuilder<>& B,
-    llvm::Value* ptr, llvm::ArrayRef<llvm::Value*> IdxList, const char* Name = "")
-{
-    OPENVDB_ASSERT(ptr);
-    OPENVDB_ASSERT(ptr->getType()->getScalarType());
-    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
-#if LLVM_VERSION_MAJOR <= 7
-    return B.CreateGEP(ptr, IdxList, Name);
-#else
-    return B.CreateGEP(ptr->getType()->getScalarType()->getPointerElementType(),
-                 ptr, IdxList, Name);
+        return false;
+    }
 #endif
-}
-
-/// @brief  Alias around IR gep2_64 inst.
-inline auto ir_constgep2_64(llvm::IRBuilder<>& B,
-    llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
-{
-    OPENVDB_ASSERT(ptr);
-    OPENVDB_ASSERT(ptr->getType()->getScalarType());
-    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
-#if LLVM_VERSION_MAJOR <= 7
-    return B.CreateConstGEP2_64(ptr, Idx0, Idx1, Name);
-#else
-    return B.CreateConstGEP2_64(
-        ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
-        Idx1, Name);
-#endif
-}
-
-/// @brief  Alias around IR in bounds gep2_64 inst.
-inline auto ir_constinboundsgep2_64(llvm::IRBuilder<>& B,
-    llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
-{
-    OPENVDB_ASSERT(ptr);
-    OPENVDB_ASSERT(ptr->getType()->getScalarType());
-    OPENVDB_ASSERT(ptr->getType()->getScalarType()->isPointerTy());
-#if LLVM_VERSION_MAJOR <= 7
-    return B.CreateConstInBoundsGEP2_64(ptr, Idx0, Idx1, Name);
-#else
-    return B.CreateConstInBoundsGEP2_64(
-        ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
-        Idx1, Name);
-#endif
+    return true;
 }
 
 /// @brief  Populate a vector of llvm Types from a vector of llvm values
@@ -136,22 +82,6 @@ llvmTypeToString(const llvm::Type* const type, std::string& str)
     llvm::raw_string_ostream os(str);
     type->print(os);
     os.flush();
-}
-
-/// @brief  Return the base llvm value which is being pointed to through
-///         any number of layered pointers.
-/// @note   This function does not check for cyclical pointer dependencies
-///
-/// @param  type  A llvm pointer type to traverse
-///
-inline llvm::Type*
-getBaseContainedType(llvm::Type* const type)
-{
-    llvm::Type* elementType = type;
-    while (elementType->isPointerTy()) {
-        elementType = elementType->getContainedType(0);
-    }
-    return elementType;
 }
 
 /// @brief  Return an llvm value representing a pointer to the provided ptr builtin
@@ -188,7 +118,7 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
                    llvm::Type* type,
                    llvm::Value* size = nullptr)
 {
-    llvm::Type* strtype = LLVMType<codegen::String>::get(B.getContext());
+    llvm::StructType* strtype = LLVMType<codegen::String>::get(B.getContext());
     // Create the allocation at the start of the function block
     llvm::Function* parent = B.GetInsertBlock()->getParent();
     OPENVDB_ASSERT(parent && !parent->empty());
@@ -206,7 +136,7 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
     if (type == strtype) {
         llvm::Value* cptr = B.CreateStructGEP(strtype, result, 0); // char**
         llvm::Value* sso = B.CreateStructGEP(strtype, result, 1); // char[]*
-        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
+        llvm::Value* sso_load = B.CreateConstGEP2_64(strtype->getTypeAtIndex(1), sso, 0, 0); // char[]
         llvm::Value* len = B.CreateStructGEP(strtype, result, 2);
         B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
         B.CreateStore(B.getInt64(0), len);
@@ -285,6 +215,7 @@ typePrecedence(llvm::Type* const typeA,
 /// @param  twine       An optional string description of the cast function. This can
 ///                     be used for for more verbose llvm information on IR compilation
 ///                     failure
+/// @todo   Deprecate this method, move functionality into codegen::Value
 inline CastFunction
 llvmArithmeticConversion(const llvm::Type* const sourceType,
                          const llvm::Type* const targetType,
@@ -298,32 +229,104 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
         std::placeholders::_3, \
         Twine)
 
+#if LLVM_VERSION_MAJOR >= 19
+// For Trunc, assume argument is never NUW/NSW (last flags)
+#define BIND_ARITHMETIC_CAST_OP_TRUNC(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine, \
+        /*IsNUW*/false, \
+        /*IsNSW*/false)
+#else
+#define BIND_ARITHMETIC_CAST_OP_TRUNC(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine)
+#endif
+
+#if LLVM_VERSION_MAJOR >= 19
+// For UItoFP, assume argument is never negative (last flag)
+#define BIND_ARITHMETIC_CAST_OP_UIFP(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine, \
+        false) // IsNonNeg
+#else
+#define BIND_ARITHMETIC_CAST_OP_UIFP(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine)
+#endif
+
+#if LLVM_VERSION_MAJOR >= 18
+// For Zext, assume argument is never negative (last flag)
+#define BIND_ARITHMETIC_CAST_OP_ZEXT(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine, \
+        false) // IsNonNeg
+#else
+#define BIND_ARITHMETIC_CAST_OP_ZEXT(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine)
+#endif
+
+#if LLVM_VERSION_MAJOR >= 20
+#define BIND_ARITHMETIC_CAST_OP_FP(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine, \
+        nullptr) // MDNode *FPMathTag
+#else
+#define BIND_ARITHMETIC_CAST_OP_FP(Function, Twine) \
+    std::bind(&Function, \
+        std::placeholders::_1, \
+        std::placeholders::_2, \
+        std::placeholders::_3, \
+        Twine)
+#endif
+
     if (targetType->isDoubleTy()) {
-        if (sourceType->isFloatTy())           return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPExt, twine);
-        else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPExt, twine);
+        if (sourceType->isFloatTy())           return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPExt, twine);
+        else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPExt, twine);
         else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateUIToFP, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_UIFP(llvm::IRBuilder<>::CreateUIToFP, twine);
     }
     else if (targetType->isFloatTy()) {
-        if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPTrunc, twine);
-        else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPExt, twine);
+        if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPTrunc, twine);
+        else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPExt, twine);
         else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateUIToFP, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_UIFP(llvm::IRBuilder<>::CreateUIToFP, twine);
     }
     else if (targetType->isHalfTy()) {
-        if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPTrunc, twine);
-        else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPTrunc, twine);
+        if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPTrunc, twine);
+        else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP_FP(llvm::IRBuilder<>::CreateFPTrunc, twine);
         else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSIToFP, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateUIToFP, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_UIFP(llvm::IRBuilder<>::CreateUIToFP, twine);
     }
     else if (targetType->isIntegerTy(64)) {
         if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
@@ -332,43 +335,43 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
         else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
         else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateZExt, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_ZEXT(llvm::IRBuilder<>::CreateZExt, twine);
     }
     else if (targetType->isIntegerTy(32)) {
         if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
-        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
         else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateZExt, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_ZEXT(llvm::IRBuilder<>::CreateZExt, twine);
     }
     else if (targetType->isIntegerTy(16)) {
         if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
-        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
         else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateSExt, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateZExt, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_ZEXT(llvm::IRBuilder<>::CreateZExt, twine);
     }
     else if (targetType->isIntegerTy(8)) {
         if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
         else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToSI, twine);
-        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateZExt, twine);
+        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(1))   return BIND_ARITHMETIC_CAST_OP_ZEXT(llvm::IRBuilder<>::CreateZExt, twine);
     }
     else if (targetType->isIntegerTy(1)) {
         if (sourceType->isDoubleTy())          return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToUI, twine);
         else if (sourceType->isFloatTy())      return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToUI, twine);
         else if (sourceType->isHalfTy())       return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateFPToUI, twine);
-        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
-        else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(64))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(32))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(16))  return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
+        else if (sourceType->isIntegerTy(8))   return BIND_ARITHMETIC_CAST_OP_TRUNC(llvm::IRBuilder<>::CreateTrunc, twine);
     }
 
 #undef BIND_ARITHMETIC_CAST_OP
@@ -434,11 +437,11 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::LESSTHAN)         return BIND_BINARY_OP(CreateICmpSLT);
         else if (token == ast::tokens::MORETHANOREQUAL)  return BIND_BINARY_OP(CreateICmpSGE);
         else if (token == ast::tokens::LESSTHANOREQUAL)  return BIND_BINARY_OP(CreateICmpSLE);
-        else if (token == ast::tokens::AND)              return BIND_BINARY_OP(CreateAnd);
+        else if (token == ast::tokens::AND)              return BIND_BINARY_OP(CreateAnd); // same as BITAND (bool/circuting logic handled a layer up)
         else if (token == ast::tokens::OR)               return BIND_BINARY_OP(CreateOr);
         else if (token == ast::tokens::SHIFTLEFT)        return BIND_BINARY_OP(CreateShl); // No Unsigned/Signed Wrap
         else if (token == ast::tokens::SHIFTRIGHT)       return BIND_BINARY_OP(CreateAShr); // IsExact = false - poison value if any of the bits shifted out are non-zero.
-        else if (token == ast::tokens::BITAND)           return BIND_BINARY_OP(CreateAnd);
+        else if (token == ast::tokens::BITAND)           return BIND_BINARY_OP(CreateAnd); // note same as AND
         else if (token == ast::tokens::BITOR)            return BIND_BINARY_OP(CreateOr);
         else if (token == ast::tokens::BITXOR)           return BIND_BINARY_OP(CreateXor);
         OPENVDB_ASSERT(false && "unrecognised binary operator");
@@ -492,55 +495,6 @@ arithmeticConversion(llvm::Value* value,
 
     CastFunction llvmCastFunction = llvmArithmeticConversion(valueType, targetType);
     return llvmCastFunction(builder, value, targetType);
-}
-
-/// @brief  Casts an array to another array of equal size but of a different element
-///         type. Both source and target array element types must be scalar types.
-///         The source array llvm Value should be a pointer to the array to cast.
-///
-/// @param ptrToArray         A llvm value which is a pointer to a llvm array
-/// @param targetElementType  The target llvm scalar type to convert each element
-///                           of the input array
-/// @param builder            The current llvm IRBuilder
-///
-inline llvm::Value*
-arrayCast(llvm::Value* ptrToArray,
-          llvm::Type* targetElementType,
-          llvm::IRBuilder<>& builder)
-{
-    OPENVDB_ASSERT(targetElementType && (targetElementType->isIntegerTy() ||
-        targetElementType->isFloatingPointTy()) &&
-        "Target element type is not a scalar type");
-    OPENVDB_ASSERT(ptrToArray && ptrToArray->getType()->isPointerTy() &&
-        "Input to arrayCast is not a pointer type.");
-
-    llvm::Type* arrayType = ptrToArray->getType()->getContainedType(0);
-    OPENVDB_ASSERT(arrayType && llvm::isa<llvm::ArrayType>(arrayType));
-
-    // getArrayElementType() calls getContainedType(0)
-    llvm::Type* sourceElementType = arrayType->getArrayElementType();
-    OPENVDB_ASSERT(sourceElementType && (sourceElementType->isIntegerTy() ||
-        sourceElementType->isFloatingPointTy()) &&
-        "Source element type is not a scalar type");
-
-    if (sourceElementType == targetElementType) return ptrToArray;
-
-    CastFunction llvmCastFunction = llvmArithmeticConversion(sourceElementType, targetElementType);
-
-    const size_t elementSize = arrayType->getArrayNumElements();
-    llvm::Value* targetArray =
-        insertStaticAlloca(builder,
-            llvm::ArrayType::get(targetElementType, elementSize));
-
-    for (size_t i = 0; i < elementSize; ++i) {
-        llvm::Value* target = ir_constgep2_64(builder, targetArray, 0, i);
-        llvm::Value* source = ir_constgep2_64(builder, ptrToArray, 0, i);
-        source = ir_load(builder, source);
-        source = llvmCastFunction(builder, source, targetElementType);
-        builder.CreateStore(source, target);
-    }
-
-    return targetArray;
 }
 
 /// @brief Converts a vector of loaded llvm scalar values of the same type to a
@@ -658,216 +612,6 @@ binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
 
     const BinaryFunction llvmBinaryFunction = llvmBinaryConversion(lhsType, token);
     return llvmBinaryFunction(builder, lhs, rhs);
-}
-
-/// @brief  Unpack a particular element of an array and return a pointer to that element
-///         The provided llvm Value is expected to be a pointer to an array
-///
-/// @param ptrToArray  A llvm value which is a pointer to a llvm array
-/// @param index       The index at which to access the array
-/// @param builder     The current llvm IRBuilder
-///
-inline llvm::Value*
-arrayIndexUnpack(llvm::Value* ptrToArray,
-                 const int16_t index,
-                 llvm::IRBuilder<>& builder)
-{
-    return ir_constgep2_64(builder, ptrToArray, 0, index);
-}
-
-/// @brief  Unpack an array type into llvm Values which represent all its elements
-///         The provided llvm Value is expected to be a pointer to an array
-///         If loadElements is true, values will store loaded llvm values instead
-///         of pointers to the array elements
-///
-/// @param ptrToArray    A llvm value which is a pointer to a llvm array
-/// @param values        A vector of llvm values where to store the array elements
-/// @param builder       The current llvm IRBuilder
-/// @param loadElements  Whether or not to load each array element into a register
-///
-inline void
-arrayUnpack(llvm::Value* ptrToArray,
-            std::vector<llvm::Value*>& values,
-            llvm::IRBuilder<>& builder,
-            const bool loadElements = false)
-{
-    const size_t elements =
-        ptrToArray->getType()->getContainedType(0)->getArrayNumElements();
-
-    values.reserve(elements);
-    for (size_t i = 0; i < elements; ++i) {
-        llvm::Value* value = ir_constgep2_64(builder, ptrToArray, 0, i);
-        if (loadElements) value = ir_load(builder, value);
-        values.push_back(value);
-    }
-}
-
-/// @brief  Unpack the first three elements of an array.
-///         The provided llvm Value is expected to be a pointer to an array
-/// @note   The elements are note loaded
-///
-/// @param ptrToArray    A llvm value which is a pointer to a llvm array
-/// @param value1        The first array value
-/// @param value2        The second array value
-/// @param value3        The third array value
-/// @param builder       The current llvm IRBuilder
-///
-inline void
-array3Unpack(llvm::Value* ptrToArray,
-             llvm::Value*& value1,
-             llvm::Value*& value2,
-             llvm::Value*& value3,
-             llvm::IRBuilder<>& builder)
-{
-    OPENVDB_ASSERT(ptrToArray && ptrToArray->getType()->isPointerTy() &&
-        "Input to array3Unpack is not a pointer type.");
-
-    value1 = ir_constgep2_64(builder, ptrToArray, 0, 0);
-    value2 = ir_constgep2_64(builder, ptrToArray, 0, 1);
-    value3 = ir_constgep2_64(builder, ptrToArray, 0, 2);
-}
-
-/// @brief  Pack three values into a new array and return a pointer to the
-///         newly allocated array. If the values are of a mismatching type,
-///         the highets order type is uses, as defined by typePrecedence. All
-///         llvm values are expected to a be a loaded scalar type
-///
-/// @param value1   The first array value
-/// @param value2   The second array value
-/// @param value3   The third array value
-/// @param builder  The current llvm IRBuilder
-///
-inline llvm::Value*
-array3Pack(llvm::Value* value1,
-           llvm::Value* value2,
-           llvm::Value* value3,
-           llvm::IRBuilder<>& builder)
-{
-    llvm::Type* type = typePrecedence(value1->getType(), value2->getType());
-    type = typePrecedence(type, value3->getType());
-
-    value1 = arithmeticConversion(value1, type, builder);
-    value2 = arithmeticConversion(value2, type, builder);
-    value3 = arithmeticConversion(value3, type, builder);
-
-    llvm::Type* vectorType = llvm::ArrayType::get(type, 3);
-    llvm::Value* vector = insertStaticAlloca(builder, vectorType);
-
-    llvm::Value* e1 = ir_constgep2_64(builder, vector, 0, 0);
-    llvm::Value* e2 = ir_constgep2_64(builder, vector, 0, 1);
-    llvm::Value* e3 = ir_constgep2_64(builder, vector, 0, 2);
-
-    builder.CreateStore(value1, e1);
-    builder.CreateStore(value2, e2);
-    builder.CreateStore(value3, e3);
-
-    return vector;
-}
-
-/// @brief  Pack a loaded llvm scalar value into a new array of a specified
-///         size and return a pointer to the newly allocated array. Each element
-///         of the new array will have the value of the given scalar
-///
-/// @param value    The uniform scalar llvm value to pack into the array
-/// @param builder  The current llvm IRBuilder
-/// @param size     The size of the newly allocated array
-///
-inline llvm::Value*
-arrayPack(llvm::Value* value,
-          llvm::IRBuilder<>& builder,
-          const size_t size = 3)
-{
-    OPENVDB_ASSERT(value && (value->getType()->isIntegerTy() ||
-        value->getType()->isFloatingPointTy()) &&
-        "value type is not a scalar type");
-
-    llvm::Type* type = value->getType();
-    llvm::Value* array =
-        insertStaticAlloca(builder,
-            llvm::ArrayType::get(type, size));
-
-    for (size_t i = 0; i < size; ++i) {
-        llvm::Value* element = ir_constgep2_64(builder, array, 0, i);
-        builder.CreateStore(value, element);
-    }
-
-    return array;
-}
-
-/// @brief  Pack a vector of loaded llvm scalar values into a new array of
-///         equal size and return a pointer to the newly allocated array.
-///
-/// @param values   A vector of loaded llvm scalar values to pack
-/// @param builder  The current llvm IRBuilder
-///
-inline llvm::Value*
-arrayPack(const std::vector<llvm::Value*>& values,
-          llvm::IRBuilder<>& builder)
-{
-    llvm::Type* type = values.front()->getType();
-    llvm::Value* array = insertStaticAlloca(builder,
-        llvm::ArrayType::get(type, values.size()));
-
-    size_t idx = 0;
-    for (llvm::Value* const& value : values) {
-        llvm::Value* element = ir_constgep2_64(builder, array, 0, idx++);
-        builder.CreateStore(value, element);
-    }
-
-    return array;
-}
-
-/// @brief  Pack a vector of loaded llvm scalar values into a new array of
-///         equal size and return a pointer to the newly allocated array.
-///         arrayPackCast first checks all the contained types in values
-///         and casts all types to the highest order type present. All llvm
-///         values in values are expected to be loaded scalar types
-///
-/// @param values   A vector of loaded llvm scalar values to pack
-/// @param builder  The current llvm IRBuilder
-///
-inline llvm::Value*
-arrayPackCast(std::vector<llvm::Value*>& values,
-              llvm::IRBuilder<>& builder)
-{
-    // get the highest order type present
-
-    llvm::Type* type = LLVMType<bool>::get(builder.getContext());
-    for (llvm::Value* const& value : values) {
-        type = typePrecedence(type, value->getType());
-    }
-
-    // convert all to this type
-
-    for (llvm::Value*& value : values) {
-        value = arithmeticConversion(value, type, builder);
-    }
-
-    return arrayPack(values, builder);
-}
-
-inline llvm::Value*
-scalarToMatrix(llvm::Value* scalar,
-     llvm::IRBuilder<>& builder,
-     const size_t dim = 3)
-{
-    OPENVDB_ASSERT(scalar && (scalar->getType()->isIntegerTy() ||
-        scalar->getType()->isFloatingPointTy()) &&
-        "value type is not a scalar type");
-
-    llvm::Type* type = scalar->getType();
-    llvm::Value* array =
-        insertStaticAlloca(builder,
-            llvm::ArrayType::get(type, dim*dim));
-
-    llvm::Value* zero = llvmConstant(0, type);
-    for (size_t i = 0; i < dim*dim; ++i) {
-        llvm::Value* m = ((i % (dim+1) == 0) ? scalar : zero);
-        llvm::Value* element = ir_constgep2_64(builder, array, 0, i);
-        builder.CreateStore(m, element);
-    }
-
-    return array;
 }
 
 } // namespace codegen

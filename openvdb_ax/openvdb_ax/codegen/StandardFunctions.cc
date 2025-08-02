@@ -46,6 +46,22 @@ namespace codegen {
 namespace
 {
 
+[[maybe_unused]] inline bool AssertSameTypes(const NativeArguments& vals)
+{
+    for (size_t i = 1; i < vals.size(); ++i) {
+        if (vals[0].GetUnderlyingType() != vals[i].GetUnderlyingType()) return false;
+    }
+    return true;
+}
+
+[[maybe_unused]] inline bool AssertSamePrecision(const NativeArguments& vals)
+{
+    for (size_t i = 1; i < vals.size(); ++i) {
+        if (vals[0].GetUnderlyingScalarType() != vals[i].GetUnderlyingScalarType()) return false;
+    }
+    return true;
+}
+
 // Reduce a size_t hash down into an unsigned int, taking all bits in the
 // size_t into account. We achieve this by repeatedly XORing as many bytes
 // that fit into an unsigned int, and then shift those bytes out of the
@@ -79,29 +95,38 @@ struct SimplexNoise
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+inline llvm::Function* llvmGetIntrinsicDecl(llvm::Module* M,
+    const llvm::Intrinsic::ID ID,
+    llvm::Type* type)
+{
+#if LLVM_VERSION_MAJOR < 20
+    return llvm::Intrinsic::getDeclaration(M, ID, type);
+#else
+    return llvm::Intrinsic::getOrInsertDeclaration(M, ID, type);
+#endif
+}
+
 #define DEFINE_LLVM_FP_INTRINSIC(Identifier, Doc, UseIR)                                    \
     inline FunctionGroup::UniquePtr llvm_##Identifier(const FunctionOptions& op)            \
     {                                                                                       \
         static auto generate =                                                              \
-            [](const std::vector<llvm::Value*>& args,                                       \
-               llvm::IRBuilder<>& B) -> llvm::Value*                                        \
+            [](const NativeArguments& args,                                                 \
+               llvm::IRBuilder<>& B) -> Value                                               \
         {                                                                                   \
+            llvm::Type* type = args[0].GetUnderlyingType();                                 \
             llvm::Module* M = B.GetInsertBlock()->getParent()->getParent();                 \
             llvm::Function* function =                                                      \
-                llvm::Intrinsic::getDeclaration(M,                                          \
-                    llvm::Intrinsic::Identifier, args[0]->getType());                       \
-            OPENVDB_ASSERT(function);                                                               \
-            return B.CreateCall(function, args);                                            \
+                llvmGetIntrinsicDecl(M, llvm::Intrinsic::Identifier, type);                 \
+            OPENVDB_ASSERT(function);                                                       \
+            return Value(B.CreateCall(function, args[0].GetValue()), type);                 \
         };                                                                                  \
                                                                                             \
         return FunctionBuilder(#Identifier)                                                 \
             .addSignature<double(double)>(generate, (double(*)(double))(std::Identifier))   \
             .addSignature<float(float)>(generate, (float(*)(float))(std::Identifier))       \
             .setArgumentNames({"n"})                                                        \
-            .addFunctionAttribute(llvm::Attribute::ReadOnly)                                \
-            .addFunctionAttribute(llvm::Attribute::NoRecurse)                               \
-            .addFunctionAttribute(llvm::Attribute::NoUnwind)                                \
-            .addFunctionAttribute(llvm::Attribute::AlwaysInline)                            \
+            .setBuiltin(true)                                                               \
+            .setReadOnly(true)                                                              \
             .setConstantFold(op.mConstantFoldCBindings)                                     \
             .setPreferredImpl((UseIR && op.mPrioritiseIR) ?                                 \
                 FunctionBuilder::IR : FunctionBuilder::C)                                   \
@@ -116,10 +141,8 @@ struct SimplexNoise
             .addSignature<double(double)>((double(*)(double))(std::Identifier))             \
             .addSignature<float(float)>((float(*)(float))(std::Identifier))                 \
             .setArgumentNames({"arg"})                                                      \
-            .addFunctionAttribute(llvm::Attribute::ReadOnly)                                \
-            .addFunctionAttribute(llvm::Attribute::NoRecurse)                               \
-            .addFunctionAttribute(llvm::Attribute::NoUnwind)                                \
-            .addFunctionAttribute(llvm::Attribute::AlwaysInline)                            \
+            .setBuiltin(true)                                                               \
+            .setReadOnly(true)                                                              \
             .setConstantFold(op.mConstantFoldCBindings)                                     \
             .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)  \
             .setDocumentation(Doc)                                                          \
@@ -134,23 +157,31 @@ struct SimplexNoise
 inline FunctionGroup::UniquePtr axmalloc(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const Arguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::BasicBlock* BB = B.GetInsertBlock();
         /// @note The return type is i8* as the void* type is aliased to
         ///  i8* in Types.h.
         /// @todo should probably remove this alias and use i8* explicitly
         llvm::Instruction* inst =
-            llvm::CallInst::CreateMalloc(BB, // location
+#if LLVM_VERSION_MAJOR < 18
+        llvm::CallInst::CreateMalloc(B.GetInsertBlock(), // location
                 B.getInt64Ty(), // int ptr type
                 B.getInt8Ty(),  // return type
                 args[0], // size
                 nullptr,
                 nullptr);
+#else
+        B.CreateMalloc(
+            B.getInt64Ty(), // int ptr type
+            B.getInt8Ty(),  // return type
+            args[0], // size
+            nullptr,
+            nullptr);
+#endif
         OPENVDB_ASSERT(inst);
         B.Insert(inst);
-        return inst;
+        return Value(inst, B.getVoidTy());
     };
 
     return FunctionBuilder("axmalloc")
@@ -166,14 +197,18 @@ inline FunctionGroup::UniquePtr axmalloc(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axfree(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const Arguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::BasicBlock* BB = B.GetInsertBlock();
-        llvm::Instruction* inst = llvm::CallInst::CreateFree(args[0], BB);
+        llvm::Instruction* inst =
+#if LLVM_VERSION_MAJOR < 18
+        llvm::CallInst::CreateFree(args[0], B.GetInsertBlock());
+#else
+        B.CreateFree(args[0]);
+#endif
         OPENVDB_ASSERT(inst);
         B.Insert(inst);
-        return nullptr;
+        return Value::Invalid();
     };
 
     return FunctionBuilder("axfree")
@@ -227,16 +262,18 @@ DEFINE_LLVM_FP_INTRINSIC(exp2, "Computes 2 raised to the given power arg.", true
 inline FunctionGroup::UniquePtr llvm_pow(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Type* overloadType = args[0]->getType();
-        llvm::Type* expType = args[1]->getType();
+        llvm::Type* overloadType = args[0].GetUnderlyingType();
+        llvm::Type* expType = args[1].GetUnderlyingType();
         const llvm::Intrinsic::ID id =
             expType->isIntegerTy() ? llvm::Intrinsic::powi : llvm::Intrinsic::pow;
         llvm::Module* M = B.GetInsertBlock()->getParent()->getParent();
-        llvm::Function* function = llvm::Intrinsic::getDeclaration(M, id, overloadType);
-        return B.CreateCall(function, args);
+        llvm::Function* function = llvmGetIntrinsicDecl(M, id, overloadType);
+        return Value(B.CreateCall(function, {
+                args[0].GetValue(), args[1].GetValue()
+            }), overloadType);
     };
 
     return FunctionBuilder("pow")
@@ -244,10 +281,8 @@ inline FunctionGroup::UniquePtr llvm_pow(const FunctionOptions& op)
         .addSignature<float(float,float)>(generate, (float(*)(float,float))(std::pow))
         .addSignature<double(double,int32_t)>(generate, (double(*)(double,int32_t))(std::pow))
         .setArgumentNames({"base", "exp"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(false) // decl's differ
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Computes the value of the first argument raised to the power of the second argument.")
@@ -264,25 +299,22 @@ DEFINE_AX_C_FP_BINDING(cbrt, "Computes the cubic root of the input.")
 inline FunctionGroup::UniquePtr axabs(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Value* value = args.front();
-        llvm::Type* type = value->getType();
-
-        if (type->isFloatingPointTy()) {
-            return llvm_fabs(op)->execute(args, B);
+        Value in = args[0];
+        if (in.IsFloat()) {
+            return llvm_fabs(op)->execute(NativeArguments{in}, B);
         }
 
         // if negative flip all the bits and add 1 (xor with -1 and sub 1)
-        llvm::Value* shift = type == LLVMType<int32_t>::get(B.getContext()) ?
-            LLVMType<int32_t>::get(B.getContext(), 31) :
-            LLVMType<int64_t>::get(B.getContext(), 63);
+        Value shift = in.GetUnderlyingType() == LLVMType<int32_t>::get(B.getContext()) ?
+            Value::Create<int32_t>(B.getContext(), 31) :
+            Value::Create<int64_t>(B.getContext(), 63);
 
-        // arithmetic shift right
-        llvm::Value* mask = B.CreateAShr(value, shift);
-        llvm::Value* xorResult = binaryOperator(value, mask, ast::tokens::BITXOR, B);
-        return binaryOperator(xorResult, mask, ast::tokens::MINUS, B);
+        Value mask = in.ShiftRight(B, shift);
+        Value xorResult = in.BitXor(B, mask);
+        return xorResult.Subtract(B, mask);
     };
 
     // @note  We also support fabs through the ax abs function
@@ -293,10 +325,8 @@ inline FunctionGroup::UniquePtr axabs(const FunctionOptions& op)
         .addSignature<float(float)>(generate, (float(*)(float))(std::abs))
         .setArgumentNames({"n"})
         .addDependency("fabs")
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Computes the absolute value of an integer number.")
@@ -306,41 +336,34 @@ inline FunctionGroup::UniquePtr axabs(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axdot(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> v1, v2;
-        arrayUnpack(args[0], v1, B, /*load*/true);
-        arrayUnpack(args[1], v2, B, /*load*/true);
-
-        v1[0] = binaryOperator(v1[0], v2[0], ast::tokens::MULTIPLY, B);
-        v1[1] = binaryOperator(v1[1], v2[1], ast::tokens::MULTIPLY, B);
-        v1[2] = binaryOperator(v1[2], v2[2], ast::tokens::MULTIPLY, B);
-
-        llvm::Value* result = binaryOperator(v1[0], v1[1], ast::tokens::PLUS, B);
-        result = binaryOperator(result, v1[2], ast::tokens::PLUS, B);
-        return result;
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        std::vector<Value> v[2];
+        args[0].ArrayToScalars(B, v[0], /*load*/true);
+        args[1].ArrayToScalars(B, v[1], /*load*/true);
+        v[0][0] = v[0][0].Multiply(B, v[1][0]);
+        v[0][1] = v[0][1].Multiply(B, v[1][1]);
+        v[0][2] = v[0][2].Multiply(B, v[1][2]);
+        return v[0][0].Add(B, v[0][1]).Add(B, v[0][2]);
     };
 
     static auto dot = [](auto a, auto b) {
         return a->dot(*b);
     };
 
-    using DotD = double(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
-    using DotF = float(openvdb::math::Vec3<float>*,openvdb::math::Vec3<float>*);
-    using DotI = int32_t(openvdb::math::Vec3<int32_t>*,openvdb::math::Vec3<int32_t>*);
+    using DotD = double(const openvdb::math::Vec3<double>*,const openvdb::math::Vec3<double>*);
+    using DotF = float(const openvdb::math::Vec3<float>*,const openvdb::math::Vec3<float>*);
+    using DotI = int32_t(const openvdb::math::Vec3<int32_t>*,const openvdb::math::Vec3<int32_t>*);
 
     return FunctionBuilder("dot")
         .addSignature<DotD>(generate, (DotD*)(dot))
         .addSignature<DotF>(generate, (DotF*)(dot))
         .addSignature<DotI>(generate, (DotI*)(dot))
         .setArgumentNames({"a", "b"})
-        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Computes the dot product of two vectors.")
@@ -350,36 +373,36 @@ inline FunctionGroup::UniquePtr axdot(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axcross(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, left, right;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], left, B, /*load*/true);
-        arrayUnpack(args[2], right, B, /*load*/true);
-        OPENVDB_ASSERT(ptrs.size() == 3);
-        OPENVDB_ASSERT(left.size() == 3);
-        OPENVDB_ASSERT(right.size() == 3);
+        OPENVDB_ASSERT(args.size() == 3);
+        OPENVDB_ASSERT(AssertSameTypes(args));
 
-        std::vector<llvm::Value*> results(3);
+        std::vector<Value> store, lhs, rhs;
+        args[0].ArrayToScalars(B, store, /*load*/false); // result
+        args[1].ArrayToScalars(B, lhs, /*load*/true);
+        args[2].ArrayToScalars(B, rhs, /*load*/true);
+        OPENVDB_ASSERT(store.size() == 3);
+        OPENVDB_ASSERT(lhs.size() == 3);
+        OPENVDB_ASSERT(rhs.size() == 3);
 
-        llvm::Value* tmp1 = binaryOperator(left[1], right[2], ast::tokens::MULTIPLY, B);
-        llvm::Value* tmp2 = binaryOperator(left[2], right[1], ast::tokens::MULTIPLY, B);
-        results[0] = binaryOperator(tmp1, tmp2, ast::tokens::MINUS, B);
+        Value tmp1 = lhs[1].Multiply(B, rhs[2]);
+        Value tmp2 = lhs[2].Multiply(B, rhs[1]);
+        Value r1 = tmp1.Subtract(B, tmp2);
 
-        tmp1 = binaryOperator(left[2], right[0], ast::tokens::MULTIPLY, B);
-        tmp2 = binaryOperator(left[0], right[2], ast::tokens::MULTIPLY, B);
-        results[1] = binaryOperator(tmp1, tmp2, ast::tokens::MINUS, B);
+        tmp1 = lhs[2].Multiply(B, rhs[0]);
+        tmp2 = lhs[0].Multiply(B, rhs[2]);
+        Value r2 = tmp1.Subtract(B, tmp2);
 
-        tmp1 = binaryOperator(left[0], right[1], ast::tokens::MULTIPLY, B);
-        tmp2 = binaryOperator(left[1], right[0], ast::tokens::MULTIPLY, B);
-        results[2] = binaryOperator(tmp1, tmp2, ast::tokens::MINUS, B);
+        tmp1 = lhs[0].Multiply(B, rhs[1]);
+        tmp2 = lhs[1].Multiply(B, rhs[0]);
+        Value r3 = tmp1.Subtract(B, tmp2);
 
-        B.CreateStore(results[0], ptrs[0]);
-        B.CreateStore(results[1], ptrs[1]);
-        B.CreateStore(results[2], ptrs[2]);
-
-        return nullptr;
+        store[0].Assign(B, r1);
+        store[1].Assign(B, r2);
+        store[2].Assign(B, r3);
+        return Value::Invalid();
     };
 
     static auto cross = [](auto out, auto a, auto b) -> auto {
@@ -399,8 +422,7 @@ inline FunctionGroup::UniquePtr axcross(const FunctionOptions& op)
         .addParameterAttribute(0, llvm::Attribute::WriteOnly)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
         .addParameterAttribute(2, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the length of the given vector")
@@ -410,26 +432,27 @@ inline FunctionGroup::UniquePtr axcross(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axlengthsq(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> elements;
-        arrayUnpack(args[0], elements, B, /*load*/true);
-        OPENVDB_ASSERT(elements.size() >= 2);
+        OPENVDB_ASSERT(args.size() == 1);
+        std::vector<Value> elements;
+        args[0].ArrayToScalars(B, elements, /*load=*/true);
+        OPENVDB_ASSERT(elements.size() >= 2 && elements.size() <= 4);
 
-        llvm::Value* v1 = binaryOperator(elements[0], elements[0], ast::tokens::MULTIPLY, B);
-        llvm::Value* v2 = binaryOperator(elements[1], elements[1], ast::tokens::MULTIPLY, B);
-        llvm::Value* result = binaryOperator(v1, v2, ast::tokens::PLUS, B);
+        Value v1 = elements[0].Multiply(B, elements[0]);
+        Value v2 = elements[1].Multiply(B, elements[1]);
+        Value result = v1.Add(B, v2);
 
         if (elements.size() > 2) {
-            llvm::Value* v3 = binaryOperator(elements[2], elements[2], ast::tokens::MULTIPLY, B);
-            result = binaryOperator(result, v3, ast::tokens::PLUS, B);
+            Value v3 = elements[2].Multiply(B, elements[2]);
+            result = result.Add(B, v3);
         }
         if (elements.size() > 3) {
-            llvm::Value* v4 = binaryOperator(elements[3], elements[3], ast::tokens::MULTIPLY, B);
-            result = binaryOperator(result, v4, ast::tokens::PLUS, B);
+            Value v4 = elements[3].Multiply(B, elements[3]);
+            result = result.Add(B, v4);
         }
-
+        OPENVDB_ASSERT(result.GetUnderlyingType() == args[0].GetUnderlyingScalarType());
         return result;
     };
 
@@ -446,11 +469,8 @@ inline FunctionGroup::UniquePtr axlengthsq(const FunctionOptions& op)
         .addSignature<float(openvdb::math::Vec4<float>*)>(generate, lengthsq)
         .addSignature<int32_t(openvdb::math::Vec4<int32_t>*)>(generate, lengthsq)
         .setArgumentNames({"v"})
-        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the squared length of the given vector")
@@ -460,13 +480,16 @@ inline FunctionGroup::UniquePtr axlengthsq(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axlength(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         auto a = axlengthsq(op);
         auto s = llvm_sqrt(op);
-        llvm::Value* lsq = a->execute(args, B);
-        return s->execute({lsq}, B);
+        Value lsq = a->execute(args, B);
+        OPENVDB_ASSERT(lsq.GetUnderlyingType() == args[0].GetUnderlyingScalarType());
+        Value len = s->execute(NativeArguments{lsq}, B);
+        OPENVDB_ASSERT(len);
+        return len;
     };
 
     static auto length = [](auto in) -> auto
@@ -491,11 +514,8 @@ inline FunctionGroup::UniquePtr axlength(const FunctionOptions& op)
         .addDependency("lengthsq")
         .addDependency("sqrt")
         .setArgumentNames({"v"})
-        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the length of the given vector")
@@ -505,37 +525,43 @@ inline FunctionGroup::UniquePtr axlength(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(args[0].IsVector());
+        OPENVDB_ASSERT(args[1].IsVector());
+
         auto a = axlength(op);
-        llvm::Value* len = a->execute({args[1]}, B);
+        Value len = a->execute(NativeArguments{args[1]}, B);
+        OPENVDB_ASSERT(len.IsFloat());
 
-        std::vector<llvm::Value*> ptrs, elements;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], elements, B, /*load*/true);
-        OPENVDB_ASSERT(ptrs.size() == 3 || ptrs.size() == 4);
-        OPENVDB_ASSERT(elements.size() == 3 || elements.size() == 4);
+        std::vector<Value> store, elems;
+        args[0].ArrayToScalars(B, store, /*load=*/false);
+        args[1].ArrayToScalars(B, elems, /*load=*/true);
+        OPENVDB_ASSERT(store.size() == 3 || store.size() == 4);
+        OPENVDB_ASSERT(elems.size() == 3 || elems.size() == 4);
 
-        if (elements[0]->getType()->isIntegerTy()) {
-           arithmeticConversion(elements, LLVMType<double>::get(B.getContext()), B);
+        if (args[0].GetUnderlyingScalarType()->isIntegerTy()) {
+            for (auto& elem : elems) {
+                elem = elem.CastToPrecision(B, LLVMType<double>::get(B.getContext()));
+            }
         }
 
         // the following is always done at fp precision
-        llvm::Value* one = llvm::ConstantFP::get(len->getType(), 1.0);
-        llvm::Value* oneDividedByLength = B.CreateFDiv(one, len);
+        Value one(llvm::ConstantFP::get(len.GetUnderlyingType(), 1.0));
+        Value oneDividedByLength = one.Divide(B, len);
+        for (auto& elem : elems) {
+            elem = elem.Multiply(B, oneDividedByLength);
+        }
 
-        elements[0] = B.CreateFMul(elements[0], oneDividedByLength);
-        elements[1] = B.CreateFMul(elements[1], oneDividedByLength);
-        elements[2] = B.CreateFMul(elements[2], oneDividedByLength);
-        if (elements.size() == 4) elements[3] = B.CreateFMul(elements[3], oneDividedByLength);
-
-        B.CreateStore(elements[0], ptrs[0]);
-        B.CreateStore(elements[1], ptrs[1]);
-        B.CreateStore(elements[2], ptrs[2]);
-        if (elements.size() == 4)  B.CreateStore(elements[3], ptrs[3]);
-
-        return nullptr;
+        store[0].Assign(B, elems[0]);
+        store[1].Assign(B, elems[1]);
+        store[2].Assign(B, elems[2]);
+        if (elems.size() == 4) {
+            store[3].Assign(B, elems[3]);
+        }
+        return Value::Invalid();
     };
 
     static auto norm = [](auto out, auto in) {
@@ -563,8 +589,7 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
         .setArgumentNames({"v"})
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the normalized result of the given vector.")
@@ -574,68 +599,71 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axlerp(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 3);
-        llvm::Value* a = args[0], *b = args[1], *t = args[2];
-        llvm::Value* zero = llvm::ConstantFP::get(a->getType(), 0.0);
-        llvm::Value* one = llvm::ConstantFP::get(a->getType(), 1.0);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+
+        const Value& a = args[0];
+        const Value& b = args[1];
+        const Value& t = args[2];
+        const Value one(llvm::ConstantFP::get(args[0].GetUnderlyingType(), 1.0));
+        const Value zero(llvm::ConstantFP::get(args[0].GetUnderlyingType(), 0.0));
+
         llvm::Function* base = B.GetInsertBlock()->getParent();
 
         // @todo short-circuit?
-        llvm::Value* a1 = binaryOperator(a, zero, ast::tokens::LESSTHANOREQUAL, B);
-        llvm::Value* b1 = binaryOperator(b, zero, ast::tokens::MORETHANOREQUAL, B);
-        llvm::Value* a2 = binaryOperator(a, zero, ast::tokens::MORETHANOREQUAL, B);
-        llvm::Value* b2 = binaryOperator(b, zero, ast::tokens::LESSTHANOREQUAL, B);
-        a1 = binaryOperator(a1, b1, ast::tokens::AND, B);
-        a2 = binaryOperator(a2, b2, ast::tokens::AND, B);
-        a1 = binaryOperator(a1, a2, ast::tokens::OR, B);
+        Value a1 = a.LessThanEquals(B, zero);
+        Value b1 = b.GreaterThanEquals(B, zero);
+        Value a2 = a.GreaterThanEquals(B, zero);
+        Value b2 = b.LessThanEquals(B, zero);
+        a1 = a1.And(B, b1);
+        a2 = a2.And(B, b2);
+        a1 = a1.Or(B, a2);
 
         llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
-        B.CreateCondBr(a1, then, post);
+        B.CreateCondBr(a1.GetValue(), then, post);
 
         B.SetInsertPoint(then);
-        llvm::Value* r = binaryOperator(one, t, ast::tokens::MINUS, B);
-        r = binaryOperator(r, a, ast::tokens::MULTIPLY, B);
-        llvm::Value* right = binaryOperator(t, b, ast::tokens::MULTIPLY, B);
-        r = binaryOperator(r, right, ast::tokens::PLUS, B);
-        B.CreateRet(r);
+        Value r = one.Subtract(B, t).Multiply(B, a);
+        Value right = t.Multiply(B, b);
+        r = r.Add(B, right);
+        B.CreateRet(r.GetValue());
 
         B.SetInsertPoint(post);
 
-        llvm::Value* tisone = binaryOperator(t, one, ast::tokens::EQUALSEQUALS, B);
-
+        Value tisone = t.Equals(B, one);
         then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         post = llvm::BasicBlock::Create(B.getContext(), "post", base);
-        B.CreateCondBr(tisone, then, post);
+        B.CreateCondBr(tisone.GetValue(), then, post);
 
         B.SetInsertPoint(then);
-        B.CreateRet(b);
+        B.CreateRet(b.GetValue());
 
         B.SetInsertPoint(post);
 
         // if nlerp
-        llvm::Value* x = binaryOperator(b, a, ast::tokens::MINUS, B);
-        x = binaryOperator(t, x, ast::tokens::MULTIPLY, B);
-        x = binaryOperator(a, x, ast::tokens::PLUS, B);
+        Value x = b.Subtract(B, a);
+        x = t.Multiply(B, x);
+        x = a.Add(B, x);
 
         then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         post = llvm::BasicBlock::Create(B.getContext(), "post", base);
 
-        a1 = binaryOperator(t, one, ast::tokens::MORETHAN, B);
-        a2 = binaryOperator(b, a, ast::tokens::MORETHAN, B);
-        a1 = binaryOperator(a1, a2, ast::tokens::EQUALSEQUALS, B);
-        B.CreateCondBr(a1, then, post);
+        a1 = t.GreaterThan(B, one);
+        a2 = b.GreaterThan(B, a);
+        a1 = a1.Equals(B, a2);
+        B.CreateCondBr(a1.GetValue(), then, post);
 
         B.SetInsertPoint(then);
-        b1 = binaryOperator(b, x, ast::tokens::LESSTHAN, B);
-        B.CreateRet(B.CreateSelect(b1, x, b));
+        b1 = b.LessThan(B, x);
+        B.CreateRet(b1.Select(B, x, b).GetValue());
 
         B.SetInsertPoint(post);
-        b1 = binaryOperator(x, b, ast::tokens::LESSTHAN, B);
-        return B.CreateRet(B.CreateSelect(b1, x, b));
+        b1 = x.LessThan(B, b);
+        return b1.Select(B, x, b);
     };
 
     // This lerp implementation is taken from clang and matches the C++20 standard
@@ -670,10 +698,8 @@ inline FunctionGroup::UniquePtr axlerp(const FunctionOptions& op)
         .addSignature<double(double,double,double)>(generate, (double(*)(double,double,double))(lerp))
         .addSignature<float(float,float,float)>(generate, (float(*)(float,float,float))(lerp))
         .setArgumentNames({"a", "b", "amount"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Performs bilinear interpolation between the values. If the "
@@ -686,12 +712,13 @@ inline FunctionGroup::UniquePtr axlerp(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axmin(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Value* result =
-            binaryOperator(args[0], args[1], ast::tokens::MORETHAN, B);
-        return B.CreateSelect(result, args[1], args[0]);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        Value result = args[0].GreaterThan(B, args[1]);
+        return result.Select(B, args[1], args[0]);
     };
 
     static auto min = [](auto a, auto b) -> auto {
@@ -704,10 +731,8 @@ inline FunctionGroup::UniquePtr axmin(const FunctionOptions& op)
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(min))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(min))
         .setArgumentNames({"a", "b"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the smaller of the given values.")
@@ -717,12 +742,13 @@ inline FunctionGroup::UniquePtr axmin(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axmax(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Value* result =
-            binaryOperator(args[0], args[1], ast::tokens::MORETHAN, B);
-        return B.CreateSelect(result, args[0], args[1]);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        Value result = args[0].GreaterThan(B, args[1]);
+        return result.Select(B, args[0], args[1]);
     };
 
     static auto max = [](auto a, auto b) -> auto {
@@ -735,10 +761,8 @@ inline FunctionGroup::UniquePtr axmax(const FunctionOptions& op)
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(max))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(max))
         .setArgumentNames({"a", "b"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the larger of the given values.")
@@ -748,11 +772,13 @@ inline FunctionGroup::UniquePtr axmax(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axclamp(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Value* min = axmax(op)->execute({args[0], args[1]}, B);
-        llvm::Value* result = axmin(op)->execute({min, args[2]}, B);
+        OPENVDB_ASSERT(args.size() == 3);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        Value min = axmax(op)->execute(NativeArguments{args[0], args[1]}, B);
+        Value result = axmin(op)->execute(NativeArguments{min, args[2]}, B);
         return result;
     };
 
@@ -768,10 +794,8 @@ inline FunctionGroup::UniquePtr axclamp(const FunctionOptions& op)
         .addSignature<ClampI>(generate, &openvdb::math::Clamp<int32_t>)
         .addDependency("min")
         .addDependency("max")
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setArgumentNames({"in", "min", "max"})
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
@@ -783,9 +807,12 @@ inline FunctionGroup::UniquePtr axclamp(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axfit(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
+        OPENVDB_ASSERT(args.size() == 5);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+
         //         (outMax - outMin)(x - inMin)
         // f(x) = ----------------------------  + outMin
         //                inMax - inMin
@@ -796,52 +823,51 @@ inline FunctionGroup::UniquePtr axfit(const FunctionOptions& op)
         // branching so that the clamping math is never executed when the value
         // is inside
 
-        std::vector<llvm::Value*> argcopy(args);
+        NativeArguments argcopy(args);
 
         // select the precision at which to perform
 
-        llvm::Type* precision = argcopy[0]->getType();
+        llvm::Type* precision = argcopy[0].GetUnderlyingType();
         if (precision->isIntegerTy()) {
             precision = LLVMType<double>::get(B.getContext());
         }
 
         // See if the input range has a valid magnitude .i.e. the values are not the same
 
-        llvm::Value* isInputRangeValid =
-            binaryOperator(argcopy[1], argcopy[2], ast::tokens::NOTEQUALS, B);
+        Value isInputRangeValid = argcopy[1].NotEquals(B, argcopy[2]);
 
         // clamp the input to the ORDERED inMin to inMax range
 
-        llvm::Value* minRangeComp =
-            binaryOperator(argcopy[1], argcopy[2], ast::tokens::LESSTHAN, B);
-        llvm::Value* minInputRange = B.CreateSelect(minRangeComp, argcopy[1], argcopy[2]);
-        llvm::Value* maxInputRange = B.CreateSelect(minRangeComp, argcopy[2], argcopy[1]);
+        Value minRangeComp = argcopy[1].LessThan(B, argcopy[2]);
+        Value minInputRange = minRangeComp.Select(B, argcopy[1], argcopy[2]);
+        Value maxInputRange = minRangeComp.Select(B, argcopy[2], argcopy[1]);
 
         // clamp
         {
             auto clamp = axclamp(op);
-            argcopy[0] = clamp->execute({ argcopy[0], minInputRange, maxInputRange }, B);
+            argcopy[0] = clamp->execute(NativeArguments{ argcopy[0], minInputRange, maxInputRange }, B);
         }
 
         // cast all (the following requires floating point precision)
 
-        for (auto& arg : argcopy) arg = arithmeticConversion(arg, precision, B);
+        for (size_t i = 0; i < argcopy.size(); ++i) {
+            argcopy[i] = argcopy[i].CastToPrecision(B, precision);
+        }
 
-        llvm::Value* valueMinusMin = B.CreateFSub(argcopy[0], argcopy[1]);
-        llvm::Value* inputRange = B.CreateFSub(argcopy[2], argcopy[1]);
-        llvm::Value* outputRange = B.CreateFSub(argcopy[4], argcopy[3]);
+        Value valueMinusMin = argcopy[0].Subtract(B, argcopy[1]);
+        Value inputRange = argcopy[2].Subtract(B, argcopy[1]);
+        Value outputRange = argcopy[4].Subtract(B, argcopy[3]);
 
-        llvm::Value* result = B.CreateFMul(outputRange, valueMinusMin);
-        result = B.CreateFDiv(result, inputRange);  // NOTE - This can cause division by zero
-        result = B.CreateFAdd(argcopy[3], result);
+        Value result = outputRange.Multiply(B, valueMinusMin);
+        result = result.Divide(B, inputRange);  // NOTE - This can cause division by zero
+        result = argcopy[3].Add(B, result);
 
         // calculate the output range over 2 and use this value if the input range is invalid
 
-        llvm::Value* outputRangeOverTwo = B.CreateFAdd(argcopy[3], argcopy[4]);
-        llvm::Value* two = llvm::ConstantFP::get(precision, 2.0);
-        outputRangeOverTwo = B.CreateFDiv(outputRangeOverTwo, two);
+        Value two(llvm::ConstantFP::get(precision, 2.0));
+        Value outputRangeOverTwo = argcopy[3].Add(B, argcopy[4]).Divide(B, two);
 
-        return B.CreateSelect(isInputRangeValid, result, outputRangeOverTwo);
+        return isInputRangeValid.Select(B, result, outputRangeOverTwo);
     };
 
     using FitD = double(double, double, double, double, double);
@@ -857,10 +883,8 @@ inline FunctionGroup::UniquePtr axfit(const FunctionOptions& op)
         .addDependency("clamp")
         .setArgumentNames({"value", "omin", "omax", "nmin", "nmax"})
         .setConstantFold(false)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Fit the first argument to the output range by "
             "first clamping the value between the second and third input range "
@@ -1020,28 +1044,25 @@ inline FunctionGroup::UniquePtr axrand32(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axsign(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-            llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         // int r = (T(0) < val) - (val < T(0));
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args.front();
-        llvm::Type* type = arg->getType();
-        llvm::Value* zero;
-        if (type->isIntegerTy()) {
-            zero = llvm::ConstantInt::get(type, static_cast<uint64_t>(0), /*signed*/true);
+        Value arg = args[0];
+        Value zero = Value::Invalid();
+        if (arg.IsInteger()) {
+            zero = Value::Create<uint64_t>(B.getContext(), 0);
         }
         else {
-            OPENVDB_ASSERT(type->isFloatingPointTy());
-            zero = llvm::ConstantFP::get(type, static_cast<double>(0.0));
+            OPENVDB_ASSERT(arg.IsFloat());
+            zero = Value::Create<double>(B.getContext(), 0.0);
         }
 
-        llvm::Value* c1 = binaryOperator(zero, arg, ast::tokens::LESSTHAN, B);
-        c1 = arithmeticConversion(c1, LLVMType<int32_t>::get(B.getContext()), B);
-        llvm::Value* c2 = binaryOperator(arg, zero, ast::tokens::LESSTHAN, B);
-        c2 = arithmeticConversion(c2, LLVMType<int32_t>::get(B.getContext()), B);
-        llvm::Value* r = binaryOperator(c1, c2, ast::tokens::MINUS, B);
-        return arithmeticConversion(r, LLVMType<int32_t>::get(B.getContext()), B);
+        llvm::Type* precision = LLVMType<int32_t>::get(B.getContext());
+        Value c1 = zero.LessThan(B, arg).CastToPrecision(B, precision);
+        Value c2 = arg.LessThan(B, zero).CastToPrecision(B, precision);
+        return c1.Subtract(B, c2).CastToPrecision(B, precision);
     };
 
     return FunctionBuilder("sign")
@@ -1050,10 +1071,8 @@ inline FunctionGroup::UniquePtr axsign(const FunctionOptions& op)
         .addSignature<int32_t(int64_t)>(generate)
         .addSignature<int32_t(int32_t)>(generate)
         .setArgumentNames({"n"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Implements signum, determining if the input is negative, zero "
@@ -1069,10 +1088,8 @@ inline FunctionGroup::UniquePtr axsignbit(const FunctionOptions& op)
         .addSignature<bool(double)>((bool(*)(double))(std::signbit))
         .addSignature<bool(float)>((bool(*)(float))(std::signbit))
         .setArgumentNames({"n"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Determines if the given floating point number input is negative. "
@@ -1084,11 +1101,12 @@ inline FunctionGroup::UniquePtr axsignbit(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axtruncatemod(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        return binaryOperator(args[0], args[1], ast::tokens::MODULO, B);
+        // Truncated mode directly uses the binary op, not Value::Modulo!
+        return args[0].TruncatedModulo(B, args[1]);
     };
 
     return FunctionBuilder("truncatemod")
@@ -1097,10 +1115,8 @@ inline FunctionGroup::UniquePtr axtruncatemod(const FunctionOptions& op)
         .addSignature<int64_t(int64_t,int64_t)>(generate)
         .addSignature<int32_t(int32_t,int32_t)>(generate)
         .setArgumentNames({"dividend", "divisor"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Truncated modulo, where the result of the division operator "
@@ -1128,26 +1144,28 @@ inline FunctionGroup::UniquePtr axfloormod(const FunctionOptions& op)
     };
 
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Value* D = args[0];
-        llvm::Value* d = args[1];
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        Value D = args[0];
+        Value d = args[1];
         // tmod
-        llvm::Value* r = binaryOperator(D, d, ast::tokens::MODULO, B);
+        llvm::Value* r = binaryOperator(D.GetValue(), d.GetValue(), ast::tokens::MODULO, B);
+        Value tmod(r, r->getType());
 
-        llvm::Value* zero = llvmConstant(0, D->getType());
-        llvm::Value* a1 = binaryOperator(r, zero, ast::tokens::MORETHAN, B);
-        llvm::Value* a2 = binaryOperator(d, zero, ast::tokens::LESSTHAN, B);
-        a1 = binaryOperator(a1, a2, ast::tokens::AND, B);
-        llvm::Value* b1 = binaryOperator(r, zero, ast::tokens::LESSTHAN, B);
-        llvm::Value* b2 = binaryOperator(d, zero, ast::tokens::MORETHAN, B);
-        b1 = binaryOperator(b1, b2, ast::tokens::AND, B);
-        a1 = binaryOperator(a1, b1, ast::tokens::OR, B);
+        Value zero = D.Zero();
+        Value a1 = tmod.GreaterThan(B, zero);
+        Value a2 = d.LessThan(B, zero);
+        a1 = a1.And(B, a2);
+        Value b1 = tmod.LessThan(B, zero);
+        Value b2 = d.GreaterThan(B, zero);
+        b1 = b1.And(B, b2);
+        a1 = a1.Or(B, b1);
 
-        llvm::Value* rplus = binaryOperator(r, d, ast::tokens::PLUS, B);
-        return B.CreateSelect(a1, rplus, r);
+        Value rplus = tmod.Add(B, d);
+        return a1.Select(B, rplus, tmod);
     };
 
     return FunctionBuilder("floormod")
@@ -1156,10 +1174,8 @@ inline FunctionGroup::UniquePtr axfloormod(const FunctionOptions& op)
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(ifmod))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(ifmod))
         .setArgumentNames({"dividend", "divisor"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Floored modulo, where the result of the division operator "
@@ -1193,21 +1209,21 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
     };
 
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Value* D = args[0], *d = args[1];
-        llvm::Value* r = binaryOperator(D, d, ast::tokens::MODULO, B); // tmod
+        Value D = args[0];
+        Value d = args[1];
+        Value r = D.TruncatedModulo(B, d);
 
-        llvm::Value* zero = llvmConstant(0, D->getType());
-        llvm::Value* a1 = binaryOperator(d, zero, ast::tokens::MORETHAN, B);
-        llvm::Value* rplus = binaryOperator(r, d, ast::tokens::PLUS, B);
-        llvm::Value* rminus = binaryOperator(r, d, ast::tokens::MINUS, B);
-        llvm::Value* rd = B.CreateSelect(a1, rplus, rminus);
-
-        a1 = binaryOperator(r, zero, ast::tokens::LESSTHAN, B);
-        return B.CreateSelect(a1, rd, r);
+        Value zero = d.Zero();
+        Value a1 = d.GreaterThan(B, zero);
+        Value rplus = r.Add(B, d);
+        Value rminus = r.Subtract(B, d);
+        Value rd = a1.Select(B, rplus, rminus);
+        a1 = r.LessThan(B, zero);
+        return a1.Select(B, rd, r);
     };
 
     return FunctionBuilder("euclideanmod")
@@ -1216,10 +1232,8 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(iemod))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(iemod))
         .setArgumentNames({"dividend", "divisor"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Euclidean modulo, where by the result of the division operator "
@@ -1233,45 +1247,42 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args[0];
-        llvm::Type* etype = arg->getType();
-        if (etype->isPointerTy()) {
-            etype = etype->getPointerElementType()->getArrayElementType();
-        }
+        Value arg = args[0];
+        OPENVDB_ASSERT(arg.IsArray() || arg.IsFloat());
 
-        llvm::Value* inf;
-        if (etype->isFloatTy()) {
+        Value inf = Value::Invalid();
+        if (arg.GetUnderlyingScalarType()->isFloatTy()) {
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEsingle());
-            inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
+            inf = Value::Create<float>(B.getContext(), apinf.convertToFloat());
         }
         else {
-            OPENVDB_ASSERT(etype->isDoubleTy());
+            OPENVDB_ASSERT(arg.GetUnderlyingScalarType()->isDoubleTy());
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
-            inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
+            inf = Value::Create<double>(B.getContext(), apinf.convertToDouble());
         }
 
-        if (!arg->getType()->isPointerTy()) {
-            arg = llvm_fabs(op)->execute({arg}, B);
-            return binaryOperator(inf, arg, ast::tokens::NOTEQUALS, B);
+        if (arg.IsFloat()) {
+            arg = llvm_fabs(op)->execute(NativeArguments{arg}, B);
+            return inf.NotEquals(B, arg);
         }
-
-        std::vector<llvm::Value*> array;
-        arrayUnpack(arg, array, B, /*load*/true);
-
-        // @todo short-circuit?
-        llvm::Value* result = B.getTrue();
-        for (auto& value : array) {
-            value = llvm_fabs(op)->execute({value}, B);
-            llvm::Value* comp = binaryOperator(inf, value, ast::tokens::NOTEQUALS, B);
-            result = binaryOperator(comp, result, ast::tokens::AND, B);
+        else {
+            std::vector<Value> elems;
+            arg.ArrayToScalars(B, elems, /*load*/true);
+            // @todo short-circuit?
+            Value result(B.getTrue());
+            for (auto& elem : elems) {
+                elem = llvm_fabs(op)->execute(NativeArguments{elem}, B);
+                Value comp = inf.NotEquals(B, elem);
+                result = comp.And(B, result);
+            }
+            return result;
         }
-        return result;
     };
 
     static auto isfinitearray = [](const auto input) -> bool
@@ -1295,10 +1306,8 @@ inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
         .addSignature<bool(float)>(generate, (bool(*)(float))(std::isfinite))
         .setArgumentNames({"arg"})
         .addDependency("fabs")
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns whether the value is finite i.e. not infinite or NaN. "
@@ -1309,45 +1318,42 @@ inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args[0];
-        llvm::Type* etype = arg->getType();
-        if (etype->isPointerTy()) {
-            etype = etype->getPointerElementType()->getArrayElementType();
-        }
+        Value arg = args[0];
+        OPENVDB_ASSERT(arg.IsArray() || arg.IsFloat());
 
-        llvm::Value* inf;
-        if (etype->isFloatTy()) {
+        Value inf = Value::Invalid();
+        if (arg.GetUnderlyingScalarType()->isFloatTy()) {
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEsingle());
-            inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
+            inf = Value::Create<float>(B.getContext(), apinf.convertToFloat());
         }
         else {
-            OPENVDB_ASSERT(etype->isDoubleTy());
+            OPENVDB_ASSERT(arg.GetUnderlyingScalarType()->isDoubleTy());
             const llvm::APFloat apinf =
                 llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
-            inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
+            inf = Value::Create<double>(B.getContext(), apinf.convertToDouble());
         }
 
-        if (!arg->getType()->isPointerTy()) {
-            arg = llvm_fabs(op)->execute({arg}, B);
-            return binaryOperator(inf, arg, ast::tokens::EQUALSEQUALS, B);
+        if (arg.IsFloat()) {
+            arg = llvm_fabs(op)->execute(NativeArguments{arg}, B);
+            return inf.Equals(B, arg);
         }
-
-        std::vector<llvm::Value*> array;
-        arrayUnpack(arg, array, B, /*load*/true);
-
-        // @todo short-circuit?
-        llvm::Value* result = B.getFalse();
-        for (auto& value : array) {
-            value = llvm_fabs(op)->execute({value}, B);
-            llvm::Value* comp = binaryOperator(inf, value, ast::tokens::EQUALSEQUALS, B);
-            result = binaryOperator(comp, result, ast::tokens::OR, B);
+        else {
+            std::vector<Value> elems;
+            arg.ArrayToScalars(B, elems, /*load*/true);
+            // @todo short-circuit?
+            Value result(B.getFalse());
+            for (auto& elem : elems) {
+                elem = llvm_fabs(op)->execute(NativeArguments{elem}, B);
+                Value comp = inf.Equals(B, elem);
+                result = comp.Or(B, result);
+            }
+            return result;
         }
-        return result;
     };
 
     static auto isinfarray = [](const auto input) -> bool
@@ -1371,10 +1377,8 @@ inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
         .addSignature<bool(float)>(generate, (bool(*)(float))(std::isinf))
         .setArgumentNames({"arg"})
         .addDependency("fabs")
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns whether the value is inf. "
@@ -1385,27 +1389,29 @@ inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axisnan(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         // uno (unordered) comparison with self
         // https://llvm.org/docs/LangRef.html#fcmp-instruction
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args[0];
-        if (!arg->getType()->isPointerTy()) {
-            return B.CreateFCmpUNO(arg, arg);
-        }
+        Value arg = args[0];
+        OPENVDB_ASSERT(arg.IsArray() || arg.IsFloat());
 
-        std::vector<llvm::Value*> array;
-        arrayUnpack(arg, array, B, /*load*/true);
-
-        // @todo short-circuit?
-        llvm::Value* result = B.getFalse();
-        for (auto& value : array) {
-            llvm::Value* comp = B.CreateFCmpUNO(value, value);
-            result = binaryOperator(comp, result, ast::tokens::OR, B);
+        if (arg.IsFloat()) {
+            return arg.IsNan(B);
         }
-        return result;
+        else {
+            std::vector<Value> elems;
+            arg.ArrayToScalars(B, elems, /*load*/true);
+            // @todo short-circuit?
+            Value result(B.getFalse());
+            for (auto& elem : elems) {
+                Value elemisnan = elem.IsNan(B);
+                result = elemisnan.Or(B, result);
+            }
+            return result;
+        }
     };
 
     static auto isnanarray = [](const auto input) -> bool
@@ -1428,10 +1434,8 @@ inline FunctionGroup::UniquePtr axisnan(const FunctionOptions& op)
         .addSignature<bool(double)>(generate/*, (bool(*)(double))(std::isnan)*/) // @note: gcc needs _GLIBCXX_NO_OBSOLETE_ISINF_ISNAN_DYNAMIC defined
         .addSignature<bool(float)>(generate, (bool(*)(float))(std::isnan))
         .setArgumentNames({"arg"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns whether the value is NaN (not-a-number).")
@@ -1447,65 +1451,71 @@ inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
 {
     // 3 by 3 determinant
     static auto generate3 =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> m1;
-        arrayUnpack(args[0], m1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsMatrix());
+
+        std::vector<Value> m1;
+        args[0].ArrayToScalars(B, m1, /*load*/true);
         OPENVDB_ASSERT(m1.size() == 9);
 
-        llvm::Value* e1 = binaryOperator(m1[4], m1[8], ast::tokens::MULTIPLY, B);
-        llvm::Value* e2 = binaryOperator(m1[5], m1[7], ast::tokens::MULTIPLY, B);
-        llvm::Value* c0 = binaryOperator(e1, e2, ast::tokens::MINUS, B);
+        Value e1 = m1[4].Multiply(B, m1[8]);
+        Value e2 = m1[5].Multiply(B, m1[7]);
+        Value c0 = e1.Subtract(B, e2);
 
-        e1 = binaryOperator(m1[5], m1[6], ast::tokens::MULTIPLY, B);
-        e2 = binaryOperator(m1[3], m1[8], ast::tokens::MULTIPLY, B);
-        llvm::Value* c1 = binaryOperator(e1, e2, ast::tokens::MINUS, B);
+        e1 = m1[5].Multiply(B, m1[6]);
+        e2 = m1[3].Multiply(B, m1[8]);
+        Value c1 = e1.Subtract(B, e2);
 
-        e1 = binaryOperator(m1[3], m1[7], ast::tokens::MULTIPLY, B);
-        e2 = binaryOperator(m1[4], m1[6], ast::tokens::MULTIPLY, B);
-        llvm::Value* c2 = binaryOperator(e1, e2, ast::tokens::MINUS, B);
+        e1 = m1[3].Multiply(B, m1[7]);
+        e2 = m1[4].Multiply(B, m1[6]);
+        Value c2 = e1.Subtract(B, e2);
 
-        c0 = binaryOperator(m1[0], c0, ast::tokens::MULTIPLY, B);
-        c1 = binaryOperator(m1[1], c1, ast::tokens::MULTIPLY, B);
-        c2 = binaryOperator(m1[2], c2, ast::tokens::MULTIPLY, B);
+        c0 = m1[0].Multiply(B, c0);
+        c1 = m1[1].Multiply(B, c1);
+        c2 = m1[2].Multiply(B, c2);
 
-        c0 = binaryOperator(c0, c1, ast::tokens::PLUS, B);
-        c0 = binaryOperator(c0, c2, ast::tokens::PLUS, B);
-        return c0;
+        return c0.Add(B, c1).Add(B, c2);
     };
 
     // 4 by 4 determinant
     static auto generate4 =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> m1;
-        arrayUnpack(args[0], m1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsMatrix());
+
+        std::vector<Value> m1;
+        args[0].ArrayToScalars(B, m1, /*load*/true);
         OPENVDB_ASSERT(m1.size() == 16);
 
         // @note  Okay to alloca here as long as embed IR is false
-        llvm::Value* subMat = B.CreateAlloca(llvm::ArrayType::get(m1.front()->getType(), 9));
-        std::vector<llvm::Value*> elements;
-        arrayUnpack(subMat, elements, B, /*load elements*/false);
+        llvm::Type* mat3type = llvm::ArrayType::get(args[0].GetUnderlyingScalarType(), 9);
+        Value subMat = Value::Alloc(B, mat3type);
 
-        llvm::Value* result = llvm::ConstantFP::get(m1.front()->getType(), 0.0);
+        std::vector<Value> elements;
+        subMat.ArrayToScalars(B, elements, /*load=*/false);
+
+        Value result(llvm::ConstantFP::get(args[0].GetUnderlyingScalarType(), 0.0));
         for (size_t i = 0; i < 4; ++i) {
             size_t sourceIndex = 0, targetIndex = 0;
             for (size_t j = 0; j < 4; ++j) {
                 for (size_t k = 0; k < 4; ++k) {
                     if ((k != i) && (j != 0)) {
-                        B.CreateStore(m1[sourceIndex], elements[targetIndex]);
+                        elements[targetIndex].Assign(B, m1[sourceIndex]);
                         ++targetIndex;
                     }
                     ++sourceIndex;
                 }
             }
-            llvm::Value* subResult = generate3({subMat}, B);
-            subResult = binaryOperator(m1[i], subResult, ast::tokens::MULTIPLY, B);
+            Value subResult = generate3({subMat}, B);
+            subResult = m1[i].Multiply(B, subResult);
 
-            if (i % 2) result = binaryOperator(result, subResult, ast::tokens::MINUS, B);
-            else       result = binaryOperator(result, subResult, ast::tokens::PLUS, B);
+            if (i % 2) result = result.Subtract(B, subResult);
+            else       result = result.Add(B, subResult);
         }
 
         return result;
@@ -1526,9 +1536,8 @@ inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
         .addSignature<DeterminantM4D>(generate4, (DeterminantM4D*)(determinant))
         .addSignature<DeterminantM4F>(generate4, (DeterminantM4F*)(determinant))
         .setArgumentNames({"mat"})
-        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the determinant of a matrix.")
@@ -1538,42 +1547,43 @@ inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, arg1;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], arg1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(args[0].IsArray()); // vector or matrix
+        OPENVDB_ASSERT(args[1].IsArray()); // vector or matrix
+
+        std::vector<Value> store, arg1;
+        args[0].ArrayToScalars(B, store, /*load*/false);
+        args[1].ArrayToScalars(B, arg1, /*load*/true);
 
         const size_t size = arg1.size();
         if (size == 3 || size == 4) {
             //vector - convert to diagonal matrix
             const size_t dim = size*size;
-            OPENVDB_ASSERT(ptrs.size() == dim);
-            llvm::Type* type = arg1.front()->getType();
-            llvm::Value* zero = type->isFloatTy() ? LLVMType<float>::get(B.getContext(), 0.0f)
-                                    : LLVMType<double>::get(B.getContext(), 0.0);
-
+            OPENVDB_ASSERT(store.size() == dim);
+            Value zero = arg1.front().Zero();
             for (size_t i = 0, j = 0; i < dim; ++i) {
-                llvm::Value* m = zero;
+                Value m = zero;
                 if (i % (size + 1) == 0) {
                     m = arg1[j];
                     ++j;
                 }
-                B.CreateStore(m, ptrs[i]);
+                store[i].Assign(B, m);
             }
         }
         else {
             // matrix - convert to vector
             OPENVDB_ASSERT(size == 9 || size == 16);
             const size_t dim = size == 9 ? 3 : 4;
-            OPENVDB_ASSERT(ptrs.size() == dim);
+            OPENVDB_ASSERT(store.size() == dim);
             for (size_t i = 0; i < dim; ++i) {
-                B.CreateStore(arg1[i+(i*dim)], ptrs[i]);
+                store[i].Assign(B, arg1[i+(i*dim)]);
             }
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto diag = [](auto result, const auto input)
@@ -1629,8 +1639,7 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
             .addParameterAttribute(0, llvm::Attribute::WriteOnly)
             .addParameterAttribute(0, llvm::Attribute::NoAlias)
             .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-            .addFunctionAttribute(llvm::Attribute::NoUnwind)
-            .addFunctionAttribute(llvm::Attribute::InlineHint)
+            .setBuiltin(true)
             .setConstantFold(op.mConstantFoldCBindings)
         .addSignature<DiagM3V3D, true>(generate, (DiagM3V3D*)(diag))
         .addSignature<DiagM3V3F, true>(generate, (DiagM3V3F*)(diag))
@@ -1640,8 +1649,7 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
             .addParameterAttribute(0, llvm::Attribute::WriteOnly)
             .addParameterAttribute(0, llvm::Attribute::NoAlias)
             .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-            .addFunctionAttribute(llvm::Attribute::NoUnwind)
-            .addFunctionAttribute(llvm::Attribute::InlineHint)
+            .setBuiltin(true)
             .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Create a diagonal matrix from a vector, or return the diagonal "
@@ -1652,26 +1660,29 @@ inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axidentity3(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> elements;
-        arrayUnpack(args[0], elements, B, /*load elements*/false);
+        OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsMatrix());
+
+        std::vector<Value> elements;
+        args[0].ArrayToScalars(B, elements, /*load=*/false);
         OPENVDB_ASSERT(elements.size() == 9);
-        llvm::Value* zero = LLVMType<float>::get(B.getContext(), 0.0f);
-        llvm::Value* one = LLVMType<float>::get(B.getContext(), 1.0f);
+
+        Value zero(LLVMType<float>::get(B.getContext(), 0.0f));
+        Value one(LLVMType<float>::get(B.getContext(), 1.0f));
         for (size_t i = 0; i < 9; ++i) {
-            llvm::Value* m = ((i == 0 || i == 4 || i == 8) ? one : zero);
-            B.CreateStore(m, elements[i]);
+            Value m = ((i == 0 || i == 4 || i == 8) ? one : zero);
+            elements[i].Assign(B, m);
         }
-        return nullptr;
+        return Value::Invalid();
     };
 
     return FunctionBuilder("identity3")
         .addSignature<void(openvdb::math::Mat3<float>*), true>(generate)
+        .setBuiltin(true)
         .setConstantFold(false)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the 3x3 identity matrix")
         .get();
@@ -1680,26 +1691,29 @@ inline FunctionGroup::UniquePtr axidentity3(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axidentity4(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> elements;
-        arrayUnpack(args[0], elements, B, /*load elements*/false);
+        OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsMatrix());
+
+        std::vector<Value> elements;
+        args[0].ArrayToScalars(B, elements, /*load=*/false);
         OPENVDB_ASSERT(elements.size() == 16);
-        llvm::Value* zero = LLVMType<float>::get(B.getContext(), 0.0f);
-        llvm::Value* one = LLVMType<float>::get(B.getContext(), 1.0f);
+
+        Value zero(LLVMType<float>::get(B.getContext(), 0.0f));
+        Value one(LLVMType<float>::get(B.getContext(), 1.0f));
         for (size_t i = 0; i < 16; ++i) {
-            llvm::Value* m = ((i == 0 || i == 5 || i == 10 || i == 15) ? one : zero);
-            B.CreateStore(m, elements[i]);
+            Value m = ((i == 0 || i == 5 || i == 10 || i == 15) ? one : zero);
+            elements[i].Assign(B, m);
         }
-        return nullptr;
+        return Value::Invalid();
     };
 
     return FunctionBuilder("identity4")
         .addSignature<void(openvdb::math::Mat4<float>*), true>(generate)
+        .setBuiltin(true)
         .setConstantFold(false)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the 4x4 identity matrix")
         .get();
@@ -1708,35 +1722,39 @@ inline FunctionGroup::UniquePtr axidentity4(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axmmmult(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, m1, m2;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], m1, B, /*load*/true);
-        arrayUnpack(args[2], m2, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 3);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+
+        std::vector<Value> ptrs, m1, m2;
+        args[0].ArrayToScalars(B, ptrs, /*load*/false);
+        args[1].ArrayToScalars(B, m1, /*load*/true);
+        args[2].ArrayToScalars(B, m2, /*load*/true);
 
         OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
         OPENVDB_ASSERT(ptrs.size() == m1.size());
         OPENVDB_ASSERT(ptrs.size() == m2.size());
         const size_t dim = m1.size() == 9 ? 3 : 4;
 
-        llvm::Value* e3 = nullptr, *e4 = nullptr;
+        Value e3 = Value::Invalid();
+        Value e4 = Value::Invalid();
         for (size_t i = 0; i < dim; ++i) {
             const size_t row = i*dim;
             for (size_t j = 0; j < dim; ++j) {
-                llvm::Value* e1 = binaryOperator(m1[0+row], m2[j], ast::tokens::MULTIPLY, B);
-                llvm::Value* e2 = binaryOperator(m1[1+row], m2[dim+j], ast::tokens::MULTIPLY, B);
-                if (dim >=3) e3 = binaryOperator(m1[2+row], m2[(dim*2)+j], ast::tokens::MULTIPLY, B);
-                if (dim >=4) e4 = binaryOperator(m1[3+row], m2[(dim*3)+j], ast::tokens::MULTIPLY, B);
-                e1 = binaryOperator(e1, e2, ast::tokens::PLUS, B);
-                if (dim >=3) e1 = binaryOperator(e1, e3, ast::tokens::PLUS, B);
-                if (dim >=4) e1 = binaryOperator(e1, e4, ast::tokens::PLUS, B);
-                B.CreateStore(e1, ptrs[row+j]);
+                Value e1 = m1[0+row].Multiply(B, m2[j]);
+                Value e2 = m1[1+row].Multiply(B, m2[dim+j]);
+                if (dim >=3) e3 = m1[2+row].Multiply(B, m2[(dim*2)+j]);
+                if (dim >=4) e4 = m1[3+row].Multiply(B, m2[(dim*3)+j]);
+                e1 = e1.Add(B, e2);
+                if (dim >=3) e1 = e1.Add(B, e3);
+                if (dim >=4) e1 = e1.Add(B, e4);
+                ptrs[row+j].Assign(B, e1);
             }
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto mmmult = [](auto out, auto mat2, auto mat1) {
@@ -1758,8 +1776,7 @@ inline FunctionGroup::UniquePtr axmmmult(const FunctionOptions& op)
         .addParameterAttribute(0, llvm::Attribute::WriteOnly)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
         .addParameterAttribute(2, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Multiplies two matrices together and returns the result")
@@ -1805,12 +1822,15 @@ inline FunctionGroup::UniquePtr axpolardecompose(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> m1, v1;
-        arrayUnpack(args[0], m1, B, /*load*/false);
-        arrayUnpack(args[1], v1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSamePrecision(args));
+
+        std::vector<Value> m1, v1;
+        args[0].ArrayToScalars(B, m1, /*load*/false);
+        args[1].ArrayToScalars(B, v1, /*load*/true);
         OPENVDB_ASSERT(m1.size() == 16);
         OPENVDB_ASSERT(v1.size() == 3);
 
@@ -1819,14 +1839,14 @@ inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
             for (size_t col = 0; col < 3; ++col) {
                 const size_t idx = (row*4) + col;
                 OPENVDB_ASSERT(idx <= 14);
-                llvm::Value* m1v = ir_load(B, m1[idx]);
-                m1v = binaryOperator(m1v, v1[col], ast::tokens::MULTIPLY, B);
-                B.CreateStore(m1v, m1[idx]);
+                Value m1v = m1[idx].Load(B);
+                m1v = m1v.Multiply(B, v1[col]);
+                m1[idx].Assign(B, m1v);
             }
         }
 
         // @warning  this is invalid for embedded IR
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto postscale = [](auto mat, auto vec) {
@@ -1841,8 +1861,7 @@ inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
         .addSignature<PostscaleM4F>(generate, (PostscaleM4F*)(postscale))
         .setArgumentNames({"transform", "vec"})
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Post-scale a given matrix by the provided vector.")
@@ -1852,13 +1871,16 @@ inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, m1, v1;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], m1, B, /*load*/true);
-        arrayUnpack(args[2], v1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 3);
+        OPENVDB_ASSERT(AssertSamePrecision(args));
+
+        std::vector<Value> ptrs, m1, v1;
+        args[0].ArrayToScalars(B, ptrs,/*load*/false);
+        args[1].ArrayToScalars(B, m1, /*load*/true);
+        args[2].ArrayToScalars(B, v1, /*load*/true);
 
         const size_t vec = v1.size();
         const size_t dim = (m1.size() == 9 ? 3 : 4);
@@ -1868,22 +1890,23 @@ inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
         OPENVDB_ASSERT(ptrs.size() == vec);
 
         // mat * vec
-        llvm::Value* e3 = nullptr, *e4 = nullptr;
+        Value e3 = Value::Invalid();
+        Value e4 = Value::Invalid();
         for (size_t i = 0; i < vec; ++i) {
-            llvm::Value* e1 = binaryOperator(v1[0], m1[0+(i*dim)], ast::tokens::MULTIPLY, B);
-            llvm::Value* e2 = binaryOperator(v1[1], m1[1+(i*dim)], ast::tokens::MULTIPLY, B);
-            if (dim >= 3) e3 = binaryOperator(v1[2], m1[2+(i*dim)], ast::tokens::MULTIPLY, B);
+            Value e1 = v1[0].Multiply(B, m1[0+(i*dim)]);
+            Value e2 = v1[1].Multiply(B, m1[1+(i*dim)]);
+            if (dim >= 3) e3 = v1[2].Multiply(B, m1[2+(i*dim)]);
             if (dim == 4) {
                 if (vec == 3) e4 = m1[3+(i*dim)];
-                else if (vec == 4) e4 = binaryOperator(v1[3], m1[3+(i*dim)], ast::tokens::MULTIPLY, B);
+                else if (vec == 4) e4 = v1[3].Multiply(B, m1[3+(i*dim)]);
             }
-            e1 = binaryOperator(e1, e2, ast::tokens::PLUS, B);
-            if (e3) e1 = binaryOperator(e1, e3, ast::tokens::PLUS, B);
-            if (e4) e1 = binaryOperator(e1, e4, ast::tokens::PLUS, B);
-            B.CreateStore(e1, ptrs[i]);
+            e1 = e1.Add(B, e2);
+            if (e3) e1 = e1.Add(B, e3);
+            if (e4) e1 = e1.Add(B, e4);
+            ptrs[i].Assign(B, e1);
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto transform = [](auto out, auto mat, auto vec) {
@@ -1909,8 +1932,7 @@ inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
         .addParameterAttribute(0, llvm::Attribute::WriteOnly)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
         .addParameterAttribute(2, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return the transformed vector by transpose of this matrix. "
@@ -1921,12 +1943,15 @@ inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> m1, v1;
-        arrayUnpack(args[0], m1, B, /*load*/false);
-        arrayUnpack(args[1], v1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSamePrecision(args));
+
+        std::vector<Value> m1, v1;
+        args[0].ArrayToScalars(B, m1, /*load*/false);
+        args[1].ArrayToScalars(B, v1, /*load*/true);
         OPENVDB_ASSERT(m1.size() == 16);
         OPENVDB_ASSERT(v1.size() == 3);
 
@@ -1935,13 +1960,13 @@ inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
             for (size_t col = 0; col < 4; ++col) {
                 const size_t idx = (row*4) + col;
                 OPENVDB_ASSERT(idx <= 11);
-                llvm::Value* m1v = ir_load(B, m1[idx]);
-                m1v = binaryOperator(m1v, v1[row], ast::tokens::MULTIPLY, B);
-                B.CreateStore(m1v, m1[idx]);
+                Value m1v = m1[idx].Load(B);
+                m1v = m1v.Multiply(B, v1[row]);
+                m1[idx].Assign(B, m1v);
             }
         }
         // @warning  this is invalid for embedded IR
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto prescale = [](auto mat, auto vec) {
@@ -1956,8 +1981,7 @@ inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
         .addSignature<PrescaleM4F>(generate, (PrescaleM4F*)(prescale))
         .setArgumentNames({"transform", "vec"})
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Pre-scale a given matrix by the provided vector.")
@@ -1967,21 +1991,25 @@ inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axtrace(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> m1;
-        arrayUnpack(args[0], m1, B, /*load*/true);
-        const size_t dim = (m1.size() == 9 ? 3 : 4);
-        OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
+        OPENVDB_ASSERT(args.size() == 1);
+        OPENVDB_ASSERT(args[0].IsMatrix());
+        OPENVDB_ASSERT(args[0].GetArrayNumElements()== 9 ||
+            args[0].GetArrayNumElements()== 16);
 
-        llvm::Value* result = binaryOperator(m1[0], m1[1+dim], ast::tokens::PLUS, B);
-        result = binaryOperator(result, m1[2+(2*dim)], ast::tokens::PLUS, B);
+        const size_t dim = (args[0].GetArrayNumElements() == 9 ? 3 : 4);
+        Value m0 = args[0].GetArrayElement(B, 0);
+        Value m1 = args[0].GetArrayElement(B, 1+dim);
+        Value m2 = args[0].GetArrayElement(B, 2+(2*dim));
+        m0 = m0.Add(B, m1).Add(B, m2);
+
         if (dim == 4) {
-            result = binaryOperator(result, m1[3+(3*dim)], ast::tokens::PLUS, B);
+            Value m3 = args[0].GetArrayElement(B, 3+(3*dim));
+            m0 = m0.Add(B, m3);
         }
-
-        return result;
+        return m0;
     };
 
     static auto trace = [](const auto input) -> auto
@@ -2007,8 +2035,7 @@ inline FunctionGroup::UniquePtr axtrace(const FunctionOptions& op)
         .addSignature<TraceM4F>(generate, (TraceM4F*)(trace))
         .setArgumentNames({"mat"})
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return the trace of a matrix, the sum of the diagonal elements.")
@@ -2018,38 +2045,45 @@ inline FunctionGroup::UniquePtr axtrace(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axtransform(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, m1, v1;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], v1, B, /*load*/true);
-        arrayUnpack(args[2], m1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 3);
+        OPENVDB_ASSERT(AssertSamePrecision(args));
+        OPENVDB_ASSERT(args[0].IsVector());
+        OPENVDB_ASSERT(args[1].IsVector());
+        OPENVDB_ASSERT(args[2].IsMatrix());
+
+        std::vector<Value> store, m1, v1;
+        args[0].ArrayToScalars(B, store, /*load*/false);
+        args[1].ArrayToScalars(B, v1, /*load*/true);
+        args[2].ArrayToScalars(B, m1, /*load*/true);
 
         const size_t vec = v1.size();
         const size_t dim = (m1.size() == 9 ? 3 : 4);
 
         OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
         OPENVDB_ASSERT(vec == 3 || vec == 4);
-        OPENVDB_ASSERT(ptrs.size() == vec);
+        OPENVDB_ASSERT(store.size() == vec);
 
         // vec * mat
-        llvm::Value* e3 = nullptr, *e4 = nullptr;
+        Value e3 = Value::Invalid();
+        Value e4 = Value::Invalid();
         for (size_t i = 0; i < vec; ++i) {
-            llvm::Value* e1 = binaryOperator(v1[0], m1[i+(0*dim)], ast::tokens::MULTIPLY, B);
-            llvm::Value* e2 = binaryOperator(v1[1], m1[i+(1*dim)], ast::tokens::MULTIPLY, B);
-            if (dim >= 3) e3 = binaryOperator(v1[2], m1[i+(2*dim)], ast::tokens::MULTIPLY, B);
+            Value e1 = v1[0].Multiply(B, m1[i+(0*dim)]);
+            Value e2 = v1[1].Multiply(B, m1[i+(1*dim)]);
+            if (dim >= 3) e3 = v1[2].Multiply(B, m1[i+(2*dim)]);
             if (dim == 4) {
                 if (vec == 3) e4 = m1[i+(3*dim)];
-                else if (vec == 4) e4 = binaryOperator(v1[3], m1[i+(3*dim)], ast::tokens::MULTIPLY, B);
+                else if (vec == 4) e4 = v1[3].Multiply(B, m1[i+(3*dim)]);
             }
-            e1 = binaryOperator(e1, e2, ast::tokens::PLUS, B);
-            if (e3) e1 = binaryOperator(e1, e3, ast::tokens::PLUS, B);
-            if (e4) e1 = binaryOperator(e1, e4, ast::tokens::PLUS, B);
-            B.CreateStore(e1, ptrs[i]);
+            e1 = e1.Add(B, e2);
+            if (e3) e1 = e1.Add(B, e3);
+            if (e4) e1 = e1.Add(B, e4);
+            store[i].Assign(B, e1);
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto transform = [](auto out, auto vec, auto mat) {
@@ -2075,8 +2109,7 @@ inline FunctionGroup::UniquePtr axtransform(const FunctionOptions& op)
         .addParameterAttribute(0, llvm::Attribute::WriteOnly)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
         .addParameterAttribute(2, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return the transformed vector by the provided "
@@ -2087,25 +2120,30 @@ inline FunctionGroup::UniquePtr axtransform(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        std::vector<llvm::Value*> ptrs, m1;
-        arrayUnpack(args[0], ptrs, B, /*load*/false);
-        arrayUnpack(args[1], m1, B, /*load*/true);
+        OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsMatrix());
+        OPENVDB_ASSERT(args[1].IsMatrix());
+
+        std::vector<Value> store, m1;
+        args[0].ArrayToScalars(B, store, /*load*/false);
+        args[1].ArrayToScalars(B, m1, /*load*/true);
         OPENVDB_ASSERT(m1.size() == 9 || m1.size() == 16);
-        OPENVDB_ASSERT(ptrs.size() == m1.size());
+        OPENVDB_ASSERT(store.size() == m1.size());
         const size_t dim = m1.size() == 9 ? 3 : 4;
 
         for (size_t i = 0; i < dim; ++i) {
             for (size_t j = 0; j < dim; ++j) {
                 const size_t source = (i*dim) + j;
                 const size_t target = (j*dim) + i;
-                B.CreateStore(m1[source], ptrs[target]);
+                store[target].Assign(B, m1[source]);
             }
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto transpose = [](auto out, auto in) {
@@ -2126,8 +2164,7 @@ inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
         .addParameterAttribute(0, llvm::Attribute::NoAlias)   // alloced by the function, always no alias
         .addParameterAttribute(0, llvm::Attribute::WriteOnly)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the transpose of a matrix")
@@ -2137,32 +2174,35 @@ inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axadjoint(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        std::vector<llvm::Value*> m1, m2;
-        arrayUnpack(args[1], m1, B, /*load*/true);
-        arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsMatrix());
+        OPENVDB_ASSERT(args[1].IsMatrix());
+
+        std::vector<Value> m1, m2;
+        args[1].ArrayToScalars(B, m1, /*load*/true);
+        args[0].ArrayToScalars(B, m2, /*load*/false); // args[0] is return type
         OPENVDB_ASSERT(m1.size() == 9 && m2.size() == 9);
 
         auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
-            return binaryOperator(
-                    binaryOperator(m1[a], m1[b], ast::tokens::MULTIPLY, B),
-                    binaryOperator(m1[c], m1[d], ast::tokens::MULTIPLY, B),
-                ast::tokens::MINUS, B);
+            Value x = m1[a].Multiply(B, m1[b]);
+            Value y = m1[c].Multiply(B, m1[d]);
+            return x.Subtract(B, y);
         };
 
-        B.CreateStore(mul_sub(4,8, 5,7), m2[0]);
-        B.CreateStore(mul_sub(2,7, 1,8), m2[1]);
-        B.CreateStore(mul_sub(1,5, 2,4), m2[2]);
-        B.CreateStore(mul_sub(5,6, 3,8), m2[3]);
-        B.CreateStore(mul_sub(0,8, 2,6), m2[4]);
-        B.CreateStore(mul_sub(2,3, 0,5), m2[5]);
-        B.CreateStore(mul_sub(3,7, 4,6), m2[6]);
-        B.CreateStore(mul_sub(1,6, 0,7), m2[7]);
-        B.CreateStore(mul_sub(0,4, 1,3), m2[8]);
-        return nullptr;
+        m2[0].Assign(B, mul_sub(4,8, 5,7));
+        m2[1].Assign(B, mul_sub(2,7, 1,8));
+        m2[2].Assign(B, mul_sub(1,5, 2,4));
+        m2[3].Assign(B, mul_sub(5,6, 3,8));
+        m2[4].Assign(B, mul_sub(0,8, 2,6));
+        m2[5].Assign(B, mul_sub(2,3, 0,5));
+        m2[6].Assign(B, mul_sub(3,7, 4,6));
+        m2[7].Assign(B, mul_sub(1,6, 0,7));
+        m2[8].Assign(B, mul_sub(0,4, 1,3));
+        return Value::Invalid();
     };
 
     static auto adjoint = [](auto out, const auto in) {
@@ -2182,8 +2222,7 @@ inline FunctionGroup::UniquePtr axadjoint(const FunctionOptions& op)
         .setArgumentNames({"input"} )
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the adjoint of a 3x3 matrix. That is, "
@@ -2194,32 +2233,35 @@ inline FunctionGroup::UniquePtr axadjoint(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axcofactor(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        std::vector<llvm::Value*> m1, m2;
-        arrayUnpack(args[1], m1, B, /*load*/true);
-        arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsMatrix());
+        OPENVDB_ASSERT(args[1].IsMatrix());
+
+        std::vector<Value> m1, m2;
+        args[1].ArrayToScalars(B, m1, /*load*/true);
+        args[0].ArrayToScalars(B, m2, /*load*/false); // args[0] is return type
         OPENVDB_ASSERT(m1.size() == 9 && m2.size() == 9);
 
         auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
-            return binaryOperator(
-                    binaryOperator(m1[a], m1[b], ast::tokens::MULTIPLY, B),
-                    binaryOperator(m1[c], m1[d], ast::tokens::MULTIPLY, B),
-                ast::tokens::MINUS, B);
+            Value x = m1[a].Multiply(B, m1[b]);
+            Value y = m1[c].Multiply(B, m1[d]);
+            return x.Subtract(B, y);
         };
 
-        B.CreateStore(mul_sub(4,8, 5,7), m2[0]);
-        B.CreateStore(mul_sub(5,6, 3,8), m2[1]);
-        B.CreateStore(mul_sub(3,7, 4,6), m2[2]);
-        B.CreateStore(mul_sub(2,7, 1,8), m2[3]);
-        B.CreateStore(mul_sub(0,8, 2,6), m2[4]);
-        B.CreateStore(mul_sub(1,6, 0,7), m2[5]);
-        B.CreateStore(mul_sub(1,5, 2,4), m2[6]);
-        B.CreateStore(mul_sub(2,3, 0,5), m2[7]);
-        B.CreateStore(mul_sub(0,4, 1,3), m2[8]);
-        return nullptr;
+        m2[0].Assign(B, mul_sub(4,8, 5,7));
+        m2[1].Assign(B, mul_sub(5,6, 3,8));
+        m2[2].Assign(B, mul_sub(3,7, 4,6));
+        m2[3].Assign(B, mul_sub(2,7, 1,8));
+        m2[4].Assign(B, mul_sub(0,8, 2,6));
+        m2[5].Assign(B, mul_sub(1,6, 0,7));
+        m2[6].Assign(B, mul_sub(1,5, 2,4));
+        m2[7].Assign(B, mul_sub(2,3, 0,5));
+        m2[8].Assign(B, mul_sub(0,4, 1,3));
+        return Value::Invalid();
     };
 
     static auto cofactor = [](auto out, const auto in) {
@@ -2239,8 +2281,7 @@ inline FunctionGroup::UniquePtr axcofactor(const FunctionOptions& op)
         .setArgumentNames({"input"} )
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Returns the cofactor matrix of a 3x3 matrix. That is, "
@@ -2251,55 +2292,56 @@ inline FunctionGroup::UniquePtr axcofactor(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axinverse(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsMatrix());
+        OPENVDB_ASSERT(args[1].IsMatrix());
 
-        llvm::Value* adj = axadjoint(op)->execute({args[1]}, B);
-        std::vector<llvm::Value*> m1, madj;
-        arrayUnpack(adj, madj, B, /*load*/true);
-        arrayUnpack(args[0], m1, B, /*load*/false); // result
+        Value adj = axadjoint(op)->execute(NativeArguments{args[1]}, B);
+        std::vector<Value> m1, madj;
+        adj.ArrayToScalars(B, madj, /*load*/true);
+        args[0].ArrayToScalars(B, m1, /*load*/false); // result
         OPENVDB_ASSERT(madj.size() == 9 && m1.size() == 9);
 
         // compute determinant of the input mat by reusing the adjoint's 0, 3 and 6 terms
-        llvm::Value* m20 = ir_load(B, ir_constgep2_64(B, args[1], 0, 0));
-        llvm::Value* m23 = ir_load(B, ir_constgep2_64(B, args[1], 0, 3));
-        llvm::Value* m26 = ir_load(B, ir_constgep2_64(B, args[1], 0, 6));
+        Value m20 = args[1].GetArrayElement(B, 0).LoadIfPtr(B);
+        Value m23 = args[1].GetArrayElement(B, 3).LoadIfPtr(B);
+        Value m26 = args[1].GetArrayElement(B, 6).LoadIfPtr(B);
 
         // compute det and store in c0
-        llvm::Value* c0 = binaryOperator(madj[0], m20, ast::tokens::MULTIPLY, B);
-        llvm::Value* c1 = binaryOperator(madj[1], m23, ast::tokens::MULTIPLY, B);
-        llvm::Value* c2 = binaryOperator(madj[2], m26, ast::tokens::MULTIPLY, B);
-        c0 = binaryOperator(c0, c1, ast::tokens::PLUS, B);
-        c0 = binaryOperator(c0, c2, ast::tokens::PLUS, B);
+        Value c0 = madj[0].Multiply(B, m20);
+        Value c1 = madj[1].Multiply(B, m23);
+        Value c2 = madj[2].Multiply(B, m26);
+        c0 = c0.Add(B, c1);
+        c0 = c0.Add(B, c2);
 
-        llvm::Value* zero = llvm::ConstantFP::get(c0->getType(), 0.0);
-        llvm::Value* detisnotzero = binaryOperator(c0, zero, ast::tokens::NOTEQUALS, B);
+        Value zero(llvm::ConstantFP::get(c0.GetUnderlyingType(), 0.0));
+        Value detisnotzero = c0.NotEquals(B, zero);
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
-        B.CreateCondBr(detisnotzero, then, post);
+        B.CreateCondBr(detisnotzero.GetValue(), then, post);
 
         B.SetInsertPoint(then);
-        llvm::Value* one = llvm::ConstantFP::get(c0->getType(), 1.0);
-        c0 = B.CreateFDiv(one, c0);
+        Value one(llvm::ConstantFP::get(c0.GetUnderlyingType(), 1.0));
+        c0 = one.Divide(B, c0);
         for (size_t i = 0; i < 9; ++i) {
-            B.CreateStore(binaryOperator(madj[i], c0, ast::tokens::MULTIPLY, B), m1[i]);
+            m1[i].Assign(B, madj[i].Multiply(B, c0));
         }
-
         B.CreateRetVoid();
 
         B.SetInsertPoint(post);
-
         madj.clear();
-        arrayUnpack(args[1], madj, B, /*load*/true);
+        args[1].ArrayToScalars(B, madj, /*load*/true);
         for (size_t i = 0; i < 9; ++i) {
-            B.CreateStore(madj[i], m1[i]);
+            m1[i].Assign(B, madj[i]);
         }
 
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto inverse = [](auto out, const auto in) {
@@ -2325,8 +2367,7 @@ inline FunctionGroup::UniquePtr axinverse(const FunctionOptions& op)
         .addDependency("adjoint")
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return the inverse of a 3x3 matrix."
@@ -2432,25 +2473,23 @@ DEFINE_AX_C_FP_BINDING(tanh, "Computes the hyperbolic tangent of the input.")
 inline FunctionGroup::UniquePtr axdegrees(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args.front();
-        llvm::Value* pi180 = arg->getType()->isFloatTy() ?
+        Value arg = args[0];
+        Value pi180(arg.GetUnderlyingType()->isFloatTy() ?
             LLVMType<float>::get(B.getContext(), 180.f / openvdb::math::pi<float>()) :
-            LLVMType<double>::get(B.getContext(), 180.0 / openvdb::math::pi<double>());
-        return binaryOperator(arg, pi180, ast::tokens::MULTIPLY, B);
+            LLVMType<double>::get(B.getContext(), 180.0 / openvdb::math::pi<double>()));
+        return arg.Multiply(B, pi180);
     };
 
     return FunctionBuilder("degrees")
         .addSignature<double(double)>(generate)
         .addSignature<float(float)>(generate)
         .setArgumentNames({"radians"})
-        .setConstantFold(true)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Converts the number of radians to degrees.")
         .get();
@@ -2459,15 +2498,15 @@ inline FunctionGroup::UniquePtr axdegrees(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axradians(const FunctionOptions& op)
 {
     static auto generate =
-        [](const std::vector<llvm::Value*>& args,
-             llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 1);
-        llvm::Value* arg = args.front();
-        llvm::Value* pi180 = arg->getType()->isFloatTy() ?
+        Value arg = args[0];
+        Value pi180(arg.GetUnderlyingType()->isFloatTy() ?
             LLVMType<float>::get(B.getContext(), openvdb::math::pi<float>() / 180.f) :
-            LLVMType<double>::get(B.getContext(), openvdb::math::pi<double>() / 180.0);
-        return binaryOperator(arg, pi180, ast::tokens::MULTIPLY, B);
+            LLVMType<double>::get(B.getContext(), openvdb::math::pi<double>() / 180.0));
+        return arg.Multiply(B, pi180);
     };
 
     return FunctionBuilder("radians")
@@ -2475,9 +2514,8 @@ inline FunctionGroup::UniquePtr axradians(const FunctionOptions& op)
         .addSignature<float(float)>(generate)
         .setArgumentNames({"degrees"})
         .setConstantFold(true)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setBuiltin(true)
+        .setReadOnly(true)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Converts the number of degrees to radians.")
         .get();
@@ -2511,10 +2549,7 @@ inline FunctionGroup::UniquePtr axtan(const FunctionOptions& op)
         .addSignature<double(double)>((double(*)(double))(std::tan))
         .addSignature<float(float)>((float(*)(float))(std::tan))
         .setArgumentNames({"n"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Computes the tangent of arg (measured in radians).")
@@ -2527,10 +2562,7 @@ inline FunctionGroup::UniquePtr axatan2(const FunctionOptions& op)
         .addSignature<double(double,double)>((double(*)(double,double))(std::atan2))
         .addSignature<float(float,float)>((float(*)(float,float))(std::atan2))
         .setArgumentNames({"y", "x"})
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Computes the arc tangent of y/x using the signs of arguments "
@@ -2551,10 +2583,7 @@ inline FunctionGroup::UniquePtr axatoi(const FunctionOptions& op)
         .addSignature<decltype(std::atoi)>(std::atoi)
         .setArgumentNames({"str"})
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Parses the string input interpreting its "
@@ -2565,15 +2594,12 @@ inline FunctionGroup::UniquePtr axatoi(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axatof(const FunctionOptions& op)
 {
     // WARNING: decltype removes the throw identifer from atof. We should
-    // use this are automatically update the function attributes as appropriate
+    // use this to automatically update the function attributes as appropriate
     return FunctionBuilder("atof")
         .addSignature<decltype(std::atof)>(std::atof)
         .setArgumentNames({"str"})
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Parses the string input, interpreting its "
@@ -2591,10 +2617,7 @@ inline FunctionGroup::UniquePtr axhash(const FunctionOptions& op)
         .addSignature<int64_t(const codegen::String*)>((int64_t(*)(const codegen::String*))(hash))
         .setArgumentNames({"str"})
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoRecurse)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Return a hash of the provided string.")
@@ -2620,7 +2643,9 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
         .addSignature<void(int64_t)>((void(*)(int64_t))(print))
         .addSignature<void(int32_t)>((void(*)(int32_t))(print))
             .setArgumentNames({"n"})
+#if LLVM_VERSION_MAJOR <= 15
             .addFunctionAttribute(llvm::Attribute::ReadOnly)
+#endif
             .addFunctionAttribute(llvm::Attribute::NoRecurse)
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)
             .setConstantFold(false /*never cf*/)
@@ -2640,7 +2665,9 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
         .addSignature<void(openvdb::math::Mat4<double>*)>((void(*)(openvdb::math::Mat4<double>*))(printv))
             .addParameterAttribute(0, llvm::Attribute::ReadOnly)
             .setArgumentNames({"n"})
+#if LLVM_VERSION_MAJOR <= 15
             .addFunctionAttribute(llvm::Attribute::ReadOnly)
+#endif
             .addFunctionAttribute(llvm::Attribute::NoRecurse)
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)
             .setConstantFold(false /*never cf*/)
@@ -2734,127 +2761,114 @@ inline FunctionGroup::UniquePtr axsort(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsVector());
+        OPENVDB_ASSERT(args[1].IsVector());
+
         llvm::Function* base = B.GetInsertBlock()->getParent();
 
-        std::vector<llvm::Value*> hsv, rgb;
-        arrayUnpack(args[0], rgb, B, /*load*/false); //output
-        arrayUnpack(args[1], hsv, B, /*load*/true);  //input
+        std::vector<Value> hsv, rgb;
+        args[0].ArrayToScalars(B, rgb, /*load*/false); //output
+        args[1].ArrayToScalars(B, hsv, /*load*/true);  //input
 
-        llvm::Type* precision = hsv[0]->getType();
-        llvm::Value* zero = llvm::ConstantFP::get(precision, 0.0);
-        llvm::Value* one = llvm::ConstantFP::get(precision, 1.0);
+        llvm::Type* precision = args[0].GetUnderlyingScalarType();
+        Value zero(llvm::ConstantFP::get(precision, 0.0));
+        Value one(llvm::ConstantFP::get(precision, 1.0));
 
         // wrap hue values to [0,1] domain, including negative values
         // i.e. -0.1 -> 0.9, 4.5 -> 0.5
-        hsv[0] = axfloormod(op)->execute({hsv[0], one}, B);
+        hsv[0] = axfloormod(op)->execute(NativeArguments{hsv[0], one}, B);
 
         // clamp saturation values to [0,1]
-        hsv[1] = axclamp(op)->execute({hsv[1], zero, one}, B);
+        hsv[1] = axclamp(op)->execute(NativeArguments{hsv[1], zero, one}, B);
 
         llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         llvm::BasicBlock* el = llvm::BasicBlock::Create(B.getContext(), "else", base);
         llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
 
-        llvm::Value* hueisone = binaryOperator(hsv[0], one, ast::tokens::EQUALSEQUALS, B);
-        B.CreateCondBr(hueisone, then, el);
+        Value hueisone = hsv[0].Equals(B, one);
+        B.CreateCondBr(hueisone.GetValue(), then, el);
 
-        llvm::Value* h = insertStaticAlloca(B, precision);
+        Value h = Value::Alloc(B, precision);
 
         B.SetInsertPoint(then);
         {
-            llvm::Value* r = binaryOperator(hsv[0], zero, ast::tokens::MULTIPLY, B); // zero hue
-            B.CreateStore(r, h);
+            Value r = hsv[0].Multiply(B, zero); // zero hue
+            h.Assign(B, r);
             B.CreateBr(post);
         }
         B.SetInsertPoint(el);
         {
-            llvm::Value* six = llvm::ConstantFP::get(hsv[0]->getType(), 6.0);
-            llvm::Value* r = binaryOperator(hsv[0], six, ast::tokens::MULTIPLY, B);
-            B.CreateStore(r, h);
+            Value six(llvm::ConstantFP::get(precision, 6.0));
+            Value r = hsv[0].Multiply(B, six);
+            h.Assign(B, r);
             B.CreateBr(post);
         }
 
         B.SetInsertPoint(post);
 
-        h = ir_load(B, h);
-        llvm::Value* sat = hsv[1];
-        llvm::Value* val = hsv[2];
+        h = h.Load(B);
+        Value sat = hsv[1];
+        Value val = hsv[2];
 
-        llvm::Value* i = llvm_floor(op)->execute({h}, B);
-        llvm::Value* f =
-            binaryOperator(h, i, ast::tokens::MINUS, B);
-        llvm::Value* p =
-            binaryOperator(val,
-                binaryOperator(one, sat, ast::tokens::MINUS, B),
-                ast::tokens::MULTIPLY, B);
-        llvm::Value* q =
-            binaryOperator(val,
-                binaryOperator(one,
-                    binaryOperator(sat, f,
-                        ast::tokens::MULTIPLY, B),
-                    ast::tokens::MINUS, B),
-                ast::tokens::MULTIPLY, B);
-        llvm::Value* t =
-            binaryOperator(val,
-                binaryOperator(one,
-                    binaryOperator(sat,
-                        binaryOperator(one, f,
-                            ast::tokens::MINUS, B),
-                        ast::tokens::MULTIPLY, B),
-                    ast::tokens::MINUS, B),
-                ast::tokens::MULTIPLY, B);
+        Value i = llvm_floor(op)->execute(NativeArguments{h}, B);
+        Value f = h.Subtract(B, i);
+        Value p = val.Multiply(B, one.Subtract(B, sat));
+        Value q = val.Multiply(B, one.Subtract(B, sat.Multiply(B, f)));
+        Value t = val.Multiply(B, one.Subtract(B, sat.Multiply(B, one.Subtract(B, f))));
 
         // start main switch
 
         post = llvm::BasicBlock::Create(B.getContext(), "post", base);
 
-        i = arithmeticConversion(i, LLVMType<int64_t>::get(B.getContext()), B);
+        i = i.CastToPrecision(B, LLVMType<int64_t>::get(B.getContext()));
+        OPENVDB_ASSERT(!i.IsPtr());
 
         for (int64_t j = 0; j <= 5; ++j)
         {
             llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
             llvm::BasicBlock* el = llvm::BasicBlock::Create(B.getContext(), "else", base);
 
-            llvm::Value* constant = LLVMType<int64_t>::get(B.getContext(), j);
-            llvm::Value* switchv = binaryOperator(i, constant, ast::tokens::EQUALSEQUALS, B);
-            B.CreateCondBr(switchv, then, el);
+            Value constant(LLVMType<int64_t>::get(B.getContext(), j));
+            Value switchv = i.Equals(B, constant);
+            B.CreateCondBr(switchv.GetValue(), then, el);
 
             B.SetInsertPoint(then);
             {
                 // The final logic for storing the RGB values
                 if (j == 0) {
-                    B.CreateStore(val, rgb[0]);
-                    B.CreateStore(t, rgb[1]);
-                    B.CreateStore(p, rgb[2]);
+                    rgb[0].Assign(B, val);
+                    rgb[1].Assign(B, t);
+                    rgb[2].Assign(B, p);
                 }
                 else if (j == 1) {
-                    B.CreateStore(q, rgb[0]);
-                    B.CreateStore(val, rgb[1]);
-                    B.CreateStore(p, rgb[2]);
+                    rgb[0].Assign(B, q);
+                    rgb[1].Assign(B, val);
+                    rgb[2].Assign(B, p);
                 }
                 else if (j == 2) {
-                    B.CreateStore(p, rgb[0]);
-                    B.CreateStore(val, rgb[1]);
-                    B.CreateStore(t, rgb[2]);
+                    rgb[0].Assign(B, p);
+                    rgb[1].Assign(B, val);
+                    rgb[2].Assign(B, t);
                 }
                 else if (j == 3) {
-                    B.CreateStore(p, rgb[0]);
-                    B.CreateStore(q, rgb[1]);
-                    B.CreateStore(val, rgb[2]);
+                    rgb[0].Assign(B, p);
+                    rgb[1].Assign(B, q);
+                    rgb[2].Assign(B, val);
                 }
                 else if (j == 4) {
-                    B.CreateStore(t, rgb[0]);
-                    B.CreateStore(p, rgb[1]);
-                    B.CreateStore(val, rgb[2]);
+                    rgb[0].Assign(B, t);
+                    rgb[1].Assign(B, p);
+                    rgb[2].Assign(B, val);
                 }
                 else if (j == 5) {
-                    B.CreateStore(val, rgb[0]);
-                    B.CreateStore(p, rgb[1]);
-                    B.CreateStore(q, rgb[2]);
+                    rgb[0].Assign(B, val);
+                    rgb[1].Assign(B, p);
+                    rgb[2].Assign(B, q);
                 }
 
                 B.CreateBr(post);
@@ -2864,13 +2878,13 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         }
 
         // Final case (hue > 1 || hue < 0), zero intialize
-        B.CreateStore(zero, rgb[0]);
-        B.CreateStore(zero, rgb[1]);
-        B.CreateStore(zero, rgb[2]);
+        rgb[0].Assign(B, zero);
+        rgb[1].Assign(B, zero);
+        rgb[2].Assign(B, zero);
         B.CreateBr(post);
 
         B.SetInsertPoint(post);
-        return B.CreateRetVoid();
+        return Value::Invalid();
     };
 
     using HSVtoRGB3D = void(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
@@ -2885,8 +2899,7 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         .addDependency("clamp")
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Convert HSV color space into RGB color space. Note "
@@ -2898,54 +2911,58 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(AssertSameTypes(args));
+        OPENVDB_ASSERT(args[0].IsVector());
+        OPENVDB_ASSERT(args[1].IsVector());
+
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::LLVMContext& C = B.getContext();
 
-        std::vector<llvm::Value*> hsv, rgb;
-        arrayUnpack(args[0], hsv, B, /*load*/false); //output
-        arrayUnpack(args[1], rgb, B, /*load*/true);  //input
-        llvm::Type* precision = rgb[0]->getType();
-        llvm::Value* zero = llvm::ConstantFP::get(precision, 0.0);
+        llvm::Type* precision = args[0].GetUnderlyingScalarType();
+        Value zero(llvm::ConstantFP::get(precision, 0.0));
 
+        std::vector<Value> hsv, rgb;
+        args[0].ArrayToScalars(B, hsv, /*load*/false); //output
+        args[1].ArrayToScalars(B, rgb, /*load*/true);  //input
 
-        llvm::Value* max = axmax(op)->execute({rgb[0], rgb[1]}, B);
-        max = axmax(op)->execute({max, rgb[2]}, B);
-        llvm::Value* min = axmin(op)->execute({rgb[0], rgb[1]}, B);
-        min = axmin(op)->execute({min, rgb[2]}, B);
+        Value max = axmax(op)->execute(NativeArguments{rgb[0], rgb[1]}, B);
+        max = axmax(op)->execute(NativeArguments{max, rgb[2]}, B);
+        Value min = axmin(op)->execute(NativeArguments{rgb[0], rgb[1]}, B);
+        min = axmin(op)->execute(NativeArguments{min, rgb[2]}, B);
 
-        llvm::Value* range = binaryOperator(max, min, ast::tokens::MINUS, B);
+        Value range = max.Subtract(B, min);
 
-        B.CreateStore(zero, hsv[0]);
-        B.CreateStore(zero, hsv[1]);
-        B.CreateStore(max, hsv[2]);
+        hsv[0].Assign(B, zero);
+        hsv[1].Assign(B, zero);
+        hsv[2].Assign(B, max);
 
         llvm::BasicBlock* then = llvm::BasicBlock::Create(C, "then", base);
         llvm::BasicBlock* post = llvm::BasicBlock::Create(C, "post", base);
 
-        llvm::Value* maxneqzero = binaryOperator(max, zero, ast::tokens::NOTEQUALS, B);
-        B.CreateCondBr(maxneqzero, then, post);
+        Value maxneqzero = max.NotEquals(B, zero);
+        B.CreateCondBr(maxneqzero.GetValue(), then, post);
 
         B.SetInsertPoint(then);
         {
-            llvm::Value* sat = binaryOperator(range, max, ast::tokens::DIVIDE, B);
-            B.CreateStore(sat, hsv[1]);
+            Value sat = range.Divide(B, max);
+            hsv[1].Assign(B, sat);
             B.CreateBr(post);
         }
 
         B.SetInsertPoint(post);
 
-        llvm::Value* sat = ir_load(B, hsv[1]);
+        Value sat = hsv[1].Load(B);
 
         then = llvm::BasicBlock::Create(C, "then", base);
         post = llvm::BasicBlock::Create(C, "post", base);
 
-        llvm::Value* satneqzero = binaryOperator(sat, zero, ast::tokens::NOTEQUALS, B);
+        Value satneqzero = sat.NotEquals(B, zero);
 
-        B.CreateCondBr(satneqzero, then, post);
+        B.CreateCondBr(satneqzero.GetValue(), then, post);
 
         B.SetInsertPoint(then);
         {
@@ -2954,18 +2971,13 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
             llvm::BasicBlock* el = llvm::BasicBlock::Create(C, "el", base);
             llvm::BasicBlock* end = llvm::BasicBlock::Create(C, "end", base);
 
-            llvm::Value* reqmax = binaryOperator(rgb[0], max, ast::tokens::EQUALSEQUALS, B);
-            B.CreateCondBr(reqmax, then, elif1);
+            Value reqmax = rgb[0].Equals(B, max);
+            B.CreateCondBr(reqmax.GetValue(), then, elif1);
 
             B.SetInsertPoint(then);
             {
-                llvm::Value* h =
-                    binaryOperator(
-                        binaryOperator(rgb[1], rgb[2], ast::tokens::MINUS, B),
-                        range,
-                        ast::tokens::DIVIDE, B);
-
-                B.CreateStore(h, hsv[0]);
+                Value h = rgb[1].Subtract(B, rgb[2]).Divide(B, range);
+                hsv[0].Assign(B, h);
                 B.CreateBr(end);
             }
 
@@ -2973,66 +2985,49 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
             {
                 then = llvm::BasicBlock::Create(C, "then", base);
 
-                llvm::Value* geqmax = binaryOperator(rgb[1], max, ast::tokens::EQUALSEQUALS, B);
-                B.CreateCondBr(geqmax, then, el);
+                Value geqmax = rgb[1].Equals(B, max);
+                B.CreateCondBr(geqmax.GetValue(), then, el);
 
                 B.SetInsertPoint(then);
                 {
-                    llvm::Value* two = llvm::ConstantFP::get(precision, 2.0);
-
-                    llvm::Value* h =
-                        binaryOperator(two,
-                            binaryOperator(
-                                binaryOperator(rgb[2], rgb[0], ast::tokens::MINUS, B),
-                                range,
-                                ast::tokens::DIVIDE, B),
-                            ast::tokens::PLUS, B);
-
-                    B.CreateStore(h, hsv[0]);
+                    Value two(llvm::ConstantFP::get(precision, 2.0));
+                    Value h = two.Add(B, (rgb[2].Subtract(B, rgb[0]).Divide(B, range)));
+                    hsv[0].Assign(B, h);
                     B.CreateBr(end);
                 }
             }
 
             B.SetInsertPoint(el);
             {
-                llvm::Value* four = llvm::ConstantFP::get(precision, 4.0);
-
-                llvm::Value* h =
-                    binaryOperator(four,
-                        binaryOperator(
-                            binaryOperator(rgb[0], rgb[1], ast::tokens::MINUS, B),
-                            range,
-                            ast::tokens::DIVIDE, B),
-                        ast::tokens::PLUS, B);
-
-                B.CreateStore(h, hsv[0]);
+                Value four(llvm::ConstantFP::get(precision, 4.0));
+                Value h = four.Add(B, rgb[0].Subtract(B, rgb[1]).Divide(B, range));
+                hsv[0].Assign(B, h);
                 B.CreateBr(end);
             }
 
             B.SetInsertPoint(end);
 
-            llvm::Value* six = llvm::ConstantFP::get(precision, 6.0);
-
-            llvm::Value* h = ir_load(B, hsv[0]);
-            h = binaryOperator(h, six, ast::tokens::DIVIDE, B);
-            B.CreateStore(h, hsv[0]);
+            Value six(llvm::ConstantFP::get(precision, 6.0));
+            Value h = hsv[0].Load(B);
+            h = h.Divide(B, six);
+            hsv[0].Assign(B, h);
 
             then = llvm::BasicBlock::Create(C, "then", base);
 
-            llvm::Value* hlesszero = binaryOperator(h, zero, ast::tokens::LESSTHAN, B);
-            B.CreateCondBr(hlesszero, then, post);
+            Value hlesszero = h.LessThan(B, zero);
+            B.CreateCondBr(hlesszero.GetValue(), then, post);
 
             B.SetInsertPoint(then);
             {
-                llvm::Value* one = llvm::ConstantFP::get(precision, 1.0);
-                h = binaryOperator(h, one, ast::tokens::PLUS, B);
-                B.CreateStore(h, hsv[0]);
+                Value one(llvm::ConstantFP::get(precision, 1.0));
+                h = h.Add(B, one);
+                hsv[0].Assign(B, h);
                 B.CreateBr(post);
             }
         }
 
         B.SetInsertPoint(post);
-        return B.CreateRetVoid();
+        return Value::Invalid();
     };
 
     using HSVtoRGB3D = void(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
@@ -3046,8 +3041,7 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
         .addDependency("min")
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
-        .addFunctionAttribute(llvm::Attribute::NoUnwind)
-        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setBuiltin(true)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
         .setDocumentation("Convert RGB color space into HSV color space.")
@@ -3092,8 +3086,8 @@ inline FunctionGroup::UniquePtr ax_external(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         // Pull out the custom data from the parent function
         llvm::Function* compute = B.GetInsertBlock()->getParent();
@@ -3103,13 +3097,15 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
         OPENVDB_ASSERT(arg);
         OPENVDB_ASSERT(arg->getName() == "custom_data");
 
-        std::vector<llvm::Value*> inputs;
-        inputs.reserve(2 + args.size());
-        inputs.emplace_back(insertStaticAlloca(B, LLVMType<float>::get(B.getContext())));
-        inputs.emplace_back(arg);
-        inputs.insert(inputs.end(), args.begin(), args.end());
+        Value result = Value::Alloc(B, LLVMType<float>::get(B.getContext()));
+
+        Arguments inputs;
+        inputs.AddArg(result);
+        inputs.AddArg(arg, ArgInfo(B.getInt8Ty(), 1));
+        inputs.AddArg(args[0], args.GetArgInfo(0));
         ax_external(op)->execute(inputs, B);
-        return ir_load(B, inputs.front());
+
+        return result.Load(B);
     };
 
     return FunctionBuilder("external")
@@ -3117,7 +3113,9 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
         .setArgumentNames({"str"})
         .addDependency("_external")
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+#if LLVM_VERSION_MAJOR <= 15
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
+#endif
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
         .setConstantFold(false)
         .setEmbedIR(true) // always embed as we pass through function param "custom_data"
@@ -3131,8 +3129,8 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+             llvm::IRBuilder<>& B) -> Value
     {
         // Pull out the custom data from the parent function
         llvm::Function* compute = B.GetInsertBlock()->getParent();
@@ -3141,14 +3139,16 @@ inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
         llvm::Value* arg = extractArgument(compute, 0);
         OPENVDB_ASSERT(arg);
         OPENVDB_ASSERT(arg->getName() == "custom_data");
+        llvm::Type* v3T = LLVMType<float[3]>::get(B.getContext());
 
-        std::vector<llvm::Value*> inputs;
-        inputs.reserve(2 + args.size());
-        inputs.emplace_back(insertStaticAlloca(B, LLVMType<float[3]>::get(B.getContext())));
-        inputs.emplace_back(arg);
-        inputs.insert(inputs.end(), args.begin(), args.end());
+        Value result = Value::Alloc(B, v3T);
+
+        Arguments inputs;
+        inputs.AddArg(result);
+        inputs.AddArg(arg, ArgInfo(B.getInt8Ty(), 1));
+        inputs.AddArg(args[0], args.GetArgInfo(0));
         ax_external(op)->execute(inputs, B);
-        return inputs.front();
+        return result;
     };
 
     return FunctionBuilder("externalv")

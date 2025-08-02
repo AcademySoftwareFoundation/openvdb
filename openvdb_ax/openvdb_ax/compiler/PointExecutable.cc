@@ -28,6 +28,8 @@
 #include <openvdb/points/PointMove.h>
 #include <openvdb/points/PointDelete.h>
 
+#include <llvm/Config/llvm-config.h>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -158,7 +160,7 @@ using KernelValueFunctionPtr = std::add_pointer<codegen::PointKernelAttributeArr
 using KernelBufferRangeFunctionPtr = std::add_pointer<codegen::PointKernelBufferRange::Signature>::type;
 using PointLeafLocalData = codegen::codegen_internal::PointLeafLocalData;
 
-#ifndef NDEBUG
+#ifdef OPENVDB_ENABLE_ASSERTS
 [[maybe_unused]] inline bool supported(const ast::tokens::CoreType type)
 {
     switch (type) {
@@ -743,20 +745,31 @@ bool checkCodecs(const points::AttributeSet::Descriptor& desc,
 
 } // anonymous namespace
 
-PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>& context,
-                const std::shared_ptr<const llvm::ExecutionEngine>& engine,
-                const AttributeRegistry::ConstPtr& attributeRegistry,
-                const CustomData::ConstPtr& customData,
-                const std::unordered_map<std::string, uint64_t>& functions,
-                const ast::Tree& ast)
+PointExecutable::PointExecutable(
+#if LLVM_VERSION_MAJOR <= 15
+        const std::shared_ptr<const llvm::LLVMContext>& context,
+        const std::shared_ptr<const llvm::ExecutionEngine>& engine,
+#else
+        const std::shared_ptr<const llvm::orc::LLJIT>& engine,
+#endif
+        const AttributeRegistry::ConstPtr& attributeRegistry,
+        const CustomData::ConstPtr& customData,
+        const std::unordered_map<std::string, uint64_t>& functions,
+        const ast::Tree& ast)
+#if LLVM_VERSION_MAJOR <= 15
     : mContext(context)
     , mExecutionEngine(engine)
+#else
+    : mExecutionEngine(engine)
+#endif
     , mAttributeRegistry(attributeRegistry)
     , mCustomData(customData)
     , mFunctionAddresses(functions)
     , mSettings(new Settings<false>)
 {
+#if LLVM_VERSION_MAJOR <= 15
     OPENVDB_ASSERT(mContext);
+#endif
     OPENVDB_ASSERT(mExecutionEngine);
     OPENVDB_ASSERT(mAttributeRegistry);
 
@@ -770,8 +783,12 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
 }
 
 PointExecutable::PointExecutable(const PointExecutable& other)
+#if LLVM_VERSION_MAJOR <= 15
     : mContext(other.mContext)
     , mExecutionEngine(other.mExecutionEngine)
+#else
+    : mExecutionEngine(other.mExecutionEngine)
+#endif
     , mAttributeRegistry(other.mAttributeRegistry)
     , mCustomData(other.mCustomData)
     , mFunctionAddresses(other.mFunctionAddresses)

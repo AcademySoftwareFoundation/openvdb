@@ -52,8 +52,8 @@ struct ConstantFolder
     //            is expected to be empty (not provided) on the first call to fold and
     //            is used on subsequent recursive calls.
     template <typename ...Tys>
-    static llvm::Value*
-    fold(const std::vector<llvm::Constant*>& args,
+    static llvm::Constant*
+    fold(const llvm::ArrayRef<llvm::Constant*>& args,
          const SignatureT& function,
          llvm::LLVMContext& C,
          Tys&&... ts)
@@ -94,8 +94,8 @@ private:
     // @brief  Specialization for supported implicit casting matching AX's supported
     //         scalar casting. Continues to traverse the constant argument list.
     template <typename In, typename Out, typename ...Tys>
-    static typename std::enable_if<std::is_convertible<In, Out>::value, llvm::Value*>::type
-    call(const std::vector<llvm::Constant*>& args,
+    static typename std::enable_if<std::is_convertible<In, Out>::value, llvm::Constant*>::type
+    call(const llvm::ArrayRef<llvm::Constant*>& args,
          const SignatureT& function,
          llvm::LLVMContext& C,
          const In& arg,
@@ -108,8 +108,8 @@ private:
     // @brief  Specialization for unsupported implicit casting. Bails out with a
     //         nullptr return.
     template <typename In, typename Out, typename ...Tys>
-    static typename std::enable_if<!std::is_convertible<In, Out>::value, llvm::Value*>::type
-    call(const std::vector<llvm::Constant*>&,
+    static typename std::enable_if<!std::is_convertible<In, Out>::value, llvm::Constant*>::type
+    call(const llvm::ArrayRef<llvm::Constant*>&,
          const SignatureT&,
          llvm::LLVMContext&,
          const In&, Tys&&...)
@@ -124,8 +124,8 @@ struct ConstantFolder<SignatureT, 0>
     // @brief  The final call to fold when all arguments have been evaluated (or no
     //         arguments exist).
     template <typename ...Tys>
-    static llvm::Value*
-    fold(const std::vector<llvm::Constant*>& args,
+    static llvm::Constant*
+    fold(const llvm::ArrayRef<llvm::Constant*>& args,
          const SignatureT& function,
          llvm::LLVMContext& C,
          Tys&&... ts)
@@ -140,8 +140,8 @@ private:
     //         type is not void or a pointer
     template <typename ReturnT, typename ...Tys>
     static typename std::enable_if<!std::is_pointer<ReturnT>::value &&
-        !std::is_same<ReturnT, void>::value, llvm::Value*>::type
-    call(const std::vector<llvm::Constant*>&,
+        !std::is_same<ReturnT, void>::value, llvm::Constant*>::type
+    call(const llvm::ArrayRef<llvm::Constant*>&,
          const SignatureT& function,
          llvm::LLVMContext& C,
          Tys&&... ts)
@@ -154,8 +154,8 @@ private:
     //         supported.
     template <typename ReturnT, typename ...Tys>
     static typename std::enable_if<std::is_pointer<ReturnT>::value ||
-        std::is_same<ReturnT, void>::value, llvm::Value*>::type
-    call(const std::vector<llvm::Constant*>&,
+        std::is_same<ReturnT, void>::value, llvm::Constant*>::type
+    call(const llvm::ArrayRef<llvm::Constant*>&,
          const SignatureT&,
          llvm::LLVMContext&,
          Tys&&...)

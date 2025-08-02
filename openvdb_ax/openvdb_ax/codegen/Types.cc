@@ -90,9 +90,13 @@ llvmTypeFromToken(const ast::tokens::CoreType& type,
 ast::tokens::CoreType
 tokenFromLLVMType(const llvm::Type* type)
 {
+#if LLVM_VERSION_MAJOR <= 15
     if (type->isPointerTy()) {
         type = type->getPointerElementType();
     }
+#else
+    OPENVDB_ASSERT(!type->isPointerTy());
+#endif
     if (type->isIntegerTy(1))   return ast::tokens::BOOL;
     if (type->isIntegerTy(16))  return ast::tokens::INT16;
     if (type->isIntegerTy(32))  return ast::tokens::INT32;

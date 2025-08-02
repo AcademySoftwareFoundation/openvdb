@@ -20,6 +20,8 @@
 #include <openvdb/version.h>
 #include <openvdb/points/PointDataGrid.h>
 
+#include <llvm/Config/llvm-config.h>
+
 #include <unordered_map>
 
 class TestPointExecutable;
@@ -27,6 +29,9 @@ class TestPointExecutable;
 namespace llvm {
 class ExecutionEngine;
 class LLVMContext;
+namespace orc {
+class LLJIT;
+}
 }
 
 namespace openvdb {
@@ -186,18 +191,27 @@ private:
     /// @param tree The AST linked to this executable. The AST is not stored
     ///   after compilation, but can be used during construction of the exe to
     ///   infer some pre/post processing optimisations.
-    PointExecutable(const std::shared_ptr<const llvm::LLVMContext>& context,
-                    const std::shared_ptr<const llvm::ExecutionEngine>& engine,
-                    const AttributeRegistry::ConstPtr& attributeRegistry,
-                    const CustomData::ConstPtr& customData,
-                    const std::unordered_map<std::string, uint64_t>& functions,
-                    const ast::Tree& tree);
+    PointExecutable(
+#if LLVM_VERSION_MAJOR <= 15
+        const std::shared_ptr<const llvm::LLVMContext>& context,
+        const std::shared_ptr<const llvm::ExecutionEngine>& engine,
+#else
+        const std::shared_ptr<const llvm::orc::LLJIT>& mExecutionEngine,
+#endif
+        const AttributeRegistry::ConstPtr& attributeRegistry,
+        const CustomData::ConstPtr& customData,
+        const std::unordered_map<std::string, uint64_t>& functions,
+        const ast::Tree& tree);
 
 private:
+#if LLVM_VERSION_MAJOR <= 15
     // The Context and ExecutionEngine must exist _only_ for object lifetime
     // management. The ExecutionEngine must be destroyed before the Context
     const std::shared_ptr<const llvm::LLVMContext> mContext;
     const std::shared_ptr<const llvm::ExecutionEngine> mExecutionEngine;
+#else
+    const std::shared_ptr<const llvm::orc::LLJIT> mExecutionEngine;
+#endif
     const AttributeRegistry::ConstPtr mAttributeRegistry;
     const CustomData::ConstPtr mCustomData;
     const std::unordered_map<std::string, uint64_t> mFunctionAddresses;
