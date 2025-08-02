@@ -12,6 +12,7 @@
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_SharedPtr.h>
 #include <UT/UT_Interrupt.h>
+#include <UT/UT_Version.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <functional>
@@ -28,6 +29,14 @@
 class GEO_PrimVDB;
 class GU_Detail;
 class UT_String;
+
+
+// Prior to Houdini 21.0 this was an unsigned.
+// After 21 they are defined in OP_DataTypes.h
+#if SYS_VERSION_MAJOR_INT < 21
+    using OP_InputIdx = unsigned;
+    using OP_OutputIdx = unsigned;
+#endif
 
 namespace openvdb_houdini {
 

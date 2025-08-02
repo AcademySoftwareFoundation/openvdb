@@ -1,0 +1,5 @@
+Houdini:
+ - Define OP_InputIdx and OP_OutputIdx for Houdini 21.0 compatibility
+ - Add Houdini 21 style camera interface to support LOP cameras
+ - Include env flag for avoiding stream writing (was backported to
+   19.5)
