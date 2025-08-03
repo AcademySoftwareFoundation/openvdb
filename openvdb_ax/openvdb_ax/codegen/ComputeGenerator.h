@@ -14,6 +14,7 @@
 #include "FunctionRegistry.h"
 #include "FunctionTypes.h"
 #include "SymbolTable.h"
+#include "Value.h"
 
 #include "../ast/AST.h"
 #include "../ast/Visitor.h"
@@ -90,12 +91,12 @@ struct OPENVDB_AX_API ComputeGenerator : public ast::Visitor<ComputeGenerator>
                      FunctionRegistry& functionRegistry,
                      Logger& logger);
 
-    virtual ~ComputeGenerator() = default;
+    virtual ~ComputeGenerator();
 
     bool generate(const ast::Tree&);
 
-    inline SymbolTable& globals() { return mSymbolTables.globals(); }
-    inline const SymbolTable& globals() const { return mSymbolTables.globals(); }
+    inline SymbolTable<llvm::Value*>& globals() { return mSymbolTables.globals(); }
+    inline const SymbolTable<llvm::Value*>& globals() const { return mSymbolTables.globals(); }
 
     // Visitor pattern
 
@@ -221,10 +222,6 @@ protected:
     const FunctionGroup* getFunction(const std::string& identifier,
             const bool allowInternal = false);
 
-    bool binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
-        const ast::tokens::OperatorToken op, const ast::Node* node);
-    bool assignExpression(llvm::Value* lhs, llvm::Value*& rhs, const ast::Node* node);
-
     /// @brief Clear any strings which were allocated in a given function.
     ///   This method accepts an IRBuilder which is expected to be attached to
     ///   a valid block/function. For each block in the function with a return
@@ -236,8 +233,8 @@ protected:
     llvm::LLVMContext& mContext;
     llvm::IRBuilder<> mBuilder;
 
-    // The stack of accessed values
-    std::stack<llvm::Value*> mValues;
+    // The stack of accessed values and their underlying types
+    std::stack<Value> mValues;
 
     // The stack of blocks for keyword branching
     std::stack<std::pair<llvm::BasicBlock*, llvm::BasicBlock*>> mBreakContinueStack;

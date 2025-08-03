@@ -43,6 +43,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeExecutable);
 void
 TestVolumeExecutable::testConstructionDestruction()
 {
+#if LLVM_VERSION_MAJOR <= 15
     // Test the building and teardown of executable objects. This is primarily to test
     // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
     // in the correct order (ExecutionEngine, then Context) otherwise LLVM will crash
@@ -53,8 +54,8 @@ TestVolumeExecutable::testConstructionDestruction()
     CPPUNIT_ASSERT(openvdb::ax::isInitialized());
 
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-#if LLVM_VERSION_MAJOR >= 15
-    // This will not work from LLVM 16. We'll need to fix this
+#if LLVM_VERSION_MAJOR == 15
+    // This will not work from LLVM 16
     // https://llvm.org/docs/OpaquePointers.html
     C->setOpaquePointers(false);
 #endif
@@ -93,6 +94,7 @@ TestVolumeExecutable::testConstructionDestruction()
 
     CPPUNIT_ASSERT_EQUAL(0, int(wE.use_count()));
     CPPUNIT_ASSERT_EQUAL(0, int(wC.use_count()));
+#endif
 }
 
 void
@@ -1088,8 +1090,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1110,8 +1112,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1132,8 +1134,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1154,8 +1156,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::IterType::ALL, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::IterType::ALL == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1176,8 +1178,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(min, Index(0));
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1189,8 +1191,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(min, Index(1));
         CPPUNIT_ASSERT_EQUAL(max, Index(2));
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1211,8 +1213,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(size_t(0), exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1224,8 +1226,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(size_t(1), exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(size_t(2), exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1256,8 +1258,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
@@ -1274,8 +1276,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
         CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
         CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT(defaultTileStream == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(defaultValueIter == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(size_t(5), exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(size_t(10), exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
@@ -1289,8 +1291,8 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(Index(2), min);
         CPPUNIT_ASSERT_EQUAL(Index(3), max);
         CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::IterType::OFF, exe->getValueIterator());
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON == exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::IterType::OFF == exe->getValueIterator());
         CPPUNIT_ASSERT_EQUAL(size_t(10), exe->getGrainSize());
         CPPUNIT_ASSERT_EQUAL(size_t(20), exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());

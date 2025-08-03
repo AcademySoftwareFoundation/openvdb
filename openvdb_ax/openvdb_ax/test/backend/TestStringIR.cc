@@ -305,7 +305,6 @@ TestStringIR::testStringStringIR()
     // Test the String IR in StringFunctions.cc
 
     unittest_util::LLVMState state;
-    llvm::Module& M = state.module();
     openvdb::ax::FunctionOptions opts;
     // This test does not test the C bindings and will fail if they are being
     // used as the function addressed wont be linked into the EE.
@@ -320,7 +319,7 @@ TestStringIR::testStringStringIR()
         reg->getOrInsert("string::string", opts, true);
     CPPUNIT_ASSERT(FG);
     for (auto& F : FG->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
@@ -329,18 +328,16 @@ TestStringIR::testStringStringIR()
         reg->getOrInsert("string::clear", opts, true);
     CPPUNIT_ASSERT(SC);
     for (auto& F : SC->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
     // JIT gen the functions
-    auto EE = state.EE();
-    CPPUNIT_ASSERT(EE);
+    state.CreateEE();
 
     // get the string::clear function for later
     CPPUNIT_ASSERT(!SC->list().empty());
-    const int64_t addressOfClear =
-        EE->getFunctionAddress(SC->list()[0]->symbol());
+    const int64_t addressOfClear = state.GetGlobalAddress(SC->list()[0]->symbol());
     CPPUNIT_ASSERT(addressOfClear);
     auto freeString =
         reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
@@ -356,7 +353,7 @@ TestStringIR::testStringStringIR()
     CPPUNIT_ASSERT_EQUAL(size_t(2), FG->list().size()); // expects 2 signatures
 
     // init string to default
-    address = EE->getFunctionAddress(FG->list()[0]->symbol());
+    address = state.GetGlobalAddress(FG->list()[0]->symbol());
     CPPUNIT_ASSERT(address);
     {
         auto F = reinterpret_cast<std::add_pointer<void(String*)>::type>(address);
@@ -372,7 +369,7 @@ TestStringIR::testStringStringIR()
     }
 
     // init string from char*
-    address = EE->getFunctionAddress(FG->list()[1]->symbol());
+    address = state.GetGlobalAddress(FG->list()[1]->symbol());
     CPPUNIT_ASSERT(address);
     {
         // This test requires SSO_LENGTH > 2
@@ -446,7 +443,6 @@ TestStringIR::testStringAssignIR()
     // Test the String IR in StringFunctions.cc
 
     unittest_util::LLVMState state;
-    llvm::Module& M = state.module();
     openvdb::ax::FunctionOptions opts;
     // This test does not test the C bindings and will fail if they are being
     // used as the function addressed wont be linked into the EE.
@@ -461,7 +457,7 @@ TestStringIR::testStringAssignIR()
         reg->getOrInsert("string::op=", opts, true);
     CPPUNIT_ASSERT(FG);
     for (auto& F : FG->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
@@ -470,18 +466,17 @@ TestStringIR::testStringAssignIR()
         reg->getOrInsert("string::clear", opts, true);
     CPPUNIT_ASSERT(SC);
     for (auto& F : SC->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
     // JIT gen the functions
-    auto EE = state.EE();
-    CPPUNIT_ASSERT(EE);
+    state.CreateEE();
 
     // get the string::clear function for later
     CPPUNIT_ASSERT(!SC->list().empty());
     const int64_t addressOfClear =
-        EE->getFunctionAddress(SC->list()[0]->symbol());
+        state.GetGlobalAddress(SC->list()[0]->symbol());
     CPPUNIT_ASSERT(addressOfClear);
     auto freeString =
         reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
@@ -493,7 +488,7 @@ TestStringIR::testStringAssignIR()
 
     CPPUNIT_ASSERT_EQUAL(size_t(1), FG->list().size()); // expects 1 signature
 
-    const int64_t address = EE->getFunctionAddress(FG->list()[0]->symbol());
+    const int64_t address = state.GetGlobalAddress(FG->list()[0]->symbol());
     CPPUNIT_ASSERT(address);
     auto F = reinterpret_cast<std::add_pointer<void(String*, const String*)>::type>(address);
     CPPUNIT_ASSERT(F);
@@ -590,7 +585,6 @@ void TestStringIR::testStringAddIR()
     // Test the String IR in StringFunctions.cc
 
     unittest_util::LLVMState state;
-    llvm::Module& M = state.module();
     openvdb::ax::FunctionOptions opts;
     openvdb::ax::codegen::FunctionRegistry::UniquePtr reg =
         openvdb::ax::codegen::createDefaultRegistry(&opts);
@@ -600,7 +594,7 @@ void TestStringIR::testStringAddIR()
         reg->getOrInsert("string::op+", opts, true);
     CPPUNIT_ASSERT(FG);
     for (auto& F : FG->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
@@ -609,18 +603,17 @@ void TestStringIR::testStringAddIR()
         reg->getOrInsert("string::clear", opts, true);
     CPPUNIT_ASSERT(SC);
     for (auto& F : SC->list()) {
-        llvm::Function* LF = F->create(M);
+        llvm::Function* LF = F->create(state.module());
         CPPUNIT_ASSERT(LF);
     }
 
     // JIT gen the functions
-    auto EE = state.EE();
-    CPPUNIT_ASSERT(EE);
+    state.CreateEE();
 
     // get the string::clear function for later
     CPPUNIT_ASSERT(!SC->list().empty());
     const int64_t addressOfClear =
-        EE->getFunctionAddress(SC->list()[0]->symbol());
+        state.GetGlobalAddress(SC->list()[0]->symbol());
     CPPUNIT_ASSERT(addressOfClear);
     auto freeString =
         reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
@@ -634,7 +627,7 @@ void TestStringIR::testStringAddIR()
 
     CPPUNIT_ASSERT_EQUAL(size_t(1), FG->list().size()); // expects 1 signature
 
-    const int64_t address = EE->getFunctionAddress(FG->list()[0]->symbol());
+    const int64_t address = state.GetGlobalAddress(FG->list()[0]->symbol());
     CPPUNIT_ASSERT(address);
     auto F = reinterpret_cast<std::add_pointer<void(String*, const String*, const String*)>::type>(address);
     CPPUNIT_ASSERT(F);
@@ -817,8 +810,7 @@ void TestStringIR::testStringClearIR()
     }
 
     // JIT gen the functions
-    auto EE = state.EE();
-    CPPUNIT_ASSERT(EE);
+    state.CreateEE();
 
     // Test the IR for each string function. These match the signatures
     // defined in StringFunctions.cc
@@ -827,7 +819,7 @@ void TestStringIR::testStringClearIR()
 
     CPPUNIT_ASSERT_EQUAL(size_t(1), FG->list().size()); // expects 1 signature
 
-    const int64_t address = EE->getFunctionAddress(FG->list()[0]->symbol());
+    const int64_t address = state.GetGlobalAddress(FG->list()[0]->symbol());
     CPPUNIT_ASSERT(address);
     auto F = reinterpret_cast<std::add_pointer<void(String*)>::type>(address);
     CPPUNIT_ASSERT(F);
@@ -876,7 +868,7 @@ void TestStringIR::testStringClearIR()
         // get the string::clear function which takes a char* initializer
         CPPUNIT_ASSERT(!MFG->list().empty());
         const int64_t addressOfStringCtr =
-            EE->getFunctionAddress(MFG->list()[1]->symbol());
+            state.GetGlobalAddress(MFG->list()[1]->symbol());
         CPPUNIT_ASSERT(addressOfStringCtr);
         auto createString =
             reinterpret_cast<std::add_pointer<void(String*, const char*)>::type>(addressOfStringCtr);

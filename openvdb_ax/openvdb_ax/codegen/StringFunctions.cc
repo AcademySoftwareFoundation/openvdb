@@ -47,21 +47,23 @@ inline FunctionGroup::UniquePtr axstrlen(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
 {
     auto generate =
-        [](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
+        OPENVDB_ASSERT(args[0].IsString());
+        OPENVDB_ASSERT(args[1].IsInteger());
         llvm::LLVMContext& C = B.getContext();
         llvm::Function* base = B.GetInsertBlock()->getParent();
-        llvm::Type* strType = LLVMType<codegen::String>::get(C);
+        llvm::StructType* strType = LLVMType<codegen::String>::get(C);
 
-        llvm::Value* str = args[0];
-        llvm::Value* size = args[1];
-        llvm::Value* cptr = B.CreateStructGEP(strType, str, 0); // char**
-        llvm::Value* sso = B.CreateStructGEP(strType, str, 1); // char[]*
-        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
+        Value str = args[0];
+        Value size = args[1];
+        llvm::Value* cptr = B.CreateStructGEP(strType, str.GetValue(), 0); // char**
+        llvm::Value* sso = B.CreateStructGEP(strType, str.GetValue(), 1); // char[]*
+        llvm::Value* sso_load = B.CreateConstGEP2_64(strType->getTypeAtIndex(1), sso, 0, 0); // char*
 
-        llvm::Value* cptr_load = ir_load(B, cptr); // char*
+        llvm::Value* cptr_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr); // char*
         llvm::Value* neq = B.CreateICmpNE(cptr_load, sso_load);
 
         llvm::BasicBlock* then = llvm::BasicBlock::Create(C, "then", base);
@@ -69,33 +71,44 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         B.CreateCondBr(neq, then, post);
         B.SetInsertPoint(then);
         {
-            llvm::BasicBlock* BB = B.GetInsertBlock();
-            llvm::Instruction* inst = llvm::CallInst::CreateFree(cptr_load, BB);
+#if LLVM_VERSION_MAJOR < 18
+            llvm::Instruction* inst = llvm::CallInst::CreateFree(cptr_load, B.GetInsertBlock());
             OPENVDB_ASSERT(inst);
             B.Insert(inst);
+#else
+            B.CreateFree(cptr_load);
+#endif
             B.CreateBr(post);
         }
 
         B.SetInsertPoint(post);
 
-        llvm::Value* gt = B.CreateICmpSGT(size, B.getInt64(codegen::String::SSO_LENGTH-1));
+        Value gt = size.GreaterThan(B, Value::Create<int64_t>(C, codegen::String::SSO_LENGTH-1));
 
         then = llvm::BasicBlock::Create(C, "then", base);
         llvm::BasicBlock* el = llvm::BasicBlock::Create(C, "else", base);
         post = llvm::BasicBlock::Create(C, "post", base);
-        B.CreateCondBr(gt, then, el);
+        B.CreateCondBr(gt.GetValue(), then, el);
         B.SetInsertPoint(then);
         {
-            llvm::BasicBlock* BB = B.GetInsertBlock();
-            llvm::Instruction* inst =
-                llvm::CallInst::CreateMalloc(BB, // location
+#if LLVM_VERSION_MAJOR < 18
+            llvm::Instruction* inst = llvm::CallInst::CreateMalloc(B.GetInsertBlock(), // location
                     B.getInt64Ty(), // int ptr type
                     B.getInt8Ty(),  // return type
-                    B.CreateAdd(size, B.getInt64(1)), // size
+                    B.CreateAdd(size.GetValue(), B.getInt64(1)), // size
                     nullptr,
                     nullptr);
             OPENVDB_ASSERT(inst);
             B.Insert(inst);
+#else
+            llvm::Instruction* inst = B.CreateMalloc(
+                    B.getInt64Ty(), // int ptr type
+                    B.getInt8Ty(),  // return type
+                    B.CreateAdd(size.GetValue(), B.getInt64(1)), // size
+                    nullptr,
+                    nullptr);
+            OPENVDB_ASSERT(inst);
+#endif
             B.CreateStore(inst, cptr);
             B.CreateBr(post);
         }
@@ -108,12 +121,12 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
 
         B.SetInsertPoint(post);
         // re-load cptr
-        cptr_load = ir_load(B, cptr); // char*
-        llvm::Value* clast = ir_gep(B, cptr_load, size);
+        cptr_load =  B.CreateLoad(strType->getTypeAtIndex(0u), cptr); // char*
+        llvm::Value* clast = B.CreateGEP(LLVMType<char>::get(C), cptr_load, size.GetValue());
         B.CreateStore(B.getInt8(int8_t('\0')), clast); // this->ptr[size] = '\0';
-        llvm::Value* len = B.CreateStructGEP(strType, str, 2);
-        B.CreateStore(size, len);
-        return nullptr;
+        llvm::Value* len = B.CreateStructGEP(strType, str.GetValue(), 2);
+        B.CreateStore(size.GetValue(), len);
+        return Value::Invalid();
     };
 
     static auto stralloc = [](codegen::String* str, const int64_t s) {
@@ -131,40 +144,44 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() >= 1);
 
         llvm::LLVMContext& C = B.getContext();
-        llvm::Type* strType = LLVMType<codegen::String>::get(C);
-        llvm::Value* str = args[0];
+        llvm::StructType* strType = LLVMType<codegen::String>::get(C);
+        llvm::Type* ctype = LLVMType<char>::get(C);
+        Value str = args[0];
 
         llvm::Value* carr;
         if (args.size() == 1) carr = B.CreateGlobalStringPtr("");
-        else                  carr = args[1];
+        else                  carr = args[1].GetValue();
         OPENVDB_ASSERT(carr);
-        llvm::Value* slen = axstrlen(op)->execute({carr}, B);
 
-        llvm::Value* cptr = B.CreateStructGEP(strType, str, 0); // char**
-        llvm::Value* sso = B.CreateStructGEP(strType, str, 1); // char[]*
-        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
-        llvm::Value* len = B.CreateStructGEP(strType, str, 2);
+        Arguments strlenargs;
+        strlenargs.AddArg(carr, ArgInfo(ctype, 1));
+        Value slen = axstrlen(op)->execute(strlenargs, B);
+
+        llvm::Value* cptr = B.CreateStructGEP(strType, str.GetValue(), 0); // char**
+        llvm::Value* sso = B.CreateStructGEP(strType, str.GetValue(), 1); // char[]*
+        llvm::Value* sso_load = B.CreateConstGEP2_64(strType->getTypeAtIndex(1), sso, 0, 0); // char*
+        llvm::Value* len = B.CreateStructGEP(strType, str.GetValue(), 2);
         B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
         B.CreateStore(B.getInt64(0), len); // this->len = 0;
 
-        axstringalloc(op)->execute({str, slen}, B);
+        axstringalloc(op)->execute(NativeArguments{str, slen}, B);
 
-        llvm::Value* cptr_load = ir_load(B, cptr);
+        llvm::Value* cptr_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr); // char*
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr_load, /*dest-align*/llvm::MaybeAlign(0),
-            carr, /*src-align*/llvm::MaybeAlign(0), slen);
+            carr, /*src-align*/llvm::MaybeAlign(0), slen.GetValue());
 #elif LLVM_VERSION_MAJOR > 6
-        B.CreateMemCpy(cptr_load, /*dest-align*/0, carr, /*src-align*/0, slen);
+        B.CreateMemCpy(cptr_load, /*dest-align*/0, carr, /*src-align*/0, slen.GetValue());
 #else
-        B.CreateMemCpy(cptr_load, carr, slen, /*align*/0);
+        B.CreateMemCpy(cptr_load, carr, slen.GetValue(), /*align*/0);
 #endif
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto strinitc = [](codegen::String* str, const char* c) {
@@ -195,22 +212,25 @@ inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const NativeArguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 2);
-        llvm::Type* strType = LLVMType<codegen::String>::get(B.getContext());
-        llvm::Value* str0 = args[0];
-        llvm::Value* str1 = args[1];
+        llvm::StructType* strType = LLVMType<codegen::String>::get(B.getContext());
+        Value str0 = args[0];
+        Value str1 = args[1];
 
-        llvm::Value* cptr0 = B.CreateStructGEP(strType, str0, 0);
-        llvm::Value* cptr1 = B.CreateStructGEP(strType, str1, 0);
-        llvm::Value* len = ir_load(B, B.CreateStructGEP(strType, str1, 2));
+        llvm::Value* cptr0 = B.CreateStructGEP(strType, str0.GetValue(), 0);
+        llvm::Value* cptr1 = B.CreateStructGEP(strType, str1.GetValue(), 0);
+        llvm::Value* len = B.CreateLoad(strType->getTypeAtIndex(2), B.CreateStructGEP(strType, str1.GetValue(), 2));
 
-        axstringalloc(op)->execute({str0, len}, B);
+        Arguments strallocargs;
+        strallocargs.AddArg(str0);
+        strallocargs.AddArg(len, ArgInfo(strType->getTypeAtIndex(2)));
+        axstringalloc(op)->execute(strallocargs, B);
 
-        llvm::Value* cptr0_load = ir_load(B, cptr0);
-        llvm::Value* cptr1_load = ir_load(B, cptr1);
+        llvm::Value* cptr0_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr0);
+        llvm::Value* cptr1_load = B.CreateLoad(strType->getTypeAtIndex(0u), cptr1);
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr0_load, /*dest-align*/llvm::MaybeAlign(0),
             cptr1_load, /*src-align*/llvm::MaybeAlign(0), len);
@@ -219,7 +239,7 @@ inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
 #else
         B.CreateMemCpy(cptr0_load, cptr1_load, len, /*align*/0);
 #endif
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto strassign = [](codegen::String* a, const codegen::String* b) {
@@ -238,26 +258,30 @@ inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        llvm::Type* strType = LLVMType<codegen::String>::get(B.getContext());
+        llvm::StructType* strType = LLVMType<codegen::String>::get(B.getContext());
         llvm::Value* result = args[0];
         // don't need to init string as it will have been created with
         // insertStaticAlloca which makes sure that cptr=SSO and len=0
-        // axstring(op)->execute({result}, B);
+        // axstring(op)->execute(Arguments{result}, B);
 
         llvm::Value* str0 = args[1];
         llvm::Value* str1 = args[2];
-        llvm::Value* len0 = ir_load(B, B.CreateStructGEP(strType, str0, 2));
-        llvm::Value* len1 = ir_load(B, B.CreateStructGEP(strType, str1, 2));
+        llvm::Value* len0 = B.CreateLoad(strType->getTypeAtIndex(2), B.CreateStructGEP(strType, str0, 2));
+        llvm::Value* len1 = B.CreateLoad(strType->getTypeAtIndex(2), B.CreateStructGEP(strType, str1, 2));
 
         llvm::Value* total = B.CreateAdd(len0, len1);
-        axstringalloc(op)->execute({result, total}, B);
 
-        llvm::Value* dst = ir_load(B, B.CreateStructGEP(strType, result, 0)); //char*
-        llvm::Value* src0 = ir_load(B, B.CreateStructGEP(strType, str0, 0)); //char*
-        llvm::Value* src1 = ir_load(B, B.CreateStructGEP(strType, str1, 0)); //char*
+        Arguments strallocargs;
+        strallocargs.AddArg(result, ArgInfo(strType, 1));
+        strallocargs.AddArg(total, ArgInfo(strType->getTypeAtIndex(2)));
+        axstringalloc(op)->execute(strallocargs, B);
+
+        llvm::Value* dst = B.CreateLoad(strType->getTypeAtIndex(0u), B.CreateStructGEP(strType, result, 0)); //char*
+        llvm::Value* src0 = B.CreateLoad(strType->getTypeAtIndex(0u), B.CreateStructGEP(strType, str0, 0)); //char*
+        llvm::Value* src1 = B.CreateLoad(strType->getTypeAtIndex(0u), B.CreateStructGEP(strType, str1, 0)); //char*
 
         // cpy first
 #if LLVM_VERSION_MAJOR >= 10
@@ -270,7 +294,7 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 #endif
 
         // cpy second
-        dst = ir_gep(B, dst, len0);
+        dst = B.CreateGEP(LLVMType<char>::get(B.getContext()), dst, len0);
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(dst, /*dest-align*/llvm::MaybeAlign(0),
             src1, /*src-align*/llvm::MaybeAlign(0), len1);
@@ -279,7 +303,7 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 #else
         B.CreateMemCpy(dst, src1, len1, /*align*/0);
 #endif
-        return nullptr;
+        return Value::Invalid();
     };
 
     static auto stradd = [](codegen::String* a, const codegen::String* b, const codegen::String* c) {
@@ -299,11 +323,14 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axstringclear(const FunctionOptions& op)
 {
     auto generate =
-        [op](const std::vector<llvm::Value*>& args,
-           llvm::IRBuilder<>& B) -> llvm::Value*
+        [op](const Arguments& args,
+           llvm::IRBuilder<>& B) -> Value
     {
-        axstringalloc(op)->execute({args[0], B.getInt64(0)}, B);
-        return nullptr;
+        Arguments strallocargs;
+        strallocargs.AddArg(args[0], args.GetArgInfo(0));
+        strallocargs.AddArg(Value::Create<int64_t>(B.getContext(), 0));
+        axstringalloc(op)->execute(strallocargs, B);
+        return Value::Invalid();
     };
 
     static auto strclear = [](codegen::String* a) { a->clear(); };

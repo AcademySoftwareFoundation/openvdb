@@ -4,6 +4,7 @@
 /// @file codegen/VolumeComputeGenerator.cc
 
 #include "VolumeComputeGenerator.h"
+#include "VolumeKernelFunctions.h"
 #include "FunctionRegistry.h"
 #include "FunctionTypes.h"
 #include "Types.h"
@@ -20,71 +21,6 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 namespace codegen {
-
-const std::array<std::string, VolumeKernelValue::N_ARGS>&
-VolumeKernelValue::argumentKeys()
-{
-    static const std::array<std::string, VolumeKernelValue::N_ARGS> arguments = {{
-        "custom_data",
-        "origin",
-        "value",
-        "active",
-        "offset",
-        "accessors",
-        "transforms",
-        "write_index"
-    }};
-
-    return arguments;
-}
-
-const char* VolumeKernelValue::getDefaultName() { return "ax.compute.voxel.k1"; }
-
-//
-
-const std::array<std::string, VolumeKernelBuffer::N_ARGS>&
-VolumeKernelBuffer::argumentKeys()
-{
-    static const std::array<std::string, VolumeKernelBuffer::N_ARGS> arguments = {{
-        "custom_data",
-        "origin",
-        "value_buffer",
-        "active_buffer",
-        "buffer_size",
-        "mode",
-        "accessors",
-        "transforms",
-        "write_index"
-    }};
-
-    return arguments;
-}
-
-const char* VolumeKernelBuffer::getDefaultName() { return "ax.compute.voxel.k2"; }
-
-//
-
-const std::array<std::string, VolumeKernelNode::N_ARGS>&
-VolumeKernelNode::argumentKeys()
-{
-    static const std::array<std::string, VolumeKernelNode::N_ARGS> arguments = {{
-        "custom_data",
-        "coord_is",
-        "accessors",
-        "transforms",
-        "write_index",
-        "write_acccessor"
-    }};
-
-    return arguments;
-}
-
-const char* VolumeKernelNode::getDefaultName() { return "ax.compute.voxel.k3"; }
-
-
-///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
-
 namespace codegen_internal {
 
 inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const AttributeRegistry&)
@@ -93,6 +29,18 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         [&](const std::vector<llvm::Value*>& args,
             llvm::IRBuilder<>& B) -> llvm::Value*
     {
+        using VBuffPtrT = VolumeKernelBuffer::FunctionTraitsT::Arg<2>::Type; // leaf value buffer argument ptr type
+        using ABuffPtrT = VolumeKernelBuffer::FunctionTraitsT::Arg<3>::Type; // active buffer type (word masks) argument ptr type
+
+        llvm::LLVMContext& C = B.getContext();
+
+        [[maybe_unused]] llvm::Type* vbuffT = LLVMType<std::remove_pointer_t<VBuffPtrT>>::get(C);
+        llvm::Type* abuffT = LLVMType<std::remove_pointer_t<ABuffPtrT>>::get(C);
+        llvm::Type* incT   = LLVMType<int64_t>::get(C); // type of the loop counter
+        OPENVDB_ASSERT(vbuffT == B.getVoidTy()); // sanity check
+        OPENVDB_ASSERT(abuffT == B.getInt64Ty()); // sanity check
+        vbuffT = B.getInt8Ty(); // points to bytes
+
         OPENVDB_ASSERT(args.size() == 9);
         llvm::Value* vbuff = args[2]; //extractArgument(rangeFunction, "value_buffer");
         llvm::Value* abuff = args[3]; //extractArgument(rangeFunction, "active_buffer");
@@ -103,27 +51,29 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         OPENVDB_ASSERT(abuff);
         OPENVDB_ASSERT(mode);
 
+        OPENVDB_ASSERT(AssertOpaquePtrs(vbuff, vbuffT));
+        OPENVDB_ASSERT(AssertOpaquePtrs(abuff, abuffT));
+
         llvm::Function* base = B.GetInsertBlock()->getParent();
-        llvm::LLVMContext& C = B.getContext();
 
         llvm::BasicBlock* conditionBlock = llvm::BasicBlock::Create(C, "k2.condition", base);
         llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(C, "k2.body", base);
         llvm::BasicBlock* iterBlock = llvm::BasicBlock::Create(C, "k2.iter", base);
 
         // init var - loops from 0 -> buffSize
-        llvm::Value* incr = insertStaticAlloca(B, LLVMType<int64_t>::get(C));
+        llvm::Value* incr = insertStaticAlloca(B, incT);
         B.CreateStore(B.getInt64(0), incr);
         B.CreateBr(conditionBlock);
 
         // increment
         B.SetInsertPoint(iterBlock);
-        llvm::Value* new_incr = B.CreateAdd(ir_load(B, incr), B.getInt64(1));
+        llvm::Value* new_incr = B.CreateAdd(B.CreateLoad(incT, incr), B.getInt64(1));
         B.CreateStore(new_incr, incr);
         B.CreateBr(conditionBlock);
 
         // generate loop body
         B.SetInsertPoint(bodyBlock);
-        llvm::Value* lincr = ir_load(B, incr);
+        llvm::Value* lincr = B.CreateLoad(incT, incr);
 
         // Extract mask bit from array of words
         // NodeMask::isOn() = (0 != (mWords[n >> 6] & (Word(1) << (n & 63))));
@@ -131,8 +81,8 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
             binaryOperator(lincr, B.getInt64(63), ast::tokens::BITAND, B),
                 ast::tokens::SHIFTLEFT, B);
         llvm::Value* word_idx = binaryOperator(lincr, B.getInt64(6), ast::tokens::SHIFTRIGHT, B);
-        llvm::Value* word = ir_gep(B, abuff, word_idx);
-        word = ir_load(B, word);
+        llvm::Value* word = B.CreateGEP(abuffT, abuff, word_idx);
+        word = B.CreateLoad(abuffT, word);
         word = binaryOperator(word, mask, ast::tokens::BITAND, B);
         llvm::Value* ison = B.CreateICmpNE(word, B.getInt64(0));
 
@@ -154,7 +104,7 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
                 args[1],            // index space coordinate
                 vbuff,              // value buffer
                 ison,               // active/inactive
-                ir_load(B, incr), // offset in the value buffer
+                B.CreateLoad(incT, incr), // offset in the value buffer
                 args[6],            // read accessors
                 args[7],            // transforms
                 args[8]             // write index
@@ -164,7 +114,7 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         }
 
         B.SetInsertPoint(conditionBlock);
-        llvm::Value* endCondition = B.CreateICmpULT(ir_load(B, incr), buffSize);
+        llvm::Value* endCondition = B.CreateICmpULT(B.CreateLoad(incT, incr), buffSize);
 
         llvm::BasicBlock* postBlock = llvm::BasicBlock::Create(C, "k2.end", base);
         B.CreateCondBr(endCondition, bodyBlock, postBlock);
@@ -199,11 +149,11 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
 
 inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const AttributeRegistry& reg)
 {
-    const SymbolTable& localTable = *(this->mSymbolTables.get(1));
+    const SymbolTable<Value>& localTable = *(this->mSymbolTables.get(1));
 
     auto generate =
-        [&, this](const std::vector<llvm::Value*>& args,
-            llvm::IRBuilder<>& B) -> llvm::Value*
+        [&, this](const Arguments& args,
+            llvm::IRBuilder<>& B) -> Value
     {
         OPENVDB_ASSERT(args.size() == 6);
         llvm::Value* isc = args[1]; // index space coord
@@ -217,12 +167,11 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
             if (!access.writes()) continue;
 
             const std::string token = access.tokenname();
-            llvm::Type* type = localTable.get(token)->getType();
-            type = type->getPointerElementType();
+            const Value& v = *localTable.get(token);
 
             llvm::Value* registeredIndex = this->mModule.getGlobalVariable(token);
             OPENVDB_ASSERT(registeredIndex);
-            registeredIndex = ir_load(B, registeredIndex);
+            registeredIndex = B.CreateLoad(B.getInt64Ty(), registeredIndex);
             llvm::Value* result = B.CreateICmpEQ(wi, registeredIndex);
 
             llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(C, "k3.invoke_k1_" + token, base);
@@ -231,12 +180,19 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
             B.CreateCondBr(result, thenBlock, continueBlock);
             B.SetInsertPoint(thenBlock);
 
-            llvm::Value* location = insertStaticAlloca(B, type);
+            llvm::Value* location = insertStaticAlloca(B, v.GetUnderlyingType());
             llvm::Value* ison = insertStaticAlloca(B, B.getInt1Ty());
 
+            Arguments probeargs;
+            probeargs.AddArg(wa,       ArgInfo(LLVMType<int8_t>::get(C), 1));
+            probeargs.AddArg(isc,      ArgInfo(LLVMType<openvdb::math::Vec3<int32_t>>::get(C), 1));
+            probeargs.AddArg(ison,     ArgInfo(B.getInt1Ty(), 1));
+            probeargs.AddArg(location, ArgInfo(v.GetUnderlyingType(), 1));
+
             const FunctionGroup* const F = this->getFunction("probevalue", true);
-            F->execute({wa, isc, ison, location}, B);
-            ison = ir_load(B, ison);
+            OPENVDB_ASSERT(F);
+            F->execute(probeargs, B);
+            ison = B.CreateLoad(B.getInt1Ty(), ison);
 
             llvm::Value* vptr = B.CreatePointerCast(location, LLVMType<void*>::get(C));
 
@@ -253,18 +209,26 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
             B.CreateCall(compute, input);
 
             // set the voxel - load the result (if its a scalar)
-            if (type->isIntegerTy() || type->isFloatingPointTy()) {
-                location = ir_load(B, location);
+            if (v.IsScalar()) {
+                location = B.CreateLoad(v.GetUnderlyingType(), location);
             }
 
+            Arguments setvargs;
+            setvargs.AddArg(wa,  ArgInfo(LLVMType<int8_t>::get(C), 1));
+            setvargs.AddArg(isc, ArgInfo(LLVMType<openvdb::math::Vec3<int32_t>>::get(C), 1));
+            setvargs.AddArg(B.getInt32(-1), ArgInfo(B.getInt32Ty())); /*level=unknown*/
+            setvargs.AddArg(ison,           ArgInfo(B.getInt1Ty()));
+            setvargs.AddArg(location,       ArgInfo(v.GetUnderlyingType(), v.IsScalar() ? 0 : 1));
+
             const FunctionGroup* const function = this->getFunction("setvoxel", true);
-            function->execute({wa, isc, /*level=unknown*/B.getInt32(-1), ison, location}, B);
+            OPENVDB_ASSERT(function);
+            function->execute(setvargs, B);
 
             B.CreateBr(continueBlock);
             B.SetInsertPoint(continueBlock);
         }
 
-        llvm::Value* ret = B.CreateRetVoid();
+        Value ret = Value::Return(B);
         // insert string frees for k3 which can allocate them
         this->createFreeSymbolStrings(B);
         return ret;
@@ -296,7 +260,8 @@ VolumeComputeGenerator::VolumeComputeGenerator(llvm::Module& module,
                                                const FunctionOptions& options,
                                                FunctionRegistry& functionRegistry,
                                                Logger& logger)
-    : ComputeGenerator(module, options, functionRegistry, logger) {}
+    : ComputeGenerator(module, options, functionRegistry, logger)
+    , mInternalPtrs() {}
 
 AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
 {
@@ -330,22 +295,22 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
     // @note  Call all attribute allocs at the start of this block so that llvm folds
     // them into the function prologue (as a static allocation)
 
-    SymbolTable* localTable = this->mSymbolTables.getOrInsert(1);
+    SymbolTable<Value>* localTable = this->mSymbolTables.getOrInsert(1);
 
     // run allocations and update the symbol table
 
     for (const AttributeRegistry::AccessData& data : registry->data()) {
         llvm::Type* type = llvmTypeFromToken(data.type(), mContext);
         {
-            llvm::Value* vptr = mBuilder.CreateAlloca(type->getPointerTo(0));
-            localTable->insert(data.tokenname() + "_vptr", vptr);
+            llvm::Value* vptr = mBuilder.CreateAlloca(llvm::PointerType::get(type, 0));
+            mInternalPtrs.insert(data.tokenname() + "_vptr", vptr);
             OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(vptr)->isStaticAlloca());
         }
 
         // @warning This method will insert the alloc before the above alloc.
         //  This is fine, but is worth noting
-        llvm::Value* value = insertStaticAlloca(mBuilder, type);
-        OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
+        Value value = Value::Alloc(mBuilder, type);
+        OPENVDB_ASSERT(llvm::cast<llvm::AllocaInst>(value.GetValue())->isStaticAlloca());
 
         // @note  this technically doesn't need to live in the local table
         //  (only the pointer to this value (_vptr) needs to) but it's
@@ -358,7 +323,7 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
     for (const AttributeRegistry::AccessData& data : registry->data()) {
         if (!data.reads()) continue;
         const std::string token = data.tokenname();
-        this->getAccessorValue(token, localTable->get(token));
+        this->getAccessorValue(token, *(localTable->get(token)));
     }
 
     // full code generation
@@ -379,13 +344,13 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
 
 bool VolumeComputeGenerator::visit(const ast::Attribute* node)
 {
-    SymbolTable* localTable = this->mSymbolTables.getOrInsert(1);
+    llvm::Type* type = llvmTypeFromToken(node->type(), mContext);
     const std::string globalName = node->tokenname();
-    llvm::Value* value;
-    value = localTable->get(globalName + "_vptr");
-    value = ir_load(mBuilder, value);
-    OPENVDB_ASSERT(value);
-    mValues.push(value);
+    auto ptrToAlloc = mInternalPtrs.get(globalName + "_vptr"); // llvm::Value**
+    OPENVDB_ASSERT(ptrToAlloc);
+    llvm::Value* alloc = mBuilder.CreateLoad(llvm::PointerType::get(type, 0), *ptrToAlloc);
+    OPENVDB_ASSERT(alloc);
+    mValues.push(Value(alloc, type));
     return true;
 }
 
@@ -394,7 +359,7 @@ bool VolumeComputeGenerator::visit(const ast::Attribute* node)
 ///////////////////////////////////////////////////////////////////////////
 
 
-void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llvm::Value* location)
+void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, Value location)
 {
     std::string name, type;
     ast::Attribute::nametypeFromToken(globalName, &name, &type);
@@ -402,7 +367,7 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
     llvm::Value* registeredIndex = llvm::cast<llvm::GlobalVariable>
         (mModule.getOrInsertGlobal(globalName, LLVMType<int64_t>::get(mContext)));
     this->globals().insert(globalName, registeredIndex);
-    registeredIndex = ir_load(mBuilder, registeredIndex);
+    registeredIndex = mBuilder.CreateLoad(LLVMType<int64_t>::get(mContext), registeredIndex);
 
     // first see if pre cached node exists.
 
@@ -421,11 +386,15 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
         llvm::Value* offset = extractArgument(mFunction, "offset");
         OPENVDB_ASSERT(valueptr);
         OPENVDB_ASSERT(offset);
+        OPENVDB_ASSERT(AssertOpaquePtrs(valueptr, LLVMType<int8_t>::get(mContext)));
 
-        llvm::Type* type = location->getType(); // ValueType*
+        OPENVDB_ASSERT(location.IsPtr());
+        llvm::Type* type = location.GetValue()->getType(); // ValueType*
         valueptr = mBuilder.CreatePointerCast(valueptr, type);
-        llvm::Value* value = ir_gep(mBuilder, valueptr, offset);
-        mBuilder.CreateStore(value, this->mSymbolTables.get(1)->get(globalName + "_vptr"));
+
+        OPENVDB_ASSERT(AssertOpaquePtrs(valueptr, location.GetUnderlyingType()));
+        llvm::Value* value = mBuilder.CreateGEP(location.GetUnderlyingType(), valueptr, offset);
+        mBuilder.CreateStore(value, *mInternalPtrs.get(globalName + "_vptr"));
         mBuilder.CreateBr(post);
     }
 
@@ -443,17 +412,32 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
         OPENVDB_ASSERT(origin);
         OPENVDB_ASSERT(offset);
 
-        accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
-        llvm::Value* targetTransform = ir_gep(mBuilder, transformPtr, registeredIndex);
-        llvm::Value* sourceTransform = ir_gep(mBuilder, transformPtr, accessIndex);
+        llvm::Type* voidstar = LLVMType<void*>::get(mContext);
 
-        llvm::Value* accessor = ir_load(mBuilder, accessorPtr);
-        targetTransform = ir_load(mBuilder, targetTransform);
-        sourceTransform = ir_load(mBuilder, sourceTransform);
+        OPENVDB_ASSERT(AssertOpaquePtrs(accessorPtr, voidstar));
+        OPENVDB_ASSERT(AssertOpaquePtrs(transformPtr, voidstar));
+
+        accessorPtr = mBuilder.CreateGEP(voidstar, accessorPtr, registeredIndex);
+        llvm::Value* targetTransform = mBuilder.CreateGEP(voidstar, transformPtr, registeredIndex);
+        llvm::Value* sourceTransform = mBuilder.CreateGEP(voidstar, transformPtr, accessIndex);
+
+        llvm::Value* accessor = mBuilder.CreateLoad(voidstar, accessorPtr);
+        targetTransform = mBuilder.CreateLoad(voidstar, targetTransform);
+        sourceTransform = mBuilder.CreateLoad(voidstar, sourceTransform);
+
+        Arguments getvargs;
+        getvargs.AddArg(accessor,            ArgInfo(LLVMType<int8_t>::get(mContext), 1));
+        getvargs.AddArg(sourceTransform,     ArgInfo(LLVMType<int8_t>::get(mContext), 1));
+        getvargs.AddArg(targetTransform,     ArgInfo(LLVMType<int8_t>::get(mContext), 1));
+        getvargs.AddArg(origin,              ArgInfo(LLVMType<openvdb::math::Vec3<int32_t>>::get(mContext), 1));
+        getvargs.AddArg(offset,              ArgInfo(mBuilder.getInt64Ty()));
+        getvargs.AddArg(location.GetValue(), ArgInfo(location));
 
         const FunctionGroup* const F = this->getFunction("getvoxel", true);
-        F->execute({accessor, sourceTransform, targetTransform, origin, offset, location}, mBuilder);
-        mBuilder.CreateStore(location, this->mSymbolTables.get(1)->get(globalName + "_vptr"));
+        OPENVDB_ASSERT(F);
+        F->execute(getvargs, mBuilder);
+
+        mBuilder.CreateStore(location.GetValue(), *mInternalPtrs.get(globalName + "_vptr"));
         mBuilder.CreateBr(post);
     }
 
@@ -469,24 +453,22 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
         (mModule.getOrInsertGlobal(globalName, LLVMType<int64_t>::get(mContext)));
     this->globals().insert(globalName, registeredIndex);
 
-    registeredIndex = ir_load(mBuilder, registeredIndex);
+    registeredIndex = mBuilder.CreateLoad(LLVMType<int64_t>::get(mContext), registeredIndex);
 
     // index into the void* array of handles and load the value.
     // The result is a loaded void* value
 
+    llvm::Type* voidstar = LLVMType<void*>::get(mContext);
     llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
     OPENVDB_ASSERT(accessorPtr);
-    accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
+    OPENVDB_ASSERT(AssertOpaquePtrs(accessorPtr, voidstar));
 
+    accessorPtr = mBuilder.CreateGEP(voidstar, accessorPtr, registeredIndex);
     // return loaded void** = void*
-    return ir_load(mBuilder, accessorPtr);
+    return mBuilder.CreateLoad(voidstar, accessorPtr);
 }
 
-///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
-
 } // namespace codegen_internal
-
 } // namespace codegen
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME
