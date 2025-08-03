@@ -7,12 +7,21 @@ OpenVDB:
         transformations representing elliptical distributions. The prior tool
         takes rotational and stretch point attributes (optionally computed from
         the prior PCA methods) and generates anisotropic surfaces.
+        - Added OPENVDB_HAS_INVOKABLE_MEMBER_FUNCTION and OPENVDB_HAS_MEMBER_FUNCTION
+        macros to help determine the presence and compatibility of interface
+        member functions at compile time.
 
     API Changes:
         - Re-worked the API in PointRasterizeSDF.h with the addition of anisotropic
         surfacing kernels. The new API exposes more concise free functions which
         take structs of parameters. The old API remains supported but is
         deprecated.
+        - Deprecated providing a filter or interrupter as arguments to
+        points::rasterize. These can instead be implemented on user transfer
+        schemes.
+        - Transfer schemes provided to points::rasterize can now optionally
+        implement a rasterizePoints callback that takes a range of points per
+        voxel.
 
     Improvements:
         - Improved the performance of PointRasterizeSDF.h tools with larger radii
