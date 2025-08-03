@@ -222,7 +222,7 @@ struct WeightPosSumsTransfer
 
     inline void rasterizePoints(const Coord&, const Index start, const Index end, const CoordBBox& bounds)
     {
-        const Index step = std::max(1ul, ((end - start) / this->maxSourcePointsPerVoxel()));
+        const Index step = std::max(Index(1), Index((end - start) / this->maxSourcePointsPerVoxel()));
 
         const auto* const data = this->template buffer<0>();
         const auto& mask = *(this->template mask<0>());
@@ -275,7 +275,7 @@ struct WeightPosSumsTransfer
                         const Index targetEnd = data[offset];
                         const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
                         const Index targetStep =
-                            std::max(1ul, ((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
+                            std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
 
                         /// @warning  stepping in this way does not guarantee
                         ///   we get a self contribution, could guarantee this
@@ -319,7 +319,7 @@ struct WeightPosSumsTransfer
 
         points::GroupWriteHandle group(leaf.groupWriteHandle(this->mIndices.mEllipsesGroupIndex));
 
-        const int32_t threshold = this->neighbourThreshold();
+        const int32_t threshold = int32_t(this->neighbourThreshold());
         for (Index i = 0; i < this->mTargetPosition->size(); ++i)
         {
             // turn points OFF if they are ON and don't meet max neighbour requirements
@@ -379,7 +379,7 @@ struct CovarianceTransfer
 
     inline void rasterizePoints(const Coord&, const Index start, const Index end, const CoordBBox& bounds)
     {
-        const Index step = std::max(1ul, ((end - start) / this->maxSourcePointsPerVoxel()));
+        const Index step = std::max(Index(1), Index((end - start) / this->maxSourcePointsPerVoxel()));
 
         const auto* const data = this->template buffer<0>();
         const auto& mask = *(this->template mask<0>());
@@ -431,7 +431,7 @@ struct CovarianceTransfer
                         const Index targetEnd = data[offset];
                         const Index targetStart = (offset == 0) ? 0 : Index(data[offset - 1]);
                         const Index targetStep =
-                            std::max(1ul, ((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
+                            std::max(Index(1), Index((targetEnd - targetStart) / this->maxTargetPointsPerVoxel()));
 
                         for (Index tgtid = targetStart; tgtid < targetEnd; tgtid += targetStep)
                         {

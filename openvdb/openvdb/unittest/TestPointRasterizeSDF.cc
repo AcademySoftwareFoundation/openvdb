@@ -1203,7 +1203,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         Ellipse ellipse(Vec3d(0), (stretch * (s.radiusScale/sdf->voxelSize()[0])), rot);
 
         for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
-            const float distance = ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]);
+            const float distance = float(ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]));
             EXPECT_NEAR(distance, *iter, 1e-6f);
         }
 
@@ -1211,7 +1211,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         // just compre the overal length to 0.0)
         size_t interiorOff = 0, exteriorOff = 0;
         for (auto iter = sdf->cbeginValueOff(); iter; ++iter) {
-            const float distance = ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]);
+            const float distance = float(ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]));
             const bool interior = (distance <= 0.0);
             if (interior) EXPECT_EQ(-sdf->background(), *iter);
             else          EXPECT_EQ(sdf->background(), *iter);
@@ -1262,8 +1262,6 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         c.setToRotation({0,0,1}, 66);
         rot = a * b * c;
 
-        // The transform that defines how we go from each voxel back to the source point
-        const math::Mat3s inv = rot.timesDiagonal(1.0 / stretch) * rot.transpose();
         //
 
         /// 1) test with a single ellips with Y stretch/rotation
@@ -1289,7 +1287,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         const Ellipse ellipse(sdf->worldToIndex(center), stretch * (1/sdf->voxelSize()[0]), rot);
 
         for (auto iter = sdf->cbeginValueOn(); iter; ++iter) {
-            const float distance = ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]);
+            const float distance = float(ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]));
             EXPECT_NEAR(distance, *iter, 1e-6f);
         }
 
@@ -1297,7 +1295,7 @@ TEST_F(TestPointRasterizeSDF, testRasterizeEllipsoids)
         // just compre the overal length to 0.0)
         size_t interiorOff = 0, exteriorOff = 0;
         for (auto iter = sdf->cbeginValueOff(); iter; ++iter) {
-            const float distance = ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]);
+            const float distance = float(ellipse.project(iter.getCoord().asVec3d()) * float(sdf->voxelSize()[0]));
             const bool interior = (distance <= 0.0);
             if (interior) EXPECT_EQ(-sdf->background(), *iter);
             else          EXPECT_EQ(sdf->background(), *iter);

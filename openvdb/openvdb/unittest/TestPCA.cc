@@ -267,7 +267,7 @@ TEST_F(TestPCA, testPCA)
         points::PcaSettings s;
         s.searchRadius = std::numeric_limits<float>::max();
         s.averagePositions = 0.0f; // disable position smoothing
-        s.neighbourThreshold = 3; // more than 2, points should end up as spheres
+        s.neighbourThreshold = 4; // more than 3, points should end up as spheres
         s.nonAnisotropicStretch = 2.0f;
 
         points::pca(*points, s, a);
