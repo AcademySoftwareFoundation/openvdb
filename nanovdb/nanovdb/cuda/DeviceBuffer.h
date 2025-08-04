@@ -41,7 +41,7 @@ class DeviceBuffer
 
     /// @brief Initialize buffer
     /// @param size byte size of buffer to be initialized
-    /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
+    /// @param device id of the device on which to initialize the buffer
     /// @note All existing buffers are first cleared
     /// @warning size is expected to be non-zero. Use clear() clear buffer!
     void init(uint64_t size, int device, cudaStream_t stream);
@@ -152,6 +152,11 @@ public:
     /// @return An instance of this class using move semantics
     static DeviceBuffer create(uint64_t size, const DeviceBuffer* dummy, bool host, void* stream){return DeviceBuffer(size, host, stream);}
 
+    /// @brief Static factory method that returns an instance of this buffer
+    /// @param size byte size of buffer to be initialized
+    /// @param dummy this argument is currently ignored but required to match the API of the HostBuffer
+    /// @param device id of the device on which to initialize the buffer
+    /// @param stream cuda stream
     static DeviceBuffer create(uint64_t size, const DeviceBuffer* dummy = nullptr, int device = cudaCpuDeviceId, cudaStream_t stream = 0){return DeviceBuffer(size, device, stream);}
 
     /// @brief Static factory method that returns an instance of this buffer that wraps externally managed memory
@@ -167,7 +172,7 @@ public:
     /// @param list list of device IDs and device memory pointers
     static DeviceBuffer create(uint64_t size, void* cpuData, std::initializer_list<std::pair<int,void*>> list) {return DeviceBuffer(size, cpuData, list);}
 
-    /// @brief  Static factory method that returns an instance of this buffer constructed from a HostBuffer
+    /// @brief Static factory method that returns an instance of this buffer constructed from a HostBuffer
     /// @param buffer host buffer from which to copy data
     /// @param device id of the device on which to initialize the buffer
     /// @param stream cuda stream
