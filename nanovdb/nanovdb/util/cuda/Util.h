@@ -198,6 +198,43 @@ inline size_t blocksPerGrid(size_t numItems, size_t threadsPerBlock)
     return (numItems + threadsPerBlock - 1) / threadsPerBlock;
 }
 
+// CUDA 13.0 changes cudaMemPrefetchAsync and cudaMemPrefetch to use a cudaMemLocation as an argument as
+// opposed to an integer device id. This function provides compatibility by returning the corresponding
+// location in CUDA 13.0 and above while passing through the device in earlier versions.
+#if (CUDART_VERSION < 13000)
+/// @brief Compatbility wrapper for cudaMemAdvise/cudaMemAdvise
+inline cudaError_t memAdvise(const void* devPtr, size_t count, cudaMemoryAdvise advice, int device) {
+    return cudaMemAdvise(devPtr, count, advice, device);
+}
+
+/// @brief Compatbility wrapper for cudaMemPrefetchAsync/cudaMemPrefetchAsync
+inline cudaError_t memPrefetchAsync(const void* devPtr, size_t count, int dstDevice, cudaStream_t stream) {
+    return cudaMemPrefetchAsync(devPtr, count, dstDevice, stream);
+}
+#else
+/// @brief Helper function that converts a device id to a cudaMemLocation
+/// @param device Integer device id
+/// @return cudaMemLocation corresponding to the device id
+inline cudaMemLocation deviceToLocation(int device) {
+    if (device < cudaCpuDeviceId) {
+        return {cudaMemLocationTypeInvalid, device};
+    } else if (device == cudaCpuDeviceId) {
+        return {cudaMemLocationTypeHost, device};
+    } else {
+        return {cudaMemLocationTypeDevice, device};
+    }
+}
+
+/// @brief Compatbility wrapper for cudaMemAdvise/cudaMemAdvise
+inline cudaError_t memAdvise(const void* devPtr, size_t count, cudaMemoryAdvise advice, int device) {
+    return cudaMemAdvise(devPtr, count, advice, deviceToLocation(device));
+}
+
+/// @brief Compatbility wrapper for cudaMemPrefetchAsync/cudaMemPrefetchAsync
+inline cudaError_t memPrefetchAsync(const void* devPtr, size_t count, int dstDevice, cudaStream_t stream) {
+    return cudaMemPrefetchAsync(devPtr, count, deviceToLocation(dstDevice), 0u, stream);
+}
+#endif
 
 #if defined(__CUDACC__)// the following functions only run on the GPU!
 

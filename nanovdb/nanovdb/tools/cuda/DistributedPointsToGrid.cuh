@@ -447,17 +447,17 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-        cudaMemAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetReadMostly, deviceId);
+        util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceCoords, deviceStripeCount * sizeof(nanovdb::Coord), cudaMemAdviseSetReadMostly, deviceId);
 
-        cudaMemAdvise(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceInputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceOutputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceInputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceOutputKeys, deviceStripeCount * sizeof(uint64_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceOutputIndices, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
 
         uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
-        cudaMemAdvise(devicePointsPerTile, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
-        cudaMemAdvise(deviceNodeCount(deviceId), 3 * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(devicePointsPerTile, deviceStripeCount * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
+        util::cuda::memAdvise(deviceNodeCount(deviceId), 3 * sizeof(uint32_t), cudaMemAdviseSetPreferredLocation, deviceId);
     }
 
     // Radix sort the subset of keys assigned to each device in parallel
@@ -472,7 +472,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* deviceOutputIndices = mData->d_indx + deviceStripeOffset;
 
-        cudaMemPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
+        util::cuda::memPrefetchAsync(coords, coordCount * sizeof(nanovdb::Coord), deviceId, stream);
 
         nanovdb::util::cuda::offsetLambdaKernel<<<numBlocks(deviceStripeCount), mNumThreads, 0, stream>>>(deviceStripeCount, deviceStripeOffset, TileKeyFunctor<BuildT, PtrT>(), mData, coords, mKeys, mIndices);
 
@@ -661,7 +661,7 @@ void DistributedPointsToGrid<BuildT>::countNodes(const PtrT coords, size_t coord
         uint64_t* deviceOutputKeys = mData->d_keys + deviceStripeOffset;
         uint32_t* devicePointsPerTile = mPointsPerTile + deviceStripeOffset;
 
-        // cudaMemPrefetchAsync(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), deviceId, stream);
+        // util::cuda::memPrefetchAsync(deviceInputKeys, deviceStripeCount * sizeof(uint64_t), deviceId, stream);
 
         CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceInputKeys, deviceOutputKeys, devicePointsPerTile, deviceNodeCount(deviceId) + 2, deviceStripeCount);
         cudaCheck(cudaEventRecord(runLengthEncodeEvents[deviceId], stream));
