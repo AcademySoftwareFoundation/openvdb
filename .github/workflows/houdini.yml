@@ -91,8 +91,6 @@ jobs:
     - name: glfw
       if: contains(matrix.config.image, '2023') == true
       run: ./ci/install_glfw.sh 3.3.10
-    - name: cppunit
-      run: ./ci/install_cppunit.sh 1.15.1
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.15.2
     - name: timestamp

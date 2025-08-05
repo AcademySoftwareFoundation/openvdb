@@ -14,6 +14,8 @@ OpenVDB AX:
      codegen::FunctionBuilder API require new usage from LLVM 16 due to
      the LLVM opaque pointer changes. If you're not using the OpenVDB AX
      Function codegen API then no client changes should be necessary.
+   - Migrated OpenVDB AX unit tests from cppunit to gtest
+     [Contributed by Tim Straubinger]
 
  - Fixes:
   - Fixed a case of undefined behaviour when explicitly casting variables to

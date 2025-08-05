@@ -407,7 +407,7 @@ jobs:
       shell: powershell
       run: |
         vcpkg update
-        vcpkg install tbb cppunit
+        vcpkg install tbb gtest
     - name: build
       run: >
         ./ci/build.sh -v
